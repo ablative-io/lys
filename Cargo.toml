@@ -1,4 +1,4 @@
 [workspace]
-members = ["crates/lys-core"]
+members = ["crates/lys","crates/lys-core"]
 workspace.resolver = "3"
 edition = "2024"
