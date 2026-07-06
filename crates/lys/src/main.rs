@@ -1,19 +1,43 @@
 //! `lys` — command-line surface for the lys trust primitives.
 //!
-//! This binary is the CLI surface over [`lys_core`]. Subcommands (key
-//! management, certificate issuance and verification, attestation, sealed
-//! transport, and transparency-log inspection/verification) will be wired in as
-//! the corresponding `lys-core` modules land. See `docs/ROADMAP.md`.
+//! This binary is a thin surface over [`lys_core`]: it parses arguments,
+//! dispatches to the subcommand implementations in [`commands`], and maps
+//! their results to process exit codes. All logic lives in the library and
+//! the per-subcommand modules — this file stays parse-and-dispatch only.
+//!
+//! Exit codes: `0` on success, `1` on any operational or verification
+//! failure (with a diagnostic on stderr), `2` for argument-parsing errors
+//! (clap's convention).
+
+mod cli;
+mod commands;
 
 use std::process::ExitCode;
 
-/// Entry point. Currently a placeholder that reports the crate version; real
-/// subcommands land in roadmap phase 2 (see `docs/ROADMAP.md`).
+use clap::Parser;
+
+use crate::cli::{Cli, Command, KeyCommand};
+
+/// Entry point: parse arguments, dispatch, and translate the outcome into an
+/// exit code. Every failure path prints a diagnostic to stderr.
 fn main() -> ExitCode {
-    println!(
-        "lys {} — trust infrastructure for AI agents",
-        env!("CARGO_PKG_VERSION")
-    );
-    println!("CLI surface under construction; see docs/ROADMAP.md");
-    ExitCode::SUCCESS
+    let cli = Cli::parse();
+    let result = match cli.command {
+        Command::Key(key_command) => match key_command {
+            KeyCommand::Generate { out } => commands::key::generate(&out),
+            KeyCommand::Inspect { key } => commands::key::inspect(&key),
+        },
+        Command::Attest { key, payload, out } => commands::attest::run(&key, &payload, &out),
+        Command::Verify {
+            attestation,
+            payload,
+        } => commands::verify::run(&attestation, &payload),
+    };
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::FAILURE
+        }
+    }
 }
