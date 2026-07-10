@@ -16,7 +16,7 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
-use crate::cli::{Cli, Command, KeyCommand};
+use crate::cli::{CaCommand, Cli, Command, KeyCommand};
 
 /// Entry point: parse arguments, dispatch, and translate the outcome into an
 /// exit code. Every failure path prints a diagnostic to stderr.
@@ -26,6 +26,20 @@ fn main() -> ExitCode {
         Command::Key(key_command) => match key_command {
             KeyCommand::Generate { out } => commands::key::generate(&out),
             KeyCommand::Inspect { key } => commands::key::inspect(&key),
+        },
+        Command::Ca(ca_command) => match ca_command {
+            CaCommand::Issue {
+                key,
+                subject,
+                claims,
+                validity_days,
+                out,
+            } => commands::ca::issue(&key, &subject, claims.as_deref(), validity_days, &out),
+            CaCommand::Verify {
+                cert,
+                issuer_public_key,
+                at,
+            } => commands::ca::verify(&cert, &issuer_public_key, at.as_deref()),
         },
         Command::Attest { key, payload, out } => commands::attest::run(&key, &payload, &out),
         Command::Verify {

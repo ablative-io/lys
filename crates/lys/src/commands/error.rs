@@ -61,6 +61,52 @@ pub enum CliError {
     /// tampered signature or timestamp.
     #[error("attestation verification failed: payload hash mismatch or invalid signature")]
     VerificationFailed,
+
+    /// The certificate did not verify against the trusted issuer key at the
+    /// requested instant. Deliberately non-oracle: a forged signature, a
+    /// self-signed certificate, a wrong issuer key, and an out-of-window
+    /// instant all collapse to this one message so a caller learns nothing
+    /// about which check rejected the certificate.
+    #[error("certificate verification failed: invalid signature or outside validity window")]
+    CertificateVerificationFailed,
+
+    /// A certificate file could not be decoded as a PEM `CERTIFICATE` block.
+    #[error("failed to parse PEM certificate from {}: {reason}", path.display())]
+    PemParse {
+        /// File that was being parsed.
+        path: PathBuf,
+        /// Structural problem with the PEM framing.
+        reason: String,
+    },
+
+    /// A capability-claims file was not valid JSON. Claims are embedded in
+    /// certificates byte-for-byte, so malformed input is refused loudly at
+    /// issuance rather than baked into a signed artifact.
+    #[error("failed to parse capability claims JSON from {}: {source}", path.display())]
+    ClaimsJsonParse {
+        /// File that was being parsed.
+        path: PathBuf,
+        /// Underlying JSON error.
+        #[source]
+        source: serde_json::Error,
+    },
+
+    /// An issuer public key argument was not exactly 64 hexadecimal
+    /// characters (a 32-byte Ed25519 key as printed by `lys key inspect`).
+    #[error(
+        "invalid issuer public key: expected exactly 64 hexadecimal characters (a 32-byte Ed25519 key)"
+    )]
+    InvalidIssuerPublicKey,
+
+    /// A timestamp argument could not be parsed as RFC 3339.
+    #[error("invalid timestamp {value:?}: expected RFC 3339, e.g. 2026-07-10T12:00:00Z ({source})")]
+    InvalidTimestamp {
+        /// The rejected argument value.
+        value: String,
+        /// Underlying parse error.
+        #[source]
+        source: chrono::ParseError,
+    },
 }
 
 /// Convenience alias for `Result<T, CliError>`.
@@ -102,5 +148,28 @@ mod tests {
             display.contains("attestation verification failed"),
             "got: {display}"
         );
+    }
+
+    #[test]
+    fn certificate_verification_failed_display_is_single_and_generic() {
+        let display = CliError::CertificateVerificationFailed.to_string();
+        assert!(
+            display.contains("certificate verification failed"),
+            "got: {display}"
+        );
+        // Non-oracle: the message must not single out one failing check.
+        assert!(!display.contains("expired"), "got: {display}");
+        assert!(!display.contains("self-signed"), "got: {display}");
+    }
+
+    #[test]
+    fn pem_parse_display_names_path_and_reason() {
+        let err = CliError::PemParse {
+            path: PathBuf::from("/certs/agent.pem"),
+            reason: "first line must be the BEGIN boundary".to_string(),
+        };
+        let display = err.to_string();
+        assert!(display.contains("/certs/agent.pem"), "got: {display}");
+        assert!(display.contains("BEGIN boundary"), "got: {display}");
     }
 }

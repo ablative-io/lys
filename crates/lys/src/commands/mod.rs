@@ -5,8 +5,10 @@
 //! carries declarations only.
 
 pub mod attest;
+pub mod ca;
 pub mod error;
 pub mod files;
 pub mod hex;
 pub mod key;
+pub mod pem;
 pub mod verify;

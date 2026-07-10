@@ -10,8 +10,10 @@
 use std::path::Path;
 use std::process::{Command, Output};
 
+use base64::Engine;
 use lys_core::Ed25519Identity;
 use lys_core::attestation::{Attestation, verify_attestation};
+use lys_core::ca::{decode_extension, verify_certificate_chain};
 
 /// Spawn the compiled `lys` binary with the given arguments.
 fn run_lys(args: &[&str]) -> Output {
@@ -351,6 +353,381 @@ fn verify_rejects_tampered_timestamp_with_exit_one() {
         stderr_of(&output).contains("attestation verification failed"),
         "stderr: {}",
         stderr_of(&output)
+    );
+}
+
+// ------------------------------------------------------------------- ca issue
+
+/// Capability claims used across the CA tests.
+const CLAIMS_JSON: &str = r#"{"capabilities":["deploy","sign"],"scope":"ci"}"#;
+
+/// The OID the CLI documents for capability-claims extensions
+/// (`LYS_OID_ARC` + `1`).
+const CLAIMS_OID: &[u64] = &[1, 3, 6, 1, 4, 1, 58888, 1];
+
+/// Strip PEM framing and base64-decode the certificate body.
+fn der_from_pem(pem_text: &str) -> Vec<u8> {
+    let body: String = pem_text
+        .lines()
+        .filter(|line| !line.starts_with("-----"))
+        .collect();
+    base64::engine::general_purpose::STANDARD
+        .decode(body)
+        .expect("PEM body was not valid base64")
+}
+
+/// Generate an issuer key and issue a certificate with the standard claims,
+/// returning the cert path and the issuer public key hex.
+fn ca_issue_fixture(dir: &Path, validity_days: &str) -> (std::path::PathBuf, String) {
+    let key_path = dir.join("issuer.key");
+    let claims_path = dir.join("claims.json");
+    let cert_path = dir.join("subject.pem");
+
+    let generate = run_lys(&["key", "generate", "--out", path_str(&key_path)]);
+    assert_eq!(generate.status.code(), Some(0), "{}", stderr_of(&generate));
+    let issuer_pub = field(&stdout_of(&generate), "public key (ed25519):");
+    std::fs::write(&claims_path, CLAIMS_JSON).unwrap();
+
+    let issue = run_lys(&[
+        "ca",
+        "issue",
+        "--key",
+        path_str(&key_path),
+        "--subject",
+        "agent-under-test",
+        "--claims",
+        path_str(&claims_path),
+        "--validity-days",
+        validity_days,
+        "--out",
+        path_str(&cert_path),
+    ]);
+    assert_eq!(issue.status.code(), Some(0), "{}", stderr_of(&issue));
+    (cert_path, issuer_pub)
+}
+
+#[test]
+fn ca_issue_writes_pem_certificate_that_lys_core_verifies() {
+    let dir = tempfile::tempdir().unwrap();
+    let key_path = dir.path().join("issuer.key");
+    let claims_path = dir.path().join("claims.json");
+    let cert_path = dir.path().join("subject.pem");
+
+    let generate = run_lys(&["key", "generate", "--out", path_str(&key_path)]);
+    assert_eq!(generate.status.code(), Some(0), "{}", stderr_of(&generate));
+    std::fs::write(&claims_path, CLAIMS_JSON).unwrap();
+
+    let output = run_lys(&[
+        "ca",
+        "issue",
+        "--key",
+        path_str(&key_path),
+        "--subject",
+        "agent-under-test",
+        "--claims",
+        path_str(&claims_path),
+        "--validity-days",
+        "1",
+        "--out",
+        path_str(&cert_path),
+    ]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr_of(&output));
+    let stdout = stdout_of(&output);
+
+    // The written file is PEM whose DER verifies through lys-core directly
+    // against the issuer key, and carries the claims byte-for-byte under the
+    // documented OID.
+    let pem_text = std::fs::read_to_string(&cert_path).unwrap();
+    assert!(pem_text.starts_with("-----BEGIN CERTIFICATE-----"));
+    let der = der_from_pem(&pem_text);
+    let identity = Ed25519Identity::load_or_generate(&key_path).unwrap();
+    verify_certificate_chain(&der, &identity.public_key_bytes()).unwrap();
+    assert_eq!(
+        decode_extension(&der, CLAIMS_OID).unwrap(),
+        Some(CLAIMS_JSON.as_bytes().to_vec())
+    );
+
+    // Printed metadata is public-only and consistent with the issuer key.
+    assert_eq!(
+        field(&stdout, "issuer public key (ed25519):"),
+        hex_lower(&identity.public_key_bytes())
+    );
+    assert_eq!(field(&stdout, "subject public key (ed25519):").len(), 64);
+    assert_eq!(field(&stdout, "fingerprint (sha256):").len(), 64);
+
+    // The issuer seed never leaks, and no subject key file is minted — the
+    // only files in the directory are the ones this test created plus the
+    // certificate.
+    let seed_hex = hex_lower(&std::fs::read(&key_path).unwrap());
+    assert!(
+        !stdout.contains(&seed_hex),
+        "private seed leaked into stdout"
+    );
+    assert!(
+        !pem_text.contains(&seed_hex),
+        "private seed leaked into certificate"
+    );
+    let mut entries: Vec<String> = std::fs::read_dir(dir.path())
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    entries.sort();
+    assert_eq!(
+        entries,
+        vec!["claims.json", "issuer.key", "subject.pem"],
+        "ca issue must not create extra files (e.g. a subject key)"
+    );
+}
+
+#[test]
+fn ca_issue_with_missing_key_fails_and_writes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let key_path = dir.path().join("absent.key");
+    let cert_path = dir.path().join("subject.pem");
+
+    let output = run_lys(&[
+        "ca",
+        "issue",
+        "--key",
+        path_str(&key_path),
+        "--subject",
+        "agent-under-test",
+        "--validity-days",
+        "1",
+        "--out",
+        path_str(&cert_path),
+    ]);
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = stderr_of(&output);
+    assert!(
+        stderr.contains("identity key file not found"),
+        "stderr: {stderr}"
+    );
+    assert!(
+        !cert_path.exists(),
+        "no certificate may be written on failure"
+    );
+    assert!(
+        !key_path.exists(),
+        "ca issue must never create a key file as a side effect"
+    );
+}
+
+#[test]
+fn ca_issue_rejects_malformed_claims_json_and_writes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let key_path = dir.path().join("issuer.key");
+    let claims_path = dir.path().join("claims.json");
+    let cert_path = dir.path().join("subject.pem");
+
+    let generate = run_lys(&["key", "generate", "--out", path_str(&key_path)]);
+    assert_eq!(generate.status.code(), Some(0), "{}", stderr_of(&generate));
+    std::fs::write(&claims_path, b"{ not json ]").unwrap();
+
+    let output = run_lys(&[
+        "ca",
+        "issue",
+        "--key",
+        path_str(&key_path),
+        "--subject",
+        "agent-under-test",
+        "--claims",
+        path_str(&claims_path),
+        "--validity-days",
+        "1",
+        "--out",
+        path_str(&cert_path),
+    ]);
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = stderr_of(&output);
+    assert!(
+        stderr.contains("capability claims JSON"),
+        "stderr: {stderr}"
+    );
+    assert!(
+        !cert_path.exists(),
+        "no certificate may be written on failure"
+    );
+}
+
+// ------------------------------------------------------------------ ca verify
+
+#[test]
+fn ca_verify_accepts_valid_certificate_with_exit_zero() {
+    let dir = tempfile::tempdir().unwrap();
+    let (cert_path, issuer_pub) = ca_issue_fixture(dir.path(), "1");
+
+    let output = run_lys(&[
+        "ca",
+        "verify",
+        "--cert",
+        path_str(&cert_path),
+        "--issuer-public-key",
+        &issuer_pub,
+    ]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr_of(&output));
+    let stdout = stdout_of(&output);
+    assert!(stdout.contains("certificate verified"), "{stdout}");
+    assert_eq!(field(&stdout, "issuer public key (ed25519):"), issuer_pub);
+    assert_eq!(field(&stdout, "capability claims:"), CLAIMS_JSON);
+}
+
+#[test]
+fn ca_verify_accepts_explicit_instant_inside_the_window() {
+    let dir = tempfile::tempdir().unwrap();
+    let (cert_path, issuer_pub) = ca_issue_fixture(dir.path(), "2");
+    let inside = (chrono::Utc::now() + chrono::Duration::days(1)).to_rfc3339();
+
+    let output = run_lys(&[
+        "ca",
+        "verify",
+        "--cert",
+        path_str(&cert_path),
+        "--issuer-public-key",
+        &issuer_pub,
+        "--at",
+        &inside,
+    ]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr_of(&output));
+    assert!(
+        stdout_of(&output).contains("certificate verified"),
+        "{}",
+        stdout_of(&output)
+    );
+}
+
+#[test]
+fn ca_verify_failures_collapse_to_one_generic_message() {
+    let dir = tempfile::tempdir().unwrap();
+    let (cert_path, issuer_pub) = ca_issue_fixture(dir.path(), "1");
+
+    // A different (untrusted) issuer key.
+    let other_key = dir.path().join("other.key");
+    let generate = run_lys(&["key", "generate", "--out", path_str(&other_key)]);
+    assert_eq!(generate.status.code(), Some(0), "{}", stderr_of(&generate));
+    let wrong_pub = field(&stdout_of(&generate), "public key (ed25519):");
+
+    let before_window = "2000-01-01T00:00:00Z".to_string();
+    let after_window = (chrono::Utc::now() + chrono::Duration::days(400)).to_rfc3339();
+
+    let cases: Vec<Vec<&str>> = vec![
+        // Wrong issuer key at a valid instant.
+        vec![
+            "ca",
+            "verify",
+            "--cert",
+            path_str(&cert_path),
+            "--issuer-public-key",
+            &wrong_pub,
+        ],
+        // Right issuer key, before the validity window.
+        vec![
+            "ca",
+            "verify",
+            "--cert",
+            path_str(&cert_path),
+            "--issuer-public-key",
+            &issuer_pub,
+            "--at",
+            &before_window,
+        ],
+        // Right issuer key, after the validity window.
+        vec![
+            "ca",
+            "verify",
+            "--cert",
+            path_str(&cert_path),
+            "--issuer-public-key",
+            &issuer_pub,
+            "--at",
+            &after_window,
+        ],
+    ];
+
+    let mut messages = Vec::new();
+    for args in &cases {
+        let output = run_lys(args);
+        assert_eq!(output.status.code(), Some(1), "args: {args:?}");
+        let stderr = stderr_of(&output);
+        assert!(
+            stderr.contains("certificate verification failed"),
+            "stderr: {stderr}"
+        );
+        assert!(
+            !stdout_of(&output).contains("certificate verified"),
+            "must not claim success"
+        );
+        messages.push(stderr);
+    }
+    // Non-oracle: wrong key, not-yet-valid, and expired must all be
+    // indistinguishable from the caller's side.
+    assert_eq!(messages[0], messages[1]);
+    assert_eq!(messages[1], messages[2]);
+}
+
+#[test]
+fn ca_verify_rejects_malformed_at_timestamp() {
+    let dir = tempfile::tempdir().unwrap();
+    let (cert_path, issuer_pub) = ca_issue_fixture(dir.path(), "1");
+
+    let output = run_lys(&[
+        "ca",
+        "verify",
+        "--cert",
+        path_str(&cert_path),
+        "--issuer-public-key",
+        &issuer_pub,
+        "--at",
+        "yesterday at noon",
+    ]);
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = stderr_of(&output);
+    assert!(stderr.contains("invalid timestamp"), "stderr: {stderr}");
+    assert!(stderr.contains("RFC 3339"), "stderr: {stderr}");
+}
+
+#[test]
+fn ca_verify_rejects_invalid_issuer_public_key_hex() {
+    let dir = tempfile::tempdir().unwrap();
+    let (cert_path, _) = ca_issue_fixture(dir.path(), "1");
+
+    for bad in ["zz", "abc123", &"ab".repeat(33)] {
+        let output = run_lys(&[
+            "ca",
+            "verify",
+            "--cert",
+            path_str(&cert_path),
+            "--issuer-public-key",
+            bad,
+        ]);
+        assert_eq!(output.status.code(), Some(1), "input: {bad}");
+        assert!(
+            stderr_of(&output).contains("invalid issuer public key"),
+            "stderr: {}",
+            stderr_of(&output)
+        );
+    }
+}
+
+#[test]
+fn ca_verify_rejects_non_pem_certificate_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let cert_path = dir.path().join("bogus.pem");
+    std::fs::write(&cert_path, b"this is not a certificate").unwrap();
+
+    let output = run_lys(&[
+        "ca",
+        "verify",
+        "--cert",
+        path_str(&cert_path),
+        "--issuer-public-key",
+        &"ab".repeat(32),
+    ]);
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = stderr_of(&output);
+    assert!(
+        stderr.contains("failed to parse PEM certificate"),
+        "stderr: {stderr}"
     );
 }
 
