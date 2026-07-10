@@ -26,7 +26,7 @@ Note: the earlier `lys/attestation/v1` JSON artifact never shipped — nothing d
 
 ---
 
-## 2. IMPLEMENTED (D1) — signed tree root: C2SP checkpoint (signed note)
+## 2. RATIFIED (D1) — signed tree root: C2SP checkpoint (signed note)
 
 **The artifact `lys log` emits for "here is the state of the log, signed" is a [C2SP tlog-checkpoint](https://github.com/C2SP/C2SP/blob/main/tlog-checkpoint.md) wrapped in the [C2SP signed-note](https://github.com/C2SP/C2SP/blob/main/signed-note.md) envelope, signed with Ed25519.**
 
@@ -72,7 +72,7 @@ Byte-exact rules that Go/Rust verifiers enforce silently — each one gets a tes
 
 ---
 
-## 3. IMPLEMENTED (D2) — inclusion & consistency proofs: self-contained JSON objects
+## 3. RATIFIED (D2) — inclusion & consistency proofs: self-contained JSON objects
 
 **The artifacts `lys log prove` emits are JSON objects carrying the RFC 6962 proof triple plus the relevant checkpoint(s) embedded verbatim** — the Sigstore-bundle `InclusionProof` pattern, which is the surviving precedent for proofs persisted as files rather than served from an online API.
 
@@ -149,11 +149,11 @@ Byte-exact contract (every rule gets a test):
 
 | # | Decision | Status |
 |---|---|---|
-| D1 | Signed root artifact = C2SP checkpoint in signed-note envelope, Ed25519, no timestamp line, no extension lines in v1 (§2) | **IMPLEMENTED — 2026-07-11, built to spec under the operator's build green-light; formal ratification pending, veto window open until 0.1.0 publishes.** Substance carried in `lys-core/src/checkpoint/` module docs |
-| D2 | Proof artifacts = self-contained JSON (`lys/log-inclusion-proof/v1`, `lys/log-consistency-proof/v1`) with embedded verbatim checkpoint(s), standard base64, 2^53 guard (§3) | **IMPLEMENTED — 2026-07-11, built to spec under the operator's build green-light; formal ratification pending, veto window open until 0.1.0 publishes.** Substance carried in `lys-core/src/tlog/` module docs |
-| D3 | RFC 9942 COSE receipts deferred to `lys-anchor`, added as a parallel v1 artifact, never replacing D2 (§4.1) | **PROPOSED — awaiting ratification** |
-| D4 | Attestation artifact = tagged COSE_Sign1 (`lys/attestation/v2`), alg = EdDSA(-8) after the deployed-practice check, protected content-type + kid domain binding, deterministic CBOR, canonical-strict verifier; the v1 JSON artifact deleted unshipped (§4.2) | **IMPLEMENTED — 2026-07-11, built to spec under the operator's build green-light; formal ratification pending, veto window open until 0.1.0 publishes.** Substance carried in `lys-core/src/attestation/` module docs; conformance evidence in `lys-core/tests/cose_conformance.rs` against vendored `veraison/go-cose` v1.3.0 |
-| D5 | Certificates remain X.509; sealed envelopes remain `lys/sealed-envelope/v1` (§4.3) | **PROPOSED — awaiting ratification** |
-| D6 | Conformance testing for D1/D2 includes vectors verified against the Go `sumdb/note` reference, not only Rust implementations (§2.2) | **IMPLEMENTED — 2026-07-11.** Evidence: `lys-core/tests/go_conformance.rs` round-trips sign/verify (including a blank-line body and a failed-known-key rejection) against the vendored `golang.org/x/mod/sumdb/note` v0.22.0, byte-identical notes both ways |
+| D1 | Signed root artifact = C2SP checkpoint in signed-note envelope, Ed25519, no timestamp line, no extension lines in v1 (§2) | **RATIFIED — 2026-07-10, Tom Whiting** (Meridian exchange, after a plain-language walkthrough of the decision and its rejected alternatives). Substance carried in `lys-core/src/checkpoint/` module docs |
+| D2 | Proof artifacts = self-contained JSON (`lys/log-inclusion-proof/v1`, `lys/log-consistency-proof/v1`) with embedded verbatim checkpoint(s), standard base64, 2^53 guard (§3) | **RATIFIED — 2026-07-10, Tom Whiting** (same exchange as D1). Substance carried in `lys-core/src/tlog/` module docs |
+| D3 | RFC 9942 COSE receipts deferred to `lys-anchor`, added as a parallel v1 artifact, never replacing D2 (§4.1) | **RATIFIED as direction — 2026-07-10, Tom Whiting** ("if it's the best possible version of it then yeah, let's do that"); byte-exact receipt spec still to be written and ratified at the anchor phase |
+| D4 | Attestation artifact = tagged COSE_Sign1 (`lys/attestation/v2`), alg = EdDSA(-8) after the deployed-practice check, protected content-type + kid domain binding, deterministic CBOR, canonical-strict verifier; the v1 JSON artifact deleted unshipped (§4.2) | **IMPLEMENTED — 2026-07-11; direction approved by the operator 2026-07-10** ("if that seems like a pretty strong recommendation from you… let's proceed", including the ruling that nothing migrates). Byte-exact ratification pending his read of §4.2 as amended; veto window open until 0.1.0. Substance in `lys-core/src/attestation/` module docs; conformance evidence in `lys-core/tests/cose_conformance.rs` against vendored `veraison/go-cose` v1.3.0 |
+| D5 | Certificates remain X.509; sealed envelopes remain `lys/sealed-envelope/v1` (§4.3) | **RATIFIED as direction — 2026-07-10, Tom Whiting** (same exchange as D3) |
+| D6 | Conformance testing for D1/D2 includes vectors verified against the Go `sumdb/note` reference, not only Rust implementations (§2.2) | **RATIFIED — 2026-07-10, Tom Whiting** (same exchange as D1; his amendment: pursue the strongest independent-authorship evidence available — a second independent implementation, Cloudflare's `signed_note` crate, is queued as an additional cross-check). Evidence: `lys-core/tests/go_conformance.rs` round-trips sign/verify against the vendored `golang.org/x/mod/sumdb/note` v0.22.0, byte-identical both ways |
 
 Ratified decisions get their status flipped here with a date and the ratifier's name; the sections above then become frozen contracts and move (in substance) into module-level docs alongside the code that implements them. **IMPLEMENTED** is the intermediate state: code is built and tested to the proposed bytes, but nothing durable has been published under them and the formats do not freeze until 0.1.0 — the operator can still amend on review, and ratification remains a recorded human decision, never inferred from a build going green.

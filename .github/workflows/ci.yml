@@ -22,10 +22,11 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      # The D6 wire-conformance gate round-trips signed notes against the
-      # Go sumdb/note reference (vendored, hermetic). LYS_REQUIRE_GO below
-      # turns the gate's developer-machine skip path into a hard failure
-      # here, so CI can never silently pass without running it.
+      # Two wire-conformance gates need Go: D6 round-trips signed notes
+      # against the Go sumdb/note reference, and D4 round-trips COSE_Sign1
+      # attestations against veraison/go-cose (both vendored, hermetic).
+      # LYS_REQUIRE_GO turns their developer-machine skip paths into hard
+      # failures here, so CI can never silently pass without running them.
       - name: Install Go toolchain (signed-note conformance gate)
         uses: actions/setup-go@v5
         with:

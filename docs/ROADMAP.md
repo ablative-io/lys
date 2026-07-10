@@ -12,30 +12,30 @@ The source crate (`meridian-trust`) passed an adversarial security review and a 
 
 **lys inherits the crate only in its hardened form.** The findings and their fixes are recorded as design commitments in [DESIGN.md](DESIGN.md#hardening-baseline).
 
-## Phase 1 — Extract to `lys-core`
+## Phase 1 — Extract to `lys-core` ✅ DONE
 
 Move the hardened crate into this repository as `lys-core`, cleaned of its Meridian lineage.
 
 - Port the five modules (`keys`, `ca`, `merkle`, `attestation`, `seal`) plus `error` and the `hex_lower` helper, unchanged in behaviour.
 - **Strip the legacy attestation fallback.** The dual-verify shim exists only so Meridian's already-persisted attestations keep verifying. lys v1 is domain-separated only — no legacy path, no caveat.
-- **Rename the wire-format tags** `meridian-trust/*` → `lys/attestation/v1`, `lys/sealed-envelope/v1`. These strings are baked into every signature forever; the extraction is the last free moment to change them.
+- **Rename the wire-format tags** `meridian-trust/*` → lys-owned tags (`lys/sealed-envelope/v1`; the attestation tag was subsequently superseded unshipped by the COSE `lys/attestation/v2` artifact — see [WIRE-FORMATS.md](design/WIRE-FORMATS.md) D4). The extraction was the last free moment to leave the meridian namespace.
 - Rename the custom-extension constant to a lys-owned OID arc; keep the placeholder PEN for now, with a note to register a real IANA Private Enterprise Number.
 - Wire the pedantic lint set (already in the workspace `Cargo.toml`), pass `fmt` / `clippy -D warnings` / `test` clean.
 - **Reserve the crates.io name** by publishing `lys` `0.0.1` (placeholder), then `lys-core` `0.0.1` once the port compiles.
 
 **Proof:** `cargo test -p lys-core` green in the new repo; the crate builds standalone with zero Meridian dependencies.
 
-## Phase 2 — `lys` CLI surface
+## Phase 2 — `lys` CLI surface ✅ DONE (2026-07-11)
 
 The library gets a command-line face — the auditor's and operator's tool.
 
-- `lys key` — generate / inspect identities (never prints private material).
-- `lys ca issue` / `lys ca verify` — issue certs with capability-claim extensions; verify a chain against an issuer key at a given instant.
-- `lys attest` / `lys verify` — sign and verify attestations over a file or stdin.
-- `lys seal` / `lys open` — sealed-envelope transport.
-- `lys log append` / `lys log prove` / `lys log verify` — transparency-log operations, including verifying an inclusion or consistency proof from **only** a published root + proof bytes (the third-party path).
+- `lys key` — generate / inspect identities (never prints private material); `inspect --note-name` prints the signed-note verifier-key form.
+- `lys ca issue` / `lys ca verify` — issue certs with capability-claim extensions; verify against an issuer key at a given instant.
+- `lys attest` / `lys verify` — sign and verify `lys/attestation/v2` COSE_Sign1 artifacts over a payload file.
+- `lys seal` / `lys open` — sealed-envelope transport (authenticated composition only; sender attestation is the COSE artifact).
+- `lys log init/append/checkpoint` / `lys log prove` / `lys log verify` — transparency-log operations: C2SP signed-note checkpoints, self-contained proof artifacts, and third-party verification from **only** the artifact + leaf + verifier key.
 
-**Proof:** a session log produced by one process is verified end-to-end by the CLI in another, with no access to the original tree.
+**Proof — demonstrated, not claimed (2026-07-11):** a log built in one directory was verified in a bare directory holding only the artifact, the leaf file, and the verifier-key string; the leaf hash reproduces with `shasum`, and the root recomputes from the artifact with a 15-line independent script. Signed notes round-trip byte-identical against the vendored Go `sumdb/note` reference; COSE artifacts round-trip against vendored `veraison/go-cose`. Every merge passed a four-lens adversarial review (attack construction, independent byte reconstruction, standards audit, mutation-probe test adequacy) plus an operator hand review.
 
 ## Phase 3 — Norn integration (the payoff)
 
@@ -49,6 +49,8 @@ Norn is the primary consumer (see [DESIGN.md](DESIGN.md#integration-norn-is-the-
 **Proof:** a Norn session that is signed, Merkle-rooted, independently verifiable offline, and replayable.
 
 ## Phase 4 — `lys-anchor` (the notary)
+
+**Gated on a design session with the operator first (his explicit ruling, 2026-07-10) — no anchor building before it.** Session agenda: the recursive federation model (an anchor IS a lys instance, anchoring upward), receipt contents, key lifecycle (rotation / revocation / custody), and signed time (RFC 3161 vs attestation-over-checkpoint — the gap the 2026-07 Sigstore research surfaced).
 
 The transparency-ledger service that makes history externally fixed.
 
