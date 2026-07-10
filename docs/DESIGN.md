@@ -26,7 +26,7 @@ Six layers, composable but separable:
 
 ### 3. Attestation (`lys-core::attestation`)
 
-Signed statements binding an agent key to an action or artifact. The signed preimage is domain-separated and complete: `domain-tag || timestamp || payload-hash` — the timestamp is authenticated, and signatures from different lys contexts (attestation, sealed-envelope binding, raw CA signing) are structurally non-interchangeable. Envelope: `{ payload_hash, signature, signer_public_key, timestamp }`, serde-serializable.
+Signed statements binding an agent key to an action or artifact. The artifact is a tagged COSE_Sign1 (`lys/attestation/v2`, RFC 9052): the signed `Sig_structure` covers the signer key (protected `kid`), the v2 content type, the payload's SHA-256 hash, and the unix-millisecond timestamp — all authenticated, and signatures from different lys contexts (attestation, sealed-envelope binding, raw CA signing, signed notes) are structurally non-interchangeable. The only durable form is the raw COSE bytes (`.cose`, `application/cose`), verifiable with any off-the-shelf COSE library; the verifier is canonical-encoding-strict.
 
 ### 4. Sealed transport (`lys-core::seal`)
 

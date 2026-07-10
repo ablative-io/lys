@@ -51,12 +51,14 @@
 
 ## Signed Attestations
 
-- [ ] **C38** — sign_attestation(payload, signing_key) signs the preimage `b"lys/attestation/v1" || timestamp.to_le_bytes() || payload_hash` — domain tag constant equals the lys string, not any meridian string
-- [ ] **C39** — Attestation { payload_hash: [u8; 32], signature: [u8; 64], signer_public_key: [u8; 32], timestamp: i64 } is serde Serialize/Deserialize
-- [ ] **C40** — verify_attestation(attestation, payload) recomputes the v1 preimage and verifies with `verify_strict`
-- [ ] **C41** — No legacy fallback exists: verification never attempts a signature check over the bare payload hash, and a signature over the bare payload hash fails verify_attestation (test exists)
+*(C38–C43 amended by WIRE-FORMATS.md decision D4: the attestation artifact is the `lys/attestation/v2` tagged COSE_Sign1; the v1 JSON/preimage form was deleted unshipped.)*
+
+- [ ] **C38** — sign_attestation(payload, signing_key) signs the COSE `Sig_structure` `["Signature1", protected, h'', claims]` (RFC 9052 §4.4) with protected `{1: -8, 3: "application/vnd.lys.attestation.v2+cbor", 4: signer key}` — no meridian string, no v1 preimage constant remains anywhere
+- [ ] **C39** — Attestation { payload_hash: [u8; 32], signature: [u8; 64], signer_public_key: [u8; 32], timestamp: i64 } carries no serde; the only durable form is `to_cose_bytes()` / `from_cose_bytes()` (canonical-encoding-strict)
+- [ ] **C40** — verify_attestation(attestation, payload) rebuilds the `Sig_structure` from the attestation's own fields and verifies with `verify_strict`
+- [ ] **C41** — No legacy fallback exists: a signature over the bare payload hash and a signature over the deleted v1 preimage both fail verify_attestation (tests exist)
 - [ ] **C42** — Tampered payload fails verify_attestation
-- [ ] **C43** — Tampered timestamp fails verify_attestation — the timestamp is inside the signed preimage (test exists)
+- [ ] **C43** — Tampered timestamp fails verify_attestation — the timestamp is a signed claim inside the `Sig_structure` (test exists)
 
 ## Sealed Envelope
 

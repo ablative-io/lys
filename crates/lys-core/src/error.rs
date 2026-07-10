@@ -97,6 +97,12 @@ pub enum TrustError {
 
     /// A signature failed verification, or the supplied signature or public
     /// key bytes were structurally invalid.
+    ///
+    /// This is also the attestation artifact class's single non-oracle
+    /// failure: a malformed or non-canonical COSE attestation artifact, a
+    /// payload-hash mismatch, and an invalid signature all collapse to this
+    /// one value, so callers cannot distinguish which check rejected the
+    /// artifact.
     #[error("invalid signature")]
     InvalidSignature,
 

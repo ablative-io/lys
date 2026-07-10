@@ -37,11 +37,13 @@ pub enum CliError {
     #[error(transparent)]
     Trust(#[from] lys_core::TrustError),
 
-    /// A JSON file carrying a `lys-core` wire type (attestation envelope,
-    /// sealed envelope) could not be parsed.
+    /// A JSON file carrying a `lys-core` wire type (sealed envelope, log
+    /// proof artifact) could not be parsed. Attestations are not JSON — a
+    /// malformed attestation artifact collapses into the relevant command's
+    /// generic verification failure instead (non-oracle).
     #[error("failed to parse {what} JSON from {}: {source}", path.display())]
     JsonParse {
-        /// What the file was expected to contain, e.g. "attestation".
+        /// What the file was expected to contain, e.g. "sealed envelope".
         what: &'static str,
         /// File that was being parsed.
         path: PathBuf,
@@ -50,10 +52,12 @@ pub enum CliError {
         source: serde_json::Error,
     },
 
-    /// Serializing a `lys-core` wire type to JSON failed.
+    /// Serializing a `lys-core` wire type (sealed envelope, log proof
+    /// artifact) to JSON failed. Attestations are not JSON — their COSE
+    /// encoding is infallible.
     #[error("failed to serialize {what} to JSON: {source}")]
     JsonSerialize {
-        /// What was being serialized, e.g. "attestation".
+        /// What was being serialized, e.g. "sealed envelope".
         what: &'static str,
         /// Underlying JSON error.
         #[source]
@@ -62,9 +66,12 @@ pub enum CliError {
 
     /// The attestation did not verify against the supplied payload. All
     /// verification failures collapse to this one message by design — the
-    /// library deliberately does not distinguish a tampered payload from a
-    /// tampered signature or timestamp.
-    #[error("attestation verification failed: payload hash mismatch or invalid signature")]
+    /// library deliberately does not distinguish a malformed or
+    /// non-canonical artifact from a tampered payload, signature, or
+    /// timestamp.
+    #[error(
+        "attestation verification failed: malformed or non-canonical artifact, payload mismatch, or invalid signature"
+    )]
     VerificationFailed,
 
     /// The certificate did not verify against the trusted issuer key at the

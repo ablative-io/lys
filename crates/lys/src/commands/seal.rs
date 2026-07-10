@@ -16,11 +16,13 @@
 //! this tool exists for. The bare primitives remain available to library
 //! consumers with broadcast or anonymous use cases.
 //!
-//! On-disk formats are the exact `serde_json` wire shapes of the `lys-core`
-//! types: `--out` receives the [`SealedEnvelope`] and `--attestation-out`
-//! receives the [`Attestation`], as two separate files mirroring the
-//! library's two-value return. Keeping them separate means each file is a
-//! pure `lys-core` wire type with no CLI-invented framing.
+//! On-disk formats are the exact `lys-core` wire artifacts: `--out`
+//! receives the [`SealedEnvelope`] as its `serde_json` wire shape, and
+//! `--attestation-out` receives the [`Attestation`] as raw tagged
+//! `COSE_Sign1` bytes (`.cose`, media type `application/cose`), as two
+//! separate files mirroring the library's two-value return. Keeping them
+//! separate means each file is a pure `lys-core` wire artifact with no
+//! CLI-invented framing.
 //!
 //! Invariants: both key-consuming commands refuse a missing key file — only
 //! `lys key generate` creates key material. Plaintext is never written to
@@ -28,9 +30,9 @@
 //! (mode `0600` on Unix), and prints only public metadata. A failed `seal`
 //! leaves no partial outputs: if the attestation cannot be written, the
 //! already-written envelope is removed. Open failures are non-oracle: wrong
-//! recipient key, forged or mismatched sender attestation, and tampered
-//! envelope fields all collapse to the one generic [`CliError::OpenFailed`]
-//! message.
+//! recipient key, a malformed or non-canonical attestation artifact, forged
+//! or mismatched sender attestation, and tampered envelope fields all
+//! collapse to the one generic [`CliError::OpenFailed`] message.
 
 use std::path::Path;
 
@@ -52,7 +54,8 @@ use crate::commands::key::load_identity;
 /// not 64 hex characters, [`CliError::Io`] if the payload cannot be read or
 /// either output cannot be written, [`CliError::Trust`] if the library
 /// rejects the seal (e.g. a low-order recipient key), and
-/// [`CliError::JsonSerialize`] if either wire type cannot be encoded.
+/// [`CliError::JsonSerialize`] if the envelope cannot be encoded (the
+/// attestation's COSE encoding is infallible).
 pub fn seal(
     key: &Path,
     recipient_public_key: &str,
@@ -67,24 +70,19 @@ pub fn seal(
 
     let (envelope, attestation) = sign_and_seal(&payload_bytes, &identity, &recipient)?;
 
-    // Both files carry the exact serde_json wire shape of the lys-core type
-    // — no CLI-invented framing — with a trailing newline for POSIX tools.
+    // Both files carry the exact lys-core wire artifact — no CLI-invented
+    // framing: the envelope as serde_json (with a trailing newline for
+    // POSIX tools), the attestation as raw COSE_Sign1 bytes.
     let mut envelope_json =
         serde_json::to_string_pretty(&envelope).map_err(|source| CliError::JsonSerialize {
             what: "sealed envelope",
             source,
         })?;
     envelope_json.push('\n');
-    let mut attestation_json =
-        serde_json::to_string_pretty(&attestation).map_err(|source| CliError::JsonSerialize {
-            what: "seal attestation",
-            source,
-        })?;
-    attestation_json.push('\n');
     write_file(out, envelope_json.as_bytes(), "sealed envelope file")?;
     if let Err(error) = write_file(
         attestation_out,
-        attestation_json.as_bytes(),
+        &attestation.to_cose_bytes(),
         "seal attestation file",
     ) {
         // Failed commands leave no partial outputs: an envelope without its
@@ -106,7 +104,10 @@ pub fn seal(
         hex_lower(&attestation.signer_public_key)
     );
     println!("sealed envelope written: {}", out.display());
-    println!("seal attestation written: {}", attestation_out.display());
+    println!(
+        "seal attestation written: {} (COSE_Sign1, application/cose)",
+        attestation_out.display()
+    );
     Ok(())
 }
 
@@ -121,10 +122,11 @@ pub fn seal(
 /// Returns [`CliError::KeyFileMissing`] if the recipient key file does not
 /// exist, [`CliError::InvalidSenderPublicKey`] if the sender key is not 64
 /// hex characters, [`CliError::Io`] if an input cannot be read or the
-/// plaintext cannot be written, [`CliError::JsonParse`] if either input file
-/// is not the expected wire type, and [`CliError::OpenFailed`] — the single
-/// non-oracle message — if the attestation or the envelope fails any
-/// cryptographic check.
+/// plaintext cannot be written, [`CliError::JsonParse`] if the envelope
+/// file is not the expected wire type, and [`CliError::OpenFailed`] — the
+/// single non-oracle message — if the attestation artifact is malformed or
+/// non-canonical, or the attestation or envelope fails any cryptographic
+/// check.
 pub fn open(
     key: &Path,
     sender_public_key: &str,
@@ -143,17 +145,14 @@ pub fn open(
             source,
         })?;
     let attestation_bytes = read_file(attestation, "seal attestation file")?;
-    let seal_attestation: Attestation =
-        serde_json::from_slice(&attestation_bytes).map_err(|source| CliError::JsonParse {
-            what: "seal attestation",
-            path: attestation.to_path_buf(),
-            source,
-        })?;
+    let seal_attestation =
+        Attestation::from_cose_bytes(&attestation_bytes).map_err(|_err| CliError::OpenFailed)?;
 
-    // Non-oracle by design: every cryptographic rejection — mismatched or
-    // forged sender attestation, tampered envelope fields, wrong recipient
-    // key — collapses to the one indistinguishable message. The library
-    // already refuses to decrypt before the attestation verifies.
+    // Non-oracle by design: every cryptographic rejection — a malformed or
+    // non-canonical attestation artifact, mismatched or forged sender
+    // attestation, tampered envelope fields, wrong recipient key —
+    // collapses to the one indistinguishable message. The library already
+    // refuses to decrypt before the attestation verifies.
     let plaintext = open_and_verify(
         &sealed,
         &seal_attestation,

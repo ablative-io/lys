@@ -17,9 +17,11 @@
 //! with.
 //!
 //! [`open_and_verify`] inverts the composition: it checks that the
-//! attestation's embedded signer key matches the expected sender public key,
-//! verifies the signature against the context-tagged sealed-envelope bytes,
-//! and only then unseals. Failure of either attestation step short-circuits with
+//! attestation's embedded signer key (carried in the COSE artifact's
+//! signature-covered protected `kid` header — see
+//! [`crate::attestation`]) matches the expected sender public key, verifies
+//! the signature against the context-tagged sealed-envelope bytes, and only
+//! then unseals. Failure of either attestation step short-circuits with
 //! [`TrustError::AttestationFailed`] — the recipient never decrypts a
 //! payload it cannot bind to a sender, which closes the substitution
 //! oracle that bare [`super::seal`] necessarily leaves open.
@@ -30,7 +32,7 @@
 
 use x25519_dalek::StaticSecret;
 
-use crate::attestation::envelope::Attestation;
+use crate::attestation::artifact::Attestation;
 use crate::attestation::sign::{sign_attestation, verify_attestation};
 use crate::error::{TrustError, TrustResult};
 use crate::keys::identity::Ed25519Identity;
@@ -67,6 +69,11 @@ fn contextualized_envelope_bytes(envelope: &SealedEnvelope) -> Vec<u8> {
 /// The attestation covers `SEALED_ENVELOPE_CONTEXT_V1 ||
 /// ephemeral_public_key || ciphertext || nonce` — a construction-specific
 /// context tag followed by every byte that travels with the envelope.
+/// (`sign_attestation` hashes its input, so the attestation's COSE claims
+/// carry `payload_hash = SHA-256(context-tagged envelope bytes)`; the
+/// context binding survives the v2 COSE artifact unchanged, now with the
+/// sender key additionally inside the signed bytes via the protected
+/// `kid` header.)
 /// Signing the canonical sealed-envelope bytes (rather than the plaintext)
 /// means the sender commits to the exact ciphertext the recipient receives;
 /// an adversary cannot replay or substitute parts of the envelope without
