@@ -33,7 +33,7 @@ Silencing a lint with `#[allow]`, an `#[ignore]`d test, a `_`-prefixed unused va
 
 ## Wire formats are forever
 
-Once a signature is produced or a leaf is logged under a format, that format is frozen — changing it breaks every historical verification. Domain-separation tags (`lys/attestation/v1`, `lys/sealed-envelope/v1`) and leaf encodings are versioned wire contracts. Evolving one means a new `v2`, never a mutation of `v1`. This is why the extraction renames the tags *before* anything durable is signed under them.
+Once a signature is produced or a leaf is logged under a format, that format is frozen — changing it breaks every historical verification. Domain-separation tags (`lys/attestation/v2`, `lys/sealed-envelope/v1`) and leaf encodings are versioned wire contracts. Evolving one means a new version alongside, never a mutation of the shipped one. This is why the extraction renames the tags *before* anything durable is signed under them.
 
 ## Gates before any commit
 

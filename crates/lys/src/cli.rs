@@ -37,7 +37,8 @@ pub enum Command {
     #[command(subcommand)]
     Log(LogCommand),
 
-    /// Sign an attestation over a payload file and write the JSON envelope.
+    /// Sign an attestation over a payload file and write the `COSE_Sign1`
+    /// artifact.
     Attest {
         /// Path to the identity key file (raw 32-byte Ed25519 seed).
         #[arg(long)]
@@ -47,16 +48,18 @@ pub enum Command {
         #[arg(long)]
         payload: PathBuf,
 
-        /// Path to write the JSON attestation envelope to.
+        /// Path to write the `COSE_Sign1` attestation artifact to (raw
+        /// bytes; conventional extension .cose).
         #[arg(long)]
         out: PathBuf,
     },
 
-    /// Verify a JSON attestation envelope against a payload file.
+    /// Verify a `COSE_Sign1` attestation artifact against a payload file.
     ///
     /// Exits 0 if the attestation verifies, 1 otherwise.
     Verify {
-        /// Path to the JSON attestation envelope produced by `lys attest`.
+        /// Path to the `COSE_Sign1` attestation artifact produced by
+        /// `lys attest`.
         #[arg(long)]
         attestation: PathBuf,
 
@@ -69,9 +72,9 @@ pub enum Command {
     /// sender's identity (X25519 + HKDF-SHA256 + AES-256-GCM, Ed25519
     /// attestation over the sealed bytes).
     ///
-    /// Writes two JSON files: the sealed envelope to --out and the sender
-    /// attestation binding it to --attestation-out. `lys open` requires
-    /// both.
+    /// Writes two files: the JSON sealed envelope to --out and the sender
+    /// `COSE_Sign1` attestation binding it to --attestation-out. `lys open`
+    /// requires both.
     Seal {
         /// Path to the sender's identity key file (raw 32-byte Ed25519
         /// seed). Must already exist — run `lys key generate` first.
@@ -91,7 +94,8 @@ pub enum Command {
         #[arg(long)]
         out: PathBuf,
 
-        /// Path to write the JSON sender attestation to.
+        /// Path to write the sender's `COSE_Sign1` attestation to (raw
+        /// bytes; conventional extension .cose).
         #[arg(long)]
         attestation_out: PathBuf,
     },
@@ -116,7 +120,8 @@ pub enum Command {
         #[arg(long)]
         envelope: PathBuf,
 
-        /// Path to the JSON sender attestation produced by `lys seal`.
+        /// Path to the `COSE_Sign1` sender attestation produced by
+        /// `lys seal`.
         #[arg(long)]
         attestation: PathBuf,
 

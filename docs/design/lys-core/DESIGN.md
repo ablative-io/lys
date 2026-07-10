@@ -70,18 +70,22 @@ Revocation tracking is deliberately absent (never built in the source crate; a f
 - `reconstruct_from_leaves(leaves)` rebuilds an identical tree from a persisted leaf sequence — the crash-recovery path for consumers persisting leaves externally.
 - Leaf serialization is a **frozen wire contract**: leaves are canonical bytes; schema evolution means a new versioned leaf type, never a mutated one. This rule is documented at the module level.
 
-### D5: Signed attestations (`lys_core::attestation`) — v1-only, domain-separated
+### D5: Signed attestations (`lys_core::attestation`) — COSE_Sign1 v2, canonical-strict
 
-Signed statements binding a key to a payload. The signed preimage is complete and domain-separated:
+> **Superseded in part by decision D4 in [WIRE-FORMATS.md](../WIRE-FORMATS.md) §4.2**: the v1 JSON/preimage form this section originally specified was deleted unshipped; the byte-exact contract now lives there. As-built summary:
+
+Signed statements binding a key to a payload. The artifact is a tagged COSE_Sign1 (`lys/attestation/v2`); the signed preimage is the RFC 9052 §4.4 `Sig_structure`:
 
 ```
-preimage = b"lys/attestation/v1" || timestamp.to_le_bytes() || payload_hash
+Sig_structure = ["Signature1", protected, h'', claims]
+protected     = {1: -8 (EdDSA), 3: "application/vnd.lys.attestation.v2+cbor", 4: signer key}
+claims        = {1: SHA-256(payload), 2: unix-ms timestamp}
 ```
 
-- The timestamp is authenticated — inside the signature, not alongside it. Tampering with either payload or timestamp fails verification.
-- The domain tag makes attestation signatures structurally non-interchangeable with any other lys signing context (sealed-envelope binding, raw CA certificate signing).
-- **The legacy fallback is stripped.** The source crate's dual-verify shim (accepting pre-domain-separation signatures over the bare payload hash) exists only for Meridian's persisted history and does not port. `verify_attestation` accepts the v1 preimage and nothing else.
-- Envelope: `Attestation { payload_hash: [u8; 32], signature: [u8; 64], signer_public_key: [u8; 32], timestamp: i64 }`, serde-serializable.
+- The timestamp, payload hash, and signer key are all authenticated — inside the signature, not alongside it. Tampering with any of them fails verification.
+- The `Sig_structure` framing plus the signature-covered content type make attestation signatures structurally non-interchangeable with any other lys signing context (sealed-envelope binding, raw CA certificate signing, signed notes) — byte-0 disjoint, per WIRE-FORMATS §4.2.
+- **No fallback paths.** `verify_attestation` accepts the v2 `Sig_structure` and nothing else: the deleted v1 preimage (`b"lys/attestation/v1" || timestamp_le || hash`) and pre-domain-separation bare-hash signatures both fail (tests exist).
+- `Attestation { payload_hash: [u8; 32], signature: [u8; 64], signer_public_key: [u8; 32], timestamp: i64 }` carries **no serde**; the only durable form is `to_cose_bytes()`, and `from_cose_bytes` is canonical-encoding-strict.
 
 ### D6: Sealed envelopes (`lys_core::seal`)
 
@@ -95,7 +99,7 @@ X25519 ephemeral key agreement + HKDF-SHA256 + AES-256-GCM, the standard sealed-
 
 ### D7: Wire formats are forever
 
-The domain tags (`lys/attestation/v1`, `lys/sealed-envelope/v1`), the attestation preimage layout, the HKDF info layout, and leaf encodings are versioned wire contracts, frozen the moment anything durable is signed under them. Evolving one means a new `v2` constant and code path, never a mutation of `v1`. The extraction renames the Meridian tags precisely because it is the last moment nothing has been signed under the lys names.
+The domain tags (`lys/attestation/v2`, `lys/sealed-envelope/v1`), the attestation `Sig_structure` layout, the HKDF info layout, and leaf encodings are versioned wire contracts, frozen the moment anything durable is signed under them. Evolving one means a new versioned constant and code path, never a mutation of the shipped one. The extraction renames the Meridian tags precisely because it is the last moment nothing has been signed under the lys names.
 
 ### D8: CLI surface (`lys` binary)
 

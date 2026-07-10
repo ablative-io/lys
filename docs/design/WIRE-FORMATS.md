@@ -14,7 +14,7 @@ These are live contracts. Evolving any of them means a new `v2` artifact alongsi
 
 | Contract | Format | Where defined |
 |---|---|---|
-| Attestation `lys/attestation/v1` | JSON (serde shape of `Attestation`); signature over `domain-tag ‖ timestamp_le ‖ payload_hash` | `lys-core/src/attestation/` |
+| Attestation `lys/attestation/v2` (the at-0.1.0 contract) | Tagged COSE_Sign1 (RFC 9052): protected `{1: -8 (EdDSA), 3: "application/vnd.lys.attestation.v2+cbor", 4: raw 32-byte Ed25519 signer key}`, empty unprotected map, payload = deterministic CBOR map `{1: 32-byte SHA-256 payload hash, 2: unix-ms timestamp}`, Ed25519 over `Sig_structure` with empty external_aad; verifier is canonical-encoding-strict | `lys-core/src/attestation/` |
 | Sealed envelope `lys/sealed-envelope/v1` | JSON (serde shape of `SealedEnvelope`); X25519 ephemeral + HKDF-SHA256 (info `lys-sealed-envelope/v1`) + AES-256-GCM | `lys-core/src/seal/` |
 | Merkle leaf encoding — typed (`Serialize`) path | postcard serialization of the leaf type; leaf hash = RFC 6962 `SHA-256(0x00 ‖ postcard-bytes)` | `lys-core/src/merkle/` (`AppendOnlyTree<L: Serialize>`) |
 | Merkle leaf encoding — raw path (transparency log; every `lys log` artifact) | leaf **file bytes verbatim** — no postcard framing, no length prefix; leaf hash = RFC 6962 `SHA-256(0x00 ‖ raw-file-bytes)`, reproducible as `(printf '\x00'; cat leaf-file) \| shasum -a 256` | `lys-core/src/merkle/` (`RawLeaf`, `raw_leaf_hash`, `verify_inclusion_raw`) |
@@ -22,7 +22,7 @@ These are live contracts. Evolving any of them means a new `v2` artifact alongsi
 
 The two leaf encodings are separate frozen contracts that never mix within one tree (the `RawLeaf` marker type makes mixing unrepresentable). They diverge on the wire: for the leaf bytes `leaf-0`, the raw path hashes `SHA-256(0x00 ‖ "leaf-0")` while the postcard path hashes `SHA-256(0x00 ‖ 0x06 ‖ "leaf-0")` (postcard's length prefix) — sentinel tests in `merkle/tree_tests.rs` and `merkle/proof_tests.rs` pin the divergence. A third-party verifier of `lys log` artifacts MUST use the raw path.
 
-Note: `lys/attestation/v1` is frozen as a format, but §4.2 proposes that **the durable, stranger-facing attestation artifact for 0.1.0 becomes COSE** — v1 remains valid and verifiable forever; it simply may not be what we lead with. Ratification decides.
+Note: the earlier `lys/attestation/v1` JSON artifact never shipped — nothing durable was signed under it, and it was removed rather than frozen (decision D4). The COSE_Sign1 artifact above is the only attestation format; like every row here it freezes at 0.1.0.
 
 ---
 
@@ -122,11 +122,21 @@ RFC 9942's registered verifiable-data-structure algorithm `RFC9162_SHA256 = 1` i
 
 When `lys-anchor` lands, it issues **RFC 9942 COSE receipts** (COSE_Sign1; protected `vds = 1` i.e. `RFC9162_SHA256`; proofs in the unprotected `vdp` map, inclusion `-1` / consistency `-2`; detached payload = the Merkle root, recomputed by the verifier), slotting into RFC 9943 transparent statements. **Not emitted today**: the RFC is a month old, there is no interop corpus, no Rust implementation verifies the full receipt dance yet, and the COSE algorithm-identifier churn (below) is live. Adding receipts later alongside the JSON artifacts is purely additive (§3.4).
 
-### 4.2 Attestations: migrate the durable artifact to COSE_Sign1 before 0.1.0
+### 4.2 IMPLEMENTED (D4) — attestations: COSE_Sign1, the only attestation artifact
 
-Proposal: the stranger-facing attestation artifact becomes a **COSE_Sign1** (payload carries what `lys/attestation/v1` signs today; the v1 domain tag moves into a protected header; timestamp carried as a signed claim). Rationale: "every signed artifact lys emits verifies with an off-the-shelf COSE library" is the strongest sentence we can put in front of a stranger, and COSE's `Sig_structure` is the standards-grade form of the domain separation we hand-rolled.
+**The attestation artifact is a tagged COSE_Sign1 (RFC 9052), and it is the only attestation format — the JSON serde-shape artifact was deleted before anything durable was signed under it.** Rationale: "every signed artifact lys emits verifies with an off-the-shelf COSE library" is the strongest sentence we can put in front of a stranger, and COSE's `Sig_structure` is the standards-grade form of the domain separation v1 hand-rolled.
 
-**Open freeze decision, flagged honestly:** COSE `alg` for Ed25519 is in churn — RFC 9053 registers polymorphic `EdDSA = -8` (what everything deployed uses today), while the fully-specified-algorithms work registers `Ed25519 = -19` and coset already marks `-8` deprecated in its IANA enum. Emitting `-8` is the boring choice every existing library verifies; `-19` is where the registry is heading. **Recommendation: `-8`, checked against what deployed SCITT services emit at implementation time.** This migration is a cryptographic change: it gets its own byte-exact spec in this document plus a full adversarial review before anything ships under it.
+Byte-exact contract (every rule gets a test):
+
+1. Outer form: CBOR tag 18 (`0xD2`) over `[protected: bstr, unprotected: {}, payload: bstr, signature: bstr(64)]`, all definite lengths. The tag is required; the unprotected map must be empty.
+2. Protected headers, exactly three, canonical order: `1: -8` (EdDSA — the deployed-practice code point: go-cose v1.3.0 and pycose 1.1.0 have no `-19`; revisiting is a v3 matter), `3: "application/vnd.lys.attestation.v2+cbor"` (the v2 domain discriminator, signature-covered), `4:` the raw 32-byte Ed25519 signer key (signature-covered — stronger than v1, whose signer key rode outside the signed bytes).
+3. Payload (embedded): deterministic CBOR map `{1: bstr(32) SHA-256 of the attested bytes, 2: int unix-millisecond timestamp (i64, pre-epoch representable)}` — both signature-covered. The artifact never carries the attested bytes; total size is 191–199 bytes.
+4. Signature: Ed25519 (strict verification) over `Sig_structure = ["Signature1", protected, h'', payload]` per RFC 9052 §4.4; external_aad is always empty.
+5. Deterministic encoding is RFC 8949 §4.2 core deterministic, and the verifier is **canonical-encoding-strict**: an artifact that is not byte-identical to the canonical re-encoding of its parsed fields is rejected even if its signature verifies — this closes unprotected-header smuggling and indefinite-length/reordering malleability, which vanilla COSE verifiers accept.
+6. On-disk form: the raw COSE bytes (`.cose`, media type `application/cose`) — no wrapper, so the file verifies with any COSE library directly and drops verbatim into the raw-leaf log path.
+7. Cross-form kill: the v1 preimage (`lys/attestation/v1 ‖ timestamp_le ‖ hash`) is rejected by construction (a `Sig_structure` begins `0x84 0x6A "Signature1"`; the four in-repo signing contexts are byte-0 disjoint) and by test.
+
+**Conformance obligation:** round-trip vectors against the vendored Go `veraison/go-cose` reference (byte-identical signing both ways, mutual verification, shared negative controls, plus strictness-delta assertions where lys rejects valid-but-noncanonical artifacts that vanilla COSE accepts) — the D6 standard, gated by `LYS_REQUIRE_GO` in CI.
 
 ### 4.3 What deliberately does NOT move to COSE
 
@@ -142,7 +152,7 @@ Proposal: the stranger-facing attestation artifact becomes a **COSE_Sign1** (pay
 | D1 | Signed root artifact = C2SP checkpoint in signed-note envelope, Ed25519, no timestamp line, no extension lines in v1 (§2) | **IMPLEMENTED — 2026-07-11, built to spec under the operator's build green-light; formal ratification pending, veto window open until 0.1.0 publishes.** Substance carried in `lys-core/src/checkpoint/` module docs |
 | D2 | Proof artifacts = self-contained JSON (`lys/log-inclusion-proof/v1`, `lys/log-consistency-proof/v1`) with embedded verbatim checkpoint(s), standard base64, 2^53 guard (§3) | **IMPLEMENTED — 2026-07-11, built to spec under the operator's build green-light; formal ratification pending, veto window open until 0.1.0 publishes.** Substance carried in `lys-core/src/tlog/` module docs |
 | D3 | RFC 9942 COSE receipts deferred to `lys-anchor`, added as a parallel v1 artifact, never replacing D2 (§4.1) | **PROPOSED — awaiting ratification** |
-| D4 | Attestation durable artifact migrates to COSE_Sign1 before 0.1.0; `alg = EdDSA(-8)` pending a deployed-practice check; byte-exact spec + adversarial review required before shipping (§4.2) | **PROPOSED — awaiting ratification** |
+| D4 | Attestation artifact = tagged COSE_Sign1 (`lys/attestation/v2`), alg = EdDSA(-8) after the deployed-practice check, protected content-type + kid domain binding, deterministic CBOR, canonical-strict verifier; the v1 JSON artifact deleted unshipped (§4.2) | **IMPLEMENTED — 2026-07-11, built to spec under the operator's build green-light; formal ratification pending, veto window open until 0.1.0 publishes.** Substance carried in `lys-core/src/attestation/` module docs; conformance evidence in `lys-core/tests/cose_conformance.rs` against vendored `veraison/go-cose` v1.3.0 |
 | D5 | Certificates remain X.509; sealed envelopes remain `lys/sealed-envelope/v1` (§4.3) | **PROPOSED — awaiting ratification** |
 | D6 | Conformance testing for D1/D2 includes vectors verified against the Go `sumdb/note` reference, not only Rust implementations (§2.2) | **IMPLEMENTED — 2026-07-11.** Evidence: `lys-core/tests/go_conformance.rs` round-trips sign/verify (including a blank-line body and a failed-known-key rejection) against the vendored `golang.org/x/mod/sumdb/note` v0.22.0, byte-identical notes both ways |
 

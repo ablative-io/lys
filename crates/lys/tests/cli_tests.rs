@@ -3,7 +3,7 @@
 //! Each subcommand is exercised through a real process spawn of the compiled
 //! binary (`CARGO_BIN_EXE_lys`), asserting on exit codes, stdout/stderr
 //! content, and on-disk side effects. The attest/verify tests additionally
-//! cross-check the CLI's JSON envelope against `lys-core` directly.
+//! cross-check the CLI's `COSE_Sign1` artifact against `lys-core` directly.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -12,7 +12,7 @@ use std::process::{Command, Output};
 
 use base64::Engine;
 use lys_core::Ed25519Identity;
-use lys_core::attestation::{Attestation, verify_attestation};
+use lys_core::attestation::{Attestation, verify_attestation_bytes};
 use lys_core::ca::{
     CertificateAuthority, decode_extension, encode_extension, verify_certificate_chain,
 };
@@ -175,11 +175,11 @@ fn key_inspect_missing_file_fails_without_creating_one() {
 // --------------------------------------------------------------------- attest
 
 #[test]
-fn attest_writes_json_envelope_that_lys_core_verifies() {
+fn attest_writes_cose_artifact_that_lys_core_verifies() {
     let dir = tempfile::tempdir().unwrap();
     let key_path = dir.path().join("agent.key");
     let payload_path = dir.path().join("payload.bin");
-    let out_path = dir.path().join("attestation.json");
+    let out_path = dir.path().join("attestation.cose");
     let payload: &[u8] = b"execution receipt: task 42 completed";
 
     let generate = run_lys(&["key", "generate", "--out", path_str(&key_path)]);
@@ -198,13 +198,20 @@ fn attest_writes_json_envelope_that_lys_core_verifies() {
     assert_eq!(output.status.code(), Some(0), "{}", stderr_of(&output));
     let stdout = stdout_of(&output);
 
-    // The written envelope is valid JSON in the lys-core wire shape and
-    // verifies against the payload through the library directly.
-    let json = std::fs::read_to_string(&out_path).unwrap();
-    let attestation: Attestation = serde_json::from_str(&json).unwrap();
-    verify_attestation(&attestation, payload).unwrap();
+    // The written file is the raw tagged COSE_Sign1 artifact — canonical
+    // size window, required tag byte — and verifies against the payload
+    // through the library directly.
+    let artifact = std::fs::read(&out_path).unwrap();
+    assert!(
+        (191..=199).contains(&artifact.len()),
+        "artifact length {} outside the canonical window",
+        artifact.len()
+    );
+    assert_eq!(artifact[0], 0xd2, "artifact must carry CBOR tag 18");
+    let attestation = verify_attestation_bytes(&artifact, payload).unwrap();
 
-    // Printed metadata matches the envelope on disk.
+    // Printed metadata matches the artifact on disk, and the output notes
+    // the standard format.
     let identity = Ed25519Identity::load_or_generate(&key_path).unwrap();
     assert_eq!(attestation.signer_public_key, identity.public_key_bytes());
     assert_eq!(
@@ -219,11 +226,24 @@ fn attest_writes_json_envelope_that_lys_core_verifies() {
         field(&stdout, "signed at (unix ms):"),
         attestation.timestamp.to_string()
     );
-
-    let seed_hex = hex_lower(&std::fs::read(&key_path).unwrap());
     assert!(
-        !json.contains(&seed_hex),
-        "private seed leaked into envelope"
+        field(&stdout, "attestation written:").contains("COSE_Sign1, application/cose"),
+        "{stdout}"
+    );
+
+    // Neither the raw seed bytes nor their hex encoding appear in the
+    // artifact, and the hex never appears in stdout.
+    let seed = std::fs::read(&key_path).unwrap();
+    let seed_hex = hex_lower(&seed);
+    assert!(
+        !artifact
+            .windows(seed.len())
+            .any(|window| window == seed.as_slice()),
+        "private seed bytes leaked into the artifact"
+    );
+    assert!(
+        !hex_lower(&artifact).contains(&seed_hex),
+        "private seed hex leaked into the artifact"
     );
     assert!(
         !stdout.contains(&seed_hex),
@@ -235,7 +255,7 @@ fn attest_writes_json_envelope_that_lys_core_verifies() {
 fn attest_with_missing_key_fails_and_writes_nothing() {
     let dir = tempfile::tempdir().unwrap();
     let payload_path = dir.path().join("payload.bin");
-    let out_path = dir.path().join("attestation.json");
+    let out_path = dir.path().join("attestation.cose");
     std::fs::write(&payload_path, b"payload").unwrap();
 
     let output = run_lys(&[
@@ -269,7 +289,7 @@ fn attest_with_missing_key_fails_and_writes_nothing() {
 fn attest_fixture(dir: &Path, payload: &[u8]) -> std::path::PathBuf {
     let key_path = dir.join("agent.key");
     let payload_path = dir.join("payload.bin");
-    let out_path = dir.join("attestation.json");
+    let out_path = dir.join("attestation.cose");
 
     let generate = run_lys(&["key", "generate", "--out", path_str(&key_path)]);
     assert_eq!(generate.status.code(), Some(0), "{}", stderr_of(&generate));
@@ -337,12 +357,17 @@ fn verify_rejects_tampered_timestamp_with_exit_one() {
     let dir = tempfile::tempdir().unwrap();
     let out_path = attest_fixture(dir.path(), b"timestamped payload");
 
-    // Shift the (authenticated) timestamp by one millisecond in the JSON.
-    let json = std::fs::read_to_string(&out_path).unwrap();
-    let mut envelope: serde_json::Value = serde_json::from_str(&json).unwrap();
-    let timestamp = envelope["timestamp"].as_i64().unwrap();
-    envelope["timestamp"] = serde_json::Value::from(timestamp + 1);
-    std::fs::write(&out_path, serde_json::to_string(&envelope).unwrap()).unwrap();
+    // Flip the low byte of the (authenticated) timestamp inside the CBOR
+    // claims. The timestamp claim is encoded `02 1b <8 bytes>` — locate it
+    // by its head bytes and flip the final value byte, which keeps the
+    // encoding canonical while changing the signed claim.
+    let mut artifact = std::fs::read(&out_path).unwrap();
+    let ts_head = artifact
+        .windows(2)
+        .position(|window| window == [0x02, 0x1b])
+        .expect("timestamp claim head not found in the artifact");
+    artifact[ts_head + 9] ^= 0x01;
+    std::fs::write(&out_path, &artifact).unwrap();
 
     let output = run_lys(&[
         "verify",
@@ -807,7 +832,7 @@ fn seal_fixture(dir: &Path, payload: &[u8]) -> SealFixture {
     let recipient_key = dir.join("recipient.key");
     let payload_path = dir.join("payload.bin");
     let envelope_path = dir.join("envelope.json");
-    let attestation_path = dir.join("seal-attestation.json");
+    let attestation_path = dir.join("seal-attestation.cose");
 
     let generate_sender = run_lys(&["key", "generate", "--out", path_str(&sender_key)]);
     assert_eq!(
@@ -862,12 +887,13 @@ fn seal_writes_envelope_and_attestation_that_lys_core_opens() {
     let payload: &[u8] = b"credential bundle: api token hunter2";
     let fixture = seal_fixture(dir.path(), payload);
 
-    // Both files are the exact lys-core wire shapes, and the pair opens
-    // through the library directly with the recipient's key.
+    // Both files are the exact lys-core wire artifacts — the envelope as
+    // JSON, the attestation as raw COSE bytes — and the pair opens through
+    // the library directly with the recipient's key.
     let envelope_json = std::fs::read_to_string(&fixture.envelope_path).unwrap();
     let envelope: SealedEnvelope = serde_json::from_str(&envelope_json).unwrap();
-    let attestation_json = std::fs::read_to_string(&fixture.attestation_path).unwrap();
-    let attestation: Attestation = serde_json::from_str(&attestation_json).unwrap();
+    let attestation_bytes = std::fs::read(&fixture.attestation_path).unwrap();
+    let attestation = Attestation::from_cose_bytes(&attestation_bytes).unwrap();
 
     let sender = Ed25519Identity::load_or_generate(&fixture.sender_key).unwrap();
     let recipient = Ed25519Identity::load_or_generate(&fixture.recipient_key).unwrap();
@@ -926,7 +952,7 @@ fn seal_with_missing_key_fails_and_writes_nothing() {
     let dir = tempfile::tempdir().unwrap();
     let payload_path = dir.path().join("payload.bin");
     let envelope_path = dir.path().join("envelope.json");
-    let attestation_path = dir.path().join("seal-attestation.json");
+    let attestation_path = dir.path().join("seal-attestation.cose");
     std::fs::write(&payload_path, b"payload").unwrap();
 
     let output = run_lys(&[
@@ -962,7 +988,7 @@ fn seal_rejects_invalid_recipient_public_key_hex() {
     let sender_key = dir.path().join("sender.key");
     let payload_path = dir.path().join("payload.bin");
     let envelope_path = dir.path().join("envelope.json");
-    let attestation_path = dir.path().join("seal-attestation.json");
+    let attestation_path = dir.path().join("seal-attestation.cose");
 
     let generate = run_lys(&["key", "generate", "--out", path_str(&sender_key)]);
     assert_eq!(generate.status.code(), Some(0), "{}", stderr_of(&generate));
@@ -1000,7 +1026,7 @@ fn seal_attestation_write_failure_leaves_no_partial_envelope() {
     let payload_path = dir.path().join("payload.bin");
     let envelope_path = dir.path().join("envelope.json");
     // Unwritable attestation destination: parent directory does not exist.
-    let attestation_path = dir.path().join("no-such-dir").join("attestation.json");
+    let attestation_path = dir.path().join("no-such-dir").join("attestation.cose");
 
     let generate_sender = run_lys(&["key", "generate", "--out", path_str(&sender_key)]);
     assert_eq!(
@@ -1147,17 +1173,14 @@ fn open_failures_collapse_to_one_generic_message() {
     )
     .unwrap();
 
-    // A tampered attestation: flip one signature byte, keeping the shape.
-    let tampered_attestation = dir.path().join("tampered-attestation.json");
-    let mut attestation: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(&fixture.attestation_path).unwrap()).unwrap();
-    let sig_byte = attestation["signature"][0].as_u64().unwrap();
-    attestation["signature"][0] = serde_json::Value::from(sig_byte ^ 0x01);
-    std::fs::write(
-        &tampered_attestation,
-        serde_json::to_string(&attestation).unwrap(),
-    )
-    .unwrap();
+    // A tampered attestation: flip one signature byte in the raw COSE
+    // artifact (the final byte is inside the 64-byte signature), keeping
+    // the artifact canonical so the rejection is cryptographic.
+    let tampered_attestation = dir.path().join("tampered-attestation.cose");
+    let mut attestation_bytes = std::fs::read(&fixture.attestation_path).unwrap();
+    let last = attestation_bytes.len() - 1;
+    attestation_bytes[last] ^= 0x01;
+    std::fs::write(&tampered_attestation, &attestation_bytes).unwrap();
 
     let cases: Vec<Vec<&str>> = vec![
         // Wrong recipient key (decryption would fail).
@@ -1305,11 +1328,14 @@ fn open_rejects_malformed_envelope_json() {
 }
 
 #[test]
-fn verify_rejects_malformed_attestation_json_with_exit_one() {
+fn verify_collapses_malformed_attestation_into_the_generic_failure() {
+    // Non-oracle widening (design V7): a file that is not a COSE artifact
+    // at all produces the SAME generic message as a cryptographic
+    // rejection — no distinct parse error exists for attestations.
     let dir = tempfile::tempdir().unwrap();
-    let attestation_path = dir.path().join("attestation.json");
+    let attestation_path = dir.path().join("attestation.cose");
     let payload_path = dir.path().join("payload.bin");
-    std::fs::write(&attestation_path, b"{ not json ]").unwrap();
+    std::fs::write(&attestation_path, b"not a cose artifact").unwrap();
     std::fs::write(&payload_path, b"payload").unwrap();
 
     let output = run_lys(&[
@@ -1320,11 +1346,69 @@ fn verify_rejects_malformed_attestation_json_with_exit_one() {
         path_str(&payload_path),
     ]);
     assert_eq!(output.status.code(), Some(1));
+    let malformed_stderr = stderr_of(&output);
+    assert!(
+        malformed_stderr.contains("attestation verification failed"),
+        "stderr: {malformed_stderr}"
+    );
+    assert!(
+        !malformed_stderr.contains("parse"),
+        "malformed artifacts must not get a distinct parse error: {malformed_stderr}"
+    );
+
+    // Same message as a signature-level rejection: attest a payload, then
+    // verify against a different payload and compare stderr byte-for-byte.
+    let out_path = attest_fixture(dir.path(), b"real payload");
+    std::fs::write(dir.path().join("payload.bin"), b"different payload").unwrap();
+    let output = run_lys(&[
+        "verify",
+        "--attestation",
+        path_str(&out_path),
+        "--payload",
+        path_str(&dir.path().join("payload.bin")),
+    ]);
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(
+        stderr_of(&output),
+        malformed_stderr,
+        "malformed-artifact and wrong-payload failures must be indistinguishable"
+    );
+}
+
+#[test]
+fn open_collapses_malformed_attestation_into_the_generic_failure() {
+    // The seal-open path widens identically: a malformed attestation file
+    // collapses into the existing generic open failure, not a parse error.
+    let dir = tempfile::tempdir().unwrap();
+    let fixture = seal_fixture(dir.path(), b"payload");
+    let out_path = dir.path().join("opened.bin");
+    let bogus_attestation = dir.path().join("bogus.cose");
+    std::fs::write(&bogus_attestation, b"not a cose artifact").unwrap();
+
+    let output = run_lys(&[
+        "open",
+        "--key",
+        path_str(&fixture.recipient_key),
+        "--sender-public-key",
+        &fixture.sender_pub,
+        "--envelope",
+        path_str(&fixture.envelope_path),
+        "--attestation",
+        path_str(&bogus_attestation),
+        "--out",
+        path_str(&out_path),
+    ]);
+    assert_eq!(output.status.code(), Some(1));
     let stderr = stderr_of(&output);
     assert!(
-        stderr.contains("failed to parse attestation JSON"),
+        stderr.contains("sealed envelope open failed"),
         "stderr: {stderr}"
     );
+    assert!(
+        !stderr.contains("parse"),
+        "malformed attestations must not get a distinct parse error: {stderr}"
+    );
+    assert!(!out_path.exists(), "no plaintext may be written on failure");
 }
 
 // ------------------------------------------------- key inspect --note-name

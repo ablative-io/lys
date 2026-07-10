@@ -2,14 +2,17 @@
 //!
 //! Reads the payload, signs it with the identity at `--key` via
 //! [`lys_core::attestation::sign_attestation`], and writes the resulting
-//! envelope to `--out` as pretty-printed JSON (the exact serde shape of
-//! [`lys_core::attestation::Attestation`], which `lys verify` reads back).
+//! tagged `COSE_Sign1` artifact to `--out` as raw bytes (conventional
+//! extension `.cose`, media type `application/cose`). The file is the
+//! exact `lys/attestation/v2` wire artifact — no CLI-invented framing — so
+//! it verifies with any off-the-shelf COSE library and drops verbatim into
+//! the transparency log's raw-leaf path.
 
 use std::path::Path;
 
 use lys_core::attestation::sign_attestation;
 
-use crate::commands::error::{CliError, CliResult};
+use crate::commands::error::CliResult;
 use crate::commands::files::{read_file, write_file};
 use crate::commands::hex::hex_lower;
 use crate::commands::key::load_identity;
@@ -19,20 +22,17 @@ use crate::commands::key::load_identity;
 /// # Errors
 ///
 /// Returns [`CliError::KeyFileMissing`] if the key file does not exist,
-/// [`CliError::Trust`] if it is invalid, [`CliError::Io`] if the payload
-/// cannot be read or the envelope cannot be written, and
-/// [`CliError::JsonSerialize`] if the envelope cannot be encoded.
+/// [`CliError::Trust`] if it is invalid, and [`CliError::Io`] if the
+/// payload cannot be read or the artifact cannot be written.
+///
+/// [`CliError::KeyFileMissing`]: crate::commands::error::CliError::KeyFileMissing
+/// [`CliError::Trust`]: crate::commands::error::CliError::Trust
+/// [`CliError::Io`]: crate::commands::error::CliError::Io
 pub fn run(key: &Path, payload: &Path, out: &Path) -> CliResult<()> {
     let identity = load_identity(key)?;
     let payload_bytes = read_file(payload, "payload file")?;
     let attestation = sign_attestation(&payload_bytes, &identity);
-    let mut json =
-        serde_json::to_string_pretty(&attestation).map_err(|source| CliError::JsonSerialize {
-            what: "attestation",
-            source,
-        })?;
-    json.push('\n');
-    write_file(out, json.as_bytes(), "attestation file")?;
+    write_file(out, &attestation.to_cose_bytes(), "attestation file")?;
     println!("attested payload: {}", payload.display());
     println!(
         "payload hash (sha256): {}",
@@ -43,6 +43,9 @@ pub fn run(key: &Path, payload: &Path, out: &Path) -> CliResult<()> {
         hex_lower(&attestation.signer_public_key)
     );
     println!("signed at (unix ms): {}", attestation.timestamp);
-    println!("attestation written: {}", out.display());
+    println!(
+        "attestation written: {} (COSE_Sign1, application/cose)",
+        out.display()
+    );
     Ok(())
 }

@@ -1,16 +1,20 @@
-//! `lys verify` — verify a JSON attestation envelope against a payload.
+//! `lys verify` — verify a `COSE_Sign1` attestation artifact against a
+//! payload.
 //!
-//! Parses the envelope written by `lys attest`, re-reads the candidate
-//! payload, and delegates to [`lys_core::attestation::verify_attestation`].
-//! Success prints the verified envelope details and exits 0; any
-//! verification failure — tampered payload, tampered timestamp, forged
+//! Reads the raw artifact bytes written by `lys attest`, re-reads the
+//! candidate payload, and delegates to
+//! [`lys_core::attestation::verify_attestation_bytes`]. Success prints the
+//! verified attestation details and exits 0; any failure — malformed or
+//! non-canonical artifact, tampered payload, tampered timestamp, forged
 //! signature, wrong signer key — exits 1 with a single indistinguishable
-//! message, matching the library's deliberate non-oracle behaviour.
+//! message, matching the library's deliberate non-oracle behaviour. There
+//! is no separate parse error for the attestation file: an unparseable
+//! artifact is indistinguishable from an unverifiable one by design.
 
 use std::path::Path;
 
 use lys_core::TrustError;
-use lys_core::attestation::{Attestation, verify_attestation};
+use lys_core::attestation::verify_attestation_bytes;
 
 use crate::commands::error::{CliError, CliResult};
 use crate::commands::files::read_file;
@@ -21,21 +25,15 @@ use crate::commands::hex::hex_lower;
 /// # Errors
 ///
 /// Returns [`CliError::Io`] if either file cannot be read,
-/// [`CliError::JsonParse`] if the attestation file is not a valid envelope,
-/// [`CliError::VerificationFailed`] if the attestation does not verify
-/// against the payload, and [`CliError::Trust`] for any other library
+/// [`CliError::VerificationFailed`] — the single generic message — if the
+/// artifact is malformed or non-canonical, the payload does not match, or
+/// the signature is invalid, and [`CliError::Trust`] for any other library
 /// failure.
 pub fn run(attestation_path: &Path, payload_path: &Path) -> CliResult<()> {
-    let envelope_bytes = read_file(attestation_path, "attestation file")?;
-    let attestation: Attestation =
-        serde_json::from_slice(&envelope_bytes).map_err(|source| CliError::JsonParse {
-            what: "attestation",
-            path: attestation_path.to_path_buf(),
-            source,
-        })?;
+    let artifact_bytes = read_file(attestation_path, "attestation file")?;
     let payload = read_file(payload_path, "payload file")?;
-    match verify_attestation(&attestation, &payload) {
-        Ok(()) => {
+    match verify_attestation_bytes(&artifact_bytes, &payload) {
+        Ok(attestation) => {
             println!("attestation verified");
             println!(
                 "signer public key (ed25519): {}",
