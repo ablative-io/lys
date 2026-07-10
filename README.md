@@ -30,10 +30,13 @@ All of it is a library (`lys-core`, domain-agnostic — no concept of agents any
 
 ## Install
 
+The crates.io releases are currently `0.0.1` name reservations published before the CLI existed — they install, but do nothing yet. Until `0.1.0` is published, install from source:
+
 ```console
-$ cargo install lys        # the CLI
-$ cargo add lys-core       # the library
+$ cargo install --git https://github.com/tomWhiting/lys lys
 ```
+
+Once `0.1.0` lands on crates.io, this becomes `cargo install lys` for the CLI and `cargo add lys-core` for the library.
 
 ## Example 1 — a tamper-evident audit log for anything
 
@@ -120,10 +123,10 @@ leaf index: 1
 root hash (sha256): 83c59810973c077111dae6b9ac63a7e7de57de7d7d6a6b75c00f22bb6c8cfd65
 ```
 
-Exit code 0. Change one byte of the leaf and it fails closed:
+Exit code 0. Tamper with the leaf — a single appended byte is enough — and it fails closed:
 
 ```console
-$ sed 's/412/413/' event-002.json > tampered.json
+$ (cat event-002.json; printf 'x') > tampered.json
 $ lys log verify inclusion --artifact event-002.proof.json --leaf tampered.json \
     --verifier-key 'ci.example.com/releases+195aa55f+AdVRzl5BPJMNZf8QW710qamRvLVsKOIBWbjmXpFoJgz7'
 error: inclusion proof verification failed: invalid artifact, checkpoint, or leaf
