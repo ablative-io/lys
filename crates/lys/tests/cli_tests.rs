@@ -358,14 +358,19 @@ fn verify_rejects_tampered_timestamp_with_exit_one() {
     let out_path = attest_fixture(dir.path(), b"timestamped payload");
 
     // Flip the low byte of the (authenticated) timestamp inside the CBOR
-    // claims. The timestamp claim is encoded `02 1b <8 bytes>` — locate it
-    // by its head bytes and flip the final value byte, which keeps the
-    // encoding canonical while changing the signed claim.
+    // claims. A present-day unix-ms timestamp exceeds u32::MAX, so the
+    // claim is encoded `02 1b <8 bytes>`; it closes the claims map and the
+    // signature bstr (`58 40` + 64 bytes) closes the artifact, so the claim
+    // head sits at a fixed offset from the end. Assert the head bytes, then
+    // flip the final value byte — the encoding stays canonical while the
+    // signed claim changes.
     let mut artifact = std::fs::read(&out_path).unwrap();
-    let ts_head = artifact
-        .windows(2)
-        .position(|window| window == [0x02, 0x1b])
-        .expect("timestamp claim head not found in the artifact");
+    let ts_head = artifact.len() - 76;
+    assert_eq!(
+        &artifact[ts_head..ts_head + 2],
+        &[0x02, 0x1b],
+        "timestamp claim head not at its fixed wire position"
+    );
     artifact[ts_head + 9] ^= 0x01;
     std::fs::write(&out_path, &artifact).unwrap();
 

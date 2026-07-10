@@ -37,10 +37,10 @@ pub enum CliError {
     #[error(transparent)]
     Trust(#[from] lys_core::TrustError),
 
-    /// A JSON file carrying a `lys-core` wire type (sealed envelope) could
-    /// not be parsed. Attestations are not JSON — a malformed attestation
-    /// artifact collapses into the relevant command's generic verification
-    /// failure instead (non-oracle).
+    /// A JSON file carrying a `lys-core` wire type (sealed envelope, log
+    /// proof artifact) could not be parsed. Attestations are not JSON — a
+    /// malformed attestation artifact collapses into the relevant command's
+    /// generic verification failure instead (non-oracle).
     #[error("failed to parse {what} JSON from {}: {source}", path.display())]
     JsonParse {
         /// What the file was expected to contain, e.g. "sealed envelope".
@@ -52,8 +52,9 @@ pub enum CliError {
         source: serde_json::Error,
     },
 
-    /// Serializing a `lys-core` wire type (sealed envelope) to JSON failed.
-    /// Attestations are not JSON — their COSE encoding is infallible.
+    /// Serializing a `lys-core` wire type (sealed envelope, log proof
+    /// artifact) to JSON failed. Attestations are not JSON — their COSE
+    /// encoding is infallible.
     #[error("failed to serialize {what} to JSON: {source}")]
     JsonSerialize {
         /// What was being serialized, e.g. "sealed envelope".
