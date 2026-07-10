@@ -22,6 +22,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use lys_core::Ed25519Identity;
 use lys_core::checkpoint::{NoteVerifierKey, sign_note, verify_note};
 
@@ -34,6 +36,10 @@ const GOLDEN_SEED_HEX: &str = "6c79732d676f2d636f6e666f726d616e63652d746573742d7
 const GOLDEN_NAME: &str = "example.com/lys/test";
 
 const GOLDEN_BODY: &str = "example.com/lys/test\n3\nz3Y6BByBzu8VeKYIP3XGG+8uABTyo+aDqX/Pylvn8Zo=\n";
+
+/// First 4 bytes of `SHA-256(name ‖ 0x0A ‖ 0x01 ‖ pubkey)` for the golden
+/// name and key.
+const GOLDEN_KEY_ID: [u8; 4] = [0x52, 0x58, 0x0c, 0xd9];
 
 const GOLDEN_VERIFIER_SPEC: &str =
     "example.com/lys/test+52580cd9+AQz9D9gbFqzLxSMM9Fy6nUuTfYJ8bI29RKFE5aulcbni";
@@ -189,4 +195,57 @@ fn go_conformance_round_trips() {
     );
     assert!(!ok, "Go accepted a tampered note");
     assert!(verify_note(tampered.as_bytes(), &verifier).is_err());
+
+    // Split-point parity: Go note.Sign requires only a trailing newline,
+    // so it will sign a body CONTAINING a blank line; both note.Open and
+    // verify_note must split at the LAST "\n\n" and return that body
+    // intact.
+    let blank_line_body = "A\n\nB\n";
+    let (ok, blank_note) = run_go_tool(
+        &go,
+        &gocache,
+        &["sign", GOLDEN_NAME, GOLDEN_SEED_HEX],
+        blank_line_body.as_bytes(),
+    );
+    assert!(ok, "Go note.Sign failed on a blank-line body");
+    let (ok, go_body) = run_go_tool(
+        &go,
+        &gocache,
+        &["verify", GOLDEN_VERIFIER_SPEC],
+        &blank_note,
+    );
+    assert!(ok, "Go note.Open rejected its own blank-line-body note");
+    assert_eq!(go_body, blank_line_body.as_bytes());
+    let body = verify_note(&blank_note, &verifier).unwrap();
+    assert_eq!(
+        body, blank_line_body,
+        "verify_note must split at the LAST blank line, exactly like Go"
+    );
+
+    // Failed-known-key parity: a garbage signature under the golden
+    // (name, key ID) followed by the valid line is rejected by BOTH — Go
+    // returns InvalidSignatureError for the first matching candidate and
+    // never reaches the valid line; lys mirrors that hard reject.
+    let mut garbage_blob = GOLDEN_KEY_ID.to_vec();
+    garbage_blob.extend_from_slice(&[0u8; 64]);
+    let garbage_line = format!(
+        "\u{2014} {GOLDEN_NAME} {}\n",
+        STANDARD.encode(&garbage_blob)
+    );
+    let valid_sig_line = &GOLDEN_NOTE[GOLDEN_BODY.len() + 1..];
+    let poisoned = format!("{GOLDEN_BODY}\n{garbage_line}{valid_sig_line}");
+    let (ok, _stdout) = run_go_tool(
+        &go,
+        &gocache,
+        &["verify", GOLDEN_VERIFIER_SPEC],
+        poisoned.as_bytes(),
+    );
+    assert!(
+        !ok,
+        "Go accepted a note with a failed known-key signature line"
+    );
+    assert!(
+        verify_note(poisoned.as_bytes(), &verifier).is_err(),
+        "lys must reject a failed known-key signature line, exactly like Go"
+    );
 }

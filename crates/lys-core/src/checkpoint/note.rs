@@ -10,14 +10,19 @@
 //! - Key ID = first 4 bytes of `SHA-256(keyname ‖ 0x0A ‖ 0x01 ‖ pubkey)`.
 //! - [`sign_note`] enforces preconditions (valid name; body non-empty,
 //!   `'\n'`-terminated, no `"\n\n"`, no ASCII control character below
-//!   `0x20` other than `'\n'`) that guarantee the emitted note always
-//!   re-verifies under [`verify_note`] AND under Go `note.Open`.
+//!   `0x20` other than `'\n'`; emitted note within [`MAX_NOTE_BYTES`])
+//!   that guarantee the emitted note always re-verifies under
+//!   [`verify_note`] AND under Go `note.Open`.
 //! - [`verify_note`] splits at the LAST `"\n\n"` (Go `bytes.LastIndex`),
 //!   rejects any malformed signature line, caps at 100 signature lines
-//!   (Go's exact cap) and 1 MiB total (a `lys` defensive cap), and treats
-//!   key IDs as candidate FILTERS only — full strict Ed25519 verification
-//!   decides, and any one fully-verifying candidate accepts (C2SP
-//!   semantics).
+//!   (Go's exact cap) and 1 MiB total (a `lys` defensive cap that
+//!   [`sign_note`] also enforces), and mirrors Go `note.Open` candidate
+//!   semantics exactly: the FIRST signature line matching the verifier's
+//!   `(name, key ID)` decides the whole note — strict Ed25519 success
+//!   accepts, failure rejects (later lines are never consulted, matching
+//!   Go's duplicate-signer skip and hard `InvalidSignatureError` reject;
+//!   the C2SP signed-note spec likewise says a failed known-key signature
+//!   rejects the whole note).
 //! - Every verification failure collapses to the single non-oracle
 //!   [`TrustError::NoteVerification`] value.
 //!
@@ -35,6 +40,9 @@ use super::verifier_key::{NoteVerifierKey, validate_note_name};
 
 /// Defensive cap on total note size (1 MiB). Go has no cap; real
 /// checkpoints are a few hundred bytes, so no legitimate note is affected.
+/// Enforced by BOTH [`sign_note`] (refusing to emit an oversized note) and
+/// [`verify_note`] (rejecting one), so the sign-then-verify invariant
+/// holds for every note this module emits.
 const MAX_NOTE_BYTES: usize = 1024 * 1024;
 
 /// Maximum number of signature lines, adopted verbatim from Go
@@ -77,11 +85,12 @@ pub fn key_id(name: &str, public_key: &[u8; 32]) -> TrustResult<[u8; 4]> {
 ///
 /// # Errors
 ///
-/// Returns [`TrustError::CheckpointEncoding`] if the name is invalid, or
-/// if the body is empty, does not end with `'\n'`, contains `"\n\n"`, or
-/// contains an ASCII control character below `0x20` other than `'\n'`.
-/// These preconditions guarantee the emitted note always re-verifies under
-/// [`verify_note`] and under Go `note.Open`.
+/// Returns [`TrustError::CheckpointEncoding`] if the name is invalid; if
+/// the body is empty, does not end with `'\n'`, contains `"\n\n"`, or
+/// contains an ASCII control character below `0x20` other than `'\n'`; or
+/// if the complete note would exceed the 1 MiB [`MAX_NOTE_BYTES`] cap that
+/// [`verify_note`] enforces. These preconditions guarantee the emitted
+/// note always re-verifies under [`verify_note`] and under Go `note.Open`.
 pub fn sign_note(body: &str, name: &str, identity: &Ed25519Identity) -> TrustResult<String> {
     validate_note_name(name).map_err(|e| TrustError::CheckpointEncoding {
         reason: format!("invalid note key name: {e}"),
@@ -115,10 +124,19 @@ pub fn sign_note(body: &str, name: &str, identity: &Ed25519Identity) -> TrustRes
     let mut blob = Vec::with_capacity(4 + 64);
     blob.extend_from_slice(&id);
     blob.extend_from_slice(&signature);
-    Ok(format!(
-        "{body}\n{SIG_PREFIX}{name} {}\n",
-        STANDARD.encode(&blob)
-    ))
+    let note = format!("{body}\n{SIG_PREFIX}{name} {}\n", STANDARD.encode(&blob));
+    // Enforce the verify-side size cap at signing time too, so the
+    // documented invariant — every emitted note re-verifies under
+    // `verify_note` — holds without exception.
+    if note.len() > MAX_NOTE_BYTES {
+        return Err(TrustError::CheckpointEncoding {
+            reason: format!(
+                "note would be {} bytes, exceeding the {MAX_NOTE_BYTES}-byte cap",
+                note.len()
+            ),
+        });
+    }
+    Ok(note)
 }
 
 /// A parsed candidate signature line: the signer name, the declared 4-byte
@@ -135,9 +153,14 @@ struct SignatureLine<'a> {
 /// Mirrors Go `note.Open`: total-size cap, UTF-8 with no ASCII control
 /// characters below `0x20` except `'\n'`, split at the last `"\n\n"`,
 /// every signature line structurally valid (any malformed line rejects
-/// the whole note), at most 100 signature lines. Candidate lines matching
-/// the verifier's `(name, key ID)` are checked with strict Ed25519
-/// verification over the body bytes; any one success accepts.
+/// the whole note), at most 100 signature lines. The FIRST signature line
+/// matching the verifier's `(name, key ID)` decides the whole note: strict
+/// Ed25519 verification over the body bytes accepts on success and rejects
+/// the note on failure — later matching lines are never consulted. This is
+/// exactly Go's behavior (duplicate signatures by one signer are skipped
+/// after the first, and a failed known-key signature is a hard
+/// `InvalidSignatureError`) and the C2SP signed-note rule that a failed
+/// signature from a known key rejects the whole note.
 ///
 /// # Errors
 ///
@@ -147,22 +170,20 @@ struct SignatureLine<'a> {
 pub fn verify_note(note_bytes: &[u8], verifier: &NoteVerifierKey) -> TrustResult<String> {
     let (body, signature_lines) = parse_note(note_bytes)?;
     let public_key = verifier.public_key();
-    let mut seen: Vec<&[u8]> = Vec::new();
     for line in &signature_lines {
         if line.name != verifier.name() || line.key_id != verifier.key_id() {
             continue;
         }
-        // Deduplicate identical candidate signatures (Go skips re-checking
-        // an already-seen signature blob for the same key).
-        if seen.contains(&line.signature.as_slice()) {
-            continue;
-        }
-        seen.push(&line.signature);
+        // First matching (name, key ID) candidate decides the whole note,
+        // mirroring Go note.Open: repeated signatures by one signer are
+        // skipped after the first, and a known-key signature that fails
+        // strict verification rejects the note outright.
         if line.signature.len() == 64
             && Ed25519Identity::verify(&public_key, body.as_bytes(), &line.signature).is_ok()
         {
             return Ok(body.to_string());
         }
+        return Err(TrustError::NoteVerification);
     }
     Err(TrustError::NoteVerification)
 }

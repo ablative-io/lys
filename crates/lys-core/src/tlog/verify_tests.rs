@@ -193,6 +193,54 @@ fn inclusion_rejects_hash_tampers() {
 }
 
 #[test]
+fn inclusion_rejects_rechunked_hash_entries() {
+    // The per-entry 32-byte rule in isolation: these re-chunks decode to a
+    // concatenation BYTE-IDENTICAL to the honest proof, so the downstream
+    // multiple-of-32 and root-recomputation checks would accept them — only
+    // the per-entry rule (WIRE-FORMATS §3.1/§3.3: each entry is one 32-byte
+    // node) rejects.
+    let honest = golden_inclusion();
+    assert_eq!(honest.hashes.len(), 2, "golden path must have two nodes");
+    let node_0 = STANDARD.decode(&honest.hashes[0]).unwrap();
+    let node_1 = STANDARD.decode(&honest.hashes[1]).unwrap();
+    let concat: Vec<u8> = [node_0.as_slice(), node_1.as_slice()].concat();
+
+    // Both nodes re-chunked into ONE 64-byte entry.
+    let mut artifact = golden_inclusion();
+    artifact.hashes = vec![STANDARD.encode(&concat)];
+    assert_inclusion_rejected(&artifact, b"leaf-1", "one 64-byte entry");
+
+    // The same 64 bytes re-split at 16/48.
+    let mut artifact = golden_inclusion();
+    artifact.hashes = vec![
+        STANDARD.encode(&concat[..16]),
+        STANDARD.encode(&concat[16..]),
+    ];
+    assert_inclusion_rejected(&artifact, b"leaf-1", "16-byte + 48-byte split");
+}
+
+#[test]
+fn consistency_rejects_rechunked_hash_entries() {
+    // Same per-entry rule, consistency side: the honest nodes re-chunked
+    // into 16-byte entries decode to a byte-identical concatenation (still
+    // a multiple of 32), so only the per-entry 32-byte rule rejects.
+    let honest = golden_consistency();
+    assert!(!honest.hashes.is_empty(), "golden proof must have nodes");
+    let concat: Vec<u8> = honest
+        .hashes
+        .iter()
+        .flat_map(|entry| STANDARD.decode(entry).unwrap())
+        .collect();
+
+    let mut artifact = golden_consistency();
+    artifact.hashes = concat
+        .chunks(16)
+        .map(|chunk| STANDARD.encode(chunk))
+        .collect();
+    assert_consistency_rejected(&artifact, "nodes re-chunked into 16-byte entries");
+}
+
+#[test]
 fn inclusion_rejects_checkpoint_substitution_and_tampers() {
     // Same log, different size: signature valid, tree_size cross-check
     // fails (redundancy checked, not trusted).

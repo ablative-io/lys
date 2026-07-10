@@ -263,6 +263,69 @@ fn oversized_note_is_rejected() {
     assert_rejected(&oversized, "note above the 1 MiB cap");
 }
 
+/// Hand-signs an otherwise-valid golden-key note whose body is a single
+/// `'a'`-line of exactly `body_len` bytes (including its trailing `'\n'`),
+/// bypassing `sign_note`'s own size cap so verify-side behavior can be
+/// tested in isolation.
+fn hand_signed_note_with_body_len(body_len: usize) -> String {
+    let (_dir, identity) = golden_identity();
+    let mut body = "a".repeat(body_len - 1);
+    body.push('\n');
+    let signature = identity.sign(body.as_bytes());
+    let mut blob = GOLDEN_KEY_ID.to_vec();
+    blob.extend_from_slice(&signature);
+    format!(
+        "{body}\n\u{2014} {GOLDEN_NAME} {}\n",
+        STANDARD.encode(&blob)
+    )
+}
+
+/// Envelope overhead around the body for a single golden-key signature
+/// line: blank-line `'\n'` (1) + em dash (3) + space (1) + name (20) +
+/// space (1) + base64 of 68 blob bytes (92) + trailing `'\n'` (1).
+const GOLDEN_NOTE_OVERHEAD: usize = 1 + 3 + 1 + GOLDEN_NAME.len() + 1 + 92 + 1;
+
+#[test]
+fn size_cap_boundary_is_exact_for_otherwise_valid_notes() {
+    // Isolates the 1 MiB cap: both notes are fully valid except for size,
+    // so the one-byte-over rejection can come only from the cap itself.
+    let at_cap = hand_signed_note_with_body_len(MAX_NOTE_BYTES - GOLDEN_NOTE_OVERHEAD);
+    assert_eq!(at_cap.len(), MAX_NOTE_BYTES);
+    let body = verify_note(at_cap.as_bytes(), &golden_verifier()).unwrap();
+    assert_eq!(body.len(), MAX_NOTE_BYTES - GOLDEN_NOTE_OVERHEAD);
+
+    let one_over = hand_signed_note_with_body_len(MAX_NOTE_BYTES - GOLDEN_NOTE_OVERHEAD + 1);
+    assert_eq!(one_over.len(), MAX_NOTE_BYTES + 1);
+    assert_rejected(
+        one_over.as_bytes(),
+        "otherwise-valid note one byte above the 1 MiB cap",
+    );
+}
+
+#[test]
+fn sign_note_refuses_bodies_that_would_exceed_the_cap() {
+    // The emitted-note-re-verifies invariant, both sides of the boundary:
+    // a body whose note lands exactly on the cap signs AND re-verifies;
+    // one byte more and sign_note refuses instead of emitting a note that
+    // verify_note would reject.
+    let (_dir, identity) = golden_identity();
+    let verifier = golden_verifier();
+
+    let mut at_cap_body = "a".repeat(MAX_NOTE_BYTES - GOLDEN_NOTE_OVERHEAD - 1);
+    at_cap_body.push('\n');
+    let note = sign_note(&at_cap_body, GOLDEN_NAME, &identity).unwrap();
+    assert_eq!(note.len(), MAX_NOTE_BYTES);
+    assert_eq!(
+        verify_note(note.as_bytes(), &verifier).unwrap(),
+        at_cap_body
+    );
+
+    let mut over_body = "a".repeat(MAX_NOTE_BYTES - GOLDEN_NOTE_OVERHEAD);
+    over_body.push('\n');
+    let err = sign_note(&over_body, GOLDEN_NAME, &identity).unwrap_err();
+    assert!(matches!(err, TrustError::CheckpointEncoding { .. }));
+}
+
 #[test]
 fn malformed_signature_blobs_are_rejected() {
     let blob = STANDARD.decode(GOLDEN_SIG_BLOB_B64).unwrap();
@@ -379,7 +442,7 @@ fn signature_under_different_name_is_filtered_not_accepted() {
 fn matching_key_id_alone_is_never_authentication() {
     // A candidate whose (name, key ID) match but whose signature is
     // garbage must not be accepted: key IDs are filters, the full Ed25519
-    // check decides.
+    // check decides — and its failure rejects the whole note.
     let mut blob = GOLDEN_KEY_ID.to_vec();
     blob.extend_from_slice(&[0u8; 64]);
     let forged = format!(
@@ -390,13 +453,32 @@ fn matching_key_id_alone_is_never_authentication() {
 }
 
 #[test]
-fn any_one_fully_verifying_candidate_accepts() {
-    // R9 (more permissive than Go's VerifierList): an invalid candidate
-    // followed by a valid one accepts.
+fn failed_known_key_signature_rejects_despite_later_valid_line() {
+    // Go parity (note.Open returns InvalidSignatureError; C2SP: a failed
+    // known-key signature rejects the whole note): a garbage candidate
+    // matching the verifier's (name, key ID) rejects even though a fully
+    // valid signature line follows it.
     let mut garbage_blob = GOLDEN_KEY_ID.to_vec();
     garbage_blob.extend_from_slice(&[0u8; 64]);
     let note = format!(
         "{GOLDEN_BODY}\n\u{2014} {GOLDEN_NAME} {}\n\u{2014} {GOLDEN_NAME} {GOLDEN_SIG_BLOB_B64}\n",
+        STANDARD.encode(&garbage_blob)
+    );
+    assert_rejected(
+        note.as_bytes(),
+        "failed known-key signature before a valid line",
+    );
+}
+
+#[test]
+fn duplicate_lines_after_a_verifying_first_candidate_are_skipped() {
+    // Go parity (the `seen` map): once the first matching candidate
+    // verifies, later lines by the same signer — even garbage ones — are
+    // skipped and the note is accepted.
+    let mut garbage_blob = GOLDEN_KEY_ID.to_vec();
+    garbage_blob.extend_from_slice(&[0u8; 64]);
+    let note = format!(
+        "{GOLDEN_BODY}\n\u{2014} {GOLDEN_NAME} {GOLDEN_SIG_BLOB_B64}\n\u{2014} {GOLDEN_NAME} {}\n",
         STANDARD.encode(&garbage_blob)
     );
     let body = verify_note(note.as_bytes(), &golden_verifier()).unwrap();
@@ -442,6 +524,29 @@ fn em_dash_line_inside_body_stays_signed_content() {
     let note = sign_note(&smuggled, GOLDEN_NAME, &identity).unwrap();
     let body = verify_note(note.as_bytes(), &golden_verifier()).unwrap();
     assert_eq!(body, smuggled, "smuggled line must remain in the body");
+}
+
+#[test]
+fn verify_note_splits_at_the_last_blank_line() {
+    // Go parity for the split point: Go note.Sign requires only a trailing
+    // newline, so a Go-signed note may carry a body CONTAINING a blank
+    // line, and Go note.Open splits at bytes.LastIndex("\n\n"). lys
+    // sign_note refuses such bodies, so hand-sign one here: verify_note
+    // must split at the LAST blank line and return the body intact.
+    let (_dir, identity) = golden_identity();
+    let blank_line_body = "A\n\nB\n";
+    let signature = identity.sign(blank_line_body.as_bytes());
+    let mut blob = GOLDEN_KEY_ID.to_vec();
+    blob.extend_from_slice(&signature);
+    let note = format!(
+        "{blank_line_body}\n\u{2014} {GOLDEN_NAME} {}\n",
+        STANDARD.encode(&blob)
+    );
+    let body = verify_note(note.as_bytes(), &golden_verifier()).unwrap();
+    assert_eq!(
+        body, blank_line_body,
+        "the body's own blank line must stay inside the signed body"
+    );
 }
 
 // --- verify_checkpoint binding and parse collapse ---
