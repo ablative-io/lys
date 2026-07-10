@@ -133,6 +133,28 @@ fn old_v1_preimage_signature_is_rejected() {
 }
 
 #[test]
+fn bare_hash_signed_attestation_is_rejected() {
+    // Cross-form kill: a signature over the bare payload hash (the
+    // pre-domain-separation scheme stripped at extraction), spliced into an
+    // otherwise-valid attestation, must never verify — there is no legacy
+    // fallback path. A 32-byte hash can never begin with the Sig_structure
+    // framing bytes as a message the verifier would rebuild, so the only
+    // expressible confusion direction is this splice.
+    let id = identity();
+    let payload = b"pre-domain-separation";
+    let payload_hash = sha256_digest(payload);
+
+    let att = Attestation {
+        payload_hash,
+        signature: id.sign(&payload_hash),
+        signer_public_key: id.public_key_bytes(),
+        timestamp: 1_700_000_000_000,
+    };
+    let err = verify_attestation(&att, payload).unwrap_err();
+    assert!(matches!(err, TrustError::InvalidSignature));
+}
+
+#[test]
 fn attestation_round_trips_through_cose_bytes() {
     let id = identity();
     let payload = b"persisted attestation";

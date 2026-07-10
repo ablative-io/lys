@@ -160,10 +160,14 @@ crates/lys-core/
     │   ├── leaf.rs               — leaf hashing, frozen-wire-contract docs (D4)
     │   └── *_tests.rs
     ├── attestation/
-    │   ├── mod.rs                — pub mod / pub use only
-    │   ├── sign.rs               — sign_attestation, verify_attestation, v1 preimage (D5)
-    │   ├── envelope.rs           — Attestation envelope type (D5)
-    │   └── *_tests.rs
+    │   ├── mod.rs                — pub mod / pub use, invariant docs
+    │   ├── artifact.rs           — Attestation type; to_cose_bytes / canonical-strict
+    │   │                           from_cose_bytes (D5)
+    │   ├── encoding.rs           — private byte-exact COSE_Sign1 encode + shape-pinned
+    │   │                           decode, Sig_structure assembly (D5)
+    │   ├── sign.rs               — sign_attestation, verify_attestation,
+    │   │                           verify_attestation_bytes over the v2 Sig_structure (D5)
+    │   └── *_tests.rs            — sibling tests incl. golden vectors and mutants A–F
     └── seal/
         ├── mod.rs                — pub mod / pub use only
         ├── sealed_envelope.rs    — seal/open, HKDF binding, contributory checks,

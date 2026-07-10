@@ -324,6 +324,53 @@ fn wrong_content_type_is_rejected() {
     assert!(Attestation::from_cose_bytes(&signed_custom(&protected, &claims)).is_err());
 }
 
+// ----------------------------------------------------------- timestamp range
+
+/// The frozen claims contract is `2: int unix-millisecond timestamp (i64,
+/// pre-epoch representable)` — the decode path must accept every i64, not
+/// just post-epoch values. Pre-epoch (negative), zero, and both extremes
+/// parse, round-trip byte-identically, and cryptographically verify.
+#[test]
+fn full_i64_timestamp_range_parses_round_trips_and_verifies() {
+    let (_dir, identity) = golden_identity();
+    let payload_hash: [u8; 32] = {
+        use sha2::{Digest, Sha256};
+        Sha256::digest(GOLDEN_PAYLOAD).into()
+    };
+    let protected = encoding::protected_bytes(&identity.public_key_bytes());
+    for ts in [i64::MIN, -1, 0, i64::MAX] {
+        let claims = encoding::claims_bytes(&payload_hash, ts);
+        let artifact = signed_custom(&protected, &claims);
+        let att = Attestation::from_cose_bytes(&artifact).unwrap();
+        assert_eq!(att.timestamp, ts, "timestamp {ts} did not round-trip");
+        assert_eq!(att.to_cose_bytes(), artifact);
+        verify_attestation(&att, GOLDEN_PAYLOAD).unwrap();
+    }
+}
+
+/// A claims timestamp outside the i64 range is rejected at decode, even
+/// with an internally consistent signature: the canonical CBOR unsigned
+/// 2^63 (one past `i64::MAX`) and its negative mirror -2^63 - 1 (one past
+/// `i64::MIN`) are both valid CBOR integers the contract excludes.
+#[test]
+fn out_of_i64_range_timestamp_is_rejected() {
+    let (_dir, identity) = golden_identity();
+    let protected = encoding::protected_bytes(&identity.public_key_bytes());
+    // Canonical claims for timestamp 0 end `02 00` (key 2, value 0); swap
+    // the value byte for a canonical 9-byte integer head outside i64.
+    let base = encoding::claims_bytes(&[0xaa; 32], 0);
+    let overflow_heads: &[[u8; 9]] = &[
+        [0x1b, 0x80, 0, 0, 0, 0, 0, 0, 0], // unsigned 2^63
+        [0x3b, 0x80, 0, 0, 0, 0, 0, 0, 0], // negative -1 - 2^63
+    ];
+    for head in overflow_heads {
+        let mut claims = base[..base.len() - 1].to_vec();
+        claims.extend_from_slice(head);
+        let mutant = signed_custom(&protected, &claims);
+        assert!(Attestation::from_cose_bytes(&mutant).is_err());
+    }
+}
+
 /// Every rejection is the same non-oracle error value.
 #[test]
 fn all_rejections_collapse_to_invalid_signature() {
