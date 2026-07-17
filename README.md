@@ -296,4 +296,5 @@ Byte-exact contracts, rationale, and rejected alternatives: [docs/design/WIRE-FO
 - [docs/VISION.md](docs/VISION.md) — why this exists: trust in AI work is social today, and needs to be structural.
 - [docs/DESIGN.md](docs/DESIGN.md) — architecture, primitive decisions, integration map.
 - [docs/ROADMAP.md](docs/ROADMAP.md) — the plan, phase by phase, and where things stand.
+- [CONTRIBUTING.md](CONTRIBUTING.md) — prerequisites, build/test/lint commands, crate layout.
 - [LICENSE](LICENSE) — Apache-2.0.
