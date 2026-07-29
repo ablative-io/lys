@@ -9,23 +9,37 @@
 //! opaque DER and this CLI defines no further semantics. Certificates are
 //! written as PEM, the X.509 interop norm.
 //!
+//! Two issuance paths are offered, and they mean different things. Without
+//! `--request`, the library generates the subject keypair and discards the
+//! private half: the certificate names a key nobody ever held, which is fine
+//! for testing the plumbing and useless for concluding anything about a
+//! holder. With `--request`, the subject presents a PKCS#10 request produced by
+//! `lys ca request` (or `openssl req`) and self-signed by a key they already
+//! control; that proof of possession is verified before issuance and the
+//! certificate binds their key. The reported `subject_key_origin` says which
+//! path produced the certificate, because the distinction is the whole
+//! difference in what the certificate is evidence of.
+//!
 //! Invariants: the issuer key file must already exist — only `lys key
 //! generate` creates key material — and the subject keypair the library
 //! generates during issuance is discarded, never written to disk or printed;
-//! only its public half is reported. Verification failures collapse to one
-//! non-oracle message, mirroring `lys verify`. Claims echoed by `ca verify`
-//! are printed verbatim only when free of control characters; anything else
-//! is shown as hex, so certificate contents can never inject terminal
-//! escape sequences into the verification output.
+//! only its public half is reported. `ca request` writes only a public
+//! artifact: a request carries a public key and a signature, never the seed.
+//! Verification failures collapse to one non-oracle message, mirroring `lys
+//! verify`. Claims echoed by `ca verify` are printed verbatim only when free
+//! of control characters; anything else is shown as hex, so certificate
+//! contents can never inject terminal escape sequences into the verification
+//! output.
 
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use lys_core::TrustError;
 use lys_core::ca::{
-    CertificateAuthority, LYS_OID_ARC, decode_extension, encode_extension,
-    verify_certificate_chain_at,
+    CertificateAuthority, LYS_OID_ARC, create_certificate_request, decode_extension,
+    encode_extension, verify_certificate_chain_at,
 };
 
 use crate::commands::error::{CliError, CliResult};
@@ -69,22 +83,80 @@ pub(crate) fn is_terminal_safe(text: &str) -> bool {
         .all(|character| !character.is_control() || character == '\n' || character == '\t')
 }
 
-/// `lys ca issue --key <path> --subject <name> [--claims <file>]
-/// --validity-days <n> --out <file>`.
+/// What an issuance produced, independent of which path produced it.
+struct Issuance {
+    der_bytes: Vec<u8>,
+    subject_public_key: [u8; 32],
+    issuer_public_key: [u8; 32],
+    fingerprint: [u8; 32],
+    expires_at: DateTime<Utc>,
+    /// Human-readable provenance of the subject key, reported so an operator
+    /// can tell whether the certificate binds a key its holder proved control
+    /// of or one this command minted and threw away.
+    subject_key_origin: &'static str,
+}
+
+/// `lys ca request --key <path> --subject <name> --out <file>`.
+///
+/// Produces the holder's side of a certificate exchange: a PKCS#10 request
+/// carrying the identity's public key, self-signed by that identity. The
+/// signature is the proof of possession `lys ca issue --request` verifies. The
+/// written file is public — it contains no private material.
+///
+/// # Errors
+///
+/// Returns [`CliError::KeyFileMissing`] if the identity key file does not
+/// exist, [`CliError::Io`] if the request cannot be written, and
+/// [`CliError::Trust`] if the subject is empty or the library cannot sign the
+/// request.
+pub fn request(key: &Path, subject: &str, out: &Path, json: bool) -> CliResult<()> {
+    let identity = Arc::new(load_identity(key)?);
+    let der = create_certificate_request(&identity, subject)?;
+
+    let pem_text = pem::encode_certificate_request(&der);
+    write_file(out, pem_text.as_bytes(), "certificate-signing request file")?;
+
+    let mut emit = Emitter::new(json);
+    emit.field(
+        "certificate-signing request for subject",
+        "subject",
+        subject,
+    );
+    emit.field(
+        "subject public key (ed25519)",
+        "subject_public_key",
+        hex_lower(&identity.public_key_bytes()),
+    );
+    emit.field("request written", "request_path", out.display().to_string());
+    emit.note("give this to the authority; it carries no private key material");
+    emit.finish();
+    Ok(())
+}
+
+/// `lys ca issue --key <path> --subject <name> [--request <file>]
+/// [--claims <file>] --validity-days <n> --out <file>`.
+///
+/// With `--request`, the subject key comes from the holder's PKCS#10 request
+/// and is certified only after its proof of possession verifies; `--subject`
+/// must equal the common name the request asked for. Without `--request`, a
+/// subject keypair is generated here and its private half discarded.
 ///
 /// # Errors
 ///
 /// Returns [`CliError::KeyFileMissing`] if the issuer key file does not
-/// exist, [`CliError::Io`] if the claims file cannot be read or the
-/// certificate cannot be written, [`CliError::ClaimsJsonParse`] if the
-/// claims file is not valid JSON, and [`CliError::Trust`] if the library
-/// rejects the issuance parameters or signing fails.
+/// exist, [`CliError::Io`] if the claims file, request file, or output
+/// certificate cannot be read or written, [`CliError::ClaimsJsonParse`] if the
+/// claims file is not valid JSON, [`CliError::PemParse`] if the request is not
+/// a PEM `CERTIFICATE REQUEST` block, and [`CliError::Trust`] if the library
+/// rejects the issuance parameters, rejects the request's proof of possession,
+/// or signing fails.
 pub fn issue(
     key: &Path,
     subject: &str,
     claims: Option<&Path>,
     validity_days: u32,
     out: &Path,
+    request_path: Option<&Path>,
     json: bool,
 ) -> CliResult<()> {
     let identity = load_identity(key)?;
@@ -107,9 +179,34 @@ pub fn issue(
 
     let ttl = Duration::from_secs(u64::from(validity_days) * SECONDS_PER_DAY);
     let authority = CertificateAuthority::new(identity);
-    // `issued` carries the freshly generated subject signing key; it is
-    // deliberately never persisted or printed and drops with this binding.
-    let issued = authority.issue_certificate(subject, ttl, extensions)?;
+
+    let issued = if let Some(path) = request_path {
+        let pem_bytes = read_file(path, "certificate-signing request file")?;
+        let request_der = pem::decode_certificate_request(&pem_bytes, path)?;
+        let certified =
+            authority.issue_certificate_for_request(&request_der, subject, ttl, extensions)?;
+        Issuance {
+            der_bytes: certified.der_bytes,
+            subject_public_key: certified.subject_public_key,
+            issuer_public_key: certified.issuer_public_key,
+            fingerprint: certified.fingerprint,
+            expires_at: certified.expires_at,
+            subject_key_origin: "presented by the holder, proof of possession verified",
+        }
+    } else {
+        // `generated` carries the freshly generated subject signing key; it is
+        // deliberately never persisted or printed and drops here.
+        let generated = authority.issue_certificate(subject, ttl, extensions)?;
+        Issuance {
+            der_bytes: generated.der_bytes,
+            subject_public_key: generated.subject_verifying_key.to_bytes(),
+            issuer_public_key: generated.issuer_public_key,
+            fingerprint: generated.fingerprint,
+            expires_at: generated.expires_at,
+            subject_key_origin: "generated by the issuer and discarded — the holder never proved \
+                                 possession",
+        }
+    };
 
     let pem_text = pem::encode_certificate(&issued.der_bytes);
     write_file(out, pem_text.as_bytes(), "certificate file")?;
@@ -119,7 +216,12 @@ pub fn issue(
     emit.field(
         "subject public key (ed25519)",
         "subject_public_key",
-        hex_lower(&issued.subject_verifying_key.to_bytes()),
+        hex_lower(&issued.subject_public_key),
+    );
+    emit.field(
+        "subject key origin",
+        "subject_key_origin",
+        issued.subject_key_origin,
     );
     emit.field(
         "issuer public key (ed25519)",

@@ -76,13 +76,25 @@ fn main() -> ExitCode {
             },
         },
         Command::Ca(ca_command) => match ca_command {
+            CaCommand::Request { key, subject, out } => {
+                commands::ca::request(&key, &subject, &out, json)
+            }
             CaCommand::Issue {
                 key,
                 subject,
+                request,
                 claims,
                 validity_days,
                 out,
-            } => commands::ca::issue(&key, &subject, claims.as_deref(), validity_days, &out, json),
+            } => commands::ca::issue(
+                &key,
+                &subject,
+                claims.as_deref(),
+                validity_days,
+                &out,
+                request.as_deref(),
+                json,
+            ),
             CaCommand::Verify {
                 cert,
                 issuer_public_key,

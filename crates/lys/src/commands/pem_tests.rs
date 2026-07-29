@@ -4,8 +4,46 @@ use std::path::PathBuf;
 
 use super::*;
 
+/// The boundary lines are pinned as literals rather than rebuilt from the
+/// module's label constants: they are what a stranger's tooling matches on, so
+/// the test should fail if the emitted text ever stops being exactly this,
+/// however the code happens to construct it.
+const BEGIN_CERTIFICATE: &str = "-----BEGIN CERTIFICATE-----";
+const END_CERTIFICATE: &str = "-----END CERTIFICATE-----";
+const BEGIN_REQUEST: &str = "-----BEGIN CERTIFICATE REQUEST-----";
+const END_REQUEST: &str = "-----END CERTIFICATE REQUEST-----";
+
 fn path() -> PathBuf {
     PathBuf::from("/certs/subject.pem")
+}
+
+#[test]
+fn request_encode_then_decode_round_trips_der_bytes() {
+    let der: Vec<u8> = (0u8..=255).cycle().take(300).collect();
+    let pem = encode_certificate_request(&der);
+    assert!(pem.starts_with(BEGIN_REQUEST));
+    assert!(pem.ends_with(&format!("{END_REQUEST}\n")));
+    assert_eq!(
+        decode_certificate_request(pem.as_bytes(), &path()).unwrap(),
+        der
+    );
+}
+
+/// A certificate and a request are both signed DER structures, so accepting
+/// one where the other is expected would hand a parser an artifact from the
+/// wrong protocol. The label is the cheapest place to refuse that, and this
+/// pins the refusal in both directions.
+#[test]
+fn a_certificate_and_a_request_are_not_interchangeable() {
+    let der = vec![1u8, 2, 3, 4];
+
+    let certificate_pem = encode_certificate(&der);
+    let error = decode_certificate_request(certificate_pem.as_bytes(), &path()).unwrap_err();
+    assert!(matches!(error, CliError::PemParse { .. }));
+
+    let request_pem = encode_certificate_request(&der);
+    let error = decode_certificate(request_pem.as_bytes(), &path()).unwrap_err();
+    assert!(matches!(error, CliError::PemParse { .. }));
 }
 
 #[test]

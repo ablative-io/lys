@@ -283,6 +283,61 @@ fn every_subcommand_honours_the_global_json_flag() {
     assert_eq!(inspected_cert["verified"], Value::Bool(false));
     assert!(s(&inspected_cert, "capability_claims_warning").contains("UNVERIFIED"));
 
+    // ── ca request / issue --request ──────────────────────────────────
+    let holder = p("holder.key");
+    let holder_pub = s(
+        &json_ok(&["--json", "key", "generate", "--out", &holder]),
+        "public_key_ed25519",
+    );
+    let request = p("holder.csr.pem");
+    let requested = json_ok(&[
+        "--json",
+        "ca",
+        "request",
+        "--key",
+        &holder,
+        "--subject",
+        "agent-holder",
+        "--out",
+        &request,
+    ]);
+    assert_eq!(requested["subject"], "agent-holder");
+    assert_eq!(s(&requested, "subject_public_key"), holder_pub);
+
+    let presented_cert = p("holder.pem");
+    let presented = json_ok(&[
+        "--json",
+        "ca",
+        "issue",
+        "--key",
+        &signer,
+        "--subject",
+        "agent-holder",
+        "--request",
+        &request,
+        "--validity-days",
+        "7",
+        "--out",
+        &presented_cert,
+    ]);
+    // The certificate binds the holder's own key rather than one the issuer
+    // minted, and says so — a consumer must be able to tell the two paths
+    // apart, because only one of them is evidence about the holder.
+    assert_eq!(s(&presented, "subject_public_key"), holder_pub);
+    assert!(s(&presented, "subject_key_origin").contains("proof of possession verified"));
+    assert!(s(&issued, "subject_key_origin").contains("never proved possession"));
+    assert_ne!(s(&issued, "subject_public_key"), holder_pub);
+
+    json_ok(&[
+        "--json",
+        "ca",
+        "verify",
+        "--cert",
+        &presented_cert,
+        "--issuer-public-key",
+        &signer_pub,
+    ]);
+
     // ── seal / open ──────────────────────────────────────────────────
     let envelope = p("secret.sealed.json");
     let seal_att = p("secret.sealed.cose");
@@ -346,6 +401,62 @@ fn failures_are_emitted_as_json_with_ok_false() {
     assert!(
         stderr.contains("error:"),
         "the human diagnostic must still reach stderr, got: {stderr}"
+    );
+}
+
+/// A refused issuance must refuse completely: non-zero exit, a machine-readable
+/// failure, and — the part worth pinning — no certificate left on disk. Writing
+/// the output file before validating the request would leave a refusal that
+/// still produced an artifact, which a later step could pick up as though
+/// issuance had succeeded.
+#[test]
+fn a_refused_request_issuance_writes_no_certificate() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path();
+    let path = |name: &str| dir.join(name).to_string_lossy().to_string();
+
+    let ca = path("ca.key");
+    run_lys(&["--json", "key", "generate", "--out", &ca]);
+    let holder = path("holder.key");
+    run_lys(&["--json", "key", "generate", "--out", &holder]);
+    let request = path("holder.csr.pem");
+    run_lys(&[
+        "--json",
+        "ca",
+        "request",
+        "--key",
+        &holder,
+        "--subject",
+        "agent-noor",
+        "--out",
+        &request,
+    ]);
+
+    let out = dir.join("never-written.pem");
+    let output = run_lys(&[
+        "--json",
+        "ca",
+        "issue",
+        "--key",
+        &ca,
+        "--subject",
+        "agent-root",
+        "--request",
+        &request,
+        "--validity-days",
+        "1",
+        "--out",
+        &out.to_string_lossy(),
+    ]);
+
+    assert!(!output.status.success(), "expected a failing exit code");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let value: Value = serde_json::from_str(stdout.trim())
+        .unwrap_or_else(|e| panic!("failure stdout was not JSON: {e}\n{stdout}"));
+    assert_eq!(value["ok"], Value::Bool(false));
+    assert!(
+        !out.exists(),
+        "a refused issuance must not leave a certificate behind"
     );
 }
 

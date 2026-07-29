@@ -34,6 +34,32 @@ fn issue_certificate_returns_non_empty_parseable_der() {
     assert_ne!(parsed.subject().as_raw(), parsed.issuer().as_raw());
 }
 
+/// The generated-key path's counterpart to the presented-key binding check in
+/// [`CertifiedKey::from_der_and_public_key`](crate::ca::CertifiedKey::from_der_and_public_key):
+/// the certificate must actually carry the keypair returned alongside it. The
+/// struct's own fields cannot witness this — they would agree with each other
+/// even if the DER bound something else entirely — so it is read out of the
+/// signed bytes.
+#[test]
+fn issued_certificate_binds_the_generated_subject_key() {
+    let ca = test_authority();
+    let issued = ca
+        .issue_certificate("agent-001", Duration::from_hours(1), vec![])
+        .unwrap();
+
+    let (_, parsed) = X509Certificate::from_der(&issued.der_bytes).unwrap();
+    assert_eq!(
+        parsed
+            .tbs_certificate
+            .subject_pki
+            .subject_public_key
+            .data
+            .as_ref(),
+        issued.subject_verifying_key.to_bytes().as_slice(),
+        "the certificate must bind the subject key it was issued with"
+    );
+}
+
 #[test]
 fn issuer_common_name_matches_ca_public_key_hex() {
     let ca = test_authority();

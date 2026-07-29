@@ -3,15 +3,35 @@
 //!
 //! The authority wraps an [`Ed25519Identity`] and issues short-lived X.509
 //! certificates for arbitrary subjects. All certificates use Ed25519
-//! exclusively: the subject keypair is generated with `PKCS_ED25519` and the
-//! certificate is signed by the authority's Ed25519 key, surfaced to rcgen
-//! through a [`RemoteKeyPair`] adapter so the authority's private seed is
-//! never exposed.
+//! exclusively, and the certificate is signed by the authority's Ed25519 key,
+//! surfaced to rcgen through a [`RemoteKeyPair`](rcgen::RemoteKeyPair) adapter
+//! so the authority's private seed is never exposed.
+//!
+//! # Two issuance paths, one certificate shape
+//!
+//! [`CertificateAuthority::issue_certificate`] generates the subject keypair
+//! itself and returns both halves. That is convenient, but the resulting
+//! certificate binds a key the *authority* produced: it says nothing about
+//! what the holder controls, so anything layered on top of it — logging
+//! issuance transparently, gating a write path on a recognised chain —
+//! authenticates the authority's willingness to issue rather than the
+//! identity of the subject.
+//!
+//! [`CertificateAuthority::issue_certificate_for_request`] is the path that
+//! carries a real binding: the holder presents a PKCS#10 request self-signed
+//! by a key they already hold, that proof of possession is verified (see
+//! [`super::request`]), and the certificate is signed over the presented key.
+//! The authority never sees the private half.
+//!
+//! Both paths build their certificate through the same [`leaf_params`] and
+//! [`validity_window`] helpers, so the two cannot drift into issuing
+//! differently shaped certificates.
 //!
 //! Chain verification is performed directly with `ed25519-dalek`:
 //! x509-parser is used only to parse the certificate and recover its
 //! to-be-signed bytes and signature. x509-parser's own `verify_signature` is
-//! never called — it cannot verify Ed25519.
+//! never called — for Ed25519 it routes to ring's non-strict verification,
+//! which accepts small-order keys and malleable signatures.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -19,14 +39,15 @@ use std::time::Duration;
 use chrono::{DateTime, Timelike, Utc};
 use ed25519_dalek::{Signature, VerifyingKey};
 use rcgen::{
-    BasicConstraints, Certificate, CertificateParams, CustomExtension, DistinguishedName, DnType,
-    IsCa, KeyPair, PKCS_ED25519, RemoteKeyPair, SignatureAlgorithm,
+    BasicConstraints, Certificate, CertificateParams, CustomExtension, IsCa, KeyPair, PKCS_ED25519,
 };
 use time::OffsetDateTime;
 use x509_parser::oid_registry::OID_SIG_ED25519;
 use x509_parser::prelude::{FromDer, X509Certificate};
 
-use crate::ca::certificate::IssuedCertificate;
+use crate::ca::certificate::{CertifiedKey, IssuedCertificate};
+use crate::ca::rcgen_bridge::{IdentitySigner, PresentedKey, distinguished_name};
+use crate::ca::request::verify_certificate_request;
 use crate::error::{TrustError, TrustResult};
 use crate::hex_lower;
 use crate::keys::Ed25519Identity;
@@ -53,10 +74,17 @@ impl CertificateAuthority {
     /// Issues a certificate for `subject`, valid for `ttl` from now, carrying
     /// the supplied non-critical custom extensions.
     ///
-    /// A fresh Ed25519 subject keypair is generated for the certificate. The
-    /// certificate is signed by this authority's Ed25519 key; the issuer
-    /// distinguished name is derived from the authority's public key so the
-    /// issued certificate's issuer field is tied to this authority.
+    /// A fresh Ed25519 subject keypair is generated for the certificate and
+    /// returned with it. The certificate is signed by this authority's Ed25519
+    /// key; the issuer distinguished name is derived from the authority's
+    /// public key so the issued certificate's issuer field is tied to this
+    /// authority.
+    ///
+    /// Because the subject key originates here, the certificate binds a key
+    /// the holder never proved control of. Where that binding matters — any
+    /// use where a verifier must conclude something about the *subject* rather
+    /// than about this authority — use
+    /// [`Self::issue_certificate_for_request`] instead.
     ///
     /// # Errors
     ///
@@ -69,16 +97,7 @@ impl CertificateAuthority {
         ttl: Duration,
         extensions: Vec<CustomExtension>,
     ) -> TrustResult<IssuedCertificate> {
-        if subject.trim().is_empty() {
-            return Err(TrustError::CertificateGeneration {
-                reason: "certificate subject must not be empty".to_string(),
-            });
-        }
-        if ttl.is_zero() {
-            return Err(TrustError::CertificateGeneration {
-                reason: "certificate TTL must be positive".to_string(),
-            });
-        }
+        let (issued_at, expires_at) = validity_window(subject, ttl)?;
 
         let issuer_key = self.issuer_key_pair()?;
         let issuer_cert = self.issuer_certificate(&issuer_key)?;
@@ -89,40 +108,7 @@ impl CertificateAuthority {
             }
         })?;
 
-        let issued_at = Utc::now();
-        let ttl =
-            chrono::Duration::from_std(ttl).map_err(|e| TrustError::CertificateGeneration {
-                reason: format!("certificate TTL is out of representable range: {e}"),
-            })?;
-        let expires_at =
-            issued_at
-                .checked_add_signed(ttl)
-                .ok_or_else(|| TrustError::CertificateGeneration {
-                    reason: "certificate expiry overflowed the supported date range".to_string(),
-                })?;
-        // The DER `notAfter` is encoded at whole-second granularity (see
-        // `to_offset_date_time`), so truncate the reported expiry to the same
-        // instant — otherwise `expires_at` could run up to a second past the
-        // certificate's actual validity.
-        let expires_at =
-            expires_at
-                .with_nanosecond(0)
-                .ok_or_else(|| TrustError::CertificateGeneration {
-                    reason: "certificate expiry could not be truncated to whole seconds"
-                        .to_string(),
-                })?;
-
-        let mut params = CertificateParams::new(Vec::<String>::new()).map_err(|e| {
-            TrustError::CertificateGeneration {
-                reason: format!("failed to build certificate parameters: {e}"),
-            }
-        })?;
-        params.distinguished_name = distinguished_name(subject);
-        params.is_ca = IsCa::ExplicitNoCa;
-        params.not_before = to_offset_date_time(issued_at)?;
-        params.not_after = to_offset_date_time(expires_at)?;
-        params.custom_extensions = extensions;
-
+        let params = leaf_params(subject, issued_at, expires_at, extensions)?;
         let certificate = params
             .signed_by(&subject_key, &issuer_cert, &issuer_key)
             .map_err(|e| TrustError::CertificateGeneration {
@@ -132,6 +118,74 @@ impl CertificateAuthority {
         IssuedCertificate::from_der_and_keypair(
             certificate.der().to_vec(),
             &subject_key,
+            expires_at,
+            self.identity.public_key_bytes(),
+        )
+    }
+
+    /// Issues a certificate over the subject key carried by a PKCS#10
+    /// certificate-signing request, after verifying the request's proof of
+    /// possession.
+    ///
+    /// This is the issuance path that produces a certificate a verifier can
+    /// reason about: the subject key is one the holder demonstrably controls,
+    /// because the request is self-signed by it and that signature is checked
+    /// with strict Ed25519 verification before anything is issued. No private
+    /// subject material exists here, which is why the result is a
+    /// [`CertifiedKey`] rather than an [`IssuedCertificate`].
+    ///
+    /// `subject` is the name **this authority** chooses to certify, and it must
+    /// equal the common name the request asked for. Requiring both to agree
+    /// keeps two distinct properties: the holder cannot name themselves, since
+    /// the authority supplies the name it will vouch for; and the authority
+    /// cannot certify a holder under a name the holder never asked for, since
+    /// a mismatch is refused. Every other certificate field — validity window,
+    /// extensions, basic constraints — comes from this authority's inputs and
+    /// never from the request; a request carrying requested extensions is
+    /// rejected outright by [`verify_certificate_request`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TrustError::CertificateParsing`] if `request_der` is not a
+    /// well-formed Ed25519 PKCS#10 request,
+    /// [`TrustError::CertificateVerification`] if its proof of possession does
+    /// not verify, and [`TrustError::CertificateGeneration`] if `subject` is
+    /// empty, disagrees with the request's common name, `ttl` is zero or out
+    /// of representable range, or rcgen cannot build or sign the certificate.
+    pub fn issue_certificate_for_request(
+        &self,
+        request_der: &[u8],
+        subject: &str,
+        ttl: Duration,
+        extensions: Vec<CustomExtension>,
+    ) -> TrustResult<CertifiedKey> {
+        let (issued_at, expires_at) = validity_window(subject, ttl)?;
+
+        let request = verify_certificate_request(request_der)?;
+        if request.common_name() != subject {
+            return Err(TrustError::CertificateGeneration {
+                reason: format!(
+                    "certificate-signing request asks for common name {:?} but issuance was \
+                     requested for subject {subject:?}",
+                    request.common_name()
+                ),
+            });
+        }
+
+        let issuer_key = self.issuer_key_pair()?;
+        let issuer_cert = self.issuer_certificate(&issuer_key)?;
+
+        let presented = PresentedKey::new(*request.subject_public_key());
+        let params = leaf_params(subject, issued_at, expires_at, extensions)?;
+        let certificate = params
+            .signed_by(&presented, &issuer_cert, &issuer_key)
+            .map_err(|e| TrustError::CertificateGeneration {
+                reason: format!("failed to sign certificate: {e}"),
+            })?;
+
+        CertifiedKey::from_der_and_public_key(
+            certificate.der().to_vec(),
+            request.subject_public_key(),
             expires_at,
             self.identity.public_key_bytes(),
         )
@@ -153,7 +207,8 @@ impl CertificateAuthority {
     }
 
     /// Builds an rcgen [`KeyPair`] backed by this authority's identity through
-    /// a [`RemoteKeyPair`] adapter, so the private seed is never serialised.
+    /// a [`RemoteKeyPair`](rcgen::RemoteKeyPair) adapter, so the private seed
+    /// is never serialised.
     fn issuer_key_pair(&self) -> TrustResult<KeyPair> {
         let remote = IdentitySigner::new(Arc::clone(&self.identity));
         KeyPair::from_remote(Box::new(remote)).map_err(|e| TrustError::CertificateGeneration {
@@ -180,6 +235,71 @@ impl CertificateAuthority {
     }
 }
 
+/// Validates the issuance inputs and computes the certificate's validity
+/// window as `(notBefore, notAfter)`.
+///
+/// Shared by both issuance paths so a certificate's validity semantics cannot
+/// differ depending on where its subject key came from.
+fn validity_window(subject: &str, ttl: Duration) -> TrustResult<(DateTime<Utc>, DateTime<Utc>)> {
+    if subject.trim().is_empty() {
+        return Err(TrustError::CertificateGeneration {
+            reason: "certificate subject must not be empty".to_string(),
+        });
+    }
+    if ttl.is_zero() {
+        return Err(TrustError::CertificateGeneration {
+            reason: "certificate TTL must be positive".to_string(),
+        });
+    }
+
+    let issued_at = Utc::now();
+    let ttl = chrono::Duration::from_std(ttl).map_err(|e| TrustError::CertificateGeneration {
+        reason: format!("certificate TTL is out of representable range: {e}"),
+    })?;
+    let expires_at =
+        issued_at
+            .checked_add_signed(ttl)
+            .ok_or_else(|| TrustError::CertificateGeneration {
+                reason: "certificate expiry overflowed the supported date range".to_string(),
+            })?;
+    // The DER `notAfter` is encoded at whole-second granularity (see
+    // `to_offset_date_time`), so truncate the reported expiry to the same
+    // instant — otherwise `expires_at` could run up to a second past the
+    // certificate's actual validity.
+    let expires_at =
+        expires_at
+            .with_nanosecond(0)
+            .ok_or_else(|| TrustError::CertificateGeneration {
+                reason: "certificate expiry could not be truncated to whole seconds".to_string(),
+            })?;
+
+    Ok((issued_at, expires_at))
+}
+
+/// Builds the leaf certificate parameters shared by both issuance paths.
+///
+/// Every field here is chosen by the authority. Nothing a certificate-signing
+/// request carries reaches these parameters — the request contributes only the
+/// subject public key, which is supplied separately to `signed_by`.
+fn leaf_params(
+    subject: &str,
+    issued_at: DateTime<Utc>,
+    expires_at: DateTime<Utc>,
+    extensions: Vec<CustomExtension>,
+) -> TrustResult<CertificateParams> {
+    let mut params = CertificateParams::new(Vec::<String>::new()).map_err(|e| {
+        TrustError::CertificateGeneration {
+            reason: format!("failed to build certificate parameters: {e}"),
+        }
+    })?;
+    params.distinguished_name = distinguished_name(subject);
+    params.is_ca = IsCa::ExplicitNoCa;
+    params.not_before = to_offset_date_time(issued_at)?;
+    params.not_after = to_offset_date_time(expires_at)?;
+    params.custom_extensions = extensions;
+    Ok(params)
+}
+
 /// Verifies a certificate's Ed25519 signature against an expected issuer key
 /// and checks the validity window at the current time (`Utc::now()`).
 ///
@@ -202,7 +322,8 @@ pub fn verify_certificate_chain(cert_der: &[u8], issuer_public_key: &[u8; 32]) -
 /// `ed25519-dalek` **strict** verification, and finally rejects the
 /// certificate if `at` lies outside its `notBefore`/`notAfter` window
 /// (boundaries inclusive, per X.509). x509-parser's `verify_signature` is
-/// deliberately not used — it cannot verify Ed25519.
+/// deliberately not used — for Ed25519 it routes to ring's non-strict
+/// verification.
 ///
 /// Strict verification (`verify_strict`) rejects signature malleability and
 /// small-order/torsion issuer keys, which plain `verify` accepts. This crate
@@ -218,6 +339,13 @@ pub fn verify_certificate_chain(cert_der: &[u8], issuer_public_key: &[u8; 32]) -
 /// legitimately issued by the authority for a caller-chosen subject equal to
 /// the authority's hex-pubkey common name is rejected here even though its
 /// signature would verify.
+///
+/// This function says nothing about who controls the certificate's *subject*
+/// key. It verifies that this issuer signed this certificate. Concluding that
+/// the subject key is held by the named subject additionally requires that the
+/// certificate was issued through
+/// [`CertificateAuthority::issue_certificate_for_request`], where possession
+/// was proven at issuance time.
 ///
 /// # Errors
 ///
@@ -310,47 +438,6 @@ fn datetime_from_asn1_timestamp(timestamp: i64, field: &str) -> TrustResult<Date
             "certificate {field} timestamp {timestamp} is outside the representable date range"
         ),
     })
-}
-
-/// rcgen [`RemoteKeyPair`] adapter over an [`Ed25519Identity`].
-///
-/// Exposes the identity's public key and `sign` operation to rcgen without
-/// revealing the private seed. Held behind an [`Arc`] so it satisfies rcgen's
-/// `'static` boxed-trait requirement while sharing the authority's identity.
-struct IdentitySigner {
-    identity: Arc<Ed25519Identity>,
-    public_key: Vec<u8>,
-}
-
-impl IdentitySigner {
-    fn new(identity: Arc<Ed25519Identity>) -> Self {
-        let public_key = identity.public_key_bytes().to_vec();
-        Self {
-            identity,
-            public_key,
-        }
-    }
-}
-
-impl RemoteKeyPair for IdentitySigner {
-    fn public_key(&self) -> &[u8] {
-        &self.public_key
-    }
-
-    fn sign(&self, msg: &[u8]) -> Result<Vec<u8>, rcgen::Error> {
-        Ok(self.identity.sign(msg).to_vec())
-    }
-
-    fn algorithm(&self) -> &'static SignatureAlgorithm {
-        &PKCS_ED25519
-    }
-}
-
-/// Builds a distinguished name carrying a single common-name component.
-fn distinguished_name(common_name: &str) -> DistinguishedName {
-    let mut dn = DistinguishedName::new();
-    dn.push(DnType::CommonName, common_name);
-    dn
 }
 
 /// Converts a chrono UTC instant into the `time` type rcgen's validity fields
