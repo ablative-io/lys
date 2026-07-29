@@ -3,9 +3,9 @@
 //! # Invariants
 //!
 //! - **Encoding is hand-assembled and infallible.** Every emitted byte is
-//!   produced by this module's fixed-shape writers — canonical (RFC 8949
-//!   §4.2 core deterministic) by construction, immune to any serializer
-//!   dependency's encoding choices across upgrades.
+//!   produced by this module's fixed-shape writers over [`crate::cbor`]'s
+//!   canonical heads — RFC 8949 §4.2 core deterministic by construction,
+//!   immune to any serializer dependency's encoding choices across upgrades.
 //! - **Decoding of untrusted input is never hand-rolled.** [`decode_fields`]
 //!   parses with `ciborium` and then enforces the exact artifact shape; the
 //!   caller ([`super::artifact::Attestation::from_cose_bytes`]) additionally
@@ -25,6 +25,10 @@
 
 use ciborium::value::Value;
 
+use crate::cbor::{
+    MAJOR_ARRAY, MAJOR_MAP, MAJOR_TAG, MAJOR_UNSIGNED, write_bytes, write_head, write_i64,
+    write_text,
+};
 use crate::error::{TrustError, TrustResult};
 
 /// The `lys/attestation/v2` domain discriminator: the protected content type
@@ -41,15 +45,6 @@ pub(crate) const MAX_ARTIFACT_LEN: usize = 1024;
 /// tagged, and the verifier requires the tag.
 const COSE_SIGN1_TAG: u64 = 18;
 
-/// CBOR major types (RFC 8949 §3.1) used by the fixed artifact shape.
-const MAJOR_UNSIGNED: u8 = 0;
-const MAJOR_NEGATIVE: u8 = 1;
-const MAJOR_BYTES: u8 = 2;
-const MAJOR_TEXT: u8 = 3;
-const MAJOR_ARRAY: u8 = 4;
-const MAJOR_MAP: u8 = 5;
-const MAJOR_TAG: u8 = 6;
-
 /// COSE header label `alg` and its `EdDSA` value (RFC 9053: `EdDSA = -8`,
 /// the deployed-practice code point — see the design's §1.4 check).
 const HEADER_LABEL_ALG: u64 = 1;
@@ -65,43 +60,6 @@ const CLAIM_KEY_PAYLOAD_HASH: u64 = 1;
 /// Claims map key for the unix-millisecond timestamp.
 const CLAIM_KEY_TIMESTAMP: u64 = 2;
 
-/// Append the canonical (shortest-form) CBOR head for `major`/`value`
-/// (RFC 8949 §4.2.1 rule 2).
-fn write_head(out: &mut Vec<u8>, major: u8, value: u64) {
-    let major_bits = major << 5;
-    if let Ok(small) = u8::try_from(value) {
-        if small < 24 {
-            out.push(major_bits | small);
-        } else {
-            out.push(major_bits | 0x18);
-            out.push(small);
-        }
-    } else if let Ok(v) = u16::try_from(value) {
-        out.push(major_bits | 0x19);
-        out.extend_from_slice(&v.to_be_bytes());
-    } else if let Ok(v) = u32::try_from(value) {
-        out.push(major_bits | 0x1a);
-        out.extend_from_slice(&v.to_be_bytes());
-    } else {
-        out.push(major_bits | 0x1b);
-        out.extend_from_slice(&value.to_be_bytes());
-    }
-}
-
-/// Append the canonical CBOR encoding of the signed 64-bit integer `value`
-/// (major type 0 for `value >= 0`, major type 1 encoding `-1 - n` otherwise).
-fn write_i64(out: &mut Vec<u8>, value: i64) {
-    // Total on all of i64: `unsigned_abs` never overflows, and for negative
-    // `value` the CBOR major-1 argument is `-1 - value == |value| - 1`,
-    // where `|value| >= 1` so the subtraction never underflows.
-    let (major, magnitude) = if value >= 0 {
-        (MAJOR_UNSIGNED, value.unsigned_abs())
-    } else {
-        (MAJOR_NEGATIVE, value.unsigned_abs() - 1)
-    };
-    write_head(out, major, magnitude);
-}
-
 /// Build the 80-byte protected header map:
 /// `{1: -8, 3: CONTENT_TYPE, 4: signer_public_key}` in canonical key order.
 pub(crate) fn protected_bytes(signer_public_key: &[u8; 32]) -> Vec<u8> {
@@ -110,11 +68,9 @@ pub(crate) fn protected_bytes(signer_public_key: &[u8; 32]) -> Vec<u8> {
     write_head(&mut out, MAJOR_UNSIGNED, HEADER_LABEL_ALG);
     write_i64(&mut out, -8);
     write_head(&mut out, MAJOR_UNSIGNED, HEADER_LABEL_CONTENT_TYPE);
-    write_head(&mut out, MAJOR_TEXT, CONTENT_TYPE.len() as u64);
-    out.extend_from_slice(CONTENT_TYPE.as_bytes());
+    write_text(&mut out, CONTENT_TYPE);
     write_head(&mut out, MAJOR_UNSIGNED, HEADER_LABEL_KID);
-    write_head(&mut out, MAJOR_BYTES, signer_public_key.len() as u64);
-    out.extend_from_slice(signer_public_key);
+    write_bytes(&mut out, signer_public_key);
     out
 }
 
@@ -124,27 +80,9 @@ pub(crate) fn claims_bytes(payload_hash: &[u8; 32], timestamp: i64) -> Vec<u8> {
     let mut out = Vec::with_capacity(46);
     write_head(&mut out, MAJOR_MAP, 2);
     write_head(&mut out, MAJOR_UNSIGNED, CLAIM_KEY_PAYLOAD_HASH);
-    write_head(&mut out, MAJOR_BYTES, payload_hash.len() as u64);
-    out.extend_from_slice(payload_hash);
+    write_bytes(&mut out, payload_hash);
     write_head(&mut out, MAJOR_UNSIGNED, CLAIM_KEY_TIMESTAMP);
     write_i64(&mut out, timestamp);
-    out
-}
-
-/// Build the `Sig_structure` signing preimage (RFC 9052 §4.4) with empty
-/// `external_aad`: `["Signature1", protected, h'', claims]` — always
-/// 135–143 bytes for this artifact. This is the exact Ed25519 input.
-pub(crate) fn sig_structure_bytes(protected: &[u8], claims: &[u8]) -> Vec<u8> {
-    const CONTEXT: &str = "Signature1";
-    let mut out = Vec::with_capacity(143);
-    write_head(&mut out, MAJOR_ARRAY, 4);
-    write_head(&mut out, MAJOR_TEXT, CONTEXT.len() as u64);
-    out.extend_from_slice(CONTEXT.as_bytes());
-    write_head(&mut out, MAJOR_BYTES, protected.len() as u64);
-    out.extend_from_slice(protected);
-    write_head(&mut out, MAJOR_BYTES, 0);
-    write_head(&mut out, MAJOR_BYTES, claims.len() as u64);
-    out.extend_from_slice(claims);
     out
 }
 
@@ -161,13 +99,10 @@ pub(crate) fn artifact_bytes(
     let mut out = Vec::with_capacity(199);
     write_head(&mut out, MAJOR_TAG, COSE_SIGN1_TAG);
     write_head(&mut out, MAJOR_ARRAY, 4);
-    write_head(&mut out, MAJOR_BYTES, protected.len() as u64);
-    out.extend_from_slice(&protected);
+    write_bytes(&mut out, &protected);
     write_head(&mut out, MAJOR_MAP, 0);
-    write_head(&mut out, MAJOR_BYTES, claims.len() as u64);
-    out.extend_from_slice(&claims);
-    write_head(&mut out, MAJOR_BYTES, signature.len() as u64);
-    out.extend_from_slice(signature);
+    write_bytes(&mut out, &claims);
+    write_bytes(&mut out, signature);
     out
 }
 

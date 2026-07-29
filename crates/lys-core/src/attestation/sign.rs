@@ -54,6 +54,7 @@ use sha2::{Digest, Sha256};
 
 use crate::attestation::artifact::Attestation;
 use crate::attestation::encoding;
+use crate::cbor;
 use crate::error::{TrustError, TrustResult};
 use crate::keys::identity::Ed25519Identity;
 
@@ -77,7 +78,7 @@ pub fn sign_attestation(payload: &[u8], signing_key: &Ed25519Identity) -> Attest
     let signer_public_key = signing_key.public_key_bytes();
     let protected = encoding::protected_bytes(&signer_public_key);
     let claims = encoding::claims_bytes(&payload_hash, timestamp);
-    let signature = signing_key.sign(&encoding::sig_structure_bytes(&protected, &claims));
+    let signature = signing_key.sign(&cbor::sig_structure_bytes(&protected, &claims));
     Attestation {
         payload_hash,
         signature,
@@ -118,7 +119,7 @@ pub fn verify_attestation(attestation: &Attestation, payload: &[u8]) -> TrustRes
     }
     let protected = encoding::protected_bytes(&attestation.signer_public_key);
     let claims = encoding::claims_bytes(&attestation.payload_hash, attestation.timestamp);
-    let sig_structure = encoding::sig_structure_bytes(&protected, &claims);
+    let sig_structure = cbor::sig_structure_bytes(&protected, &claims);
     Ed25519Identity::verify(
         &attestation.signer_public_key,
         &sig_structure,

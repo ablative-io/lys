@@ -1,9 +1,12 @@
-// cosetool: sign/verify lys/attestation/v2 tagged COSE_Sign1 artifacts with
-// the veraison/go-cose reference implementation.
+// cosetool: sign and verify lys tagged COSE_Sign1 artifacts with the
+// veraison/go-cose reference implementation. This file handles
+// lys/attestation/v2; receipt.go handles lys/anchor-receipt/v1.
 //
 // Usage:
-//   cosetool sign <seed-hex> <timestamp-ms>   (payload on stdin; tagged COSE_Sign1 on stdout)
-//   cosetool verify <pubkey-hex>              (COSE bytes on stdin; "<hash-hex> <ts>\n" on stdout; exit 0/1)
+//   cosetool sign           <seed-hex> <timestamp-ms>              (payload on stdin)
+//   cosetool verify         <pubkey-hex>                           (COSE on stdin; "<hash-hex> <ts>")
+//   cosetool receipt-sign   <seed-hex> <leaf-index> <leaf-hex>...
+//   cosetool receipt-verify <pubkey-hex> <leaf-index> <leaf-hex>... (receipt on stdin)
 //
 // Claims are built with fxamacker/cbor CoreDetEncOptions (RFC 8949 §4.2 core
 // deterministic), which is byte-identical to the lys hand encoder.
@@ -142,6 +145,16 @@ func main() {
 			fail("usage: cosetool verify <pubkey-hex>")
 		}
 		verify(os.Args[2], stdin)
+	case "receipt-sign":
+		if len(os.Args) < 5 {
+			fail("usage: cosetool receipt-sign <seed-hex> <leaf-index> <leaf-hex>...")
+		}
+		receiptSign(os.Args[2], os.Args[3], os.Args[4:])
+	case "receipt-verify":
+		if len(os.Args) < 5 {
+			fail("usage: cosetool receipt-verify <pubkey-hex> <leaf-index> <leaf-hex>...")
+		}
+		receiptVerify(os.Args[2], os.Args[3], os.Args[4:], stdin)
 	default:
 		fail("unknown mode %q", os.Args[1])
 	}

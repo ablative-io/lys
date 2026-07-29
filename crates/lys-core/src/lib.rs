@@ -6,9 +6,9 @@
 //! on top — this crate knows nothing about any higher-level concepts.
 //!
 //! The foundation laid here is [`TrustError`], [`TrustResult`], and
-//! [`Ed25519Identity`]. The [`ca`], [`merkle`], [`attestation`], [`seal`],
-//! [`checkpoint`], and [`tlog`] modules are implemented on top of these
-//! primitives.
+//! [`Ed25519Identity`]. The [`ca`], [`merkle`], [`attestation`], [`receipt`],
+//! [`seal`], [`checkpoint`], and [`tlog`] modules are implemented on top of
+//! these primitives.
 //!
 //! ```
 //! use lys_core::TrustResult;
@@ -28,10 +28,12 @@
 
 pub mod attestation;
 pub mod ca;
+mod cbor;
 pub mod checkpoint;
 pub mod error;
 pub mod keys;
 pub mod merkle;
+pub mod receipt;
 pub mod seal;
 pub mod tlog;
 

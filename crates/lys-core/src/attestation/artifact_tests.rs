@@ -3,6 +3,7 @@
 use super::*;
 use crate::attestation::encoding;
 use crate::attestation::sign::verify_attestation;
+use crate::cbor;
 use crate::keys::identity::Ed25519Identity;
 
 /// Fixed golden seed: the 32 ASCII bytes `"lys-cose-conformance-test-seed01"`.
@@ -73,7 +74,7 @@ fn assemble(protected: &[u8], unprotected: &[u8], claims: &[u8], signature: &[u8
 /// shapes the verifier must reject.
 fn signed_custom(protected: &[u8], claims: &[u8]) -> Vec<u8> {
     let (_dir, identity) = golden_identity();
-    let signature = identity.sign(&encoding::sig_structure_bytes(protected, claims));
+    let signature = identity.sign(&cbor::sig_structure_bytes(protected, claims));
     assemble(protected, &[0xa0], claims, &signature)
 }
 

@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::*;
+use crate::cbor::sig_structure_bytes;
 use crate::keys::identity::Ed25519Identity;
 
 /// Fixed golden seed: the 32 ASCII bytes `"lys-cose-conformance-test-seed01"`.
