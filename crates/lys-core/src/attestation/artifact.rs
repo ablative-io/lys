@@ -21,7 +21,7 @@
 //!   [`super::sign::verify_attestation`] (or use
 //!   [`super::sign::verify_attestation_bytes`]) before trusting the fields.
 //! - Every parse failure collapses to
-//!   [`TrustError::InvalidSignature`](crate::error::TrustError::InvalidSignature)
+//!   [`TrustError::InvalidSignature`]
 //!   (non-oracle).
 
 use crate::attestation::encoding;

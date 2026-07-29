@@ -147,7 +147,7 @@ impl CertifiedKey {
     ///
     /// Computes the SHA-256 fingerprint over `der_bytes` and confirms that the
     /// certificate actually binds `subject_public_key` — see
-    /// [`assert_der_binds_subject_key`].
+    /// `assert_der_binds_subject_key`.
     ///
     /// # Errors
     ///

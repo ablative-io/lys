@@ -10,7 +10,7 @@
 //! - Key ID = first 4 bytes of `SHA-256(keyname ‖ 0x0A ‖ 0x01 ‖ pubkey)`.
 //! - [`sign_note`] enforces preconditions (valid name; body non-empty,
 //!   `'\n'`-terminated, no `"\n\n"`, no ASCII control character below
-//!   `0x20` other than `'\n'`; emitted note within [`MAX_NOTE_BYTES`])
+//!   `0x20` other than `'\n'`; emitted note within `MAX_NOTE_BYTES`)
 //!   that guarantee the emitted note always re-verifies under
 //!   [`verify_note`] AND under Go `note.Open`.
 //! - [`verify_note`] splits at the LAST `"\n\n"` (Go `bytes.LastIndex`),
@@ -88,7 +88,7 @@ pub fn key_id(name: &str, public_key: &[u8; 32]) -> TrustResult<[u8; 4]> {
 /// Returns [`TrustError::CheckpointEncoding`] if the name is invalid; if
 /// the body is empty, does not end with `'\n'`, contains `"\n\n"`, or
 /// contains an ASCII control character below `0x20` other than `'\n'`; or
-/// if the complete note would exceed the 1 MiB [`MAX_NOTE_BYTES`] cap that
+/// if the complete note would exceed the 1 MiB `MAX_NOTE_BYTES` cap that
 /// [`verify_note`] enforces. These preconditions guarantee the emitted
 /// note always re-verifies under [`verify_note`] and under Go `note.Open`.
 pub fn sign_note(body: &str, name: &str, identity: &Ed25519Identity) -> TrustResult<String> {

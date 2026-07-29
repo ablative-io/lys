@@ -23,8 +23,8 @@
 //! [`super::request`]), and the certificate is signed over the presented key.
 //! The authority never sees the private half.
 //!
-//! Both paths build their certificate through the same [`leaf_params`] and
-//! [`validity_window`] helpers, so the two cannot drift into issuing
+//! Both paths build their certificate through the same `leaf_params` and
+//! `validity_window` helpers, so the two cannot drift into issuing
 //! differently shaped certificates.
 //!
 //! Chain verification is performed directly with `ed25519-dalek`:

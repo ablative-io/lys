@@ -12,6 +12,63 @@
 //! request with their own key, and that self-signature is the proof of
 //! possession.
 //!
+//! # What proof of possession actually prevents
+//!
+//! It is tempting to read proof of possession as "the verifier learns the
+//! holder controls the key", and then to conclude it is redundant — because a
+//! verifier who checks a signature against the certified key has just observed
+//! that control directly and far more recently. That reading is wrong, and
+//! getting it wrong is how an authority ends up dropping the check as
+//! ceremony.
+//!
+//! The attack it prevents is **misattribution by key binding**, and it targets
+//! the authority, not the verifier. Suppose Mallory may request certificates
+//! and presents Noor's public key under the subject name `agent-mallory`.
+//! Without proof of possession the authority issues it, and from then on every
+//! statement Noor legitimately signs verifies against a certificate naming
+//! Mallory. Noor's work is attributed to Mallory, by a certificate that is
+//! genuinely valid, with no forgery anywhere and nothing for a verifier to
+//! detect. The join in `lys verify --cert` would report success, correctly, on
+//! a false statement.
+//!
+//! Both paths this crate offers are safe against that: `issue_certificate`
+//! generates the key itself so no caller-supplied key is ever bound, and this
+//! module requires a signature over the request — which includes the subject
+//! name — so a presented key can only be certified by whoever holds it, and
+//! only under the name they asked for.
+//!
+//! # A certificate does not record how it was issued
+//!
+//! Nothing in X.509 marks a certificate as having been issued over a proven
+//! key, and this crate adds no such marker. A relying party therefore **cannot
+//! tell from the certificate alone** whether the certified key is one its
+//! holder controls or one an authority minted and discarded, and trust in that
+//! property rests on the issuer's policy rather than on the artifact.
+//!
+//! This is a limitation to state rather than paper over, but it is narrower
+//! than it first looks. A certificate over a discarded generated key binds a
+//! key nobody can sign with, so it can never satisfy a signature check — it
+//! fails closed, uselessly rather than dangerously. The property an issuer's
+//! policy must actually supply is the one above: that it never binds a key its
+//! requester did not prove control of. Making that policy publicly auditable is
+//! the argument for logging issuance transparently, rather than something a
+//! certificate field could carry.
+//!
+//! # Requests are replayable, deliberately
+//!
+//! A request's signature covers the subject key and the requested name, and
+//! nothing that ties it to one issuance, one authority, or one moment. Anyone
+//! holding a copy can submit it again, to this authority or another, and get a
+//! certificate over that key under that name.
+//!
+//! That is not a weakness, because proof of possession is a claim about key
+//! control and not an authorisation of a particular issuance. A replayed
+//! request yields a certificate naming the same holder over the same key they
+//! already proved they hold — a public fact anybody could have asked to have
+//! certified. An authority that needs issuance itself to be authorised needs an
+//! access-control decision about the requester, which is a separate concern
+//! from this one and must not be built on the request's signature.
+//!
 //! # Why PKCS#10 rather than a lys-native format
 //!
 //! RFC 2986 already specifies exactly this exchange, its self-signature is
@@ -91,7 +148,7 @@ impl VerifiedRequest {
 /// `identity`'s public key and a signature over the request made with the
 /// matching private key, which is what
 /// [`verify_certificate_request`] checks. The private seed is reached only
-/// through [`IdentitySigner`], so it is never serialised into an rcgen
+/// through `IdentitySigner`, so it is never serialised into an rcgen
 /// keypair.
 ///
 /// The request is deliberately minimal — one common name, no subject

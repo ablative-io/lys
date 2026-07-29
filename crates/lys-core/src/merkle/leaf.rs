@@ -6,7 +6,7 @@
 //! `T: AsRef<[u8]>`, so `SerializedLeaf` satisfies the bound by exposing
 //! its bytes through [`AsRef`]. The tree never sees the original `L` —
 //! `serialize_leaf` is the single conversion point for `Serialize` leaves,
-//! and [`SerializedLeaf::from_raw_bytes`] is the single entry point for the
+//! and `SerializedLeaf::from_raw_bytes` is the single entry point for the
 //! raw-leaf path (see below).
 //!
 //! Serialization is performed with `postcard`, a compact and deterministic
@@ -46,7 +46,7 @@
 //! `postcard` prefixes byte-sequence leaves with a length varint, so the
 //! bytes a `Serialize` tree hashes are **not** the consumer's bytes — a
 //! third party holding only the raw leaf cannot recompute the leaf hash
-//! with standard tooling. [`SerializedLeaf::from_raw_bytes`] wraps bytes
+//! with standard tooling. `SerializedLeaf::from_raw_bytes` wraps bytes
 //! verbatim (no postcard, no length prefix), so a tree fed through it
 //! hashes exactly `SHA-256(0x00 ‖ bytes)` per RFC 6962. **Invariant:** for
 //! every raw leaf, `leaf_hash = SHA-256(0x00 ‖ leaf-bytes)`; reproduce with
