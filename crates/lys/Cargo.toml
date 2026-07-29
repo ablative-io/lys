@@ -23,6 +23,9 @@ clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+# Read-only X.509 field extraction for `lys inspect cert`; verification stays
+# in lys-core, which speaks DER and owns every trust decision.
+x509-parser.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

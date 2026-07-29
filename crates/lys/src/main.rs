@@ -17,7 +17,8 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use crate::cli::{
-    CaCommand, Cli, Command, KeyCommand, LogCommand, LogProveCommand, LogVerifyCommand,
+    CaCommand, Cli, Command, InspectCommand, KeyCommand, LogCommand, LogProveCommand,
+    LogVerifyCommand,
 };
 
 /// Entry point: parse arguments, dispatch, and translate the outcome into an
@@ -82,6 +83,12 @@ fn main() -> ExitCode {
             attestation,
             payload,
         } => commands::verify::run(&attestation, &payload),
+        Command::Inspect(inspect_command) => match inspect_command {
+            InspectCommand::Attestation { attestation } => {
+                commands::inspect::attestation(&attestation)
+            }
+            InspectCommand::Cert { cert } => commands::inspect::cert(&cert),
+        },
         Command::Seal {
             key,
             recipient_public_key,

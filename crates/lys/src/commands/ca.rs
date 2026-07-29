@@ -44,7 +44,10 @@ const CAPABILITY_CLAIMS_COMPONENT: u64 = 1;
 const SECONDS_PER_DAY: u64 = 86_400;
 
 /// The full OID under which this CLI transports capability claims.
-fn capability_claims_oid() -> Vec<u64> {
+///
+/// Shared with `lys inspect cert`, which reads claims back from the same OID
+/// without verifying the certificate that carries them.
+pub(crate) fn capability_claims_oid() -> Vec<u64> {
     let mut oid = LYS_OID_ARC.to_vec();
     oid.push(CAPABILITY_CLAIMS_COMPONENT);
     oid
@@ -57,7 +60,10 @@ fn capability_claims_oid() -> Vec<u64> {
 /// control characters), so anything containing control characters beyond
 /// newline and tab — including ANSI escape sequences that could spoof the
 /// surrounding verification output — falls back to hex.
-fn is_terminal_safe(text: &str) -> bool {
+///
+/// Shared with `lys inspect cert`, which reads the same fields out of
+/// certificates nothing has vouched for and so needs the identical screen.
+pub(crate) fn is_terminal_safe(text: &str) -> bool {
     text.chars()
         .all(|character| !character.is_control() || character == '\n' || character == '\t')
 }

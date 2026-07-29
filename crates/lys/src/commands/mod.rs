@@ -9,6 +9,7 @@ pub mod ca;
 pub mod error;
 pub mod files;
 pub mod hex;
+pub mod inspect;
 pub mod key;
 pub mod log;
 pub mod pem;

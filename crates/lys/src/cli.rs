@@ -68,6 +68,16 @@ pub enum Command {
         payload: PathBuf,
     },
 
+    /// Read-only viewers: print what an artifact or certificate file says,
+    /// WITHOUT verifying any of it.
+    ///
+    /// Every output opens with an UNVERIFIED banner naming the command that
+    /// does verify — `lys verify` for attestations, `lys ca verify` for
+    /// certificates. For local files only: never expose these through a
+    /// network service, where a decode-success signal is a parsing oracle.
+    #[command(subcommand)]
+    Inspect(InspectCommand),
+
     /// Seal a payload for a recipient and sign the envelope with the
     /// sender's identity (X25519 + HKDF-SHA256 + AES-256-GCM, Ed25519
     /// attestation over the sealed bytes).
@@ -351,6 +361,38 @@ pub enum LogVerifyCommand {
         /// `lys log checkpoint` and `lys key inspect --note-name`.
         #[arg(long)]
         verifier_key: String,
+    },
+}
+
+/// `lys inspect` subcommands — read-only viewers over local files. They
+/// decode and print; they verify nothing, and every output says so on its
+/// first line.
+#[derive(Debug, Subcommand)]
+pub enum InspectCommand {
+    /// Print the fields of a `COSE_Sign1` attestation artifact WITHOUT
+    /// checking its signature.
+    ///
+    /// Exits 0 if the artifact decodes, 1 otherwise with the same generic
+    /// message `lys verify` prints. Everything printed is UNVERIFIED — run
+    /// `lys verify` to check the signature against a payload.
+    Attestation {
+        /// Path to the `COSE_Sign1` attestation artifact produced by
+        /// `lys attest`.
+        #[arg(long)]
+        attestation: PathBuf,
+    },
+
+    /// Print a PEM certificate's fields and capability claims WITHOUT
+    /// checking it against any issuer.
+    ///
+    /// Exits 0 if the certificate decodes, 1 otherwise. Everything printed —
+    /// subject, validity window, and especially the capability claims — is
+    /// UNVERIFIED and attacker-choosable; run `lys ca verify` to check the
+    /// signature and the validity window before believing any of it.
+    Cert {
+        /// Path to the PEM certificate produced by `lys ca issue`.
+        #[arg(long)]
+        cert: PathBuf,
     },
 }
 
