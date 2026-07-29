@@ -73,17 +73,17 @@ fn write_head(out: &mut Vec<u8>, major: u8, value: u64) {
         if small < 24 {
             out.push(major_bits | small);
         } else {
-            out.push(major_bits | 24);
+            out.push(major_bits | 0x18);
             out.push(small);
         }
     } else if let Ok(v) = u16::try_from(value) {
-        out.push(major_bits | 25);
+        out.push(major_bits | 0x19);
         out.extend_from_slice(&v.to_be_bytes());
     } else if let Ok(v) = u32::try_from(value) {
-        out.push(major_bits | 26);
+        out.push(major_bits | 0x1a);
         out.extend_from_slice(&v.to_be_bytes());
     } else {
-        out.push(major_bits | 27);
+        out.push(major_bits | 0x1b);
         out.extend_from_slice(&value.to_be_bytes());
     }
 }
