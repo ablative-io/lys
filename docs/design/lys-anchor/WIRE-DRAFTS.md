@@ -251,12 +251,44 @@ already a self-contained JSON file a 15-line script can check):
   "format": "lys/verification-bundle/v1",
   "leaf": "<base64 standard, padded — the leaf bytes verbatim>",
   "inclusion_proof": { "...D2 inclusion artifact, embedded verbatim..." },
-  "receipts": [
-    "<base64 of tagged COSE_Sign1 receipt bytes>"
+  "links": [
+    {
+      "checkpoint": "<the signed note this link's receipt proves, verbatim>",
+      "receipt": "<base64 of tagged COSE_Sign1 receipt bytes>"
+    }
   ],
   "counter_anchor": null
 }
 ```
+
+> **Correction, 2026-07-30 (implementation).** An earlier revision gave this as
+> `"receipts": ["<base64 …>"]` — a flat array of receipts. **That is
+> unverifiable for any chain longer than one link,** and the reason is the
+> receipt design in §1 working exactly as intended: a receipt's payload is
+> *detached*, so verifying receipt *i* requires the leaf bytes it proves.
+>
+> - Receipt 0's leaf is the log's signed note, which the bundle already carries
+>   as `inclusion_proof.checkpoint`. Fine.
+> - Receipt 1's leaf is **anchor 0's own signed note**, which appeared nowhere in
+>   the bundle — and cannot be reconstructed from receipt 0 either. A receipt
+>   yields a root and a tree size, but §1.5 deliberately keeps origins out of
+>   receipts and a receipt carries no note signature.
+>
+> So `receipts` becomes **`links`**, each pairing the notarized checkpoint with
+> the receipt over it. Both halves are load-bearing and neither is redundant.
+
+### 2.2.1 `counter_anchor` is an opaque base64 string, not nested JSON
+
+Typing the slot as arbitrary JSON would make `lys-core` depend on a JSON codec,
+which it deliberately does not — the crate derives `Serialize`/`Deserialize` and
+lets the consumer choose the codec (a stated `tlog` invariant). A counter-anchor
+proof is binary anyway (an `.ots` file), so base64 matches how `leaf` and
+`receipt` are already carried.
+
+**A populated slot is refused** while nothing can verify one. Carrying a time
+attestation that nothing checks is how a reader comes to believe it. The slot
+exists so a future version needs no v2 — not so today's bundles can gesture at
+time.
 
 - **`format`** — first field, mandatory, exact string match. A bundle whose
   format string is unrecognised is rejected before any other field is read.
@@ -281,11 +313,40 @@ already a self-contained JSON file a 15-line script can check):
 1. Reject unrecognised `format`.
 2. Verify the D2 inclusion proof against its embedded checkpoint (existing
    `lys log verify inclusion` path — unchanged).
-3. For each receipt in order: verify it, then require its proven leaf bytes to
-   equal the previous link's checkpoint bytes. **Failure to check this link is
-   the bundle's one interesting vulnerability** — it is what turns a pile of
-   valid receipts into an actual chain.
-4. If `counter_anchor` is present, verify it independently.
+3. **`links[0].checkpoint` must be byte-identical to
+   `inclusion_proof.checkpoint`.** This is the join — it makes the first
+   notarization about *the log the leaf is in*, rather than about some other log
+   whose checkpoint also happens to verify.
+4. For each link *i*: verify its receipt against `links[i].checkpoint` as the
+   proven leaf, under the anchor key the **caller** supplied for that link.
+5. **The rung.** Where `links[i+1]` exists, its checkpoint must be anchor *i*'s
+   own signed checkpoint, and its root and tree size must equal the root receipt
+   *i* reconstructs and the size it claims. This forces two independently signed
+   statements to agree — the anchor's *receipt* signature over a recomputed root,
+   and the anchor's *note* signature over its published checkpoint. **It is also
+   what makes §1.3.1's `tree_size` malleability harmless here:** a relabelled
+   size no longer matches a note-signed one.
+6. If `counter_anchor` is present, refuse (§2.2.1) until something can verify one.
+
+**Steps 3 and 5 are the bundle's one interesting vulnerability** — they are what
+turn a pile of valid receipts into an actual chain. Both are proven load-bearing
+by drift injection: removing either fails exactly the one test built for it, and
+nothing else.
+
+**Trust inputs are the caller's.** The bundle names no keys — not the log's, not
+any anchor's. One `NoteVerifierKey` per link serves both roles, and that is a
+binding worth enforcing rather than a convenience: **an anchor's receipt-signing
+key must be the same key its published checkpoints are signed with**, or nobody
+could cross-check a receipt against the anchor's own log.
+
+`anchors.len()` must equal `links.len()` exactly. A bundle claiming more
+notarization than the verifier will check cannot be checked, and silently
+verifying a prefix would report success for less than the bundle asserts.
+
+**An empty chain is valid** and asserts something weaker: a leaf in a log nobody
+notarized. The verifier reports it rather than letting a reader assume otherwise.
+Truncating a chain is likewise not an attack — it removes a notarization rather
+than fabricating one.
 
 Every step uses artifacts that verify standalone. The bundle adds no step that
 requires trusting the bundle.

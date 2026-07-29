@@ -7,7 +7,7 @@
 //!
 //! The foundation laid here is [`TrustError`], [`TrustResult`], and
 //! [`Ed25519Identity`]. The [`ca`], [`merkle`], [`attestation`], [`receipt`],
-//! [`seal`], [`checkpoint`], and [`tlog`] modules are implemented on top of
+//! [`bundle`], [`seal`], [`checkpoint`], and [`tlog`] modules are implemented on top of
 //! these primitives.
 //!
 //! ```
@@ -27,6 +27,7 @@
 #![cfg_attr(not(test), forbid(unsafe_code))]
 
 pub mod attestation;
+pub mod bundle;
 pub mod ca;
 mod cbor;
 pub mod checkpoint;

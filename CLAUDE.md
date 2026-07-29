@@ -8,7 +8,7 @@ Read [docs/VISION.md](docs/VISION.md) for why this exists, [docs/DESIGN.md](docs
 
 ## Crates
 
-- **`lys-core`** — the library. All trust logic lives here: `keys`, `ca`, `merkle`, `checkpoint`, `tlog`, `attestation`, `receipt`, `seal`, and the shared `error` type. Domain-agnostic — no concept of agents, sessions, or workspaces. This is what consumers depend on and what gets published to crates.io.
+- **`lys-core`** — the library. All trust logic lives here: `keys`, `ca`, `merkle`, `checkpoint`, `tlog`, `attestation`, `receipt`, `bundle`, `seal`, and the shared `error` type. Domain-agnostic — no concept of agents, sessions, or workspaces. This is what consumers depend on and what gets published to crates.io.
 - **`lys`** — the CLI binary. Thin surface over `lys-core`. The "everything is a library + CLI + MCP surface" principle: logic lives in the library, the binary only parses arguments and formats output.
 
 Future crates (later phases): `lys-anchor` (transparency-ledger service), `lys-mcp` (MCP server surface).
