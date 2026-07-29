@@ -1,0 +1,227 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
+use super::*;
+
+#[test]
+fn display_certificate_generation() {
+    let err = TrustError::CertificateGeneration {
+        reason: "rcgen rejected params".to_string(),
+    };
+    let display = err.to_string();
+    assert!(
+        display.contains("certificate generation failed"),
+        "got: {display}"
+    );
+    assert!(display.contains("rcgen rejected params"), "got: {display}");
+}
+
+#[test]
+fn display_certificate_parsing() {
+    let err = TrustError::CertificateParsing {
+        reason: "malformed DER".to_string(),
+    };
+    let display = err.to_string();
+    assert!(
+        display.contains("certificate parsing failed"),
+        "got: {display}"
+    );
+    assert!(display.contains("malformed DER"), "got: {display}");
+}
+
+#[test]
+fn display_certificate_verification() {
+    let err = TrustError::CertificateVerification {
+        reason: "issuer mismatch".to_string(),
+    };
+    let display = err.to_string();
+    assert!(
+        display.contains("certificate verification failed"),
+        "got: {display}"
+    );
+    assert!(display.contains("issuer mismatch"), "got: {display}");
+}
+
+#[test]
+fn display_certificate_revocation() {
+    let err = TrustError::CertificateRevocation {
+        reason: "unknown fingerprint".to_string(),
+    };
+    let display = err.to_string();
+    assert!(
+        display.contains("certificate revocation failed"),
+        "got: {display}"
+    );
+    assert!(display.contains("unknown fingerprint"), "got: {display}");
+}
+
+#[test]
+fn display_merkle_tree() {
+    let err = TrustError::MerkleTree {
+        reason: "index out of range".to_string(),
+    };
+    let display = err.to_string();
+    assert!(
+        display.contains("merkle tree operation failed"),
+        "got: {display}"
+    );
+    assert!(display.contains("index out of range"), "got: {display}");
+}
+
+#[test]
+fn display_seal() {
+    let err = TrustError::Seal {
+        reason: "HKDF expand failed".to_string(),
+    };
+    let display = err.to_string();
+    assert!(display.contains("seal failed"), "got: {display}");
+    assert!(display.contains("HKDF expand failed"), "got: {display}");
+}
+
+#[test]
+fn display_key_management() {
+    let err = TrustError::KeyManagement {
+        reason: "identity key file has invalid length".to_string(),
+    };
+    let display = err.to_string();
+    assert!(display.contains("key management failed"), "got: {display}");
+    assert!(
+        display.contains("identity key file has invalid length"),
+        "got: {display}"
+    );
+}
+
+#[test]
+fn display_signing() {
+    let err = TrustError::Signing {
+        reason: "no signing key configured".to_string(),
+    };
+    let display = err.to_string();
+    assert!(display.contains("signing failed"), "got: {display}");
+    assert!(
+        display.contains("no signing key configured"),
+        "got: {display}"
+    );
+}
+
+#[test]
+fn display_unseal_failed() {
+    let err = TrustError::UnsealFailed;
+    let display = err.to_string();
+    assert!(display.contains("unseal failed"), "got: {display}");
+}
+
+#[test]
+fn display_attestation_failed() {
+    let err = TrustError::AttestationFailed;
+    let display = err.to_string();
+    assert!(
+        display.contains("attestation verification failed"),
+        "got: {display}"
+    );
+}
+
+#[test]
+fn display_invalid_signature() {
+    let err = TrustError::InvalidSignature;
+    let display = err.to_string();
+    assert!(display.contains("invalid signature"), "got: {display}");
+}
+
+#[test]
+fn display_checkpoint_encoding() {
+    let err = TrustError::CheckpointEncoding {
+        reason: "origin contains '+'".to_string(),
+    };
+    let display = err.to_string();
+    assert!(
+        display.contains("checkpoint encoding failed"),
+        "got: {display}"
+    );
+    assert!(display.contains("origin contains '+'"), "got: {display}");
+}
+
+#[test]
+fn display_checkpoint_parsing() {
+    let err = TrustError::CheckpointParsing {
+        reason: "tree size has a leading zero".to_string(),
+    };
+    let display = err.to_string();
+    assert!(
+        display.contains("checkpoint parsing failed"),
+        "got: {display}"
+    );
+    assert!(
+        display.contains("tree size has a leading zero"),
+        "got: {display}"
+    );
+}
+
+#[test]
+fn display_verifier_key() {
+    let err = TrustError::VerifierKey {
+        reason: "declared key ID does not match".to_string(),
+    };
+    let display = err.to_string();
+    assert!(
+        display.contains("invalid note verifier key"),
+        "got: {display}"
+    );
+    assert!(
+        display.contains("declared key ID does not match"),
+        "got: {display}"
+    );
+}
+
+/// Non-oracle: the note-verification failure string is a single generic
+/// message that never distinguishes a malformed envelope from an unknown
+/// key from a bad signature.
+#[test]
+fn note_verification_display_is_single_and_generic() {
+    let display = TrustError::NoteVerification.to_string();
+    assert_eq!(display, "note verification failed");
+    for oracle_word in ["signature", "key", "envelope", "structure", "base64"] {
+        assert!(
+            !display.contains(oracle_word),
+            "non-oracle message must not mention {oracle_word}: {display}"
+        );
+    }
+}
+
+#[test]
+fn display_log_artifact_encoding() {
+    let err = TrustError::LogArtifactEncoding {
+        reason: "tree size exceeds the JSON-safe bound".to_string(),
+    };
+    let display = err.to_string();
+    assert!(
+        display.contains("log artifact encoding failed"),
+        "got: {display}"
+    );
+    assert!(
+        display.contains("tree size exceeds the JSON-safe bound"),
+        "got: {display}"
+    );
+}
+
+/// Non-oracle: the artifact-verification failure string is a single
+/// generic message that never distinguishes checkpoint, size, root,
+/// hash, or kind failures.
+#[test]
+fn log_artifact_verification_display_is_single_and_generic() {
+    let display = TrustError::LogArtifactVerification.to_string();
+    assert_eq!(display, "log artifact verification failed");
+    for oracle_word in ["signature", "checkpoint", "root", "size", "hash", "format"] {
+        assert!(
+            !display.contains(oracle_word),
+            "non-oracle message must not mention {oracle_word}: {display}"
+        );
+    }
+}
+
+#[test]
+fn trust_result_alias_accepts_ok_and_err() {
+    let ok: TrustResult<u8> = Ok(7);
+    let err: TrustResult<u8> = Err(TrustError::InvalidSignature);
+    assert!(ok.is_ok());
+    assert!(err.is_err());
+}
