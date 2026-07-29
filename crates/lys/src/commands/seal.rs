@@ -162,7 +162,8 @@ pub fn open(
     .map_err(|_err| CliError::OpenFailed)?;
 
     // The payload was confidential enough to be sealed; the recovered
-    // plaintext lands owner-readable only (0600 on Unix), not umask-default.
+    // plaintext lands owner-readable only (0600 on Unix), not umask-default,
+    // and an existing file at `out` is tightened rather than left as found.
     write_file_private(out, &plaintext, "opened payload file")?;
 
     println!("sealed envelope opened");

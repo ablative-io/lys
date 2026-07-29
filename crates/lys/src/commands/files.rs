@@ -31,14 +31,19 @@ pub fn write_file(path: &Path, contents: &[u8], what: &str) -> CliResult<()> {
 /// plaintext recovered by `lys open`. On non-Unix platforms this is a plain
 /// [`write_file`].
 ///
-/// The mode applies at creation; an existing file at `path` is truncated and
-/// keeps its current permissions, matching how `lys-core` treats existing
-/// key files (warn-don't-tighten is the operator's call).
+/// The mode is enforced unconditionally: `OpenOptions::mode` covers the
+/// creation case, and permissions are set again after writing so that a
+/// pre-existing file at `path` cannot donate looser permissions to the
+/// plaintext. This mirrors `lys-core`'s identity-key write path, which
+/// force-tightens the same way. (`lys-core` warns rather than tightens when
+/// *loading* an over-permissive key — that is a different path, and the
+/// earlier version of this comment cited it as precedent for not tightening
+/// here, which was the wrong analog.)
 pub fn write_file_private(path: &Path, contents: &[u8], what: &str) -> CliResult<()> {
     #[cfg(unix)]
     {
         use std::io::Write;
-        use std::os::unix::fs::OpenOptionsExt;
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 
         let mut file = std::fs::OpenOptions::new()
             .write(true)
@@ -53,6 +58,19 @@ pub fn write_file_private(path: &Path, contents: &[u8], what: &str) -> CliResult
         file.write_all(contents).map_err(|source| CliError::Io {
             context: format!("failed to write {what} {}", path.display()),
             source,
+        })?;
+        // Creation-time mode does not apply to a file that already existed,
+        // so tighten explicitly. Failing loudly here is deliberate: silently
+        // leaving decrypted plaintext readable is the outcome this exists to
+        // prevent, so it must not degrade into a warning.
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).map_err(|source| {
+            CliError::Io {
+                context: format!(
+                    "failed to restrict permissions on {what} {}",
+                    path.display()
+                ),
+                source,
+            }
         })
     }
     #[cfg(not(unix))]
