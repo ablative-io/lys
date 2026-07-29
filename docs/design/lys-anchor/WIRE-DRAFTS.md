@@ -21,6 +21,19 @@
 > the moment the anchor signs one receipt under a tag, that tag is permanent.
 > A receipt nobody can verify in five years is worse than no receipt, because
 > it was believed.
+>
+> **Update 2026-07-30:** §1 is now **implemented** in `lys-core::receipt`, and
+> building it corrected this document twice — the vdp's RFC 9942 wrappers
+> (§1.2) and the size-1 conformance gap (§1.2.1) — plus surfaced one documented
+> limitation (§1.3.1). Interop is earned rather than asserted: the vendored
+> `veraison/go-cose` gate verifies lys receipts across every leaf of every tree
+> size 2..=17, deriving the detached root from RFC 6962's *recursive*
+> definitions while lys uses an *iterative* walk, and the two implementations
+> produce byte-identical receipts.
+>
+> The document nonetheless **stays DRAFT**: code that could sign freezes
+> nothing. Only a durable artifact signed under the tag does, and none exists —
+> tests sign, nothing else may, and §2 (the bundle) is still unimplemented.
 
 ---
 
@@ -76,12 +89,58 @@ Tagged `COSE_Sign1` (RFC 9052), CBOR tag 18, array of four:
 
 | Label | Value |
 |---|---|
-| `396` (vdp) | map keyed by proof type: inclusion `-1` → `[tree_size: uint, leaf_index: uint, inclusion_path: [+ bstr]]` |
+| `396` (vdp) | map keyed by proof type: inclusion `-1` → **array of** proofs, each an RFC 9942 `bstr .cbor [tree_size: uint, leaf_index: uint, inclusion_path: [+ bstr]]` |
+
+> **Correction, 2026-07-30 (implementation).** An earlier revision of this table
+> wrote the value at `-1` as a bare `[tree_size, leaf_index, inclusion_path]`
+> array. That is **wrong**, and it is the kind of wrong that only shows up in
+> someone else's parser. RFC 9942's CDDL nests the proof twice:
+>
+> ```
+> verifiable-proofs = { &(inclusion-proof: -1) => inclusion-proofs }
+> inclusion-proofs  = [ + inclusion-proof ]
+> inclusion-proof   = bstr .cbor [ tree-size, leaf-index, inclusion-path ]
+> ```
+>
+> Both wrappers — the array of proofs, and the `bstr` around each proof's CBOR
+> — are load-bearing for conformance. Dropping either would have produced
+> receipts that verify perfectly under lys and are unparseable by every
+> conforming RFC 9942 implementation, which is precisely the failure this
+> project exists to avoid. Caught before any artifact was signed, which is the
+> entire argument for writing this file before building.
+
+**lys issues and accepts exactly one proof in that array.** RFC 9942 permits
+several; a receipt carries one signature over one root, so a multi-proof receipt
+would need a rule for what disagreement between the proofs means. Checking only
+the first while carrying others is a confusion attack waiting to happen — a
+downstream reader could act on a proof the verifier never looked at. Widening
+this means deciding the all-proofs-must-agree rule explicitly, and that is a v2
+matter.
 
 Consistency proofs (`-2` → `[size_1, size_2, consistency_path]`) are specified
 but **not issued at launch** (DP2 recommendation (b)).
 
 **Payload:** `nil` — detached.
+
+### 1.2.1 Tree size 1 cannot be expressed, and the remedy is a genesis leaf
+
+RFC 9942 types `inclusion-path` as `[+ bstr]` — *one or more*. The sole leaf of a
+one-leaf tree has an **empty** path (RFC 6962's `PATH(0, {d0}) = {}`), so a
+receipt for it cannot be a conforming artifact. The two facts are both correct
+and jointly exclude a real state: a log's very first entry.
+
+**Ruling:** issuance refuses `tree_size == 1`; the anchor's log is seeded with a
+**genesis leaf** at initialisation, after which `tree_size >= 2` always holds and
+every path has at least one node. Verification still *accepts* an empty path,
+because refusing a mathematically true proof another implementation legitimately
+made would be refusing a true statement — and nothing is admitted by accepting
+it, since the root reconstruction independently requires the exact path length
+that `(leaf_index, tree_size)` demands.
+
+The asymmetry is deliberate: emit only what conforms, accept anything true. The
+alternative — emitting one technically non-conforming receipt — would have made
+it the *first* receipt in existence, and earliest artifacts are the ones others
+reach for as interop test vectors.
 
 ### 1.3 What is signed, and why an unprotected proof is safe
 
@@ -108,6 +167,34 @@ the safety.
 In words, the anchor's signature asserts: *"the leaf that hashes to this
 path's base was included at index N in my tree of size S, whose root I
 vouch for."*
+
+### 1.3.1 The limit of "authenticated by consequence": `tree_size`
+
+Authentication by consequence is exactly as strong as the consequence, and for
+`tree_size` the consequence is incomplete. `tree_size` is pinned only as far as
+it **changes the reconstruction**, and it does not always change it. At
+`leaf_index = 0`, a tree of size 3 and a tree of size 4 produce the same sequence
+of left/right combinations, so a valid receipt can be re-presented with the other
+size: same leaf, same index, same root, same signature, different claimed size.
+`receipt::sign_tests` proves this rather than leaving it to be discovered, and
+also proves that sizes *outside* that class are refused — the equivalence is
+narrow, not an absence of checking.
+
+This is not a forgery and not a false inclusion claim. The leaf, the index and
+the root are unaffected, and the information needed to distinguish the two sizes
+is simply not present in an RFC 6962 inclusion path — which is why RFC 9162 tells
+verifiers to check a proof against a *known* root at a *known* size.
+
+**Ruling: conform and document.** Fixing it in the format would mean moving the
+proof into the protected header or signing `root ‖ tree_size`, and both break
+RFC 9942 conformance — a high price for a low-impact, externally detectable
+malleability. A consumer relying on `tree_size` for anything load-bearing must
+cross-check it against the anchor's published checkpoint at that size, where a
+relabelled size mismatches immediately.
+
+**Consequence for §2.3 (the bundle):** the chain-link check must compare *proven
+leaf bytes*, never claimed sizes. Checkpoint bytes are self-describing and
+signature-covered by the child's own note; `tree_size` in a receipt is not.
 
 ### 1.4 Verifier discipline
 
@@ -205,7 +292,21 @@ requires trusting the bundle.
 
 ---
 
-## 3. What this draft still needs from the round
+## 3. Status of the five open items
+
+All five are now settled — items 1, 2, 4 and 5 by derivation in
+[DECISIONS.md](DECISIONS.md), and item 3 (§1.5, the anchor-origin
+sub-question) by taking the lean: **the receipt carries no origin string.** The
+anchor is identified by its key in label `4`, and the checkpoint being proven
+already carries the child's origin. A second name for the same thing is a second
+thing to disagree with itself, and D1 made origins mandatory precisely because
+collisions are a security defect — adding an unvalidated origin field here would
+reintroduce that surface for convenience. §1 is implemented that way.
+
+What §1 still needs is not a decision but an act: authorisation to sign
+something durable. Until then the tag is free.
+
+### Original text, kept for the record
 
 1. **Ratify or reject the two tag names.** They freeze on first signature.
 2. **Ratify `-8` over `-19`**, with the migration trigger written down (DP2 —
