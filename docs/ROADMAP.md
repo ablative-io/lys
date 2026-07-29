@@ -30,7 +30,7 @@ Move the hardened crate into this repository as `lys-core`, cleaned of its Merid
 The library gets a command-line face — the auditor's and operator's tool.
 
 - `lys key` — generate / inspect identities (never prints private material); `inspect --note-name` prints the signed-note verifier-key form.
-- `lys ca issue` / `lys ca verify` — issue certs with capability-claim extensions; verify against an issuer key at a given instant.
+- `lys ca request` / `lys ca issue` / `lys ca verify` — a holder signs a PKCS#10 request with a key they already control; `issue --request` verifies that proof of possession and certifies *their* key, with capability-claim extensions; `verify` checks against an issuer key at a given instant. Without `--request` the subject keypair is generated and discarded, and the reported `subject_key_origin` says so — such a certificate names a key nobody ever held.
 - `lys attest` / `lys verify` — sign and verify `lys/attestation/v2` COSE_Sign1 artifacts over a payload file.
 - `lys seal` / `lys open` — sealed-envelope transport (authenticated composition only; sender attestation is the COSE artifact).
 - `lys log init/append/checkpoint` / `lys log prove` / `lys log verify` — transparency-log operations: C2SP signed-note checkpoints, self-contained proof artifacts, and third-party verification from **only** the artifact + leaf + verifier key.

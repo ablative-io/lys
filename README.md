@@ -19,7 +19,7 @@ A receipt nobody can verify with standard tooling is worthless. Verification mus
 ## What exists today
 
 - **Identity** — Ed25519 keypairs; each doubles as a signed-note verifier key and derives an X25519 key for sealed transport.
-- **Capability certificates** — Ed25519-signed X.509 certificates with JSON capability claims embedded as an extension: identity and permission as one presentable object.
+- **Capability certificates** — Ed25519-signed X.509 certificates with JSON capability claims embedded as an extension: identity and permission as one presentable object. Issued over a key the holder proves possession of with a standard PKCS#10 request, so the certificate binds the key that actually signs their work.
 - **Attestations** — compact (under 200 bytes) COSE_Sign1 statements binding a signer to a payload hash and timestamp, with canonical-encoding-strict verification.
 - **Sealed transport** — authenticated envelopes so a credential travels to exactly one recipient, from a provable sender, without the infrastructure in between being able to read it.
 - **Transparency logs** — RFC 6962 append-only Merkle logs over raw file bytes, C2SP signed-note checkpoints, and self-contained inclusion/consistency proof artifacts a third party verifies offline.
@@ -170,12 +170,22 @@ Append `myapp-1.4.2.tar.gz.cose` to the log as a leaf and the attestation itself
 
 The same primitives, applied to the problem lys was built for: agents that can prove who they are, what they were allowed to do, and what they actually did.
 
-**Birth certificate.** An orchestrator issues an agent a capability certificate — identity and permission as one object. Claims are plain JSON:
+**Birth certificate.** The agent generates its own key and never surrenders it. It asks for a certificate by signing a request with that key — the signature is proof it holds the private half. The orchestrator verifies that proof, then certifies the key along with what the agent is permitted to do. Identity and permission as one object; claims are plain JSON:
 
 ```console
 $ lys key generate --out orchestrator.key
 generated new identity key: orchestrator.key
-public key (ed25519): 06550cfda45fbe5df579a921b52cdd378827e76dcd09569c4eb556e149c9f276
+public key (ed25519): 40c20137b187a9caefb74dffedc01ad64acfcbb45badc3e14835ce3dbf91ec69
+
+$ lys key generate --out agent.key
+generated new identity key: agent.key
+public key (ed25519): 254f31d0057e669e47b8078eca766eefc2070467a6a6da3185ca25fff18cc6a8
+
+$ lys ca request --key agent.key --subject agent-noor --out agent-noor.csr.pem
+certificate-signing request for subject: agent-noor
+subject public key (ed25519): 254f31d0057e669e47b8078eca766eefc2070467a6a6da3185ca25fff18cc6a8
+request written: agent-noor.csr.pem
+give this to the authority; it carries no private key material
 
 $ cat capabilities.json
 {
@@ -184,27 +194,32 @@ $ cat capabilities.json
   "max_budget_usd": 50
 }
 
-$ lys ca issue --key orchestrator.key --subject agent-noor --claims capabilities.json \
-    --validity-days 7 --out agent-noor.pem
+$ lys ca issue --key orchestrator.key --subject agent-noor --request agent-noor.csr.pem \
+    --claims capabilities.json --validity-days 7 --out agent-noor.pem
 issued certificate for subject: agent-noor
-subject public key (ed25519): 45d014ed38a175291a39360767fed3cc99d2a042b4fe4dd6ea4bb3da6a92774c
-issuer public key (ed25519): 06550cfda45fbe5df579a921b52cdd378827e76dcd09569c4eb556e149c9f276
-fingerprint (sha256): 59fc3cdee97c771e63e54b4ad4c7745a30d9a6b9814506ccd1a7d32d2cfe244e
-expires at (rfc3339): 2026-07-17T18:51:56+00:00
+subject public key (ed25519): 254f31d0057e669e47b8078eca766eefc2070467a6a6da3185ca25fff18cc6a8
+subject key origin: presented by the holder, proof of possession verified
+issuer public key (ed25519): 40c20137b187a9caefb74dffedc01ad64acfcbb45badc3e14835ce3dbf91ec69
+fingerprint (sha256): a06815abf461ca4d01184b47f136811f6789e7e8344d3e17418b0e632dfca63e
+expires at (rfc3339): 2026-08-05T21:21:23+00:00
 capability claims embedded from: capabilities.json
 certificate written: agent-noor.pem
 ```
 
-One thing to read precisely: the certificate's subject keypair is generated at issuance and immediately discarded — nobody holds its private half. The certificate is a signed, verifiable claims object naming a subject, not a binding to the agent's signing key (which appears below and is a different key).
+The subject public key in the certificate is the agent's own key, byte for byte — `254f31d0…` in all three commands. That identity is what makes the rest of this example mean anything: the same key signs the session log below, so the certificate and the log are provably about one agent rather than two unrelated keys that each verify on their own. The request is a public artifact and carries no private material; the agent's private key never leaves the agent.
+
+The request is a standard PKCS#10 request, so an agent with no lys at all can produce one with `openssl req` and still be certified here.
+
+(`--request` is optional. Without it, lys generates the subject keypair and discards the private half, and reports `subject key origin: generated by the issuer and discarded — the holder never proved possession`. That is convenient for testing the plumbing, but such a certificate names a key nobody ever held and proves nothing about any holder. Read that field.)
 
 Any counterparty holding the issuer's public key verifies the certificate and reads the claims — "should I trust this agent?" becomes a query:
 
 ```console
 $ lys ca verify --cert agent-noor.pem \
-    --issuer-public-key 06550cfda45fbe5df579a921b52cdd378827e76dcd09569c4eb556e149c9f276
+    --issuer-public-key 40c20137b187a9caefb74dffedc01ad64acfcbb45badc3e14835ce3dbf91ec69
 certificate verified
-issuer public key (ed25519): 06550cfda45fbe5df579a921b52cdd378827e76dcd09569c4eb556e149c9f276
-checked at (rfc3339): 2026-07-10T18:52:08.432205+00:00
+issuer public key (ed25519): 40c20137b187a9caefb74dffedc01ad64acfcbb45badc3e14835ce3dbf91ec69
+checked at (rfc3339): 2026-07-29T21:21:32.585285+00:00
 capability claims: {
   "capabilities": ["repo:read", "ci:dispatch", "artifact:sign"],
   "delegated_by": "tom@example.com",
@@ -212,13 +227,9 @@ capability claims: {
 }
 ```
 
-**Flight recorder.** Each agent session gets its own log — every message, tool call, and result appended as it happens, checkpointed under the agent's own key. Exactly the machinery from Example 1, with a per-session origin:
+**Flight recorder.** Each agent session gets its own log — every message, tool call, and result appended as it happens, checkpointed under `agent.key`: the same key the certificate above binds. Exactly the machinery from Example 1, with a per-session origin:
 
 ```console
-$ lys key generate --out agent.key
-generated new identity key: agent.key
-public key (ed25519): aeb552a9cf067a8c61e756c00b11c05f82df8119e7c2a36dde25113f63fda5a2
-
 $ lys log init --dir session-log --origin agents.example.com/agent-noor/session-0001
 initialized log directory: session-log
 origin: agents.example.com/agent-noor/session-0001
@@ -227,16 +238,16 @@ root hash (sha256): e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852
 
 $ lys log append --dir session-log --leaf tool-call-001.json
 leaf index: 0
-leaf hash (sha256, rfc6962): 1c96b0231afa7d6f654185d034c5eca12ed0c25b0f658b46a0c5444bf3bcce32
+leaf hash (sha256, rfc6962): df190b31e103bcd0d16d30999e0ccd8543103dafd377a7b6240ec685c7a44105
 tree size: 1
-root hash (sha256): 1c96b0231afa7d6f654185d034c5eca12ed0c25b0f658b46a0c5444bf3bcce32
+root hash (sha256): df190b31e103bcd0d16d30999e0ccd8543103dafd377a7b6240ec685c7a44105
 
 $ lys log checkpoint --dir session-log --key agent.key --out session.checkpoint
 origin: agents.example.com/agent-noor/session-0001
 tree size: 1
-root hash (sha256): 1c96b0231afa7d6f654185d034c5eca12ed0c25b0f658b46a0c5444bf3bcce32
+root hash (sha256): df190b31e103bcd0d16d30999e0ccd8543103dafd377a7b6240ec685c7a44105
 checkpoint written: session.checkpoint
-verifier key (signed-note): agents.example.com/agent-noor/session-0001+26c74c25+Aa61UqnPBnqMYedWwAsRwF+C34EZ58Kjbd4lET9j/aWi
+verifier key (signed-note): agents.example.com/agent-noor/session-0001+c1e1402c+ASVPMdAFfmaeR7gHjsp2bu/CBwRnpqbaMYXKJf/xjMao
 ```
 
 A disputed session answers with an inclusion proof for the one challenged entry — the rest of the session stays private, exactly as in Example 1.
