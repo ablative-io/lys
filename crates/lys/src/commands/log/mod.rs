@@ -7,5 +7,6 @@ pub mod append;
 pub mod checkpoint;
 pub mod init;
 pub mod prove;
+pub mod status;
 pub mod store;
 pub mod verify;

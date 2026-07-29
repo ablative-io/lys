@@ -34,6 +34,7 @@ fn main() -> ExitCode {
         },
         Command::Log(log_command) => match log_command {
             LogCommand::Init { dir, origin } => commands::log::init::run(&dir, &origin),
+            LogCommand::Status { dir } => commands::log::status::run(&dir),
             LogCommand::Append { dir, leaf } => commands::log::append::run(&dir, &leaf),
             LogCommand::Checkpoint { dir, key, out } => {
                 commands::log::checkpoint::run(&dir, &key, &out)

@@ -228,6 +228,22 @@ pub enum LogCommand {
         origin: String,
     },
 
+    /// Report a log's origin, size and current root hash — without its key.
+    ///
+    /// Read-only. Every other route to a log's current size and root goes
+    /// through `lys log checkpoint`, which signs and so requires custody of
+    /// the signing key; observing your own append-only log should not.
+    /// Prints no verifier key, because that is derived from the signing key
+    /// this command never touches — use `lys log checkpoint` when a third
+    /// party needs it. The root is recomputed from local bytes the local
+    /// operator controls, so it reports what this directory contains, not
+    /// that anyone has attested to it.
+    Status {
+        /// Path to the log directory to inspect.
+        #[arg(long)]
+        dir: PathBuf,
+    },
+
     /// Append a leaf file's raw bytes to the log.
     ///
     /// The bytes are hashed verbatim per RFC 6962: leaf hash =
