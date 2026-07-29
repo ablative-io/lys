@@ -6,10 +6,15 @@ contract. The publish is called by the operator, not inferred from readiness.
 
 ## Preconditions (in order)
 
-1. **PEN assigned by IANA** — flip `LYS_OID_ARC` from the `58888` placeholder
-   to the real number (single constant; see
-   [PEN-REGISTRATION.md](PEN-REGISTRATION.md) for the location and sub-arc
-   plan). Publishing certificates under the placeholder arc is not an option.
+1. **PEN assigned by IANA and adopted everywhere** — done: PEN 66364, so
+   `LYS_OID_ARC` is `1.3.6.1.4.1.66364` (see
+   [PEN-REGISTRATION.md](PEN-REGISTRATION.md) for the sub-arc plan and the
+   file-by-file list). Not a single constant — the arc is spelled out in the
+   constant, the `ca issue` help text, module docs, three hardcoded test OIDs,
+   and the design docs, ten files in all, so the check is
+   `grep -rn '58888' crates/ docs/` returning nothing but the historical note
+   in PEN-REGISTRATION.md. Publishing certificates under a placeholder arc is
+   not an option.
 2. **Operator ratifications complete** — the WIRE-FORMATS decision log shows
    no `IMPLEMENTED`-pending-ratification rows for anything in the frozen table.
 3. **Operator calls the publish.**

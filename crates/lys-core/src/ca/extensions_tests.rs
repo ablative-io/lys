@@ -7,7 +7,7 @@ use crate::ca::authority::CertificateAuthority;
 use crate::keys::Ed25519Identity;
 
 /// A custom extension OID under [`LYS_OID_ARC`] used for these tests.
-const TEST_EXT_OID: &[u64] = &[1, 3, 6, 1, 4, 1, 58888, 7];
+const TEST_EXT_OID: &[u64] = &[1, 3, 6, 1, 4, 1, 66364, 7];
 
 fn test_authority() -> CertificateAuthority {
     let dir = tempfile::tempdir().unwrap();

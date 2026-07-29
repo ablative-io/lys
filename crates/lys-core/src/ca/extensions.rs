@@ -21,12 +21,12 @@ pub use rcgen::CustomExtension;
 /// Private-enterprise OID arc reserved for lys custom extensions.
 ///
 /// Rooted at the IANA Private Enterprise Numbers arc (`1.3.6.1.4.1`). The
-/// final component is a stable placeholder used only to namespace opaque
-/// extension payloads within lys; it is not yet an officially registered
-/// Private Enterprise Number, pending an IANA registration. Consumers append
-/// their own sub-components to this arc to distinguish individual extension
-/// kinds.
-pub const LYS_OID_ARC: &[u64] = &[1, 3, 6, 1, 4, 1, 58888];
+/// final component, `66364`, is the Private Enterprise Number IANA assigned
+/// to lys — permanent, publicly registered, and never renumbered: extensions
+/// are signed under OIDs beneath this arc, so changing it would invalidate
+/// every certificate ever issued. Consumers append their own sub-components
+/// to this arc to distinguish individual extension kinds.
+pub const LYS_OID_ARC: &[u64] = &[1, 3, 6, 1, 4, 1, 66364];
 
 /// Encodes an opaque DER payload into a non-critical custom X.509 extension.
 ///

@@ -1,6 +1,6 @@
-# IANA Private Enterprise Number — what to register and why
+# IANA Private Enterprise Number — the lys OID arc
 
-**Status: ACTION NEEDED (operator). Nothing blocks this — register now.**
+**Status: ASSIGNED — PEN 66364. The lys arc is `1.3.6.1.4.1.66364`, permanently.**
 
 ## What this is
 
@@ -10,60 +10,56 @@ tree. It is the namespace under which lys defines its X.509 certificate
 extensions — today the capability-claims extension, later the identity/issuer
 extensions the agent-identity work will add.
 
-lys currently uses a **placeholder**: `LYS_OID_ARC = 1.3.6.1.4.1.58888`
-(`crates/lys-core/src/ca/extensions.rs:29`). 58888 is not ours. Any
-certificate minted before the real PEN lands carries an OID arc that could
-collide with someone else's registered space — fine for development, not
-acceptable in anything durable. **The real PEN must land before 0.1.0
-publishes or anything long-lived is signed.**
+IANA assigned us **66364**, so `LYS_OID_ARC = 1.3.6.1.4.1.66364`
+(`crates/lys-core/src/ca/extensions.rs`). One registration covers the
+organisation forever: sub-arcs beneath it are ours to allocate and never
+involve IANA again. There was exactly **one** registration to make, ever, and
+this was it — submitted through the IANA PEN application form
+(https://pen.iana.org/pen/PenApplication.page, free, no account needed), with
+the registrant of record listed in the public registry at
+https://www.iana.org/assignments/enterprise-numbers/.
 
 Precedent: Sigstore's entire certificate-extension story hangs off their
 registered PEN 57264 (`1.3.6.1.4.1.57264.1.*`). One number, managed sub-arcs,
 permanent.
 
-## Does anything need to be developed first?
+## History: the 58888 placeholder
 
-**No.** The registration is independent of all code. One PEN covers the
-organisation forever — sub-arcs beneath it are ours to allocate and never
-involve IANA again. There is exactly **one** registration to make, ever.
+Before the assignment landed the arc ended in `58888` — a number that was
+never ours, carried deliberately as a development placeholder. It is recorded
+here so the provenance of the change stays legible, and nowhere else.
 
-Timing note: IANA turnaround is typically days to a few weeks, so submitting
-now means the number is in hand well before 0.1.0. Registering early costs
-nothing; registering late gates the release.
+**Nothing durable was ever signed under it.** No release published, no
+long-lived certificate issued; the only certificates minted under the
+placeholder were test fixtures that re-mint on every run. Registering before
+0.1.0 was the whole point — an arc is a wire contract, and the placeholder
+could have collided with somebody else's registered space.
 
-## What to submit
+## What the adoption touched
 
-Form: **https://pen.iana.org/pen/PenApplication.page** (IANA PEN application —
-free, no account needed).
+Not the "single constant" this document once predicted. The dotted-decimal
+form is spelled out in prose, in `--help` text, and in hardcoded test OIDs, so
+the flip touched ten files across both crates and the design docs:
 
-| Field | Value to enter |
-|---|---|
-| Organisation name | The legal entity name — e.g. `Ablative Pty Ltd` (use the exact registered business name; this appears verbatim in the public registry) |
-| Organisation address | The business address |
-| Contact name | Tom Whiting |
-| Contact email | `tom@ablative.com.au` (public in the registry — use a role address like `iana@ablative.com.au` instead if you prefer not to expose a personal one) |
-| Contact phone | Business number (registry-public as well) |
+- `LYS_OID_ARC` and its doc comment in `crates/lys-core/src/ca/extensions.rs`
+- the hardcoded test OIDs in `crates/lys-core/src/ca/extensions_tests.rs`,
+  `crates/lys/src/commands/ca.rs`, and `crates/lys/tests/cli_tests.rs`
+- the `lys ca issue` help text in `crates/lys/src/cli.rs`, and the module and
+  item docs in `crates/lys/src/commands/ca.rs`
+- this document, `docs/DESIGN.md`, `docs/RELEASE-CHECKLIST.md`,
+  `docs/design/lys-core/DESIGN.md`, and `docs/design/lys-core/CHECKLIST.md`
 
-That's the whole application — Bob's your uncle. IANA emails the assigned
-number; the registration is permanent, free, and appears in the public
-registry at https://www.iana.org/assignments/enterprise-numbers/.
+The help-text copy is the one a future arc change could silently strand, so it
+is pinned: a test renders the `ca issue` help and asserts it names the OID that
+`capability_claims_oid()` actually builds.
 
-## What happens after assignment
-
-One small, mechanical change plus docs — I handle all of it:
-
-1. `LYS_OID_ARC` flips from `58888` to the assigned number (single constant).
-2. The OID literals in docs, `--help` text, and tests update to match.
-3. Test certificates re-mint automatically (nothing durable was ever signed
-   under the placeholder — that is the point of doing this before 0.1.0).
-
-## Planned sub-arc allocation under `1.3.6.1.4.1.<PEN>`
+## Sub-arc allocation under `1.3.6.1.4.1.66364`
 
 Managed by us, documented here as the single source of truth:
 
 | Arc | Purpose | Status |
 |---|---|---|
-| `.1` | Capability claims (certificate extension carrying operator-reviewed claim bytes; today's `lys ca issue --claims`) | In use (under placeholder) |
+| `.1` | Capability claims (certificate extension carrying operator-reviewed claim bytes; today's `lys ca issue --claims`) | In use |
 | `.2` | Reserved: identity/issuer extensions for agent certificates (Sigstore-`.1.8`-style — which issuer vouched, runtime identity, session binding) — allocated when the agent-identity design lands | Reserved |
 | `.3+` | Unallocated | — |
 

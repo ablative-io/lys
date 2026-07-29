@@ -5,7 +5,7 @@
 //! whole number of days (the library's TTL model — there is no backdating).
 //! Capability claims, when supplied, are validated as JSON and embedded
 //! byte-for-byte as a non-critical extension under the lys OID arc with
-//! sub-component `1` (`1.3.6.1.4.1.58888.1`); the library carries them as
+//! sub-component `1` (`1.3.6.1.4.1.66364.1`); the library carries them as
 //! opaque DER and this CLI defines no further semantics. Certificates are
 //! written as PEM, the X.509 interop norm.
 //!
@@ -36,7 +36,7 @@ use crate::commands::pem;
 
 /// Sub-component appended to [`LYS_OID_ARC`] for the CLI's capability-claims
 /// extension. Part of the wire contract: certificates issued by this CLI
-/// carry claims under `1.3.6.1.4.1.58888.1`, and `lys ca verify` reads them
+/// carry claims under `1.3.6.1.4.1.66364.1`, and `lys ca verify` reads them
 /// back from the same OID.
 const CAPABILITY_CLAIMS_COMPONENT: u64 = 1;
 
@@ -201,7 +201,7 @@ mod tests {
     #[test]
     fn capability_claims_oid_extends_the_lys_arc_by_one() {
         let oid = capability_claims_oid();
-        assert_eq!(oid, vec![1, 3, 6, 1, 4, 1, 58888, 1]);
+        assert_eq!(oid, vec![1, 3, 6, 1, 4, 1, 66364, 1]);
         assert_eq!(&oid[..LYS_OID_ARC.len()], LYS_OID_ARC);
     }
 

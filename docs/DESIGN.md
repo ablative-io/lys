@@ -16,7 +16,7 @@ Six layers, composable but separable:
 
 - `Ed25519Identity`: file- or env-backed keypair, strict verification, Debug-redacted, with X25519 derivation (clamped-scalar conversion) so one long-term key serves both signing and credential unsealing.
 - `CertificateAuthority`: Ed25519-rooted X.509 issuance via rcgen with a `RemoteKeyPair` adapter (the private seed never serialises). Chain verification extracts TBS bytes with x509-parser and verifies with ed25519-dalek (`verify_strict`), enforcing the validity window. Capability claims travel as opaque DER in custom extensions under the lys OID arc — the cert *is* the permission object; consumers define claim semantics.
-- **Open item:** register a real IANA Private Enterprise Number (the current arc uses placeholder PEN 58888).
+- The lys OID arc is `1.3.6.1.4.1.66364`, rooted at IANA Private Enterprise Number 66364, assigned to us and permanent — nothing beneath it may ever be renumbered. Sub-arc allocation is tracked in [PEN-REGISTRATION.md](PEN-REGISTRATION.md).
 
 ### 2. Tamper-evident log (`lys-core::merkle`)
 

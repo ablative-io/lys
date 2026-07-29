@@ -1,6 +1,12 @@
 //! Clap argument definitions for the `lys` binary.
 //!
 //! Pure declaration — no logic. Doc comments double as `--help` text.
+//!
+//! One piece of that text is load-bearing: `ca issue` quotes the
+//! capability-claims OID, which must stay identical to the OID the CLI
+//! actually writes into certificates. The literal below is pinned to
+//! `capability_claims_oid()` by a test that renders the help, so the two
+//! cannot drift.
 
 use std::path::PathBuf;
 
@@ -153,7 +159,7 @@ pub enum CaCommand {
     /// its private half is discarded — only the subject public key is
     /// printed. Capability claims, if given, must be a valid JSON file and
     /// are embedded byte-for-byte as a non-critical X.509 extension under
-    /// OID 1.3.6.1.4.1.58888.1 (the lys arc).
+    /// OID 1.3.6.1.4.1.66364.1 (the lys arc).
     Issue {
         /// Path to the issuing authority's identity key file (raw 32-byte
         /// Ed25519 seed). Must already exist — run `lys key generate` first.
@@ -422,4 +428,39 @@ pub enum KeyCommand {
         #[arg(long)]
         note_name: Option<String>,
     },
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+mod tests {
+    use clap::CommandFactory;
+
+    use super::Cli;
+    use crate::commands::ca::capability_claims_oid;
+
+    /// An OID in the dotted-decimal form help text quotes it in.
+    fn dotted(oid: &[u64]) -> String {
+        let components: Vec<String> = oid.iter().map(u64::to_string).collect();
+        components.join(".")
+    }
+
+    /// The OID in the `ca issue` help is a hand-written literal; this pins it
+    /// to the OID the CLI actually issues under, so changing the arc without
+    /// changing the help text fails here rather than misleading an operator.
+    #[test]
+    fn ca_issue_help_quotes_the_capability_claims_oid() {
+        let mut command = Cli::command();
+        let issue = command
+            .find_subcommand_mut("ca")
+            .expect("`ca` subcommand is declared")
+            .find_subcommand_mut("issue")
+            .expect("`ca issue` subcommand is declared");
+        let help = issue.render_long_help().to_string();
+        let expected = dotted(&capability_claims_oid());
+
+        assert!(
+            help.contains(&expected),
+            "`lys ca issue --help` must name OID {expected}; rendered help was:\n{help}"
+        );
+    }
 }

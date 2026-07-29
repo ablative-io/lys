@@ -31,7 +31,7 @@
 - [ ] **C21** — Chain verification enforces the validity window: expired certificates and not-yet-valid certificates are both rejected (tests exist for each)
 - [ ] **C22** — verify_certificate_chain_at(cert_der, issuer_public_key, instant) verifies at an explicit instant; a cert expired now but valid at the given instant passes
 - [ ] **C23** — Self-signed certificates are rejected by verify_certificate_chain
-- [ ] **C24** — `LYS_OID_ARC` constant equals [1, 3, 6, 1, 4, 1, 58888] with a doc comment stating the PEN is a placeholder pending IANA Private Enterprise Number registration
+- [ ] **C24** — `LYS_OID_ARC` constant equals [1, 3, 6, 1, 4, 1, 66364] with a doc comment stating that 66364 is the IANA Private Enterprise Number assigned to lys and that the arc is permanent
 - [ ] **C25** — encode_extension / decode_extension round-trip an arbitrary DER payload under LYS_OID_ARC; decode of a cert without the extension returns Ok(None)
 - [ ] **C26** — Round-trip test: rcgen-generated Ed25519 keypair is loadable as ed25519-dalek SigningKey/VerifyingKey
 

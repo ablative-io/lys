@@ -396,7 +396,7 @@ const CLAIMS_JSON: &str = r#"{"capabilities":["deploy","sign"],"scope":"ci"}"#;
 
 /// The OID the CLI documents for capability-claims extensions
 /// (`LYS_OID_ARC` + `1`).
-const CLAIMS_OID: &[u64] = &[1, 3, 6, 1, 4, 1, 58888, 1];
+const CLAIMS_OID: &[u64] = &[1, 3, 6, 1, 4, 1, 66364, 1];
 
 /// Strip PEM framing and base64-decode the certificate body.
 fn der_from_pem(pem_text: &str) -> Vec<u8> {
