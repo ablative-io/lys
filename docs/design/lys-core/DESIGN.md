@@ -8,7 +8,7 @@ title: "Lys Core — Trust Primitives and CLI Surface"
 
 ## Intention
 
-When this cluster is done, the hardened trust primitives live in this repository as `lys-core` — a standalone, domain-agnostic library with zero Meridian lineage — and the `lys` binary gives operators and auditors a command-line face over every primitive. An agent runtime signs session events with it. An auditor verifies a challenged log with it, offline, from nothing but a published root and proof bytes. A future anchoring service consumes its roots and attestations. Nothing in the crate knows what an agent, session, or workspace is; domain meaning is applied by consumers.
+When this cluster is done, the hardened trust primitives live in this repository as `lys-core` — a standalone, domain-agnostic library with zero Meridian lineage — and the `lys` binary gives operators and auditors a command-line face over every primitive. An agent runtime signs session events with it. An auditor verifies a challenged log with it, offline, from nothing but a signed proof artifact, the leaf in question, and the log's verifier key. A future anchoring service consumes its roots and attestations. Nothing in the crate knows what an agent, session, or workspace is; domain meaning is applied by consumers.
 
 The crate arrives only in its hardened form. Phase 0 (the adversarial review and fix pass on `meridian-trust`) is done; this cluster is the extraction (phase 1) plus the CLI surface (phase 2). Behaviour is ported unchanged except for three deliberate breaks made at the last free moment: the wire-format tags are renamed to lys-owned strings, the legacy pre-domain-separation attestation fallback is stripped, and the identity env var and OID constant take lys names.
 
@@ -31,7 +31,8 @@ The founding rule carries over unchanged: `lys-core` knows no domain concepts. N
 
 - Ed25519 key management with X25519 derivation
 - A Certificate Authority that issues X.509 certificates for any subject
-- An RFC 6962 Merkle transparency log over any serializable leaf
+- An RFC 6962 Merkle transparency log over any serializable leaf, or over raw leaf bytes
+- Signed tree heads as C2SP checkpoints in the signed-note envelope, and self-contained JSON proof artifacts a third party can verify unaided
 - Domain-separated signed attestations over any byte payload
 - Sealed envelopes for any byte payload, standalone or sender-authenticated
 
@@ -60,7 +61,7 @@ Ed25519-rooted X.509 issuance and verification:
 
 Revocation tracking is deliberately absent (never built in the source crate; a first-class revocation story is an open product question — see repo DESIGN.md §Open questions).
 
-### D4: Merkle transparency log (`lys_core::merkle`)
+### D4: Merkle transparency log (`lys_core::merkle`, `lys_core::checkpoint`, `lys_core::tlog`)
 
 `AppendOnlyTree<L: Serialize>` provides RFC 6962 semantics over SHA-256, backed by `ct-merkle` behind a deliberately backing-agnostic API:
 
@@ -68,7 +69,12 @@ Revocation tracking is deliberately absent (never built in the source crate; a f
 - Inclusion proofs (`prove_inclusion` / `verify_inclusion`) and consistency proofs (`prove_consistency` / `verify_consistency`), with byte round-tripping (`as_bytes` / `try_from_bytes`) on both proof types.
 - `RootHash::from_parts(root_hash, num_leaves)` / `to_parts()` — the external-verifier constructor. A third party holding only a published root and proof bytes can verify inclusion and consistency with no access to the tree. The external-verifier round trip is the defining test of the layer.
 - `reconstruct_from_leaves(leaves)` rebuilds an identical tree from a persisted leaf sequence — the crash-recovery path for consumers persisting leaves externally.
-- Leaf serialization is a **frozen wire contract**: leaves are canonical bytes; schema evolution means a new versioned leaf type, never a mutated one. This rule is documented at the module level.
+- Leaf serialization is a **frozen wire contract**: leaves are canonical bytes; schema evolution means a new versioned leaf type, never a mutated one. This rule is documented at the module level. Two encodings are frozen and never mix within one tree — the typed postcard path, and the raw path (`RawLeaf`: leaf file bytes verbatim, no framing) that every `lys log` artifact uses.
+
+Two layers ratified after this cluster was first written — decisions **D1** and **D2** in [WIRE-FORMATS.md](../WIRE-FORMATS.md) §2–§3 — ship on top of `merkle` and are part of the crate as built:
+
+- **`lys_core::checkpoint`** — the signed tree head: a C2SP tlog-checkpoint body wrapped in the C2SP signed-note envelope, Ed25519-signed, byte-compatible with the Go `sumdb/note` reference. `verify_checkpoint` **enforces** `checkpoint origin == verifier-key name`, so a key that signs two logs can never have one log's checkpoint accepted by a verifier configured for the other. Every failure mode — size, UTF-8, structure, unknown key, bad signature — collapses to the single `TrustError::NoteVerification`.
+- **`lys_core::tlog`** — self-contained JSON proof artifacts: an RFC 6962 proof plus the relevant signed checkpoint(s) embedded verbatim, identified by frozen `format` strings, with unknown fields rejected. Redundancy is checked, not trusted: every size an artifact declares is compared against the size inside its signature-verified checkpoint, and roots are recomputed rather than believed. Builders self-verify before returning, tree sizes at or beyond 2^53 are refused on both emit and verify, and every failure collapses to the single `TrustError::LogArtifactVerification`.
 
 ### D5: Signed attestations (`lys_core::attestation`) — COSE_Sign1 v2, canonical-strict
 
@@ -99,18 +105,21 @@ X25519 ephemeral key agreement + HKDF-SHA256 + AES-256-GCM, the standard sealed-
 
 ### D7: Wire formats are forever
 
-The domain tags (`lys/attestation/v2`, `lys/sealed-envelope/v1`), the attestation `Sig_structure` layout, the HKDF info layout, and leaf encodings are versioned wire contracts, frozen the moment anything durable is signed under them. Evolving one means a new versioned constant and code path, never a mutation of the shipped one. The extraction renames the Meridian tags precisely because it is the last moment nothing has been signed under the lys names.
+The domain tags (`lys/attestation/v2`, `lys/sealed-envelope/v1`, and the distinct HKDF info tag `lys-sealed-envelope/v1`), the attestation `Sig_structure` layout, the HKDF info layout, both leaf encodings, the checkpoint and signed-note encodings, and the proof-artifact `format` strings are versioned wire contracts, frozen the moment anything durable is signed under them. [WIRE-FORMATS.md](../WIRE-FORMATS.md) §1 is the authoritative table. Evolving one means a new versioned constant and code path, never a mutation of the shipped one. The extraction renames the Meridian tags precisely because it is the last moment nothing has been signed under the lys names.
 
 ### D8: CLI surface (`lys` binary)
 
-The auditor's and operator's tool — a thin clap surface over `lys-core`. Logic lives in the library; the binary parses arguments and formats output (`anyhow` at the top level only). Subcommands:
+> **Superseded in part by decisions D1 and D2 in [WIRE-FORMATS.md](../WIRE-FORMATS.md) §2–§3**: the log subcommands emit C2SP signed-note checkpoints and self-contained JSON proof artifacts, and third-party verification takes the artifact, the leaf, and the verifier key rather than raw root parts plus proof bytes. As-built summary:
 
-- `lys key` — generate and inspect identities (public key, fingerprint). **Never prints private key material** under any flag or format.
+The auditor's and operator's tool — a thin clap surface over `lys-core`. Logic lives in the library; the binary parses arguments, dispatches, and maps results to exit codes (`0` success, `1` operational or verification failure, `2` clap argument errors). As built it carries its own `thiserror` error type with deliberately non-oracle failure messages, and no `anyhow`. Subcommands:
+
+- `lys key generate` / `lys key inspect` — generate and inspect identities (Ed25519 and derived X25519 public keys, and with `--note-name` the signed-note verifier-key string). **Never prints private key material** under any flag or format.
 - `lys ca issue` — issue a certificate with a capability-claim extension payload, signed by an issuer identity.
 - `lys ca verify` — verify a certificate chain against an issuer public key, with an optional explicit verification instant (the `verify_certificate_chain_at` path).
-- `lys attest` / `lys verify` — sign and verify attestations over a file or stdin.
-- `lys seal` / `lys open` — sealed-envelope transport of a payload file.
-- `lys log append` / `lys log prove` / `lys log verify` — transparency-log operations over a persisted leaf sequence, including the third-party path: `lys log verify` proves an inclusion or consistency claim from **only** a published root and proof bytes, with no access to the original tree.
+- `lys attest` / `lys verify` — sign and verify `lys/attestation/v2` COSE_Sign1 artifacts over a payload file. (File paths only as built; there is no stdin path.)
+- `lys seal` / `lys open` — sealed-envelope transport of a payload file, authenticated composition only: `seal` writes the JSON envelope and the sender's COSE attestation, and `open` requires both, verifying before it decrypts.
+- `lys inspect attestation` / `lys inspect cert` — read-only viewers that print what a file says **without verifying any of it**, every output opening with an UNVERIFIED banner naming the command that does verify. Local files only.
+- `lys log init` / `append` / `checkpoint` / `prove` / `verify` — transparency-log operations over a persisted leaf sequence: `init` pins the log's origin exactly once and refuses re-initialization, `append` hashes a leaf file's raw bytes per RFC 6962, `checkpoint` signs a C2SP signed-note checkpoint over the current root, `prove` emits a self-contained JSON proof artifact with the relevant signed checkpoint(s) embedded, and `verify` checks an inclusion or consistency claim from **only** the artifact, the leaf, and the verifier key — no access to the store or the tree.
 
 The phase proof: a log produced by one process is verified end-to-end by the CLI in another process that never sees the original tree.
 
@@ -118,7 +127,7 @@ The phase proof: a log produced by one process is verified end-to-end by the CLI
 
 1. `lys-core` compiles standalone in this repository with zero Meridian dependencies and zero Meridian references, behaviour-identical to the hardened source crate except the deliberate breaks (D5 legacy strip, D7 tag renames, `LYS_IDENTITY_KEY`, `LYS_OID_ARC`).
 2. All hardening commitments hold in the ported code: `verify_strict` everywhere, validity-window enforcement with an `_at` variant, `RootHash::from_parts` external verification, authenticated timestamps with domain separation, contributory-DH rejection, seed zeroization, single-arbiter unsealing, race-free key generation.
-3. Attestation verification is v1-only: no legacy code path exists in the crate.
+3. Attestation verification is v2-only (WIRE-FORMATS.md D4): no legacy code path exists in the crate — neither the Meridian preimage nor the deleted-unshipped `lys/attestation/v1` form verifies.
 4. An external verifier round-trips: inclusion and consistency proofs verify from published root parts and proof bytes alone.
 5. The `lys` CLI covers every primitive, and a log produced in one process verifies end-to-end via the CLI in another with no access to the original tree.
 6. `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and `cargo test --workspace` all pass clean.
@@ -138,6 +147,10 @@ The phase proof: a log produced by one process is verified end-to-end by the CLI
 ```
 crates/lys-core/
 ├── Cargo.toml
+├── tests/                        — cross-implementation conformance suites
+│   ├── cose_conformance.rs       — round-trip against veraison/go-cose
+│   ├── go_conformance.rs         — round-trip against Go sumdb/note
+│   └── signed_note_crosscheck.rs — crosscheck against Cloudflare signed_note
 └── src/
     ├── lib.rs                    — pub mod + re-exports, hex_lower helper (D1)
     ├── error.rs                  — TrustError enum, TrustResult<T> (D1)
@@ -156,8 +169,21 @@ crates/lys-core/
     │   ├── mod.rs                — pub mod / pub use only
     │   ├── tree.rs               — AppendOnlyTree<L>: append, root, proofs, reconstruct (D4)
     │   ├── proof.rs              — RootHash from_parts/to_parts, Inclusion/ConsistencyProof,
-    │   │                           verify_inclusion, verify_consistency (D4)
-    │   ├── leaf.rs               — leaf hashing, frozen-wire-contract docs (D4)
+    │   │                           verify_inclusion, verify_consistency, raw-leaf path (D4)
+    │   ├── leaf.rs               — leaf hashing, RawLeaf, frozen-wire-contract docs (D4)
+    │   └── *_tests.rs
+    ├── checkpoint/               — WIRE-FORMATS D1: signed tree heads
+    │   ├── mod.rs                — pub mod / pub use only
+    │   ├── body.rs               — CheckpointBody encode/parse (C2SP tlog-checkpoint)
+    │   ├── note.rs               — sign_note / verify_note / verify_checkpoint
+    │   │                           (C2SP signed-note; origin == key-name enforced)
+    │   ├── verifier_key.rs       — verifier-key strings and RFC 6962-style key IDs
+    │   └── *_tests.rs
+    ├── tlog/                     — WIRE-FORMATS D2: self-contained proof artifacts
+    │   ├── mod.rs                — pub mod / pub use only
+    │   ├── artifact.rs           — frozen JSON artifact shapes and format strings
+    │   ├── build.rs              — self-verifying inclusion/consistency builders
+    │   ├── verify.rs             — third-party verification, single non-oracle error
     │   └── *_tests.rs
     ├── attestation/
     │   ├── mod.rs                — pub mod / pub use, invariant docs
@@ -172,21 +198,40 @@ crates/lys-core/
         ├── mod.rs                — pub mod / pub use only
         ├── sealed_envelope.rs    — seal/open, HKDF binding, contributory checks,
         │                           single failure arbiter (D6)
-        ├── authenticated.rs      — sign_and_seal / open_and_verify (D6)
-        └── *_tests.rs
+        └── authenticated.rs      — sign_and_seal / open_and_verify (D6)
 
 crates/lys/
 ├── Cargo.toml
+├── tests/
+│   ├── cli_tests.rs              — key / attest / verify / ca / seal / open / inspect
+│   └── log_tests.rs              — log lifecycle incl. the cross-process third-party path
 └── src/
-    ├── main.rs                   — thin entry: parse args, dispatch, format errors (D8)
+    ├── main.rs                   — thin entry: parse args, dispatch, exit codes (D8)
+    ├── cli.rs                    — clap definitions and help text only (D8)
     └── commands/
         ├── mod.rs                — pub mod only
-        ├── key.rs                — lys key (D8)
+        ├── key.rs                — lys key generate / inspect (D8)
         ├── ca.rs                 — lys ca issue / verify (D8)
-        ├── attest.rs             — lys attest / verify (D8)
+        ├── attest.rs             — lys attest (D8)
+        ├── verify.rs             — lys verify (D8)
+        ├── inspect.rs            — lys inspect attestation / cert (D8)
         ├── seal.rs               — lys seal / open (D8)
-        └── log.rs                — lys log append / prove / verify (D8)
+        ├── error.rs              — CLI error type, non-oracle failure messages (D8)
+        ├── files.rs              — file I/O incl. owner-only plaintext writes (D8)
+        ├── hex.rs                — hex parsing/formatting helpers (D8)
+        ├── pem.rs                — PEM encode/decode helpers (D8)
+        └── log/
+            ├── mod.rs            — pub mod only
+            ├── init.rs           — lys log init (origin pinned once) (D8)
+            ├── append.rs         — lys log append (D8)
+            ├── checkpoint.rs     — lys log checkpoint (D8)
+            ├── prove.rs          — lys log prove inclusion / consistency (D8)
+            ├── verify.rs         — lys log verify inclusion / consistency (D8)
+            └── store.rs          — leaf-sequence store: O_EXCL leaf writes,
+                                    atomic tmp+rename state, rebuild on open (D8)
 ```
+
+Tests live in sibling `*_tests.rs` files throughout `merkle`, `ca`, `keys`, `attestation`, `checkpoint`, and `tlog`; `merkle/leaf.rs`, both `seal/` files, and several CLI modules currently carry inline `mod tests` instead (see [REVIEW-23-07.md](../../REVIEW-23-07.md) F12).
 
 ## Constraints
 

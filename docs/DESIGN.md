@@ -1,6 +1,6 @@
 # Lys — Design
 
-> Status: pre-extraction. The core primitives live today as `meridian-trust` inside the Meridian workspace, undergoing a security-hardening pass (see [Hardening baseline](#hardening-baseline)). This document records the design as it will stand in this repository.
+> Status: post-extraction — Phases 0–2 are **done** (see [ROADMAP.md](ROADMAP.md)). The hardened primitives live in this repository as `lys-core`, and the `lys` CLI surfaces every one of them. They originated as `meridian-trust` inside the Meridian workspace and were extracted only after the security-hardening pass recorded in the [hardening baseline](#hardening-baseline) below. This document records the architecture; the byte-exact, frozen wire contracts live in [design/WIRE-FORMATS.md](design/WIRE-FORMATS.md), which is authoritative wherever the two disagree.
 
 ## Origin
 
@@ -18,11 +18,15 @@ Six layers, composable but separable:
 - `CertificateAuthority`: Ed25519-rooted X.509 issuance via rcgen with a `RemoteKeyPair` adapter (the private seed never serialises). Chain verification extracts TBS bytes with x509-parser and verifies with ed25519-dalek (`verify_strict`), enforcing the validity window. Capability claims travel as opaque DER in custom extensions under the lys OID arc — the cert *is* the permission object; consumers define claim semantics.
 - The lys OID arc is `1.3.6.1.4.1.66364`, rooted at IANA Private Enterprise Number 66364, assigned to us and permanent — nothing beneath it may ever be renumbered. Sub-arc allocation is tracked in [PEN-REGISTRATION.md](PEN-REGISTRATION.md).
 
-### 2. Tamper-evident log (`lys-core::merkle`)
+### 2. Tamper-evident log (`lys-core::merkle`, `lys-core::checkpoint`, `lys-core::tlog`)
 
 - `AppendOnlyTree<L>`: RFC 6962 semantics over SHA-256. Append is the only mutation; the API exposes no delete/modify and pre-checks every argument so the underlying library cannot panic.
 - Inclusion and consistency proofs with byte round-tripping, and — critically — `RootHash::from_parts(bytes, leaf_count)` so a third party holding only a published root and a proof can verify. The external-verifier round trip is the defining test of the layer.
-- Leaf serialization is a **frozen wire contract**: leaves are canonical bytes; schema evolution means a new versioned leaf type, never a mutated one.
+- Leaf serialization is a **frozen wire contract**: leaves are canonical bytes; schema evolution means a new versioned leaf type, never a mutated one. Two encodings are frozen and never mix in one tree: the typed postcard path, and the raw path (leaf file bytes verbatim) that every `lys log` artifact uses.
+- **Signed tree heads (`lys-core::checkpoint`)**: the artifact for "here is the state of the log, signed" is a C2SP tlog-checkpoint body wrapped in the C2SP signed-note envelope, Ed25519-signed — the single most convergent format in the transparency ecosystem (Tessera, Rekor v2, static-CT and the public witness network all speak it), byte-compatible with the Go `sumdb/note` reference. Verification enforces `checkpoint origin == verifier-key name`, so a key that signs two logs can never have one log's checkpoint accepted for the other, and every failure mode collapses to one non-oracle error.
+- **Proof artifacts (`lys-core::tlog`)**: self-contained JSON carrying an RFC 6962 proof plus the relevant signed checkpoint(s) embedded verbatim, so a third party needs only the artifact, the leaf, and the verifier key — never the store or the tree. Nothing an artifact declares is trusted: every declared size is checked against the size inside the signature-verified checkpoint, roots are recomputed rather than believed, and builders self-verify before returning.
+
+Both of the above are ratified, frozen contracts — decisions **D1** and **D2** in [design/WIRE-FORMATS.md](design/WIRE-FORMATS.md).
 
 ### 3. Attestation (`lys-core::attestation`)
 
@@ -41,9 +45,9 @@ The layer that makes history *externally* fixed. Instances periodically submit l
 - Privacy invariant: the service sees roots and signer identities, never contents. Salted-hash leaves for anything sensitive even at the metadata level.
 - Deployment shapes: hosted shared ledger (the product), self-hosted for enterprises, and — for minimal-trust operation — counter-anchoring the service's own root to public infrastructure (OpenTimestamps-style).
 
-### 6. Verification (`lys-verify` — new, CLI + library)
+### 6. Verification (`lys-core` + the `lys` CLI)
 
-The auditor's tool: given published roots, receipts, and proofs, answer "is this history intact?" without contacting the operator. Verifies cert chains to instance CAs, inclusion/consistency against anchored roots, attestation signatures, and — where the runtime supports it — drives deterministic replay as the strongest check. Must be independently implementable from the wire formats alone.
+The auditor's tool: given published roots, receipts, and proofs, answer "is this history intact?" without contacting the operator. **This shipped inside the `lys` binary in Phase 2, not as the separate `lys-verify` crate this document originally planned** — `lys verify` (attestation signatures), `lys ca verify` (cert chains to instance CAs, at an explicit instant), and `lys log verify` (inclusion and consistency against a signed checkpoint, from only the artifact, the leaf, and the verifier key). Receipt verification arrives with `lys-anchor` (layer 5); deterministic replay — the strongest check — with the Norn integration (phase 3). The standing requirement is unchanged: every one of these must be independently implementable from the wire formats alone.
 
 ## Primitive decisions
 
