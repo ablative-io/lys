@@ -26,17 +26,21 @@ A receipt nobody can verify with standard tooling is worthless. Verification mus
 
 All of it is a library (`lys-core`, domain-agnostic — no concept of agents anywhere in it) plus a thin CLI (`lys`).
 
-**Maturity:** pre-1.0. The wire formats above are implemented and conformance-tested against independent implementations (Go `sumdb/note`, `veraison/go-cose`, Cloudflare's `signed_note`), and they **freeze at 0.1.0** — from then on, evolving a format means a new version alongside, never a mutation of the shipped one. Until 0.1.0, treat formats as settling. See [docs/design/WIRE-FORMATS.md](docs/design/WIRE-FORMATS.md) for the byte-exact contracts and the decision log.
+**Maturity:** pre-1.0. The wire formats above are implemented and conformance-tested against independent implementations (Go `sumdb/note`, `veraison/go-cose`, Cloudflare's `signed_note`), and they **freeze at 0.1.0**, this release — evolving a format now means a new version alongside, never a mutation of the shipped one. See [docs/design/WIRE-FORMATS.md](docs/design/WIRE-FORMATS.md) for the byte-exact contracts and the decision log.
 
 ## Install
 
-The crates.io releases are currently `0.0.1` name reservations published before the CLI existed — they install, but do nothing yet. Until `0.1.0` is published, install from source:
+The CLI, from crates.io:
 
 ```console
-$ cargo install --git https://github.com/tomWhiting/lys lys
+$ cargo install lys
 ```
 
-Once `0.1.0` lands on crates.io, this becomes `cargo install lys` for the CLI and `cargo add lys-core` for the library.
+The library, for building on the primitives directly:
+
+```console
+$ cargo add lys-core
+```
 
 ## Example 1 — a tamper-evident audit log for anything
 
