@@ -2,5 +2,6 @@
 //! payload transport.
 
 pub mod identity;
+pub mod ssh;
 
 pub use identity::Ed25519Identity;

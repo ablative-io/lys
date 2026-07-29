@@ -57,7 +57,12 @@ pub fn generate(out: &Path) -> CliResult<()> {
 /// [`CliError::Trust`] if it cannot be read or is not a valid 32-byte seed,
 /// or if `note_name` violates the signed-note key-name rules (non-empty,
 /// no whitespace, no `'+'`).
-pub fn inspect(key: &Path, note_name: Option<&str>) -> CliResult<()> {
+pub fn inspect(
+    key: &Path,
+    note_name: Option<&str>,
+    ssh: bool,
+    allowed_signers: Option<&str>,
+) -> CliResult<()> {
     let identity = load_identity(key)?;
     println!("identity key: {}", key.display());
     println!(
@@ -72,6 +77,18 @@ pub fn inspect(key: &Path, note_name: Option<&str>) -> CliResult<()> {
         let verifier =
             NoteVerifierKey::new(name, identity.public_key_bytes()).map_err(CliError::from)?;
         println!("verifier key (signed-note): {}", verifier.to_spec());
+    }
+    if ssh {
+        println!(
+            "public key (openssh): {}",
+            lys_core::keys::ssh::openssh_public_key(&identity.public_key_bytes())
+        );
+    }
+    if let Some(principal) = allowed_signers {
+        let line =
+            lys_core::keys::ssh::allowed_signers_line(principal, &identity.public_key_bytes())
+                .map_err(CliError::from)?;
+        println!("allowed_signers: {line}");
     }
     Ok(())
 }

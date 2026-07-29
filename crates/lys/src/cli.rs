@@ -443,6 +443,31 @@ pub enum KeyCommand {
         /// checkpoints for (the `--origin` given to `lys log init`).
         #[arg(long)]
         note_name: Option<String>,
+
+        /// Also print the OpenSSH public-key line for this identity.
+        ///
+        /// A lys identity is an Ed25519 keypair, which is what an SSH
+        /// signing key is. Point Git at this key with `gpg.format = ssh`
+        /// and it can sign commits that `git verify-commit` checks on
+        /// plain GitHub — no accounts and no lys on the verifier's machine.
+        /// Public material only; there is no private-key export, because
+        /// an OpenSSH private key file would be a second at-rest copy of
+        /// the seed.
+        #[arg(long)]
+        ssh: bool,
+
+        /// Also print an `allowed_signers` line binding this principal to
+        /// the key for Git signatures.
+        ///
+        /// Write it to a file and set
+        /// `git config gpg.ssh.allowedSignersFile <path>`. The entry is
+        /// scoped to `namespaces="git"` deliberately: an unscoped entry
+        /// authorises the key for every SSH signature namespace, and a
+        /// commit-signing key is not automatically a signing key for
+        /// anything else. Must contain no whitespace — the file format is
+        /// whitespace-separated.
+        #[arg(long, value_name = "PRINCIPAL")]
+        allowed_signers: Option<String>,
     },
 }
 

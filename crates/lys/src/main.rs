@@ -28,8 +28,13 @@ fn main() -> ExitCode {
     let result = match cli.command {
         Command::Key(key_command) => match key_command {
             KeyCommand::Generate { out } => commands::key::generate(&out),
-            KeyCommand::Inspect { key, note_name } => {
-                commands::key::inspect(&key, note_name.as_deref())
+            KeyCommand::Inspect {
+                key,
+                note_name,
+                ssh,
+                allowed_signers,
+            } => {
+                commands::key::inspect(&key, note_name.as_deref(), ssh, allowed_signers.as_deref())
             }
         },
         Command::Log(log_command) => match log_command {
