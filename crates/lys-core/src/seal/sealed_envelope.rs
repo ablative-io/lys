@@ -433,6 +433,68 @@ mod tests {
         assert_eq!(opened.as_slice(), b"persisted");
     }
 
+    /// Freeze guard for the `lys/sealed-envelope/v1` JSON shape.
+    ///
+    /// `WIRE-FORMATS.md` freezes this format as "JSON (serde shape of
+    /// [`SealedEnvelope`])", so as of 0.1.0 the three field names and their
+    /// encodings are a permanent wire contract: an envelope written by any
+    /// version must be readable by every later one.
+    ///
+    /// The postcard round-trip above cannot guard it. Postcard is positional,
+    /// so a stray `#[serde(rename)]` leaves that test green while silently
+    /// breaking every historical JSON envelope. This test pins the shape from
+    /// both directions — what we emit, and what we must accept from a
+    /// third-party implementation that only ever read the spec.
+    #[test]
+    fn sealed_envelope_json_shape_is_frozen() {
+        let envelope = SealedEnvelope {
+            ephemeral_public_key: [1u8; 32],
+            ciphertext: vec![0xde, 0xad, 0xbe, 0xef],
+            nonce: [2u8; NONCE_LEN],
+        };
+
+        let value = serde_json::to_value(&envelope).unwrap();
+        let object = value
+            .as_object()
+            .expect("a sealed envelope serialises as a JSON object");
+
+        // Exactly these three keys. An *added* field breaks older readers just
+        // as surely as a renamed one, so the set is pinned, not just probed.
+        let mut keys: Vec<&str> = object.keys().map(String::as_str).collect();
+        keys.sort_unstable();
+        assert_eq!(
+            keys,
+            ["ciphertext", "ephemeral_public_key", "nonce"],
+            "the frozen JSON field set changed"
+        );
+
+        // Encodings: byte arrays, with both fixed-width fields at their exact
+        // declared lengths.
+        assert_eq!(
+            object["ephemeral_public_key"],
+            serde_json::json!(vec![1u8; 32])
+        );
+        assert_eq!(
+            object["ciphertext"],
+            serde_json::json!([0xde, 0xad, 0xbe, 0xef])
+        );
+        assert_eq!(object["nonce"], serde_json::json!(vec![2u8; NONCE_LEN]));
+
+        // The reading direction is the half that actually matters to a
+        // stranger: a hand-written document must deserialise to the same
+        // envelope, byte for byte.
+        let from_wire: SealedEnvelope = serde_json::from_str(
+            r#"{
+                "ephemeral_public_key":
+                    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                "ciphertext": [222,173,190,239],
+                "nonce": [2,2,2,2,2,2,2,2,2,2,2,2]
+            }"#,
+        )
+        .unwrap();
+        assert_eq!(from_wire, envelope);
+    }
+
     #[test]
     fn attestation_bytes_concatenates_in_declared_order() {
         let recipient = identity();

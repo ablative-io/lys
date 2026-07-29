@@ -171,7 +171,7 @@ fn certificate_verifies_at_explicit_instant_inside_window() {
 }
 
 #[test]
-fn validity_boundaries_are_inclusive() {
+fn not_after_boundary_is_inclusive() {
     let ca = test_authority();
     let issued = ca
         .issue_certificate("agent-009", Duration::from_hours(1), vec![])
@@ -189,6 +189,44 @@ fn validity_boundaries_are_inclusive() {
     )
     .unwrap_err();
     assert!(err.to_string().contains("expired"), "got: {err}");
+}
+
+/// The notBefore half of the inclusive-boundary contract.
+///
+/// The sibling test above covers only notAfter, and the coarse −2 h instant
+/// used elsewhere would still pass if notBefore flipped to exclusive. This
+/// pins the exact instant, read back from the DER rather than reconstructed,
+/// because `issue_certificate` truncates to whole seconds and a
+/// locally-computed "now" would be testing the truncation instead of the
+/// boundary.
+#[test]
+fn not_before_boundary_is_inclusive() {
+    let ca = test_authority();
+    let issued = ca
+        .issue_certificate("agent-011", Duration::from_hours(1), vec![])
+        .unwrap();
+
+    let (_, parsed) = X509Certificate::from_der(&issued.der_bytes).unwrap();
+    let not_before = chrono::DateTime::<chrono::Utc>::from_timestamp(
+        parsed.validity().not_before.timestamp(),
+        0,
+    )
+    .expect("notBefore is within the representable range");
+
+    // Exactly at notBefore must PASS: X.509 validity is inclusive at both
+    // ends, and `check_validity_window` rejects only on `at < not_before`.
+    verify_certificate_chain_at(&issued.der_bytes, &ca.public_key_bytes(), not_before).unwrap();
+
+    // One second earlier must fail, and must name the boundary it violated.
+    // Asserting the reason — not merely that it errored — is what catches a
+    // swapped comparison, which would still reject here but call it expired.
+    let err = verify_certificate_chain_at(
+        &issued.der_bytes,
+        &ca.public_key_bytes(),
+        not_before - chrono::Duration::seconds(1),
+    )
+    .unwrap_err();
+    assert!(err.to_string().contains("not yet valid"), "got: {err}");
 }
 
 // ─── expires_at / DER notAfter agreement ──────────────────────────
