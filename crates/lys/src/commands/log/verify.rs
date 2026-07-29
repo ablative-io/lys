@@ -24,6 +24,7 @@ use lys_core::tlog::{
 use crate::commands::error::{CliError, CliResult};
 use crate::commands::files::read_file;
 use crate::commands::hex::hex_lower;
+use crate::commands::output::Emitter;
 
 /// Defensive cap on artifact file size (16 MiB). Real artifacts are a few
 /// kilobytes; the cap bounds hostile-input memory without ever touching a
@@ -41,7 +42,12 @@ const MAX_ARTIFACT_BYTES: u64 = 16 * 1024 * 1024;
 /// if the verifier key string is malformed (trusted operator input), and
 /// [`CliError::LogInclusionVerificationFailed`] — one generic message —
 /// for every verification failure.
-pub fn inclusion(artifact_path: &Path, leaf: &Path, verifier_key: &str) -> CliResult<()> {
+pub fn inclusion(
+    artifact_path: &Path,
+    leaf: &Path,
+    verifier_key: &str,
+    json: bool,
+) -> CliResult<()> {
     let artifact_bytes = read_artifact_file(artifact_path)?;
     let artifact: InclusionProofArtifact =
         serde_json::from_slice(&artifact_bytes).map_err(|source| CliError::JsonParse {
@@ -53,11 +59,17 @@ pub fn inclusion(artifact_path: &Path, leaf: &Path, verifier_key: &str) -> CliRe
     let verifier = NoteVerifierKey::from_spec(verifier_key)?;
     let body = verify_inclusion_artifact(&artifact, &leaf_bytes, &verifier)
         .map_err(|_err| CliError::LogInclusionVerificationFailed)?;
-    println!("inclusion verified");
-    println!("origin: {}", body.origin());
-    println!("tree size: {}", body.tree_size());
-    println!("leaf index: {}", artifact.leaf_index);
-    println!("root hash (sha256): {}", hex_lower(&body.root_hash()));
+    let mut emit = Emitter::new(json);
+    emit.flag("inclusion verified", "verified");
+    emit.field("origin", "origin", body.origin());
+    emit.field("tree size", "tree_size", body.tree_size());
+    emit.field("leaf index", "leaf_index", artifact.leaf_index);
+    emit.field(
+        "root hash (sha256)",
+        "root_hash",
+        hex_lower(&body.root_hash()),
+    );
+    emit.finish();
     Ok(())
 }
 
@@ -71,7 +83,7 @@ pub fn inclusion(artifact_path: &Path, leaf: &Path, verifier_key: &str) -> CliRe
 /// if the verifier key string is malformed (trusted operator input), and
 /// [`CliError::LogConsistencyVerificationFailed`] — one generic message —
 /// for every verification failure.
-pub fn consistency(artifact_path: &Path, verifier_key: &str) -> CliResult<()> {
+pub fn consistency(artifact_path: &Path, verifier_key: &str, json: bool) -> CliResult<()> {
     let artifact_bytes = read_artifact_file(artifact_path)?;
     let artifact: ConsistencyProofArtifact =
         serde_json::from_slice(&artifact_bytes).map_err(|source| CliError::JsonParse {
@@ -82,12 +94,22 @@ pub fn consistency(artifact_path: &Path, verifier_key: &str) -> CliResult<()> {
     let verifier = NoteVerifierKey::from_spec(verifier_key)?;
     let (body_1, body_2) = verify_consistency_artifact(&artifact, &verifier)
         .map_err(|_err| CliError::LogConsistencyVerificationFailed)?;
-    println!("consistency verified");
-    println!("origin: {}", body_2.origin());
-    println!("old tree size: {}", body_1.tree_size());
-    println!("new tree size: {}", body_2.tree_size());
-    println!("old root hash (sha256): {}", hex_lower(&body_1.root_hash()));
-    println!("new root hash (sha256): {}", hex_lower(&body_2.root_hash()));
+    let mut emit = Emitter::new(json);
+    emit.flag("consistency verified", "verified");
+    emit.field("origin", "origin", body_2.origin());
+    emit.field("old tree size", "old_tree_size", body_1.tree_size());
+    emit.field("new tree size", "new_tree_size", body_2.tree_size());
+    emit.field(
+        "old root hash (sha256)",
+        "old_root_hash",
+        hex_lower(&body_1.root_hash()),
+    );
+    emit.field(
+        "new root hash (sha256)",
+        "new_root_hash",
+        hex_lower(&body_2.root_hash()),
+    );
+    emit.finish();
     Ok(())
 }
 

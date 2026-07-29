@@ -25,24 +25,29 @@ use crate::cli::{
 /// exit code. Every failure path prints a diagnostic to stderr.
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    let json = cli.json;
     let result = match cli.command {
         Command::Key(key_command) => match key_command {
-            KeyCommand::Generate { out } => commands::key::generate(&out),
+            KeyCommand::Generate { out } => commands::key::generate(&out, json),
             KeyCommand::Inspect {
                 key,
                 note_name,
                 ssh,
                 allowed_signers,
-            } => {
-                commands::key::inspect(&key, note_name.as_deref(), ssh, allowed_signers.as_deref())
-            }
+            } => commands::key::inspect(
+                &key,
+                note_name.as_deref(),
+                ssh,
+                allowed_signers.as_deref(),
+                json,
+            ),
         },
         Command::Log(log_command) => match log_command {
-            LogCommand::Init { dir, origin } => commands::log::init::run(&dir, &origin),
-            LogCommand::Status { dir } => commands::log::status::run(&dir),
-            LogCommand::Append { dir, leaf } => commands::log::append::run(&dir, &leaf),
+            LogCommand::Init { dir, origin } => commands::log::init::run(&dir, &origin, json),
+            LogCommand::Status { dir } => commands::log::status::run(&dir, json),
+            LogCommand::Append { dir, leaf } => commands::log::append::run(&dir, &leaf, json),
             LogCommand::Checkpoint { dir, key, out } => {
-                commands::log::checkpoint::run(&dir, &key, &out)
+                commands::log::checkpoint::run(&dir, &key, &out, json)
             }
             LogCommand::Prove(prove_command) => match prove_command {
                 LogProveCommand::Inclusion {
@@ -50,24 +55,24 @@ fn main() -> ExitCode {
                     key,
                     leaf_index,
                     out,
-                } => commands::log::prove::inclusion(&dir, &key, leaf_index, &out),
+                } => commands::log::prove::inclusion(&dir, &key, leaf_index, &out, json),
                 LogProveCommand::Consistency {
                     dir,
                     key,
                     old_size,
                     out,
-                } => commands::log::prove::consistency(&dir, &key, old_size, &out),
+                } => commands::log::prove::consistency(&dir, &key, old_size, &out, json),
             },
             LogCommand::Verify(verify_command) => match verify_command {
                 LogVerifyCommand::Inclusion {
                     artifact,
                     leaf,
                     verifier_key,
-                } => commands::log::verify::inclusion(&artifact, &leaf, &verifier_key),
+                } => commands::log::verify::inclusion(&artifact, &leaf, &verifier_key, json),
                 LogVerifyCommand::Consistency {
                     artifact,
                     verifier_key,
-                } => commands::log::verify::consistency(&artifact, &verifier_key),
+                } => commands::log::verify::consistency(&artifact, &verifier_key, json),
             },
         },
         Command::Ca(ca_command) => match ca_command {
@@ -77,23 +82,23 @@ fn main() -> ExitCode {
                 claims,
                 validity_days,
                 out,
-            } => commands::ca::issue(&key, &subject, claims.as_deref(), validity_days, &out),
+            } => commands::ca::issue(&key, &subject, claims.as_deref(), validity_days, &out, json),
             CaCommand::Verify {
                 cert,
                 issuer_public_key,
                 at,
-            } => commands::ca::verify(&cert, &issuer_public_key, at.as_deref()),
+            } => commands::ca::verify(&cert, &issuer_public_key, at.as_deref(), json),
         },
-        Command::Attest { key, payload, out } => commands::attest::run(&key, &payload, &out),
+        Command::Attest { key, payload, out } => commands::attest::run(&key, &payload, &out, json),
         Command::Verify {
             attestation,
             payload,
-        } => commands::verify::run(&attestation, &payload),
+        } => commands::verify::run(&attestation, &payload, json),
         Command::Inspect(inspect_command) => match inspect_command {
             InspectCommand::Attestation { attestation } => {
-                commands::inspect::attestation(&attestation)
+                commands::inspect::attestation(&attestation, json)
             }
-            InspectCommand::Cert { cert } => commands::inspect::cert(&cert),
+            InspectCommand::Cert { cert } => commands::inspect::cert(&cert, json),
         },
         Command::Seal {
             key,
@@ -107,6 +112,7 @@ fn main() -> ExitCode {
             &payload,
             &out,
             &attestation_out,
+            json,
         ),
         Command::Open {
             key,
@@ -114,12 +120,29 @@ fn main() -> ExitCode {
             envelope,
             attestation,
             out,
-        } => commands::seal::open(&key, &sender_public_key, &envelope, &attestation, &out),
+        } => commands::seal::open(
+            &key,
+            &sender_public_key,
+            &envelope,
+            &attestation,
+            &out,
+            json,
+        ),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
+            // The diagnostic always goes to stderr, so an operator watching a
+            // terminal sees it in the usual place. Under `--json` the failure
+            // is ALSO emitted as an object on stdout: a caller that asked for
+            // parseable output must not receive unparseable output at exactly
+            // the moment it matters most. The message is the CLI's existing
+            // text, already collapsed to non-specific wording for
+            // verification failures — JSON mode reformats, it never widens.
             eprintln!("error: {error}");
+            if json {
+                commands::output::emit_json_error(&error.to_string());
+            }
             ExitCode::FAILURE
         }
     }

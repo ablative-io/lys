@@ -43,6 +43,7 @@ use crate::commands::error::{CliError, CliResult};
 use crate::commands::files::{read_file, write_file, write_file_private};
 use crate::commands::hex::{hex_lower, parse_hex_32};
 use crate::commands::key::load_identity;
+use crate::commands::output::Emitter;
 
 /// `lys seal --key <path> --recipient-public-key <hex> --payload <file>
 /// --out <file> --attestation-out <file>`.
@@ -62,6 +63,7 @@ pub fn seal(
     payload: &Path,
     out: &Path,
     attestation_out: &Path,
+    json: bool,
 ) -> CliResult<()> {
     let identity = load_identity(key)?;
     let recipient =
@@ -97,17 +99,46 @@ pub fn seal(
         return Err(error);
     }
 
-    println!("sealed payload: {}", payload.display());
-    println!("recipient public key (x25519): {}", hex_lower(&recipient));
-    println!(
-        "sender public key (ed25519): {}",
-        hex_lower(&attestation.signer_public_key)
+    let mut emit = Emitter::new(json);
+    emit.field(
+        "sealed payload",
+        "payload_path",
+        payload.display().to_string(),
     );
-    println!("sealed envelope written: {}", out.display());
-    println!(
-        "seal attestation written: {} (COSE_Sign1, application/cose)",
-        attestation_out.display()
+    emit.field(
+        "recipient public key (x25519)",
+        "recipient_public_key",
+        hex_lower(&recipient),
     );
+    emit.field(
+        "sender public key (ed25519)",
+        "sender_public_key",
+        hex_lower(&attestation.signer_public_key),
+    );
+    emit.field(
+        "sealed envelope written",
+        "envelope_path",
+        out.display().to_string(),
+    );
+    if emit.is_json() {
+        emit.field(
+            "seal attestation written",
+            "attestation_path",
+            attestation_out.display().to_string(),
+        );
+        emit.field("attestation format", "attestation_format", "COSE_Sign1");
+        emit.field(
+            "attestation media type",
+            "attestation_media_type",
+            "application/cose",
+        );
+    } else {
+        emit.note(&format!(
+            "seal attestation written: {} (COSE_Sign1, application/cose)",
+            attestation_out.display()
+        ));
+    }
+    emit.finish();
     Ok(())
 }
 
@@ -133,6 +164,7 @@ pub fn open(
     envelope: &Path,
     attestation: &Path,
     out: &Path,
+    json: bool,
 ) -> CliResult<()> {
     let identity = load_identity(key)?;
     let sender = parse_hex_32(sender_public_key).ok_or(CliError::InvalidSenderPublicKey)?;
@@ -166,9 +198,15 @@ pub fn open(
     // and an existing file at `out` is tightened rather than left as found.
     write_file_private(out, &plaintext, "opened payload file")?;
 
-    println!("sealed envelope opened");
-    println!("sender public key (ed25519): {}", hex_lower(&sender));
-    println!("payload bytes: {}", plaintext.len());
-    println!("payload written: {}", out.display());
+    let mut emit = Emitter::new(json);
+    emit.flag("sealed envelope opened", "opened");
+    emit.field(
+        "sender public key (ed25519)",
+        "sender_public_key",
+        hex_lower(&sender),
+    );
+    emit.field("payload bytes", "payload_bytes", plaintext.len());
+    emit.field("payload written", "payload_path", out.display().to_string());
+    emit.finish();
     Ok(())
 }

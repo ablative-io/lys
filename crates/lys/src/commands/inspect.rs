@@ -44,6 +44,7 @@ use crate::commands::ca::{capability_claims_oid, is_terminal_safe};
 use crate::commands::error::{CliError, CliResult};
 use crate::commands::files::read_file;
 use crate::commands::hex::hex_lower;
+use crate::commands::output::Emitter;
 use crate::commands::pem;
 
 /// Opening line of `lys inspect attestation`, naming the command that does
@@ -83,7 +84,7 @@ const UNREPRESENTABLE_INSTANT: &str = "out of representable range";
 /// `lys verify` uses — if the bytes are not a canonical artifact, and
 /// [`CliError::Trust`] for any other library failure. There is deliberately
 /// no distinct decode error.
-pub fn attestation(attestation_path: &Path) -> CliResult<()> {
+pub fn attestation(attestation_path: &Path, json: bool) -> CliResult<()> {
     let artifact_bytes = read_file(attestation_path, "attestation file")?;
     // Decode before printing anything: a rejected artifact must produce the
     // generic failure and no fields at all, banner included.
@@ -94,17 +95,32 @@ pub fn attestation(attestation_path: &Path) -> CliResult<()> {
     };
 
     let signed_at = render_millis(attestation.timestamp);
-    println!("{ATTESTATION_BANNER}");
-    println!(
-        "signer public key (ed25519): {}",
-        hex_lower(&attestation.signer_public_key)
+    let mut emit = Emitter::new(json);
+    // The banner is prose, but a machine consumer must not be able to
+    // mistake this for verified data — so in JSON it becomes an explicit
+    // `verified: false` plus the warning text, not a dropped sentence.
+    emit.note(ATTESTATION_BANNER);
+    if emit.is_json() {
+        emit.field("verified", "verified", false);
+        emit.field("warning", "warning", ATTESTATION_BANNER);
+    }
+    emit.field(
+        "signer public key (ed25519)",
+        "signer_public_key",
+        hex_lower(&attestation.signer_public_key),
     );
-    println!(
-        "payload hash (sha256): {}",
-        hex_lower(&attestation.payload_hash)
+    emit.field(
+        "payload hash (sha256)",
+        "payload_hash",
+        hex_lower(&attestation.payload_hash),
     );
-    println!("signed at (unix ms): {}", attestation.timestamp);
-    println!("signed at (rfc3339): {signed_at}");
+    emit.field(
+        "signed at (unix ms)",
+        "signed_at_unix_ms",
+        attestation.timestamp,
+    );
+    emit.field("signed at (rfc3339)", "signed_at_rfc3339", signed_at);
+    emit.finish();
     Ok(())
 }
 
@@ -125,7 +141,7 @@ pub fn attestation(attestation_path: &Path) -> CliResult<()> {
 /// [`CliError::PemParse`] if it is not a PEM `CERTIFICATE` block or its body
 /// is not a parseable X.509 certificate, and [`CliError::Trust`] if the
 /// claims extension cannot be read back.
-pub fn cert(cert_path: &Path) -> CliResult<()> {
+pub fn cert(cert_path: &Path, json: bool) -> CliResult<()> {
     let pem_bytes = read_file(cert_path, "certificate file")?;
     let der = pem::decode_certificate(&pem_bytes, cert_path)?;
     let certificate = parse_certificate(&der, cert_path)?;
@@ -140,39 +156,66 @@ pub fn cert(cert_path: &Path) -> CliResult<()> {
     let not_after = render_seconds(validity.not_after.timestamp());
     let subject_key = hex_lower(&certificate.public_key().subject_public_key.data);
 
-    println!("{CERTIFICATE_BANNER}");
-    match subject {
-        Some(name) if is_terminal_safe(name) => println!("subject: {name}"),
-        // The subject of an unverified certificate is attacker-chosen text:
-        // control characters (terminal escape injection) go out as hex.
-        Some(unsafe_name) => println!("subject (hex): {}", hex_lower(unsafe_name.as_bytes())),
-        None => println!("subject: none"),
+    let mut emit = Emitter::new(json);
+    emit.note(CERTIFICATE_BANNER);
+    if emit.is_json() {
+        emit.field("verified", "verified", false);
+        emit.field("warning", "warning", CERTIFICATE_BANNER);
     }
-    println!("not before (rfc3339): {not_before}");
-    println!("not after (rfc3339): {not_after}");
-    println!("subject public key (ed25519): {subject_key}");
+    match subject {
+        Some(name) if is_terminal_safe(name) => emit.field("subject", "subject", name),
+        // The subject of an unverified certificate is attacker-chosen text:
+        // control characters (terminal escape injection) go out as hex, under
+        // a distinct key so a consumer cannot mistake hex for the name.
+        Some(unsafe_name) => emit.field(
+            "subject (hex)",
+            "subject_hex",
+            hex_lower(unsafe_name.as_bytes()),
+        ),
+        None => emit.field("subject", "subject", "none"),
+    }
+    emit.field("not before (rfc3339)", "not_before", not_before);
+    emit.field("not after (rfc3339)", "not_after", not_after);
+    emit.field(
+        "subject public key (ed25519)",
+        "subject_public_key",
+        subject_key,
+    );
 
     match decode_extension(&der, &capability_claims_oid())? {
         Some(bytes) => {
             // The marker precedes the claims unconditionally — no reader ever
-            // meets the claims before being told they are worthless.
-            println!("{CLAIMS_MARKER}");
+            // meets the claims before being told they are worthless. In JSON
+            // it rides as a field for the same reason.
+            emit.note(CLAIMS_MARKER);
+            if emit.is_json() {
+                emit.field(
+                    "capability claims warning",
+                    "capability_claims_warning",
+                    CLAIMS_MARKER,
+                );
+            }
             match String::from_utf8(bytes) {
-                Ok(text) if is_terminal_safe(&text) => println!("capability claims: {text}"),
+                Ok(text) if is_terminal_safe(&text) => {
+                    emit.field("capability claims", "capability_claims", text);
+                }
                 // Non-UTF-8 or control characters: echo the bytes as hex,
                 // never raw, exactly as `lys ca verify` does.
-                Ok(unsafe_text) => println!(
-                    "capability claims (hex): {}",
-                    hex_lower(unsafe_text.as_bytes())
+                Ok(unsafe_text) => emit.field(
+                    "capability claims (hex)",
+                    "capability_claims_hex",
+                    hex_lower(unsafe_text.as_bytes()),
                 ),
-                Err(non_utf8) => println!(
-                    "capability claims (hex): {}",
-                    hex_lower(non_utf8.as_bytes())
+                Err(non_utf8) => emit.field(
+                    "capability claims (hex)",
+                    "capability_claims_hex",
+                    hex_lower(non_utf8.as_bytes()),
                 ),
             }
         }
-        None => println!("capability claims: none"),
+        None => emit.field("capability claims", "capability_claims", "none"),
     }
+    emit.finish();
     Ok(())
 }
 

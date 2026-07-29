@@ -13,6 +13,7 @@ use lys_core::merkle::{AppendOnlyTree, RawLeaf};
 use crate::commands::error::CliResult;
 use crate::commands::hex::hex_lower;
 use crate::commands::log::store::LogStore;
+use crate::commands::output::Emitter;
 
 /// `lys log init --dir <log-dir> --origin <origin>`.
 ///
@@ -25,12 +26,18 @@ use crate::commands::log::store::LogStore;
 /// [`CliError::Trust`]: crate::commands::error::CliError::Trust
 /// [`CliError::LogDirInvalid`]: crate::commands::error::CliError::LogDirInvalid
 /// [`CliError::Io`]: crate::commands::error::CliError::Io
-pub fn run(dir: &Path, origin: &str) -> CliResult<()> {
+pub fn run(dir: &Path, origin: &str, json: bool) -> CliResult<()> {
     LogStore::init(dir, origin)?;
     let (empty_root, tree_size) = AppendOnlyTree::<RawLeaf>::new().root().to_parts();
-    println!("initialized log directory: {}", dir.display());
-    println!("origin: {origin}");
-    println!("tree size: {tree_size}");
-    println!("root hash (sha256): {}", hex_lower(&empty_root));
+    let mut out = Emitter::new(json);
+    out.field(
+        "initialized log directory",
+        "log_directory",
+        dir.display().to_string(),
+    );
+    out.field("origin", "origin", origin);
+    out.field("tree size", "tree_size", tree_size);
+    out.field("root hash (sha256)", "root_hash", hex_lower(&empty_root));
+    out.finish();
     Ok(())
 }

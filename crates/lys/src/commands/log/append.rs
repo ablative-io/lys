@@ -12,6 +12,7 @@ use crate::commands::error::CliResult;
 use crate::commands::files::read_file;
 use crate::commands::hex::hex_lower;
 use crate::commands::log::store::LogStore;
+use crate::commands::output::Emitter;
 
 /// `lys log append --dir <log-dir> --leaf <file>`.
 ///
@@ -25,14 +26,20 @@ use crate::commands::log::store::LogStore;
 /// [`CliError::LogDirMissing`]: crate::commands::error::CliError::LogDirMissing
 /// [`CliError::LogDirInvalid`]: crate::commands::error::CliError::LogDirInvalid
 /// [`CliError::Io`]: crate::commands::error::CliError::Io
-pub fn run(dir: &Path, leaf: &Path) -> CliResult<()> {
+pub fn run(dir: &Path, leaf: &Path, json: bool) -> CliResult<()> {
     let mut store = LogStore::open(dir)?;
     let leaf_bytes = read_file(leaf, "leaf file")?;
     let (index, leaf_hash) = store.append(&leaf_bytes)?;
     let (root, tree_size) = store.tree().root().to_parts();
-    println!("leaf index: {index}");
-    println!("leaf hash (sha256, rfc6962): {}", hex_lower(&leaf_hash));
-    println!("tree size: {tree_size}");
-    println!("root hash (sha256): {}", hex_lower(&root));
+    let mut out = Emitter::new(json);
+    out.field("leaf index", "leaf_index", index);
+    out.field(
+        "leaf hash (sha256, rfc6962)",
+        "leaf_hash",
+        hex_lower(&leaf_hash),
+    );
+    out.field("tree size", "tree_size", tree_size);
+    out.field("root hash (sha256)", "root_hash", hex_lower(&root));
+    out.finish();
     Ok(())
 }

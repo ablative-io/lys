@@ -33,7 +33,7 @@ fn status_succeeds_with_no_signing_key_present() {
         "precondition: the log directory is the only thing in scope"
     );
 
-    run(&dir).unwrap();
+    run(&dir, false).unwrap();
 }
 
 /// `status` must report the same root the signing path would sign.
@@ -56,7 +56,7 @@ fn status_root_matches_the_root_a_checkpoint_would_sign() {
     assert_eq!(size, 3);
 
     // The command reads through the same store and root computation.
-    run(&dir).unwrap();
+    run(&dir, false).unwrap();
     let (root_again, size_again) = LogStore::open(&dir).unwrap().tree().root().to_parts();
     assert_eq!(root_again, root);
     assert_eq!(size_again, size);
@@ -69,7 +69,7 @@ fn status_reports_an_empty_log_without_error() {
     init_log(&dir);
     let (_, size) = LogStore::open(&dir).unwrap().tree().root().to_parts();
     assert_eq!(size, 0, "a freshly initialized log has no leaves");
-    run(&dir).unwrap();
+    run(&dir, false).unwrap();
 }
 
 /// An uninitialized directory is refused, and the refusal says what to run.
@@ -81,7 +81,7 @@ fn status_reports_an_empty_log_without_error() {
 #[test]
 fn status_refuses_an_uninitialized_directory() {
     let tmp = tempfile::tempdir().unwrap();
-    let err = run(&tmp.path().join("not-a-log")).unwrap_err();
+    let err = run(&tmp.path().join("not-a-log"), false).unwrap_err();
     assert!(matches!(err, CliError::LogDirMissing { .. }), "got: {err}");
     let message = err.to_string();
     assert!(message.contains("not initialized"), "got: {message}");

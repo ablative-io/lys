@@ -17,6 +17,7 @@ use crate::commands::files::write_file;
 use crate::commands::hex::hex_lower;
 use crate::commands::key::load_identity;
 use crate::commands::log::store::LogStore;
+use crate::commands::output::Emitter;
 
 /// `lys log checkpoint --dir <log-dir> --key <keyfile> --out <file>`.
 ///
@@ -33,17 +34,31 @@ use crate::commands::log::store::LogStore;
 /// [`CliError::KeyFileMissing`]: crate::commands::error::CliError::KeyFileMissing
 /// [`CliError::Trust`]: crate::commands::error::CliError::Trust
 /// [`CliError::Io`]: crate::commands::error::CliError::Io
-pub fn run(dir: &Path, key: &Path, out: &Path) -> CliResult<()> {
+pub fn run(dir: &Path, key: &Path, out: &Path, json: bool) -> CliResult<()> {
     let store = LogStore::open(dir)?;
     let identity = load_identity(key)?;
     let body = CheckpointBody::from_root(store.origin(), &store.tree().root())?;
     let note = sign_note(&body.encode(), store.origin(), &identity)?;
     write_file(out, note.as_bytes(), "checkpoint note file")?;
     let verifier = NoteVerifierKey::new(store.origin(), identity.public_key_bytes())?;
-    println!("origin: {}", body.origin());
-    println!("tree size: {}", body.tree_size());
-    println!("root hash (sha256): {}", hex_lower(&body.root_hash()));
-    println!("checkpoint written: {}", out.display());
-    println!("verifier key (signed-note): {}", verifier.to_spec());
+    let mut emit = Emitter::new(json);
+    emit.field("origin", "origin", body.origin());
+    emit.field("tree size", "tree_size", body.tree_size());
+    emit.field(
+        "root hash (sha256)",
+        "root_hash",
+        hex_lower(&body.root_hash()),
+    );
+    emit.field(
+        "checkpoint written",
+        "checkpoint_path",
+        out.display().to_string(),
+    );
+    emit.field(
+        "verifier key (signed-note)",
+        "verifier_key",
+        verifier.to_spec(),
+    );
+    emit.finish();
     Ok(())
 }

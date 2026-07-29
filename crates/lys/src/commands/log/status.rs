@@ -20,6 +20,7 @@ use std::path::Path;
 use crate::commands::error::CliResult;
 use crate::commands::hex::hex_lower;
 use crate::commands::log::store::LogStore;
+use crate::commands::output::Emitter;
 
 /// `lys log status --dir <log-dir>`.
 ///
@@ -33,14 +34,16 @@ use crate::commands::log::store::LogStore;
 /// [`CliError::LogDirMissing`]: crate::commands::error::CliError::LogDirMissing
 /// [`CliError::LogDirInvalid`]: crate::commands::error::CliError::LogDirInvalid
 /// [`CliError::Io`]: crate::commands::error::CliError::Io
-pub fn run(dir: &Path) -> CliResult<()> {
+pub fn run(dir: &Path, json: bool) -> CliResult<()> {
     let store = LogStore::open(dir)?;
     let (root, tree_size) = store.tree().root().to_parts();
 
-    println!("log directory: {}", dir.display());
-    println!("origin: {}", store.origin());
-    println!("tree size: {tree_size}");
-    println!("root hash (sha256): {}", hex_lower(&root));
+    let mut out = Emitter::new(json);
+    out.field("log directory", "log_directory", dir.display().to_string());
+    out.field("origin", "origin", store.origin());
+    out.field("tree size", "tree_size", tree_size);
+    out.field("root hash (sha256)", "root_hash", hex_lower(&root));
+    out.finish();
     Ok(())
 }
 

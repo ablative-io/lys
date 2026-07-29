@@ -32,6 +32,7 @@ use crate::commands::error::{CliError, CliResult};
 use crate::commands::files::{read_file, write_file};
 use crate::commands::hex::{hex_lower, parse_hex_32};
 use crate::commands::key::load_identity;
+use crate::commands::output::Emitter;
 use crate::commands::pem;
 
 /// Sub-component appended to [`LYS_OID_ARC`] for the CLI's capability-claims
@@ -84,6 +85,7 @@ pub fn issue(
     claims: Option<&Path>,
     validity_days: u32,
     out: &Path,
+    json: bool,
 ) -> CliResult<()> {
     let identity = load_identity(key)?;
 
@@ -112,22 +114,42 @@ pub fn issue(
     let pem_text = pem::encode_certificate(&issued.der_bytes);
     write_file(out, pem_text.as_bytes(), "certificate file")?;
 
-    println!("issued certificate for subject: {subject}");
-    println!(
-        "subject public key (ed25519): {}",
-        hex_lower(&issued.subject_verifying_key.to_bytes())
+    let mut emit = Emitter::new(json);
+    emit.field("issued certificate for subject", "subject", subject);
+    emit.field(
+        "subject public key (ed25519)",
+        "subject_public_key",
+        hex_lower(&issued.subject_verifying_key.to_bytes()),
     );
-    println!(
-        "issuer public key (ed25519): {}",
-        hex_lower(&issued.issuer_public_key)
+    emit.field(
+        "issuer public key (ed25519)",
+        "issuer_public_key",
+        hex_lower(&issued.issuer_public_key),
     );
-    println!("fingerprint (sha256): {}", hex_lower(&issued.fingerprint));
-    println!("expires at (rfc3339): {}", issued.expires_at.to_rfc3339());
+    emit.field(
+        "fingerprint (sha256)",
+        "fingerprint",
+        hex_lower(&issued.fingerprint),
+    );
+    emit.field(
+        "expires at (rfc3339)",
+        "expires_at",
+        issued.expires_at.to_rfc3339(),
+    );
     match claims {
-        Some(claims_path) => println!("capability claims embedded from: {}", claims_path.display()),
-        None => println!("capability claims: none"),
+        Some(claims_path) => emit.field(
+            "capability claims embedded from",
+            "capability_claims_path",
+            claims_path.display().to_string(),
+        ),
+        None => emit.field("capability claims", "capability_claims", "none"),
     }
-    println!("certificate written: {}", out.display());
+    emit.field(
+        "certificate written",
+        "certificate_path",
+        out.display().to_string(),
+    );
+    emit.finish();
     Ok(())
 }
 
@@ -142,7 +164,7 @@ pub fn issue(
 /// single non-oracle message — if any verification check rejects the
 /// certificate, and [`CliError::Trust`] if the DER cannot be parsed as a
 /// certificate at all.
-pub fn verify(cert: &Path, issuer_public_key: &str, at: Option<&str>) -> CliResult<()> {
+pub fn verify(cert: &Path, issuer_public_key: &str, at: Option<&str>, json: bool) -> CliResult<()> {
     let pem_bytes = read_file(cert, "certificate file")?;
     let der = pem::decode_certificate(&pem_bytes, cert)?;
     let issuer = parse_hex_32(issuer_public_key).ok_or(CliError::InvalidIssuerPublicKey)?;
@@ -171,25 +193,41 @@ pub fn verify(cert: &Path, issuer_public_key: &str, at: Option<&str>) -> CliResu
     // unverified certificate is ever echoed.
     let claims = decode_extension(&der, &capability_claims_oid())?;
 
-    println!("certificate verified");
-    println!("issuer public key (ed25519): {}", hex_lower(&issuer));
-    println!("checked at (rfc3339): {}", checked_at.to_rfc3339());
+    let mut emit = Emitter::new(json);
+    emit.flag("certificate verified", "verified");
+    emit.field(
+        "issuer public key (ed25519)",
+        "issuer_public_key",
+        hex_lower(&issuer),
+    );
+    emit.field(
+        "checked at (rfc3339)",
+        "checked_at",
+        checked_at.to_rfc3339(),
+    );
     match claims {
         Some(bytes) => match String::from_utf8(bytes) {
-            Ok(text) if is_terminal_safe(&text) => println!("capability claims: {text}"),
+            Ok(text) if is_terminal_safe(&text) => {
+                emit.field("capability claims", "capability_claims", text);
+            }
             // Non-UTF-8 or control characters (terminal escape injection):
-            // echo the bytes as hex, never raw.
-            Ok(unsafe_text) => println!(
-                "capability claims (hex): {}",
-                hex_lower(unsafe_text.as_bytes())
+            // echo the bytes as hex, never raw. The JSON key differs too, so
+            // a consumer can tell it received hex rather than the claims
+            // text and cannot mistake one encoding for the other.
+            Ok(unsafe_text) => emit.field(
+                "capability claims (hex)",
+                "capability_claims_hex",
+                hex_lower(unsafe_text.as_bytes()),
             ),
-            Err(non_utf8) => println!(
-                "capability claims (hex): {}",
-                hex_lower(non_utf8.as_bytes())
+            Err(non_utf8) => emit.field(
+                "capability claims (hex)",
+                "capability_claims_hex",
+                hex_lower(non_utf8.as_bytes()),
             ),
         },
-        None => println!("capability claims: none"),
+        None => emit.field("capability claims", "capability_claims", "none"),
     }
+    emit.finish();
     Ok(())
 }
 

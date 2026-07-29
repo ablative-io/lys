@@ -11,6 +11,7 @@ use lys_core::checkpoint::NoteVerifierKey;
 
 use crate::commands::error::{CliError, CliResult};
 use crate::commands::hex::hex_lower;
+use crate::commands::output::Emitter;
 
 /// `lys key generate --out <path>`.
 ///
@@ -23,21 +24,35 @@ use crate::commands::hex::hex_lower;
 ///
 /// Returns [`CliError::Trust`] if the key file cannot be created or an
 /// existing file at `out` is not a valid 32-byte seed.
-pub fn generate(out: &Path) -> CliResult<()> {
+pub fn generate(out: &Path, json: bool) -> CliResult<()> {
     // Existence is checked before the call purely to report accurately
     // whether a key was generated or loaded; `load_or_generate` itself is
     // race-safe regardless.
     let existed = out.exists();
     let identity = Ed25519Identity::load_or_generate(out).map_err(CliError::from)?;
+    let mut emit = Emitter::new(json);
     if existed {
-        println!("loaded existing identity key: {}", out.display());
+        emit.note(&format!("loaded existing identity key: {}", out.display()));
     } else {
-        println!("generated new identity key: {}", out.display());
+        emit.note(&format!("generated new identity key: {}", out.display()));
     }
-    println!(
-        "public key (ed25519): {}",
-        hex_lower(&identity.public_key_bytes())
+    if emit.is_json() {
+        emit.field(
+            "identity key",
+            "identity_key_path",
+            out.display().to_string(),
+        );
+        // Whether the key was created or already present is the one thing a
+        // caller cannot infer from the file afterwards, so it is a field
+        // rather than only a sentence.
+        emit.field("generated", "generated", !existed);
+    }
+    emit.field(
+        "public key (ed25519)",
+        "public_key_ed25519",
+        hex_lower(&identity.public_key_bytes()),
     );
+    emit.finish();
     Ok(())
 }
 
@@ -62,34 +77,48 @@ pub fn inspect(
     note_name: Option<&str>,
     ssh: bool,
     allowed_signers: Option<&str>,
+    json: bool,
 ) -> CliResult<()> {
     let identity = load_identity(key)?;
-    println!("identity key: {}", key.display());
-    println!(
-        "public key (ed25519): {}",
-        hex_lower(&identity.public_key_bytes())
+    let mut emit = Emitter::new(json);
+    emit.field(
+        "identity key",
+        "identity_key_path",
+        key.display().to_string(),
     );
-    println!(
-        "public key (x25519): {}",
-        hex_lower(&identity.x25519_public_key())
+    emit.field(
+        "public key (ed25519)",
+        "public_key_ed25519",
+        hex_lower(&identity.public_key_bytes()),
+    );
+    emit.field(
+        "public key (x25519)",
+        "public_key_x25519",
+        hex_lower(&identity.x25519_public_key()),
     );
     if let Some(name) = note_name {
         let verifier =
             NoteVerifierKey::new(name, identity.public_key_bytes()).map_err(CliError::from)?;
-        println!("verifier key (signed-note): {}", verifier.to_spec());
+        emit.field(
+            "verifier key (signed-note)",
+            "verifier_key",
+            verifier.to_spec(),
+        );
     }
     if ssh {
-        println!(
-            "public key (openssh): {}",
-            lys_core::keys::ssh::openssh_public_key(&identity.public_key_bytes())
+        emit.field(
+            "public key (openssh)",
+            "public_key_openssh",
+            lys_core::keys::ssh::openssh_public_key(&identity.public_key_bytes()),
         );
     }
     if let Some(principal) = allowed_signers {
         let line =
             lys_core::keys::ssh::allowed_signers_line(principal, &identity.public_key_bytes())
                 .map_err(CliError::from)?;
-        println!("allowed_signers: {line}");
+        emit.field("allowed_signers", "allowed_signers", line);
     }
+    emit.finish();
     Ok(())
 }
 

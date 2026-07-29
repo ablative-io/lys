@@ -16,6 +16,7 @@ use crate::commands::error::CliResult;
 use crate::commands::files::{read_file, write_file};
 use crate::commands::hex::hex_lower;
 use crate::commands::key::load_identity;
+use crate::commands::output::Emitter;
 
 /// `lys attest --key <path> --payload <file> --out <file>`.
 ///
@@ -28,24 +29,46 @@ use crate::commands::key::load_identity;
 /// [`CliError::KeyFileMissing`]: crate::commands::error::CliError::KeyFileMissing
 /// [`CliError::Trust`]: crate::commands::error::CliError::Trust
 /// [`CliError::Io`]: crate::commands::error::CliError::Io
-pub fn run(key: &Path, payload: &Path, out: &Path) -> CliResult<()> {
+pub fn run(key: &Path, payload: &Path, out: &Path, json: bool) -> CliResult<()> {
     let identity = load_identity(key)?;
     let payload_bytes = read_file(payload, "payload file")?;
     let attestation = sign_attestation(&payload_bytes, &identity);
     write_file(out, &attestation.to_cose_bytes(), "attestation file")?;
-    println!("attested payload: {}", payload.display());
-    println!(
-        "payload hash (sha256): {}",
-        hex_lower(&attestation.payload_hash)
+    let mut emit = Emitter::new(json);
+    emit.field(
+        "attested payload",
+        "payload_path",
+        payload.display().to_string(),
     );
-    println!(
-        "signer public key (ed25519): {}",
-        hex_lower(&attestation.signer_public_key)
+    emit.field(
+        "payload hash (sha256)",
+        "payload_hash",
+        hex_lower(&attestation.payload_hash),
     );
-    println!("signed at (unix ms): {}", attestation.timestamp);
-    println!(
-        "attestation written: {} (COSE_Sign1, application/cose)",
-        out.display()
+    emit.field(
+        "signer public key (ed25519)",
+        "signer_public_key",
+        hex_lower(&attestation.signer_public_key),
     );
+    emit.field(
+        "signed at (unix ms)",
+        "signed_at_unix_ms",
+        attestation.timestamp,
+    );
+    if emit.is_json() {
+        emit.field(
+            "attestation written",
+            "attestation_path",
+            out.display().to_string(),
+        );
+        emit.field("attestation format", "format", "COSE_Sign1");
+        emit.field("attestation media type", "media_type", "application/cose");
+    } else {
+        emit.note(&format!(
+            "attestation written: {} (COSE_Sign1, application/cose)",
+            out.display()
+        ));
+    }
+    emit.finish();
     Ok(())
 }

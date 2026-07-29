@@ -19,6 +19,7 @@ use lys_core::attestation::verify_attestation_bytes;
 use crate::commands::error::{CliError, CliResult};
 use crate::commands::files::read_file;
 use crate::commands::hex::hex_lower;
+use crate::commands::output::Emitter;
 
 /// `lys verify --attestation <file> --payload <file>`.
 ///
@@ -29,21 +30,29 @@ use crate::commands::hex::hex_lower;
 /// artifact is malformed or non-canonical, the payload does not match, or
 /// the signature is invalid, and [`CliError::Trust`] for any other library
 /// failure.
-pub fn run(attestation_path: &Path, payload_path: &Path) -> CliResult<()> {
+pub fn run(attestation_path: &Path, payload_path: &Path, json: bool) -> CliResult<()> {
     let artifact_bytes = read_file(attestation_path, "attestation file")?;
     let payload = read_file(payload_path, "payload file")?;
     match verify_attestation_bytes(&artifact_bytes, &payload) {
         Ok(attestation) => {
-            println!("attestation verified");
-            println!(
-                "signer public key (ed25519): {}",
-                hex_lower(&attestation.signer_public_key)
+            let mut emit = Emitter::new(json);
+            emit.flag("attestation verified", "verified");
+            emit.field(
+                "signer public key (ed25519)",
+                "signer_public_key",
+                hex_lower(&attestation.signer_public_key),
             );
-            println!(
-                "payload hash (sha256): {}",
-                hex_lower(&attestation.payload_hash)
+            emit.field(
+                "payload hash (sha256)",
+                "payload_hash",
+                hex_lower(&attestation.payload_hash),
             );
-            println!("signed at (unix ms): {}", attestation.timestamp);
+            emit.field(
+                "signed at (unix ms)",
+                "signed_at_unix_ms",
+                attestation.timestamp,
+            );
+            emit.finish();
             Ok(())
         }
         Err(TrustError::InvalidSignature) => Err(CliError::VerificationFailed),

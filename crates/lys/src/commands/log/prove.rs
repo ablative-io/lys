@@ -19,6 +19,7 @@ use crate::commands::files::write_file;
 use crate::commands::hex::hex_lower;
 use crate::commands::key::load_identity;
 use crate::commands::log::store::LogStore;
+use crate::commands::output::Emitter;
 
 /// `lys log prove inclusion --dir <log-dir> --key <keyfile>
 /// --leaf-index <n> --out <file>`.
@@ -38,7 +39,7 @@ use crate::commands::log::store::LogStore;
 /// [`CliError::Trust`]: crate::commands::error::CliError::Trust
 /// [`CliError::Io`]: crate::commands::error::CliError::Io
 /// [`CliError::JsonSerialize`]: crate::commands::error::CliError::JsonSerialize
-pub fn inclusion(dir: &Path, key: &Path, leaf_index: u64, out: &Path) -> CliResult<()> {
+pub fn inclusion(dir: &Path, key: &Path, leaf_index: u64, out: &Path, json: bool) -> CliResult<()> {
     let store = LogStore::open(dir)?;
     let identity = load_identity(key)?;
     let leaf_bytes = store.leaf_bytes(leaf_index).ok_or_else(|| {
@@ -58,10 +59,16 @@ pub fn inclusion(dir: &Path, key: &Path, leaf_index: u64, out: &Path) -> CliResu
     )?;
     write_artifact(out, &artifact, "inclusion proof artifact")?;
     let (root, tree_size) = store.tree().root().to_parts();
-    println!("leaf index: {leaf_index}");
-    println!("tree size: {tree_size}");
-    println!("root hash (sha256): {}", hex_lower(&root));
-    println!("artifact written: {}", out.display());
+    let mut emit = Emitter::new(json);
+    emit.field("leaf index", "leaf_index", leaf_index);
+    emit.field("tree size", "tree_size", tree_size);
+    emit.field("root hash (sha256)", "root_hash", hex_lower(&root));
+    emit.field(
+        "artifact written",
+        "artifact_path",
+        out.display().to_string(),
+    );
+    emit.finish();
     Ok(())
 }
 
@@ -76,7 +83,7 @@ pub fn inclusion(dir: &Path, key: &Path, leaf_index: u64, out: &Path) -> CliResu
 ///
 /// As [`inclusion`], with `TrustError::LogArtifactEncoding` for size-rule
 /// violations.
-pub fn consistency(dir: &Path, key: &Path, old_size: u64, out: &Path) -> CliResult<()> {
+pub fn consistency(dir: &Path, key: &Path, old_size: u64, out: &Path, json: bool) -> CliResult<()> {
     let store = LogStore::open(dir)?;
     let identity = load_identity(key)?;
     let new_size = store.tree().len();
@@ -93,11 +100,25 @@ pub fn consistency(dir: &Path, key: &Path, old_size: u64, out: &Path) -> CliResu
     write_artifact(out, &artifact, "consistency proof artifact")?;
     let (old_root, _old) = old_tree.root().to_parts();
     let (new_root, _new) = store.tree().root().to_parts();
-    println!("old tree size: {old_size}");
-    println!("new tree size: {new_size}");
-    println!("old root hash (sha256): {}", hex_lower(&old_root));
-    println!("new root hash (sha256): {}", hex_lower(&new_root));
-    println!("artifact written: {}", out.display());
+    let mut emit = Emitter::new(json);
+    emit.field("old tree size", "old_tree_size", old_size);
+    emit.field("new tree size", "new_tree_size", new_size);
+    emit.field(
+        "old root hash (sha256)",
+        "old_root_hash",
+        hex_lower(&old_root),
+    );
+    emit.field(
+        "new root hash (sha256)",
+        "new_root_hash",
+        hex_lower(&new_root),
+    );
+    emit.field(
+        "artifact written",
+        "artifact_path",
+        out.display().to_string(),
+    );
+    emit.finish();
     Ok(())
 }
 

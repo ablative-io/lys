@@ -17,6 +17,18 @@ use clap::{Parser, Subcommand};
 #[derive(Debug, Parser)]
 #[command(name = "lys", version, propagate_version = true)]
 pub struct Cli {
+    /// Emit one JSON object on stdout instead of human-readable lines.
+    ///
+    /// Global, and honoured by every subcommand — a caller never has to
+    /// discover which commands support it. Success is
+    /// `{"ok":true,...}`; failure is `{"ok":false,"error":"..."}` on stdout
+    /// with the diagnostic still on stderr, so a pipeline gating on this
+    /// output never receives something it cannot parse. Human-only prose,
+    /// such as the `UNVERIFIED` banners, is represented as fields rather
+    /// than sentences.
+    #[arg(long, global = true)]
+    pub json: bool,
+
     /// Subcommand to run.
     #[command(subcommand)]
     pub command: Command,
