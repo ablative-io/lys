@@ -107,10 +107,17 @@ impl Ed25519Identity {
 
     /// Derives the X25519 static secret from the Ed25519 signing key.
     ///
-    /// Uses the standard Ed25519-to-X25519 clamped-scalar conversion
-    /// (`to_scalar_bytes`), so the same Ed25519 identity always yields the
-    /// same X25519 secret. Used as the long-term key for sealed payload key
-    /// agreement.
+    /// This is the standard Ed25519-to-X25519 conversion: the secret is the
+    /// low 32 bytes of SHA-512 over the Ed25519 seed, obtained here via
+    /// dalek's `to_scalar_bytes`. That function returns the scalar
+    /// **unreduced and unclamped** — clamping is applied downstream by
+    /// `x25519-dalek`, when the bytes are used for public-key derivation or
+    /// Diffie-Hellman. The end-to-end conversion is therefore correct, but
+    /// the clamping does not happen at this call site and this method must
+    /// not be read as performing it.
+    ///
+    /// Deterministic: the same Ed25519 identity always yields the same X25519
+    /// secret. Used as the long-term key for sealed payload key agreement.
     pub fn x25519_static_secret(&self) -> x25519_dalek::StaticSecret {
         x25519_dalek::StaticSecret::from(self.signing_key.to_scalar_bytes())
     }

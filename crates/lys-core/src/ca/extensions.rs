@@ -47,6 +47,27 @@ pub fn encode_extension(oid: &[u64], payload_bytes: impl Into<Vec<u8>>) -> Custo
 /// extension value bytes unchanged, or `None` when the certificate does not
 /// carry an extension with that OID.
 ///
+/// # The returned payload is UNAUTHENTICATED
+///
+/// This function performs **no signature check and no issuer check**. It
+/// parses bytes out of a certificate that anybody can construct, and the
+/// extensions it reads are non-critical, so a parser that does not recognise
+/// the OID accepts the certificate regardless of what the payload says.
+///
+/// Capability claims read this way are therefore **claims, not permissions**.
+/// They become trustworthy only once
+/// [`verify_certificate_chain`](crate::ca::verify_certificate_chain) — or
+/// [`verify_certificate_chain_at`](crate::ca::verify_certificate_chain_at)
+/// for an explicit instant — has succeeded against the public key of an
+/// issuer you already trust. Verifying the certificate *after* acting on a
+/// payload read from it is not equivalent, and treating the return value of
+/// this function as an authorisation decision is a privilege-escalation bug:
+/// the caller chooses the certificate, so the caller chooses the claims.
+///
+/// The CLI's `lys inspect cert` models the intended discipline — it prints
+/// these payloads under an explicit `UNVERIFIED CLAIMS` marker naming the
+/// command that does verify.
+///
 /// # Errors
 ///
 /// Returns [`TrustError::CertificateParsing`] if `cert_der` is not a valid
