@@ -5,9 +5,17 @@
 > The strawman defers to this document in three places ("byte-exact spec to be
 > written and ratified per D3"). It exists so the design round ratifies or
 > shoots down *text* rather than generating it live. No code implements any of
-> it; no artifact exists under any tag named here. Until Tom ratifies, every
-> byte below is free to change — which is exactly why it is written down now,
-> before the freeze rule bites.
+> it; no artifact exists under any tag named here. Every byte below is still
+> free to change — which is exactly why it is written down now, before the
+> freeze rule bites.
+>
+> **Update 2026-07-29:** the design decisions governing this file are now settled
+> by derivation in [DECISIONS.md](DECISIONS.md) — receipts alongside JSON proofs,
+> whole certificates in the issuance log, an unsigned bundle with mandatory
+> chain-link checks, domain-scoped origins, and no timestamp inside receipts.
+> This document stays DRAFT regardless: a format is frozen by the first durable
+> artifact signed under it, not by a decision to adopt it, and no such artifact
+> exists.
 >
 > **The freeze rule, restated because it is the whole reason for this file:**
 > the moment the anchor signs one receipt under a tag, that tag is permanent.
