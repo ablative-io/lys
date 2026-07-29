@@ -185,8 +185,63 @@ impl fmt::Debug for CertifiedKey {
     }
 }
 
+/// Reads the 32-byte Ed25519 subject public key out of a certificate's
+/// `subjectPublicKeyInfo`.
+///
+/// This is the key a certificate *vouches for*. Recovering it is what lets a
+/// verifier close the join between a certificate and something the subject
+/// signed: verifying a certificate proves the authority issued it, and
+/// verifying an attestation proves some key signed a payload, but neither says
+/// the two concern the same identity. Comparing this against an attestation's
+/// signer key is the check that connects them.
+///
+/// Parsing only — this says nothing about whether the certificate verifies, and
+/// callers must not treat a successful read as any kind of endorsement. Verify
+/// the chain with [`verify_certificate_chain_at`](crate::ca::verify_certificate_chain_at)
+/// first; a key recovered from an unverified certificate is an attacker-chosen
+/// value.
+///
+/// # Errors
+///
+/// Returns [`TrustError::CertificateParsing`] if `cert_der` cannot be parsed,
+/// the subject key algorithm is not Ed25519, the algorithm carries parameters
+/// (RFC 8410 §3 requires their absence), or the key is not exactly 32 bytes in
+/// a BIT STRING with no unused bits.
+pub fn certificate_subject_public_key(cert_der: &[u8]) -> TrustResult<[u8; 32]> {
+    let (_, certificate) =
+        X509Certificate::from_der(cert_der).map_err(|e| TrustError::CertificateParsing {
+            reason: format!("failed to parse certificate DER: {e:?}"),
+        })?;
+
+    let spki = &certificate.tbs_certificate.subject_pki;
+    if spki.algorithm.algorithm != OID_SIG_ED25519 {
+        return Err(TrustError::CertificateParsing {
+            reason: "certificate subject key algorithm is not Ed25519".to_string(),
+        });
+    }
+    if spki.algorithm.parameters.is_some() {
+        return Err(TrustError::CertificateParsing {
+            reason: "Ed25519 subject key algorithm must carry no parameters (RFC 8410)".to_string(),
+        });
+    }
+    if spki.subject_public_key.unused_bits != 0 {
+        return Err(TrustError::CertificateParsing {
+            reason: "certificate subject key BIT STRING must have no unused bits".to_string(),
+        });
+    }
+
+    let data = spki.subject_public_key.data.as_ref();
+    data.try_into()
+        .map_err(|_err| TrustError::CertificateParsing {
+            reason: format!(
+                "certificate subject key must be 32 bytes for Ed25519, got {}",
+                data.len()
+            ),
+        })
+}
+
 /// Confirms that a freshly issued certificate's `subjectPublicKeyInfo` carries
-/// exactly `expected` under the Ed25519 algorithm identifier.
+/// exactly `expected`.
 ///
 /// This is a self-check on our own output, not a verification of a stranger's
 /// artifact: it exists so that "issuance succeeded" cannot be reported for a
@@ -194,19 +249,18 @@ impl fmt::Debug for CertifiedKey {
 /// certify. The whole value of the presented-key path is that the certified
 /// key is the holder's, so that binding is the one thing worth re-reading from
 /// the bytes rather than assuming.
+///
+/// Failures are reported as [`TrustError::CertificateGeneration`] rather than
+/// the parsing error [`certificate_subject_public_key`] returns: at this point
+/// the malformed certificate is one *we* just produced, and that distinction
+/// matters to whoever reads the error.
 fn assert_der_binds_subject_key(der_bytes: &[u8], expected: &[u8; 32]) -> TrustResult<()> {
-    let (_, certificate) =
-        X509Certificate::from_der(der_bytes).map_err(|e| TrustError::CertificateGeneration {
-            reason: format!("freshly issued certificate could not be parsed back: {e:?}"),
-        })?;
-
-    let spki = &certificate.tbs_certificate.subject_pki;
-    if spki.algorithm.algorithm != OID_SIG_ED25519 {
-        return Err(TrustError::CertificateGeneration {
-            reason: "freshly issued certificate does not carry an Ed25519 subject key".to_string(),
-        });
-    }
-    if spki.subject_public_key.data.as_ref() != expected.as_slice() {
+    let subject_key = certificate_subject_public_key(der_bytes).map_err(|e| {
+        TrustError::CertificateGeneration {
+            reason: format!("freshly issued certificate could not be read back: {e}"),
+        }
+    })?;
+    if &subject_key != expected {
         return Err(TrustError::CertificateGeneration {
             reason: "freshly issued certificate binds a different subject key than requested"
                 .to_string(),

@@ -61,6 +61,36 @@ fn issued_certificate_binds_the_generated_subject_key() {
 }
 
 #[test]
+fn certificate_subject_public_key_reads_back_what_was_certified() {
+    let ca = test_authority();
+    let issued = ca
+        .issue_certificate("agent-001", Duration::from_hours(1), vec![])
+        .unwrap();
+
+    let recovered = crate::ca::certificate_subject_public_key(&issued.der_bytes).unwrap();
+    assert_eq!(recovered, issued.subject_verifying_key.to_bytes());
+}
+
+/// The recovery path must refuse anything that is not a certificate rather than
+/// returning bytes from a partially-understood structure — the value it returns
+/// is compared against an attestation's signer key, so a wrong answer here
+/// would silently break the one check that joins an identity to its statements.
+#[test]
+fn certificate_subject_public_key_refuses_non_certificates() {
+    for bytes in [
+        b"".as_slice(),
+        b"not der at all".as_slice(),
+        &[0x30, 0x03, 0x02, 0x01, 0x00],
+    ] {
+        let error = crate::ca::certificate_subject_public_key(bytes).unwrap_err();
+        assert!(
+            matches!(error, TrustError::CertificateParsing { .. }),
+            "expected a parsing failure for {bytes:?}, got {error:?}"
+        );
+    }
+}
+
+#[test]
 fn issuer_common_name_matches_ca_public_key_hex() {
     let ca = test_authority();
     let issued = ca

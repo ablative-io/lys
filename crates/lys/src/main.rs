@@ -105,7 +105,17 @@ fn main() -> ExitCode {
         Command::Verify {
             attestation,
             payload,
-        } => commands::verify::run(&attestation, &payload, json),
+            cert,
+            issuer_public_key,
+            at,
+        } => commands::verify::run(
+            &attestation,
+            &payload,
+            cert.as_deref(),
+            issuer_public_key.as_deref(),
+            at.as_deref(),
+            json,
+        ),
         Command::Inspect(inspect_command) => match inspect_command {
             InspectCommand::Attestation { attestation } => {
                 commands::inspect::attestation(&attestation, json)

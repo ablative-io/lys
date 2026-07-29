@@ -82,6 +82,23 @@ pub enum CliError {
     #[error("certificate verification failed: invalid signature or outside validity window")]
     CertificateVerificationFailed,
 
+    /// A certified attestation did not verify: the certificate, the
+    /// attestation, or the binding between them failed.
+    ///
+    /// Deliberately non-oracle across *all three* halves. `lys verify --cert`
+    /// answers one question — "did the identity this certificate vouches for
+    /// make this statement?" — and a caller who learns which half failed can
+    /// probe each independently. Localising a failure is a debugging task, and
+    /// the message names the two commands that do it, each of which is itself
+    /// non-oracle within its own surface.
+    #[error(
+        "certified attestation verification failed: invalid certificate, certificate outside \
+         validity window, malformed or non-canonical attestation, payload mismatch, invalid \
+         signature, or the attestation was not signed by the key the certificate certifies — \
+         run `lys ca verify` and `lys verify` separately to localise it"
+    )]
+    CertifiedVerificationFailed,
+
     /// A certificate file could not be decoded as a PEM `CERTIFICATE` block.
     #[error("failed to parse PEM certificate from {}: {reason}", path.display())]
     PemParse {

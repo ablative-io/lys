@@ -252,6 +252,37 @@ verifier key (signed-note): agents.example.com/agent-noor/session-0001+c1e1402c+
 
 A disputed session answers with an inclusion proof for the one challenged entry — the rest of the session stays private, exactly as in Example 1.
 
+**One question, one answer.** The agent signs the work it did; a counterparty checks the statement, the certificate, and — the part that is easy to skip and fatal to skip — that they concern the same identity:
+
+```console
+$ lys attest --key agent.key --payload release-4.2.json --out release-4.2.cose
+attested payload: release-4.2.json
+payload hash (sha256): c4d4fc1fc06f9056901f2497e04fc7753f38371cb86b2fe9fdbb7ac1302a73a1
+signer public key (ed25519): 254f31d0057e669e47b8078eca766eefc2070467a6a6da3185ca25fff18cc6a8
+signed at (unix ms): 1785360846484
+attestation written: release-4.2.cose (COSE_Sign1, application/cose)
+
+$ lys verify --attestation release-4.2.cose --payload release-4.2.json \
+    --cert agent-noor.pem \
+    --issuer-public-key 40c20137b187a9caefb74dffedc01ad64acfcbb45badc3e14835ce3dbf91ec69
+certified attestation verified
+attestation signer is the key this certificate certifies
+signer public key (ed25519): 254f31d0057e669e47b8078eca766eefc2070467a6a6da3185ca25fff18cc6a8
+payload hash (sha256): c4d4fc1fc06f9056901f2497e04fc7753f38371cb86b2fe9fdbb7ac1302a73a1
+signed at (unix ms): 1785360846484
+issuer public key (ed25519): 40c20137b187a9caefb74dffedc01ad64acfcbb45badc3e14835ce3dbf91ec69
+checked at (rfc3339): 2026-07-29T21:34:06.491783+00:00
+capability claims: {
+  "capabilities": ["repo:read", "ci:dispatch", "artifact:sign"],
+  "delegated_by": "tom@example.com",
+  "max_budget_usd": 50
+}
+```
+
+That is the whole sentence in one exit code: **this named subject, holding these capabilities, made this statement.** Drop `--cert` and you get a weaker claim — that *some* key signed the payload — which is all a signature can ever mean on its own. Run the two checks separately and each passes while telling you nothing about the other; the second line above is the one that connects them, and lys will not print the capability claims until it holds.
+
+The claims are read only after all three checks pass, so nothing from a certificate that failed is ever echoed back to you.
+
 **Sealed credential hand-off.** The status quo for giving an agent a credential is pasting a secret into a context window. Instead: seal it to the agent's key, signed by the sender, opaque to everything in between. Each lys identity derives an X25519 key; `lys key inspect` prints it:
 
 ```console

@@ -72,9 +72,19 @@ pub enum Command {
         out: PathBuf,
     },
 
-    /// Verify a `COSE_Sign1` attestation artifact against a payload file.
+    /// Verify a `COSE_Sign1` attestation artifact against a payload file, and
+    /// optionally against the certificate that vouches for its signer.
     ///
-    /// Exits 0 if the attestation verifies, 1 otherwise.
+    /// Without --cert this proves only that *some* key signed the payload, and
+    /// prints which key. With --cert and --issuer-public-key it additionally
+    /// requires that the certificate verifies against that issuer and that the
+    /// attestation's signer is the key the certificate certifies — so the
+    /// answer covers "did this named subject, holding these capabilities, make
+    /// this statement?" rather than leaving you to compare two hex strings by
+    /// eye. Capability claims are printed only when all three checks pass.
+    ///
+    /// Exits 0 if everything asked for verifies, 1 otherwise with a single
+    /// generic failure message.
     Verify {
         /// Path to the `COSE_Sign1` attestation artifact produced by
         /// `lys attest`.
@@ -84,6 +94,21 @@ pub enum Command {
         /// Path to the payload file the attestation should cover.
         #[arg(long)]
         payload: PathBuf,
+
+        /// Path to the PEM certificate vouching for the attestation's signer
+        /// (optional). Requires --issuer-public-key.
+        #[arg(long, requires = "issuer_public_key")]
+        cert: Option<PathBuf>,
+
+        /// Trusted issuer Ed25519 public key as 64 hexadecimal characters.
+        /// Requires --cert.
+        #[arg(long, requires = "cert")]
+        issuer_public_key: Option<String>,
+
+        /// RFC 3339 instant to evaluate the certificate's validity window at
+        /// (default: now). Only meaningful with --cert.
+        #[arg(long, requires = "cert")]
+        at: Option<String>,
     },
 
     /// Read-only viewers: print what an artifact or certificate file says,
