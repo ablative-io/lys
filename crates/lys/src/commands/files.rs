@@ -2,7 +2,7 @@
 //!
 //! Thin wrappers over `std::fs` that attach the failing path and a
 //! description of what the file was for, so every I/O failure surfaces as an
-//! actionable [`CliError::Io`](crate::commands::error::CliError::Io).
+//! actionable [`CliError::Io`].
 
 use std::path::Path;
 

@@ -432,8 +432,8 @@ pub enum LogVerifyCommand {
         #[arg(long)]
         leaf: PathBuf,
 
-        /// Trusted verifier key string
-        /// (<origin>+<hex keyid>+<base64 key>), as printed by
+        /// Trusted verifier key string in the signed-note format
+        /// `ORIGIN+KEYID_HEX+KEY_BASE64`, as printed by
         /// `lys log checkpoint` and `lys key inspect --note-name`.
         #[arg(long)]
         verifier_key: String,
@@ -449,8 +449,8 @@ pub enum LogVerifyCommand {
         #[arg(long)]
         artifact: PathBuf,
 
-        /// Trusted verifier key string
-        /// (<origin>+<hex keyid>+<base64 key>), as printed by
+        /// Trusted verifier key string in the signed-note format
+        /// `ORIGIN+KEYID_HEX+KEY_BASE64`, as printed by
         /// `lys log checkpoint` and `lys key inspect --note-name`.
         #[arg(long)]
         verifier_key: String,

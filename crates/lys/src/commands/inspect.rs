@@ -25,7 +25,7 @@
 //!   whole reason this viewer exists separately.
 //! - **Failures reuse the existing non-oracle messages.** An undecodable
 //!   artifact collapses into the same
-//!   [`CliError::VerificationFailed`](crate::commands::error::CliError::VerificationFailed)
+//!   [`CliError::VerificationFailed`]
 //!   message `lys verify` prints; no decode-specific detail is invented here.
 //! - **Nothing is echoed raw unless it is terminal-safe.** Subject names and
 //!   capability claims come from files nothing has vouched for, so they pass
