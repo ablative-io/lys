@@ -40,6 +40,7 @@
 
 pub mod leaf;
 pub mod proof;
+pub mod reconstruct;
 pub mod tree;
 
 pub use leaf::raw_leaf_hash;
@@ -47,4 +48,5 @@ pub use proof::{
     ConsistencyProof, InclusionProof, RootHash, verify_consistency, verify_inclusion,
     verify_inclusion_raw,
 };
+pub use reconstruct::root_from_inclusion_path;
 pub use tree::{AppendOnlyTree, RawLeaf};
