@@ -118,8 +118,25 @@ impl Ed25519Identity {
     ///
     /// Deterministic: the same Ed25519 identity always yields the same X25519
     /// secret. Used as the long-term key for sealed payload key agreement.
+    ///
+    /// The intermediate scalar is held in [`Zeroizing`] so the buffer is
+    /// wiped when this call returns. `to_scalar_bytes` hands back a bare
+    /// `[u8; 32]`, and an unwrapped temporary would be dropped intact,
+    /// leaving the X25519 private scalar as stack residue — the one seed
+    /// buffer in this file not covered by the M4 discipline. The returned
+    /// [`x25519_dalek::StaticSecret`] wipes its own copy on drop (its
+    /// `zeroize` feature is enabled through the default feature set).
+    ///
+    /// This narrows residue; it is not a defence against an adversary who
+    /// can read live process memory. Such an adversary already holds
+    /// `signing_key`, and this scalar is a deterministic function of it, so
+    /// they can recompute it at will. The benefit is confined to material
+    /// that outlives the process — core dumps, swap, hibernation images —
+    /// where a stale stack page can persist long after the structured secret
+    /// is gone.
     pub fn x25519_static_secret(&self) -> x25519_dalek::StaticSecret {
-        x25519_dalek::StaticSecret::from(self.signing_key.to_scalar_bytes())
+        let scalar = Zeroizing::new(self.signing_key.to_scalar_bytes());
+        x25519_dalek::StaticSecret::from(*scalar)
     }
 
     /// Returns the Montgomery-form X25519 public key derived from this
