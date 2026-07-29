@@ -63,7 +63,7 @@
 ## Sealed Envelope
 
 - [ ] **C44** — seal(payload, recipient_public_key) returns SealedEnvelope { ephemeral_public_key, ciphertext, nonce } using a fresh ephemeral X25519 keypair per call (two seals of the same payload to the same recipient differ)
-- [ ] **C45** — HKDF-SHA256 info input is `b"lys/sealed-envelope/v1" || ephemeral_public_key || recipient_public_key` — domain tag constant equals the lys string
+- [ ] **C45** — HKDF-SHA256 info input is `b"lys-sealed-envelope/v1" || ephemeral_public_key || recipient_public_key` — the hyphen-form HKDF domain tag, deliberately distinct from the slash-form attestation context tag `lys/sealed-envelope/v1`
 - [ ] **C46** — Both seal and open reject non-contributory Diffie-Hellman: a low-order public key fails via `was_contributory` before any key derivation (test exists)
 - [ ] **C47** — Seal/open roundtrip succeeds: sealed with the recipient's X25519 public key, opened with the recipient's static secret
 - [ ] **C48** — Wrong private key, tampered ciphertext, and tampered nonce all return exactly TrustError::UnsealFailed — a single undifferentiated failure through the AES-GCM arbiter, with no early return distinguishing causes
