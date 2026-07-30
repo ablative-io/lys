@@ -241,7 +241,59 @@ screens for is already absent. Claiming that recipe as the standard would be
 asserting a control that cannot fire, which is the failure this repo names
 elsewhere.
 
-**The real residual risk is narrower and is a one-token mistake.** Because (3)
+##### "Covered" does not answer "chosen by whom" — the selection is caller-supplied
+
+Re-derivation (3) means the verifier must decide *which* constant to re-derive
+*before* it verifies. **If that branch were driven by a type field read off the
+wire, re-derivation would buy nothing** — an attacker flips the label, the
+verifier obligingly re-derives the matching constant, and the signature checks
+out. So the question is not whether the type is covered but who selects it.
+
+**It is the caller, by Rust type, and the wire has no vote.** There is no
+dispatch on the content type anywhere in the workspace. `from_cose_bytes` is an
+inherent associated function on the concrete `AnchorReceipt`
+(`receipt/artifact.rs:123`) — naming the type *is* declaring the intent, and
+there is deliberately no polymorphic `from_cose_bytes(bytes) -> AnyReceipt`
+entry point. `decode_protected` then tests equality against **one** hardcoded
+constant (`receipt/encoding.rs:257`), not membership in a set of known ones, so
+property (4) pins against the re-derived constant rather than against
+"any recognised type".
+
+**This is a standing constraint, not an accident of the current shape.** A
+convenience API that sniffs the type and dispatches would move selection to the
+attacker while every one of the four properties above still held, and would read
+as a usability improvement. If such an entry point is ever wanted, it must
+dispatch to the per-type decoder and the dispatch must not be what authenticates
+— the caller still has to say what it expected.
+
+##### A false finding of my own, and what caught it
+
+While checking the above I concluded the receipt content-type pin was **not
+covered by any test**, on the strength of a grep for `CONTENT_TYPE` across the
+receipt test modules that returned only the frozen-string test. That was wrong.
+`every_protected_header_pin_is_enforced` (`receipt/encoding_tests.rs:285-321`)
+mutates the content type's first byte at a verified offset (lines 303-308) and
+asserts rejection. **Removing the pin fails exactly that test and nothing else —
+confirmed by injection, which is the only reason the false finding was not
+filed.**
+
+The error was not a bad grep; the grep answered exactly what it was asked. **The
+question was wrong: I searched for a name and concluded about a behaviour.** A
+test that mutates a byte at an offset never spells the constant it is defending,
+so name-search is structurally blind to precisely the best-built tests. Distinct
+from a tool-level false zero (a mis-quoted glob), because here the tool was
+correct and complete.
+
+**The genuine residual it left behind is smaller and real.** That one test
+bundles five independent pins — `alg -7`, `alg -19`, content type, `vds`, map
+arity — so removing *any* of the five fails the same single test. The
+exactly-one-test-fails standard is met at the test level and **not at the case
+level: the failure cannot say which pin broke.** It matters because this test is
+the template the consistency path would copy, and a five-in-one case would make
+the re-label drift injection ambiguous exactly where it must be decisive. The
+consistency pins get one case each.
+
+**A further residual risk is narrower and is a one-token mistake.** Because (3)
 re-derives the header from a *hardcoded* constant per code path, the separation
 rests entirely on the consistency path passing its own constant. If
 `receipt/consistency.rs` calls `protected_bytes` with the inclusion content type,
