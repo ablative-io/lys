@@ -158,6 +158,11 @@ func main() {
 			fail("usage: cosetool receipt-verify <pubkey-hex> <leaf-index> <leaf-hex>...")
 		}
 		receiptVerify(os.Args[2], os.Args[3], os.Args[4:], stdin)
+	case "consistency":
+		if len(os.Args) < 5 {
+			fail("usage: cosetool consistency <first-size> <second-size> <leaf-hex>...")
+		}
+		consistency(os.Args[2], os.Args[3], os.Args[4:])
 	case "bundle-verify":
 		// Zero anchor keys is legitimate: an unnotarized bundle still has an
 		// inclusion proof to verify, and refusing one here would make this tool
