@@ -25,6 +25,18 @@
 //! would leave `Ok` meaning "probably". The trait requires durable-on-return
 //! and a storage layer that quietly means otherwise is the exact defect that
 //! makes a log unrepairable rather than merely wrong.
+//!
+//! **On macOS the claim is stronger than plain `fsync(2)`, and this was checked
+//! rather than assumed.** A bare `fsync` on Apple platforms returns once the
+//! data has reached the drive, without waiting for the drive to flush its own
+//! write cache; `fcntl(F_FULLFSYNC)` is the call that waits. Rust's
+//! `File::sync_all` dispatches to `F_FULLFSYNC` under `#[cfg(target_vendor =
+//! "apple")]` and to `libc::fsync` elsewhere, and it propagates the result
+//! through `cvt_r` — so an unsupported operation surfaces as an error rather
+//! than degrading silently into the weaker guarantee. Verified against the
+//! toolchain's own `std` source, because "cannot determine" resolving quietly to
+//! the reassuring answer is the failure mode this whole module is arranged
+//! against.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};

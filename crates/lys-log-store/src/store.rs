@@ -48,6 +48,27 @@
 //! silent one is indistinguishable from a leaf that was never offered. This
 //! crate is organised so that the only reachable route to a missing leaf runs
 //! through an error the caller received.
+//!
+//! # `LeafAlreadyWritten` is a conflict, not a resume signal
+//!
+//! Worth stating because the opposite reading is reasonable and would be a
+//! serious bug. Consider a crash between a durable `put_leaf(N)` and whatever
+//! the caller does next. If the caller had to *resume* by re-attempting
+//! `put_leaf(N)` and treating the refusal as "already fine, carry on", then a
+//! terminal refusal would turn an ordinary crash into an unrecoverable store.
+//!
+//! That situation cannot arise here, because **catching up happens when the log
+//! opens, before any write is attempted.** A [`Log`](crate::Log) does not
+//! persist its own tree length; it rebuilds the tree from stored leaves at open
+//! and reconciles it with the pin, which repairs exactly the
+//! one-leaf-ahead state that crash leaves behind. By the time a caller can call
+//! `put_leaf` again, its tree already covers leaf `N`.
+//!
+//! So a refusal at `N` means something else entirely: **another writer holds
+//! that position.** It is terminal for that call and it is not a state to
+//! recover from by retrying — retrying is how two writers take turns
+//! overwriting each other's idea of the log. Reopen instead, and the position
+//! that writer took will be part of the tree.
 
 use crate::error::StoreResult;
 
