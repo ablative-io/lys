@@ -165,9 +165,102 @@ RFC9162_SHA256_Consistency_Proof_Content = [
 ]
 ```
 
-Everything else matches §1.2: tagged `COSE_Sign1`, `alg -8`, the same content
-type, `kid` in the protected header, `vds 395 => 1`, detached `nil` payload, and
-**exactly one proof in the array** for the same reason.
+Everything else matches §1.2: tagged `COSE_Sign1`, `alg -8`, `kid` in the
+protected header, `vds 395 => 1`, detached `nil` payload, and **exactly one proof
+in the array** for the same reason.
+
+#### The content type MUST differ, or the two receipt kinds are confusable
+
+`application/vnd.lys.consistency-receipt.v1+cbor` — **not** the inclusion
+receipt's content type. The media type is lys's to choose (RFC 9942 does not
+specify it), and this one has to be different, for a reason found by working out
+the shape before writing any code:
+
+With a shared content type, an inclusion receipt and a consistency receipt have a
+**byte-identical protected header** — same `alg`, same content type, same `kid`,
+same `vds` — and the payload is detached in both. The RFC 9052 §4.4
+`Sig_structure` therefore covers *exactly the same bytes* for both kinds, and the
+two are distinguished only by whether the **unprotected** header holds `-1` or
+`-2`. Unprotected means not signature-covered, so that discriminator is free to
+rewrite.
+
+The consequence runs in the direction that matters. Take a valid *inclusion*
+receipt: the anchor signed root `R` at size `S`. Rewrite its unprotected header to
+`{-2: [<bstr .cbor [S1, S, path]>]}` and present it as a consistency receipt. The
+signature still verifies — the detached payload is still `R`, which is exactly what
+"the newer root at `tree_size_2`" is supposed to be. **The anchor never made a
+consistency statement, and a verifier is now told that it did**, with a valid
+signature to show.
+
+The §1.3 argument for putting the proof in an unprotected header does not rescue
+this. "Authenticated by consequence" works when tampering changes the
+reconstruction; here the tampering changes *which reconstruction procedure the
+verifier runs*, and both procedures can arrive at the same detached root.
+
+**Ruling: the discriminator goes inside the signed bytes, as the content type.**
+Same fix as the one already recorded for attestations — receipts and attestations
+share the `0x84 0x6A "Signature1"` byte-0 prefix, so the protected bucket is what
+separates them. Two of our own formats sharing a signature scope needs the same
+treatment, and this is the third time that reasoning has applied.
+
+Verifiers pin the content type they expect and refuse the other, so a
+re-labelled artifact fails on the protected header before any proof is examined.
+**A test must construct exactly this attack — an inclusion receipt re-labelled as
+a consistency receipt — and prove it is refused.** Until that test exists this
+section is a hypothesis, which is the standing rule in this file.
+
+**The detached payload is the *newer* root.** RFC 9942 §5.3.1: *"In a signed
+consistency proof, the newer Merkle Tree root (proven to be consistent with an
+older Merkle Tree root) is a detached payload and corresponds to the log at size
+`tree-size-2`."*
+
+#### A consistency receipt is NOT self-verifying, and the RFC does not say where the older root comes from
+
+This is the important asymmetry with §1.2, and it is not a detail.
+
+An **inclusion** receipt plus the leaf bytes is enough for a stranger: the
+verifier recomputes the detached root from `(leaf, leaf_index, tree_size, path)`
+and the signature either matches or does not. Nothing else is needed — no
+checkpoint, no service, no prior state.
+
+A **consistency** receipt cannot work that way. RFC 6962 consistency verification
+relates *two* roots, and only one of them (the newer) is the detached payload. The
+older root is not in the artifact, and **RFC 9942 does not state where a verifier
+obtains it** — asked directly, the document simply does not address retrieval of
+the `tree_size_1` root. §5.3.1's verification prose ("the consistency proof is
+checked by applying a previous inclusion proof to the consistency proof") does not
+close the gap either; it names no comparison.
+
+That gap has a security consequence, and DECISIONS.md's governing principle
+settles it: **a claim must not be settable by the party being judged.** If a
+verifier accepts the older root from anywhere convenient — including anything the
+anchor supplied alongside the receipt — then the anchor chooses both endpoints of
+the statement it is being held to, and "consistent with an earlier version of my
+log" becomes "consistent with whatever earlier version I nominate today". That is
+precisely the equivocation a consistency proof exists to detect, re-admitted
+through the verifier's front door.
+
+**Ruling, matching §1.4's discipline for the anchor key: verification takes the
+older root as a required argument from the caller, and there is no form of the
+call that does not.** The caller is asserting *"this is the root I previously
+held"*, and the receipt is then evidence about that specific prior belief. A
+consistency receipt is not a self-contained artifact; it is an artifact that
+attaches to a root the verifier already had, and the API must make that
+impossible to forget rather than merely document it.
+
+The same reasoning as `verify_receipt` requiring its anchor key, and the same as
+the G1/G2 identity join: an artifact that carries its own trust anchor verifies
+against whatever anchor it carries.
+
+#### Two more things the RFC leaves open, ruled here
+
+- **Size ordering is not specified.** RFC 9942 does not say whether
+  `tree_size_1 < tree_size_2` is required or equal sizes are permitted. lys rules
+  it below, and the ruling is lys's own, not the RFC's — recorded that way so a
+  future reader does not go looking for RFC authority that is not there.
+- **The verification order is underspecified.** lys applies §1.4's rule
+  unchanged: signature first, and the proof is not examined at all until the
+  signature over the detached newer root verifies against the named anchor key.
 
 > **Correction, 2026-07-30 (fourth in this file).** The previous revision wrote
 > this as `-2 → [size_1, size_2, consistency_path]` — a **bare array**, missing
