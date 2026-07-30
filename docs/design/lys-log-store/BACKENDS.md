@@ -52,7 +52,7 @@ The intended second backend, and currently **blocked**. Verified at
 | # | Blocker | Evidence at `cf07bc0` |
 |---|---|---|
 | **#11** | **Read side: WAL recovery does not fail closed.** A checksum-mismatched frame is logged at `warn`, sets a flag, breaks the replay loop, and returns `Ok`. The shard boot path never reads that flag, so a corrupt tail opens as a silent prefix and subsequent writes land on top of it. | `wal/recovery.rs:159-165` returns `Ok` after `stopped_at_corruption = true`; the only non-test consumer of `stopped_at_corruption()` is `db/vacuum/shard_scan.rs:86`; `shard/actor.rs:240-275` (`from_recovered_with_clock`) consumes the recovery result without consulting it, and `shard/actor/native/boot.rs:109` is the production path that calls it. |
-| **#58** | **Write side: a bare append is not fsynced under the shipped policy.** `FsyncPolicy::CommitOnly` makes `should_sync_after_append()` false, and production constructs exactly that. Wiring `put_leaf` to a plain append would return `Ok` for a leaf not on stable storage — violating criterion 1 through a policy default that neither the trait nor the call site mentions. | `wal/durable.rs:35-42` (the policy enum), `wal/durable.rs:277-283` (`should_sync_after_append` returns false for `CommitOnly`), `shard/actor/native/boot.rs:110` (`DurableWal::new(wal_path, FsyncPolicy::CommitOnly)`). The promise path at `wal/durable.rs:175` always syncs, and `:165` documents that asymmetry — so the codebase already says a plain append is unsynced. |
+| **#58** | **Write side: a plain append is not fsynced under the shipped policy — and this is haematite's *ruled, documented* position, not an oversight.** `FsyncPolicy::CommitOnly` makes `should_sync_after_append()` false and production constructs exactly that, so wiring `put_leaf` to a plain append returns `Ok` for a leaf not on stable storage. The blocker is therefore **an incompatibility between two stated contracts**, not a defect to report: haematite says acknowledged plain writes may not survive an immediate crash, and criterion 1 says they must. | `docs/design/COMMIT-DURABILITY-CONTRACT.md` **§N1**, under the heading *Explicit non-guarantees and reservations*: "that policy never syncs on append … Therefore `Ok` from any listed plain write alone does not promise survival of an immediate crash. … `write_all` plus `CommitOnly` is not a per-operation fsync." Code: `wal/durable.rs:35-42` (policy enum), `wal/durable.rs:277-283` (`should_sync_after_append` false for `CommitOnly`), `shard/actor/native/boot.rs:110` (the construction). |
 | **#57** | **No committed `Cargo.lock`.** Gate evidence cannot say which patch versions linked, so "N tests green" cites a dependency resolution nobody recorded — a reproducibility hole in a chain whose product is reproducible verification. | `.gitignore` lists `Cargo.lock`; `git ls-files` does not track it. |
 
 **#11 and #58 are different tasks and neither substitutes for the other:** one is
@@ -71,6 +71,25 @@ Two notes that narrow the write-side problem rather than excusing it:
   (`wal/durable.rs:446`, beside the temp-file seal at `:389`). Whether every
   create and rename reaches it is *not* established — recorded as present, not
   as complete.
+
+And two findings about §N1 itself, which matter to anyone reading it as the
+authority on this:
+
+- **N1's scope is unstated.** It reads as a property of haematite and is a
+  property of the *native* backend. Grepping the contract for `opfs`, `wasm` or
+  `PerWrite` returns **zero** matches (positive control: `CommitOnly` matches
+  twice, so the search works), while `store/opfs/mod.rs:60,110` construct
+  `PerWrite`. The document is not false; its denominator has no stated search
+  space. If anything ever targets the wasm backend, N1 does not describe it and
+  nothing else does either.
+- **N1's own cite for the construction is rotted.** It names
+  `shard/actor/native.rs:97-103`; that range now holds `assert_sealed` and a
+  `DrainUnit` enum, and `CommitOnly` does not appear in that file at all. The
+  live location is `shard/actor/native/boot.rs:110`. Note the file was *not*
+  replaced by the directory — `native.rs` and `native/` both exist, so a reader
+  following the cite lands on real, unrelated code and cannot tell whether the
+  claim moved or died. **In an estate whose discipline is "check it at the cite",
+  a true claim behind a dead pointer fails closed for the reader and silently.**
 
 `#57` cannot be landed from an agent seat: generating a lockfile means running
 cargo on the machine, so it needs an executor and Tom's word.
