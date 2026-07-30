@@ -425,6 +425,40 @@ zero-iteration loop cannot pass
 verification still accepts an empty path.** Emit only what conforms, accept
 anything true.
 
+> **⛔ THE SECOND HALF OF THAT RULING IS WITHDRAWN — verification refuses equal
+> sizes too. This is the FIFTH defect found in this draft by implementing it,
+> and like the other four it was invisible to re-reading.**
+>
+> **The analogy to §1.2.1 does not hold, and writing
+> `merkle::root_from_consistency_path` is what exposed the difference.** For a
+> one-leaf inclusion path the empty path still leaves a derivation standing: the
+> root is computed from the *leaf hash*, which the verifier supplies and which
+> the receipt's claim is about. Authentication-by-consequence keeps working —
+> substitute a different leaf and the derived root stops matching the signature.
+>
+> For equal sizes **there is no derivation left at all.** The newer root is the
+> caller's `old_root` argument, returned untouched. So the signature check
+> collapses to *"has this anchor ever signed this 32-byte value?"* — with the
+> value entirely chosen by whoever presents the receipt.
+>
+> **Concretely: any inclusion receipt becomes an equal-size consistency receipt.**
+> Its payload is a 32-byte root; present it as `old_root` with
+> `tree_size_1 == tree_size_2` and an empty path, and the derived "newer root"
+> equals it, so the anchor's real signature verifies over the real value. The
+> content type is then the *only* thing refusing it. §1.2.2 already requires the
+> content type to differ, and that check stands — but **domain separation should
+> be the second line of this defence and here it would be the only one.**
+>
+> **Nothing is lost by refusing.** A verifier holding `old_root` learns exactly
+> nothing from being told the log is still that size. *"Accept anything true"* is
+> the right rule while the true statement carries information; it was never
+> written for a vacuous statement whose acceptance degenerates a signature check
+> into an existential query over the anchor's whole signing history.
+>
+> Enforced in `root_from_consistency_path` (`size_1 >= size_2` refused) and
+> pinned by `equal_sizes_are_refused_even_though_the_statement_would_be_true`,
+> drift-injected: permitting equal sizes fails that case and only that case.
+
 No change is needed to make that hold. `tlog::build_consistency_artifact`
 already requires `1 <= old_size < new_size` strictly, decided for its own
 reasons before this limit was known. `merkle::prove_consistency` deliberately

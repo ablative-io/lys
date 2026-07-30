@@ -38,11 +38,13 @@
 //!
 //! [`TrustError::MerkleTree`]: crate::error::TrustError::MerkleTree
 
+pub mod consistency;
 pub mod leaf;
 pub mod proof;
 pub mod reconstruct;
 pub mod tree;
 
+pub use consistency::root_from_consistency_path;
 pub use leaf::raw_leaf_hash;
 pub use proof::{
     ConsistencyProof, InclusionProof, RootHash, verify_consistency, verify_inclusion,
