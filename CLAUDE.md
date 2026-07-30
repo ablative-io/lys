@@ -34,6 +34,39 @@ Non-negotiable, enforced by CI (`clippy --all-targets -- -D warnings`):
 
 Silencing a lint with `#[allow]`, an `#[ignore]`d test, a `_`-prefixed unused variable, or `#[cfg(any())]` is a bypass, not a fix. Fix the code.
 
+## A test needs a second party, or it only agrees with itself
+
+A suite written from the implementation encodes what the code *does*. There is then
+nothing for it to disagree with, so it passes for exactly as long as the behaviour is
+wrong. This is not carelessness and more care does not fix it — with one party,
+agreement is structural.
+
+`lys-log-store`'s file store fsynced nothing while promising durable-on-return. Every
+test passed for as long as that code existed. It was found the moment the code moved
+somewhere its contract had to be written down: **writing the contract created the
+second party.**
+
+So arrange one *before* you need it:
+
+- **State the intent somewhere the implementation cannot quietly agree with it** — a
+  trait contract, a module-doc invariant, a wire draft. Prose that can be wrong is
+  worth more than a test that cannot.
+- **Key a check on what the other side supplied**, never on a value your own code
+  substituted, and never on a property that merely happens to be unique today.
+- **Count what fired, not what passed.** A loop that runs zero times satisfies every
+  assertion inside it, and a control that never fires is indistinguishable from one
+  that passed. Assert the case count; assert rejections, not just successes.
+- **A drift injection proves nothing unless exactly one test fails, and it is the test
+  built for that check.** Two checks guarding one rule means neither is proven by the
+  obvious case — isolate each with a case only it can catch.
+- **Say which axis the independence is on.** Two implementations agreeing is
+  independence of *algorithm*; run on one machine, one toolchain, one dependency
+  resolution, it is not independence of *platform*. Claim the axis you have.
+
+And when a check is skipped for a defensible reason — "docs-only, it cannot break
+behaviour" — that reasoning is more dangerous than negligence, because it survives
+review. Run the gates anyway.
+
 ## Wire formats are forever
 
 Once a signature is produced or a leaf is logged under a format, that format is frozen — changing it breaks every historical verification. Domain-separation tags (`lys/attestation/v2`, `lys/sealed-envelope/v1`) and leaf encodings are versioned wire contracts. Evolving one means a new version alongside, never a mutation of the shipped one. This is why the extraction renames the tags *before* anything durable is signed under them.

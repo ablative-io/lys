@@ -37,6 +37,15 @@
 //! toolchain's own `std` source, because "cannot determine" resolving quietly to
 //! the reassuring answer is the failure mode this whole module is arranged
 //! against.
+//!
+//! **Scope of that verification, stated rather than left to be assumed:** it was
+//! established by *reading* the standard library's dispatch, on one platform. No
+//! test here observes a power-loss outcome, and nothing has run these paths on a
+//! filesystem that refuses `F_FULLFSYNC`. So the durability claim rests on the
+//! platform contract plus error propagation, not on an experiment — which is the
+//! honest strength for a property whose failure needs a crash to observe, and
+//! which is a different and weaker axis of independence than the crate's Merkle
+//! cross-checks, where two separately written implementations disagree or agree.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
