@@ -26,9 +26,12 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Stdio};
 
+mod harness;
+
+use harness::{build_go_tool, go_or_skip, run_built_tool};
 use lys_core::Ed25519Identity;
 use lys_core::attestation::{Attestation, verify_attestation, verify_attestation_bytes};
 use lys_core::merkle::tree::{AppendOnlyTree, RawLeaf};
@@ -163,27 +166,6 @@ fn golden_vectors_pure_rust() {
     assert!(Attestation::from_cose_bytes(&indefinite_length_mutant()).is_err());
 }
 
-/// Locates the Go toolchain: `LYS_GO_BIN` override, then the pinned
-/// absolute path, then `go` on PATH. `None` means "skip the round-trip".
-fn find_go() -> Option<PathBuf> {
-    if let Ok(overridden) = std::env::var("LYS_GO_BIN") {
-        return Some(PathBuf::from(overridden));
-    }
-    let pinned = Path::new("/usr/local/go/bin/go");
-    if pinned.exists() {
-        return Some(pinned.to_path_buf());
-    }
-    let on_path = Command::new("go")
-        .arg("version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
-    match on_path {
-        Ok(status) if status.success() => Some(PathBuf::from("go")),
-        _ => None,
-    }
-}
-
 /// Runs the vendored Go tool hermetically with `input` on stdin; returns
 /// `(exit_success, stdout_bytes)`. Any spawn failure with a PRESENT
 /// toolchain is a hard panic — the environment contract is documented in
@@ -218,16 +200,10 @@ fn run_go_tool(go: &Path, gocache: &Path, args: &[&str], input: &[u8]) -> (bool,
 
 #[test]
 fn go_cose_conformance_round_trips() {
-    let Some(go) = find_go() else {
-        // The skip is for developer machines only. CI sets LYS_REQUIRE_GO,
-        // so a missing toolchain there is a hard failure — the D4 gate can
-        // never silently degrade to "passed" where it matters.
-        assert!(
-            std::env::var_os("LYS_REQUIRE_GO").is_none(),
-            "LYS_REQUIRE_GO is set but no Go toolchain was found — \
-             the COSE conformance gate must not skip in this environment"
-        );
-        eprintln!("skipping go-cose conformance round-trip: no Go toolchain found");
+    // The skip is for developer machines only. CI sets LYS_REQUIRE_GO, so a
+    // missing toolchain there is a hard failure — the D4 gate can never
+    // silently degrade to "passed" where it matters.
+    let Some(go) = go_or_skip("go-cose attestation conformance") else {
         return;
     };
     let gocache_dir = tempfile::tempdir().unwrap();
@@ -312,47 +288,6 @@ fn go_cose_conformance_round_trips() {
 
 // ------------------------------------------------- lys/anchor-receipt/v1 gate
 
-/// Compiles the Go tool once so the shape sweep below can afford to be
-/// exhaustive. `go run .` re-links on every invocation, which would make a
-/// 150-case sweep cost minutes; a single build plus fast execs costs seconds.
-fn build_go_tool(go: &Path, gocache: &Path, out: &Path) {
-    let scaffold_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/cose-conformance");
-    let status = Command::new(go)
-        .arg("build")
-        .arg("-o")
-        .arg(out)
-        .arg(".")
-        .current_dir(&scaffold_dir)
-        .env("GOFLAGS", "-mod=vendor")
-        .env("GOPROXY", "off")
-        .env("GOTOOLCHAIN", "local")
-        .env("GOCACHE", gocache)
-        .status()
-        .expect("failed to spawn the Go toolchain (present but broken is a hard failure)");
-    assert!(status.success(), "go build of the conformance tool failed");
-}
-
-/// Runs the pre-built tool with `input` on stdin; returns `(ok, stdout)`.
-fn run_built_tool(bin: &Path, args: &[String], input: &[u8]) -> (bool, Vec<u8>) {
-    let mut child = Command::new(bin)
-        .args(args)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .expect("failed to spawn the built conformance tool");
-    child
-        .stdin
-        .take()
-        .expect("child stdin is piped")
-        .write_all(input)
-        .expect("failed to write to the tool's stdin");
-    let output = child
-        .wait_with_output()
-        .expect("failed to wait for the tool");
-    (output.status.success(), output.stdout)
-}
-
 const RECEIPT_SEED: &[u8; 32] = b"lys-receipt-conformance-seed-001";
 
 fn receipt_identity() -> (tempfile::TempDir, Ed25519Identity) {
@@ -409,13 +344,7 @@ fn issue(size: u64, index: u64, key: &Ed25519Identity) -> (AnchorReceipt, [u8; 3
 /// language by different code.
 #[test]
 fn go_cose_receipt_conformance_round_trips() {
-    let Some(go) = find_go() else {
-        assert!(
-            std::env::var_os("LYS_REQUIRE_GO").is_none(),
-            "LYS_REQUIRE_GO is set but no Go toolchain was found — \
-             the receipt conformance gate must not skip in this environment"
-        );
-        eprintln!("skipping go-cose receipt conformance round-trip: no Go toolchain found");
+    let Some(go) = go_or_skip("go-cose receipt conformance") else {
         return;
     };
     let workdir = tempfile::tempdir().unwrap();

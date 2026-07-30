@@ -1,12 +1,15 @@
-// cosetool: sign and verify lys tagged COSE_Sign1 artifacts with the
-// veraison/go-cose reference implementation. This file handles
-// lys/attestation/v2; receipt.go handles lys/anchor-receipt/v1.
+// cosetool: sign and verify lys artifacts with reference implementations —
+// veraison/go-cose for COSE_Sign1 and x/mod/sumdb/note for signed notes. This
+// file handles lys/attestation/v2; receipt.go handles lys/anchor-receipt/v1 and
+// bundle.go handles lys/verification-bundle/v1.
 //
 // Usage:
 //   cosetool sign           <seed-hex> <timestamp-ms>              (payload on stdin)
 //   cosetool verify         <pubkey-hex>                           (COSE on stdin; "<hash-hex> <ts>")
 //   cosetool receipt-sign   <seed-hex> <leaf-index> <leaf-hex>...
 //   cosetool receipt-verify <pubkey-hex> <leaf-index> <leaf-hex>... (receipt on stdin)
+//   cosetool bundle-verify  <log-verifier-key> <anchor-verifier-key>...
+//                                                                  (bundle JSON on stdin)
 //
 // Claims are built with fxamacker/cbor CoreDetEncOptions (RFC 8949 §4.2 core
 // deterministic), which is byte-identical to the lys hand encoder.
@@ -155,6 +158,14 @@ func main() {
 			fail("usage: cosetool receipt-verify <pubkey-hex> <leaf-index> <leaf-hex>...")
 		}
 		receiptVerify(os.Args[2], os.Args[3], os.Args[4:], stdin)
+	case "bundle-verify":
+		// Zero anchor keys is legitimate: an unnotarized bundle still has an
+		// inclusion proof to verify, and refusing one here would make this tool
+		// disagree with lys about a bundle that is merely weaker, not invalid.
+		if len(os.Args) < 3 {
+			fail("usage: cosetool bundle-verify <log-verifier-key> <anchor-verifier-key>...")
+		}
+		bundleVerify(os.Args[2], os.Args[3:], stdin)
 	default:
 		fail("unknown mode %q", os.Args[1])
 	}

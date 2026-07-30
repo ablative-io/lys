@@ -196,6 +196,22 @@ relabelled size mismatches immediately.
 leaf bytes*, never claimed sizes. Checkpoint bytes are self-describing and
 signature-covered by the child's own note; `tree_size` in a receipt is not.
 
+**The discharge is now tested, from both directions.** `bundle_conformance`
+carries a receipt that claims size 3 while carrying a size-4 path — the exact
+malleability above, at `leaf_index = 1`, where sizes 3 and 4 also share a walk —
+and asserts that the bundle refuses it because the anchor's own note-signed
+checkpoint says 4. Two facts came out of building that case, and both are worth
+keeping:
+
+- The malleability reproduces **identically in an independent implementation**.
+  The Go cross-check rebuilds the root from RFC 6962's recursive structure rather
+  than lys's iterative walk, and accepts the relabelled receipt too. That
+  confirms the malleability belongs to the RFC's proof format and is not a defect
+  in lys's walk — which is what "conform and document" assumed but had not shown.
+- The same relabelled receipt on the **final** link is accepted by both, because
+  there is no next checkpoint to contradict it. That is the honest residual limit
+  and it is now pinned as a passing test rather than left as prose.
+
 ### 1.4 Verifier discipline
 
 Same as the shipped attestation verifier, for the same reasons:
@@ -332,6 +348,35 @@ time.
 turn a pile of valid receipts into an actual chain. Both are proven load-bearing
 by drift injection: removing either fails exactly the one test built for it, and
 nothing else.
+
+**Correction found by drift-injecting the two halves of step 5 separately.** The
+rung compares a root *and* a size, and the obvious attack against it — an anchor
+that grows after issuing a receipt — changes both, so it cannot show either
+comparison is individually necessary. Removing the root comparison left that
+attack still caught by the size comparison, and the drift passed unnoticed. Each
+half needed a case that trips only that half, and both now exist in
+`bundle_conformance`:
+
+| removed check | the only case that fails |
+|---|---|
+| step 3, the link-0 join | `link_zero_over_an_unrelated_log` |
+| step 5's root comparison | `anchor_equivocates_at_the_same_tree_size` |
+| step 5's size comparison | `relabelled_tree_size_contradicts_the_anchors_checkpoint` |
+
+The lesson generalises past this format: **a drift injection that removes a check
+and still sees the suite fail has proven nothing unless exactly one test fails,
+and that test is the one built for that check.** An attack that trips two checks
+at once hides the loss of either.
+
+**Interop evidence (D6) now covers both formats, but not in the same way.** A
+receipt is one signed artifact with a deterministic encoding, so its gate asserts
+byte-identity against go-cose across 152 tree shapes. A bundle is a container
+whose value is entirely in the relationships between the artifacts inside it, and
+those live in checks rather than bytes — so its gate asserts **verdict parity
+over 23 cases**, in both directions, against an independent Go verifier that
+opens notes with `sumdb/note`, checks receipt signatures with go-cose, and
+rebuilds roots from RFC 6962's recursive structure. Accepted cases must also
+agree on every value derived: leaf, origin, size, and each reconstructed root.
 
 **Trust inputs are the caller's.** The bundle names no keys — not the log's, not
 any anchor's. One `NoteVerifierKey` per link serves both roles, and that is a

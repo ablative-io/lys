@@ -98,6 +98,58 @@ func path(m int, leaves [][]byte) [][]byte {
 	return append(path(m-k, leaves[k:]), mth(leaves[:k]))
 }
 
+// largestPowerOfTwoBelowU64 is largestPowerOfTwoBelow over wire-sized values.
+// The tree sizes a bundle carries are uint64 and bounded below 2^53, so this
+// avoids narrowing them to int on the way into the recursion.
+func largestPowerOfTwoBelowU64(n uint64) uint64 {
+	k := uint64(1)
+	for k*2 < n {
+		k *= 2
+	}
+	return k
+}
+
+// rootFromPath rebuilds MTH(D[n]) from a leaf hash and an inclusion path, by
+// inverting RFC 6962 §2.1.1's *recursive* PATH definition: PATH(m, D[n]) is
+// PATH(m, D[0:k]) : MTH(D[k:n]) for m < k, so the path's LAST node is the
+// sibling nearest the root, and each level of the recursion consumes it.
+//
+// This is deliberately not lys's formulation. lys walks upward from the leaf,
+// tracking the current node index and the level's last index; this splits
+// downward on the largest power of two and consumes the path from the far end.
+// Two structurally different derivations of the same value is the point — the
+// receipt's payload is the detached root, so any disagreement between them
+// surfaces as a signature failure rather than as an artifact that verifies
+// under both implementations while meaning different things.
+//
+// Path length is exact by construction, not by a separate check: a path too
+// long leaves nodes unconsumed when the recursion bottoms out at a single leaf,
+// and one too short runs out before it gets there. Both fail.
+func rootFromPath(leaf []byte, m, n uint64, proofPath [][]byte) []byte {
+	if n == 0 {
+		fail("a tree of zero leaves has no inclusion path")
+	}
+	if m >= n {
+		fail("leaf index %d is not below tree size %d", m, n)
+	}
+	if n == 1 {
+		if len(proofPath) != 0 {
+			fail("a one-leaf tree's path must be empty, got %d nodes", len(proofPath))
+		}
+		return leaf
+	}
+	if len(proofPath) == 0 {
+		fail("inclusion path ran out below a tree of %d leaves", n)
+	}
+	sibling := proofPath[len(proofPath)-1]
+	rest := proofPath[:len(proofPath)-1]
+	k := largestPowerOfTwoBelowU64(n)
+	if m < k {
+		return interiorHash(rootFromPath(leaf, m, k, rest), sibling)
+	}
+	return interiorHash(sibling, rootFromPath(leaf, m-k, n-k, rest))
+}
+
 func decodeLeaves(hexes []string) [][]byte {
 	leaves := make([][]byte, 0, len(hexes))
 	for i, h := range hexes {
@@ -256,17 +308,15 @@ func extractInclusionProof(msg *cose.Sign1Message) (uint64, uint64, [][]byte) {
 	return treeSize, leafIndex, proofPath
 }
 
-func receiptVerify(pubHex, indexArg string, leafHexes []string, artifact []byte) {
-	pub, err := hex.DecodeString(pubHex)
-	if err != nil || len(pub) != ed25519.PublicKeySize {
-		fail("bad public key")
-	}
-	expectedIndex, err := strconv.ParseUint(indexArg, 10, 64)
-	if err != nil {
-		fail("bad leaf index: %v", err)
-	}
-	leaves := decodeLeaves(leafHexes)
-
+// openReceiptEnvelope decodes a receipt and enforces every pin that lives in
+// the signature-covered protected header, plus the detached payload.
+//
+// The key ID check is the one worth naming: the anchor's public key sits in the
+// *protected* bucket, so it is covered by the signature, and comparing it with
+// the key the caller expects is what makes a receipt attributable rather than
+// merely well-formed. (This inherits the attestation v1→v2 fix, whose defect
+// was leaving the signer key outside the signed bytes.)
+func openReceiptEnvelope(artifact, pub []byte) *cose.Sign1Message {
 	var msg cose.Sign1Message
 	if err := msg.UnmarshalCBOR(artifact); err != nil {
 		fail("UnmarshalCBOR: %v", err)
@@ -274,7 +324,6 @@ func receiptVerify(pubHex, indexArg string, leafHexes []string, artifact []byte)
 	if msg.Payload != nil {
 		fail("a receipt's payload must be detached (nil)")
 	}
-
 	alg, err := msg.Headers.Protected.Algorithm()
 	if err != nil || alg != cose.AlgorithmEdDSA {
 		fail("wrong algorithm")
@@ -294,8 +343,51 @@ func receiptVerify(pubHex, indexArg string, leafHexes []string, artifact []byte)
 	if v, ok := asInt(vds); !ok || v != vdsRFC9162SHA256 {
 		fail("wrong vds")
 	}
+	return &msg
+}
 
-	treeSize, leafIndex, proofPath := extractInclusionProof(&msg)
+// openReceipt verifies a receipt against the leaf bytes it claims to prove,
+// returning the reconstructed root, tree size and leaf index.
+//
+// This is the verification a receipt holder actually performs, and unlike
+// receiptVerify it needs no access to the anchor's leaves: the root is rebuilt
+// from the leaf and the carried path. That is what makes a receipt
+// self-verifying — and what makes the inclusion proof safe to carry in the
+// UNPROTECTED header, which reads as "unauthenticated" until you follow the
+// consequence: a tampered path yields a root the anchor never signed, so the
+// signature check below fails. The proof is authenticated by consequence rather
+// than by coverage.
+func openReceipt(pub ed25519.PublicKey, leaf, artifact []byte) ([]byte, uint64, uint64) {
+	msg := openReceiptEnvelope(artifact, pub)
+	treeSize, leafIndex, proofPath := extractInclusionProof(msg)
+
+	root := rootFromPath(leafHash(leaf), leafIndex, treeSize, proofPath)
+	msg.Payload = root
+
+	verifier, err := cose.NewVerifier(cose.AlgorithmEdDSA, pub)
+	if err != nil {
+		fail("NewVerifier: %v", err)
+	}
+	if err := msg.Verify(nil, verifier); err != nil {
+		fail("Verify: %v", err)
+	}
+	return root, treeSize, leafIndex
+}
+
+func receiptVerify(pubHex, indexArg string, leafHexes []string, artifact []byte) {
+	pub, err := hex.DecodeString(pubHex)
+	if err != nil || len(pub) != ed25519.PublicKeySize {
+		fail("bad public key")
+	}
+	expectedIndex, err := strconv.ParseUint(indexArg, 10, 64)
+	if err != nil {
+		fail("bad leaf index: %v", err)
+	}
+	leaves := decodeLeaves(leafHexes)
+
+	msg := openReceiptEnvelope(artifact, pub)
+
+	treeSize, leafIndex, proofPath := extractInclusionProof(msg)
 	if treeSize != uint64(len(leaves)) {
 		fail("claimed tree size %d but %d leaves were supplied", treeSize, len(leaves))
 	}
