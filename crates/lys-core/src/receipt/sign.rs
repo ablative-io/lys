@@ -153,7 +153,8 @@ pub fn sign_receipt(
     // tree and a path length that disagrees with the claimed shape.
     let root = merkle::root_from_inclusion_path(&leaf_hash, leaf_index, tree_size, &flattened)?;
 
-    let protected = encoding::protected_bytes(&anchor_key.public_key_bytes());
+    let protected =
+        encoding::protected_bytes(encoding::CONTENT_TYPE, &anchor_key.public_key_bytes());
     let signature = anchor_key.sign(&cbor::sig_structure_bytes(&protected, &root));
 
     Ok(AnchorReceipt {
@@ -211,7 +212,7 @@ pub fn verify_receipt(
     )
     .map_err(|_err| TrustError::ReceiptVerification)?;
 
-    let protected = encoding::protected_bytes(&receipt.anchor_public_key);
+    let protected = encoding::protected_bytes(encoding::CONTENT_TYPE, &receipt.anchor_public_key);
     let sig_structure = cbor::sig_structure_bytes(&protected, &root);
     // Mapped, not propagated: `verify` reports `InvalidSignature`, and letting
     // that through would make a forged signature distinguishable from every

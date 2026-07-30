@@ -209,6 +209,22 @@ re-labelled artifact fails on the protected header before any proof is examined.
 a consistency receipt — and prove it is refused.** Until that test exists this
 section is a hypothesis, which is the standing rule in this file.
 
+> **✅ NO LONGER A HYPOTHESIS.** `a_relabelled_inclusion_receipt_is_refused`
+> (`receipt/consistency_tests.rs`) builds the attack rather than arguing it: a
+> genuine inclusion receipt over the size-13 root, whose signature is then
+> presented inside a consistency artifact whose `5 → 13` proof derives *exactly
+> that root*. The signature is real and covers exactly the right 32 bytes, so
+> only the content type stands in the way. It is refused, and the test asserts
+> the spliced inclusion receipt is **independently valid on its own terms**, so
+> the refusal is the re-labelling and not a broken fixture.
+>
+> Proven load-bearing by the drift that matters: collapsing
+> `CONSISTENCY_CONTENT_TYPE` to `CONTENT_TYPE` — the one-token mistake, applied
+> to *both* sides at once so honest issue-then-verify still round-trips — fails
+> this test. A verifier-only version of the same drift breaks the honest path
+> too and is therefore loud; **the both-sides version is the silent one, and it
+> is the one this test exists for.**
+
 ##### The type is covered, and separately is not attacker-supplied — verified, with cites
 
 A differing content type is only a discriminator if it is *inside the signed

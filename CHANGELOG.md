@@ -47,6 +47,38 @@ unreleased things cannot be used to tell what a published version contains.
   the identical `(tree_size, root)` remains permitted, because a no-op must not
   be an error, and that idempotent repeat is the door the check stands in.
 
+### Added — `lys-core` (behind the off-by-default `unstable-anchor` feature)
+
+- **`merkle::root_from_consistency_path`** — RFC 6962 §2.1.4.2, deriving the
+  *newer* root rather than comparing two roots the caller already holds. A
+  verifier supplying both roots can only confirm a pair it already knew; deriving
+  is what lets a receipt tell it where the log got to, and is what RFC 9942's
+  detached payload is for. The older root is a required argument and is checked
+  against the path's own reconstruction, so a proof descending from a different
+  history is refused rather than producing a root a signature would appear to
+  endorse. Swept against `ct-merkle` over every size pair, and cross-checked
+  against the RFC's *recursive* `SUBPROOF` transcribed in Go.
+
+- **`receipt::ConsistencyReceipt`** with `sign_consistency_receipt`,
+  `verify_consistency_receipt` and `verify_consistency_receipt_bytes` —
+  `lys/consistency-receipt/v1`, RFC 9942 `vdp` type `-2`. Verification takes the
+  older root as a **required** argument; there is deliberately no overload
+  without it, because a verifier that accepted the anchor's word for both
+  endpoints would be checking a claim the anchor could make about any pair of
+  trees it liked.
+
+  **The content type differs from the inclusion receipt's as a security
+  property, not a naming convention.** Both kinds sign a bare 32-byte root with a
+  detached payload, so a shared type would give them byte-identical signing
+  preimages and an inclusion receipt could be re-labelled as a consistency one
+  with its signature still valid. The proof type `-1` versus `-2` lives in the
+  unprotected header and is free to rewrite, so it cannot be the discriminator.
+
+  **Equal sizes are refused at issuance and at verification.** An equal-size
+  proof is true but carries no derivation: the newer root would be the caller's
+  own argument handed back, collapsing the signature check into "has this anchor
+  ever signed this 32-byte value?" over an attacker-chosen value.
+
 ### Changed — `lys`
 
 - The `lys log` commands now run on `lys-log-store`; the log directory layout,

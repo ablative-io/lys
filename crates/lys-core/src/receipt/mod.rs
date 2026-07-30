@@ -77,8 +77,13 @@
 //! no production anchor to issue under it.
 
 pub mod artifact;
+pub mod consistency;
 mod encoding;
 pub mod sign;
 
 pub use artifact::AnchorReceipt;
+pub use consistency::{
+    ConsistencyReceipt, sign_consistency_receipt, verify_consistency_receipt,
+    verify_consistency_receipt_bytes,
+};
 pub use sign::{sign_receipt, verify_receipt, verify_receipt_bytes};

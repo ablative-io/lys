@@ -87,15 +87,75 @@ fn the_content_type_is_the_frozen_slash_free_string() {
 
 #[test]
 fn protected_bucket_matches_the_specification_bytes() {
-    let built = protected_bytes(&ANCHOR_KEY);
+    let built = protected_bytes(CONTENT_TYPE, &ANCHOR_KEY);
     assert_eq!(built, expected_protected(&ANCHOR_KEY));
     assert_eq!(built.len(), 80, "the protected bucket is always 80 bytes");
 }
 
 #[test]
+fn the_consistency_content_type_is_the_frozen_string() {
+    assert_eq!(
+        CONSISTENCY_CONTENT_TYPE,
+        "application/vnd.lys.consistency-receipt.v1+cbor"
+    );
+    assert_eq!(CONSISTENCY_CONTENT_TYPE.len(), 47);
+}
+
+/// The consistency protected bucket, written out from the spec table exactly as
+/// [`expected_protected`] is — the same 92 bytes a conforming implementation
+/// would assemble, not whatever this crate's encoder happens to emit.
+fn expected_consistency_protected(key: &[u8; 32]) -> Vec<u8> {
+    let mut out = vec![
+        0xa4, // map(4)
+        0x01, 0x27, // 1 (alg) => -8 (EdDSA)
+        0x03, 0x78, 0x2f, // 3 (content type) => text(47)
+    ];
+    out.extend_from_slice(b"application/vnd.lys.consistency-receipt.v1+cbor");
+    out.extend_from_slice(&[0x04, 0x58, 0x20]); // 4 (kid) => bstr(32)
+    out.extend_from_slice(key);
+    out.extend_from_slice(&[0x19, 0x01, 0x8b, 0x01]); // 395 (vds) => 1
+    out
+}
+
+#[test]
+fn the_consistency_protected_bucket_matches_the_specification_bytes() {
+    let built = protected_bytes(CONSISTENCY_CONTENT_TYPE, &ANCHOR_KEY);
+    assert_eq!(built, expected_consistency_protected(&ANCHOR_KEY));
+    assert_eq!(built.len(), 92, "80 plus the 12-byte longer media type");
+}
+
+#[test]
+fn the_two_receipt_kinds_sign_different_bytes() {
+    // THE gate on the re-labelling attack. It asserts ONLY the separation
+    // property — the spec bytes of each bucket are pinned by their own tests
+    // above, and repeating those pins here would make this case fail whenever
+    // either constant changed, for reasons having nothing to do with
+    // separation. The rule this case owns is that a consistency code path
+    // passing the INCLUSION constant must be caught, and that mistake is a
+    // single token at a call site.
+    let inclusion = protected_bytes(CONTENT_TYPE, &ANCHOR_KEY);
+    let consistency = protected_bytes(CONSISTENCY_CONTENT_TYPE, &ANCHOR_KEY);
+    assert_ne!(inclusion, consistency);
+
+    // The consequence that actually matters: the COSE signing preimages differ,
+    // so an anchor's signature over one can never satisfy the other. The
+    // `Sig_structure` prefix is identical for both — byte-0 disjointness does
+    // not separate them, the protected bucket inside the signed bytes does.
+    let root = [0x33u8; 32];
+    let inclusion_preimage = crate::cbor::sig_structure_bytes(&inclusion, &root);
+    let consistency_preimage = crate::cbor::sig_structure_bytes(&consistency, &root);
+    assert_eq!(&inclusion_preimage[..12], b"\x84\x6aSignature1");
+    assert_eq!(&consistency_preimage[..12], b"\x84\x6aSignature1");
+    assert_ne!(
+        inclusion_preimage, consistency_preimage,
+        "identical preimages would make an inclusion receipt re-labellable"
+    );
+}
+
+#[test]
 fn protected_bucket_is_fixed_width_for_every_key() {
     for byte in [0x00u8, 0x7f, 0xff] {
-        assert_eq!(protected_bytes(&[byte; 32]).len(), 80);
+        assert_eq!(protected_bytes(CONTENT_TYPE, &[byte; 32]).len(), 80);
     }
 }
 
@@ -103,7 +163,7 @@ fn protected_bucket_is_fixed_width_for_every_key() {
 fn protected_labels_ascend_so_numeric_and_bytewise_order_coincide() {
     // RFC 8949 §4.2 sorts by encoded key bytes. For {1, 3, 4, 395} that is the
     // same as ascending numeric order, and the invariant docs claim so.
-    let built = protected_bytes(&ANCHOR_KEY);
+    let built = protected_bytes(CONTENT_TYPE, &ANCHOR_KEY);
     let Value::Map(entries) = ciborium::de::from_reader(built.as_slice()).unwrap() else {
         panic!("protected bucket is a map");
     };
