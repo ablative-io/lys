@@ -225,6 +225,41 @@ section is a hypothesis, which is the standing rule in this file.
 > too and is therefore loud; **the both-sides version is the silent one, and it
 > is the one this test exists for.**
 
+##### The envelope has a Go gate, and building it found that the proof body's field order was pinned by nothing
+
+`consistency_conformance.rs` gates the *derivation* — lys's iterative walk
+against RFC 6962's recursive `SUBPROOF` and §2.1.4.2 in Go. It says nothing
+about the COSE envelope those roots travel in, and a receipt whose root is right
+but whose envelope no conforming library accepts is exactly as worthless as one
+with the wrong root. `consistency_receipt_conformance.rs` closes that: over all
+136 size pairs, lys signs and go-cose verifies, **and** go-cose signs and the
+artifacts are compared **byte-for-byte**. Byte-identity is available here because
+Ed25519 is deterministic and both sides emit RFC 8949 §4.2 core-deterministic
+CBOR, and it is the stronger claim — it holds only if the two sides first agreed
+on the detached payload, so equal bytes means equal roots, equal proof encodings
+and equal header pins at once.
+
+**⭐ THE FINDING, and it is a coverage hole this gate was the first thing to
+see.** Swapping `tree-size-1` and `tree-size-2` in the wire encoder *and* the
+decoder together — symmetric, so every round trip still succeeds — leaves **all
+440 in-crate `lys-core` tests passing** and fails only this gate. The order of
+the two sizes in the RFC 9942 §5.3.1 proof body was, until now, pinned by
+nothing: the in-crate suite encodes and decodes with the same pair of functions,
+so it has no way to disagree with itself about which field comes first. The
+protected bucket has a hand-written golden vector; the proof body did not. This
+is the one-party problem in its exact form, and the second party had to come from
+another implementation reading the RFC's CDDL.
+
+**⭐ AND THE GATE'S OWN NEGATIVE TEST WAS VACUOUS-CAPABLE.** Drifting the Go
+content-type constant by one character made the sweep fail — and left
+`go_cose_refuses_what_lys_refuses` **green**, because every assertion in it says
+the Go tool *refused* something and a verifier that refuses everything satisfies
+all of them at once. Its validity was borrowed entirely from a positive result in
+a *different* test. Fixed by giving it its own positive control as its first
+assertion; the same drift now fails both. **A test made only of refusals cannot
+distinguish a working verifier from a broken one, and "the other test covers it"
+is not a property the test itself has.**
+
 ##### The type is covered, and separately is not attacker-supplied — verified, with cites
 
 A differing content type is only a discriminator if it is *inside the signed

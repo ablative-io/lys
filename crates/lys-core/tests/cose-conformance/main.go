@@ -8,6 +8,10 @@
 //   cosetool verify         <pubkey-hex>                           (COSE on stdin; "<hash-hex> <ts>")
 //   cosetool receipt-sign   <seed-hex> <leaf-index> <leaf-hex>...
 //   cosetool receipt-verify <pubkey-hex> <leaf-index> <leaf-hex>... (receipt on stdin)
+//   cosetool consistency        <first-size> <second-size> <leaf-hex>...
+//   cosetool consistency-sign   <seed-hex> <first-size> <second-size> <leaf-hex>...
+//   cosetool consistency-verify <pubkey-hex> <first-size> <second-size> <leaf-hex>...
+//                                                                  (receipt on stdin)
 //   cosetool bundle-verify  <log-verifier-key> <anchor-verifier-key>...
 //                                                                  (bundle JSON on stdin)
 //
@@ -163,6 +167,16 @@ func main() {
 			fail("usage: cosetool consistency <first-size> <second-size> <leaf-hex>...")
 		}
 		consistency(os.Args[2], os.Args[3], os.Args[4:])
+	case "consistency-sign":
+		if len(os.Args) < 6 {
+			fail("usage: cosetool consistency-sign <seed-hex> <first-size> <second-size> <leaf-hex>...")
+		}
+		consistencySign(os.Args[2], os.Args[3], os.Args[4], os.Args[5:])
+	case "consistency-verify":
+		if len(os.Args) < 6 {
+			fail("usage: cosetool consistency-verify <pubkey-hex> <first-size> <second-size> <leaf-hex>...")
+		}
+		consistencyVerify(os.Args[2], os.Args[3], os.Args[4], os.Args[5:], stdin)
 	case "bundle-verify":
 		// Zero anchor keys is legitimate: an unnotarized bundle still has an
 		// inclusion proof to verify, and refusing one here would make this tool

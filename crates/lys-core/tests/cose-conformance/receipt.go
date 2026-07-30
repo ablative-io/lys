@@ -308,15 +308,24 @@ func extractInclusionProof(msg *cose.Sign1Message) (uint64, uint64, [][]byte) {
 	return treeSize, leafIndex, proofPath
 }
 
-// openReceiptEnvelope decodes a receipt and enforces every pin that lives in
-// the signature-covered protected header, plus the detached payload.
+// openEnvelope decodes a receipt of either kind and enforces every pin that
+// lives in the signature-covered protected header, plus the detached payload.
 //
 // The key ID check is the one worth naming: the anchor's public key sits in the
 // *protected* bucket, so it is covered by the signature, and comparing it with
 // the key the caller expects is what makes a receipt attributable rather than
 // merely well-formed. (This inherits the attestation v1→v2 fix, whose defect
 // was leaving the signer key outside the signed bytes.)
-func openReceiptEnvelope(artifact, pub []byte) *cose.Sign1Message {
+//
+// `wantContentType` is the CALLER'S declaration of which artifact kind it asked
+// for, never a value read from `artifact` and compared against itself. An
+// inclusion and a consistency receipt are the same COSE shape signed by the same
+// key over a 32-byte detached root, so the content type inside the signed bytes
+// is the only thing that stops one being presented as the other — and a tool
+// that dispatched on the type it found would hand that choice to whoever wrote
+// the artifact. This mirrors lys's own `decode_protected`, which takes the
+// expected type for exactly this reason.
+func openEnvelope(artifact, pub []byte, wantContentType string) *cose.Sign1Message {
 	var msg cose.Sign1Message
 	if err := msg.UnmarshalCBOR(artifact); err != nil {
 		fail("UnmarshalCBOR: %v", err)
@@ -329,7 +338,7 @@ func openReceiptEnvelope(artifact, pub []byte) *cose.Sign1Message {
 		fail("wrong algorithm")
 	}
 	ct, ok := msg.Headers.Protected[cose.HeaderLabelContentType].(string)
-	if !ok || ct != receiptContentType {
+	if !ok || ct != wantContentType {
 		fail("wrong content type")
 	}
 	kid, ok := msg.Headers.Protected[cose.HeaderLabelKeyID].([]byte)
@@ -358,7 +367,7 @@ func openReceiptEnvelope(artifact, pub []byte) *cose.Sign1Message {
 // signature check below fails. The proof is authenticated by consequence rather
 // than by coverage.
 func openReceipt(pub ed25519.PublicKey, leaf, artifact []byte) ([]byte, uint64, uint64) {
-	msg := openReceiptEnvelope(artifact, pub)
+	msg := openEnvelope(artifact, pub, receiptContentType)
 	treeSize, leafIndex, proofPath := extractInclusionProof(msg)
 
 	root := rootFromPath(leafHash(leaf), leafIndex, treeSize, proofPath)
@@ -385,7 +394,7 @@ func receiptVerify(pubHex, indexArg string, leafHexes []string, artifact []byte)
 	}
 	leaves := decodeLeaves(leafHexes)
 
-	msg := openReceiptEnvelope(artifact, pub)
+	msg := openEnvelope(artifact, pub, receiptContentType)
 
 	treeSize, leafIndex, proofPath := extractInclusionProof(msg)
 	if treeSize != uint64(len(leaves)) {

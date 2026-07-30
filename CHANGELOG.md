@@ -79,6 +79,20 @@ unreleased things cannot be used to tell what a published version contains.
   own argument handed back, collapsing the signature check into "has this anchor
   ever signed this 32-byte value?" over an attacker-chosen value.
 
+### Internal
+
+- Go interop gate for the consistency receipt *envelope*, alongside the existing
+  one for its Merkle derivation: across all 136 size pairs, lys signs and
+  `veraison/go-cose` verifies, and go-cose signs and the artifacts are compared
+  byte-for-byte. Both implementations must also refuse the same inputs, including
+  a receipt of each kind presented as the other.
+
+  Building it found that the order of the two tree sizes in the RFC 9942 §5.3.1
+  proof body was pinned by nothing: swapping them in the encoder and decoder
+  together leaves every in-crate test passing, because that suite encodes and
+  decodes with the same pair of functions and so cannot disagree with itself
+  about which field comes first.
+
 ### Changed — `lys`
 
 - The `lys log` commands now run on `lys-log-store`; the log directory layout,
