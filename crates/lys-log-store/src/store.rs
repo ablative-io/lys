@@ -167,13 +167,25 @@ pub trait LeafStore {
     /// stored data, and the only reason it is allowed to is that the pin is
     /// local integrity state rather than log content — see [`PinnedRoot`].
     ///
+    /// Being the only replacing operation, it is also the only place
+    /// equivocation can enter, and **monotonicity alone does not stop it.** A
+    /// second, different root offered for a size already pinned does not move
+    /// the size backwards, so a size-only check accepts it — and an append-only
+    /// tree has exactly one root per size, so accepting it would record that
+    /// the log's history is two different things. Implementors must refuse it.
+    /// Re-pinning the *identical* `(tree_size, root)` stays permitted, because a
+    /// no-op must not be an error; that idempotent repeat is precisely the door
+    /// the check has to stand in.
+    ///
     /// # Errors
     ///
-    /// [`StoreError::PinWentBackwards`] if `pin.tree_size` is below the
-    /// current pinned size, and [`StoreError::Io`] if the write cannot be made
+    /// [`StoreError::PinWentBackwards`] if `pin.tree_size` is below the current
+    /// pinned size, [`StoreError::PinRootChanged`] if `pin.tree_size` equals it
+    /// but the root differs, and [`StoreError::Io`] if the write cannot be made
     /// durable.
     ///
     /// [`StoreError::PinWentBackwards`]: crate::StoreError::PinWentBackwards
+    /// [`StoreError::PinRootChanged`]: crate::StoreError::PinRootChanged
     /// [`StoreError::Io`]: crate::StoreError::Io
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()>;
 }

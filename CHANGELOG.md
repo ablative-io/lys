@@ -37,6 +37,16 @@ unreleased things cannot be used to tell what a published version contains.
   directory's entry is, so syncing only the file would make durable-on-return
   mean "probably".
 
+  **The pin refuses a second root at a size it already holds**
+  (`PinRootChanged`). Pinning is the one operation on a store permitted to
+  replace stored data, so it is the one place equivocation can enter, and a
+  monotonic size check does not stop it: a different root at an *equal* size does
+  not move the size backwards. An append-only tree has exactly one root per size,
+  so accepting two would record that the log's history is two different things —
+  the property the rest of this crate exists to make unrepresentable. Re-pinning
+  the identical `(tree_size, root)` remains permitted, because a no-op must not
+  be an error, and that idempotent repeat is the door the check stands in.
+
 ### Changed — `lys`
 
 - The `lys log` commands now run on `lys-log-store`; the log directory layout,

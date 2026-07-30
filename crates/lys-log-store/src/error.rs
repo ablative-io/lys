@@ -95,6 +95,28 @@ pub enum StoreError {
         requested: u64,
     },
 
+    /// A second, different root was offered for a tree size already pinned.
+    ///
+    /// **This is equivocation, and monotonicity does not catch it** — the size
+    /// does not go backwards, so a size-only check waves it through. An
+    /// append-only tree has exactly one root at any given size, so two roots at
+    /// one size is a claim that the log's history is two different things. That
+    /// is the precise property this crate exists to make unrepresentable, and it
+    /// would otherwise arrive through the one operation permitted to repeat: an
+    /// idempotent re-pin. Re-pinning the *identical* root stays permitted,
+    /// because a no-op must not be an error.
+    #[error(
+        "refusing a second root for tree size {tree_size}: {held} is already pinned there, not {offered} — an append-only tree has one root per size"
+    )]
+    PinRootChanged {
+        /// The tree size at which both roots were claimed.
+        tree_size: u64,
+        /// The base64 root already held at that size.
+        held: String,
+        /// The base64 root that was offered for it.
+        offered: String,
+    },
+
     /// The path is not an initialized store.
     #[error("not an initialized log store: {}", path.display())]
     NotInitialized {

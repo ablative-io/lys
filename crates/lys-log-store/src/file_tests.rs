@@ -18,6 +18,41 @@
 //! | remove `create_new` | `create_new_alone_refuses_a_leaf_this_store_never_saw` — the index *is* the next free one, so the extent check is satisfied and another writer's leaf would be clobbered |
 //!
 //! Both were injected before this landed; each failed exactly one case.
+//!
+//! # The same rule applies to the pin, and it was NOT applied here at first
+//!
+//! The reasoning above was written for the absent-checks and then not carried
+//! three tests down the file: `pin` had a single `the_pin_only_advances` case
+//! bundling **three independent rules** — refuse a smaller size, permit an
+//! identical re-pin, and keep the pin across a reopen. Any one of the three
+//! breaking failed that one test, so *"exactly one test failed"* was satisfied
+//! by construction and identified nothing.
+//!
+//! **A bundled test is invisible to any single injection.** One injection tells
+//! you a rule is guarded; only a *second* injection on a *different* rule, whose
+//! failure signature you compare against the first, tells you the guard is
+//! specific. That is why this went unnoticed through five injections that each
+//! looked decisive.
+//!
+//! | injection | the only case that fails |
+//! |---|---|
+//! | remove the `size <` monotonic check | `the_pin_refuses_going_backwards` |
+//! | refuse an identical re-pin | `re_pinning_the_identical_pin_is_permitted` |
+//! | remove the equal-size root comparison | `the_pin_refuses_a_second_root_at_a_size_it_already_holds` |
+//!
+//! Durability is deliberately **not** in that table. Making `pin` skip its
+//! write fails six cases, and correctly so: persistence is a substrate the
+//! integrity checks stand on, not a rule with one guard. The criterion applies
+//! to rules. What it does require is that no *rule* case be dragged into the
+//! substrate's failure signature — which is why the equivocation case asserts
+//! nothing about the on-disk root.
+//!
+//! One probe had to be rebuilt to learn this. Flipping the monotonic `<` to
+//! `<=` fails two cases, and that is honest: it changes the allowance *and*
+//! re-routes an equivocation attempt to the wrong error, so it is not a
+//! single-rule drift. **The criterion presumes the injection isolates one rule;
+//! an injection that moves a boundary inside a shared condition does not, and
+//! its two failures indict the probe rather than the tests.**
 
 use std::path::Path;
 
@@ -190,11 +225,9 @@ fn a_write_past_the_next_index_is_refused_and_leaves_no_file() {
     assert_eq!(store.extent(), 1);
 }
 
-#[test]
-fn the_pin_only_advances() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("log");
-    let mut store = create(&dir);
+/// A store with one leaf and the pin already at `(1, [7; 32])`.
+fn store_pinned_at_one(dir: &Path) -> FileLeafStore {
+    let mut store = create(dir);
     store.put_leaf(0, b"leaf-0").unwrap();
     store
         .pin(PinnedRoot {
@@ -202,6 +235,14 @@ fn the_pin_only_advances() {
             root: [7u8; 32],
         })
         .unwrap();
+    store
+}
+
+#[test]
+fn the_pin_refuses_going_backwards() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut store = store_pinned_at_one(&dir);
     let err = store
         .pin(PinnedRoot {
             tree_size: 0,
@@ -218,14 +259,56 @@ fn the_pin_only_advances() {
         ),
         "{err}"
     );
-    // Re-pinning the SAME size is allowed: crash recovery re-pins a size it may
-    // already hold, and refusing that would turn a no-op into a failure.
+}
+
+#[test]
+fn re_pinning_the_identical_pin_is_permitted() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut store = store_pinned_at_one(&dir);
     store
         .pin(PinnedRoot {
             tree_size: 1,
             root: [7u8; 32],
         })
-        .unwrap();
+        .expect("an identical re-pin is a no-op, not a failure");
+    assert_eq!(store.pinned().root, [7u8; 32]);
+}
+
+#[test]
+fn the_pin_refuses_a_second_root_at_a_size_it_already_holds() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut store = store_pinned_at_one(&dir);
+    // Two different roots at one tree size is equivocation — the thing this
+    // crate exists to make unrepresentable. A size-only monotonicity check does
+    // not catch it, because the size does not go backwards.
+    let err = store
+        .pin(PinnedRoot {
+            tree_size: 1,
+            root: [9u8; 32],
+        })
+        .unwrap_err();
+    assert!(
+        matches!(err, StoreError::PinRootChanged { tree_size: 1, .. }),
+        "{err}"
+    );
+    assert_eq!(
+        store.pinned().root,
+        [7u8; 32],
+        "the refused pin must not have taken effect"
+    );
+    // Deliberately NOT asserting the on-disk root here. That would make this
+    // case fail whenever pin *durability* broke, for reasons having nothing to
+    // do with equivocation — and a drift injection cannot tell a bundled test
+    // apart from a specific one. `a_pin_survives_a_reopen` owns durability.
+}
+
+#[test]
+fn a_pin_survives_a_reopen() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let store = store_pinned_at_one(&dir);
     assert_eq!(store.pinned().root, [7u8; 32]);
     assert_eq!(FileLeafStore::open(&dir).unwrap().pinned().root, [7u8; 32]);
 }

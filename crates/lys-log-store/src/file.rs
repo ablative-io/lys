@@ -282,6 +282,16 @@ impl LeafStore for FileLeafStore {
                 requested: pin.tree_size,
             });
         }
+        // Monotonicity is about the size and says nothing about the root, so a
+        // second root at an already-pinned size passes it. That is equivocation
+        // arriving through the one operation allowed to repeat.
+        if pin.tree_size == self.pinned.tree_size && pin.root != self.pinned.root {
+            return Err(StoreError::PinRootChanged {
+                tree_size: pin.tree_size,
+                held: STANDARD.encode(self.pinned.root),
+                offered: STANDARD.encode(pin.root),
+            });
+        }
         write_state(&self.dir, pin)?;
         self.pinned = pin;
         Ok(())
