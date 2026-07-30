@@ -337,7 +337,9 @@ fn debug_summarizes_without_leaf_content() {
 #[test]
 fn validate_origin_matches_what_a_checkpoint_would_accept() {
     validate_origin("example.com/lys/ok").unwrap();
-    for bad in ["", "has space", "has+plus"] {
+    let bad_origins = ["", "has space", "has+plus"];
+    for bad in bad_origins {
         assert!(validate_origin(bad).is_err(), "{bad:?}");
     }
+    assert_eq!(bad_origins.len(), 3, "an empty list would pass vacuously");
 }

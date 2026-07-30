@@ -62,13 +62,21 @@ fn create_refuses_to_reinitialize() {
 #[test]
 fn create_rejects_an_origin_a_checkpoint_would_reject() {
     let tmp = tempfile::tempdir().unwrap();
-    for bad in ["", "has space", "has+plus"] {
-        let dir = tmp.path().join(format!("log-{}", bad.len()));
+    let bad_origins = ["", "has space", "has+plus"];
+    for (index, bad) in bad_origins.iter().enumerate() {
+        // Indexed, not named by `bad.len()`: two rejected origins of equal
+        // length would silently share one directory, and a fixture that
+        // collides by coincidence is one edit away from testing nothing.
+        let dir = tmp.path().join(format!("log-{index}"));
         let err = FileLeafStore::create(&dir, bad).unwrap_err();
         assert!(matches!(err, StoreError::Trust(_)), "{bad:?}: {err}");
         // Nothing was created for a rejected origin.
         assert!(!dir.join("log.json").exists(), "{bad:?}");
     }
+    // A loop that silently ran zero times would satisfy every assertion inside
+    // it: a control that passes without firing looks exactly like one that
+    // passed.
+    assert_eq!(bad_origins.len(), 3);
 }
 
 #[test]
