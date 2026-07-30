@@ -110,6 +110,25 @@ impl AnchorReceipt {
     /// the canonical re-encoding of the parsed fields, so no non-canonical
     /// artifact is ever accepted even when its signature would verify.
     ///
+    /// # This function must stay monomorphic — the caller names the type
+    ///
+    /// **Which artifact kind is expected is the caller's declaration, made by
+    /// naming this type, and the wire has no vote in it.** The content type is
+    /// signature-covered, and verification re-derives the protected header from a
+    /// constant rather than reading the wire's copy — but both of those protect
+    /// the label, not the *choice* of which label to expect. A convenience
+    /// `from_cose_bytes(bytes) -> AnyReceipt` that sniffed the type and
+    /// dispatched would move that choice to the attacker while every one of those
+    /// properties still held: flip the label, and the verifier obligingly
+    /// re-derives the matching constant.
+    ///
+    /// So a type-sniffing entry point is not an ergonomics improvement here, even
+    /// though it would arrive looking like one. If one is ever genuinely needed
+    /// it must dispatch to the per-type parser and the dispatch must not be what
+    /// authenticates — the caller still has to say what it expected, and be told
+    /// when the artifact was something else. See the anchor wire draft's
+    /// re-labelling section for the attack this closes.
+    ///
     /// This performs no signature verification and no inclusion check —
     /// follow with [`super::sign::verify_receipt`], or use
     /// [`super::sign::verify_receipt_bytes`] for the combined check. A parsed
