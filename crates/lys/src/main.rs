@@ -84,16 +84,21 @@ fn main() -> ExitCode {
                 subject,
                 request,
                 claims,
+                validity,
                 validity_days,
                 out,
-            } => commands::ca::issue(
-                &key,
-                &subject,
-                claims.as_deref(),
-                validity_days,
-                &out,
-                request.as_deref(),
-                json,
+            } => commands::duration::validity_window(validity_days, validity.as_deref()).and_then(
+                |ttl| {
+                    commands::ca::issue(
+                        &key,
+                        &subject,
+                        claims.as_deref(),
+                        ttl,
+                        &out,
+                        request.as_deref(),
+                        json,
+                    )
+                },
             ),
             CaCommand::Verify {
                 cert,

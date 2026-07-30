@@ -214,7 +214,10 @@ pub enum CaCommand {
     /// Issue an Ed25519-signed X.509 certificate for a named subject and
     /// write it as PEM.
     ///
-    /// The certificate is valid from now for --validity-days whole days.
+    /// The certificate is valid from now for exactly one of --validity
+    /// (a suffixed window, e.g. 30m, 12h, 7d) or --validity-days (whole days).
+    /// Prefer --validity: short-lived scoped grants want minutes to hours, and
+    /// --validity-days cannot express less than a day.
     /// With --request, the subject key comes from the holder's request and is
     /// certified only after its proof of possession verifies, so the
     /// certificate binds a key its holder demonstrably controls. Without
@@ -225,6 +228,11 @@ pub enum CaCommand {
     /// byte-for-byte as a non-critical X.509 extension under OID
     /// 1.3.6.1.4.1.66364.1 (the lys arc); claims always come from the
     /// authority, never from the request.
+    #[command(group(
+        clap::ArgGroup::new("validity_window")
+            .required(true)
+            .args(["validity", "validity_days"])
+    ))]
     Issue {
         /// Path to the issuing authority's identity key file (raw 32-byte
         /// Ed25519 seed). Must already exist — run `lys key generate` first.
@@ -246,10 +254,20 @@ pub enum CaCommand {
         #[arg(long)]
         claims: Option<PathBuf>,
 
+        /// Validity window from now as a count and one unit: s, m, h, or d
+        /// (notBefore = now, notAfter = now + this). For example 30m, 12h, 7d.
+        /// Exactly one unit — compound windows like 1h30m are refused rather
+        /// than partially read.
+        #[arg(long)]
+        validity: Option<String>,
+
         /// Validity window length in whole days from now (notBefore = now,
         /// notAfter = now + this many days). Must be at least 1.
+        ///
+        /// Retained unchanged; --validity covers the same windows and finer
+        /// ones.
         #[arg(long, value_parser = clap::value_parser!(u32).range(1..))]
-        validity_days: u32,
+        validity_days: Option<u32>,
 
         /// Path to write the PEM-encoded certificate to.
         #[arg(long)]

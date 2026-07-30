@@ -1,8 +1,11 @@
 //! `lys ca` subcommands — issue and verify Ed25519-rooted X.509 certificates.
 //!
 //! Issuance wraps [`lys_core::ca::CertificateAuthority`]: the issuer identity
-//! at `--key` signs a certificate for a named subject, valid from now for a
-//! whole number of days (the library's TTL model — there is no backdating).
+//! at `--key` signs a certificate for a named subject, valid from now for the
+//! window `--validity` (or `--validity-days`) asks for — the library's TTL
+//! model, which takes a `Duration` and does not backdate. Sub-day windows are
+//! expressible because short-lived scoped grants need them; see
+//! [`crate::commands::duration`].
 //! Capability claims, when supplied, are validated as JSON and embedded
 //! byte-for-byte as a non-critical extension under the lys OID arc with
 //! sub-component `1` (`1.3.6.1.4.1.66364.1`); the library carries them as
@@ -54,9 +57,6 @@ use crate::commands::pem;
 /// carry claims under `1.3.6.1.4.1.66364.1`, and `lys ca verify` reads them
 /// back from the same OID.
 const CAPABILITY_CLAIMS_COMPONENT: u64 = 1;
-
-/// Seconds in one day, for the `--validity-days` conversion.
-const SECONDS_PER_DAY: u64 = 86_400;
 
 /// The full OID under which this CLI transports capability claims.
 ///
@@ -134,7 +134,11 @@ pub fn request(key: &Path, subject: &str, out: &Path, json: bool) -> CliResult<(
 }
 
 /// `lys ca issue --key <path> --subject <name> [--request <file>]
-/// [--claims <file>] --validity-days <n> --out <file>`.
+/// [--claims <file>] (--validity <window> | --validity-days <n>) --out <file>`.
+///
+/// `ttl` is the already-resolved validity window; the two flags are reconciled
+/// in [`crate::commands::duration::validity_window`] so this function has one
+/// notion of the window rather than two.
 ///
 /// With `--request`, the subject key comes from the holder's PKCS#10 request
 /// and is certified only after its proof of possession verifies; `--subject`
@@ -154,7 +158,7 @@ pub fn issue(
     key: &Path,
     subject: &str,
     claims: Option<&Path>,
-    validity_days: u32,
+    ttl: Duration,
     out: &Path,
     request_path: Option<&Path>,
     json: bool,
@@ -177,7 +181,6 @@ pub fn issue(
         None => Vec::new(),
     };
 
-    let ttl = Duration::from_secs(u64::from(validity_days) * SECONDS_PER_DAY);
     let authority = CertificateAuthority::new(identity);
 
     let issued = if let Some(path) = request_path {
