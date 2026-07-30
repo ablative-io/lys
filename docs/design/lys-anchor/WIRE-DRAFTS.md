@@ -209,6 +209,49 @@ re-labelled artifact fails on the protected header before any proof is examined.
 a consistency receipt — and prove it is refused.** Until that test exists this
 section is a hypothesis, which is the standing rule in this file.
 
+##### The type is covered, and separately is not attacker-supplied — verified, with cites
+
+A differing content type is only a discriminator if it is *inside the signed
+message*. A type that sits beside the signature — an envelope field, a filename,
+a header read before verifying — is decoration: the attacker rewrites the label
+and the signature still covers the bytes it always did. For the shipped inclusion
+receipt, four separate things hold, and each closes a different attack:
+
+1. **It is in the protected header.** `receipt/encoding.rs:115-116` writes label
+   `3` with `CONTENT_TYPE` into the protected map.
+2. **The protected header is a covered input.** `cbor.rs:96` builds the RFC 9052
+   §4.4 `Sig_structure` `["Signature1", protected, h'', payload]`; the signature
+   is taken over exactly that (`receipt/sign.rs:156-157`).
+3. **At verification the protected header is *re-derived*, not read from the
+   wire** (`receipt/sign.rs:214-215`). So the discriminator is not merely
+   covered — at signature-check time it is not attacker-supplied at all. A
+   re-labelled artifact cannot even present its label to the check.
+4. **The wire copy is independently pinned byte-exactly.** `decode_protected`
+   (`receipt/encoding.rs:243-265`) destructures the map as exactly four entries
+   in exactly that order and pins each value, and the re-encode identity gate
+   (`receipt/artifact_tests.rs:42-47`) refuses a non-canonical encoding of the
+   same value. Without (4), (3) would leave the wire header unconstrained and two
+   distinct byte strings would both verify — malleability, not forgery.
+
+**Consequence for how the test must be built.** The usual positive-control
+recipe — *a fixture that passes today and fails once the type is covered* —
+**cannot be constructed here, because there is nothing uncovered to flip.** Its
+absence is not evidence the control is missing; it is evidence the defect it
+screens for is already absent. Claiming that recipe as the standard would be
+asserting a control that cannot fire, which is the failure this repo names
+elsewhere.
+
+**The real residual risk is narrower and is a one-token mistake.** Because (3)
+re-derives the header from a *hardcoded* constant per code path, the separation
+rests entirely on the consistency path passing its own constant. If
+`receipt/consistency.rs` calls `protected_bytes` with the inclusion content type,
+the two preimages coincide, the re-label attack succeeds, and **no test in the
+suite today would fail** — nothing yet asserts that the consistency preimage
+differs from the inclusion one. That is what the drift injection must pin: emit
+the inclusion constant from the consistency path, and **exactly one** test may
+fail, the re-label test. Assert the exact tag bytes of both protected buckets,
+not merely that they are unequal.
+
 **The detached payload is the *newer* root.** RFC 9942 §5.3.1: *"In a signed
 consistency proof, the newer Merkle Tree root (proven to be consistent with an
 older Merkle Tree root) is a detached payload and corresponds to the log at size
