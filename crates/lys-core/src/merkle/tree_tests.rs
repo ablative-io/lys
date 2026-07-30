@@ -337,3 +337,37 @@ fn raw_tree_inclusion_and_consistency_proofs_verify() {
     let proof = tree.prove_consistency(2, 3).unwrap();
     verify_consistency(&prefix.root(), &root, &proof).unwrap();
 }
+
+/// A consistency proof's path is empty **exactly** when the two sizes are equal,
+/// and never otherwise. Swept rather than reasoned about, because the RFC 9942
+/// receipt encoding types `consistency-path` as `[ + bstr ]` — one or more — so
+/// which sizes produce an empty path decides which true statements that wire
+/// format can carry at all. The same shape as `tree_size == 1` for inclusion.
+#[test]
+fn a_consistency_path_is_empty_exactly_when_the_sizes_are_equal() {
+    let mut swept = 0;
+    let mut empty = 0;
+    for new_size in 1u64..=17 {
+        let mut tree = AppendOnlyTree::<u64>::new();
+        for leaf in 0..new_size {
+            tree.append(leaf).unwrap();
+        }
+        for old_size in 1u64..=new_size {
+            let proof = tree.prove_consistency(old_size, new_size).unwrap();
+            let path_is_empty = proof.as_bytes().is_empty();
+            assert_eq!(
+                path_is_empty,
+                old_size == new_size,
+                "sizes ({old_size}, {new_size}): path empty = {path_is_empty}"
+            );
+            swept += 1;
+            empty += u32::from(path_is_empty);
+        }
+    }
+    // A loop that ran zero times would satisfy every assertion inside it.
+    assert_eq!(swept, 153, "17*18/2 pairs with 1 <= old_size <= new_size");
+    assert_eq!(
+        empty, 17,
+        "one empty case per tree size, the equal-size one"
+    );
+}

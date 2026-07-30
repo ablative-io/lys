@@ -117,9 +117,6 @@ downstream reader could act on a proof the verifier never looked at. Widening
 this means deciding the all-proofs-must-agree rule explicitly, and that is a v2
 matter.
 
-Consistency proofs (`-2` → `[size_1, size_2, consistency_path]`) are specified
-but **not issued at launch** (DP2 recommendation (b)).
-
 **Payload:** `nil` — detached.
 
 ### 1.2.1 Tree size 1 cannot be expressed, and the remedy is a genesis leaf
@@ -141,6 +138,75 @@ The asymmetry is deliberate: emit only what conforms, accept anything true. The
 alternative — emitting one technically non-conforming receipt — would have made
 it the *first* receipt in existence, and earliest artifacts are the ones others
 reach for as interop test vectors.
+
+### 1.2.2 Consistency proofs, `vdp` type `-2`
+
+Not issued at launch (DP2 recommendation (b)), but specified here byte-exactly,
+because "specified" previously meant a one-line sketch and the sketch was wrong.
+
+RFC 9942 §5.3.1 ("Receipt of Consistency"):
+
+```
+RFC9162_SHA256_Verifiable_Consistency_Proofs = {
+  &(consistency-proof: -2) => RFC9162_SHA256_Consistency_Proofs
+}
+
+RFC9162_SHA256_Consistency_Proofs = [
+  + RFC9162_SHA256_Consistency_Proof
+]
+
+RFC9162_SHA256_Consistency_Proof =
+  bstr .cbor RFC9162_SHA256_Consistency_Proof_Content
+
+RFC9162_SHA256_Consistency_Proof_Content = [
+  tree_size_1: uint,
+  tree_size_2: uint,
+  consistency_path: [ + bstr ]
+]
+```
+
+Everything else matches §1.2: tagged `COSE_Sign1`, `alg -8`, the same content
+type, `kid` in the protected header, `vds 395 => 1`, detached `nil` payload, and
+**exactly one proof in the array** for the same reason.
+
+> **Correction, 2026-07-30 (fourth in this file).** The previous revision wrote
+> this as `-2 → [size_1, size_2, consistency_path]` — a **bare array**, missing
+> the array-of-proofs wrapper *and* the per-proof `bstr .cbor`. That is the
+> identical defect corrected for `-1` in §1.2 above, repeated one paragraph
+> below its own correction notice.
+>
+> The transferable part is not "check the CDDL". It is that **a correction
+> recorded in prose does not propagate to its neighbours.** The `-1` fix was
+> written as a note about `-1`, so the `-2` line beside it kept the same wrong
+> shape and read as settled because the paragraph above it looked rigorous.
+> When a defect is found in one instance of a pattern, the fix is to sweep every
+> instance of that pattern in the same pass — the note is a record, not a
+> repair.
+
+#### An equal-size consistency proof cannot be expressed
+
+`consistency-path` is `[ + bstr ]` — one or more. But **a consistency proof
+between two equal sizes has an empty path**, and it is a true and useful
+statement: *these two views of the log are the same log, unchanged.* Two correct
+facts jointly excluding a real state, exactly as `[ + bstr ]` on
+`inclusion-path` excludes a one-leaf tree (§1.2.1).
+
+This is measured, not deduced. `merkle` sweeps all 153 pairs
+`1 <= old_size <= new_size <= 17` and asserts the path is empty **iff** the
+sizes are equal — 17 such cases, with the swept count asserted so a
+zero-iteration loop cannot pass
+(`a_consistency_path_is_empty_exactly_when_the_sizes_are_equal`).
+
+**Ruling, following §1.2.1: issuance refuses `tree_size_1 == tree_size_2`;
+verification still accepts an empty path.** Emit only what conforms, accept
+anything true.
+
+No change is needed to make that hold. `tlog::build_consistency_artifact`
+already requires `1 <= old_size < new_size` strictly, decided for its own
+reasons before this limit was known. `merkle::prove_consistency` deliberately
+*does* allow `old_size == new_size`, and should keep allowing it: the primitive's
+job is to express a true proof, and the place a wire format's limit belongs is
+the artifact layer that has to encode it.
 
 ### 1.3 What is signed, and why an unprotected proof is safe
 
