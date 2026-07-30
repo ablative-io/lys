@@ -75,6 +75,10 @@
 //! See [`harness`] — vendored, network-free, and a hard failure rather than a
 //! skip when `LYS_REQUIRE_GO` is set.
 
+// The whole gate belongs to the draft format: with `unstable-anchor` off there is
+// no `bundle` module to verify, and compiling the file out (rather than gating
+// items inside it) leaves no unused shared harness behind either.
+#![cfg(feature = "unstable-anchor")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod harness;

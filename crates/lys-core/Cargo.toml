@@ -12,7 +12,38 @@ keywords = ["cryptography", "transparency", "merkle", "attestation", "agents"]
 categories = ["cryptography"]
 # The vendored Go reference implementations exist only for the shell-out
 # conformance gates; the published package must not carry them.
-exclude = ["tests/go-conformance/", "tests/cose-conformance/"]
+# The Go conformance scaffolding is repo-only: it is vendored, sizeable, and of
+# no use to a consumer. The Rust gates that drive it are excluded WITH it —
+# shipping a test that cannot pass because its fixture was excluded is worse than
+# not shipping it, and a downloaded crate should have a suite that runs clean.
+# The Go cross-checks remain mandatory here; see CLAUDE.md.
+exclude = [
+    "tests/go-conformance/",
+    "tests/cose-conformance/",
+    "tests/go_conformance.rs",
+    "tests/cose_conformance.rs",
+    "tests/receipt_conformance.rs",
+    "tests/bundle_conformance.rs",
+    "tests/harness/",
+]
+
+[features]
+default = []
+
+# The lys-anchor wire formats — `lys/anchor-receipt/v1` and
+# `lys/verification-bundle/v1`. OFF BY DEFAULT AND EXEMPT FROM SEMVER until the
+# formats are ratified.
+#
+# Publishing a crate that exposes a format is one of the two things that FREEZES
+# it (the other is signing a durable artifact under its tag): once a consumer can
+# emit artifacts, changing the encoding breaks every historical verification. Both
+# formats are still drafts — three spec bugs have already been found in them by
+# implementation — and no production anchor key exists yet. Gating them keeps that
+# true through a release rather than freezing them as a side effect of one.
+#
+# Nothing is lost by the default being off: no anchor exists, so nothing can emit
+# a receipt or a bundle, so nothing needs to verify one.
+unstable-anchor = []
 
 [dependencies]
 aes-gcm.workspace = true

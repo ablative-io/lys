@@ -67,6 +67,10 @@ pub fn go_or_skip(gate: &str) -> Option<PathBuf> {
 
 /// Compiles the Go tool once, to `out`.
 ///
+/// Every gate uses the built binary rather than `go run .`, which re-links on
+/// each invocation: one spawn path shared by all three gates, and a sweep of
+/// hundreds of cases costs seconds instead of minutes.
+///
 /// `go run .` re-links on every invocation, which turns a many-case sweep into
 /// minutes of linking; a single build plus fast execs costs seconds.
 ///

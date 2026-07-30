@@ -1,11 +1,10 @@
-//! D4/D6 conformance gate: round-trip the `lys/attestation/v2` and
-//! `lys/anchor-receipt/v1` `COSE_Sign1` implementations against the vendored Go
-//! `veraison/go-cose` reference implementation.
+//! D4/D6 conformance gate: round-trip the `lys/attestation/v2` `COSE_Sign1`
+//! implementation against the vendored Go `veraison/go-cose` reference
+//! implementation.
 //!
-//! The receipt half ([`go_cose_receipt_conformance_round_trips`]) carries extra
-//! weight: because a receipt's payload is the *detached* Merkle root, the Go
-//! side must independently derive the value the signature covers, and it does so
-//! from RFC 6962's recursive definitions rather than from lys's iterative walk.
+//! The `lys/anchor-receipt/v1` half lives in `receipt_conformance.rs`, which
+//! compiles only with the `unstable-anchor` feature. Both share [`harness`], and
+//! the environment contract below is the shared part.
 //!
 //! # Environment contract
 //!
@@ -25,17 +24,11 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use std::io::Write;
-use std::path::Path;
-use std::process::{Command, Stdio};
-
 mod harness;
 
 use harness::{build_go_tool, go_or_skip, run_built_tool};
 use lys_core::Ed25519Identity;
 use lys_core::attestation::{Attestation, verify_attestation, verify_attestation_bytes};
-use lys_core::merkle::tree::{AppendOnlyTree, RawLeaf};
-use lys_core::receipt::{AnchorReceipt, sign_receipt, verify_receipt_bytes};
 
 /// Fixed golden seed: the 32 ASCII bytes `"lys-cose-conformance-test-seed01"`.
 const GOLDEN_SEED: &[u8; 32] = b"lys-cose-conformance-test-seed01";
@@ -166,38 +159,6 @@ fn golden_vectors_pure_rust() {
     assert!(Attestation::from_cose_bytes(&indefinite_length_mutant()).is_err());
 }
 
-/// Runs the vendored Go tool hermetically with `input` on stdin; returns
-/// `(exit_success, stdout_bytes)`. Any spawn failure with a PRESENT
-/// toolchain is a hard panic — the environment contract is documented in
-/// the file header.
-fn run_go_tool(go: &Path, gocache: &Path, args: &[&str], input: &[u8]) -> (bool, Vec<u8>) {
-    let scaffold_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/cose-conformance");
-    let mut child = Command::new(go)
-        .arg("run")
-        .arg(".")
-        .args(args)
-        .current_dir(&scaffold_dir)
-        .env("GOFLAGS", "-mod=vendor")
-        .env("GOPROXY", "off")
-        .env("GOTOOLCHAIN", "local")
-        .env("GOCACHE", gocache)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .expect("failed to spawn the Go toolchain (present but broken is a hard failure)");
-    child
-        .stdin
-        .take()
-        .expect("child stdin is piped")
-        .write_all(input)
-        .expect("failed to write to the Go tool's stdin");
-    let output = child
-        .wait_with_output()
-        .expect("failed to wait for the Go tool");
-    (output.status.success(), output.stdout)
-}
-
 #[test]
 fn go_cose_conformance_round_trips() {
     // The skip is for developer machines only. CI sets LYS_REQUIRE_GO, so a
@@ -206,19 +167,16 @@ fn go_cose_conformance_round_trips() {
     let Some(go) = go_or_skip("go-cose attestation conformance") else {
         return;
     };
-    let gocache_dir = tempfile::tempdir().unwrap();
-    let gocache = gocache_dir.path().join("gocache");
+    let workdir = tempfile::tempdir().unwrap();
+    let gocache = workdir.path().join("gocache");
+    let bin = workdir.path().join("cosetool");
+    build_go_tool(&go, &gocache, &bin);
 
     let expected_verify_line = format!("{GOLDEN_HASH_HEX} {GOLDEN_TIMESTAMP}\n");
 
     // Round-trip A (Rust -> Go): the go-cose reference verifier accepts
     // the Rust-built artifact and reports the golden hash and timestamp.
-    let (ok, stdout) = run_go_tool(
-        &go,
-        &gocache,
-        &["verify", GOLDEN_PUBKEY_HEX],
-        &golden_artifact(),
-    );
+    let (ok, stdout) = run_built_tool(&bin, &["verify", GOLDEN_PUBKEY_HEX], &golden_artifact());
     assert!(ok, "go-cose rejected the Rust-built artifact");
     assert_eq!(
         stdout,
@@ -228,9 +186,8 @@ fn go_cose_conformance_round_trips() {
 
     // Round-trip B (Go -> Rust): the go-cose-built artifact is
     // byte-identical to the Rust one and verifies under lys.
-    let (ok, go_artifact) = run_go_tool(
-        &go,
-        &gocache,
+    let (ok, go_artifact) = run_built_tool(
+        &bin,
         &["sign", GOLDEN_SEED_HEX, &GOLDEN_TIMESTAMP.to_string()],
         GOLDEN_PAYLOAD,
     );
@@ -246,7 +203,7 @@ fn go_cose_conformance_round_trips() {
     // Negative parity: one flipped claims byte, rejected by BOTH.
     let mut tampered = golden_artifact();
     tampered[OFFSET_CLAIMS + 5] ^= 0x01;
-    let (ok, _stdout) = run_go_tool(&go, &gocache, &["verify", GOLDEN_PUBKEY_HEX], &tampered);
+    let (ok, _stdout) = run_built_tool(&bin, &["verify", GOLDEN_PUBKEY_HEX], &tampered);
     assert!(!ok, "go-cose accepted a tampered artifact");
     assert!(verify_attestation_bytes(&tampered, GOLDEN_PAYLOAD).is_err());
 
@@ -255,7 +212,7 @@ fn go_cose_conformance_round_trips() {
     // is outside Sig_structure); lys rejects it. This pins why the
     // canonical-strict verifier exists.
     let smuggled = smuggling_mutant();
-    let (ok, stdout) = run_go_tool(&go, &gocache, &["verify", GOLDEN_PUBKEY_HEX], &smuggled);
+    let (ok, stdout) = run_built_tool(&bin, &["verify", GOLDEN_PUBKEY_HEX], &smuggled);
     assert!(
         ok,
         "go-cose is expected to accept the unprotected-smuggling mutant \
@@ -267,7 +224,7 @@ fn go_cose_conformance_round_trips() {
     // Strictness delta 2 — oversized length head (valid signature,
     // non-canonical framing): vanilla go-cose ACCEPTS it; lys rejects.
     let oversized = oversized_head_mutant();
-    let (ok, stdout) = run_go_tool(&go, &gocache, &["verify", GOLDEN_PUBKEY_HEX], &oversized);
+    let (ok, stdout) = run_built_tool(&bin, &["verify", GOLDEN_PUBKEY_HEX], &oversized);
     assert!(
         ok,
         "go-cose is expected to accept the oversized-length-head mutant \
@@ -281,166 +238,7 @@ fn go_cose_conformance_round_trips() {
     // by BOTH (empirically re-checked during this build; the D4 design
     // draft expected go-cose to accept it).
     let indefinite = indefinite_length_mutant();
-    let (ok, _stdout) = run_go_tool(&go, &gocache, &["verify", GOLDEN_PUBKEY_HEX], &indefinite);
+    let (ok, _stdout) = run_built_tool(&bin, &["verify", GOLDEN_PUBKEY_HEX], &indefinite);
     assert!(!ok, "go-cose accepted an indefinite-length artifact");
     assert!(Attestation::from_cose_bytes(&indefinite).is_err());
-}
-
-// ------------------------------------------------- lys/anchor-receipt/v1 gate
-
-const RECEIPT_SEED: &[u8; 32] = b"lys-receipt-conformance-seed-001";
-
-fn receipt_identity() -> (tempfile::TempDir, Ed25519Identity) {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("anchor.key");
-    std::fs::write(&path, RECEIPT_SEED).unwrap();
-    let identity = Ed25519Identity::load(&path).unwrap();
-    (dir, identity)
-}
-
-fn receipt_leaf(index: u64) -> Vec<u8> {
-    format!("anchor-checkpoint-{index}").into_bytes()
-}
-
-fn to_hex(bytes: &[u8]) -> String {
-    use std::fmt::Write;
-    bytes.iter().fold(String::new(), |mut acc, b| {
-        let _ = write!(acc, "{b:02x}");
-        acc
-    })
-}
-
-/// Issue a receipt from a real tree of `size` for `index`.
-fn issue(size: u64, index: u64, key: &Ed25519Identity) -> (AnchorReceipt, [u8; 32]) {
-    let mut tree = AppendOnlyTree::<RawLeaf>::new();
-    for i in 0..size {
-        tree.append_raw(&receipt_leaf(i));
-    }
-    let proof = tree.prove_inclusion(index).unwrap();
-    let path: Vec<[u8; 32]> = proof
-        .as_bytes()
-        .chunks_exact(32)
-        .map(|c| <[u8; 32]>::try_from(c).unwrap())
-        .collect();
-    let receipt = sign_receipt(&receipt_leaf(index), index, size, &path, key).unwrap();
-    (receipt, tree.root().to_parts().0)
-}
-
-/// The D6 gate for receipts: a receipt no off-the-shelf library verifies is
-/// worthless, so go-cose must verify ours.
-///
-/// This test carries more weight than the attestation gate, because the Go side
-/// independently derives the values the signature covers. The receipt's payload
-/// is the **detached** Merkle root, and the Go tool recomputes it from RFC 6962
-/// §2.1's *recursive* `MTH` definition while lys computes it with an *iterative*
-/// upward walk. go-cose's signature check therefore passes only if two
-/// independently written algorithms agree on the root — and the Go tool also
-/// re-derives the inclusion path from the RFC's recursive `PATH` and requires it
-/// to equal the one the artifact carries.
-///
-/// That closes the hand-written-walk risk from a second direction. The 561
-/// in-crate cases prove the walk agrees with `ct-merkle`'s tree; this proves it
-/// agrees with the RFC's own recursive definition, transcribed in another
-/// language by different code.
-#[test]
-fn go_cose_receipt_conformance_round_trips() {
-    let Some(go) = go_or_skip("go-cose receipt conformance") else {
-        return;
-    };
-    let workdir = tempfile::tempdir().unwrap();
-    let gocache = workdir.path().join("gocache");
-    let bin = workdir.path().join("cosetool");
-    build_go_tool(&go, &gocache, &bin);
-
-    let (_dir, key) = receipt_identity();
-    let pubkey_hex = to_hex(&key.public_key_bytes());
-    let seed_hex = to_hex(RECEIPT_SEED);
-
-    // ---- Shape sweep (Rust -> Go), every leaf of every size a genesis-seeded
-    // log passes through. Incomplete trees are where an iterative walk and a
-    // recursive definition part company, so sampling would prove little.
-    let mut sweep_cases = 0usize;
-    for size in 2..=17u64 {
-        for index in 0..size {
-            sweep_cases += 1;
-            let (receipt, expected_root) = issue(size, index, &key);
-            let mut args = vec![
-                "receipt-verify".to_string(),
-                pubkey_hex.clone(),
-                index.to_string(),
-            ];
-            args.extend((0..size).map(|i| to_hex(&receipt_leaf(i))));
-
-            let (ok, stdout) = run_built_tool(&bin, &args, &receipt.to_cose_bytes());
-            assert!(
-                ok,
-                "go-cose rejected the lys receipt at size {size} index {index}"
-            );
-            assert_eq!(
-                String::from_utf8(stdout).unwrap(),
-                format!("{} {size} {index}\n", to_hex(&expected_root)),
-                "the Go recursive MTH disagreed with lys at size {size} index {index}"
-            );
-        }
-    }
-    // A loop that silently ran zero times would pass every assertion above.
-    assert_eq!(
-        sweep_cases, 152,
-        "the shape sweep must cover every leaf of sizes 2..=17"
-    );
-
-    // ---- Go -> Rust: a receipt built entirely by go-cose, with its path
-    // derived from RFC 6962's recursive PATH, must verify under lys.
-    let size = 5u64;
-    let index = 2u64;
-    let mut args = vec!["receipt-sign".to_string(), seed_hex, index.to_string()];
-    args.extend((0..size).map(|i| to_hex(&receipt_leaf(i))));
-    let (ok, go_receipt) = run_built_tool(&bin, &args, &[]);
-    assert!(ok, "go-cose receipt-sign failed");
-
-    let restored =
-        verify_receipt_bytes(&go_receipt, &receipt_leaf(index), &key.public_key_bytes()).unwrap();
-    assert_eq!(restored.tree_size, size);
-    assert_eq!(restored.leaf_index, index);
-
-    // Byte-identity is the stronger claim and it holds: Ed25519 is
-    // deterministic and both sides encode core-deterministic CBOR, so the two
-    // implementations produce the same artifact rather than merely compatible
-    // ones. If this ever fails, check the encoders before the crypto.
-    let (ours, _root) = issue(size, index, &key);
-    assert_eq!(
-        go_receipt,
-        ours.to_cose_bytes(),
-        "go-cose and lys receipts must be byte-identical"
-    );
-
-    // ---- Negative parity: a tampered path node must be rejected by BOTH. The
-    // Go side rejects it at the path comparison; lys rejects it because the
-    // recomputed root is one the anchor never signed.
-    let (mut tampered, _root) = issue(size, index, &key);
-    tampered.inclusion_path[0][0] ^= 0x01;
-    let mut args = vec![
-        "receipt-verify".to_string(),
-        pubkey_hex.clone(),
-        index.to_string(),
-    ];
-    args.extend((0..size).map(|i| to_hex(&receipt_leaf(i))));
-    let (ok, _stdout) = run_built_tool(&bin, &args, &tampered.to_cose_bytes());
-    assert!(!ok, "go-cose accepted a receipt with a tampered path");
-    assert!(
-        verify_receipt_bytes(
-            &tampered.to_cose_bytes(),
-            &receipt_leaf(index),
-            &key.public_key_bytes()
-        )
-        .is_err()
-    );
-
-    // ---- And a receipt presented against the wrong leaf: the Go side computes
-    // a root over different leaves, so the detached payload no longer matches.
-    let (receipt, _root) = issue(size, index, &key);
-    let mut args = vec!["receipt-verify".to_string(), pubkey_hex, index.to_string()];
-    args.extend((0..size).map(|i| to_hex(&receipt_leaf(i + 100))));
-    let (ok, _stdout) = run_built_tool(&bin, &args, &receipt.to_cose_bytes());
-    assert!(!ok, "go-cose accepted a receipt against the wrong leaves");
 }

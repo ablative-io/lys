@@ -30,6 +30,10 @@ pub(crate) const MAJOR_TAG: u8 = 6;
 
 /// The encoded simple value `null` (major type 7, value 22) — the CBOR `nil`
 /// a detached `COSE_Sign1` payload is required to carry.
+///
+/// Only receipts detach their payload, so this follows the `unstable-anchor`
+/// feature rather than being carried as dead weight in the default build.
+#[cfg(feature = "unstable-anchor")]
 pub(crate) const NULL: u8 = 0xf6;
 
 /// Append the canonical (shortest-form) CBOR head for `major`/`value`

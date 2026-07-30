@@ -128,6 +128,9 @@ fn text_and_bytes_carry_a_length_prefixed_definite_head() {
     assert_eq!(digest.len(), 34);
 }
 
+// Only receipts detach a payload, so `NULL` follows the `unstable-anchor`
+// feature and so does its test.
+#[cfg(feature = "unstable-anchor")]
 #[test]
 fn null_is_the_canonical_detached_payload_marker() {
     // RFC 9052 requires a detached payload to be encoded as CBOR nil, and

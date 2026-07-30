@@ -27,6 +27,7 @@
 #![cfg_attr(not(test), forbid(unsafe_code))]
 
 pub mod attestation;
+#[cfg(feature = "unstable-anchor")]
 pub mod bundle;
 pub mod ca;
 mod cbor;
@@ -34,6 +35,7 @@ pub mod checkpoint;
 pub mod error;
 pub mod keys;
 pub mod merkle;
+#[cfg(feature = "unstable-anchor")]
 pub mod receipt;
 pub mod seal;
 pub mod tlog;

@@ -18,7 +18,7 @@
 //!
 //! [`verify_receipt`] reverses it: recompute the leaf hash, walk the path to a
 //! candidate root, and verify the anchor's signature against *that*. Any
-//! mismatch collapses to [`TrustError::InvalidSignature`].
+//! mismatch collapses to [`TrustError::ReceiptVerification`].
 //!
 //! # Verifying requires naming the anchor you expect
 //!
@@ -184,7 +184,7 @@ pub fn sign_receipt(
 ///
 /// # Errors
 ///
-/// Returns [`TrustError::InvalidSignature`] for every failure. A receipt from
+/// Returns [`TrustError::ReceiptVerification`] for every failure. A receipt from
 /// the wrong anchor, an inconsistent proof, a tampered path and a forged
 /// signature are deliberately indistinguishable: a receipt verifier is exactly
 /// the network-exposed surface where a distinguishable error becomes a parsing
@@ -196,7 +196,7 @@ pub fn verify_receipt(
     expected_anchor_public_key: &[u8; DIGEST_LEN],
 ) -> TrustResult<()> {
     if receipt.anchor_public_key != *expected_anchor_public_key {
-        return Err(TrustError::InvalidSignature);
+        return Err(TrustError::ReceiptVerification);
     }
     let leaf_hash = raw_leaf_hash(leaf);
     let flattened = receipt.flattened_path();
@@ -209,15 +209,22 @@ pub fn verify_receipt(
         receipt.tree_size,
         &flattened,
     )
-    .map_err(|_err| TrustError::InvalidSignature)?;
+    .map_err(|_err| TrustError::ReceiptVerification)?;
 
     let protected = encoding::protected_bytes(&receipt.anchor_public_key);
     let sig_structure = cbor::sig_structure_bytes(&protected, &root);
+    // Mapped, not propagated: `verify` reports `InvalidSignature`, and letting
+    // that through would make a forged signature distinguishable from every
+    // other way a receipt fails. It was indistinguishable only while receipts
+    // reused `InvalidSignature` as their own collapse value — the moment they
+    // stopped, this became a leak. `every_verification_failure_is_the_same_error`
+    // caught it.
     Ed25519Identity::verify(
         &receipt.anchor_public_key,
         &sig_structure,
         &receipt.signature,
     )
+    .map_err(|_err| TrustError::ReceiptVerification)
 }
 
 /// Parse a tagged `COSE_Sign1` receipt and verify it against `leaf` and the
@@ -229,7 +236,7 @@ pub fn verify_receipt(
 ///
 /// # Errors
 ///
-/// Returns [`TrustError::InvalidSignature`] for every failure — a malformed or
+/// Returns [`TrustError::ReceiptVerification`] for every failure — a malformed or
 /// non-canonical artifact, the wrong anchor, an inconsistent proof and an
 /// invalid signature are deliberately indistinguishable (non-oracle).
 pub fn verify_receipt_bytes(

@@ -102,7 +102,7 @@ fn a_receipt_for_one_leaf_does_not_verify_for_another() {
     let receipt = sign_receipt(&leaf_bytes(3), 3, size, &path_of(size, 3), &key).unwrap();
     assert!(matches!(
         verify_receipt(&receipt, &leaf_bytes(4), &key.public_key_bytes()),
-        Err(TrustError::InvalidSignature)
+        Err(TrustError::ReceiptVerification)
     ));
     // Including a leaf that differs by a single byte.
     let mut nearly = leaf_bytes(3);
@@ -127,7 +127,7 @@ fn a_receipt_from_an_unexpected_anchor_is_refused_though_it_is_internally_perfec
     // And is refused when the caller names the anchor they actually trust.
     assert!(matches!(
         verify_receipt(&receipt, &leaf, &primary().public_key_bytes()),
-        Err(TrustError::InvalidSignature)
+        Err(TrustError::ReceiptVerification)
     ));
 }
 
@@ -435,12 +435,12 @@ fn every_verification_failure_is_the_same_error() {
     for (name, receipt, candidate_leaf) in cases {
         let err = verify_receipt(&receipt, &candidate_leaf, &expected).unwrap_err();
         assert!(
-            matches!(err, TrustError::InvalidSignature),
+            matches!(err, TrustError::ReceiptVerification),
             "{name} produced a distinguishable error: {err:?}"
         );
         assert_eq!(
             format!("{err}"),
-            format!("{}", TrustError::InvalidSignature),
+            format!("{}", TrustError::ReceiptVerification),
             "{name} produced a distinguishable message"
         );
     }
@@ -469,7 +469,7 @@ fn malformed_bytes_and_bad_signatures_are_indistinguishable_through_the_bytes_ap
 
     for mutant in [truncated, trailing, forged, vec![], vec![0xff; 10]] {
         let err = verify_receipt_bytes(&mutant, &leaf, &expected).unwrap_err();
-        assert!(matches!(err, TrustError::InvalidSignature));
+        assert!(matches!(err, TrustError::ReceiptVerification));
     }
 }
 

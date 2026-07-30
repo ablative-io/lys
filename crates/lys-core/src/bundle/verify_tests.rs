@@ -266,7 +266,7 @@ fn a_receipt_over_an_unrelated_log_can_never_satisfy_the_join() {
     );
     assert!(matches!(
         verify_bundle(&spliced, &s.child.verifier(), &[decoy_anchor.verifier()]),
-        Err(TrustError::LogArtifactVerification)
+        Err(TrustError::BundleVerification)
     ));
 }
 
@@ -533,12 +533,12 @@ fn every_failure_is_the_same_error() {
     ] {
         let err = verify_bundle(&bundle, &child_v, &anchors).unwrap_err();
         assert!(
-            matches!(err, TrustError::LogArtifactVerification),
+            matches!(err, TrustError::BundleVerification),
             "{name} produced a distinguishable error: {err:?}"
         );
         assert_eq!(
             format!("{err}"),
-            format!("{}", TrustError::LogArtifactVerification),
+            format!("{}", TrustError::BundleVerification),
             "{name} produced a distinguishable message"
         );
     }

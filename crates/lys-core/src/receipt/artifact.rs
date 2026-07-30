@@ -26,7 +26,7 @@
 //!   `from_cose_bytes` with [`super::sign::verify_receipt`] (or use
 //!   [`super::sign::verify_receipt_bytes`]) before trusting any field.
 //! - Every parse failure collapses to
-//!   [`TrustError::InvalidSignature`]
+//!   [`TrustError::ReceiptVerification`]
 //!   (non-oracle).
 
 use crate::error::{TrustError, TrustResult};
@@ -117,7 +117,7 @@ impl AnchorReceipt {
     ///
     /// # Errors
     ///
-    /// Returns [`TrustError::InvalidSignature`] for every rejected input —
+    /// Returns [`TrustError::ReceiptVerification`] for every rejected input —
     /// oversize, malformed CBOR, wrong shape, wrong header pins, and
     /// non-canonical encoding are deliberately indistinguishable (non-oracle).
     pub fn from_cose_bytes(bytes: &[u8]) -> TrustResult<Self> {
@@ -130,7 +130,7 @@ impl AnchorReceipt {
             &fields.signature,
         );
         if canonical != bytes {
-            return Err(TrustError::InvalidSignature);
+            return Err(TrustError::ReceiptVerification);
         }
         Ok(Self {
             anchor_public_key: fields.anchor_public_key,

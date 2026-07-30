@@ -24,7 +24,7 @@
 //! - **Artifacts are embedded verbatim** — re-encoding a frozen artifact inside
 //!   a container is how byte-identity gets lost.
 //! - **Non-oracle verification:** every failure collapses to
-//!   [`TrustError::LogArtifactVerification`].
+//!   [`TrustError::BundleVerification`].
 //!
 //! # What a verified bundle does and does not establish
 //!
@@ -42,7 +42,15 @@
 //! unnotarized log. [`VerifiedBundle::notarizations`] reports it rather than
 //! letting a reader assume notarization happened.
 //!
-//! [`TrustError::LogArtifactVerification`]: crate::error::TrustError::LogArtifactVerification
+//! [`TrustError::BundleVerification`]: crate::error::TrustError::BundleVerification
+//!
+//! # Availability
+//!
+//! Behind the off-by-default `unstable-anchor` feature, and **exempt from
+//! semantic versioning** until the format is ratified. Publishing a crate that
+//! exposes a format is one of the two things that freezes it — the other is
+//! signing a durable artifact under its tag — and this one is still a draft with
+//! no production anchor to issue under it.
 
 pub mod artifact;
 pub mod verify;

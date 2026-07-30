@@ -14,7 +14,27 @@
 /// parsing, verification, revocation), the Merkle transparency log, sealed
 /// payload transport (seal/unseal), key management, signing, and the
 /// dedicated signature-verification failure.
+///
+/// # Why this is `#[non_exhaustive]`
+///
+/// Downstream `match`es must carry a wildcard arm, which makes **every future
+/// variant an additive change instead of a breaking one**. That matters more
+/// here than in a typical library: this crate gains a verification surface with
+/// each new artifact class, and each one wants its own non-oracle failure value
+/// (see [`Self::ReceiptVerification`] and [`Self::BundleVerification`]). Without
+/// this attribute, giving a new artifact class an honest error would mean a
+/// semver break, and the cheap way out — reusing another class's variant —
+/// makes errors mean less over time.
+///
+/// # Non-oracle variants carry no cause, deliberately
+///
+/// The verification failures are deliberately causeless. A caller learns *that*
+/// an artifact failed, never *which check* failed, because these types are
+/// reachable from network-exposed surfaces where a distinguishable error is a
+/// parsing oracle. Callers diagnosing their own artifacts verify the embedded
+/// pieces individually, where the errors are specific and actionable.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum TrustError {
     /// Generating a certificate failed.
     #[error("certificate generation failed: {reason}")]
@@ -150,6 +170,30 @@ pub enum TrustError {
     /// mismatch, malformed hashes, and kind confusion are indistinguishable.
     #[error("log artifact verification failed")]
     LogArtifactVerification,
+
+    /// An anchor receipt failed verification — deliberately omits the cause
+    /// (non-oracle): a bad signature, the wrong anchor key, a tampered
+    /// inclusion path, a malformed or non-canonical artifact, and a leaf the
+    /// receipt does not prove are all indistinguishable.
+    ///
+    /// Distinct from [`Self::InvalidSignature`], which it previously reused: a
+    /// receipt failure is not necessarily a signature failure, and saying so
+    /// misdescribed every other way one can fail. The *class* of artifact is
+    /// already known to the caller from the function they called, so naming it
+    /// leaks nothing a caller did not supply.
+    #[error("receipt verification failed")]
+    ReceiptVerification,
+
+    /// A verification bundle failed verification — deliberately omits the
+    /// cause (non-oracle): a malformed container, a broken inclusion proof, a
+    /// receipt from the wrong anchor, and a chain whose links do not join are
+    /// all indistinguishable.
+    ///
+    /// Distinct from [`Self::LogArtifactVerification`], which it previously
+    /// reused, for the same reason: a bundle is a different artifact class with
+    /// a different set of ways to be wrong.
+    #[error("bundle verification failed")]
+    BundleVerification,
 }
 
 /// Convenience alias for `Result<T, TrustError>`.

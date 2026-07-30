@@ -21,7 +21,7 @@
 //!   Merkle root as a *detached* payload, which never appears in the artifact
 //!   — the verifier recomputes it. See [`super`] for why that is the point.
 //! - Every decode failure collapses to
-//!   [`TrustError::InvalidSignature`](crate::error::TrustError::InvalidSignature)
+//!   [`TrustError::ReceiptVerification`](crate::error::TrustError::ReceiptVerification)
 //!   (non-oracle; see the [`super`] module docs).
 //!
 //! # The vdp shape follows RFC 9942 exactly, including its wrappers
@@ -198,7 +198,7 @@ pub(crate) struct DecodedFields {
 
 /// Non-oracle failure for every rejected receipt (see module docs).
 fn reject() -> TrustError {
-    TrustError::InvalidSignature
+    TrustError::ReceiptVerification
 }
 
 /// Parse one CBOR value from `bytes` with ciborium. Trailing garbage is not
@@ -351,7 +351,7 @@ fn decode_unprotected(unprotected_item: &Value) -> TrustResult<DecodedProof> {
 ///
 /// # Errors
 ///
-/// Every failure collapses to [`TrustError::InvalidSignature`].
+/// Every failure collapses to [`TrustError::ReceiptVerification`].
 pub(crate) fn decode_fields(bytes: &[u8]) -> TrustResult<DecodedFields> {
     if bytes.len() > MAX_ARTIFACT_LEN {
         return Err(reject());

@@ -24,7 +24,7 @@
 //!   fields — even inputs whose signature is cryptographically valid.
 //! - **Non-oracle verification.** Every failure — parse, canonicality, header
 //!   pins, wrong anchor, inconsistent proof, signature — collapses to the
-//!   single [`TrustError::InvalidSignature`] value.
+//!   single [`TrustError::ReceiptVerification`] value.
 //! - **Verification names its anchor.** [`verify_receipt`] requires the caller
 //!   to supply the anchor key they trust. There is no unattributed verify, for
 //!   the reason in [`sign`].
@@ -66,7 +66,15 @@
 //! statement durable and attributable, so that misbehaviour is *provable* after
 //! the fact rather than deniable.
 //!
-//! [`TrustError::InvalidSignature`]: crate::error::TrustError::InvalidSignature
+//! [`TrustError::ReceiptVerification`]: crate::error::TrustError::ReceiptVerification
+//!
+//! # Availability
+//!
+//! Behind the off-by-default `unstable-anchor` feature, and **exempt from
+//! semantic versioning** until the format is ratified. Publishing a crate that
+//! exposes a format is one of the two things that freezes it — the other is
+//! signing a durable artifact under its tag — and this one is still a draft with
+//! no production anchor to issue under it.
 
 pub mod artifact;
 mod encoding;

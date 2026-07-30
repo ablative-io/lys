@@ -46,7 +46,7 @@
 //! # Non-oracle
 //!
 //! Every failure collapses to
-//! [`TrustError::LogArtifactVerification`].
+//! [`TrustError::BundleVerification`].
 //! A malformed container, a broken inclusion proof, a receipt from the wrong
 //! anchor and a chain whose links do not join are deliberately
 //! indistinguishable: a bundle verifier is a network-exposed surface where a
@@ -54,7 +54,7 @@
 //! bundle verify the embedded artifacts individually, where the errors are
 //! actionable.
 //!
-//! [`TrustError::LogArtifactVerification`]: crate::error::TrustError::LogArtifactVerification
+//! [`TrustError::BundleVerification`]: crate::error::TrustError::BundleVerification
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
@@ -67,7 +67,7 @@ use crate::tlog::verify_inclusion_artifact;
 
 /// Non-oracle failure for every rejected bundle (see module docs).
 fn reject() -> TrustError {
-    TrustError::LogArtifactVerification
+    TrustError::BundleVerification
 }
 
 /// What one verified rung of the chain establishes.
@@ -150,7 +150,7 @@ impl VerifiedBundle {
 ///
 /// # Errors
 ///
-/// Returns [`TrustError::LogArtifactVerification`] for every failure
+/// Returns [`TrustError::BundleVerification`] for every failure
 /// (non-oracle; see the module docs).
 ///
 /// Note that `anchors.len()` must equal `bundle.links.len()` exactly, and a
