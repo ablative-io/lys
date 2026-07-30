@@ -11,7 +11,7 @@ use std::path::Path;
 use crate::commands::error::CliResult;
 use crate::commands::files::read_file;
 use crate::commands::hex::hex_lower;
-use crate::commands::log::store::LogStore;
+use crate::commands::log::store;
 use crate::commands::output::Emitter;
 
 /// `lys log append --dir <log-dir> --leaf <file>`.
@@ -27,10 +27,10 @@ use crate::commands::output::Emitter;
 /// [`CliError::LogDirInvalid`]: crate::commands::error::CliError::LogDirInvalid
 /// [`CliError::Io`]: crate::commands::error::CliError::Io
 pub fn run(dir: &Path, leaf: &Path, json: bool) -> CliResult<()> {
-    let mut store = LogStore::open(dir)?;
+    let mut log = store::open(dir)?;
     let leaf_bytes = read_file(leaf, "leaf file")?;
-    let (index, leaf_hash) = store.append(&leaf_bytes)?;
-    let (root, tree_size) = store.tree().root().to_parts();
+    let (index, leaf_hash) = log.append(&leaf_bytes)?;
+    let (root, tree_size) = log.tree().root().to_parts();
     let mut out = Emitter::new(json);
     out.field("leaf index", "leaf_index", index);
     out.field(

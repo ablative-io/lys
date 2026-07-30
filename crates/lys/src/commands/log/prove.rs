@@ -18,7 +18,7 @@ use crate::commands::error::{CliError, CliResult};
 use crate::commands::files::write_file;
 use crate::commands::hex::hex_lower;
 use crate::commands::key::load_identity;
-use crate::commands::log::store::LogStore;
+use crate::commands::log::store;
 use crate::commands::output::Emitter;
 
 /// `lys log prove inclusion --dir <log-dir> --key <keyfile>
@@ -40,25 +40,20 @@ use crate::commands::output::Emitter;
 /// [`CliError::Io`]: crate::commands::error::CliError::Io
 /// [`CliError::JsonSerialize`]: crate::commands::error::CliError::JsonSerialize
 pub fn inclusion(dir: &Path, key: &Path, leaf_index: u64, out: &Path, json: bool) -> CliResult<()> {
-    let store = LogStore::open(dir)?;
+    let log = store::open(dir)?;
     let identity = load_identity(key)?;
-    let leaf_bytes = store.leaf_bytes(leaf_index).ok_or_else(|| {
+    let leaf_bytes = log.leaf_bytes(leaf_index).ok_or_else(|| {
         CliError::Trust(TrustError::MerkleTree {
             reason: format!(
                 "inclusion proof requested for leaf index {leaf_index} but tree has {} leaves",
-                store.tree().len()
+                log.tree().len()
             ),
         })
     })?;
-    let artifact = build_inclusion_artifact(
-        store.tree(),
-        leaf_bytes,
-        store.origin(),
-        &identity,
-        leaf_index,
-    )?;
+    let artifact =
+        build_inclusion_artifact(log.tree(), leaf_bytes, log.origin(), &identity, leaf_index)?;
     write_artifact(out, &artifact, "inclusion proof artifact")?;
-    let (root, tree_size) = store.tree().root().to_parts();
+    let (root, tree_size) = log.tree().root().to_parts();
     let mut emit = Emitter::new(json);
     emit.field("leaf index", "leaf_index", leaf_index);
     emit.field("tree size", "tree_size", tree_size);
@@ -84,9 +79,9 @@ pub fn inclusion(dir: &Path, key: &Path, leaf_index: u64, out: &Path, json: bool
 /// As [`inclusion`], with `TrustError::LogArtifactEncoding` for size-rule
 /// violations.
 pub fn consistency(dir: &Path, key: &Path, old_size: u64, out: &Path, json: bool) -> CliResult<()> {
-    let store = LogStore::open(dir)?;
+    let log = store::open(dir)?;
     let identity = load_identity(key)?;
-    let new_size = store.tree().len();
+    let new_size = log.tree().len();
     if old_size >= new_size {
         return Err(CliError::Trust(TrustError::LogArtifactEncoding {
             reason: format!(
@@ -95,11 +90,11 @@ pub fn consistency(dir: &Path, key: &Path, old_size: u64, out: &Path, json: bool
             ),
         }));
     }
-    let old_tree = store.prefix_tree(old_size)?;
-    let artifact = build_consistency_artifact(&old_tree, store.tree(), store.origin(), &identity)?;
+    let old_tree = log.prefix_tree(old_size)?;
+    let artifact = build_consistency_artifact(&old_tree, log.tree(), log.origin(), &identity)?;
     write_artifact(out, &artifact, "consistency proof artifact")?;
     let (old_root, _old) = old_tree.root().to_parts();
-    let (new_root, _new) = store.tree().root().to_parts();
+    let (new_root, _new) = log.tree().root().to_parts();
     let mut emit = Emitter::new(json);
     emit.field("old tree size", "old_tree_size", old_size);
     emit.field("new tree size", "new_tree_size", new_size);

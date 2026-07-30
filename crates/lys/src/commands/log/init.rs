@@ -12,7 +12,7 @@ use lys_core::merkle::{AppendOnlyTree, RawLeaf};
 
 use crate::commands::error::CliResult;
 use crate::commands::hex::hex_lower;
-use crate::commands::log::store::LogStore;
+use crate::commands::log::store;
 use crate::commands::output::Emitter;
 
 /// `lys log init --dir <log-dir> --origin <origin>`.
@@ -27,7 +27,7 @@ use crate::commands::output::Emitter;
 /// [`CliError::LogDirInvalid`]: crate::commands::error::CliError::LogDirInvalid
 /// [`CliError::Io`]: crate::commands::error::CliError::Io
 pub fn run(dir: &Path, origin: &str, json: bool) -> CliResult<()> {
-    LogStore::init(dir, origin)?;
+    store::init(dir, origin)?;
     let (empty_root, tree_size) = AppendOnlyTree::<RawLeaf>::new().root().to_parts();
     let mut out = Emitter::new(json);
     out.field(

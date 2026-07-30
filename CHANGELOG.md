@@ -9,6 +9,45 @@ caveat that minor bumps may break.
 work in progress are deliberately absent — a release record that mentions
 unreleased things cannot be used to tell what a published version contains.
 
+## [Unreleased]
+
+### Added — `lys-log-store` (new crate)
+
+- **Durable, append-only, write-once storage for a log**, so `lys-core` stays
+  free of I/O. Three pieces: the `LeafStore` trait stating what a log needs from
+  storage, `FileLeafStore` providing it from a directory of leaf files, and
+  `Log<S>` maintaining the RFC 6962 tree and the open-time integrity check over
+  any backend.
+
+  **The trait exposes no `fork`, no `merge`, no `delete`, no `truncate` and no
+  way to rewrite a stored leaf.** For an append-only transparency log these are
+  not missing features: the single property such a log provides is that its
+  operator cannot hold two histories and show each observer whichever suits, and
+  two branches of one log are exactly two histories. A storage API offering
+  `fork` hands that attack back as a supported operation.
+
+  A write must land at the next free index or be refused, which makes index reuse
+  and skipped positions *reported* errors — `LeafAlreadyWritten` and
+  `LeafWouldLeaveGap` — rather than an overwrite or a silent hole. A reported gap
+  is attributable to a specific refused write; a silent one is indistinguishable
+  from an entry nobody ever offered.
+
+  Writes are fsynced, **file and containing directory both**, before returning
+  `Ok`. On POSIX a newly created or renamed file is not durable until its parent
+  directory's entry is, so syncing only the file would make durable-on-return
+  mean "probably".
+
+### Changed — `lys`
+
+- The `lys log` commands now run on `lys-log-store`; the log directory layout,
+  the write-once rules and the integrity routine moved there rather than being
+  duplicated. **The on-disk layout is byte-identical** — the format marker,
+  filename width and `state.json` shape are unchanged, so existing log
+  directories open exactly as before.
+- Interrupted appends are still repaired at open and still reported, but the
+  library now *returns* the fact and the CLI prints it, instead of the library
+  writing to stderr on its caller's behalf.
+
 ## [0.2.0] — 2026-07-30
 
 ### Added — `lys-core`

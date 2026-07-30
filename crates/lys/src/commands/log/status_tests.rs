@@ -6,7 +6,7 @@ use crate::commands::error::CliError;
 const ORIGIN: &str = "example.com/lys/status-test";
 
 fn init_log(dir: &Path) {
-    LogStore::init(dir, ORIGIN).unwrap();
+    store::init(dir, ORIGIN).unwrap();
 }
 
 /// The point of the command: reading your own log needs no signing key.
@@ -21,8 +21,8 @@ fn status_succeeds_with_no_signing_key_present() {
     let dir = tmp.path().join("log");
     init_log(&dir);
     for leaf in [b"one".as_slice(), b"two".as_slice()] {
-        let mut store = LogStore::open(&dir).unwrap();
-        store.append(leaf).unwrap();
+        let mut log = store::open(&dir).unwrap();
+        log.append(leaf).unwrap();
     }
 
     assert!(
@@ -46,18 +46,18 @@ fn status_root_matches_the_root_a_checkpoint_would_sign() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
     init_log(&dir);
-    let mut store = LogStore::open(&dir).unwrap();
-    store.append(b"leaf-a").unwrap();
-    store.append(b"leaf-b").unwrap();
-    store.append(b"leaf-c").unwrap();
+    let mut log = store::open(&dir).unwrap();
+    log.append(b"leaf-a").unwrap();
+    log.append(b"leaf-b").unwrap();
+    log.append(b"leaf-c").unwrap();
 
-    let reopened = LogStore::open(&dir).unwrap();
+    let reopened = store::open(&dir).unwrap();
     let (root, size) = reopened.tree().root().to_parts();
     assert_eq!(size, 3);
 
     // The command reads through the same store and root computation.
     run(&dir, false).unwrap();
-    let (root_again, size_again) = LogStore::open(&dir).unwrap().tree().root().to_parts();
+    let (root_again, size_again) = store::open(&dir).unwrap().tree().root().to_parts();
     assert_eq!(root_again, root);
     assert_eq!(size_again, size);
 }
@@ -67,7 +67,7 @@ fn status_reports_an_empty_log_without_error() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
     init_log(&dir);
-    let (_, size) = LogStore::open(&dir).unwrap().tree().root().to_parts();
+    let (_, size) = store::open(&dir).unwrap().tree().root().to_parts();
     assert_eq!(size, 0, "a freshly initialized log has no leaves");
     run(&dir, false).unwrap();
 }

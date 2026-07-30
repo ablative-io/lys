@@ -19,7 +19,7 @@ use std::path::Path;
 
 use crate::commands::error::CliResult;
 use crate::commands::hex::hex_lower;
-use crate::commands::log::store::LogStore;
+use crate::commands::log::store;
 use crate::commands::output::Emitter;
 
 /// `lys log status --dir <log-dir>`.
@@ -35,12 +35,12 @@ use crate::commands::output::Emitter;
 /// [`CliError::LogDirInvalid`]: crate::commands::error::CliError::LogDirInvalid
 /// [`CliError::Io`]: crate::commands::error::CliError::Io
 pub fn run(dir: &Path, json: bool) -> CliResult<()> {
-    let store = LogStore::open(dir)?;
-    let (root, tree_size) = store.tree().root().to_parts();
+    let log = store::open(dir)?;
+    let (root, tree_size) = log.tree().root().to_parts();
 
     let mut out = Emitter::new(json);
     out.field("log directory", "log_directory", dir.display().to_string());
-    out.field("origin", "origin", store.origin());
+    out.field("origin", "origin", log.origin());
     out.field("tree size", "tree_size", tree_size);
     out.field("root hash (sha256)", "root_hash", hex_lower(&root));
     out.finish();

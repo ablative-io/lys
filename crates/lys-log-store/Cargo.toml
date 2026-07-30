@@ -1,0 +1,24 @@
+[package]
+name = "lys-log-store"
+description = "Durable, append-only, write-once storage for a lys transparency log — the storage trait, and a file-backed implementation of it."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+keywords = ["transparency", "merkle", "append-only", "storage", "log"]
+categories = ["cryptography", "database-implementations"]
+
+[dependencies]
+base64.workspace = true
+lys-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

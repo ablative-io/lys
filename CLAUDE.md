@@ -9,9 +9,10 @@ Read [docs/VISION.md](docs/VISION.md) for why this exists, [docs/DESIGN.md](docs
 ## Crates
 
 - **`lys-core`** — the library. All trust logic lives here: `keys`, `ca`, `merkle`, `checkpoint`, `tlog`, `attestation`, `seal`, the shared `error` type, and — behind the off-by-default `unstable-anchor` feature — `receipt` and `bundle`. Domain-agnostic — no concept of agents, sessions, or workspaces. This is what consumers depend on and what gets published to crates.io.
+- **`lys-log-store`** — durable persistence for a log, so `lys-core` stays free of I/O. Owns the `LeafStore` trait (what a log needs from storage), a file-backed implementation of it, and the `Log` that maintains the RFC 6962 tree over either. **The trait exposes no `fork`, no `merge`, no `delete` and no way to rewrite a leaf** — for an append-only log a branch is equivocation with a nicer name, and that absence is the crate's reason to exist rather than an omission to fill in later.
 - **`lys`** — the CLI binary. Thin surface over `lys-core`. The "everything is a library + CLI + MCP surface" principle: logic lives in the library, the binary only parses arguments and formats output.
 
-Future crates (later phases): `lys-anchor` (transparency-ledger service), `lys-mcp` (MCP server surface), and a sibling log-store crate that owns persistence so `lys-core` stays free of I/O.
+Future crates (later phases): `lys-anchor` (transparency-ledger service) and `lys-mcp` (MCP server surface).
 
 **`unstable-anchor` gates the draft wire formats and is exempt from semver.** A format is frozen by publishing a crate that exposes it or by signing a durable artifact under its tag — so shipping `receipt` and `bundle` ungated would freeze two drafts that have already had three specification bugs found in them by implementation. The gate keeps them changeable until they are ratified; it comes off when a real anchor exists.
 

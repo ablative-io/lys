@@ -61,6 +61,8 @@ changes as breaking, in their own subsection, and say what a consumer must do.
 ```
 cargo package -p lys-core --allow-dirty
 cd target/package/lys-core-<version> && cargo test --all-features
+cargo package -p lys-log-store --allow-dirty
+cd target/package/lys-log-store-<version> && cargo test
 ```
 
 The dry-run catches what the workspace build cannot: files excluded from the
@@ -68,13 +70,26 @@ package that something included still needs. A test shipped without its fixture
 panics for every consumer who runs the suite. The packaged crate's tests must
 pass on their own.
 
+Dry-run **every** crate being published, not just the one that changed. A crate
+whose own sources are untouched can still package differently — a new
+`exclude`, a moved fixture, or a dependency that stopped being path-only.
+
 ### 5. Publish
 
 ```
 cargo publish -p lys-core
 # wait for the index to carry it, then:
+cargo publish -p lys-log-store
+# wait again, then:
 cargo publish -p lys
 ```
+
+**The order is forced by the dependency graph, not chosen**, and `cargo` proves
+it: `cargo package -p lys` fails while the version of `lys-core` it requires is
+absent from the index. `lys-log-store` depends on `lys-core`, and `lys` depends
+on both, so anything else fails loudly rather than shipping a crate pinned to a
+version nobody can resolve. Wait for each to appear at the index before the next
+— the verify build for the following crate downloads it from the registry.
 
 ### 6. Tag and verify from the outside
 

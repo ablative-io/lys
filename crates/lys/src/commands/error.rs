@@ -169,6 +169,18 @@ pub enum CliError {
         reason: String,
     },
 
+    /// A log storage failure the CLI has nothing to add to. The store's own
+    /// message already names the index or path at fault, so it is forwarded
+    /// verbatim rather than reworded into something less specific.
+    ///
+    /// Constructed only by the mapping in
+    /// [`commands::log::store`](crate::commands::log::store) — the variants an
+    /// operator can act on differently (an uninitialized directory, a
+    /// re-initialization) are translated there into messages that carry a
+    /// remedy.
+    #[error(transparent)]
+    LogStore(lys_log_store::StoreError),
+
     /// An inclusion-proof artifact did not verify. Deliberately non-oracle:
     /// a malformed artifact, a bad checkpoint signature, an origin mismatch,
     /// a size mismatch, and a root mismatch all collapse to this one message

@@ -16,7 +16,7 @@ use crate::commands::error::CliResult;
 use crate::commands::files::write_file;
 use crate::commands::hex::hex_lower;
 use crate::commands::key::load_identity;
-use crate::commands::log::store::LogStore;
+use crate::commands::log::store;
 use crate::commands::output::Emitter;
 
 /// `lys log checkpoint --dir <log-dir> --key <keyfile> --out <file>`.
@@ -35,12 +35,12 @@ use crate::commands::output::Emitter;
 /// [`CliError::Trust`]: crate::commands::error::CliError::Trust
 /// [`CliError::Io`]: crate::commands::error::CliError::Io
 pub fn run(dir: &Path, key: &Path, out: &Path, json: bool) -> CliResult<()> {
-    let store = LogStore::open(dir)?;
+    let log = store::open(dir)?;
     let identity = load_identity(key)?;
-    let body = CheckpointBody::from_root(store.origin(), &store.tree().root())?;
-    let note = sign_note(&body.encode(), store.origin(), &identity)?;
+    let body = CheckpointBody::from_root(log.origin(), &log.tree().root())?;
+    let note = sign_note(&body.encode(), log.origin(), &identity)?;
     write_file(out, note.as_bytes(), "checkpoint note file")?;
-    let verifier = NoteVerifierKey::new(store.origin(), identity.public_key_bytes())?;
+    let verifier = NoteVerifierKey::new(log.origin(), identity.public_key_bytes())?;
     let mut emit = Emitter::new(json);
     emit.field("origin", "origin", body.origin());
     emit.field("tree size", "tree_size", body.tree_size());

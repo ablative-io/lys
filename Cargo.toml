@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/lys", "crates/lys-core"]
+members = ["crates/lys", "crates/lys-core", "crates/lys-log-store"]
 resolver = "3"
 
 [workspace.package]
@@ -13,6 +13,7 @@ rust-version = "1.85"
 [workspace.dependencies]
 # Internal
 lys-core = { version = "0.2.0", path = "crates/lys-core" }
+lys-log-store = { version = "0.2.0", path = "crates/lys-log-store" }
 
 # Cryptographic primitives — pinned at the versions hardened in meridian-trust.
 # This lineup is deliberate and boring: the trust layer speaks the verification
