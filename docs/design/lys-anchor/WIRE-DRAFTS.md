@@ -252,6 +252,42 @@ The same reasoning as `verify_receipt` requiring its anchor key, and the same as
 the G1/G2 identity join: an artifact that carries its own trust anchor verifies
 against whatever anchor it carries.
 
+#### Verification derives the newer root; it does not accept one
+
+Given the older root, there are two ways to check a consistency receipt, and the
+choice decides what the artifact is *worth*.
+
+**(a) Take both roots from the caller.** Use the existing
+`merkle::verify_consistency(old_root, new_root, proof)`, then check the signature
+over the caller's `new_root`. Sound — a wrong `new_root` fails the signature — and
+it needs no new code. But the receipt then only confirms a statement the verifier
+already held in full. It cannot *tell* you the anchor's current root, so it is
+useless for the case that matters: learning where the log has got to, provably.
+
+**(b) Derive the newer root from `(old_root, tree_size_1, tree_size_2, path)`** and
+check the signature over the derived value. This is authentication by consequence,
+exactly as for inclusion: alter the path or either size and the derived root
+changes, so the signature over the root the anchor actually signed fails. The
+caller supplies only what it legitimately owns — the root it previously held — and
+*learns* the new root as an output.
+
+**Ruling: (b).** It is what RFC 9942's detached payload is for; (a) makes the
+detachment pointless.
+
+**This requires a primitive lys does not have yet.** `merkle` exposes
+`root_from_inclusion_path` (the inclusion analogue, cross-checked against
+`ct-merkle` at every size 1..33) and `verify_consistency`, which takes both roots
+and delegates. There is no `root_from_consistency_path`. Writing one means
+implementing RFC 6962 §2.1.4.2's reconstruction directly, and it inherits the
+standard this repo already applies to hand-written Merkle walks: swept against
+`ct-merkle` across every `(old_size, new_size)` pair, plus the Go gate deriving the
+same value from the RFC's *recursive* `SUBPROOF` definition so two independently
+written algorithms must agree.
+
+Until that exists and is cross-checked, `-2` stays specified and unimplemented.
+That is the honest state, and it is recorded here rather than left as an absence
+someone reads as "nearly done".
+
 #### Two more things the RFC leaves open, ruled here
 
 - **Size ordering is not specified.** RFC 9942 does not say whether
