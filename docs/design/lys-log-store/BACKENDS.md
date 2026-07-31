@@ -49,15 +49,23 @@ finding so the check can be repeated rather than re-litigated.
 The intended second backend, and currently **blocked**. Verified at
 `haematite@cf07bc0`, working tree clean, on `main`:
 
-| # | Blocker | Evidence at `cf07bc0` |
-|---|---|---|
-| **#11** | **Read side: WAL recovery does not fail closed.** A checksum-mismatched frame is logged at `warn`, sets a flag, breaks the replay loop, and returns `Ok`. The shard boot path never reads that flag, so a corrupt tail opens as a silent prefix and subsequent writes land on top of it. | `wal/recovery.rs:159-165` returns `Ok` after `stopped_at_corruption = true`; the only non-test consumer of `stopped_at_corruption()` is `db/vacuum/shard_scan.rs:86`; `shard/actor.rs:240-275` (`from_recovered_with_clock`) consumes the recovery result without consulting it, and `shard/actor/native/boot.rs:109` is the production path that calls it. |
-| **#58** | **Write side: a plain append is not fsynced under the shipped policy — and this is haematite's *ruled, documented* position, not an oversight.** `FsyncPolicy::CommitOnly` makes `should_sync_after_append()` false and production constructs exactly that, so wiring `put_leaf` to a plain append returns `Ok` for a leaf not on stable storage. The blocker is therefore **an incompatibility between two stated contracts**, not a defect to report: haematite says acknowledged plain writes may not survive an immediate crash, and criterion 1 says they must. | `docs/design/COMMIT-DURABILITY-CONTRACT.md` **§N1**, under the heading *Explicit non-guarantees and reservations*: "that policy never syncs on append … Therefore `Ok` from any listed plain write alone does not promise survival of an immediate crash. … `write_all` plus `CommitOnly` is not a per-operation fsync." Code: `wal/durable.rs:35-42` (policy enum), `wal/durable.rs:277-283` (`should_sync_after_append` false for `CommitOnly`), `shard/actor/native/boot.rs:110` (the construction). |
-| **#57** | **No committed `Cargo.lock`.** Gate evidence cannot say which patch versions linked, so "N tests green" cites a dependency resolution nobody recorded — a reproducibility hole in a chain whose product is reproducible verification. | `.gitignore` lists `Cargo.lock`; `git ls-files` does not track it. |
+**Cite these by number *and* subject, never by number alone.** At least three trackers
+in this estate number issues from one, so a bare `#11` resolves to a different item in
+each and to the wrong one for any reader who holds a different tracker in mind. A
+citation that silently resolves to the wrong item is worse than an unresolvable one,
+because it fails closed for the reader and looks answered. The subject is what makes
+the number checkable, so it travels with it — including in conversation.
 
-**#11 and #58 are different tasks and neither substitutes for the other:** one is
-what recovery does with damage it finds, the other is whether the damage gets a
-chance to exist. A fix to either leaves the other's failure fully available.
+| Item | Blocker | Evidence at `cf07bc0` |
+|---|---|---|
+| **haematite #11**<br>*recovery fails open* | **Read side: WAL recovery does not fail closed.** A checksum-mismatched frame is logged at `warn`, sets a flag, breaks the replay loop, and returns `Ok`. The shard boot path never reads that flag, so a corrupt tail opens as a silent prefix and subsequent writes land on top of it. | `wal/recovery.rs:159-165` returns `Ok` after `stopped_at_corruption = true`; the only non-test consumer of `stopped_at_corruption()` is `db/vacuum/shard_scan.rs:86`; `shard/actor.rs:240-275` (`from_recovered_with_clock`) consumes the recovery result without consulting it, and `shard/actor/native/boot.rs:109` is the production path that calls it. |
+| **haematite #58**<br>*append not fsynced* | **Write side: a plain append is not fsynced under the shipped policy — and this is haematite's *ruled, documented* position, not an oversight.** `FsyncPolicy::CommitOnly` makes `should_sync_after_append()` false and production constructs exactly that, so wiring `put_leaf` to a plain append returns `Ok` for a leaf not on stable storage. The blocker is therefore **an incompatibility between two stated contracts**, not a defect to report: haematite says acknowledged plain writes may not survive an immediate crash, and criterion 1 says they must. | `docs/design/COMMIT-DURABILITY-CONTRACT.md` **§N1**, under the heading *Explicit non-guarantees and reservations*: "that policy never syncs on append … Therefore `Ok` from any listed plain write alone does not promise survival of an immediate crash. … `write_all` plus `CommitOnly` is not a per-operation fsync." Code: `wal/durable.rs:35-42` (policy enum), `wal/durable.rs:277-283` (`should_sync_after_append` false for `CommitOnly`), `shard/actor/native/boot.rs:110` (the construction). |
+| **haematite #57**<br>*no committed lockfile* | **No committed `Cargo.lock`.** Gate evidence cannot say which patch versions linked, so "N tests green" cites a dependency resolution nobody recorded — a reproducibility hole in a chain whose product is reproducible verification. | `.gitignore` lists `Cargo.lock`; `git ls-files` does not track it. |
+
+**haematite #11 (*recovery fails open*) and #58 (*append not fsynced*) are different
+tasks and neither substitutes for the other:** one is what recovery does with the
+damage it finds, the other is whether the damage gets a chance to exist. A fix to
+either leaves the other's failure fully available.
 
 Two notes that narrow the write-side problem rather than excusing it:
 
@@ -91,8 +99,9 @@ authority on this:
   claim moved or died. **In an estate whose discipline is "check it at the cite",
   a true claim behind a dead pointer fails closed for the reader and silently.**
 
-`#57` cannot be landed from an agent seat: generating a lockfile means running
-cargo on the machine, so it needs an executor and Tom's word.
+haematite #57 (*no committed lockfile*) cannot be landed from an agent seat:
+generating a lockfile means running cargo on the machine, so it needs an executor
+and Tom's word.
 
 ### On lys's own version of these
 
