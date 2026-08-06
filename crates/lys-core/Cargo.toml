@@ -24,7 +24,16 @@ exclude = [
     "tests/cose_conformance.rs",
     "tests/receipt_conformance.rs",
     "tests/bundle_conformance.rs",
+    "tests/consistency_conformance.rs",
+    "tests/consistency_receipt_conformance.rs",
     "tests/harness/",
+    # The openssl interop gate is repo-only for the same reason: it requires an
+    # Ed25519-capable openssl on the machine and FAILS rather than skips when
+    # there is none (a skipped gate reports green while testing nothing). That
+    # policy is right here, where the gate is mandatory, and wrong in a
+    # downloaded crate whose suite should run clean without a third-party
+    # toolchain.
+    "tests/openssl_csr_interop.rs",
 ]
 
 [features]
