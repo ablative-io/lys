@@ -65,6 +65,16 @@ const AES_KEY_LEN: usize = 32;
 /// AES-GCM nonce length in bytes.
 const NONCE_LEN: usize = 12;
 
+// The split in `derive_key_and_nonce` consumes the OKM exactly: the key takes
+// `okm[..AES_KEY_LEN]` and the nonce takes all of `okm[AES_KEY_LEN..]`. If these
+// three constants ever stopped agreeing, that second slice would be the wrong
+// length for the nonce array and `copy_from_slice` would panic — in library
+// code, which this crate forbids. The relationship was previously stated only in
+// the doc comment on `HKDF_OUTPUT_LEN`, i.e. held by three constants happening to
+// agree and by prose that does not run. This makes a mismatch fail to compile
+// rather than fail at runtime.
+const _: () = assert!(HKDF_OUTPUT_LEN == AES_KEY_LEN + NONCE_LEN);
+
 /// Sealed payload bound to a single recipient X25519 public key.
 ///
 /// Constructed by [`seal`] and consumed by [`open`]. The envelope is the
