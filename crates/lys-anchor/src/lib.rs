@@ -29,6 +29,22 @@
 //!   reason already written into the CLI: a library that writes to stderr has
 //!   decided for its caller how a repair gets reported, and a silently repaired
 //!   log is indistinguishable from one that never needed repairing.
+//! - **A checkpoint is signed under the log's own origin, and carries no
+//!   time.** [`Anchor::publish_checkpoint`] emits an ordinary C2SP signed note
+//!   over the current root; the signed-note key name is the origin, which
+//!   `lys-core`'s `verify_checkpoint` binds, so one log's checkpoint can never
+//!   be accepted for another. Publishing does not append: an anchor does not
+//!   log its own checkpoints.
+//!
+//! # The signer boundary is reserved, not usable, and that is stated on purpose
+//!
+//! An anchor signs through [`Signer`], never through a key its callers hold.
+//! **But a remote signer — HSM, KMS, anything off-process — can implement
+//! [`Signer`] today and still cannot drive this crate**, because `lys-core`'s
+//! signing entry points take a concrete `Ed25519Identity`. The gap is carried
+//! as the [`InProcessSigner`] bound rather than as a promise, so the compiler
+//! refuses the swap instead of an integration discovering it. [`keys::signer`]
+//! names exactly what would have to change and what must not be done instead.
 //!
 //! # The limit of a standalone anchor, stated here because it cannot be fixed here
 //!
@@ -46,7 +62,9 @@
 pub mod anchor;
 pub mod config;
 pub mod error;
+pub mod keys;
 
-pub use anchor::Anchor;
+pub use anchor::{Anchor, PublishedCheckpoint};
 pub use config::AnchorConfig;
 pub use error::{AnchorError, AnchorResult};
+pub use keys::{FileSigner, InProcessSigner, Signer};

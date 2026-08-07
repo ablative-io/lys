@@ -33,10 +33,26 @@ use std::path::{Path, PathBuf};
 use lys_log_store::{FileLeafStore, LeafStore, StoreError};
 use tempfile::TempDir;
 
+use crate::keys::FileSigner;
+
 use super::*;
 
 const ORIGIN: &str = "example.com/lys/anchor-test";
 const GENESIS: &[u8] = b"genesis bytes chosen by the caller, not by lys-anchor";
+
+/// `lys-core`'s Go-conformance fixture seed. Tests use a fixed seed rather than
+/// a generated one so nothing here depends on randomness, and `FileSigner` is
+/// exercised through the one path it offers: a key file that already exists.
+const FIXTURE_SEED: &[u8; 32] = b"lys-go-conformance-test-seed-01!";
+
+/// Writes the fixture key into `dir` and loads a signer over it. The log store
+/// enumerates only its `leaves/` subdirectory, so a key file alongside it is
+/// invisible to the store.
+fn signer(dir: &Path) -> FileSigner {
+    let path = dir.join("anchor.key");
+    std::fs::write(&path, FIXTURE_SEED).unwrap();
+    FileSigner::load(&path).unwrap()
+}
 
 /// Path of a leaf file, per the layout `FileLeafStore` documents.
 ///
@@ -48,15 +64,16 @@ fn leaf_path(dir: &Path, index: u64) -> PathBuf {
 }
 
 /// Creates a store and an anchor over it, returning the anchor.
-fn create_anchor(dir: &Path, origin: &str, genesis: &[u8]) -> Anchor<FileLeafStore> {
+fn create_anchor(dir: &Path, origin: &str, genesis: &[u8]) -> Anchor<FileLeafStore, FileSigner> {
     let store = FileLeafStore::create(dir, origin).unwrap();
-    Anchor::create(store, genesis, AnchorConfig::unconfigured()).unwrap()
+    Anchor::create(store, genesis, signer(dir), AnchorConfig::unconfigured()).unwrap()
 }
 
 /// Reopens the anchor at `dir` through a fresh store handle.
-fn reopen(dir: &Path) -> AnchorResult<Anchor<FileLeafStore>> {
+fn reopen(dir: &Path) -> AnchorResult<Anchor<FileLeafStore, FileSigner>> {
     Anchor::open(
         FileLeafStore::open(dir).unwrap(),
+        signer(dir),
         AnchorConfig::unconfigured(),
     )
 }
@@ -78,7 +95,7 @@ fn genesis_lands_at_index_zero_and_survives_a_reopen() {
     assert_eq!(store.leaf(0).unwrap().as_deref(), Some(GENESIS));
     assert_eq!(store.leaf(1).unwrap(), None);
 
-    let reopened = Anchor::open(store, AnchorConfig::unconfigured()).unwrap();
+    let reopened = Anchor::open(store, signer(dir), AnchorConfig::unconfigured()).unwrap();
     assert_eq!(reopened.tree_size(), 1);
     assert_eq!(reopened.recovered_to(), None);
 }
@@ -202,7 +219,7 @@ fn creating_genesis_over_a_log_that_already_has_leaves_is_refused() {
     let before = FileLeafStore::open(dir).unwrap().leaf(0).unwrap();
 
     let store = FileLeafStore::open(dir).unwrap();
-    match Anchor::create(store, GENESIS, AnchorConfig::unconfigured()) {
+    match Anchor::create(store, GENESIS, signer(dir), AnchorConfig::unconfigured()) {
         Err(AnchorError::GenesisAlreadyWritten { origin, tree_size }) => {
             assert_eq!(origin, ORIGIN);
             assert_eq!(tree_size, 1);

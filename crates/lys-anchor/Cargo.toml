@@ -16,6 +16,13 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+# Default features only, and that is load-bearing: `lys-core`'s
+# `unstable-anchor` feature gates the DRAFT receipt and bundle wire formats,
+# and a dependency edge that enabled it here would turn it on for every
+# workspace build that happens to include this crate. Nothing in increments
+# 1-3 needs it — `checkpoint` and `keys` are ungated — so the edge stays
+# default-only until a receipt is actually issued.
+lys-core.workspace = true
 lys-log-store.workspace = true
 thiserror.workspace = true
 

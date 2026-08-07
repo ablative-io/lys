@@ -17,6 +17,7 @@
 //! so a future addition is judged against it rather than pattern-matched onto
 //! the variants below.
 
+use lys_core::error::TrustError;
 use lys_log_store::StoreError;
 
 /// Errors returned by an [`Anchor`](crate::Anchor) operation.
@@ -68,6 +69,42 @@ pub enum AnchorError {
         origin: String,
         /// The number of leaves already present.
         tree_size: u64,
+    },
+
+    /// The anchor's signing key could not be loaded from its file.
+    ///
+    /// The path is carried because `lys-core`'s own reason does not name it —
+    /// `std::fs` errors do not include the path they were raised for — and an
+    /// operator holding "failed to read identity key: No such file or
+    /// directory" has been told everything except the one fact they need.
+    ///
+    /// **A missing file reaches here rather than being repaired.** Generating a
+    /// key for a caller who asked to load one produces an anchor that publishes
+    /// under an identity nobody was ever told about, and reports success while
+    /// doing it.
+    #[error("failed to load the anchor's signing key from {path}: {source}")]
+    SignerKey {
+        /// The key file path, as it was given.
+        path: String,
+        /// `lys-core`'s reason for refusing the key file.
+        source: TrustError,
+    },
+
+    /// The anchor could not sign a checkpoint over its own log.
+    ///
+    /// Every precondition `lys-core` checks here is already satisfied by
+    /// construction — the origin was validated when the store was created, and
+    /// the body is machine-generated — so this variant reports something
+    /// genuinely unexpected rather than a routine refusal. It is propagated
+    /// with its cause instead of being treated as impossible, because a
+    /// precondition that "cannot" fail is exactly the one nobody notices
+    /// changing.
+    #[error("failed to publish a checkpoint for {origin}: {source}")]
+    Checkpoint {
+        /// The origin the checkpoint was being published for.
+        origin: String,
+        /// `lys-core`'s reason for refusing to encode or sign it.
+        source: TrustError,
     },
 }
 

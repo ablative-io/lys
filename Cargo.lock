@@ -802,6 +802,7 @@ dependencies = [
 name = "lys-anchor"
 version = "0.2.0"
 dependencies = [
+ "lys-core",
  "lys-log-store",
  "tempfile",
  "thiserror 2.0.19",
