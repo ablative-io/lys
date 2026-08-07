@@ -18,9 +18,32 @@ These are live contracts. Evolving any of them means a new `v2` artifact alongsi
 | Sealed envelope `lys/sealed-envelope/v1` | JSON (serde shape of `SealedEnvelope`: `ephemeral_public_key`, `ciphertext`, `nonce`). Fresh X25519 ephemeral per seal; shared secret = X25519(ephemeral secret, recipient public), contributory-behaviour checked on both sides. Key material = **HKDF-SHA256 with an ABSENT salt** (`Hkdf::new(None, shared_secret)`), `info` = **`b"lys-sealed-envelope/v1" ‖ ephemeral_public_key(32) ‖ recipient_public_key(32)`** — 86 bytes, **hyphen** form, **ephemeral first** — expanded to **exactly 44 bytes**, split **`okm[0..32]` = AES-256 key, `okm[32..44]` = GCM nonce**. AEAD = AES-256-GCM with an **empty AAD**, tag appended to the ciphertext. Note the nonce is *derived*, not random, so every envelope publishes 12 bytes of its own KDF output | `lys-core/src/seal/` |
 | Merkle leaf encoding — typed (`Serialize`) path | postcard serialization of the leaf type; leaf hash = RFC 6962 `SHA-256(0x00 ‖ postcard-bytes)` | `lys-core/src/merkle/` (`AppendOnlyTree<L: Serialize>`) |
 | Merkle leaf encoding — raw path (transparency log; every `lys log` artifact) | leaf **file bytes verbatim** — no postcard framing, no length prefix; leaf hash = RFC 6962 `SHA-256(0x00 ‖ raw-file-bytes)`, reproducible as `(printf '\x00'; cat leaf-file) \| shasum -a 256` | `lys-core/src/merkle/` (`RawLeaf`, `raw_leaf_hash`, `verify_inclusion_raw`) |
-| Certificates | X.509 (rcgen-issued, Ed25519), capability claims in an extension under `LYS_OID_ARC` | `lys-core/src/ca/` |
+| Certificates | X.509 (rcgen-issued, Ed25519). An extension under `LYS_OID_ARC` carries **opaque bytes**; `encode_extension`/`decode_extension` round-trip them unexamined. ⚠️ **The format of those bytes is NOT specified, and nothing in `lys-core` interprets or verifies them** — this row describes a *transport*, not a schema. What a certificate proves today is that a subject key is holder-controlled and chains to a CA; it does **not** express what the holder may do. See the note below | `lys-core/src/ca/` |
 
 The two leaf encodings are separate frozen contracts that never mix within one tree (the `RawLeaf` marker type makes mixing unrepresentable). They diverge on the wire: for the leaf bytes `leaf-0`, the raw path hashes `SHA-256(0x00 ‖ "leaf-0")` while the postcard path hashes `SHA-256(0x00 ‖ 0x06 ‖ "leaf-0")` (postcard's length prefix) — sentinel tests in `merkle/tree_tests.rs` and `merkle/proof_tests.rs` pin the divergence. A third-party verifier of `lys log` artifacts MUST use the raw path.
+
+**Note on certificates and "capability", added 2026-08-08 after this row misled a consuming
+seat.** The previous wording — *"capability claims in an extension under `LYS_OID_ARC`"* —
+**described a transport and read as a schema.** There is no capability type, no schema, no
+semantics and no verification anywhere in `lys-core`; the only occurrences of the word are
+in test files, as arbitrary payload bytes chosen to prove the extension round-trips
+*arbitrary* content. **A "certificate" and a "capability certificate" are not the same
+object and this table conflated them.**
+
+The consequence is worth stating because it is the reason this was corrected rather than
+left for the design round: a consumer holding an unverified string — *"who is claiming to
+be at this keyboard"* — could move it into a signed X.509 extension and gain **better
+provenance with identical semantics.** ⚠️ **A signed unchecked string looks checked.** That
+is a remedy that makes matters worse while measuring as progress, and the misleading row
+would have caused it.
+
+Specifying a capability format is a permanent wire-format decision and is **not started and
+not scheduled**. It requires: what a claim asserts, what a verifier checks, how it is
+scoped, what a *rendering* consumer checks — a claim becomes a delegation at the reader —
+and how it is revoked. ⛔ **That last one is a hard constraint rather than an open option:
+lys has no CRL and no OCSP by design, so revocation must be an append and the live set a
+fold over the log.** Until that round happens, this table confines itself to what it can
+prove.
 
 Note: the earlier `lys/attestation/v1` JSON artifact never shipped — nothing durable was signed under it, and it was removed rather than frozen (decision D4). The COSE_Sign1 artifact above is the only attestation format; like every row here it freezes at 0.1.0.
 
