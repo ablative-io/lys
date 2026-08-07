@@ -241,6 +241,73 @@ nothing.
 DP8 (no timestamp inside the receipt; time from checkpoint bytes and witness cosignatures,
 never a public timestamp authority) was re-put and re-accepted unchanged.
 
+### DP18 — A witness records; it does not audit
+
+**Ruling: accepted, and the operator's own derivation is better than the one put to him and
+so is recorded in preference to it.** His words: *"I can't really push back on that because
+I don't know how a witness would verify something that they weren't there for — so they
+really is witnessing the time, and what was recorded, and then we just have to rely on
+witnesses sort of disagreeing."*
+
+⭐ **That is the argument from the witness's own epistemic position rather than from cost.**
+The case originally put was economic — a verifying witness must fetch and check the whole
+log, so witnessing becomes expensive, so witnesses become few, which destroys the property
+they exist to provide. The operator's version is stronger: **a witness cannot attest to what
+it did not observe.** It saw a claim at a time. That is the whole of what it can honestly
+sign, and asking it to sign more would be asking it to sign something it does not know.
+
+So a witness cosignature asserts exactly: *at this time, this anchor presented this root.*
+It asserts **nothing** about whether the log is well-formed, whether the contents are true,
+or whether the anchor is honest. Equivocation is caught by **two witness memories that
+disagree**, which works even though neither witness understood what it signed.
+
+**Consequence for wire and prose: a cosignature must never be presentable as an
+endorsement.** The receipt vocabulary has to make "witnessed" and "verified" impossible to
+confuse. Recorded as a known weak point — this is mitigated by *language*, and a week of
+evidence in this repo says prose enforces nothing. If a structural guard is available it
+should beat the wording.
+
+### DP19 — Standalone operation is a hard requirement, not a deployment mode
+
+**Ruling, his words: "I just want to make sure that we're not making anything too cumbersome
+— it needs to be able to run standalone as well."**
+
+⛔ **A single anchor, with zero witnesses, pinning to no one, must be fully functional.** It
+accepts submissions, appends, publishes checkpoints, and issues receipts, with no peer and
+no network dependency in the core path. **Witnessing and cascading are OPTIONAL ADDITIONS,
+never preconditions** — the moment federation becomes required to operate, self-hosting
+acquires a permission step and DP14's "one instance among equals" is dead.
+
+This constrains the design and not merely the documentation: the witness API and the
+upward-pinning path must be **additive surfaces over a complete standalone core**, not
+layers the core is built through. **If any core operation cannot complete without a peer,
+the design is wrong.** The honest cost is stated plainly rather than hidden: a standalone
+anchor with no witnesses **can equivocate undetectably**, and no local check will catch it.
+That is a real and accepted limit of the standalone mode, not a gap to be papered over —
+witnesses are what remove it, and an operator running without them should be told so.
+
+### DP20 — `seal` migrates to HPKE (RFC 9180) as a v2 alongside, later
+
+**Ratified on recommendation.** A new versioned format beside `lys/sealed-envelope/v1`,
+never a mutation of it. The argument is "verification must outlive the vendor": HPKE has
+published test vectors and multiple independent implementations, which is the second party
+our own construction structurally lacks. **Not urgent, and sequenced after the anchor.**
+
+### DP21 — The receipt drafts freeze only after the anchor has run privately
+
+**Ratified on recommendation.** Implementing those drafts found **five specification bugs**,
+including one permitting an inclusion receipt to be re-labelled as a consistency receipt with
+a genuine signature still attached. **Every one was found by implementing, not by reviewing.
+Running the thing is the next class of bug-finder, and freezing before that spends the
+opportunity for nothing.**
+
+### DP22 — No log-position claim inside attestations
+
+**Ratified on recommendation: not now.** An attestation says *this happened*; the receipt
+already binds an entry to its position. Putting the position inside the attestation as well
+duplicates one fact across two artifacts that can disagree, and forces ordering to exist at
+signing time rather than after it.
+
 ---
 
 ## What remains Tom's
