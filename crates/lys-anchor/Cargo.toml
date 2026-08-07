@@ -1,0 +1,26 @@
+[package]
+name = "lys-anchor"
+description = "A lys transparency anchor: an append-only log with a genesis leaf, over any LeafStore."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+# Never published, and this is a mechanical guard rather than a formality.
+# Publishing a crate that exposes a wire format is one of the two things that
+# FREEZES that format (crates/lys-core/Cargo.toml). This crate is where the
+# draft anchor formats will be built, so it stays unpublishable until the
+# operator's ratify-then-publish sequence completes.
+publish = false
+
+[dependencies]
+lys-log-store.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

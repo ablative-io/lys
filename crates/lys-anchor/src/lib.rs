@@ -1,0 +1,52 @@
+//! `lys-anchor` — a transparency anchor over a durable append-only log.
+//!
+//! An anchor is a log that publishes about itself. This crate holds the part
+//! that is neither a cryptographic primitive (`lys-core`) nor durable storage
+//! (`lys-log-store`): the object that owns one log, keeps its invariants, and
+//! will later sign about it.
+//!
+//! # The invariants this crate holds
+//!
+//! - **An anchor's log always has a leaf 0, and it is put there at creation or
+//!   never.** [`Anchor::create`] appends the caller's genesis bytes as leaf 0;
+//!   [`Anchor::open`] refuses a log that has none. The refusal is not fussiness:
+//!   `lys-core`'s receipt signing declines a tree of size 1 (RFC 9942 types an
+//!   inclusion path as one-or-more, and a one-leaf tree's path is empty), so an
+//!   anchor without a genesis leaf cannot issue a receipt for its first real
+//!   entry — and `LeafStore` has no `insert`, no `rewrite` and no `fork`, so
+//!   leaf 0 can never be supplied afterwards. An anchor initialised without one
+//!   is not repairable, which is why this is checked at open rather than at
+//!   first use.
+//! - **The origin is read through to storage and never held here.** An anchor's
+//!   origin is whatever the store was created with; [`Anchor::origin`] forwards
+//!   to `Log::origin`, which forwards to `LeafStore::origin`, fixed immutably
+//!   when a store was created. This crate contains no origin constant, no
+//!   default and no fallback, and [`AnchorConfig`] has no origin field — there
+//!   is nowhere for such a value to live, which is how the rule is kept
+//!   structurally rather than by discipline.
+//! - **A repair discovered at open is returned, never printed and never
+//!   dropped.** [`Anchor::recovered_to`] forwards `Log::recovered_to` for the
+//!   reason already written into the CLI: a library that writes to stderr has
+//!   decided for its caller how a repair gets reported, and a silently repaired
+//!   log is indistinguishable from one that never needed repairing.
+//!
+//! # The limit of a standalone anchor, stated here because it cannot be fixed here
+//!
+//! **An anchor with no witnesses can equivocate undetectably. No local check
+//! catches it.** It can hold two histories and show each observer whichever
+//! suits, and nothing in its own storage, its own pin, or its own signed
+//! artifacts detects that. This is not a gap awaiting better local checking — it
+//! cannot be closed locally at all, for the reason already written into the
+//! storage layer: an actor able to rewrite both the leaves and the pin can
+//! present a consistent shorter log, and no purely local check can catch that.
+//!
+//! What changes it is one external party keeping its own durable memory of this
+//! anchor's checkpoints. Nothing in this crate substitutes for that.
+
+pub mod anchor;
+pub mod config;
+pub mod error;
+
+pub use anchor::Anchor;
+pub use config::AnchorConfig;
+pub use error::{AnchorError, AnchorResult};

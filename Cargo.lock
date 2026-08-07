@@ -799,6 +799,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lys-anchor"
+version = "0.2.0"
+dependencies = [
+ "lys-log-store",
+ "tempfile",
+ "thiserror 2.0.19",
+]
+
+[[package]]
 name = "lys-core"
 version = "0.2.0"
 dependencies = [
