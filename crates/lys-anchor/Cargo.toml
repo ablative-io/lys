@@ -15,18 +15,48 @@ rust-version.workspace = true
 # operator's ratify-then-publish sequence completes.
 publish = false
 
+[features]
+default = []
+
+# Forwards `lys-core`'s draft-format gate. OFF BY DEFAULT, and the shape below
+# — a forwarding feature rather than an unconditional dependency edge — was
+# chosen from a measurement, not from taste.
+#
+# The submit path needs `lys_core::receipt`, which lives behind
+# `lys-core/unstable-anchor`. The obvious way to reach it is to write the edge
+# into the dependency itself:
+#
+#     lys-core = { workspace = true, features = ["unstable-anchor"] }
+#
+# That was tried and measured. Cargo unifies features across the whole
+# workspace build, so an edge here turns the draft-format gate on for
+# `lys-core` in EVERY build that happens to include this crate — including the
+# default one. On the tree this feature was added to, `cargo test --workspace`
+# went from **548 passing to 646** — exactly its own `--all-features` count —
+# and the 98-test gap between the two runs collapsed to zero. The default run
+# would have stayed green while no longer proving anything about the shape
+# consumers actually get, which is the silent coverage loss CLAUDE.md refuses
+# everywhere else.
+#
+# As a forwarding feature the gate stays a decision made at the top of the
+# build: `--all-features` turns it on and runs the receipt gates, and the
+# default run still compiles this crate with the receipt path absent. That is
+# also the honest shape — the draft formats are not ratified, so a build that
+# did not ask for them should not get them.
+unstable-anchor = ["lys-core/unstable-anchor"]
+
 [dependencies]
-# Default features only, and that is load-bearing: `lys-core`'s
-# `unstable-anchor` feature gates the DRAFT receipt and bundle wire formats,
-# and a dependency edge that enabled it here would turn it on for every
-# workspace build that happens to include this crate. Nothing in increments
-# 1-3 needs it — `checkpoint` and `keys` are ungated — so the edge stays
-# default-only until a receipt is actually issued.
+# Default features only — see [features] above for the measurement that says
+# why `unstable-anchor` is forwarded from this crate instead of being enabled
+# on this edge.
 lys-core.workspace = true
 lys-log-store.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+# A SHA-256 the tests drive themselves, so a leaf hash can be checked against
+# something other than the helper that produced it.
+sha2.workspace = true
 tempfile.workspace = true
 
 [lints]

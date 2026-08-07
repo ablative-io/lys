@@ -35,6 +35,16 @@
 //!   `lys-core`'s `verify_checkpoint` binds, so one log's checkpoint can never
 //!   be accepted for another. Publishing does not append: an anchor does not
 //!   log its own checkpoints.
+//! - **A submitted statement is appended verbatim and never interpreted.**
+//!   [`Submission`] carries the bytes and nothing else — no content type, no
+//!   producer, no kind — because an anchor that knew what a statement meant
+//!   would have taken a position on which statements are well-formed, and its
+//!   receipts would be endorsements rather than observations. Two identical
+//!   submissions are two events at two indices with two receipts: recognising
+//!   a repeat would mean deciding that two byte strings mean the same thing,
+//!   which is precisely the judgement this crate does not make. `submit` and
+//!   the receipt it returns are behind the off-by-default `unstable-anchor`
+//!   feature, which forwards `lys-core`'s gate on the draft receipt format.
 //!
 //! # The signer boundary is reserved, not usable, and that is stated on purpose
 //!
@@ -63,8 +73,12 @@ pub mod anchor;
 pub mod config;
 pub mod error;
 pub mod keys;
+pub mod wire;
 
-pub use anchor::{Anchor, PublishedCheckpoint};
+pub use anchor::{Anchor, PublishedCheckpoint, proof_nodes};
 pub use config::AnchorConfig;
 pub use error::{AnchorError, AnchorResult};
 pub use keys::{FileSigner, InProcessSigner, Signer};
+pub use wire::Submission;
+#[cfg(feature = "unstable-anchor")]
+pub use wire::SubmissionOutcome;
