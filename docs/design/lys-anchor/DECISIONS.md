@@ -170,17 +170,92 @@ to be revised. Recorded so the choices are visible, not because they are settled
 
 ---
 
+## Operator rulings — 2026-08-07, Tom Whiting (Meridian exchange)
+
+Recorded in the D4 style: the operator ruled on the substance and on a plain-language set of
+recommendations, not on a line-by-line reading. Stated that way so a later reader knows
+exactly what was ratified and what rests on the recommendation being sound.
+
+### DP13 — The anchor is domain-agnostic. Norn is not its subject.
+
+**Ruling, his words: "think about it being completely general and able to be wired into
+anything and used by anything to sign anything."** The prior roadmap framing — Norn
+integration as the payoff that precedes the anchor — is **withdrawn**, and it was the
+assistant's narrowing rather than a change of direction: `lys-core` is already
+domain-agnostic with no concept of agents, sessions, or workspaces. The anchor accepts
+signed statements from any producer and knows nothing about what they mean. This is what
+SCITT already assumes, so the alignment costs nothing.
+
+### DP14 — Hosted **and** self-hostable, with anchors pinning to anchors
+
+**Ruling: "we will be hosting it or it will be self-hostible… anchors can pin to other
+anchors kind of things so we can have a cascading sort of effect."** Consequences accepted
+with it, and each is a veto point if it was not understood:
+
+- **The anchor is itself a lys instance** — keeps an append-only log, publishes checkpoints,
+  submits its own root upward. Same code, same verification, no special case.
+- **Nothing hardcodes a trust root.** A verifier is always *told* which anchor to trust and
+  never assumes ours. A shipped default of "trust the hosted instance" would quietly rebuild
+  a certificate authority and make self-hosting second-class. **Hosted is one instance among
+  equals in the protocol, not merely in the marketing.**
+- ⭐ **Cascading IS the witness mechanism.** An anchor pinning to another countersigns it.
+  Without witnesses an anchor can present two histories to two parties and no local check
+  detects it — the whole distance between *trust the operator* and *need not trust the
+  operator*. The feature wanted for its own sake is what makes the security claim true.
+
+### DP15 — Origin domain: `ablative.com.au`, and **not hardcoded**
+
+**Ruling: "we can use ablative.com.au but it'd be good if we didnt hardcode it."**
+So the origin is **configuration, never a constant** — the same rule as DP14's trust root,
+for the same reason: a self-hoster mints their own origin and must not need permission to
+exist. `ablative.com.au` names *our* instance only. DP12's `anchor.lys.dev/prod-01` was
+always illustrative; the live value is supplied at run time and no build embeds it.
+
+The selection rule that produced it, for whoever inherits this: **pick the domain still
+controlled in twenty years.** Origins sit inside signed checkpoint bytes forever, and a
+lapsed domain orphans every historical proof — verification must outlive the vendor.
+
+### DP16 — Key structure: two keys, rotation as an append
+
+**Ratified on recommendation.** Ed25519 throughout. A **root identity that only ever signs
+key-delegation entries into the log**, and an **operational key** signing day-to-day
+checkpoints. Rotation is then an append — the key history *is* log history, which makes it
+verifiable rather than announced. Generated offline on a machine that never serves traffic;
+offline backups in two physically separate locations.
+
+**Stated limit, accepted rather than solved: custody does not defend against key
+compromise.** Anyone holding the key can sign a false history and no purely local check
+catches it. **Witnesses are the mitigation; good custody must not be allowed to argue them
+away.** The witness API therefore ships in v1 even if zero witnesses run at first —
+retrofitting it later is painful, and until it exists every claim made is weaker than it
+sounds.
+
+### DP17 — Publication waits
+
+**Ratified on recommendation: build → run privately against a real log → ratify the formats
+→ publish.** Publishing freezes wire formats permanently. That trap has already been caught
+once here: shipping the receipt formats would have frozen two drafts that implementation
+subsequently found five specification bugs in. Publishing early costs everything and buys
+nothing.
+
+DP8 (no timestamp inside the receipt; time from checkpoint bytes and witness cosignatures,
+never a public timestamp authority) was re-put and re-accepted unchanged.
+
+---
+
 ## What remains Tom's
 
-**Whether to stand an anchor up, and under what domain.** Building the crate freezes
-nothing — a format is frozen by publishing a crate or signing a durable artifact under a
-tag, not by writing code that could. So implementation can proceed against these rulings
-and stay reversible. What is not reversible, and so is not inferred here:
+**Whether to stand an anchor up.** Building the crate freezes nothing — a format is frozen
+by publishing a crate or signing a durable artifact under a tag, not by writing code that
+could. So implementation can proceed against these rulings and stay reversible. What is not
+reversible, and so is not inferred here:
 
 - publishing `lys-anchor` to crates.io;
 - generating a production anchor key;
-- emitting any receipt outside a test, under `lys/anchor-receipt/v1` or any other tag;
-- choosing the domain an origin is minted under.
+- emitting any receipt outside a test, under `lys/anchor-receipt/v1` or any other tag.
+
+**The domain is no longer open — settled as `ablative.com.au` by DP15 — but it is supplied
+as configuration, so no build step and no committed constant depends on it.**
 
 Until those, `WIRE-DRAFTS.md` stays DRAFT and every one of the five rulings above is still
 cheap to overturn.
