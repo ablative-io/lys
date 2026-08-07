@@ -40,10 +40,34 @@ would have caused it.
 Specifying a capability format is a permanent wire-format decision and is **not started and
 not scheduled**. It requires: what a claim asserts, what a verifier checks, how it is
 scoped, what a *rendering* consumer checks — a claim becomes a delegation at the reader —
-and how it is revoked. ⛔ **That last one is a hard constraint rather than an open option:
-lys has no CRL and no OCSP by design, so revocation must be an append and the live set a
-fold over the log.** Until that round happens, this table confines itself to what it can
-prove.
+and how it is revoked.
+
+**On that last one, the fact and the inference are separated deliberately.** The **fact**,
+settled at `c9a9428` (6 Jul): lys has no CRL, no OCSP and no revocation flag, and that
+document records revocation as *"consumer-side today; a first-class answer is an open
+product question."* The **inference**, which is a proposal and not a ruling: with no lookup
+service available, revocation would have to be an append and the live set a fold over the
+log.
+
+⚠️ **That inference was previously written here as "a hard constraint rather than an open
+option", and this correction exists because of how it acquired that status.** Nobody ruled
+on it. It was written down as an inference, circulated to two other seats, endorsed,
+recorded elsewhere under an attribution column with a single slot for a name — so the
+endorsement was filed where authorship goes — and returned to its own author reading as an
+independent constraint, which its author then argued against on the merits. No one
+misrepresented anything and the loop closed anyway. **A claim that round-trips through
+relays is indistinguishable from corroboration; endorsement is not origination; and a
+record with one slot for "who" will silently promote an endorser to an author.**
+
+Two consequences were derived from the inference and remain sound *as derivations of it*,
+never as established requirements: that the revocable unit and the claim unit must be the
+same unit — or a certificate can be half-revoked with no way to express that state — and
+that a verifier's freshness tolerance belongs in the verification call as an input rather
+than as a judgement applied to its output, since a verdict carrying "valid as of size N"
+handed to a caller free to ignore N is an obligation documented on the caller. Removing the
+CRL removed the lookup service, not the staleness question.
+
+Until that round happens, this table confines itself to what it can prove.
 
 Note: the earlier `lys/attestation/v1` JSON artifact never shipped — nothing durable was signed under it, and it was removed rather than frozen (decision D4). The COSE_Sign1 artifact above is the only attestation format; like every row here it freezes at 0.1.0.
 
