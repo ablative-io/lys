@@ -14,7 +14,13 @@ Read [docs/VISION.md](docs/VISION.md) for why this exists, [docs/DESIGN.md](docs
 
 Future crates (later phases): `lys-anchor` (transparency-ledger service) and `lys-mcp` (MCP server surface).
 
-**`unstable-anchor` gates the draft wire formats and is exempt from semver.** A format is frozen by publishing a crate that exposes it or by signing a durable artifact under its tag — so shipping `receipt` and `bundle` ungated would freeze two drafts that have already had three specification bugs found in them by implementation. The gate keeps them changeable until they are ratified; it comes off when a real anchor exists.
+**`unstable-anchor` gates the draft wire formats and is exempt from semver.** A format is frozen by publishing a crate that exposes it or by signing a durable artifact under its tag — so shipping `receipt` and `bundle` ungated would freeze drafts that have already had specification bugs found in them by implementation.
+
+⛔ **CORRECTED 2026-08-08 — the sentence that used to end that paragraph was false, and it had been false for nine days.** It read: *"The gate keeps them changeable until they are ratified; it comes off when a real anchor exists."* But **`lys-core 0.2.0` was published to crates.io on 2026-07-30 with `unstable-anchor` in its feature list**, so any consumer can enable it and emit artifacts. By this paragraph's own rule, `lys/anchor-receipt/v1` and `lys/verification-bundle/v1` **froze on that date** — not at some future ratification. The gate keeps the formats *off by default and semver-exempt*, which is worth having; it does not keep a published format changeable, and reading it that way is how a freeze happens without anyone deciding to.
+
+**The freeze was in fact honoured, verified rather than assumed** by diffing the published 0.2.0 tarball against the tree: `CONTENT_TYPE` is unchanged, the inclusion receipt's protected bucket is still the same 80 bytes with the same frozen literals (`0x01 0x27`, `0x03 0x78 0x23`, `0x19 0x01 0x8b 0x01`) and those literals still pass, `bundle/verify.rs` and `bundle/artifact.rs` are byte-identical, and `lys/consistency-receipt/v1` was added as a **new content type alongside** rather than as a mutation. That is exactly the rule below — a new version alongside, never a mutation of the shipped one — followed by discipline while the paragraph above said the discipline was not yet needed.
+
+**What is and is not published, as of 2026-08-08:** `lys-core` 0.2.0, `lys` 0.2.0 and `lys-log-store` 0.2.0 are on crates.io. `lys-anchor` and `lys-anchor-cli` are `publish = false`. **`lys/anchor-delegation/v1` is NOT published**, which is the only reason today's payload change (adding `sequence`) was free. Publishing `lys-core` 0.3.0 freezes it — so that release waits until the fold that enforces its ordering rule exists, because until then the format's central security property is carried by prose.
 
 ## The one rule that governs everything
 
