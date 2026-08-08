@@ -33,7 +33,9 @@ use std::path::{Path, PathBuf};
 use lys_log_store::{FileLeafStore, LeafStore, StoreError};
 use tempfile::TempDir;
 
+use crate::admission::{AcceptAll, AdmissionPolicy, MaxSize, NotAdmitted, SubmitterContext};
 use crate::keys::FileSigner;
+use crate::wire::Submission;
 
 use super::*;
 
@@ -64,16 +66,28 @@ fn leaf_path(dir: &Path, index: u64) -> PathBuf {
 }
 
 /// Creates a store and an anchor over it, returning the anchor.
-fn create_anchor(dir: &Path, origin: &str, genesis: &[u8]) -> Anchor<FileLeafStore, FileSigner> {
+fn create_anchor(
+    dir: &Path,
+    origin: &str,
+    genesis: &[u8],
+) -> Anchor<FileLeafStore, FileSigner, AcceptAll> {
     let store = FileLeafStore::create(dir, origin).unwrap();
-    Anchor::create(store, genesis, signer(dir), AnchorConfig::unconfigured()).unwrap()
+    Anchor::create(
+        store,
+        genesis,
+        signer(dir),
+        AcceptAll,
+        AnchorConfig::unconfigured(),
+    )
+    .unwrap()
 }
 
 /// Reopens the anchor at `dir` through a fresh store handle.
-fn reopen(dir: &Path) -> AnchorResult<Anchor<FileLeafStore, FileSigner>> {
+fn reopen(dir: &Path) -> AnchorResult<Anchor<FileLeafStore, FileSigner, AcceptAll>> {
     Anchor::open(
         FileLeafStore::open(dir).unwrap(),
         signer(dir),
+        AcceptAll,
         AnchorConfig::unconfigured(),
     )
 }
@@ -95,7 +109,8 @@ fn genesis_lands_at_index_zero_and_survives_a_reopen() {
     assert_eq!(store.leaf(0).unwrap().as_deref(), Some(GENESIS));
     assert_eq!(store.leaf(1).unwrap(), None);
 
-    let reopened = Anchor::open(store, signer(dir), AnchorConfig::unconfigured()).unwrap();
+    let reopened =
+        Anchor::open(store, signer(dir), AcceptAll, AnchorConfig::unconfigured()).unwrap();
     assert_eq!(reopened.tree_size(), 1);
     assert_eq!(reopened.recovered_to(), None);
 }
@@ -219,7 +234,13 @@ fn creating_genesis_over_a_log_that_already_has_leaves_is_refused() {
     let before = FileLeafStore::open(dir).unwrap().leaf(0).unwrap();
 
     let store = FileLeafStore::open(dir).unwrap();
-    match Anchor::create(store, GENESIS, signer(dir), AnchorConfig::unconfigured()) {
+    match Anchor::create(
+        store,
+        GENESIS,
+        signer(dir),
+        AcceptAll,
+        AnchorConfig::unconfigured(),
+    ) {
         Err(AnchorError::GenesisAlreadyWritten { origin, tree_size }) => {
             assert_eq!(origin, ORIGIN);
             assert_eq!(tree_size, 1);
@@ -232,4 +253,42 @@ fn creating_genesis_over_a_log_that_already_has_leaves_is_refused() {
     let after = FileLeafStore::open(dir).unwrap();
     assert_eq!(after.extent(), 1);
     assert_eq!(after.leaf(0).unwrap(), before);
+}
+
+#[test]
+fn genesis_is_written_even_under_a_policy_that_would_refuse_it() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    // The control that makes this test mean anything: this policy really does
+    // refuse these exact bytes. Without it the assertion below would pass for a
+    // policy that admits everything, which is most of them.
+    let refusing = MaxSize::new(0);
+    assert_eq!(
+        refusing.admit(
+            &Submission { statement: GENESIS },
+            &SubmitterContext::Unidentified
+        ),
+        Err(NotAdmitted),
+        "the fixture policy must refuse the genesis bytes"
+    );
+
+    let store = FileLeafStore::create(dir, ORIGIN).unwrap();
+    let anchor = Anchor::create(
+        store,
+        GENESIS,
+        signer(dir),
+        refusing,
+        AnchorConfig::unconfigured(),
+    )
+    .expect("creating an anchor must not consult its admission policy");
+    assert_eq!(anchor.tree_size(), 1);
+    assert_eq!(anchor.policy(), &MaxSize::new(0));
+    drop(anchor);
+
+    // Read back through a handle that never saw the append: genesis is on disk,
+    // verbatim.
+    let store = FileLeafStore::open(dir).unwrap();
+    assert_eq!(store.extent(), 1);
+    assert_eq!(store.leaf(0).unwrap().as_deref(), Some(GENESIS));
 }

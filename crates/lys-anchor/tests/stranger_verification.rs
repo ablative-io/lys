@@ -119,7 +119,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use lys_anchor::{Anchor, AnchorConfig, FileSigner};
+use lys_anchor::{AcceptAll, Anchor, AnchorConfig, FileSigner};
 use lys_log_store::{FileLeafStore, Log};
 use tempfile::TempDir;
 
@@ -246,7 +246,14 @@ fn build_case(leaf_index: u64) -> Case {
     let signer = || FileSigner::load(&key_path).unwrap();
 
     let store = FileLeafStore::create(dir, ORIGIN).unwrap();
-    Anchor::create(store, GENESIS, signer(), AnchorConfig::unconfigured()).unwrap();
+    Anchor::create(
+        store,
+        GENESIS,
+        signer(),
+        AcceptAll,
+        AnchorConfig::unconfigured(),
+    )
+    .unwrap();
 
     let mut log = Log::open(FileLeafStore::open(dir).unwrap()).unwrap();
     for statement in STATEMENTS {
@@ -265,6 +272,7 @@ fn build_case(leaf_index: u64) -> Case {
     let anchor = Anchor::open(
         FileLeafStore::open(dir).unwrap(),
         signer(),
+        AcceptAll,
         AnchorConfig::unconfigured(),
     )
     .unwrap();

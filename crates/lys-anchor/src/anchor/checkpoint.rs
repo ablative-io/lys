@@ -38,6 +38,7 @@
 use lys_core::checkpoint::{CheckpointBody, sign_note};
 use lys_log_store::LeafStore;
 
+use crate::admission::AdmissionPolicy;
 use crate::error::{AnchorError, AnchorResult};
 use crate::keys::InProcessSigner;
 
@@ -59,7 +60,7 @@ pub struct PublishedCheckpoint {
     pub body: CheckpointBody,
 }
 
-impl<S: LeafStore, K: InProcessSigner> Anchor<S, K> {
+impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     /// Signs a C2SP checkpoint over the log's current root, under the log's own
     /// origin.
     ///

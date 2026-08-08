@@ -63,6 +63,7 @@ use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
 use crate::AnchorConfig;
+use crate::admission::AcceptAll;
 use crate::keys::{FileSigner, Signer};
 
 use super::*;
@@ -236,7 +237,7 @@ fn signer(dir: &Path) -> FileSigner {
 /// The anchor never places a leaf here. Every artifact it produces below is
 /// therefore a proof about entries written by something else, which is the
 /// situation an anchor reopened after a restart is always in.
-fn anchor_over(dir: &Path, statements: &[&[u8]]) -> Anchor<FileLeafStore, FileSigner> {
+fn anchor_over(dir: &Path, statements: &[&[u8]]) -> Anchor<FileLeafStore, FileSigner, AcceptAll> {
     let store = FileLeafStore::create(dir, ORIGIN).unwrap();
     let mut log = Log::open(store).unwrap();
     log.append(GENESIS).unwrap();
@@ -248,10 +249,11 @@ fn anchor_over(dir: &Path, statements: &[&[u8]]) -> Anchor<FileLeafStore, FileSi
 }
 
 /// Reopens the anchor over a directory that already holds a log.
-fn reopen(dir: &Path) -> Anchor<FileLeafStore, FileSigner> {
+fn reopen(dir: &Path) -> Anchor<FileLeafStore, FileSigner, AcceptAll> {
     Anchor::open(
         FileLeafStore::open(dir).unwrap(),
         signer(dir),
+        AcceptAll,
         AnchorConfig::unconfigured(),
     )
     .unwrap()
@@ -266,7 +268,7 @@ fn append_to(dir: &Path, statement: &[u8]) {
 
 /// The verifier a third party would build: the origin they were told, and the
 /// public key they were given.
-fn verifier(anchor: &Anchor<FileLeafStore, FileSigner>) -> NoteVerifierKey {
+fn verifier(anchor: &Anchor<FileLeafStore, FileSigner, AcceptAll>) -> NoteVerifierKey {
     NoteVerifierKey::new(ORIGIN, anchor.signer().public_key()).unwrap()
 }
 

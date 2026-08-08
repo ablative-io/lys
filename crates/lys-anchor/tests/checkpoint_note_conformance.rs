@@ -54,7 +54,7 @@ mod harness;
 
 use std::path::Path;
 
-use lys_anchor::{Anchor, AnchorConfig, FileSigner, Signer};
+use lys_anchor::{AcceptAll, Anchor, AnchorConfig, FileSigner, Signer};
 use lys_core::checkpoint::{NoteVerifierKey, verify_checkpoint};
 use lys_log_store::{FileLeafStore, Log};
 use tempfile::TempDir;
@@ -78,10 +78,11 @@ fn signer(dir: &Path) -> FileSigner {
     FileSigner::load(&path).unwrap()
 }
 
-fn open_anchor(dir: &Path) -> Anchor<FileLeafStore, FileSigner> {
+fn open_anchor(dir: &Path) -> Anchor<FileLeafStore, FileSigner, AcceptAll> {
     Anchor::open(
         FileLeafStore::open(dir).unwrap(),
         signer(dir),
+        AcceptAll,
         AnchorConfig::unconfigured(),
     )
     .unwrap()
@@ -95,12 +96,24 @@ fn go_sumdb_note_reproduces_the_anchors_checkpoints_byte_for_byte() {
     let gocache_dir = TempDir::new().unwrap();
     let bin_dir = TempDir::new().unwrap();
     let bin = bin_dir.path().join("notetool");
-    harness::build_go_tool(&go, &gocache_dir.path().join("gocache"), &bin);
+    harness::build_go_tool(
+        &go,
+        harness::GoScaffold::Note,
+        &gocache_dir.path().join("gocache"),
+        &bin,
+    );
 
     let tmp = TempDir::new().unwrap();
     let dir = tmp.path();
     let store = FileLeafStore::create(dir, ORIGIN).unwrap();
-    Anchor::create(store, GENESIS, signer(dir), AnchorConfig::unconfigured()).unwrap();
+    Anchor::create(
+        store,
+        GENESIS,
+        signer(dir),
+        AcceptAll,
+        AnchorConfig::unconfigured(),
+    )
+    .unwrap();
 
     // The verifier key a stranger would be handed: the origin they were told,
     // and the anchor's public key. Built here from the literal this test gave

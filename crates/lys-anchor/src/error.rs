@@ -50,6 +50,41 @@
 //! submission was not admitted, with the detail going to the operator's log
 //! and not to the caller. This note is here so that is decided before the code
 //! is, rather than argued about after.
+//!
+//! # The expiry arrived, and this is how it was honoured
+//!
+//! `AdmissionPolicy` now exists (DP23), so the paragraph above is spent rather
+//! than anticipatory. [`AnchorError::NotAdmitted`] is the variant it predicted,
+//! and it was built to the constraint written above it:
+//!
+//! - **It has no fields.** Not a reason, not a policy name, not a size, not an
+//!   origin, not a source error. Every refusal by every policy — a length rule,
+//!   an absent credential, a certificate from the wrong authority, a subject
+//!   key that is not on the list — arrives as the same value with the same
+//!   `Display` and the same `Debug`. A submitter cannot learn which rule
+//!   refused them, and cannot learn which policy the anchor is running.
+//! - **The collapse is structural, not disciplinary.** The anchor is never told
+//!   why. `AdmissionPolicy::admit` returns
+//!   [`NotAdmitted`](crate::admission::NotAdmitted), a zero-sized value with
+//!   nowhere to put a cause, so there is no reason-carrying value crossing into
+//!   this crate that a later "just add the source" change could pick up. The
+//!   thing that would have to be leaked does not exist here.
+//! - **The operator's detail lives with the policy, which is the operator's
+//!   object.** They construct it; an implementation that wants to record its
+//!   own refusals does so in its own state, through whatever its deployment
+//!   already uses. This crate ships no logging framework and deliberately
+//!   invents none — a reason routed through the anchor is a reason living one
+//!   edit away from the error type that must not carry it. **This version
+//!   offers no operator channel of its own**, and that is a statement of what
+//!   is missing rather than a claim that nothing is.
+//! - **What it does not buy** is stated where the trait is:
+//!   [`admission::policy`](crate::admission::policy) names the timing channel
+//!   the collapse cannot close.
+//!
+//! The variants above are unchanged. They remain facts about the operator's own
+//! machine, and the argument for their detail was never that the crate had no
+//! stranger-driven path — it was that no *variant* was a function of the
+//! stranger's bytes. Exactly one now is, and it is the one carrying nothing.
 
 use lys_core::error::TrustError;
 use lys_log_store::StoreError;
@@ -72,6 +107,32 @@ pub enum AnchorError {
     /// place for that wording to drift.
     #[error(transparent)]
     Store(#[from] StoreError),
+
+    /// The anchor's admission policy refused the submission.
+    ///
+    /// **The one variant in this type that is a verdict on a stranger's bytes,
+    /// and the only one carrying nothing.** Every reason a submission can be
+    /// refused — a length rule, a missing credential, a certificate from
+    /// another authority, a subject key that is not on the list, a rule in a
+    /// policy this crate has never seen — produces this exact value, with this
+    /// exact message. That is not tidiness: a refusal that varied by cause
+    /// would let a submitter read the policy out by probing, and with a size
+    /// rule it would be a free binary search on the threshold.
+    ///
+    /// It carries no origin either. The origin is public — it is the first line
+    /// of every checkpoint this anchor signs — so naming it would disclose
+    /// nothing, and it is still absent, because a field that could vary is a
+    /// field a later change can make vary.
+    ///
+    /// **Nothing was appended.** Admission is decided before the append, so a
+    /// refused submission occupies no index and leaves no trace in the log.
+    ///
+    /// The module docs say where an operator's own detail belongs, since it
+    /// does not belong here.
+    #[error(
+        "the anchor's admission policy did not admit this submission; no further detail is available to a submitter, by design"
+    )]
+    NotAdmitted,
 
     /// The log holds no leaves, so it has no genesis leaf and never can.
     ///

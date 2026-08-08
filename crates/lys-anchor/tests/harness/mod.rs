@@ -1,13 +1,19 @@
 //! Go-toolchain harness for `lys-anchor`'s conformance gates.
 //!
-//! # There is one Go scaffold, and it is `lys-core`'s
+//! # The Go scaffolds are `lys-core`'s, both of them
 //!
-//! This harness drives the *existing* vendored tool at
+//! This harness drives the *existing* vendored tools at
 //! `crates/lys-core/tests/go-conformance` — the one that wraps
-//! `golang.org/x/mod/sumdb/note`. A second `go.mod` and a second vendor tree
-//! would be a second pinned copy of the reference implementation, and two
-//! copies of a reference are two things that can disagree about what the
+//! `golang.org/x/mod/sumdb/note` — and `crates/lys-core/tests/cose-conformance`,
+//! which wraps `github.com/veraison/go-cose`. A second `go.mod` and a second
+//! vendor tree would be a second pinned copy of a reference implementation, and
+//! two copies of a reference are two things that can disagree about what the
 //! reference says. So nothing here is vendored; only the spawn is local.
+//!
+//! Which scaffold a gate wants is a [`GoScaffold`], not a path a call site
+//! writes out: a mistyped directory would be a `go build` failure rather than a
+//! silent pass, but a *closed set* means a new gate cannot invent a third
+//! vendored copy by accident either.
 //!
 //! # The duplication that remains, named rather than left to be noticed
 //!
@@ -53,9 +59,31 @@ pub const GO_ENV: [(&str, &str); 3] = [
     ("GOTOOLCHAIN", "local"),
 ];
 
-/// The vendored Go scaffold — `lys-core`'s, deliberately not a second copy.
-fn scaffold_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../lys-core/tests/go-conformance")
+/// Which vendored Go scaffold a gate needs — `lys-core`'s, deliberately not a
+/// second copy of either.
+#[derive(Clone, Copy, Debug)]
+pub enum GoScaffold {
+    /// `go-conformance`: `golang.org/x/mod/sumdb/note`, the C2SP signed-note
+    /// reference. Judges checkpoints.
+    Note,
+    /// `cose-conformance`: `github.com/veraison/go-cose` plus RFC 6962's
+    /// *recursive* `MTH`/`PATH` transcribed in Go. Judges receipts.
+    Cose,
+}
+
+/// Every scaffold a gate may ask for. The closed set, as data, so the test
+/// below checks all of them rather than the ones someone remembered.
+pub const ALL_SCAFFOLDS: [GoScaffold; 2] = [GoScaffold::Note, GoScaffold::Cose];
+
+impl GoScaffold {
+    /// The scaffold's directory, relative to this crate's manifest.
+    fn dir(self) -> PathBuf {
+        let name = match self {
+            Self::Note => "go-conformance",
+            Self::Cose => "cose-conformance",
+        };
+        Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../lys-core/tests/{name}"))
+    }
 }
 
 /// `lys-core`'s harness source, read to detect contract drift between the two.
@@ -104,7 +132,7 @@ pub fn go_or_skip(gate: &str) -> Option<PathBuf> {
     None
 }
 
-/// Compiles the Go tool once, to `out`.
+/// Compiles `scaffold`'s Go tool once, to `out`.
 ///
 /// Built once and exec'd per case rather than `go run .` per case, which
 /// re-links every time and turns a sweep into minutes of linking.
@@ -112,19 +140,21 @@ pub fn go_or_skip(gate: &str) -> Option<PathBuf> {
 /// # Panics
 ///
 /// Panics if the toolchain cannot be spawned or the build fails. A toolchain
-/// that is present but broken is deliberately a hard failure, never a skip.
-pub fn build_go_tool(go: &Path, gocache: &Path, out: &Path) {
+/// that is present but broken is deliberately a hard failure, never a skip —
+/// and so is a scaffold that will not build offline, since `GOPROXY=off` means
+/// an unvendored dependency cannot resolve at all rather than being fetched.
+pub fn build_go_tool(go: &Path, scaffold: GoScaffold, gocache: &Path, out: &Path) {
     let status = Command::new(go)
         .arg("build")
         .arg("-o")
         .arg(out)
         .arg(".")
-        .current_dir(scaffold_dir())
+        .current_dir(scaffold.dir())
         .envs(GO_ENV)
         .env("GOCACHE", gocache)
         .status()
         .expect("failed to spawn the Go toolchain (present but broken is a hard failure)");
-    assert!(status.success(), "go build of the note tool failed");
+    assert!(status.success(), "go build of the {scaffold:?} tool failed");
 }
 
 /// Runs the pre-built tool with `input` on stdin; returns `(exit_success,
@@ -192,4 +222,31 @@ fn the_go_environment_contract_matches_the_one_lys_core_wrote_down() {
         theirs.contains(r#".env("GOCACHE", gocache)"#),
         "lys-core's harness no longer uses a throwaway GOCACHE"
     );
+}
+
+#[test]
+fn every_scaffold_is_vendored_where_this_harness_says_it_is() {
+    // `GOPROXY=off` means an unvendored dependency cannot resolve at all, so a
+    // de-vendored scaffold is already a hard build failure rather than a silent
+    // network fetch. This asserts it by name anyway, because the failure a gate
+    // would otherwise show is "go build failed", which reads like a broken
+    // toolchain rather than like a missing vendor tree.
+    let mut checked = 0;
+    for scaffold in ALL_SCAFFOLDS {
+        let dir = scaffold.dir();
+        for required in ["go.mod", "vendor/modules.txt"] {
+            let path = dir.join(required);
+            assert!(
+                path.exists(),
+                "the {scaffold:?} scaffold has no {required} at {} — it cannot \
+                 build under GOPROXY=off",
+                path.display()
+            );
+        }
+        checked += 1;
+    }
+    // Count what fired: an empty scaffold set would satisfy the loop while
+    // checking nothing.
+    assert_eq!(checked, ALL_SCAFFOLDS.len());
+    assert_eq!(checked, 2, "there are two vendored scaffolds");
 }

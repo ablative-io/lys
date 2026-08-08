@@ -59,6 +59,36 @@
 //!   and [`anchor::artifact`] says what a caller who needs them to agree must
 //!   do.
 //!
+//! - **Admission is an object the operator chooses, and there is no default.**
+//!   [`Anchor`] is generic over an [`AdmissionPolicy`]; [`Anchor::create`] and
+//!   [`Anchor::open`] both require one and neither has an overload that omits
+//!   it. No policy in this crate implements [`Default`] — the absence is
+//!   checked by `compile_fail` doctests, not merely intended — so an anchor
+//!   cannot come into existence under an admission rule nobody named. That is
+//!   DP23: DP9 wants a certificate-gated write path and DP13 wants an anchor
+//!   that will sign anything for anyone, and those are reconcilable only if
+//!   the gate is a policy the deployment picks rather than behaviour the
+//!   library ships.
+//! - **What a policy is told about the submitter carries its provenance in the
+//!   type.** [`SubmitterContext`] separates bytes the submitter asserted from a
+//!   peer a transport authenticated, and the authenticated arm holds an
+//!   [`AuthenticatedPeer`], which has no public field and one named
+//!   constructor — so claiming an authentication is a line of code that says
+//!   so, not a field assignment nobody can see afterwards. It is an
+//!   attestation by that caller and not a fact this crate verifies, which
+//!   [`admission::context`] states rather than lets the type imply.
+//!   [`Submission`] keeps its single field: what a submitter *is* travels
+//!   beside the statement, never inside it, and never reaches a leaf.
+//! - **Every admission refusal is one indistinguishable value.**
+//!   [`AdmissionPolicy::admit`] can return only [`NotAdmitted`], which has no
+//!   fields, and `Anchor::submit` turns it into
+//!   [`AnchorError::NotAdmitted`], which also has no fields. A submitter
+//!   learns neither which rule refused them nor which policy the anchor runs.
+//!   This is the one variant in [`AnchorError`] whose outcome depends on a
+//!   stranger's bytes, and [`error`] records why it had to be the one carrying
+//!   nothing — an admission policy is a function of the submitted bytes, so a
+//!   refusal that varied by cause is a read-out of the rule.
+//!
 //! # The signer boundary is reserved, not usable, and that is stated on purpose
 //!
 //! An anchor signs through [`Signer`], never through a key its callers hold.
@@ -82,12 +112,17 @@
 //! What changes it is one external party keeping its own durable memory of this
 //! anchor's checkpoints. Nothing in this crate substitutes for that.
 
+pub mod admission;
 pub mod anchor;
 pub mod config;
 pub mod error;
 pub mod keys;
 pub mod wire;
 
+pub use admission::{
+    AcceptAll, AdmissionPolicy, AuthenticatedPeer, MaxSize, NotAdmitted, RecognisedCertificate,
+    SubmitterContext,
+};
 pub use anchor::{Anchor, PublishedCheckpoint, proof_nodes};
 pub use config::AnchorConfig;
 pub use error::{AnchorError, AnchorResult};

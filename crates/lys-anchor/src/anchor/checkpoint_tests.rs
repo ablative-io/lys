@@ -35,6 +35,7 @@ use lys_log_store::{FileLeafStore, LeafStore, Log};
 use tempfile::TempDir;
 
 use crate::AnchorConfig;
+use crate::admission::AcceptAll;
 use crate::keys::{FileSigner, Signer};
 
 use super::*;
@@ -68,16 +69,24 @@ fn signer(dir: &Path) -> FileSigner {
 }
 
 /// Creates a store at `dir` under `origin` and an anchor over it.
-fn create_anchor(dir: &Path, origin: &str) -> Anchor<FileLeafStore, FileSigner> {
+fn create_anchor(dir: &Path, origin: &str) -> Anchor<FileLeafStore, FileSigner, AcceptAll> {
     let store = FileLeafStore::create(dir, origin).unwrap();
-    Anchor::create(store, GENESIS, signer(dir), AnchorConfig::unconfigured()).unwrap()
+    Anchor::create(
+        store,
+        GENESIS,
+        signer(dir),
+        AcceptAll,
+        AnchorConfig::unconfigured(),
+    )
+    .unwrap()
 }
 
 /// Reopens the anchor at `dir` through a fresh store handle.
-fn reopen(dir: &Path) -> Anchor<FileLeafStore, FileSigner> {
+fn reopen(dir: &Path) -> Anchor<FileLeafStore, FileSigner, AcceptAll> {
     Anchor::open(
         FileLeafStore::open(dir).unwrap(),
         signer(dir),
+        AcceptAll,
         AnchorConfig::unconfigured(),
     )
     .unwrap()
@@ -85,7 +94,10 @@ fn reopen(dir: &Path) -> Anchor<FileLeafStore, FileSigner> {
 
 /// The verifier a third party would build: the origin they were told, and the
 /// public key they were given.
-fn verifier_for(origin: &str, anchor: &Anchor<FileLeafStore, FileSigner>) -> NoteVerifierKey {
+fn verifier_for(
+    origin: &str,
+    anchor: &Anchor<FileLeafStore, FileSigner, AcceptAll>,
+) -> NoteVerifierKey {
     NoteVerifierKey::new(origin, anchor.signer().public_key()).unwrap()
 }
 

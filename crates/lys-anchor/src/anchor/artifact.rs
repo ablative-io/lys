@@ -94,12 +94,13 @@
 use lys_core::tlog::{InclusionProofArtifact, build_inclusion_artifact};
 use lys_log_store::LeafStore;
 
+use crate::admission::AdmissionPolicy;
 use crate::error::{AnchorError, AnchorResult};
 use crate::keys::InProcessSigner;
 
 use super::open::Anchor;
 
-impl<S: LeafStore, K: InProcessSigner> Anchor<S, K> {
+impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     /// Builds the `lys/log-inclusion-proof/v1` JSON artifact for the leaf
     /// already at `leaf_index`, against the log's current size.
     ///

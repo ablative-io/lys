@@ -33,6 +33,23 @@
 //! [`keys::signer`](crate::keys::signer) for what that bound records and what
 //! would remove it.
 //!
+//! # The admission policy is held too, and there is no way to not choose one
+//!
+//! An anchor's third type parameter is its [`AdmissionPolicy`]. Both
+//! constructors take one by value and neither has an overload that omits it,
+//! because DP23's ruling is that **no deployment inherits an admission rule
+//! nobody chose** — and a convenience constructor that picked one would undo
+//! that in a line. There is no `Default` on any policy this crate ships and
+//! none should be added downstream.
+//!
+//! **Creating an anchor does not consult the policy.** Genesis is the
+//! operator's own bytes, handed to [`Anchor::create`] at construction, not a
+//! stranger's submission; policing it would make an anchor's existence depend
+//! on its access-control rule agreeing with its operator, and a policy that
+//! refuses everything would leave nothing to run it on. So `create` writes leaf
+//! 0 regardless, and the policy governs submissions only. That is asserted in
+//! this module's tests rather than left as an intention.
+//!
 //! # A repair is returned, not reported
 //!
 //! `Log::open` repairs exactly one divergence — storage one leaf ahead of the
@@ -45,6 +62,7 @@
 
 use lys_log_store::{LeafStore, Log};
 
+use crate::admission::AdmissionPolicy;
 use crate::config::AnchorConfig;
 use crate::error::{AnchorError, AnchorResult};
 use crate::keys::InProcessSigner;
@@ -52,10 +70,11 @@ use crate::keys::InProcessSigner;
 /// A transparency anchor: one append-only log, with a genesis leaf.
 ///
 /// Generic over the storage backend so a file-backed anchor is a type
-/// parameter rather than a commitment, and over the signer so key custody is a
-/// caller's choice rather than this crate's. Holds no origin and no peer —
-/// every operation completes with nothing else in existence.
-pub struct Anchor<S: LeafStore, K: InProcessSigner> {
+/// parameter rather than a commitment, over the signer so key custody is a
+/// caller's choice rather than this crate's, and over the admission policy so
+/// no deployment inherits an admission rule nobody chose. Holds no origin and
+/// no peer — every operation completes with nothing else in existence.
+pub struct Anchor<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> {
     // Visible to the rest of `anchor::` — `publish_checkpoint` and everything
     // after it live in sibling files to keep each one small, and they need the
     // log and the key. Not `pub(crate)`: no module outside `anchor::` has any
@@ -63,10 +82,19 @@ pub struct Anchor<S: LeafStore, K: InProcessSigner> {
     pub(super) log: Log<S>,
     pub(super) signer: K,
     pub(super) config: AnchorConfig,
+    pub(super) policy: P,
 }
 
-impl<S: LeafStore, K: InProcessSigner> std::fmt::Debug for Anchor<S, K> {
+impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> std::fmt::Debug for Anchor<S, K, P> {
     /// Summarizes the anchor without dumping log content.
+    ///
+    /// **The admission policy is deliberately not among the fields.** A
+    /// policy's `Debug` names its rule — a size limit, an issuer key, an
+    /// allow-list — and `Debug` output travels: into panic messages, error
+    /// reports and log lines that a submitter may well end up reading. The
+    /// refusal path spent an entire type on not disclosing the rule, and a
+    /// derived formatter would hand it over for free. An operator who wants it
+    /// has [`Anchor::policy`].
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Anchor")
             .field("origin", &self.origin())
@@ -76,21 +104,30 @@ impl<S: LeafStore, K: InProcessSigner> std::fmt::Debug for Anchor<S, K> {
     }
 }
 
-impl<S: LeafStore, K: InProcessSigner> Anchor<S, K> {
+impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     /// Creates an anchor over `store`, appending `genesis` as leaf 0.
     ///
     /// The genesis bytes are supplied by the caller and are not interpreted:
     /// they are stored verbatim, like any other leaf. The store must already
     /// exist and must be empty — it carries the origin, which is fixed at its
     /// creation and is never chosen here. `signer` is the key this anchor will
-    /// publish under; it is never consulted while creating the log.
+    /// publish under; it is never consulted while creating the log. `policy`
+    /// governs submissions and **is not consulted for genesis** — see the
+    /// [module docs](self) for why an anchor's own creation is not subject to
+    /// its access-control rule.
     ///
     /// # Errors
     ///
     /// [`AnchorError::GenesisAlreadyWritten`] if the store already holds
     /// leaves, and [`AnchorError::Store`] for anything the log or its storage
     /// refuses — including an integrity failure found while opening.
-    pub fn create(store: S, genesis: &[u8], signer: K, config: AnchorConfig) -> AnchorResult<Self> {
+    pub fn create(
+        store: S,
+        genesis: &[u8],
+        signer: K,
+        policy: P,
+        config: AnchorConfig,
+    ) -> AnchorResult<Self> {
         let mut log = Log::open(store)?;
         let tree_size = log.tree().len();
         if tree_size != 0 {
@@ -104,6 +141,7 @@ impl<S: LeafStore, K: InProcessSigner> Anchor<S, K> {
             log,
             signer,
             config,
+            policy,
         })
     }
 
@@ -115,13 +153,19 @@ impl<S: LeafStore, K: InProcessSigner> Anchor<S, K> {
     /// returns the size it was repaired to; the repair is never silent and this
     /// layer never consumes it.
     ///
+    /// `policy` is named here for the same reason it is named in
+    /// [`create`](Self::create): an admission rule is not a property of the
+    /// stored log and is not recovered from it. Two processes may open the same
+    /// store under two different policies, and the log carries no record of
+    /// which one admitted what — an anchor's log is what was admitted, not why.
+    ///
     /// # Errors
     ///
     /// [`AnchorError::NoGenesisLeaf`] if the log has no leaves, and
     /// [`AnchorError::Store`] for anything the log or its storage refuses —
     /// notably `StoreError::PinMismatch` when the stored leaves no longer
     /// rebuild to the pinned root.
-    pub fn open(store: S, signer: K, config: AnchorConfig) -> AnchorResult<Self> {
+    pub fn open(store: S, signer: K, policy: P, config: AnchorConfig) -> AnchorResult<Self> {
         let log = Log::open(store)?;
         if log.tree().is_empty() {
             return Err(AnchorError::NoGenesisLeaf {
@@ -132,6 +176,7 @@ impl<S: LeafStore, K: InProcessSigner> Anchor<S, K> {
             log,
             signer,
             config,
+            policy,
         })
     }
 
@@ -172,6 +217,17 @@ impl<S: LeafStore, K: InProcessSigner> Anchor<S, K> {
     /// offers no route to the private key.
     pub fn signer(&self) -> &K {
         &self.signer
+    }
+
+    /// The admission policy this anchor was constructed with.
+    ///
+    /// Borrowed, never replaced: there is no setter. An anchor whose admission
+    /// rule could be swapped mid-life would have a log whose contents were
+    /// admitted under rules nobody can reconstruct — and the log records no
+    /// rule, so the change would be invisible in the artifact afterwards.
+    /// Changing the policy means constructing an anchor with the new one.
+    pub fn policy(&self) -> &P {
+        &self.policy
     }
 }
 

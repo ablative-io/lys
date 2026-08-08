@@ -18,10 +18,33 @@
 //!   no index of seen statements, and has nowhere to keep one: recognising a
 //!   repeat would require deciding that two byte strings *mean* the same
 //!   thing, and an append-only log's answer is that it saw two events.
-//! - **`submit` interprets nothing.** No parse, no validation, no size rule.
-//!   Admission policy is a later increment and will be a separate,
-//!   explicitly-configured object; until it exists there is no code path here
-//!   in which the content of a statement changes the outcome.
+//! - **`submit` interprets nothing, and the admission policy is not `submit`
+//!   interpreting something.** There is still no parse, no validation and no
+//!   size rule *in this file*: the one decision that depends on a submission's
+//!   content is delegated whole to the [`AdmissionPolicy`] the operator
+//!   constructed the anchor with, and this module's entire part in it is to ask
+//!   before appending and to convert a refusal into a value carrying nothing.
+//!   An anchor with [`AcceptAll`](crate::AcceptAll) has, as before, no code
+//!   path in which a statement's content changes the outcome.
+//! - **What was established about the submitter travels beside the statement,
+//!   never inside it.** [`SubmitterContext`] is a second argument to `submit`,
+//!   not a field of [`Submission`], and it never reaches a leaf: the log holds
+//!   the statement bytes and nothing about who sent them. That keeps
+//!   [`Submission`] to the one field §3.2 specified, and it puts the
+//!   provenance of a credential — asserted by the submitter, or authenticated
+//!   by a transport — in a type whose variants a policy has to tell apart.
+//! - **Admission is decided before the append, and a refusal leaves no trace.**
+//!   The order is the invariant: a policy consulted after the append would have
+//!   an append-only log holding entries it refused, with no way to remove them.
+//!   So the log is what was admitted — and it records nothing about *why*,
+//!   because it holds no rule and no policy identity.
+//! - **The refusal is one value.** Every reason any policy has for refusing
+//!   arrives here as [`NotAdmitted`](crate::admission::NotAdmitted), which
+//!   carries nothing, and leaves as
+//!   [`AnchorError::NotAdmitted`], which also carries nothing. That is the
+//!   collapse `error`'s module docs demanded before this path existed: an
+//!   admission decision is a function of the submitted bytes, so a
+//!   distinguishable refusal would be an oracle for the policy.
 //!
 //! # Why a receipt needs two leaves, and why that is genesis's job
 //!
@@ -38,6 +61,7 @@
 use lys_core::receipt::{AnchorReceipt, sign_receipt};
 use lys_log_store::LeafStore;
 
+use crate::admission::{AdmissionPolicy, SubmitterContext};
 use crate::error::{AnchorError, AnchorResult};
 use crate::keys::InProcessSigner;
 use crate::wire::{Submission, SubmissionOutcome};
@@ -45,16 +69,29 @@ use crate::wire::{Submission, SubmissionOutcome};
 use super::open::Anchor;
 use super::proof_nodes::proof_nodes;
 
-impl<S: LeafStore, K: InProcessSigner> Anchor<S, K> {
-    /// Appends `submission`'s statement bytes to the log and returns the
-    /// anchor's signed receipt for them.
+impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
+    /// Puts `submission` to the anchor's admission policy, under `context`,
+    /// and — if it is admitted — appends its statement bytes to the log and
+    /// returns the anchor's signed receipt for them.
     ///
-    /// The bytes are stored verbatim as one leaf. Two submissions of identical
-    /// bytes produce two leaves at two indices and two receipts; nothing here
-    /// de-duplicates, and the [module docs](self) say why that is the only
-    /// answer an append-only log can give.
+    /// `context` is what the *caller* established about the submitter, and the
+    /// caller is whoever is in front of this anchor: a transport that
+    /// authenticated a peer, or a local process that authenticated nobody and
+    /// says so with [`SubmitterContext::Unidentified`]. It is read only by the
+    /// policy and is stored nowhere — the leaf is the statement bytes,
+    /// verbatim, and carries nothing about who sent them.
+    ///
+    /// Two submissions of identical bytes produce two leaves at two indices and
+    /// two receipts; nothing here de-duplicates, and the [module docs](self)
+    /// say why that is the only answer an append-only log can give.
     ///
     /// # Errors
+    ///
+    /// [`AnchorError::NotAdmitted`] if the policy refused, in which case
+    /// **nothing was appended** and the returned value is identical for every
+    /// reason any policy might have had. It is the same value a different
+    /// policy would have produced, so it discloses neither the rule nor the
+    /// policy.
     ///
     /// [`AnchorError::Store`] if the append fails — including
     /// `StoreError::Poisoned`, which means an earlier append on this handle
@@ -67,7 +104,17 @@ impl<S: LeafStore, K: InProcessSigner> Anchor<S, K> {
     /// that entry point exists separately.
     ///
     /// Otherwise whatever `receipt_for` returns.
-    pub fn submit(&mut self, submission: Submission<'_>) -> AnchorResult<SubmissionOutcome> {
+    pub fn submit(
+        &mut self,
+        submission: Submission<'_>,
+        context: SubmitterContext<'_>,
+    ) -> AnchorResult<SubmissionOutcome> {
+        // Before the append, and the refusal is discarded rather than mapped:
+        // `NotAdmitted` carries nothing, so there is nothing to carry across,
+        // and the variant it becomes has nowhere to put it if there were.
+        self.policy
+            .admit(&submission, &context)
+            .map_err(|_refusal| AnchorError::NotAdmitted)?;
         let (leaf_index, leaf_hash) = self.log.append(submission.statement)?;
         let receipt = self.receipt_for(leaf_index)?;
         Ok(SubmissionOutcome {

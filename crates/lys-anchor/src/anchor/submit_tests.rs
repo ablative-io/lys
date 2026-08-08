@@ -53,7 +53,10 @@
 //! claim belongs to the Go conformance gate and is not made here.
 
 use std::path::Path;
+use std::time::Duration;
 
+use lys_core::Ed25519Identity;
+use lys_core::ca::CertificateAuthority;
 use lys_core::checkpoint::{NoteVerifierKey, verify_checkpoint};
 use lys_core::receipt::verify_receipt;
 use lys_log_store::{FileLeafStore, Log};
@@ -61,6 +64,9 @@ use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
 use crate::AnchorConfig;
+use crate::admission::{
+    AcceptAll, AdmissionPolicy, AuthenticatedPeer, MaxSize, RecognisedCertificate, SubmitterContext,
+};
 use crate::keys::{FileSigner, Signer};
 
 use super::*;
@@ -112,14 +118,30 @@ fn signer(dir: &Path) -> FileSigner {
 }
 
 /// Creates a store at `dir` under [`ORIGIN`] and an anchor over it.
-fn create_anchor(dir: &Path) -> Anchor<FileLeafStore, FileSigner> {
+fn create_anchor(dir: &Path) -> Anchor<FileLeafStore, FileSigner, AcceptAll> {
+    create_anchor_with(dir, AcceptAll)
+}
+
+/// Creates a store at `dir` under [`ORIGIN`] and an anchor over it, under a
+/// named admission policy.
+fn create_anchor_with<P: AdmissionPolicy>(
+    dir: &Path,
+    policy: P,
+) -> Anchor<FileLeafStore, FileSigner, P> {
     let store = FileLeafStore::create(dir, ORIGIN).unwrap();
-    Anchor::create(store, GENESIS, signer(dir), AnchorConfig::unconfigured()).unwrap()
+    Anchor::create(
+        store,
+        GENESIS,
+        signer(dir),
+        policy,
+        AnchorConfig::unconfigured(),
+    )
+    .unwrap()
 }
 
 /// The verifier a third party would build: the origin they were told, and the
 /// public key they were given.
-fn verifier(anchor: &Anchor<FileLeafStore, FileSigner>) -> NoteVerifierKey {
+fn verifier(anchor: &Anchor<FileLeafStore, FileSigner, AcceptAll>) -> NoteVerifierKey {
     NoteVerifierKey::new(ORIGIN, anchor.signer().public_key()).unwrap()
 }
 
@@ -138,9 +160,12 @@ fn the_leaf_hash_is_sha256_of_the_tag_byte_and_the_statement() {
     let mut anchor = create_anchor(tmp.path());
 
     let outcome = anchor
-        .submit(Submission {
-            statement: STATEMENT,
-        })
+        .submit(
+            Submission {
+                statement: STATEMENT,
+            },
+            SubmitterContext::Unidentified,
+        )
         .unwrap();
 
     // Driven by the test, not by `raw_leaf_hash` — the helper the append path
@@ -172,7 +197,9 @@ fn the_statement_is_stored_verbatim_and_the_anchor_reads_nothing_into_it() {
     // Bytes that are not valid UTF-8, contain a NUL, and would be mangled by
     // any canonicalization, trimming or text handling on the way to storage.
     let statement: &[u8] = &[0xff, 0x00, 0x0a, b'{', 0xc3, 0x28, b'}', 0x0d];
-    let outcome = anchor.submit(Submission { statement }).unwrap();
+    let outcome = anchor
+        .submit(Submission { statement }, SubmitterContext::Unidentified)
+        .unwrap();
 
     assert_eq!(leaf_from_disk(dir, outcome.leaf_index), statement);
 
@@ -197,9 +224,12 @@ fn every_receipt_in_a_deeper_log_reconstructs_the_root_the_checkpoint_publishes(
 
     for n in 0..8_u8 {
         anchor
-            .submit(Submission {
-                statement: &[n; 11],
-            })
+            .submit(
+                Submission {
+                    statement: &[n; 11],
+                },
+                SubmitterContext::Unidentified,
+            )
             .unwrap();
     }
     assert_eq!(anchor.tree_size(), 9);
@@ -250,9 +280,12 @@ fn the_receipt_reconstructs_the_root_the_checkpoint_publishes() {
     let mut anchor = create_anchor(tmp.path());
 
     let outcome = anchor
-        .submit(Submission {
-            statement: STATEMENT,
-        })
+        .submit(
+            Submission {
+                statement: STATEMENT,
+            },
+            SubmitterContext::Unidentified,
+        )
         .unwrap();
 
     // The receipt verifies — necessary, and on its own worth nothing here: it
@@ -300,9 +333,12 @@ fn duplicate_submissions_are_two_events_with_two_independently_verifying_receipt
     for _ in 0..2 {
         outcomes.push(
             anchor
-                .submit(Submission {
-                    statement: STATEMENT,
-                })
+                .submit(
+                    Submission {
+                        statement: STATEMENT,
+                    },
+                    SubmitterContext::Unidentified,
+                )
                 .unwrap(),
         );
     }
@@ -361,9 +397,12 @@ fn receipt_for_refuses_an_index_the_log_does_not_have() {
     let tmp = TempDir::new().unwrap();
     let mut anchor = create_anchor(tmp.path());
     anchor
-        .submit(Submission {
-            statement: STATEMENT,
-        })
+        .submit(
+            Submission {
+                statement: STATEMENT,
+            },
+            SubmitterContext::Unidentified,
+        )
         .unwrap();
 
     // Positive control: the indices that exist are served, so the refusals
@@ -421,11 +460,154 @@ fn receipt_for_refuses_a_log_that_holds_only_its_genesis_leaf() {
     // Positive control, and the proof that the refusal is about the size and
     // nothing else: one submission removes the condition permanently.
     anchor
-        .submit(Submission {
-            statement: STATEMENT,
-        })
+        .submit(
+            Submission {
+                statement: STATEMENT,
+            },
+            SubmitterContext::Unidentified,
+        )
         .unwrap();
     anchor
         .receipt_for(0)
         .expect("genesis has a receipt once a second leaf exists");
+}
+
+#[test]
+fn a_refused_submission_appends_nothing() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    let mut anchor = create_anchor_with(dir, MaxSize::new(4));
+
+    // Positive control first: the policy admits something, so the refusal below
+    // is the rule firing rather than an anchor that refuses everything.
+    let admitted = anchor
+        .submit(
+            Submission { statement: b"four" },
+            SubmitterContext::Unidentified,
+        )
+        .unwrap();
+    assert_eq!(admitted.leaf_index, 1);
+    assert_eq!(anchor.tree_size(), 2);
+
+    let err = anchor
+        .submit(
+            Submission {
+                statement: b"five!",
+            },
+            SubmitterContext::Unidentified,
+        )
+        .unwrap_err();
+    assert!(
+        matches!(err, AnchorError::NotAdmitted),
+        "a refused submission must produce NotAdmitted, got: {err}"
+    );
+
+    // The claim is about what is on disk, so it is read back through a store
+    // handle that never saw either call.
+    assert_eq!(anchor.tree_size(), 2);
+    let store = FileLeafStore::open(dir).unwrap();
+    assert_eq!(store.extent(), 2, "a refused submission must not append");
+    assert_eq!(store.leaf(0).unwrap().as_deref(), Some(GENESIS));
+    assert_eq!(store.leaf(1).unwrap().as_deref(), Some(&b"four"[..]));
+}
+
+#[test]
+fn refusals_from_different_rules_and_different_policies_are_one_value() {
+    // Three anchors, three admission rules, two policy types. A submitter who
+    // could tell any of these apart would be reading the rule out of the
+    // refusal, which is the disclosure the collapse exists to prevent.
+    let tmp_a = TempDir::new().unwrap();
+    let mut by_length = create_anchor_with(tmp_a.path(), MaxSize::new(0));
+
+    let ca_dir = TempDir::new().unwrap();
+    let ca_key = ca_dir.path().join("ca.key");
+    std::fs::write(&ca_key, b"lys-anchor-submit-gate-ca-seed1!").unwrap();
+    let ours = CertificateAuthority::new(Ed25519Identity::load(&ca_key).unwrap());
+    let other_key = ca_dir.path().join("other-ca.key");
+    std::fs::write(&other_key, b"lys-anchor-submit-gate-ca-seed2!").unwrap();
+    let theirs = CertificateAuthority::new(Ed25519Identity::load(&other_key).unwrap());
+    let foreign = theirs
+        .issue_certificate("submitter", Duration::from_secs(3600), vec![])
+        .unwrap();
+
+    let tmp_b = TempDir::new().unwrap();
+    let mut by_absence = create_anchor_with(
+        tmp_b.path(),
+        RecognisedCertificate::issued_by(ours.public_key_bytes()),
+    );
+    let tmp_c = TempDir::new().unwrap();
+    let mut by_issuer = create_anchor_with(
+        tmp_c.path(),
+        RecognisedCertificate::issued_by(ours.public_key_bytes()),
+    );
+
+    let refusals = [
+        // Tripped by length.
+        by_length
+            .submit(
+                Submission {
+                    statement: STATEMENT,
+                },
+                SubmitterContext::Unidentified,
+            )
+            .unwrap_err(),
+        // Tripped by there being no credential at all.
+        by_absence
+            .submit(
+                Submission {
+                    statement: STATEMENT,
+                },
+                SubmitterContext::Unidentified,
+            )
+            .unwrap_err(),
+        // Tripped by a valid certificate from the wrong authority — and
+        // reached through the arm a transport would use, so the provenance
+        // carrying the strongest claim does not soften the refusal.
+        by_issuer
+            .submit(
+                Submission {
+                    statement: STATEMENT,
+                },
+                SubmitterContext::AuthenticatedByTransport(
+                    AuthenticatedPeer::verified_by_transport(&foreign.der_bytes),
+                ),
+            )
+            .unwrap_err(),
+    ];
+
+    let mut compared = 0;
+    for refusal in &refusals {
+        assert!(matches!(refusal, AnchorError::NotAdmitted));
+        assert_eq!(refusal.to_string(), refusals[0].to_string());
+        assert_eq!(format!("{refusal:?}"), format!("{:?}", refusals[0]));
+        assert_eq!(
+            std::mem::discriminant(refusal),
+            std::mem::discriminant(&refusals[0])
+        );
+        compared += 1;
+    }
+    // Count what fired: an empty array satisfies the loop without comparing
+    // anything at all.
+    assert_eq!(compared, 3, "every refusal case must have been submitted");
+
+    // Positive control, and it is the part that can fail today. The three
+    // assertions above are all *equalities*, and equalities between values a
+    // broken harness produced identically would also pass. So the same three
+    // comparisons are run against an error that genuinely differs: if
+    // `to_string`, `Debug` or `discriminant` were blind, this would pass too.
+    let different = by_length.receipt_for(9_999).unwrap_err();
+    assert_ne!(different.to_string(), refusals[0].to_string());
+    assert_ne!(format!("{different:?}"), format!("{:?}", refusals[0]));
+    assert_ne!(
+        std::mem::discriminant(&different),
+        std::mem::discriminant(&refusals[0])
+    );
+
+    // And the refusal really does say nothing: no origin, no size, no rule.
+    let message = refusals[0].to_string();
+    assert!(!message.contains(ORIGIN), "the refusal named the origin");
+    assert!(
+        !message.chars().any(|c| c.is_ascii_digit()),
+        "the refusal carried a number: {message}"
+    );
 }
