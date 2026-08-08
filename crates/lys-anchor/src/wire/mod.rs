@@ -15,10 +15,12 @@
 //! - **Nothing here is authoritative on its own.** Every field of
 //!   `SubmissionOutcome` except the receipt is a convenience a holder can
 //!   recompute or check for themselves, and the receipt is the only value in
-//!   it that carries a signature.
+//!   it that carries a signature. [`AppendOutcome`] is the same value with that
+//!   one field absent, so *nothing* in it is authoritative — which is stated on
+//!   the type rather than left to be inferred from the missing field.
 
 pub mod submission;
 
-pub use submission::Submission;
 #[cfg(feature = "unstable-anchor")]
 pub use submission::SubmissionOutcome;
+pub use submission::{AppendOutcome, Submission};

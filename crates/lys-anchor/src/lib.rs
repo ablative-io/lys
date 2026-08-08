@@ -42,9 +42,18 @@
 //!   receipts would be endorsements rather than observations. Two identical
 //!   submissions are two events at two indices with two receipts: recognising
 //!   a repeat would mean deciding that two byte strings mean the same thing,
-//!   which is precisely the judgement this crate does not make. `submit` and
-//!   the receipt it returns are behind the off-by-default `unstable-anchor`
-//!   feature, which forwards `lys-core`'s gate on the draft receipt format.
+//!   which is precisely the judgement this crate does not make.
+//! - **The gate is on the receipt, not on the append.** [`Anchor::append`] is
+//!   ungated: it runs the admission policy, adds the leaf, and returns an
+//!   [`AppendOutcome`] carrying three numbers and no wire format. `submit` is
+//!   `append` followed by `receipt_for`, and *it* is behind the off-by-default
+//!   `unstable-anchor` feature, which forwards `lys-core`'s gate on the draft
+//!   receipt format. The split was made after the previous arrangement was
+//!   measured: with the gate on the verb, **a default-features anchor was
+//!   frozen at tree size 1 forever**, so the only leaf the ungated JSON
+//!   artifact could describe was genesis, and the claim that ungating it put
+//!   DP2 in the feature graph was false. [`anchor::append`] carries the
+//!   account.
 //! - **The JSON proof of inclusion is *not* behind that gate, and that is a
 //!   property rather than a convenience.** [`Anchor::inclusion_artifact`] emits
 //!   the `lys/log-inclusion-proof/v1` artifact — an RFC 6962 path plus a signed
@@ -112,6 +121,27 @@
 //! What changes it is one external party keeping its own durable memory of this
 //! anchor's checkpoints. Nothing in this crate substitutes for that.
 //!
+//! **That paragraph is also a value.** [`Anchor::status`] returns an
+//! [`AnchorStatus`] whose `posture` field is a [`WitnessPosture`], and
+//! `WitnessPosture`'s `Display` is [`STANDALONE_DISCLOSURE`] — the same
+//! sentence, whole. A caller cannot obtain a status without obtaining the
+//! posture, and cannot display the posture without displaying the disclosure,
+//! so it is not a sentence a renderer can quietly drop. [`anchor::status`] says
+//! what is and is not yet established by "the posture is computed, never
+//! stored".
+//!
+//! # Reading an anchor does not require the ability to sign for it
+//!
+//! [`Anchor::open_read_only`] opens an anchor with no signer and no admission
+//! policy, and returns an [`Anchor<S, NoSigner, NoPolicy>`](Anchor) on which
+//! the signing and appending methods **do not resolve** — [`NoSigner`]
+//! implements no signing trait and [`NoPolicy`] no policy trait, and the bounds
+//! that gate those methods live on their `impl` blocks. There is no
+//! `Option<signer>` for a signerless anchor to travel through a signing path
+//! inside; the refusal is the compiler's. [`Anchor::root`] is on the same
+//! unbounded surface, so reporting a root no longer requires emitting a signed
+//! checkpoint as a side effect.
+//!
 //! # Witnessing is additive, off by default, and endorses nothing
 //!
 //! Being that external party for somebody else is the `witness` module, behind
@@ -151,12 +181,15 @@ pub use admission::{
     AcceptAll, AdmissionPolicy, AuthenticatedPeer, MaxSize, NotAdmitted, RecognisedCertificate,
     SubmitterContext,
 };
-pub use anchor::{Anchor, PublishedCheckpoint, proof_nodes};
+pub use anchor::{
+    Anchor, AnchorStatus, NoPolicy, NoSigner, PublishedCheckpoint, ReadOnlyAnchor,
+    STANDALONE_DISCLOSURE, WitnessPosture, proof_nodes,
+};
 pub use config::AnchorConfig;
 pub use error::{AnchorError, AnchorResult};
 pub use keys::{FileSigner, InProcessSigner, Signer};
-pub use wire::Submission;
 #[cfg(feature = "unstable-anchor")]
 pub use wire::SubmissionOutcome;
+pub use wire::{AppendOutcome, Submission};
 #[cfg(feature = "federation")]
 pub use witness::{Observation, OriginState, Relation, WitnessProjection, observe};

@@ -1,6 +1,20 @@
 //! [`Anchor::submit`] — append a statement and issue the receipt for it — and
 //! [`Anchor::receipt_for`], which issues one for a leaf already logged.
 //!
+//! # `submit` is `append` plus `receipt_for`, and the split is deliberate
+//!
+//! The policy consultation, the append and the tree read live in
+//! [`anchor::append`](super::append), which is **not** behind
+//! `unstable-anchor`. `submit` calls it and adds the one thing that is a draft
+//! format — the receipt. The gate belongs on the noun: an anchor that could not
+//! append without the feature was frozen at tree size 1 in a default build, and
+//! `append`'s module docs carry the full account.
+//!
+//! Everything the invariants below assert about the *order* of admission and
+//! append is therefore held by `append` and asserted in its tests; it is
+//! restated here because `submit` is where a reader looks for it, not because
+//! there are two copies of the code.
+//!
 //! # Invariants
 //!
 //! - **The statement is appended before anything is signed, and the receipt is
@@ -109,20 +123,16 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
         submission: Submission<'_>,
         context: SubmitterContext<'_>,
     ) -> AnchorResult<SubmissionOutcome> {
-        // Before the append, and the refusal is discarded rather than mapped:
-        // `NotAdmitted` carries nothing, so there is nothing to carry across,
-        // and the variant it becomes has nowhere to put it if there were.
-        self.policy
-            .admit(&submission, &context)
-            .map_err(|_refusal| AnchorError::NotAdmitted)?;
-        let (leaf_index, leaf_hash) = self.log.append(submission.statement)?;
-        let receipt = self.receipt_for(leaf_index)?;
+        // The policy consultation, the append and the tree read are all
+        // `append`'s, reached rather than repeated: two copies of the
+        // admission-then-append order would be two places for the order to
+        // drift, and the order is the invariant.
+        let appended = self.append(submission, context)?;
+        let receipt = self.receipt_for(appended.leaf_index)?;
         Ok(SubmissionOutcome {
-            leaf_index,
-            // Read from the tree, the same source `publish_checkpoint` reads,
-            // rather than counted or remembered here.
-            tree_size: self.tree_size(),
-            leaf_hash,
+            leaf_index: appended.leaf_index,
+            tree_size: appended.tree_size,
+            leaf_hash: appended.leaf_hash,
             receipt,
         })
     }

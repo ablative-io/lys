@@ -1,5 +1,5 @@
-//! [`Submission`] — the bytes offered to an anchor — and
-//! `SubmissionOutcome` — what it says back.
+//! [`Submission`] — the bytes offered to an anchor — [`AppendOutcome`], what a
+//! bare append reports, and `SubmissionOutcome`, which is that plus a receipt.
 //!
 //! # The anchor does not know what it notarized, and that is the design
 //!
@@ -52,6 +52,26 @@
 //! The anchor's **origin appears nowhere in the receipt**. A receipt says
 //! which key signed, not which log; binding a receipt to a named log is the
 //! checkpoint's job, and a consumer who needs both needs both artifacts.
+//!
+//! # [`AppendOutcome`]: nothing in it is signed at all
+//!
+//! An [`AppendOutcome`] is a `SubmissionOutcome` with the one signed field
+//! removed, and stating the consequence flatly is the whole reason it has its
+//! own type rather than being an `Option<receipt>` on the other: **no field of
+//! an `AppendOutcome` is covered by any signature, so all three are reports and
+//! none is a claim.** A holder who wants a claim about this leaf asks for one —
+//! [`Anchor::inclusion_artifact`](crate::Anchor::inclusion_artifact) in any
+//! build, `receipt_for` in a build with `unstable-anchor` — and gets an
+//! artifact whose bytes a stranger can check. Until then the three numbers are
+//! the anchor telling the caller where it put their bytes, and are worth
+//! exactly the caller's trust in the anchor.
+//!
+//! The individual fields are the same values, and are checkable in the same
+//! ways, as the ones described above — `leaf_hash` is recomputable by anyone
+//! holding the statement, `leaf_index` and `tree_size` are confirmable against
+//! any artifact the anchor later issues for that leaf. What is different is
+//! that *here* nothing authenticates them even by consequence, because there is
+//! no signed root in the value for them to be inconsistent with.
 
 /// One statement offered to an anchor, verbatim.
 ///
@@ -65,6 +85,26 @@ pub struct Submission<'a> {
     /// The statement bytes, exactly as the submitter supplied them. The anchor
     /// does not interpret them.
     pub statement: &'a [u8],
+}
+
+/// What an anchor reports after admitting a statement and appending it.
+///
+/// Every field is a report. See the [module docs](self) for the consequence of
+/// there being no receipt here: **nothing in this value is signed at all**, so
+/// a holder who needs a claim rather than a report asks the anchor for an
+/// artifact about the leaf this names.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AppendOutcome {
+    /// The index the statement was appended at. Never `0` — index 0 is the
+    /// genesis leaf, written when the anchor was created.
+    pub leaf_index: u64,
+    /// The size of the anchor's tree once the statement was in it, read from
+    /// the tree rather than counted here.
+    pub tree_size: u64,
+    /// RFC 6962's `SHA-256(0x00 ‖ statement)`, the hash the log knows this
+    /// leaf by. Recomputable by anyone holding the statement, which is the only
+    /// reason to believe it.
+    pub leaf_hash: [u8; 32],
 }
 
 /// What an anchor reports after admitting a submission.

@@ -50,6 +50,25 @@
 //! 0 regardless, and the policy governs submissions only. That is asserted in
 //! this module's tests rather than left as an intention.
 //!
+//! # The bounds live on the impl blocks, not on the type
+//!
+//! [`Anchor`]'s declaration names no bound on its signer or its policy
+//! parameter; each `impl` block names the bounds its methods actually need.
+//! That is not stylistic. It is what lets one type carry two capabilities:
+//! `create` and `open` require `K: InProcessSigner` and `P: AdmissionPolicy`,
+//! so an anchor built through them can sign and can admit — while
+//! [`Anchor::open_read_only`](crate::Anchor::open_read_only) produces an
+//! `Anchor<S, NoSigner, NoPolicy>`, and [`NoSigner`](crate::NoSigner)
+//! implements neither trait, so **the signing and admitting methods are not in
+//! scope on that value at all**. The refusal is a resolution failure at compile
+//! time, not a runtime check that could be forgotten, and there is no
+//! `Option<K>` anywhere for a signerless anchor to travel through a signing
+//! path inside.
+//!
+//! The reads below — origin, size, root, leaf bytes, repair, config — are on
+//! the unbounded block for the same reason: none of them signs anything, so
+//! none of them should need the ability to.
+//!
 //! # A repair is returned, not reported
 //!
 //! `Log::open` repairs exactly one divergence — storage one leaf ahead of the
@@ -60,6 +79,7 @@
 //! reported, and a repair the operator never hears about is indistinguishable
 //! from one that never happened.
 
+use lys_core::merkle::RootHash;
 use lys_log_store::{LeafStore, Log};
 
 use crate::admission::AdmissionPolicy;
@@ -74,7 +94,11 @@ use crate::keys::InProcessSigner;
 /// caller's choice rather than this crate's, and over the admission policy so
 /// no deployment inherits an admission rule nobody chose. Holds no origin and
 /// no peer — every operation completes with nothing else in existence.
-pub struct Anchor<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> {
+///
+/// `K` and `P` carry no bound here; see the [module docs](self) for why the
+/// bounds sit on the `impl` blocks and what that buys — a read-only anchor for
+/// which the signing methods do not exist.
+pub struct Anchor<S: LeafStore, K, P> {
     // Visible to the rest of `anchor::` — `publish_checkpoint` and everything
     // after it live in sibling files to keep each one small, and they need the
     // log and the key. Not `pub(crate)`: no module outside `anchor::` has any
@@ -85,7 +109,7 @@ pub struct Anchor<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> {
     pub(super) policy: P,
 }
 
-impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> std::fmt::Debug for Anchor<S, K, P> {
+impl<S: LeafStore, K, P> std::fmt::Debug for Anchor<S, K, P> {
     /// Summarizes the anchor without dumping log content.
     ///
     /// **The admission policy is deliberately not among the fields.** A
@@ -180,6 +204,31 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
         })
     }
 
+    /// The signer this anchor publishes under.
+    ///
+    /// Exposed so a caller can obtain the public key to hand a verifier — the
+    /// only thing anybody outside needs from it. The trait it is bounded by
+    /// offers no route to the private key.
+    pub fn signer(&self) -> &K {
+        &self.signer
+    }
+
+    /// The admission policy this anchor was constructed with.
+    ///
+    /// Borrowed, never replaced: there is no setter. An anchor whose admission
+    /// rule could be swapped mid-life would have a log whose contents were
+    /// admitted under rules nobody can reconstruct — and the log records no
+    /// rule, so the change would be invisible in the artifact afterwards.
+    /// Changing the policy means constructing an anchor with the new one.
+    pub fn policy(&self) -> &P {
+        &self.policy
+    }
+}
+
+/// The reads. **Nothing in this block signs, and nothing in it admits**, which
+/// is why it names no bound on `K` or `P`: the methods here are reachable on a
+/// read-only anchor, and the compiler is what says so rather than a comment.
+impl<S: LeafStore, K, P> Anchor<S, K, P> {
     /// The anchor's origin, as its store reports it.
     ///
     /// Read through to storage on every call. This crate has no origin of its
@@ -194,6 +243,30 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     /// refuses a log without one.
     pub fn tree_size(&self) -> u64 {
         self.log.tree().len()
+    }
+
+    /// The RFC 6962 Merkle Tree Hash of the log as it stands, together with the
+    /// leaf count it was computed at — [`RootHash`] carries both, so the two
+    /// cannot be reported out of step.
+    ///
+    /// **Reading the root signs nothing.** Before this existed the only route
+    /// to an anchor's current root was
+    /// [`publish_checkpoint`](Self::publish_checkpoint), which signs a note, so
+    /// a command that merely wanted to *report* the root emitted a signed
+    /// artifact as a side effect. That inverts the division
+    /// `crates/lys/src/commands/log/store.rs` records — observing your own
+    /// append-only log should not require the ability to sign for it — and the
+    /// inversion is why this accessor is on the unbounded block: a value that
+    /// cannot sign can still be asked what its root is.
+    ///
+    /// This is not a substitute for a checkpoint and cannot be handed to a
+    /// third party as evidence of anything. A root nobody signed is a number
+    /// the holder read off their own disk; what makes it a claim is
+    /// `publish_checkpoint`, and a verifier should be given that instead.
+    ///
+    /// Read through to the tree on every call, like every other accessor here.
+    pub fn root(&self) -> RootHash {
+        self.log.tree().root()
     }
 
     /// The bytes stored at `leaf_index`, or `None` if the log holds no such
@@ -223,26 +296,6 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     /// The configuration this anchor was constructed with.
     pub fn config(&self) -> &AnchorConfig {
         &self.config
-    }
-
-    /// The signer this anchor publishes under.
-    ///
-    /// Exposed so a caller can obtain the public key to hand a verifier — the
-    /// only thing anybody outside needs from it. The trait it is bounded by
-    /// offers no route to the private key.
-    pub fn signer(&self) -> &K {
-        &self.signer
-    }
-
-    /// The admission policy this anchor was constructed with.
-    ///
-    /// Borrowed, never replaced: there is no setter. An anchor whose admission
-    /// rule could be swapped mid-life would have a log whose contents were
-    /// admitted under rules nobody can reconstruct — and the log records no
-    /// rule, so the change would be invisible in the artifact afterwards.
-    /// Changing the policy means constructing an anchor with the new one.
-    pub fn policy(&self) -> &P {
-        &self.policy
     }
 }
 
