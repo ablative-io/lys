@@ -41,6 +41,82 @@ published"* — is answered rather than ignored:
 Location changes nothing about *when* the format freezes. It freezes when a real anchor
 writes leaf 0, because `LeafStore` has no insert — and that is DP17's, not this file's.
 
+## 0.5 🔴 OPEN DECISION — the `origin` field may become a general `subject`, and this is the only free window
+
+**Raised 2026-08-08, before publication, by the arrival of a real consumer. Tom's to rule.**
+
+This document specifies `origin` as a DNS-style origin on DP15's reasoning — *pick the domain
+you will still control in twenty years* — compared by raw byte equality against a value the
+verifier was configured with. That is right for an anchor. It is wrong for the first consumer.
+
+`manifold` is already a `lys-core` consumer (26 call sites, identity and attestation both
+load-bearing). Its requirement, written in its own source at `compose/record.rs:160`, is that
+*"passkey + lys certificate is what turns a claim into a countersigned delegation"* — and the
+structural fact underneath it is that **its registry is keyed on the handle and nothing else,
+so a seat has no registry entry to be checked against.** The gap is therefore not a missing
+check but a **missing binding**, and the architecture that supplies one is exactly one hop:
+
+> **The registry pins the handle. A delegation extends that pin one hop to a seat.**
+
+A verifier walks envelope → delegation → registry pin: three links, each terminating in
+something it already trusts.
+
+**But this format cannot express it, and forcing it would be a lie in the signed bytes.** A
+handle is not a domain; putting one in `origin` puts a value into a slot whose documented
+meaning is something else, which is the "signed value that reads as something it is not"
+failure this document argues against in §2.3 and §2.4. `role` has one inhabitant and rejects
+unknown values *by design*, so "speaks-for" does not exist. `sequence` is scoped to
+`(origin, role)` for rotation ordering in a log that path does not have.
+
+**The two options, and why the timing is the whole point:**
+
+1. **Generalise now** — one payload saying *"key A states key B holds role R for subject S,
+   from time T, sequence N"*, with `subject` an **opaque typed string**: an anchor passes a
+   domain, manifold passes a seat identifier. This is DP13 (domain-agnostic) applied to the
+   payload rather than only to the crate.
+2. **Mint a sibling later** — leave this format alone and add a second one.
+
+⭐ **Publication is what forecloses option 1.** `lys-core 0.3.0` is deliberately held, so
+generalising is free *today* and a `v2` after any release. A consumer arriving inside that
+window is luck to spend rather than admire.
+
+The honest argument against generalising: a format shaped by whichever consumer arrived first
+is a format shaped by an accident. The mitigation is to keep `subject` opaque and typed rather
+than trying to anticipate every future subject kind — describe the slot, not its occupants.
+
+### 0.5.1 The `typed` half of "opaque typed subject" is load-bearing, and it is what preserves DP15
+
+Worth stating separately, because "opaque string" and "opaque **typed** string" are one word
+apart and the word carries a security property.
+
+**Generalising `origin` to a bare string would move DP15's protection out of the format and
+into the caller.** Today the field's meaning is fixed, so "this is a domain, and a lapsed
+domain orphans every proof" is a property of the artifact. Make it a bare string and an anchor
+could pass a seat identifier, or a consumer a domain, and **nothing would notice** — the
+delegation would verify perfectly and mean something no verifier could pin down. That is
+precisely the §2.3 failure (a signed value whose semantics live nowhere) reintroduced through
+the field that used to be the most tightly specified.
+
+So the subject carries its **kind** alongside its value, and **a verifier states the kind it
+expects**. Cross-kind confusion is then refused at decode rather than discovered downstream —
+the same discipline §3.1 applies *between* formats, applied *within* one. A seat delegation
+cannot be presented to an anchor verifier and a domain delegation cannot be presented to
+manifold, for the same structural reason an inclusion receipt cannot be re-labelled as a
+consistency receipt.
+
+The kind set is closed and unknown kinds are rejected, on §2.3's reasoning exactly. Two kinds
+are known to be wanted; a third is a `v3`, and that is what versioned wire contracts are for.
+
+**This makes option 1 strictly better than a bare generalisation and answers the
+"shaped-by-whoever-arrived-first" objection concretely**: the format is not shaped by manifold,
+it is shaped to *distinguish* manifold's subject from an anchor's — which is a property the
+current single-purpose field gets for free and a bare string would silently lose.
+
+**What is already built stays useful either way.** The construction — tagged `COSE_Sign1`,
+canonical CBOR, `kid`-is-a-claim, re-encode-and-byte-compare, non-oracle failure, an
+independent second encoder and a `go-cose` gate — is payload-independent. Increment 11b
+(genesis-as-delegation) changes a call site if the payload generalises, not a structure.
+
 ## 1. The artifact
 
 A **tagged** `COSE_Sign1` (RFC 9052 tag 18), so byte 0 is `0xD2`.
@@ -480,12 +556,67 @@ at some later, less debuggable moment.
 
 ## 5. Genesis-as-delegation (the second half of increment 11)
 
-`Anchor::create` currently appends caller-supplied genesis bytes. It changes to build leaf 0
-as a delegation from the **root** signer to the **operational** signer's public key, for the
-configured origin.
+⛔ **CORRECTED — this section said "`Anchor::create` … changes to build leaf 0 as a
+delegation", and that substitution is impossible. §0 and §5 could not both be satisfied, and
+§5 never noticed.** Found by building it.
 
-Deferred to a separate commit after the format is reviewed, so the freeze is reviewable on
-its own. **No delegation may be signed outside tests (DP17).**
+§0 puts the format behind `unstable-anchor` **in order to keep it changeable**. But
+**genesis is the one code path a default build cannot do without** — `LeafStore` has no
+insert, so a log created without leaf 0 can never be given one. So the gate that protects the
+format *forbids* the substitution: replacing `create`'s body with a delegation build leaves a
+default-features build unable to create any anchor at all, which is a worse form of the
+"reachable API over an unreachable state" trap this build already fell into once.
+
+**The resolution, and it is a genuine design finding rather than a workaround: the two
+feature shapes need different genesis, and a default build cannot create a DP16-conformant
+anchor. By construction, until the format is ratified and the gate comes off.**
+
+- `Anchor::create(store, genesis: &[u8], …)` stays **ungated and byte-for-byte unchanged**.
+- `Anchor::create_with_delegated_genesis(store, root_signer, not_before_unix_ms, …)` is a
+  **second, differently-named** constructor behind `unstable-anchor`.
+
+Two names, not one name with a `#[cfg]`-varying signature — that would be two functions
+wearing one name, forking every call site and `standalone_is_complete.rs`, which is
+deliberately `#[cfg]`-free so it compiles in both shapes. And emphatically not a constructor
+that accepts a root signer and writes *something else* when the feature is off: that puts a
+durable leaf 0 that looks like an intended delegation and is not one at the single position
+that can never be corrected.
+
+**Normative decisions this section previously left to a parenthetical or to silence:**
+
+- **`sequence` is `0` for genesis**, fixed by the constructor, not a parameter. It was stated
+  only as an aside in §6.1's *test-vector* rationale, which is not where a constructor's
+  behaviour belongs. Not a parameter because genesis is the first delegation for its
+  `(origin, role)` by construction, so any nonzero start opens a range below the first entry
+  that nothing can ever write into — and a caller-chosen start is the same foot-gun §1.2
+  closes at `u64::MAX`.
+- **`not_before_unix_ms` is a parameter and no clock is read.** It is a claim by the signer,
+  and the signer is the caller holding the root key, not the library. The argument that
+  settles it is the field's own purpose: `not_before` exists so a delegation can be prepared
+  **offline to take effect later**, which a clock read at creation time forbids outright.
+- **The origin comes from `LeafStore::origin()`.** No new config field, no constant (DP15).
+- **Ordering inside the constructor is an invariant:** check-empty → build → sign → assemble
+  (which verifies) → append. Leaf 0 cannot be replaced, so a signer that declines must leave
+  an **empty** log that can still be given genesis later.
+
+⭐ **An unexpected result worth keeping: the root-signer bound is `Signer`, not
+`InProcessSigner`.** Because the constructor goes through `delegation_preimage` +
+`Signer::sign` + `assemble_delegation` rather than the `sign_delegation` convenience, **an
+offline or remote root signer can issue an anchor's genesis today**, with no
+`Ed25519Identity` anywhere in the path. `keys/signer.rs` had said "nothing in this crate
+calls `sign` yet"; that is now false and was corrected. The asymmetry *is* the custody story:
+the key that must stay online is the one the crate has to hold, and the root key — the one an
+operator most wants air-gapped — is the one it does not. **An entry point designed for absent
+key material passes a custody boundary for free.**
+
+**No delegation may be signed outside tests (DP17)** — and the exposure is now one flag wide:
+nothing in `lys-anchor-cli` reaches the new constructor, so the moment `anchor init` grows a
+`--root-key`, DP17 is violated by a command rather than by a library call.
+
+**Known limit, named rather than papered over: the DP16 invariant holds only at creation.**
+`Anchor::open` never inspects leaf 0, so a store created by a default build and later opened
+by an all-features build is a non-DP16 anchor and nothing flags it. Checking at open would
+need a root key argument and, done properly, the deferred key-history fold.
 
 ---
 

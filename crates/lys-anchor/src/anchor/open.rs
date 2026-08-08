@@ -7,6 +7,25 @@
 //! leaves at all. Between them, a value of this type always has a leaf 0 that
 //! was placed there by the party that created the log.
 //!
+//! # There is a second genesis constructor, and this one does not interpret anything
+//!
+//! `Anchor::create_with_delegated_genesis` — named in plain text because a link
+//! from these ungated docs to a gated item resolves under `--all-features` and
+//! breaks the default `cargo doc`, which is a gate — builds leaf 0 as a
+//! `lys/anchor-delegation/v1` artifact signed by the anchor's offline root key.
+//! It is the DP16 constructor and it lives behind `unstable-anchor`, because the
+//! delegation format does.
+//!
+//! [`Anchor::create`] is deliberately **not** that, and is not a deprecated
+//! path either: it stores the operator's bytes verbatim, and it is the only
+//! genesis a default-features build has. **A default build therefore cannot
+//! create a DP16-conformant anchor**, and cannot until the delegation format is
+//! ratified and its gate comes off. That is stated here rather than in the
+//! gated module alone, because a reader arriving at `create` is exactly the
+//! reader who needs to know its leaf 0 means nothing in particular.
+//! `anchor::genesis`'s module docs carry the four alternatives that were
+//! rejected to reach two constructors.
+//!
 //! Both refusals exist because the position cannot be repaired later.
 //! `LeafStore` offers no `insert`, no `rewrite` and no `fork` — deliberately —
 //! so nothing can move an entry aside to make room at 0. An anchor initialised
@@ -132,7 +151,14 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     /// Creates an anchor over `store`, appending `genesis` as leaf 0.
     ///
     /// The genesis bytes are supplied by the caller and are not interpreted:
-    /// they are stored verbatim, like any other leaf. The store must already
+    /// they are stored verbatim, like any other leaf, and nothing downstream may
+    /// conclude anything from them. For an anchor whose leaf 0 is a signed
+    /// delegation from its root key to its operational key — DP16's two-key
+    /// model, and the shape a real anchor must have — reach
+    /// `Anchor::create_with_delegated_genesis`, behind the `unstable-anchor`
+    /// feature. See the [module docs](self) for why both exist.
+    ///
+    /// The store must already
     /// exist and must be empty — it carries the origin, which is fixed at its
     /// creation and is never chosen here. `signer` is the key this anchor will
     /// publish under; it is never consulted while creating the log. `policy`

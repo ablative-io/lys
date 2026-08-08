@@ -585,6 +585,20 @@ pub struct Observation {
 
 ### 3.6 The delegation entry — `lys/anchor-delegation/v1`  *(core; DRAFT; increment 11)*
 
+⛔ **STALE — DO NOT READ THIS SECTION AS THE FORMAT.** The authoritative specification is
+[`DELEGATION-V1.md`](DELEGATION-V1.md), which supersedes everything below. Two concrete
+divergences, so nobody reconciles them by guessing:
+
+- **The payload map below is missing `sequence` (label 5)**, which was added by the
+  adversarial review to stop a replay that resurrects a revoked key. A four-field payload is
+  the *defective* version of this format.
+- **It types `not-before unix-ms` as `int`; the format is a `uint`** (u64, shortest-form).
+
+The sketch below is kept because its per-choice rationale is still the reasoning behind the
+protected header, and because deleting a superseded draft hides that the design moved. It is
+a plan, not a contract — and a plan that reads like a byte specification is exactly the trap
+recorded at the top of this file.
+
 DP16 wants two keys and rotation-as-append. One format serves genesis and every later
 rotation, because two formats is two things to freeze.
 

@@ -40,9 +40,20 @@ The library gets a command-line face — the auditor's and operator's tool.
 
 ⚠️ **The July demonstration used an instrument that was never committed, and this line said "demonstrated, not claimed" for a month while nothing could be re-run.** Four documents cited that script; `git log --all --diff-filter=A` found it had never existed on any branch. **A demonstration whose instrument is not committed decays into exactly the claim it was cited to refute, and no event marks the crossing.** The dates above are deliberately separate: the result belongs to July, the *re-runnable instrument* to August, and a re-established result carries the date of the instrument that can be re-run. It is now exercised by `crates/lys-anchor/tests/stranger_verification.rs`, where `LYS_REQUIRE_PYTHON` turns a skipped run into a hard failure — because a silently skipping gate is how the first one vanished. Signed notes round-trip byte-identical against the vendored Go `sumdb/note` reference; COSE artifacts round-trip against vendored `veraison/go-cose`. Every merge passed a four-lens adversarial review (attack construction, independent byte reconstruction, standards audit, mutation-probe test adequacy) plus an operator hand review.
 
-## Phase 3 — Norn integration (the payoff)
+## Phase 3 — first consumer integration
 
-Norn is the primary consumer (see [DESIGN.md](DESIGN.md#integration-norn-is-the-primary-consumer)). This is the demo nobody else can give.
+⛔ **REORDERED AND REFRAMED BY TOM, 2026-08-08. Norn is no longer the first consumer, and "the primary consumer" was the wrong frame.** His words: *"I want us to think of this as a general purpose thing that can be consumed by multiple consumers, not single purpose thing"*, and **manifold is the first consumer**, not Norn. Norn integration is pushed back — it remains a real payoff and a genuinely strong demo (the re-runnable signed log below), but it is no longer what unblocks the project.
+
+**This overrode a recommendation of mine, and it is recorded as overridden so it can never later read as one he accepted.** I had argued Phase 3 should come immediately after Phase 4, on the grounds that the anchor was ~90% built with no consumer. The premise was right — the *conclusion* named the wrong consumer, because I read "primary consumer" out of this document instead of asking. **A stale document is a confident source.**
+
+Two consequences worth stating, because the reframe is not cosmetic:
+
+- **It is DP13 applied rather than DP13 restated.** `DECISIONS.md` DP13 already ruled the anchor domain-agnostic — *"completely general… used by anything to sign anything"* — and withdrew an earlier Norn-first framing of mine as a narrowing. This document kept the Norn-first framing anyway. Multiple consumers is the same rule reaching the roadmap.
+- **It puts the capability gap on the critical path.** manifold's compose door carries an unverified `claimed_seat`, and lys has **no capability type at all** (see the Phase 5 note and `docs/design/lys-anchor/WIRE-FORMATS.md`). A lys certificate handed to manifold on the strength of the old certificate-capability row would give it *better provenance with identical semantics* — a signed field nothing checks, reading as verified to every downstream reader. That is worse than today's honest state while measuring as progress. So the Phase 5 capability design round is no longer a later-phase item; it is what the first consumer needs, and it is Tom's to call.
+
+The Norn work below is retained as written, deferred rather than cancelled.
+
+Norn is *a* consumer (see [DESIGN.md](DESIGN.md#integration-norn-is-the-primary-consumer)). The re-runnability claim is still the demo nobody else can give.
 
 - A signing `PersistenceSink` decorator: every session event flows through Norn's single append chokepoint, gets signed with the agent's key, and extends a per-session Merkle root. Zero core-loop changes.
 - Certificate issuance at agent spawn; capability claims carried in the cert.

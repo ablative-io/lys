@@ -8,8 +8,16 @@
 //! # The invariants this crate holds
 //!
 //! - **An anchor's log always has a leaf 0, and it is put there at creation or
-//!   never.** [`Anchor::create`] appends the caller's genesis bytes as leaf 0;
-//!   [`Anchor::open`] refuses a log that has none. The refusal is not fussiness:
+//!   never.** [`Anchor::create`] appends the caller's genesis bytes as leaf 0
+//!   and does not interpret them; `Anchor::create_with_delegated_genesis` —
+//!   plain text, because linking from these ungated docs to a gated item breaks
+//!   the default `cargo doc` — makes leaf 0 a `lys/anchor-delegation/v1`
+//!   artifact signed by the anchor's offline root key, which is what DP16 asks
+//!   for and is behind `unstable-anchor` because the format is.
+//!   **A default-features build has only the uninterpreted form**, and
+//!   `anchor::genesis` records why that cannot be collapsed into one
+//!   constructor until the format is ratified. [`Anchor::open`] refuses a log
+//!   that has none. The refusal is not fussiness:
 //!   `lys-core`'s receipt signing declines a tree of size 1 (RFC 9942 types an
 //!   inclusion path as one-or-more, and a one-leaf tree's path is empty), so an
 //!   anchor without a genesis leaf cannot issue a receipt for its first real
@@ -98,15 +106,21 @@
 //!   nothing — an admission policy is a function of the submitted bytes, so a
 //!   refusal that varied by cause is a read-out of the rule.
 //!
-//! # The signer boundary is reserved, not usable, and that is stated on purpose
+//! # The signer boundary works for the root key and is reserved for the rest
 //!
 //! An anchor signs through [`Signer`], never through a key its callers hold.
-//! **But a remote signer — HSM, KMS, anything off-process — can implement
-//! [`Signer`] today and still cannot drive this crate**, because `lys-core`'s
-//! signing entry points take a concrete `Ed25519Identity`. The gap is carried
-//! as the [`InProcessSigner`] bound rather than as a promise, so the compiler
-//! refuses the swap instead of an integration discovering it. [`keys::signer`]
-//! names exactly what would have to change and what must not be done instead.
+//! **A remote signer — HSM, KMS, anything off-process — can implement [`Signer`]
+//! today, issue an anchor's genesis delegation, and still not publish a
+//! checkpoint or a receipt**, because `lys-core`'s *other* signing entry points
+//! take a concrete `Ed25519Identity`. The gap is carried as the
+//! [`InProcessSigner`] bound rather than as a promise, so the compiler refuses
+//! the swap instead of an integration discovering it. [`keys::signer`] names
+//! exactly what would have to change and what must not be done instead.
+//!
+//! Genesis is the exception because the delegation format was specified with a
+//! two-phase preimage-then-assemble API *for* an offline root key, and an entry
+//! point designed for absent key material passes a custody boundary for free.
+//! That is the shape every other signing path is missing, not a special case.
 //!
 //! # The limit of a standalone anchor, stated here because it cannot be fixed here
 //!
@@ -215,6 +229,8 @@ pub use admission::{
     AcceptAll, AdmissionPolicy, AuthenticatedPeer, MaxSize, NotAdmitted, RecognisedCertificate,
     SubmitterContext,
 };
+#[cfg(feature = "unstable-anchor")]
+pub use anchor::GENESIS_SEQUENCE;
 pub use anchor::{
     Anchor, AnchorStatus, NoPolicy, NoSigner, PublishedCheckpoint, ReadOnlyAnchor,
     STANDALONE_DISCLOSURE, WitnessPosture, proof_nodes,

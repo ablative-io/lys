@@ -177,6 +177,39 @@ pub enum AnchorError {
         origin: String,
     },
 
+    /// `lys-core` refused to assemble the genesis delegation.
+    ///
+    /// Reachable two ways, and they are not the same fault:
+    ///
+    /// - The claim is one `lys-core`'s own decoder would reject — in practice an
+    ///   origin long enough to push the artifact past the size cap, since the
+    ///   other refusals (an empty origin, an unusable delegated key) are
+    ///   unreachable from a store whose origin was validated at creation and a
+    ///   signer whose key was validated at load.
+    /// - The signature the root signer produced does not verify against the key
+    ///   that signer advertises. That is a broken
+    ///   [`Signer`](crate::Signer) implementation, and it is caught here rather
+    ///   than becoming a leaf 0 nothing can ever verify.
+    ///
+    /// Detailed rather than collapsed, on the rule the module docs set: creation
+    /// is the operator's own act on their own store, with their own key. No
+    /// stranger can drive it and nothing about a stranger's bytes is disclosed.
+    ///
+    /// **Nothing was appended.** The delegation is built and verified before the
+    /// log is touched, because leaf 0 cannot be replaced.
+    ///
+    /// `#[cfg(feature = "unstable-anchor")]` because the delegation format is,
+    /// so the default build has no call site and could not construct this.
+    #[cfg(feature = "unstable-anchor")]
+    #[error("failed to build the genesis delegation for {origin}: {source}")]
+    GenesisDelegation {
+        /// The origin of the log genesis was being written into, as its store
+        /// reports it.
+        origin: String,
+        /// `lys-core`'s reason for refusing to assemble or to verify it.
+        source: TrustError,
+    },
+
     /// Creation was asked to write genesis into a log that already has entries.
     ///
     /// Appending here would put the genesis bytes at whatever the next free
@@ -210,6 +243,35 @@ pub enum AnchorError {
         path: String,
         /// `lys-core`'s reason for refusing the key file.
         source: TrustError,
+    },
+
+    /// A [`Signer`](crate::keys::Signer) declined to produce a signature.
+    ///
+    /// **This variant exists because the trait promises a failure this enum
+    /// could not express.** `Signer::sign` is documented as fallible "for the
+    /// remote custody this trait is shaped for, where the network, the device or
+    /// the operator's authorization can all decline" — but every other variant
+    /// here describes the operator's *own* log or key file, so a remote signer
+    /// had no honest name for its own refusal and had to borrow
+    /// [`SignerKey`](Self::SignerKey), which reports a key-file problem for
+    /// something that is not one.
+    ///
+    /// The gap stopped being hypothetical when genesis-as-delegation landed
+    /// bounded on `Signer` rather than `InProcessSigner`: an offline or remote
+    /// root signer is a real, reachable path now, and it is the one signing call
+    /// in this crate that a network or a human can refuse.
+    ///
+    /// `#[non_exhaustive]` on this enum means a downstream implementor **cannot**
+    /// add a variant themselves, so a trait whose contract promises a failure
+    /// mode obliges the crate that owns the error type to name it. Free text
+    /// rather than a structured cause because the reasons are the implementor's
+    /// domain — an HSM's refusal, a declined touch, a timeout — and inventing a
+    /// taxonomy for devices this crate has never seen would be guessing at
+    /// somebody else's failure modes.
+    #[error("the signer declined to sign: {reason}")]
+    SignerDeclined {
+        /// The signer's own account of why it refused.
+        reason: String,
     },
 
     /// The anchor could not sign a checkpoint over its own log.

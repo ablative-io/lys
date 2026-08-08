@@ -68,6 +68,39 @@
 //! shipped and semver-bound, so the fix is a `v3` signature rather than a
 //! change here, and until then the warning is the mitigation.
 //!
+//! ## What this module PROVIDES, and what it merely PERMITS
+//!
+//! **A safety property supplied by the caller is not a property of this
+//! library.** The distinction is invisible to anyone integrating by reading the
+//! happy path — the call returns `Ok`, and nothing in the signature indicates
+//! that half the guarantee was the caller's job — so it is drawn explicitly:
+//!
+//! | | |
+//! |---|---|
+//! | **Provided** | The signature is valid over the canonical artifact bytes, under strict Ed25519, for the key the artifact names. Canonical-encoding strictness, the header pins, the size window, and non-oracle failure. |
+//! | **Permitted, never provided** | That the signer is anyone in particular. **Attribution is entirely the caller's**, and no argument to these functions can express it. |
+//!
+//! This was not written from the API but measured against a real integrator, by
+//! someone who could read a repository this crate cannot see. `manifold-node`
+//! consumes this module and closes the gap **by construction** rather than by
+//! discipline: at its single production verification site it looks up a registry
+//! pin keyed on the claimed sender, passes it in, and resolves to one of three
+//! verdicts — pin matches, pin differs (*forged*), or **no pin at all, which
+//! yields `UnknownSigner` and can never become `Verified`.* The type makes the
+//! comparison unskippable, so a missing pin cannot degrade into a pass.
+//!
+//! That shape is the worked example, offered because an instruction to "compare
+//! the key" is weaker than a demonstration of what comparing it looks like when
+//! it cannot be forgotten. **None of that construction ships here**, and it does
+//! not travel to the next integrator by being true of this one — which is
+//! exactly why the table above exists rather than a sentence saying callers
+//! ought to be careful.
+//!
+//! *(Finding and framing: Waffles the Terrible, on the manifold seat, 2026-08-08.
+//! This crate's own review had bounded the gap as "mitigated in the callers I
+//! found" — a search of this repository only, which could establish that the
+//! hole existed but never that any consumer had closed it.)*
+//!
 //! Domain meaning (execution receipt, audit entry, dispatch attestation) is
 //! applied by consumers; the trust crate only provides the sign/verify and
 //! the artifact shape.
