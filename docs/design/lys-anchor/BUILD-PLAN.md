@@ -375,8 +375,11 @@ crates/lys-anchor/
     keys/mod.rs
     keys/signer.rs                `Signer` trait (custody boundary) + key type   (~80)
     keys/file_signer.rs           file-backed impl over Ed25519Identity          (~90)
-    keys/delegation.rs            build / parse / verify a delegation entry     (~220)
-    keys/delegation_encoding.rs   byte-exact COSE_Sign1 encode + decode         (~260)
+    ⛔ NOT HERE — the two delegation files below were planned for this crate and
+       the plan was overridden at increment 11. They live in `lys-core::delegation`,
+       behind `unstable-anchor`. See §3.6's amendment for the code fact that forced it.
+    ~~keys/delegation.rs~~            build / parse / verify a delegation entry
+    ~~keys/delegation_encoding.rs~~   byte-exact COSE_Sign1 encode + decode
 
     anchor/mod.rs
     anchor/open.rs                Anchor::create / Anchor::open; genesis        (~200)
@@ -604,6 +607,36 @@ receipt there is no value the verifier independently recomputes.
 **This format freezes the moment a real anchor initialises**, because leaf 0 cannot be
 inserted afterwards. It must not be built until increment 11, and no instance may be signed
 outside tests (DP17, `DECISIONS.md:252-255`).
+
+#### ⛔ Amendment at increment 11 — this format lives in `lys-core`, not here
+
+§2.4 filed `keys/delegation.rs` and `keys/delegation_encoding.rs` under `lys-anchor`. **That
+was wrong, and a code fact rather than a preference overrides it:** `lys-core`'s `cbor`
+module — which owns `write_head`, `write_i64`, `write_text`, `write_bytes` and
+`sig_structure_bytes` — is declared `mod cbor;`, **private** (`lys-core/src/lib.rs:36`).
+
+A delegation entry is a tagged `COSE_Sign1` over canonical CBOR. Building it in `lys-anchor`
+therefore means re-implementing RFC 8949 §4.2 heads and the RFC 9052 §4.4 `Sig_structure` a
+second time in this workspace — and `lys-anchor/src/keys/signer.rs` already names that
+outcome, in the course of refusing it for a different reason: *"a second copy of a canonical
+encoder in the workspace, which is the failure this repository guards against hardest: two
+encoders drift silently, and every round-trip test on either side keeps passing while they
+do."* The plan proposed the exact thing the crate's own docs refuse three files away.
+
+So the format is built as `lys_core::delegation`, behind the existing off-by-default,
+semver-exempt `unstable-anchor` feature. §2.3's objection to `lys-core` — *"a format with no
+second implementation and no operator ratification should not sit in the crate that gets
+published"* — is answered rather than waived:
+
+- **Ratification** is precisely what `unstable-anchor` holds a format *until*.
+  `lys/anchor-receipt/v1` and `lys/verification-bundle/v1` already sit behind it on that
+  argument (CLAUDE.md). A third draft in the drawer built for drafts is the gate working.
+- **A second implementation** is a deliverable of this increment, not a missing
+  precondition: an independent encoder written from the spec, plus a `go-cose` gate, land
+  with the format.
+
+**Location does not change when the format freezes.** It freezes when a real anchor writes
+leaf 0 — `LeafStore` has no insert — and that remains DP17's to authorise, not this plan's.
 
 ---
 

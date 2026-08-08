@@ -26,6 +26,7 @@ exclude = [
     "tests/bundle_conformance.rs",
     "tests/consistency_conformance.rs",
     "tests/consistency_receipt_conformance.rs",
+    "tests/delegation_conformance.rs",
     "tests/harness/",
     # The openssl interop gate is repo-only for the same reason: it requires an
     # Ed25519-capable openssl on the machine and FAILS rather than skips when

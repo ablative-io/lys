@@ -255,6 +255,101 @@ impl Ed25519Identity {
     }
 }
 
+/// The prime `p = 2²⁵⁵ − 19`, little-endian — the field modulus a canonical
+/// Ed25519 y-coordinate must be strictly below (RFC 8032 §5.1.2).
+///
+/// Follows the `unstable-anchor` feature rather than being carried as dead
+/// weight in the default build, for the same reason `cbor::NULL` does: the only
+/// artifact class that names a key it does not itself verify with is the gated
+/// `delegation` format.
+#[cfg(feature = "unstable-anchor")]
+const CURVE25519_FIELD_MODULUS_LE: [u8; 32] = [
+    0xed, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
+];
+
+/// Whether the y-coordinate in a compressed Ed25519 point encoding is canonical
+/// — strictly less than `p` once the sign bit is masked off.
+///
+/// **This is checked here because `VerifyingKey::from_bytes` does not check it**,
+/// which is not what one would assume from the name. Measured rather than
+/// inferred: `from_bytes` accepts all-`0xff` and reports it as non-weak,
+/// because decompression reduces the y-coordinate modulo `p` instead of
+/// rejecting an out-of-range one. A non-canonical encoding is a second spelling
+/// of a point that already has one, which is the same defect class this crate
+/// refuses everywhere else in its wire formats.
+#[cfg(feature = "unstable-anchor")]
+fn is_canonical_y_coordinate(bytes: &[u8; 32]) -> bool {
+    let mut y = *bytes;
+    // The top bit of the last byte is the x-coordinate's sign, not part of y.
+    y[31] &= 0x7f;
+    // Little-endian magnitude comparison, most significant byte first.
+    for index in (0..32).rev() {
+        if y[index] < CURVE25519_FIELD_MODULUS_LE[index] {
+            return true;
+        }
+        if y[index] > CURVE25519_FIELD_MODULUS_LE[index] {
+            return false;
+        }
+    }
+    // y == p exactly: a non-canonical encoding of zero.
+    false
+}
+
+/// Whether `bytes` is a public key that could ever verify anything.
+///
+/// Three conditions:
+///
+/// 1. **Canonical y-coordinate** — see [`is_canonical_y_coordinate`], and note
+///    that `VerifyingKey::from_bytes` does *not* enforce this.
+/// 2. **Decompresses to a curve point** at all.
+/// 3. **Not small-order.** A small-order key — the identity point among them —
+///    admits forged signatures for arbitrary messages, which is why strict
+///    verification refuses it.
+///
+/// Exposed to the crate rather than to consumers, and placed here rather than
+/// at its call site, because this is the one file that knows how lys decides an
+/// Ed25519 key is usable. A second copy elsewhere would be free to drift out of
+/// agreement with [`Ed25519Identity::verify`] while both kept passing their own
+/// tests.
+///
+/// The use for it is artifacts that *name* a key they do not verify with: a key
+/// that fails here can never authorise anything, so an artifact carrying one is
+/// a signed statement that cannot mean anything — a signed unchecked value that
+/// looks checked.
+///
+/// # This is STRICTER than [`Ed25519Identity::verify`], deliberately
+///
+/// Condition 1 has no counterpart in verification. `verify_strict` checks the
+/// canonical `s` scalar, and small-order `R` and `A` — read from the dependency
+/// rather than assumed — but it does **not** check that `A`'s y-coordinate is
+/// canonically encoded, and neither does `from_bytes`. So a key with `y >= p`
+/// is accepted as a verifying key elsewhere in this crate while being refused
+/// here.
+///
+/// The asymmetry is in the safe direction and is kept rather than smoothed
+/// over. A non-canonical encoding is a second spelling of a point that already
+/// has one, and this crate refuses second spellings in every wire format it
+/// owns; an artifact that *names* a key is naming an identity, and an identity
+/// with two spellings is one that compares unequal to itself. Making `verify`
+/// match would change shipped, ungated, semver-bound behaviour on the strength
+/// of a low-severity finding, which is a decision for a release rather than for
+/// this module.
+///
+/// Practical impact of the gap is small: every place lys compares a key
+/// compares raw bytes against a configured value, so a second spelling fails
+/// closed rather than matching.
+#[cfg(feature = "unstable-anchor")]
+pub(crate) fn is_usable_ed25519_public_key(bytes: &[u8; 32]) -> bool {
+    if !is_canonical_y_coordinate(bytes) {
+        return false;
+    }
+    match ed25519_dalek::VerifyingKey::from_bytes(bytes) {
+        Ok(key) => !key.is_weak(),
+        Err(_err) => false,
+    }
+}
+
 #[cfg(unix)]
 fn warn_if_loose_permissions(path: &Path) {
     use std::os::unix::fs::PermissionsExt;

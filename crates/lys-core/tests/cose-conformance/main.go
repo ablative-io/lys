@@ -14,6 +14,8 @@
 //                                                                  (receipt on stdin)
 //   cosetool bundle-verify  <log-verifier-key> <anchor-verifier-key>...
 //                                                                  (bundle JSON on stdin)
+//   cosetool delegation-verify <root-pubkey-hex>                    (delegation on stdin;
+//                                                                    eight "<name> <value>" lines)
 //
 // Claims are built with fxamacker/cbor CoreDetEncOptions (RFC 8949 §4.2 core
 // deterministic), which is byte-identical to the lys hand encoder.
@@ -185,6 +187,15 @@ func main() {
 			fail("usage: cosetool bundle-verify <log-verifier-key> <anchor-verifier-key>...")
 		}
 		bundleVerify(os.Args[2], os.Args[3:], stdin)
+	case "delegation-verify":
+		// The root key is a required positional and there is no form of this
+		// subcommand that takes none: a delegation carries its signer's key in
+		// its own protected header, so a tool that could be asked to "just
+		// verify this" would verify it against the attacker's key.
+		if len(os.Args) != 3 {
+			fail("usage: cosetool delegation-verify <root-pubkey-hex>")
+		}
+		delegationVerify(os.Args[2], stdin)
 	default:
 		fail("unknown mode %q", os.Args[1])
 	}

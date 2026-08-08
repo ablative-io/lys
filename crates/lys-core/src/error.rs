@@ -184,6 +184,77 @@ pub enum TrustError {
     #[error("receipt verification failed")]
     ReceiptVerification,
 
+    /// An anchor delegation failed verification — deliberately omits the cause
+    /// (non-oracle): a malformed or non-canonical artifact, the wrong content
+    /// type, a `kid` that is not the root key the caller named, an origin the
+    /// caller did not ask for, an unknown role, an unusable delegated key, an
+    /// empty origin, a non-empty unprotected header and a bad signature all
+    /// return this one value.
+    ///
+    /// The collapse matters more here than for most artifact classes. A
+    /// delegation is the statement *"this key speaks for that origin"*, so a
+    /// verifier that reported which check fired would let a prober separate
+    /// "your signature is wrong" from "you named the wrong root key" from "you
+    /// named the wrong origin" — that is, it would answer questions about the
+    /// verifier's own configuration to anyone who can hand it bytes.
+    ///
+    /// # A collapsed error type is not a non-oracle on its own
+    ///
+    /// This variant makes the failures indistinguishable **in the return
+    /// value**, which is one channel. It is not by itself a claim that they are
+    /// indistinguishable, and an earlier version of this doc said they were.
+    /// An adversarial review measured a **32.8×** timing separation between a
+    /// `kid`/origin mismatch and a bad signature, because the first two returned
+    /// before the Ed25519 verification ran and that verification dominates
+    /// everything preceding it. The error values were identical throughout.
+    ///
+    /// **The general rule, which this crate had stated only about error values:
+    /// a collapsed error type is not a non-oracle if the amount of work done
+    /// differs per cause.** An error enum is observable in one channel; a
+    /// function is observable in several — wall time, allocation, cache
+    /// behaviour. `delegation::verify_delegation` therefore runs its signature
+    /// verification unconditionally and combines all three results at the end.
+    /// Any future verifier reaching for this variant inherits that obligation
+    /// along with it. (Named without an intra-doc link: it lives behind
+    /// `unstable-anchor`, and a link from ungated docs to a gated item resolves
+    /// under `--all-features` and breaks in the default doc build.)
+    #[error("delegation verification failed")]
+    DelegationVerification,
+
+    /// Building a delegation artifact failed: the claim cannot be encoded into
+    /// a delegation this crate would itself accept.
+    ///
+    /// # ⚠️ Operator-facing only — never return this from a path a stranger can reach
+    ///
+    /// This variant **may carry a cause**, and that is exactly why its blast
+    /// radius has to be stated rather than left to judgement. It is for the
+    /// *issuing* side: the caller supplied every input, holds the signing key,
+    /// and already knows everything the reason could tell them, so a descriptive
+    /// message costs nothing and saves an operator staring at "delegation
+    /// verification failed" because their origin was 3885 bytes.
+    ///
+    /// **Reusing it anywhere reachable by an untrusted party — in
+    /// `delegation::verify_delegation`, or in any future
+    /// parse-then-act helper — reintroduces the parsing oracle that
+    /// [`Self::DelegationVerification`] exists to close.** The two variants are
+    /// not interchangeable and the compiler cannot tell them apart; only this
+    /// sentence can. It follows the same split the crate already makes for
+    /// [`Self::CheckpointEncoding`]/[`Self::NoteVerification`] and
+    /// [`Self::LogArtifactEncoding`]/[`Self::LogArtifactVerification`].
+    ///
+    /// It exists because encode and decode were allowed to disagree once. The
+    /// artifact size cap was enforced on the decode side only, so an origin of
+    /// 3884 bytes signed and verified while 3885 signed successfully and then
+    /// failed every verification afterwards — precisely the "fails at some
+    /// later, less debuggable moment" outcome that assembling-with-verification
+    /// exists to prevent. Every constraint the decoder enforces is now refused
+    /// at encode too, and this variant is how that refusal is reported.
+    #[error("delegation encoding failed: {reason}")]
+    DelegationEncoding {
+        /// Human-readable cause of the encoding failure.
+        reason: String,
+    },
+
     /// A verification bundle failed verification — deliberately omits the
     /// cause (non-oracle): a malformed container, a broken inclusion proof, a
     /// receipt from the wrong anchor, and a chain whose links do not join are
