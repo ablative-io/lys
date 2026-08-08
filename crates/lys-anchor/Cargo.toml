@@ -45,6 +45,21 @@ default = []
 # did not ask for them should not get them.
 unstable-anchor = ["lys-core/unstable-anchor"]
 
+# The witness surface: recording another log's checkpoint and reporting what
+# this anchor's own memory makes of it. OFF BY DEFAULT, which is the shape the
+# design asks for rather than a hedge — a single anchor with zero witnesses,
+# pinning to no one, must be fully functional, so the build the default gate
+# exercises should be that one. With the feature off, `witness/` does not exist
+# and no core path can name anything in it; the compiler is the second party for
+# that claim, on the only axis the claim is made on, which is reachability.
+#
+# It implies `unstable-anchor` because it is built out of it: an `Observation`
+# carries a `SubmissionOutcome`, and a witness receipt is the receipt the core
+# submit path issues. That implication is what makes a bare
+# `--features federation` build meaningful, and it is a one-way edge — nothing
+# in `unstable-anchor` reaches back.
+federation = ["unstable-anchor"]
+
 [dependencies]
 # Default features only — see [features] above for the measurement that says
 # why `unstable-anchor` is forwarded from this crate instead of being enabled

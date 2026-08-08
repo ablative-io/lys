@@ -811,6 +811,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "lys-anchor-cli"
+version = "0.2.0"
+dependencies = [
+ "clap",
+ "lys-anchor",
+ "lys-core",
+ "lys-log-store",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.19",
+]
+
+[[package]]
 name = "lys-core"
 version = "0.2.0"
 dependencies = [

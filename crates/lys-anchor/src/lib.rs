@@ -111,6 +111,32 @@
 //!
 //! What changes it is one external party keeping its own durable memory of this
 //! anchor's checkpoints. Nothing in this crate substitutes for that.
+//!
+//! # Witnessing is additive, off by default, and endorses nothing
+//!
+//! Being that external party for somebody else is the `witness` module, behind
+//! the off-by-default `federation` feature. It adds one function, `observe`,
+//! and two report types, `Observation` and `Relation`; it adds no wire format,
+//! no admission rule, and no artifact.
+//!
+//! Three properties are held by the shape rather than by this paragraph:
+//!
+//! - **The default build is the standalone one.** With `federation` off the
+//!   module does not exist, so no path described above can reach it. A core
+//!   path that named a witness item would fail the default build, which is a
+//!   gate — the compiler is the second party, on the only axis the claim is
+//!   made on.
+//! - **A witness emits nothing a plain recorder could not.** `observe` records
+//!   the checkpoint note through `Anchor::submit` and returns that submission's
+//!   receipt unchanged. There is no witness receipt type and no field in which
+//!   "I also checked this" could be written, so a reader cannot infer
+//!   endorsement from a receipt: the receipt does not distinguish the two
+//!   cases. The report — what this witness previously recorded, and how the new
+//!   checkpoint sits against it — is outside every signature.
+//! - **The record precedes the check, unconditionally.** An equivocating
+//!   checkpoint is appended and receipted like any other statement, because
+//!   equivocation is caught by two durable memories disagreeing and a witness
+//!   that refused to hold the second one would have destroyed the evidence.
 
 pub mod admission;
 pub mod anchor;
@@ -118,6 +144,8 @@ pub mod config;
 pub mod error;
 pub mod keys;
 pub mod wire;
+#[cfg(feature = "federation")]
+pub mod witness;
 
 pub use admission::{
     AcceptAll, AdmissionPolicy, AuthenticatedPeer, MaxSize, NotAdmitted, RecognisedCertificate,
@@ -130,3 +158,5 @@ pub use keys::{FileSigner, InProcessSigner, Signer};
 pub use wire::Submission;
 #[cfg(feature = "unstable-anchor")]
 pub use wire::SubmissionOutcome;
+#[cfg(feature = "federation")]
+pub use witness::{Observation, OriginState, Relation, WitnessProjection, observe};

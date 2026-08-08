@@ -1,0 +1,76 @@
+[package]
+name = "lys-anchor-cli"
+description = "The `lys-anchor` command-line binary: create, submit to, checkpoint, prove and inspect a lys transparency anchor."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+# Never published, and for the same mechanical reason `lys-anchor` is not
+# (crates/lys-anchor/Cargo.toml). This crate depends on `lys-anchor`, which is
+# where the draft anchor formats live; a published crate that exposes a format
+# FREEZES it. It stays unpublishable until the operator's ratify-then-publish
+# sequence completes.
+#
+# This is also why the anchor CLI is NOT `lys anchor …` inside the published
+# `lys` binary. `docs/design/lys-anchor/BUILD-PLAN.md` §2.5 rules on it:
+# "publishing `lys` would freeze `lys/anchor-receipt/v1` and
+# `lys/verification-bundle/v1` as a side effect". The rule is mechanical as
+# well as principled — `cargo publish` refuses a dependency with no version,
+# and `lys-anchor` has none to give.
+publish = false
+
+[lib]
+# The modules live here, not in the binary, and the reason is a gate rather
+# than taste — see `src/lib.rs`. Briefly: a documented binary target named
+# `lys-anchor` normalises to the crate name `lys_anchor` and collides with the
+# `lys-anchor` LIBRARY in `target/doc/`, which `cargo doc --no-deps` reports as
+# a warning; the doc gate runs at zero. The alternative fix, `doc = false` on
+# the binary, would take rustdoc away from every module in this crate — and
+# rustdoc is the only thing that catches `broken_intra_doc_links`.
+name = "lys_anchor_cli"
+path = "src/lib.rs"
+
+[[bin]]
+# The binary the plan names, in a package named for what it is. §2.5 places
+# this binary in the `lys-anchor` crate itself; it lives in a sibling crate
+# instead only because `crates/lys-anchor` was under concurrent construction
+# when this was built. Folding it back is a directory move: nothing here
+# depends on being a separate package. The doc collision above would arise
+# there too, identically.
+name = "lys-anchor"
+path = "src/main.rs"
+doc = false
+
+[features]
+default = []
+
+# Forwards `lys-anchor`'s gate, which forwards `lys-core`'s. OFF BY DEFAULT.
+#
+# `Anchor::submit` and the receipt it returns are gated, so `lys-anchor submit`
+# is compiled out of a default build — the subcommand does not merely refuse at
+# runtime, it does not exist. That is the honest shape: the receipt format is a
+# draft, and a build that did not ask for a draft should not be able to sign
+# one. See `crates/lys-anchor/Cargo.toml` for the measurement behind forwarding
+# rather than enabling the feature on the dependency edge.
+unstable-anchor = ["lys-anchor/unstable-anchor"]
+
+[dependencies]
+# A path dependency with no version, deliberately: `lys-anchor` is
+# `publish = false`, so there is no version to name, and writing one would
+# imply a publishable edge that does not exist.
+lys-anchor = { path = "../lys-anchor" }
+lys-core.workspace = true
+lys-log-store.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

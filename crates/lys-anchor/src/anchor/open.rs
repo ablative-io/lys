@@ -196,6 +196,21 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
         self.log.tree().len()
     }
 
+    /// The bytes stored at `leaf_index`, or `None` if the log holds no such
+    /// index.
+    ///
+    /// Verbatim: exactly what was appended, not canonicalized and not parsed.
+    /// This is the read side a receipt needs — `verify_receipt` takes the leaf
+    /// as well as the receipt, so an anchor that could issue one but never show
+    /// the bytes it was over would be handing out artifacts nobody holding only
+    /// the anchor could check.
+    ///
+    /// Read through to the log on every call. Nothing is cached here, so this
+    /// cannot disagree with storage.
+    pub fn leaf_bytes(&self, leaf_index: u64) -> Option<&[u8]> {
+        self.log.leaf_bytes(leaf_index)
+    }
+
     /// The tree size an interrupted append was recovered to when this anchor
     /// was opened, if one was. `None` means the log opened clean.
     ///
