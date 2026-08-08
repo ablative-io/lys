@@ -45,6 +45,19 @@
 //!   which is precisely the judgement this crate does not make. `submit` and
 //!   the receipt it returns are behind the off-by-default `unstable-anchor`
 //!   feature, which forwards `lys-core`'s gate on the draft receipt format.
+//! - **The JSON proof of inclusion is *not* behind that gate, and that is a
+//!   property rather than a convenience.** [`Anchor::inclusion_artifact`] emits
+//!   the `lys/log-inclusion-proof/v1` artifact — an RFC 6962 path plus a signed
+//!   checkpoint over the root it leads to — from `lys_core::tlog`, which is
+//!   ungated. Gating it would have meant the artifact any stock tooling can
+//!   verify is opt-in while the draft binary receipt is what a default build
+//!   gets, inverting the rule that verification must outlive the vendor. The
+//!   shape consumers get by default therefore includes the JSON proof and
+//!   excludes the draft receipt, which is checkable by building rather than by
+//!   reading. An artifact and a receipt taken at two tree sizes describe two
+//!   different moments and will disagree about size and root; both are correct,
+//!   and [`anchor::artifact`] says what a caller who needs them to agree must
+//!   do.
 //!
 //! # The signer boundary is reserved, not usable, and that is stated on purpose
 //!

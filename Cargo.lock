@@ -804,6 +804,7 @@ version = "0.2.0"
 dependencies = [
  "lys-core",
  "lys-log-store",
+ "serde_json",
  "sha2",
  "tempfile",
  "thiserror 2.0.19",

@@ -1,5 +1,6 @@
 //! The anchor itself — one log, its genesis leaf, and the facts it forwards.
 
+pub mod artifact;
 pub mod checkpoint;
 pub mod open;
 pub mod proof_nodes;

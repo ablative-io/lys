@@ -35,7 +35,11 @@
 //! a leak either, and not because the number is unimportant: the tree size is
 //! the second line of every checkpoint the anchor signs and hands out. A
 //! refusal cannot disclose what the artifact it exists to support already
-//! publishes.
+//! publishes. `Anchor::inclusion_artifact` takes the same stranger-choosable
+//! index and reuses that same refusal for the same reason; its own variant,
+//! [`AnchorError::InclusionArtifact`], is not a verdict on anything a caller
+//! supplied at all — it reports that this anchor failed to build a proof about
+//! its own tree.
 //!
 //! **This reasoning expires with the first variant whose outcome depends on a
 //! statement's content, and one is already scheduled.** An `AdmissionPolicy`
@@ -223,6 +227,40 @@ pub enum AnchorError {
         /// The tree size the receipt would have been issued against.
         tree_size: u64,
         /// `lys-core`'s reason for refusing to prove or to sign.
+        source: TrustError,
+    },
+
+    /// The anchor could not build the JSON inclusion artifact for one of its
+    /// own leaves.
+    ///
+    /// Separate from [`AnchorError::Receipt`] rather than folded into it,
+    /// because the two failures are not the same failure wearing two names.
+    /// A receipt fails at proving or at COSE signing; an artifact additionally
+    /// fails at the 2^53 JSON-number bound, at checkpoint encoding under the
+    /// origin, and — the one that matters — at `lys-core`'s **build-time
+    /// self-verification**, which runs the third party's whole verification
+    /// path over the artifact before it is returned. An operator told "failed
+    /// to issue a receipt" for a self-verification failure has been pointed at
+    /// the wrong artifact and the wrong code.
+    ///
+    /// **Reachable in practice only if this crate is wrong.** The index is
+    /// checked against the log first, the leaf bytes handed to the builder are
+    /// the ones read back out of that same log at that same index, and the
+    /// origin was validated when the store was created. It is propagated with
+    /// its cause instead of being treated as impossible, for the reason the
+    /// neighbouring variants give: a precondition that "cannot" fail is
+    /// exactly the one nobody notices changing.
+    #[error(
+        "failed to build an inclusion artifact for leaf {leaf_index} of {origin} at tree size {tree_size}: {source}"
+    )]
+    InclusionArtifact {
+        /// The origin of the log the artifact was for.
+        origin: String,
+        /// The index the artifact was requested for.
+        leaf_index: u64,
+        /// The tree size the artifact would have been built against.
+        tree_size: u64,
+        /// `lys-core`'s reason for refusing to build or to self-verify it.
         source: TrustError,
     },
 }

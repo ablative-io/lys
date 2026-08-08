@@ -54,6 +54,12 @@ lys-log-store.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+# The JSON codec for the proof artifact. A dev-dependency and not a dependency:
+# `lys-core` deliberately performs no JSON (de)serialization itself — the types
+# only derive `Serialize`/`Deserialize` and the consumer picks the codec — and
+# this crate makes the same choice. Only the tests need one, to exercise the
+# artifact's serialized shape.
+serde_json.workspace = true
 # A SHA-256 the tests drive themselves, so a leaf hash can be checked against
 # something other than the helper that produced it.
 sha2.workspace = true
