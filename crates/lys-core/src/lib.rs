@@ -6,9 +6,12 @@
 //! on top — this crate knows nothing about any higher-level concepts.
 //!
 //! The foundation laid here is [`TrustError`], [`TrustResult`], and
-//! [`Ed25519Identity`]. The [`ca`], [`merkle`], [`attestation`], [`receipt`],
-//! [`bundle`], [`seal`], [`checkpoint`], and [`tlog`] modules are implemented on top of
-//! these primitives.
+//! [`Ed25519Identity`]. The [`ca`], [`merkle`], [`attestation`], `receipt`,
+//! `bundle`, [`seal`], [`checkpoint`], and [`tlog`] modules are implemented on top of
+//! these primitives. (`receipt` and `bundle` are named without intra-doc links
+//! because they exist only under `unstable-anchor`; a link from ungated docs to
+//! a gated item resolves under `--all-features` and breaks in the default doc
+//! build, which is the shape consumers get.)
 //!
 //! ```
 //! use lys_core::TrustResult;

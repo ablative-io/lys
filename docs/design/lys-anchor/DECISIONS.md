@@ -53,9 +53,22 @@ surrounding standard API surface: that world is essentially one service in previ
 front-loading it buys an interface with nothing to test against.
 
 The JSON proof keeps being emitted regardless. A receipt that only specialised tooling can
-check violates "verification must outlive the vendor," and the existing fifteen-line
-independent verification script is the strongest evidence this project has that its claims
-are real. Losing it to gain a nicer encoding would be a regression dressed as progress.
+check violates "verification must outlive the vendor," and the standalone stdlib-only
+verification script (`scripts/verify_inclusion.py`) is the **most auditable** evidence this
+project has that its claims are real — a stranger reads its fifteen lines of RFC 6962
+hashing against the RFC in one sitting, with no toolchain, no vendored tree and no network.
+
+⚠️ **Two corrections, because this sentence previously overstated on both counts.** It said
+"the existing fifteen-line script" when **no such file existed in the repository** — it ran
+once in July and was never committed, and four documents cited it. And it said **"strongest"**,
+which is the wrong claim and arguably the reason nobody opened it for a month: the script
+verifies *inclusion*, not *authenticity*. There is no Ed25519 in the Python standard library,
+so it cannot check the checkpoint's signature, and it will report success on an artifact whose
+checkpoint an attacker minted unless a root is supplied out of band. **The Go `sumdb/note` and
+`veraison/go-cose` gates are the stronger evidence** — real reference implementations, byte
+identity in both directions. Auditability and strength are different axes and this row now
+claims only the one it has. **The stronger the claim made for an instrument, the less anyone
+checks it.** Losing it to gain a nicer encoding would be a regression dressed as progress.
 
 ### DP3 — What goes into the certificate log
 

@@ -79,6 +79,7 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo clippy --all-targets -- -D warnings
 cargo test --workspace --all-features
 cargo doc --no-deps --all-features
+cargo doc --no-deps
 ```
 
 All five clean. No exceptions.
@@ -94,3 +95,14 @@ prove the shape consumers actually get still builds.
 `private_intra_doc_links`, `redundant_explicit_link_target` and broken intra-doc
 links pass clippy and fail `cargo doc`. The baseline is zero warnings, so any
 regression is visible.
+
+**`cargo doc` is run in BOTH feature shapes for the same reason clippy is, and
+the second line was added after a regression walked through the gap.** An
+intra-doc link from ungated docs to a gated item — `[`SubmissionOutcome`]`,
+`[`receipt`]`, `[`bundle`]` — **resolves under `--all-features` and breaks in
+the default build**, so the all-features doc run is structurally blind to it.
+Increment 4 added three such links and every gate passed; two more had been
+sitting in `lys-core` for longer. The default baseline was never zero, so the
+"any regression is visible" argument above did not hold for the shape consumers
+actually get. This is the same defect class as the feature-unification trap in
+the test gate, in the one gate that had only one shape.

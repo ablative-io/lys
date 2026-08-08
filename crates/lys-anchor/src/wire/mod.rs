@@ -13,7 +13,7 @@
 //!   receipt, whose encoding belongs to `lys-core`; nothing in this module
 //!   serializes anything, so nothing here can drift away from a format.
 //! - **Nothing here is authoritative on its own.** Every field of
-//!   [`SubmissionOutcome`] except the receipt is a convenience a holder can
+//!   `SubmissionOutcome` except the receipt is a convenience a holder can
 //!   recompute or check for themselves, and the receipt is the only value in
 //!   it that carries a signature.
 

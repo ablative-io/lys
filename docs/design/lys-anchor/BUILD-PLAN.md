@@ -922,8 +922,10 @@ publish a checkpoint. Then, **with no `lys` code in the loop**:
 
 - Recompute the leaf hash with a shell pipeline: `(printf '\x00'; cat leaf) | shasum -a 256`
   — the reproducibility WIRE-FORMATS states as a contract (`WIRE-FORMATS.md:20`).
-- Recompute the root from the JSON artifact with the independent script from Phase 2
-  (`ROADMAP.md:39`).
+- Recompute the root from the JSON artifact with `scripts/verify_inclusion.py` — **committed
+  2026-08-08, because the "independent script from Phase 2" this line used to name had never
+  been committed at all** (`ROADMAP.md:39` carries the full account). This gate now exists as
+  `crates/lys-anchor/tests/stranger_verification.rs`.
 - Verify the receipt with the vendored Go `veraison/go-cose`.
 
 **Second party: a different language and a shell.** The axis is *algorithm and toolchain*,

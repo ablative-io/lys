@@ -56,7 +56,7 @@ D3 ratified the direction: RFC 9942 COSE receipts, at the anchor phase, additive
 
 **Ecosystem honesty.** The SCITT service world is thinner than the RFC's polish suggests: [scitt.io/implementations](https://scitt.io/implementations.html) lists essentially one service (DataTrails, Preview, tracking [SCRAPI](https://datatracker.ietf.org/doc/draft-ietf-scitt-scrapi/) draft 10); Microsoft's contribution is a [receipt profile](https://datatracker.ietf.org/doc/draft-ietf-scitt-receipts-ccf-profile/), not a public service. There is no interop corpus to conform against yet. That argues for shipping the receipt *format* (it's fully specified and the tree is one we already implement) while treating full SCRAPI API conformance as Phase 5.
 
-**Day one vs later.** Day one: inclusion receipts (`-1`) over submitted checkpoints, plus the existing D2 JSON proofs served in parallel (an anchor that can't emit the artifact a 15-line script verifies has regressed). Later: consistency receipts (`-2`), SCRAPI surface, `-19` migration.
+**Day one vs later.** Day one: inclusion receipts (`-1`) over submitted checkpoints, plus the existing D2 JSON proofs served in parallel (an anchor that can't emit the artifact `scripts/verify_inclusion.py` verifies has regressed — now checkable rather than rhetorical, via `crates/lys-anchor/tests/stranger_verification.rs`). Later: consistency receipts (`-2`), SCRAPI surface, `-19` migration.
 
 > **DECISION POINT 2 — receipt scope at launch.**
 > **Question:** what does the anchor emit on day one?

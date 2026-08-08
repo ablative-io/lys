@@ -1,5 +1,5 @@
 //! [`Submission`] — the bytes offered to an anchor — and
-//! [`SubmissionOutcome`] — what it says back.
+//! `SubmissionOutcome` — what it says back.
 //!
 //! # The anchor does not know what it notarized, and that is the design
 //!
@@ -19,7 +19,7 @@
 //!
 //! # What is signed, and what is only reported
 //!
-//! Of the four fields in [`SubmissionOutcome`], exactly one is a signed claim:
+//! Of the four fields in `SubmissionOutcome`, exactly one is a signed claim:
 //!
 //! - **`receipt`** — the anchor's `COSE_Sign1` over the Merkle root it derived
 //!   from the leaf and its inclusion path. This is the artifact. Everything
