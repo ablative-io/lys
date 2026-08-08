@@ -339,3 +339,97 @@ as configuration, so no build step and no committed constant depends on it.**
 
 Until those, `WIRE-DRAFTS.md` stays DRAFT and every one of the five rulings above is still
 cheap to overturn.
+
+---
+
+## Round 3 — the operator ruled 2026-08-08: build the complete version
+
+Tom's words, verbatim, on being handed F1–F4 with a recommendation on each:
+
+> *"Yep so just can we make it the most complete version possible for each of the decisions?
+> I'd rather not have to come back to anything so I don't think about it as version one. Just
+> think about what do we need to do for the complete version."*
+
+**That is a scope ruling before it is four answers, and it changes one of my
+recommendations rather than accepting it.** I had argued F2 down to "the Rust contract only,
+transport later, nothing is retrofitted." The instruction *not to think of this as version
+one* removes the premise that argument rested on. Recorded here because a recommendation
+overturned by the principal should not quietly read as one he accepted.
+
+### DP23 — Admission is a policy object, and no default ships (settles F1)
+
+DP9 (a certificate-gated write path) and DP13 (domain-agnostic, "used by anything to sign
+anything") are genuinely contradictory: a cert-gated path means the anchor holds an opinion
+about who submitters are, and an opinion about submitters is a domain.
+
+Resolved by an `AdmissionPolicy` trait. The core stays ignorant; the cert-gated rule becomes
+one policy among several; **no default is shipped**, so no deployment can inherit an
+admission rule nobody chose. Under the complete-version ruling both halves land together —
+the trait *and* the certificate-gated policy (increments 6a and 6b), rather than the trait
+now and the policy behind a later decision.
+
+**The constraint that comes with it, already written into `error.rs` and now load-bearing:**
+the argument that this crate's detailed error variants are not a parsing oracle rests on no
+variant being a function of the submitted bytes. **An admission policy is exactly a function
+of the submitted bytes.** Its refusals must therefore collapse to one indistinguishable
+value, and that expiry was recorded in the module docs before the policy existed.
+
+### DP24 — The witness API ships with transport (settles F2, against my recommendation)
+
+I argued contract-only: DP5 ruled the network surface down because serving lookups turns
+decode-success into a parsing oracle, a submission endpoint is that in sharper form, the
+read path needs no server, and DP17's "run privately" is a directory and a binary. Every one
+of those points survives — **as engineering constraints on the transport, not as reasons to
+omit it.** The complete version has a running witness endpoint.
+
+**Non-negotiable, carried from §5.2:** one refusal status for every substantive refusal.
+A transport mapping four internal refusals to four status codes rebuilds the oracle the
+library spent effort removing. C2SP's distinguished codes are the sole candidate exception,
+because they are part of a contract with a counterparty — adopting them is adopting the
+oracle knowingly, and it must be recorded as such where it happens.
+
+### DP25 — A witness checks against its own record (settles F3)
+
+Yes. DP18 holds that a witness cannot attest to what it did not observe — and a witness's
+own prior `(size, root)` is precisely something it observed. The check compares two things
+it personally holds, so it sits *inside* DP18 rather than against it. It is also the only
+mechanism by which equivocation is ever caught: two durable memories disagreeing. The path
+stays **record → check → report**, because refusing an equivocating checkpoint without
+recording it destroys the evidence the detection runs on.
+
+### DP26 — Revocation is an append, and the live set is a fold (settles F4)
+
+Adopted as the design premise. With no CRL and no OCSP there is no other shape available.
+
+⚠️ **Provenance, because this one has a history and it is mine.** The absence of CRL/OCSP is
+a design fact settled at `c9a9428` (6 Jul), whose own words are that revocation is
+*"consumer-side today; a first-class answer is an open product question."* The inference —
+*therefore an append* — is mine, written into `WIRE-FORMATS.md` as a hard constraint, which
+then circulated to two seats, was endorsed, and returned to me as another seat's constraint
+that I argued against on the merits. I withdrew it and put it to Tom as a question. **This
+ruling is what makes it a premise; it was never one before.**
+
+Two consequences, now ruled rather than derived:
+
+- **The revocable unit and the claim unit are the same unit.** Otherwise revoking one claim
+  forces a reissue, and in the gap the holder either keeps a bad claim or loses all of them.
+- **Freshness tolerance is an input to the verification call, never a judgement on its
+  output.** A verdict carrying "valid as of size N", handed to a caller free to ignore N, is
+  an obligation documented on the caller. No default tolerance ships; N is in the answer type
+  from the first version. A derived grants view may **refuse** on its own authority and may
+  **never permit** on its own authority — staleness fails open for revocation and closed for
+  grants, so a permission must walk the tail from the view's stamped position to the current
+  tip. That is bounded by entries-since-snapshot, never by history, which is what the
+  efficiency constraint requires.
+
+### What remains Tom's, narrowed but not empty
+
+Tom added: *"you've got approval for anything else you need approval for."* That is taken as
+approval for **build scope** — every increment in the plan, every increment previously
+blocked, and the design decisions inside them.
+
+**It is not taken as approval for the three irreversible acts listed above**, and they are
+unchanged: publishing `lys-anchor`, generating a production anchor key, and emitting any
+receipt outside a test. Those are not scope decisions — they are the acts that freeze a wire
+format permanently (DP17), and none of them is required to build the complete version. They
+stay his, and they stay explicit.
