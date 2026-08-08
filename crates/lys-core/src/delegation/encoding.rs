@@ -590,15 +590,14 @@ fn decode_protected(protected_raw: &[u8]) -> TrustResult<[u8; KEY_LEN]> {
 ///    explicit `y < p` comparison is required and lives in
 ///    [`crate::keys::identity`].
 ///
-///    A consequence worth knowing before reading further: that makes this check
-///    **stricter than [`crate::Ed25519Identity::verify`]**, which is shipped,
-///    ungated and semver-bound. `verify_strict` — read out of the vendored
-///    dalek source, not inferred — checks the canonical `s` scalar and
-///    small-order `R` and `A`, but **not** `A`'s y-canonicality. Whether to
-///    tighten `verify` is a release decision and deliberately not taken here;
-///    the asymmetry is in the safe direction, and every place lys compares a key
-///    compares raw bytes against a configured value, so a second spelling fails
-///    closed rather than matching.
+///    ⛔ **This check used to be stricter than
+///    [`crate::Ed25519Identity::verify`]**, and the note here recorded that as
+///    deliberate: `verify_strict` checks the canonical `s` scalar and
+///    small-order `R` and `A` but **not** `A`'s y-canonicality, so a key with
+///    `y >= p` was refused by this decoder and accepted by the crate's own
+///    verifier. That asymmetry is closed — `verify` now applies the same
+///    predicate — so the delegation format's notion of a key and the crate's
+///    are one notion rather than two that agreed by review.
 ///
 /// A sixth rule bounds `sequence` at [`MAX_SEQUENCE`], so that a successor
 /// always exists. Its *monotonicity* is not checked here and cannot be: this

@@ -5,6 +5,15 @@
 //! unconditionally; key-management errors carry only operational context, not
 //! key material.
 //!
+//! **Key-acceptance invariant:** there is exactly one rule in this crate for
+//! whether 32 bytes are an Ed25519 public key at all —
+//! `is_usable_ed25519_public_key` — and [`Ed25519Identity::verify`] admits a
+//! key if and only if that predicate does. In particular a **non-canonical
+//! encoding is not a key**: `y` and `y + p` are two spellings of one point, and
+//! `ed25519_dalek::VerifyingKey::from_bytes` reduces rather than rejects, so
+//! the check has to be made here. Anything that decides key-ness by some other
+//! means is a second copy of this rule and free to drift from it.
+//!
 //! Identities are obtained via [`Ed25519Identity::load_or_generate`]
 //! (file-backed) or [`Ed25519Identity::from_env`] (env-var-backed, for
 //! containers and CI). The two paths are independent — neither calls the
@@ -75,7 +84,9 @@ impl Ed25519Identity {
     }
 
     /// Verifies an Ed25519 signature against a public key using **strict**
-    /// verification (`verify_strict`).
+    /// verification (`verify_strict`), over a public key this crate considers
+    /// usable at all — see `is_usable_ed25519_public_key` (crate-private:
+    /// key-ness is this crate's rule to state, not a knob for consumers).
     ///
     /// Static method (no `&self`) so callers can verify against any public
     /// key without holding an [`Ed25519Identity`] instance.
@@ -88,17 +99,41 @@ impl Ed25519Identity {
     /// keys — for which signatures can be forged for arbitrary messages —
     /// are categorically rejected.
     ///
+    /// # The public key must also be *canonically encoded*, which
+    /// `verify_strict` does not check
+    ///
+    /// `VerifyingKey::from_bytes` **reduces the y-coordinate modulo `p`
+    /// instead of rejecting one that is out of range** — measured, not
+    /// inferred: all-`0xff` decodes, reports `is_weak() == false`, and hands
+    /// back a key whose `to_bytes()` is the all-`0xff` input verbatim. So
+    /// without the check below, `y` and `y + p` are two 32-byte strings
+    /// denoting one key, and an identity with two spellings is one that
+    /// compares unequal to itself. Every wire format this crate owns refuses
+    /// second spellings; the primitive underneath them now does too.
+    ///
+    /// The rule is stated once, in `is_usable_ed25519_public_key`, and
+    /// applied both here and by the artifact decoders that *name* a key
+    /// without verifying with it, so the two can no longer drift apart. Its
+    /// small-order clause deliberately overlaps `verify_strict`'s own: the
+    /// overlap is across a dependency boundary, and this crate does not want
+    /// its key-acceptance rule to be whatever the dependency happens to do
+    /// this release.
+    ///
     /// # Errors
     ///
     /// Returns [`TrustError::InvalidSignature`] if the signature is not
-    /// exactly 64 bytes, the public key is not a valid Ed25519 point, the
-    /// public key or the signature's `R` component is a small-order point,
-    /// or the signature does not strictly verify against the message.
+    /// exactly 64 bytes, the public key is not a canonically encoded Ed25519
+    /// point, the public key or the signature's `R` component is a
+    /// small-order point, or the signature does not strictly verify against
+    /// the message.
     pub fn verify(public_key: &[u8; 32], message: &[u8], signature: &[u8]) -> TrustResult<()> {
         let sig_bytes: &[u8; 64] = signature
             .try_into()
             .map_err(|_err| TrustError::InvalidSignature)?;
         let signature = ed25519_dalek::Signature::from_bytes(sig_bytes);
+        if !is_usable_ed25519_public_key(public_key) {
+            return Err(TrustError::InvalidSignature);
+        }
         let vk = ed25519_dalek::VerifyingKey::from_bytes(public_key)
             .map_err(|_err| TrustError::InvalidSignature)?;
         vk.verify_strict(message, &signature)
@@ -258,11 +293,13 @@ impl Ed25519Identity {
 /// The prime `p = 2²⁵⁵ − 19`, little-endian — the field modulus a canonical
 /// Ed25519 y-coordinate must be strictly below (RFC 8032 §5.1.2).
 ///
-/// Follows the `unstable-anchor` feature rather than being carried as dead
-/// weight in the default build, for the same reason `cbor::NULL` does: the only
-/// artifact class that names a key it does not itself verify with is the gated
-/// `delegation` format.
-#[cfg(feature = "unstable-anchor")]
+/// ⛔ **This was `#[cfg(feature = "unstable-anchor")]`, on the reasoning that
+/// "the only artifact class that names a key it does not itself verify with is
+/// the gated `delegation` format".** The premise was true and the conclusion did
+/// not follow: [`Ed25519Identity::verify`] *does* verify with the key, and it
+/// was accepting a non-canonical encoding of one. The gate meant the default
+/// build — the shape consumers actually get — could not have enforced the rule
+/// even if it had wanted to.
 const CURVE25519_FIELD_MODULUS_LE: [u8; 32] = [
     0xed, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
@@ -278,7 +315,15 @@ const CURVE25519_FIELD_MODULUS_LE: [u8; 32] = [
 /// rejecting an out-of-range one. A non-canonical encoding is a second spelling
 /// of a point that already has one, which is the same defect class this crate
 /// refuses everywhere else in its wire formats.
-#[cfg(feature = "unstable-anchor")]
+///
+/// **The sign bit is masked off and not otherwise checked.** `x = 0` with the
+/// sign bit set is a second non-canonical spelling, of the two points with
+/// `x = 0` — `y = 1` (the identity) and `y = p − 1` (the order-2 point). Both
+/// are small-order, so [`is_usable_ed25519_public_key`]'s third condition
+/// refuses them under either spelling and there is no encoding this masking
+/// lets through. Stated because it is a gap in *this* function that another
+/// condition closes, which is exactly the kind of thing that stops being true
+/// silently.
 fn is_canonical_y_coordinate(bytes: &[u8; 32]) -> bool {
     let mut y = *bytes;
     // The top bit of the last byte is the x-coordinate's sign, not part of y.
@@ -313,33 +358,41 @@ fn is_canonical_y_coordinate(bytes: &[u8; 32]) -> bool {
 /// agreement with [`Ed25519Identity::verify`] while both kept passing their own
 /// tests.
 ///
-/// The use for it is artifacts that *name* a key they do not verify with: a key
-/// that fails here can never authorise anything, so an artifact carrying one is
-/// a signed statement that cannot mean anything — a signed unchecked value that
-/// looks checked.
+/// Two kinds of caller: artifacts that *name* a key they do not verify with — a
+/// key that fails here can never authorise anything, so an artifact carrying
+/// one is a signed statement that cannot mean anything — and
+/// [`Ed25519Identity::verify`] itself, which admits exactly the keys this
+/// predicate admits.
 ///
-/// # This is STRICTER than [`Ed25519Identity::verify`], deliberately
+/// # This USED to be stricter than [`Ed25519Identity::verify`]
 ///
-/// Condition 1 has no counterpart in verification. `verify_strict` checks the
-/// canonical `s` scalar, and small-order `R` and `A` — read from the dependency
-/// rather than assumed — but it does **not** check that `A`'s y-coordinate is
-/// canonically encoded, and neither does `from_bytes`. So a key with `y >= p`
-/// is accepted as a verifying key elsewhere in this crate while being refused
-/// here.
+/// ⛔ The paragraph replaced here recorded the asymmetry as deliberate and
+/// deferred: condition 1 had no counterpart in verification, because
+/// `verify_strict` checks the canonical `s` scalar and small-order `R` and `A`
+/// but **not** that `A`'s y-coordinate is canonically encoded, and neither does
+/// `from_bytes`. It argued that closing the gap "would change shipped, ungated,
+/// semver-bound behaviour on the strength of a low-severity finding, which is a
+/// decision for a release rather than for this module".
 ///
-/// The asymmetry is in the safe direction and is kept rather than smoothed
-/// over. A non-canonical encoding is a second spelling of a point that already
-/// has one, and this crate refuses second spellings in every wire format it
-/// owns; an artifact that *names* a key is naming an identity, and an identity
-/// with two spellings is one that compares unequal to itself. Making `verify`
-/// match would change shipped, ungated, semver-bound behaviour on the strength
-/// of a low-severity finding, which is a decision for a release rather than for
-/// this module.
+/// That was a reasonable thing to defer and a bad thing to *leave written down*
+/// as a resting state. Two notions of "a key lys will accept" in one crate is
+/// the drift this function was extracted to prevent, reintroduced one level up:
+/// the delegation decoder and `verify` disagreed about the same 32 bytes, and
+/// nothing anywhere would have failed if they had drifted further. `verify` now
+/// calls this predicate, so agreement is structural rather than reviewed.
 ///
-/// Practical impact of the gap is small: every place lys compares a key
-/// compares raw bytes against a configured value, so a second spelling fails
-/// closed rather than matching.
-#[cfg(feature = "unstable-anchor")]
+/// **What that narrowed, precisely.** Only encodings with `y >= p` once the sign
+/// bit is masked — the 38 strings `y ∈ {p, …, p + 18}` × 2 sign bits. Of those,
+/// 14 never decompressed and were already refused by `from_bytes`; 4 (`y = p`
+/// and `y = p + 1`, both signs) reduce to the order-4 and identity points and
+/// were already refused by `verify_strict`'s small-order check. The remaining
+/// **20 were accepted as verifying keys and now are not.** None of the 20 can
+/// have had a verifying signature that anyone could produce: each is a second
+/// spelling of a point with `y ∈ {3, 4, 5, 6, 9, 10, 14, 15, 16, 18}`, and
+/// signing under one means holding its discrete logarithm. So the change
+/// narrows the set of accepted *key encodings* and cannot change any
+/// constructible `Ok` outcome — which is also why no test can distinguish the
+/// two behaviours through `verify`'s return value. See the tests.
 pub(crate) fn is_usable_ed25519_public_key(bytes: &[u8; 32]) -> bool {
     if !is_canonical_y_coordinate(bytes) {
         return false;
