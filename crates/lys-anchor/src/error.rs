@@ -278,6 +278,109 @@ pub enum AnchorError {
         tree_size: u64,
     },
 
+    /// A log was opened strictly and its leaf 0 is not a genesis delegation from
+    /// the root key the caller named, for this store's own origin.
+    ///
+    /// **This is the variant that exists because creating a DP16 anchor and
+    /// opening one were different guarantees.** `Anchor::open` checks that leaf 0
+    /// exists and reads no byte of it, so a store whose genesis is uninterpreted
+    /// operator bytes — everything a default-features build can create — opens
+    /// indistinguishably from one whose genesis is a delegation.
+    /// `Anchor::open_verifying_genesis` is where that stops, and this is its
+    /// refusal.
+    ///
+    /// # The cause is deliberately not narrowed, and the source says so
+    ///
+    /// `source` is `lys-core`'s single collapsed
+    /// [`TrustError::DelegationVerification`], which is one value for a malformed
+    /// artifact, a non-canonical encoding, a delegation from a different root
+    /// key, one for a different origin, one for a *seat* whose identifier equals
+    /// this origin, and a forged signature alike. That collapse is a
+    /// security property of `lys-core`'s verifier — a delegation verifier is the
+    /// network-exposed surface where a distinguishable error becomes an oracle
+    /// for the verifier's configuration — and this variant carries the value it
+    /// was given rather than inferring a reason nobody supplied it.
+    ///
+    /// Naming the origin costs nothing: it is the first line of every checkpoint
+    /// this anchor signs.
+    ///
+    /// `#[cfg(feature = "unstable-anchor")]` because the delegation format is,
+    /// so the default build has no call site and could not construct this.
+    #[cfg(feature = "unstable-anchor")]
+    #[error(
+        "leaf 0 of the log for {origin} is not a genesis delegation from the named root key for \
+         that origin: {source}"
+    )]
+    GenesisNotADelegation {
+        /// The origin of the log that was opened, as its store reports it —
+        /// which is also the subject value leaf 0 was required to name.
+        origin: String,
+        /// `lys-core`'s single collapsed reason for refusing the delegation.
+        source: TrustError,
+    },
+
+    /// A log was opened strictly and its leaf 0 delegates the operational role
+    /// to the very key that signed it.
+    ///
+    /// The open-time arm of the rule
+    /// [`Self::GenesisRootKeyIsOperationalKey`] enforces at creation, and the
+    /// reason it needs a second arm is that the two paths cannot see the same
+    /// thing. Creation compares two *signers* it was handed. Opening has no
+    /// signers to compare — only the artifact — and the artifact was not
+    /// necessarily written by this crate's constructor. `lys-core` permits
+    /// self-delegation, because whether a subject may delegate to its own signer
+    /// is a format question the format has not ruled on, so nothing between the
+    /// bytes and here would otherwise flag it.
+    ///
+    /// What it would mean if accepted is unchanged from the creation-time
+    /// variant: a perfectly valid, perfectly signed delegation in which DP16's
+    /// entire reason for two keys is void, at the one position a log can never
+    /// correct.
+    ///
+    /// `#[cfg(feature = "unstable-anchor")]` because the delegation format is,
+    /// so the default build has no call site and could not construct this.
+    #[cfg(feature = "unstable-anchor")]
+    #[error(
+        "leaf 0 of the log for {origin} delegates the operational role to its own root key, so \
+         DP16's two-key model is void in an artifact nothing else would flag"
+    )]
+    GenesisDelegatesToTheRootKey {
+        /// The origin of the log that was opened, as its store reports it.
+        origin: String,
+    },
+
+    /// A log was opened strictly and its leaf 0 carries a `sequence` other than
+    /// [`GENESIS_SEQUENCE`](crate::GENESIS_SEQUENCE).
+    ///
+    /// **This checks a convention of this crate, not a property of the format,
+    /// and the distinction is the whole content of the variant.** `lys/delegation/v1`
+    /// marks nothing as genesis; `sequence = 0` is what
+    /// `Anchor::create_with_delegated_genesis` writes, and it writes it because a
+    /// caller-chosen start would open a range below the first delegation into
+    /// which nothing can ever be written. A stranger holding only the artifact
+    /// still cannot conclude from `sequence = 0` that they are looking at the
+    /// first delegation for a subject, and this refusal does not make them able
+    /// to.
+    ///
+    /// The value read is carried rather than written into the message as a
+    /// literal, so an operator is told what was found instead of what was
+    /// expected.
+    ///
+    /// `#[cfg(feature = "unstable-anchor")]` because the delegation format is,
+    /// so the default build has no call site and could not construct this.
+    #[cfg(feature = "unstable-anchor")]
+    #[error(
+        "leaf 0 of the log for {origin} carries sequence {sequence}: this crate writes 0 at \
+         genesis, and a higher start leaves a range below the first delegation that nothing can \
+         ever fill"
+    )]
+    GenesisSequenceIsNotGenesis {
+        /// The origin of the log that was opened, as its store reports it.
+        origin: String,
+        /// The `sequence` leaf 0 actually carried.
+        sequence: u64,
+    },
+
     /// The anchor's signing key could not be loaded from its file.
     ///
     /// The path is carried because `lys-core`'s own reason does not name it —

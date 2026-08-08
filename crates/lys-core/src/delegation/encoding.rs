@@ -10,7 +10,7 @@
 //!   drift silently while every round-trip test on either side keeps passing.
 //! - **Decoding of untrusted input is never hand-rolled.** [`decode_fields`]
 //!   parses with `ciborium` and then enforces the exact artifact shape; the
-//!   caller ([`super::artifact::AnchorDelegation::from_cose_bytes`])
+//!   caller ([`super::artifact::Delegation::from_cose_bytes`])
 //!   additionally re-encodes the extracted fields and requires byte-identity
 //!   with the input (canonical-encoding strictness).
 //! - The protected header bucket is
@@ -139,7 +139,7 @@
 //! no signature covers under any verifier's strategy — tag head width,
 //! indefinite-length forms in the outer array, the three `bstr`s and the
 //! unprotected map, non-minimal length heads, and trailing garbage. At
-//! [`super::artifact::AnchorDelegation::from_cose_bytes`] the byte-compare is
+//! [`super::artifact::Delegation::from_cose_bytes`] the byte-compare is
 //! the only canonicality guard there is, since no signature is checked at all.
 //!
 //! ## What removing the byte-compare has been *measured* to admit

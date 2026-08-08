@@ -655,7 +655,7 @@ fn unusable_keys() -> [[u8; KEY_LEN]; 3] {
 // Several of this format's rules — the content-type pin, the empty unprotected
 // bucket, the closed role enum, the mandatory tag, the non-empty origin, the
 // usable delegated key — are each ALSO caught by the byte-compare in
-// `AnchorDelegation::from_cose_bytes`, because the canonical re-encoding always
+// `Delegation::from_cose_bytes`, because the canonical re-encoding always
 // emits the right content type, an empty bucket, a known role and the tag. A
 // violation therefore fails twice at the artifact level, which means **neither
 // check is proven by an artifact-level test**: disable one and the other still
@@ -800,7 +800,7 @@ fn decode_refuses_an_unknown_subject_kind_with_no_help_from_the_byte_compare() {
 /// A second property this test carries alone: the caller's
 /// re-encode-and-byte-compare cannot mask this rule, because the canonical
 /// re-encoding of an invalid pair **is** the invalid pair. Delete the check and
-/// `AnchorDelegation::from_cose_bytes` accepts these artifacts too — unlike the
+/// `Delegation::from_cose_bytes` accepts these artifacts too — unlike the
 /// content-type pin, the unprotected-bucket rule and the tag rule, all of which
 /// the byte-compare covers for.
 #[test]
@@ -1104,7 +1104,7 @@ fn decode_refuses_an_unusable_kid_with_no_help_from_the_byte_compare() {
     // ⛔ The slot the module docs claimed length alone protected. It does not:
     // every key below is exactly 32 bytes and none is a point strict Ed25519
     // verification could accept, so before this rule existed each parsed into a
-    // `kid` and became `AnchorDelegation::root_public_key` — a field named for a
+    // `kid` and became `Delegation::root_public_key` — a field named for a
     // key, holding something that is not one.
     //
     // Distinct from the delegated-key case below, and each must be able to fail

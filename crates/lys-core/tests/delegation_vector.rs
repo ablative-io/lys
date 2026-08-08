@@ -197,7 +197,7 @@
 
 use lys_core::Ed25519Identity;
 use lys_core::delegation::{
-    AnchorDelegation, DelegationClaim, DelegationRole, DelegationSubjectKind, assemble_delegation,
+    Delegation, DelegationClaim, DelegationRole, DelegationSubjectKind, assemble_delegation,
     delegation_preimage, sign_delegation, verify_delegation,
 };
 
@@ -1067,7 +1067,7 @@ fn the_frozen_artifacts_verify_and_parse_back() {
         // The parse-only route reaches the same value. Named for parsing because
         // it is NOT verification: it takes no expected key and no expected
         // subject, so the delegation it returns vouches for nothing.
-        let parsed = AnchorDelegation::from_cose_bytes(&artifact).unwrap();
+        let parsed = Delegation::from_cose_bytes(&artifact).unwrap();
         assert_eq!(parsed, verified, "{name}");
 
         kinds.insert(v.subject_kind_wire);

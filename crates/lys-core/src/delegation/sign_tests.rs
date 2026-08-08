@@ -484,11 +484,11 @@ fn the_two_subject_kinds_do_not_interchange_even_at_the_same_subject_value() {
 
     // The premise, asserted rather than assumed: one string, two artifacts.
     assert_eq!(
-        AnchorDelegation::from_cose_bytes(&domain)
+        Delegation::from_cose_bytes(&domain)
             .unwrap()
             .claim
             .subject_value,
-        AnchorDelegation::from_cose_bytes(&seat)
+        Delegation::from_cose_bytes(&seat)
             .unwrap()
             .claim
             .subject_value,
@@ -1231,7 +1231,7 @@ fn the_verifier_does_the_same_work_for_every_kind_of_mismatch() {
     ] {
         // Each mutant's own signature status, asserted rather than assumed, so
         // the three arms really are the three different causes.
-        let parsed = AnchorDelegation::from_cose_bytes(&mutant).unwrap();
+        let parsed = Delegation::from_cose_bytes(&mutant).unwrap();
         let preimage = delegation_preimage(&parsed.root_public_key, &parsed.claim);
         let signature_ok =
             Ed25519Identity::verify(&parsed.root_public_key, &preimage, &parsed.signature).is_ok();

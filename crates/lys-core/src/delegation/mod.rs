@@ -139,9 +139,9 @@
 //!
 //! # Invariants
 //!
-//! - **The artifact is the only durable form.** [`AnchorDelegation`] implements
+//! - **The artifact is the only durable form.** [`Delegation`] implements
 //!   no `serde`; the wire shape is exactly the tagged `COSE_Sign1` emitted by
-//!   [`AnchorDelegation::to_cose_bytes`] — protected headers
+//!   [`Delegation::to_cose_bytes`] — protected headers
 //!   `{1: -8 (EdDSA), 3: "application/vnd.lys.delegation.v1+cbor",
 //!   4: <raw 32-byte root key>}`, an **empty** unprotected map, an **embedded**
 //!   payload `{1: subject_kind, 2: subject_value, 3: delegated key, 4: role,
@@ -154,7 +154,7 @@
 //!   by-product of how this crate verifies: RFC 9052 §9 does not constrain map
 //!   key ordering, so without the format saying so a conforming stranger would
 //!   accept a permuted map as a second valid artifact for one statement.
-//!   [`AnchorDelegation::from_cose_bytes`] rejects any input that is not
+//!   [`Delegation::from_cose_bytes`] rejects any input that is not
 //!   byte-identical to the canonical re-encoding of its parsed fields — even
 //!   inputs whose signature is cryptographically valid.
 //! - **Non-oracle verification, in the return value *and* in the work done.**
@@ -240,10 +240,28 @@
 //! signing a durable artifact under its tag — and this one is still a draft
 //! with no production anchor to issue under it. No delegation may be signed
 //! outside tests until it is.
+//!
+//! # The Rust type was renamed, and unlike the content type this one was free
+//!
+//! [`Delegation`] was called `Anchor` + `Delegation` — written in two pieces so
+//! that no future search-and-replace can rewrite both sides of this sentence and
+//! destroy the record, which has already happened once to the account of the
+//! content-type rename. It was renamed for the same reason the content type was:
+//! the format serves seats as well as anchor domains, so a name saying *anchor*
+//! describes only half of what it carries.
+//!
+//! **The two renames were free for different reasons, and conflating them is the
+//! mistake to avoid.** The content type is signature-covered wire, and it was
+//! free only because no crate exposing it had been published and no durable
+//! artifact had been signed under it. This is a Rust item name: it is not on the
+//! wire, appears in no signed byte, and freezes nothing — it binds under semantic
+//! versioning the moment `lys-core 0.3.0` ships, and that release is held. A
+//! consumer pinned to an earlier version is unaffected because no earlier version
+//! exposes this module at all.
 
 pub mod artifact;
 mod encoding;
 pub mod sign;
 
-pub use artifact::{AnchorDelegation, DelegationClaim, DelegationRole, DelegationSubjectKind};
+pub use artifact::{Delegation, DelegationClaim, DelegationRole, DelegationSubjectKind};
 pub use sign::{assemble_delegation, delegation_preimage, sign_delegation, verify_delegation};

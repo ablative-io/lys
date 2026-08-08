@@ -229,12 +229,12 @@ pub use admission::{
     AcceptAll, AdmissionPolicy, AuthenticatedPeer, MaxSize, NotAdmitted, RecognisedCertificate,
     SubmitterContext,
 };
-#[cfg(feature = "unstable-anchor")]
-pub use anchor::GENESIS_SEQUENCE;
 pub use anchor::{
     Anchor, AnchorStatus, NoPolicy, NoSigner, PublishedCheckpoint, ReadOnlyAnchor,
     STANDALONE_DISCLOSURE, WitnessPosture, proof_nodes,
 };
+#[cfg(feature = "unstable-anchor")]
+pub use anchor::{GENESIS_SEQUENCE, verify_genesis_delegation};
 pub use config::AnchorConfig;
 pub use error::{AnchorError, AnchorResult};
 pub use keys::{FileSigner, InProcessSigner, Signer};

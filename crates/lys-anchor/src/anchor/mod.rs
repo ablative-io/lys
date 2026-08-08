@@ -14,7 +14,7 @@ pub mod submit;
 
 pub use checkpoint::PublishedCheckpoint;
 #[cfg(feature = "unstable-anchor")]
-pub use genesis::GENESIS_SEQUENCE;
+pub use genesis::{GENESIS_SEQUENCE, verify_genesis_delegation};
 pub use open::Anchor;
 pub use proof_nodes::proof_nodes;
 pub use read_only::{NoPolicy, NoSigner, ReadOnlyAnchor};

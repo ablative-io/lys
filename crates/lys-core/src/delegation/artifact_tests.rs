@@ -1,5 +1,5 @@
 //! Round-trip and canonical-encoding-strictness tests for
-//! [`AnchorDelegation`].
+//! [`Delegation`].
 //!
 //! The mutants here all have or could have **cryptographically valid
 //! signatures** — several are re-encodings of a genuine delegation rather than
@@ -67,8 +67,8 @@ fn claim_for(subject_value: &str, not_before_unix_ms: u64, sequence: u64) -> Del
 
 /// The `(seat, speaks-for)` sample, so the round trip is exercised on both valid
 /// pairs rather than only on the one an anchor happens to use.
-fn seat_sample() -> AnchorDelegation {
-    AnchorDelegation {
+fn seat_sample() -> Delegation {
+    Delegation {
         root_public_key: ROOT_KEY,
         claim: DelegationClaim {
             subject_kind: DelegationSubjectKind::Seat,
@@ -82,8 +82,8 @@ fn seat_sample() -> AnchorDelegation {
     }
 }
 
-fn sample() -> AnchorDelegation {
-    AnchorDelegation {
+fn sample() -> Delegation {
+    Delegation {
         root_public_key: ROOT_KEY,
         claim: claim_for("example.test", 1_700_000_000_000, 300),
         signature: SIGNATURE,
@@ -105,7 +105,7 @@ fn artifact_with_payload(payload: &[u8]) -> Vec<u8> {
 fn round_trip_is_identity_on_the_value() {
     let mut checked = 0;
     for delegation in [sample(), seat_sample()] {
-        let parsed = AnchorDelegation::from_cose_bytes(&delegation.to_cose_bytes()).unwrap();
+        let parsed = Delegation::from_cose_bytes(&delegation.to_cose_bytes()).unwrap();
         assert_eq!(parsed, delegation);
         checked += 1;
     }
@@ -138,7 +138,7 @@ fn a_hand_built_invalid_kind_role_pair_encodes_and_is_then_refused() {
         );
         assert!(
             matches!(
-                AnchorDelegation::from_cose_bytes(&bytes),
+                Delegation::from_cose_bytes(&bytes),
                 Err(TrustError::DelegationVerification)
             ),
             "({kind:?}, {role:?}) parsed back"
@@ -148,16 +148,14 @@ fn a_hand_built_invalid_kind_role_pair_encodes_and_is_then_refused() {
     assert_eq!(refused, 2, "both invalid pairs must have been tried");
 
     // Positive controls: the two valid pairs parse back through the same route.
-    AnchorDelegation::from_cose_bytes(&sample().to_cose_bytes()).unwrap();
-    AnchorDelegation::from_cose_bytes(&seat_sample().to_cose_bytes()).unwrap();
+    Delegation::from_cose_bytes(&sample().to_cose_bytes()).unwrap();
+    Delegation::from_cose_bytes(&seat_sample().to_cose_bytes()).unwrap();
 }
 
 #[test]
 fn round_trip_is_identity_on_the_bytes() {
     let bytes = sample().to_cose_bytes();
-    let reencoded = AnchorDelegation::from_cose_bytes(&bytes)
-        .unwrap()
-        .to_cose_bytes();
+    let reencoded = Delegation::from_cose_bytes(&bytes).unwrap().to_cose_bytes();
     assert_eq!(reencoded, bytes);
 }
 
@@ -178,17 +176,14 @@ fn round_trip_holds_across_the_interesting_shapes() {
     ];
     let mut checked = 0;
     for (origin, not_before_unix_ms, sequence) in cases {
-        let delegation = AnchorDelegation {
+        let delegation = Delegation {
             root_public_key: ROOT_KEY,
             claim: claim_for(&origin, not_before_unix_ms, sequence),
             signature: SIGNATURE,
         };
         let bytes = delegation.to_cose_bytes();
         assert!(bytes.len() <= MAX_ARTIFACT_LEN, "fixture within the cap");
-        assert_eq!(
-            AnchorDelegation::from_cose_bytes(&bytes).unwrap(),
-            delegation
-        );
+        assert_eq!(Delegation::from_cose_bytes(&bytes).unwrap(), delegation);
         checked += 1;
     }
     assert_eq!(checked, 6, "every shape must have been exercised");
@@ -303,7 +298,7 @@ fn the_envelope_malleability_sweep_is_refused() {
         );
         assert!(
             matches!(
-                AnchorDelegation::from_cose_bytes(mutant),
+                Delegation::from_cose_bytes(mutant),
                 Err(TrustError::DelegationVerification)
             ),
             "{name} was accepted"
@@ -317,7 +312,7 @@ fn the_envelope_malleability_sweep_is_refused() {
 
     // The positive control. Without it a parser that refused everything would
     // satisfy all twelve assertions above.
-    AnchorDelegation::from_cose_bytes(&good).unwrap();
+    Delegation::from_cose_bytes(&good).unwrap();
 }
 
 #[test]
@@ -348,7 +343,7 @@ fn an_oversized_integer_head_in_the_payload_is_refused() {
         ciborium::de::from_reader::<ciborium::value::Value, _>(mutant.as_slice()).is_ok(),
         "the mutant must be well-formed CBOR for this test to mean anything"
     );
-    assert!(AnchorDelegation::from_cose_bytes(&mutant).is_err());
+    assert!(Delegation::from_cose_bytes(&mutant).is_err());
 }
 
 #[test]
@@ -374,7 +369,7 @@ fn a_reordered_protected_map_is_refused() {
     mutant.extend_from_slice(&reordered);
     mutant.extend_from_slice(&good[PROTECTED_AT + PROTECTED_LEN..]);
     assert_eq!(mutant.len(), good.len());
-    assert!(AnchorDelegation::from_cose_bytes(&mutant).is_err());
+    assert!(Delegation::from_cose_bytes(&mutant).is_err());
 }
 
 #[test]
@@ -392,14 +387,14 @@ fn a_detached_nil_payload_is_not_a_delegation() {
         ciborium::de::from_reader::<ciborium::value::Value, _>(mutant.as_slice()).is_ok(),
         "the mutant must be well-formed CBOR for this test to mean anything"
     );
-    assert!(AnchorDelegation::from_cose_bytes(&mutant).is_err());
+    assert!(Delegation::from_cose_bytes(&mutant).is_err());
 }
 
 #[test]
 fn stripping_the_tag_is_refused() {
     let good = sample().to_cose_bytes();
     assert_eq!(good[0], 0xd2);
-    assert!(AnchorDelegation::from_cose_bytes(&good[1..]).is_err());
+    assert!(Delegation::from_cose_bytes(&good[1..]).is_err());
 }
 
 #[test]
@@ -409,7 +404,7 @@ fn a_wrong_tag_number_is_refused() {
     let mut mutant = sample().to_cose_bytes();
     mutant[0] = 0xd8;
     mutant.insert(1, 98);
-    assert!(AnchorDelegation::from_cose_bytes(&mutant).is_err());
+    assert!(Delegation::from_cose_bytes(&mutant).is_err());
 }
 
 #[test]
@@ -423,19 +418,19 @@ fn a_receipt_content_type_in_the_protected_bucket_is_refused_by_the_parser() {
         &encoding::payload_bytes(&sample().claim),
         &SIGNATURE,
     );
-    assert!(AnchorDelegation::from_cose_bytes(&confused).is_err());
+    assert!(Delegation::from_cose_bytes(&confused).is_err());
 }
 
 #[test]
 fn an_oversize_artifact_is_refused() {
-    let delegation = AnchorDelegation {
+    let delegation = Delegation {
         root_public_key: ROOT_KEY,
         claim: claim_for(&"o".repeat(MAX_ARTIFACT_LEN), 0, 0),
         signature: SIGNATURE,
     };
     let bytes = delegation.to_cose_bytes();
     assert!(bytes.len() > MAX_ARTIFACT_LEN);
-    assert!(AnchorDelegation::from_cose_bytes(&bytes).is_err());
+    assert!(Delegation::from_cose_bytes(&bytes).is_err());
 }
 
 #[test]
@@ -450,25 +445,25 @@ fn to_cose_bytes_stays_infallible_which_is_why_the_round_trip_claim_is_qualified
     //
     // Every issuing entry point in `sign` refuses these up front; the only way
     // here is to build the struct literal yourself.
-    let over_cap = AnchorDelegation {
+    let over_cap = Delegation {
         root_public_key: ROOT_KEY,
         claim: claim_for(&"o".repeat(MAX_ARTIFACT_LEN), 0, 0),
         signature: SIGNATURE,
     };
-    assert!(AnchorDelegation::from_cose_bytes(&over_cap.to_cose_bytes()).is_err());
+    assert!(Delegation::from_cose_bytes(&over_cap.to_cose_bytes()).is_err());
 
-    let empty_subject = AnchorDelegation {
+    let empty_subject = Delegation {
         root_public_key: ROOT_KEY,
         claim: claim_for("", 0, 0),
         signature: SIGNATURE,
     };
-    assert!(AnchorDelegation::from_cose_bytes(&empty_subject.to_cose_bytes()).is_err());
+    assert!(Delegation::from_cose_bytes(&empty_subject.to_cose_bytes()).is_err());
 
     // Whereas a value that does satisfy them round-trips, which is the invariant
     // as it is actually stated.
     let ok = sample();
     assert_eq!(
-        AnchorDelegation::from_cose_bytes(&ok.to_cose_bytes()).unwrap(),
+        Delegation::from_cose_bytes(&ok.to_cose_bytes()).unwrap(),
         ok
     );
 }
@@ -479,7 +474,7 @@ fn every_parse_failure_is_the_same_error() {
     // must parse, or a parser that refused everything would satisfy every
     // assertion below without doing any work.
     let good = sample().to_cose_bytes();
-    AnchorDelegation::from_cose_bytes(&good).unwrap();
+    Delegation::from_cose_bytes(&good).unwrap();
 
     let mut trailing = good.clone();
     trailing.push(0x00);
@@ -513,7 +508,7 @@ fn every_parse_failure_is_the_same_error() {
 
     let mut refused = 0;
     for (name, mutant) in cases {
-        let err = AnchorDelegation::from_cose_bytes(&mutant).unwrap_err();
+        let err = Delegation::from_cose_bytes(&mutant).unwrap_err();
         assert!(
             matches!(err, TrustError::DelegationVerification),
             "{name} produced a distinguishable error: {err:?}"

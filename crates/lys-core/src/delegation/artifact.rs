@@ -1,28 +1,28 @@
-//! [`AnchorDelegation`], [`DelegationClaim`] and [`DelegationRole`] — the
+//! [`Delegation`], [`DelegationClaim`] and [`DelegationRole`] — the
 //! parsed form of the `lys/delegation/v1` tagged `COSE_Sign1` artifact.
 //!
 //! # Invariants
 //!
 //! - **The only durable form is the COSE bytes.** These types deliberately
 //!   implement no `serde` traits: nothing can persist a delegation except
-//!   [`AnchorDelegation::to_cose_bytes`], so no second wire shape can ever
+//!   [`Delegation::to_cose_bytes`], so no second wire shape can ever
 //!   exist alongside the frozen COSE artifact.
 //! - **Round-trip identity:** `from_cose_bytes(x.to_cose_bytes()) == x` for
-//!   every `AnchorDelegation` whose fields satisfy the format's constraints —
+//!   every `Delegation` whose fields satisfy the format's constraints —
 //!   a non-empty subject value, a delegated key strict Ed25519 could accept,
 //!   a `(subject_kind, role)` pair this version defines, and an
 //!   encoded length within the artifact cap — and `to_cose_bytes` of a parsed
 //!   delegation reproduces the input bytes exactly.
 //!
 //!   **The qualification is not decoration and was added after it was
-//!   violated.** [`AnchorDelegation::to_cose_bytes`] is infallible by design, so
+//!   violated.** [`Delegation::to_cose_bytes`] is infallible by design, so
 //!   a hand-built value outside those constraints still encodes; the decoder
 //!   then refuses what the encoder produced. The unqualified claim was false for
 //!   a subject value of 3885 bytes. Every issuing entry point in
 //!   [`super::sign`]
 //!   refuses such a claim up front, so the only way to reach the gap is to
 //!   construct the struct literal yourself and call `to_cose_bytes` on it.
-//! - **Canonical-encoding strictness:** [`AnchorDelegation::from_cose_bytes`]
+//! - **Canonical-encoding strictness:** [`Delegation::from_cose_bytes`]
 //!   rejects any input that is not byte-identical to the canonical re-encoding
 //!   of its parsed fields — including inputs whose signature is
 //!   cryptographically valid (indefinite lengths, oversized integer heads,
@@ -415,7 +415,7 @@ pub struct DelegationClaim {
 /// exists to keep the root key on a machine that need not hold this crate's
 /// types.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AnchorDelegation {
+pub struct Delegation {
     /// Ed25519 verifying key of the **root** key that signed, from the
     /// protected `kid` header — inside the signed bytes, so it cannot be
     /// swapped without invalidating `signature`.
@@ -436,7 +436,7 @@ pub struct AnchorDelegation {
     pub signature: [u8; 64],
 }
 
-impl AnchorDelegation {
+impl Delegation {
     /// Encode this delegation as its canonical tagged `COSE_Sign1` artifact
     /// (media type `application/cose`).
     ///

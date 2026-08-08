@@ -24,7 +24,7 @@
 //! argument** and enforces `kid == expected`. There is deliberately no
 //! "just verify this" entry point. Callers who genuinely want to inspect an
 //! unattributed delegation use
-//! [`AnchorDelegation::from_cose_bytes`](crate::delegation::AnchorDelegation::from_cose_bytes),
+//! [`Delegation::from_cose_bytes`](crate::delegation::Delegation::from_cose_bytes),
 //! which is honestly labelled as parsing rather than verification.
 //!
 //! # The subject is required for the same reason, one level down
@@ -97,7 +97,7 @@
 //! error from a forgery.
 
 use crate::cbor;
-use crate::delegation::artifact::{AnchorDelegation, DelegationClaim, DelegationSubjectKind};
+use crate::delegation::artifact::{Delegation, DelegationClaim, DelegationSubjectKind};
 use crate::delegation::encoding::{self, KEY_LEN};
 use crate::error::{TrustError, TrustResult};
 use crate::keys::identity::Ed25519Identity;
@@ -280,8 +280,8 @@ pub fn verify_delegation(
     expected_root_public_key: &[u8; KEY_LEN],
     expected_subject_kind: DelegationSubjectKind,
     expected_subject_value: &str,
-) -> TrustResult<AnchorDelegation> {
-    let delegation = AnchorDelegation::from_cose_bytes(cose)?;
+) -> TrustResult<Delegation> {
+    let delegation = Delegation::from_cose_bytes(cose)?;
 
     // The signature check runs FIRST and UNCONDITIONALLY. Moving it after the
     // comparisons, or making it conditional on them, restores the 32.8×
@@ -333,7 +333,7 @@ thread_local! {
 /// Extracted so the count and the verification cannot be separated: an edit that
 /// skips the work also skips the increment, which is what makes the counter a
 /// measurement rather than a decoration sitting next to one.
-fn check_signature(delegation: &AnchorDelegation) -> bool {
+fn check_signature(delegation: &Delegation) -> bool {
     let preimage = delegation_preimage(&delegation.root_public_key, &delegation.claim);
     let outcome = Ed25519Identity::verify(
         &delegation.root_public_key,

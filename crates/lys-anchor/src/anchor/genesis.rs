@@ -197,10 +197,85 @@
 //! It is a bare parameter rather than an [`AnchorConfig`] field because it is an
 //! input to one act, not a property of the anchor: `open` would otherwise have
 //! to be handed a `not_before` it has no use for, on every call, forever.
+//!
+//! # ⛔ Creating a DP16 anchor and opening one are different guarantees, and the second is opt-in
+//!
+//! [`Anchor::create_with_delegated_genesis`] makes leaf 0 a delegation. It does
+//! **not** follow that every anchor a process opens has one:
+//! [`Anchor::open`](super::Anchor::open) checks that leaf 0 *exists* and reads no
+//! byte of it, so a store created by a default-features build through
+//! [`create`](super::Anchor::create) — whose leaf 0 is uninterpreted operator
+//! bytes — opens without complaint under an all-features build, and the resulting
+//! value is indistinguishable from a DP16 anchor at every method.
+//!
+//! [`Anchor::open_verifying_genesis`] is the opt-in that closes that, and
+//! [`verify_genesis_delegation`] is the check itself, reachable without opening
+//! anything so a read-only auditor can run it too.
+//!
+//! **Why opt-in rather than folded into `open`.** Exactly the argument this
+//! module's four rejected alternatives already make about `create`, one layer
+//! along: `open` is ungated, so it cannot call into `lys_core::delegation` —
+//! that module does not exist in a default build. An `open` whose behaviour
+//! changed under `#[cfg]` would be two functions wearing one name, and an `open`
+//! that refused a non-delegation genesis would leave a default build unable to
+//! open the anchors it is able to create. So the strict open is a second,
+//! differently-named constructor, and the residual is stated rather than
+//! designed away: **nothing forces a caller to use it**, and an anchor opened
+//! through [`Anchor::open`](super::Anchor::open) carries no genesis guarantee
+//! whatsoever.
+//!
+//! # What the open-time check establishes, and the three things it does not
+//!
+//! [`verify_genesis_delegation`] establishes, for the bytes at leaf 0:
+//!
+//! - they parse as a canonically-encoded `lys/delegation/v1` artifact;
+//! - the signature verifies under the root key **the caller named**;
+//! - the subject is `(Domain, this store's origin)` — the origin read through
+//!   `LeafStore::origin`, never a caller argument, for the reason below;
+//! - the delegated key is not the root key, so DP16's two-key model is not void;
+//! - `sequence` is [`GENESIS_SEQUENCE`].
+//!
+//! It does **not** establish:
+//!
+//! - **That the named root key is the right one.** A delegation verifies against
+//!   whatever key it carries; naming the trusted key is the caller's declaration
+//!   and always was. `lys-core` refuses to offer an unattributed verify for this
+//!   reason and so does this.
+//! - **That this anchor's operational signer is the currently delegated key.**
+//!   Leaf 0 names the key that was delegated *at genesis*. Revocation is an
+//!   append of a later, superseding delegation, so after any rotation leaf 0
+//!   names a key that is no longer operational — and deciding which delegation is
+//!   current is a fold over the whole log, which does not exist yet. Checking
+//!   `signer.public_key()` against leaf 0 here would therefore be a check that
+//!   *forbids rotation*, sold as a check that confirms the key. The delegated key
+//!   is returned instead, so a caller who knows their anchor has never rotated can
+//!   compare it and one that has cannot be broken by an assumption this crate made
+//!   for them.
+//! - **That leaves 1..n are anything at all.** They are not read. A log whose
+//!   genesis is impeccable and whose every later leaf revokes it passes.
+//!
+//! `sequence == GENESIS_SEQUENCE` is a check against **this crate's convention**
+//! and nothing stronger: the format has no genesis marker, so a stranger holding
+//! only the artifact cannot conclude from `sequence = 0` that it is the first
+//! delegation for its subject. What the check buys is that a leaf 0 written with
+//! a nonzero start — the foot-gun the constructor closes by not taking the value
+//! as a parameter — is refused on the way back in rather than never noticed.
+//!
+//! # Why the open-time check reads the origin from the store and does not take one
+//!
+//! An `expected_subject` parameter is the obvious shape and it is the wrong one.
+//! The creation-time invariant is that leaf 0's subject **is** the store's
+//! origin; a caller-supplied subject checks leaf 0 against the caller instead,
+//! so a store whose origin had drifted from its own genesis would pass as long
+//! as the caller named genesis's value. That is the binding worth having,
+//! silently dropped. The origin therefore comes from `LeafStore::origin` on both
+//! paths, from the same accessor, and a caller who wants to pin *which store this
+//! is* has [`Anchor::origin`](super::Anchor::origin) for it — a separate question
+//! with a separate answer.
 
 use lys_core::delegation::{
-    DelegationClaim, DelegationRole, DelegationSubjectKind, assemble_delegation,
-    delegation_preimage,
+    Delegation, DelegationClaim, DelegationRole, DelegationSubjectKind, assemble_delegation,
+    delegation_preimage, verify_delegation,
 };
 use lys_log_store::{LeafStore, Log};
 
@@ -223,6 +298,88 @@ use super::Anchor;
 /// See the [module docs](self) for why genesis does not take this as a
 /// parameter.
 pub const GENESIS_SEQUENCE: u64 = 0;
+
+/// Checks that `leaf_zero` is a genesis delegation for `origin` from
+/// `expected_root_public_key`, returning it parsed.
+///
+/// This is the open-time counterpart to
+/// [`Anchor::create_with_delegated_genesis`], and it is a free function rather
+/// than a method so that a party holding only the bytes — a read-only anchor, an
+/// auditor, a witness — can run the same check without a signer, an admission
+/// policy, or the ability to append. There is one definition of the rule and
+/// both paths reach it.
+///
+/// `origin` is the store's own origin. Callers inside this crate read it through
+/// `LeafStore::origin`; the [module docs](self) say why it is not an
+/// `expected_subject` argument.
+///
+/// # ⛔ Read what this does not establish before relying on it
+///
+/// It is a check on **leaf 0 alone**. It says nothing about whether the named
+/// root key deserves trust, whether the delegation is still current, or what any
+/// later leaf says — see the [module docs](self), which enumerate the three gaps.
+/// In particular the returned [`Delegation`]'s
+/// `claim.delegated_public_key` is the key delegated **at genesis**, which is the
+/// operational key only until the first rotation.
+///
+/// The `(subject_kind, role)` pair is not re-checked here: `lys-core` validates
+/// it at decode and `Domain` permits only `Operational`, so a second check in
+/// this function would guard a rule already guarded and leave neither provable by
+/// the obvious case. The role is asserted in this module's tests against the
+/// enum variant, not against whatever the artifact carried.
+///
+/// # Errors
+///
+/// - [`AnchorError::GenesisNotADelegation`] if the bytes are not a canonical
+///   `lys/delegation/v1` artifact, or do not verify under
+///   `expected_root_public_key`, or name a different subject or subject kind.
+///   `lys-core` collapses all of those into one value on purpose, and this
+///   variant carries it rather than re-deriving a reason it was not given.
+/// - [`AnchorError::GenesisDelegatesToTheRootKey`] if the delegated key equals
+///   the signing root key — the open-time arm of the rule
+///   [`AnchorError::GenesisRootKeyIsOperationalKey`] enforces at creation.
+/// - [`AnchorError::GenesisSequenceIsNotGenesis`] if `sequence` is not
+///   [`GENESIS_SEQUENCE`].
+pub fn verify_genesis_delegation(
+    leaf_zero: &[u8],
+    expected_root_public_key: &[u8; 32],
+    origin: &str,
+) -> AnchorResult<Delegation> {
+    // The kind is named as a constant of this crate, exactly as the constructor
+    // names it: an anchor's genesis is a domain delegation, and `lys-core`
+    // requires the caller to declare the kind precisely so that a seat
+    // delegation whose identifier happens to equal this origin cannot pass.
+    let delegation = verify_delegation(
+        leaf_zero,
+        expected_root_public_key,
+        DelegationSubjectKind::Domain,
+        origin,
+    )
+    .map_err(|source| AnchorError::GenesisNotADelegation {
+        origin: origin.to_string(),
+        source,
+    })?;
+
+    // DP16's two-key model, checked against the artifact rather than against two
+    // signers. `lys-core` permits self-delegation — whether a subject may
+    // delegate to its own signer is a format question the format has not ruled
+    // on — so a store whose leaf 0 was written by anything other than this
+    // crate's constructor can carry one, and nothing else would flag it.
+    if delegation.claim.delegated_public_key == delegation.root_public_key {
+        return Err(AnchorError::GenesisDelegatesToTheRootKey {
+            origin: origin.to_string(),
+        });
+    }
+
+    if delegation.claim.sequence != GENESIS_SEQUENCE {
+        return Err(AnchorError::GenesisSequenceIsNotGenesis {
+            origin: origin.to_string(),
+            sequence: delegation.claim.sequence,
+        });
+    }
+
+    Ok(delegation)
+}
 
 impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     /// Creates an anchor over `store` whose leaf 0 **is** a
@@ -336,6 +493,77 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
 
         // Only now. Everything above can fail without touching the log.
         log.append(&genesis)?;
+        Ok(Self {
+            log,
+            signer,
+            config,
+            policy,
+        })
+    }
+
+    /// Opens an anchor over an existing `store`, refusing it unless leaf 0 is a
+    /// genesis delegation from `expected_root_public_key` for the store's own
+    /// origin.
+    ///
+    /// This is [`Anchor::open`](super::Anchor::open) plus
+    /// [`verify_genesis_delegation`], and it is the only constructor in this
+    /// crate that checks anything about leaf 0's *content* on the way in. `open`
+    /// checks that leaf 0 exists and reads none of it; the [module docs](self)
+    /// say why the strict version is a second name rather than a stricter `open`,
+    /// and record that nothing forces a caller here.
+    ///
+    /// Everything `open` does still happens first: the tree is rebuilt from
+    /// stored leaves and reconciled with the pin, and an interrupted append is
+    /// repaired and reported through
+    /// [`recovered_to`](super::Anchor::recovered_to).
+    ///
+    /// # ⛔ What a successful open does not tell you
+    ///
+    /// That leaf 0 is a well-formed genesis delegation from a key you named. It
+    /// is **not** a statement that the key is trustworthy, that `signer` is the
+    /// currently delegated operational key, or that any later leaf has not
+    /// superseded the delegation — the last needs a fold over the log that does
+    /// not exist yet. [`verify_genesis_delegation`] enumerates all three, and
+    /// returns the parsed delegation for a caller who wants to compare the
+    /// delegated key themselves.
+    ///
+    /// # Errors
+    ///
+    /// - [`AnchorError::NoGenesisLeaf`] if the log has no leaves.
+    /// - [`AnchorError::NoSuchLeaf`] if the tree is non-empty and index 0 is
+    ///   nonetheless absent from storage. Not reachable through a `LeafStore`
+    ///   honouring its contract, and named rather than assumed away because the
+    ///   alternative is an `unwrap` on somebody else's invariant.
+    /// - Everything [`verify_genesis_delegation`] returns.
+    /// - [`AnchorError::Store`] for anything the log or its storage refuses —
+    ///   notably `StoreError::PinMismatch` when the stored leaves no longer
+    ///   rebuild to the pinned root.
+    pub fn open_verifying_genesis(
+        store: S,
+        expected_root_public_key: &[u8; 32],
+        signer: K,
+        policy: P,
+        config: AnchorConfig,
+    ) -> AnchorResult<Self> {
+        let log = Log::open(store)?;
+        let tree_size = log.tree().len();
+        if tree_size == 0 {
+            return Err(AnchorError::NoGenesisLeaf {
+                origin: log.origin().to_string(),
+            });
+        }
+
+        let leaf_zero = log.leaf_bytes(0).ok_or_else(|| AnchorError::NoSuchLeaf {
+            origin: log.origin().to_string(),
+            leaf_index: 0,
+            tree_size,
+        })?;
+
+        // The origin comes from storage on this path exactly as it does on the
+        // creation path, through the same accessor. There is no argument for a
+        // caller to disagree with it through.
+        verify_genesis_delegation(leaf_zero, expected_root_public_key, log.origin())?;
+
         Ok(Self {
             log,
             signer,
