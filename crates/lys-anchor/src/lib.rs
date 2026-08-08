@@ -167,12 +167,46 @@
 //!   checkpoint is appended and receipted like any other statement, because
 //!   equivocation is caught by two durable memories disagreeing and a witness
 //!   that refused to hold the second one would have destroyed the evidence.
+//!
+//! # Pinning upward is the same act from the other side, and it freezes nothing
+//!
+//! Being the party that *asks* to be remembered is the `upward` module, behind
+//! the same feature. `pin` publishes this anchor's checkpoint and submits it to
+//! a parent; `bundle_for` packages a leaf, its inclusion proof and the resulting
+//! cascade into a `lys/verification-bundle/v1`. DP14 asks that cascading and
+//! witnessing be one mechanism rather than two, and they are — the same
+//! `Anchor::submit`, over the same bytes, producing the same receipt.
+//!
+//! Three properties, again held by shape:
+//!
+//! - **No wire format is introduced.** The leaf a parent records is this
+//!   anchor's checkpoint note *verbatim* — an ordinary C2SP signed note. There
+//!   is no cascade envelope, no new domain-separation tag and no new leaf
+//!   encoding, so nothing in this path can be frozen by a durable append. The
+//!   first format this crate freezes is the delegation entry, deliberately
+//!   last.
+//! - **The parent's `submit` is unchanged and cannot tell.** `pin` passes the
+//!   two arguments every submission passes. `Submission` has one field, so
+//!   there is nowhere for "this is a cascade" to be written, and the parent's
+//!   receipt is therefore identical to any other submitter's — which is the
+//!   same structural guard that keeps a witness's receipt from reading as an
+//!   endorsement.
+//! - **Federation is a caller of the core, never a layer the core is built
+//!   through.** `pin` calls `Anchor::submit`; nothing in `Anchor::submit` knows
+//!   `upward` exists. A core path that named it would break the default build.
+//!
+//! An upward pin appends **nothing to this anchor's own log** — publishing is
+//! not an append, and the parent's leaf lands in the parent's log — so a pinned
+//! anchor still holds no local evidence that anybody remembers it.
+//! [`anchor::status`] says what that means for [`WitnessPosture`].
 
 pub mod admission;
 pub mod anchor;
 pub mod config;
 pub mod error;
 pub mod keys;
+#[cfg(feature = "federation")]
+pub mod upward;
 pub mod wire;
 #[cfg(feature = "federation")]
 pub mod witness;
@@ -188,6 +222,8 @@ pub use anchor::{
 pub use config::AnchorConfig;
 pub use error::{AnchorError, AnchorResult};
 pub use keys::{FileSigner, InProcessSigner, Signer};
+#[cfg(feature = "federation")]
+pub use upward::{UpwardPin, bundle_for, pin};
 #[cfg(feature = "unstable-anchor")]
 pub use wire::SubmissionOutcome;
 pub use wire::{AppendOutcome, Submission};

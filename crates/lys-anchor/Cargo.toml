@@ -69,6 +69,12 @@ lys-log-store.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+# A base64 codec the tests drive themselves, so what a bundle carries can be
+# read back by something other than the encoder that wrote it. A
+# dev-dependency: nothing in this crate's own code encodes base64, because the
+# container's encodings are `lys-core`'s and a second copy of a canonical
+# encoder is what a suite testing only itself can never catch drifting.
+base64.workspace = true
 # The JSON codec for the proof artifact. A dev-dependency and not a dependency:
 # `lys-core` deliberately performs no JSON (de)serialization itself — the types
 # only derive `Serialize`/`Deserialize` and the consumer picks the codec — and

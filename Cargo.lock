@@ -802,6 +802,7 @@ dependencies = [
 name = "lys-anchor"
 version = "0.2.0"
 dependencies = [
+ "base64 0.22.1",
  "lys-core",
  "lys-log-store",
  "serde_json",

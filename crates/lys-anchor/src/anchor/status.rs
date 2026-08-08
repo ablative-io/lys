@@ -51,18 +51,37 @@
 //! plainly rather than implied: [`WitnessPosture`] has one variant, and
 //! `status` returns it unconditionally. That is not a stub standing in for a
 //! scan that was skipped — it is that the evidence a witnessed posture would
-//! require does not exist to be scanned for. The leaf that would carry it is
-//! written by the upward-pin path (BUILD-PLAN increment 8), which is not built,
-//! and there is no ratified format for a parent's receipt over this anchor's
-//! checkpoint for a scan to recognise. Writing a recogniser for a format that
-//! does not exist would be inventing the format, in the crate whose entire
-//! discipline is that formats are frozen the moment something durable is signed
-//! under them.
+//! require does not exist to be scanned for. There is no ratified format for a
+//! parent's receipt over this anchor's checkpoint for a scan to recognise, and
+//! writing a recogniser for a format that does not exist would be inventing the
+//! format, in the crate whose entire discipline is that formats are frozen the
+//! moment something durable is signed under them.
 //!
-//! So the honest statement is: the value is **unreachable-by-configuration
-//! today and unreachable-by-content today**, and increment 8 makes the second
-//! half a real scan. This module is where that scan goes, and it is the only
-//! place that has to change.
+//! ## The upward-pin path is now built, and it did not make the scan writable
+//!
+//! This paragraph previously said the leaf a scan would recognise "is written
+//! by the upward-pin path (BUILD-PLAN increment 8), which is not built". That
+//! was the wrong reason, and building increment 8 is what showed it. **An
+//! upward pin writes nothing here at all.** Publishing a checkpoint is not an
+//! append — `publish_checkpoint` takes `&self` — and the leaf a parent records
+//! lands in the *parent's* log. A pinned anchor's own storage is byte-for-byte
+//! what it was before it was pinned, which is asserted in `upward`'s tests
+//! rather than left as a reading of the code.
+//!
+//! So the blocker was never a missing call site. It is that **the receipt a
+//! parent hands back is an artifact this anchor holds, not a leaf this anchor
+//! logs**, and turning a held artifact into recorded evidence needs a leaf
+//! encoding for "a parent receipted my checkpoint at this size" — a wire format,
+//! frozen by the first durable append under it, and therefore not something to
+//! invent as a side effect of wanting a nicer status line. It is deliberately
+//! not invented here.
+//!
+//! The honest statement is unchanged in substance and sharper in reason: the
+//! value is **unreachable-by-configuration today and unreachable-by-content
+//! today**, and what would change the second half is a ratified leaf format for
+//! a parent's countersignature, not any of the increments already built. This
+//! module is still where that scan goes, and it is still the only place that has
+//! to change.
 //!
 //! **The consequence for tests, said out loud:** an assertion that a fresh
 //! anchor's posture is `Unwitnessed` cannot fail while the enum has one
@@ -105,9 +124,10 @@ pub const STANDALONE_DISCLOSURE: &str = "this anchor has no witnesses: an anchor
 /// what it does not yet.
 ///
 /// `#[non_exhaustive]` because the second variant is scheduled rather than
-/// hypothetical: increment 8's upward pin is what makes a witnessed anchor
-/// expressible, and a renderer written now should be forced to say what it will
-/// do with a posture it has not seen.
+/// hypothetical: a ratified leaf format for a parent's countersignature is what
+/// makes a witnessed anchor expressible — see the [module docs](self) for why
+/// the upward pin, which is built, is not that — and a renderer written now
+/// should be forced to say what it will do with a posture it has not seen.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum WitnessPosture {

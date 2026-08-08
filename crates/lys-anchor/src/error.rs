@@ -85,6 +85,33 @@
 //! machine, and the argument for their detail was never that the crate had no
 //! stranger-driven path — it was that no *variant* was a function of the
 //! stranger's bytes. Exactly one now is, and it is the one carrying nothing.
+//!
+//! # The two federation variants, judged against the same constraint
+//!
+//! `CascadeTooDeep` and `CascadeJoinMismatch` — named in plain text here rather
+//! than linked, because a link from these ungated docs to a gated item resolves
+//! under `--all-features` and breaks the default `cargo doc`, which is a gate —
+//! exist only with the `federation` feature, and both are detailed. They were
+//! put to the rule above rather than pattern-matched onto the variants beside
+//! them, and they pass it for a reason that is about *who drives the path*
+//! rather than about how interesting the numbers are: **bundle assembly is a
+//! producer-side operation on the operator's own artifacts.** A stranger cannot
+//! reach `bundle_for` — it takes the operator's anchor, an index into the
+//! operator's log, and a cascade the operator built by pinning. Nothing a
+//! submitter sends changes which variant comes back or what it says, so there
+//! is no verdict on anyone's bytes for the detail to disclose.
+//!
+//! The reader who checks bundles is a stranger, and *their* refusal is
+//! `lys-core`'s single non-oracle `BundleVerification` — deliberately
+//! indistinguishable across a malformed container, a bad receipt and a chain
+//! that does not join. These two variants do not soften that. They are what the
+//! operator is told about a bundle their own code declined to emit; a bundle
+//! that reaches a verifier gets the one collapsed answer, unchanged.
+//!
+//! They are `#[cfg(feature = "federation")]` because the default build cannot
+//! produce them: with federation off there is no `upward` module and no call
+//! site, and a variant nothing can construct is a promise in the error surface
+//! consumers actually get.
 
 use lys_core::error::TrustError;
 use lys_log_store::StoreError;
@@ -323,6 +350,68 @@ pub enum AnchorError {
         tree_size: u64,
         /// `lys-core`'s reason for refusing to build or to self-verify it.
         source: TrustError,
+    },
+
+    /// A cascade was handed to bundle assembly with more links than
+    /// `lys-core`'s `MAX_LINKS` cap allows.
+    ///
+    /// Refused at assembly rather than emitted, because the workspace already
+    /// knows the answer: `verify_bundle` rejects a bundle past the cap, so
+    /// producing one would hand a caller an artifact nothing can accept. The
+    /// cap exists so an untrusted bundle cannot ask a verifier for unbounded
+    /// work, and a chain this deep is pathological on its own terms — each link
+    /// is one anchor notarizing the one below it.
+    ///
+    /// **`max` is carried as a field rather than written into the text as a
+    /// literal**, so the message reports the cap the code actually enforced
+    /// instead of the one this sentence remembers.
+    #[cfg(feature = "federation")]
+    #[error(
+        "refusing to assemble a verification bundle for {origin} from a cascade of {links} links: a verifier accepts at most {max}, so a deeper chain would produce an artifact nothing can check"
+    )]
+    CascadeTooDeep {
+        /// The origin of the log the bundle was being assembled for.
+        origin: String,
+        /// The number of links the cascade held.
+        links: usize,
+        /// The cap, as read from `lys-core` at the point of refusal.
+        max: usize,
+    },
+
+    /// The first link of the cascade does not notarize the checkpoint the
+    /// freshly built inclusion artifact carries.
+    ///
+    /// A bundle's first link is what joins the notarization to the inclusion
+    /// proof: `verify_bundle` requires `links[0].checkpoint` to be
+    /// **byte-identical** to `inclusion_proof.checkpoint`, or the notarization
+    /// is about some other log whose checkpoint also happens to verify.
+    ///
+    /// **The usual cause is an append between the pin and the assembly.** An
+    /// inclusion artifact embeds a checkpoint signed over the tree at the moment
+    /// it is built, so a statement admitted in between moves the artifact to a
+    /// later size while the pinned checkpoint still states the earlier one. Both
+    /// notes are valid and neither is corrupt; they are photographs of one log
+    /// taken at two moments. The remedy is to pin again from the current tree,
+    /// or to assemble the bundle from the artifact taken at the size that was
+    /// pinned.
+    ///
+    /// Both sizes are named because that is what distinguishes this from a pin
+    /// against an entirely different log, and neither discloses anything: a
+    /// tree size is the second line of every checkpoint this anchor signs and
+    /// publishes.
+    #[cfg(feature = "federation")]
+    #[error(
+        "the cascade's first link notarizes a checkpoint of {origin} at tree size {pinned_tree_size}, but the inclusion artifact for leaf {leaf_index} carries one at tree size {artifact_tree_size}: a bundle's first link must notarize the very checkpoint its inclusion proof was verified against"
+    )]
+    CascadeJoinMismatch {
+        /// The origin of the log the bundle was being assembled for.
+        origin: String,
+        /// The index the bundle was being assembled for.
+        leaf_index: u64,
+        /// The tree size the pinned checkpoint committed to.
+        pinned_tree_size: u64,
+        /// The tree size the inclusion artifact's checkpoint committed to.
+        artifact_tree_size: u64,
     },
 }
 
