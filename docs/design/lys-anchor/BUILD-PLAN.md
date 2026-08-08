@@ -262,7 +262,7 @@ than a matter of discipline.**
 | `Anchor::status` (incl. `WitnessPosture`) | ✅ | |
 | `Signer`, `FileSigner` | ✅ | |
 | `AdmissionPolicy` and its policies | ✅ | |
-| `lys/anchor-delegation/v1` | ✅ | |
+| `lys/delegation/v1` | ✅ | |
 | `witness::` — origin projection, observation, reporting | | ✅ |
 | `upward::` — pinning this anchor's checkpoint to a parent | | ✅ |
 | Bundle assembly across a cascade | | ✅ |
@@ -586,12 +586,23 @@ pub struct Observation {
 ### 3.6 The delegation entry — `lys/anchor-delegation/v1`  *(core; DRAFT; increment 11)*
 
 ⛔ **STALE — DO NOT READ THIS SECTION AS THE FORMAT.** The authoritative specification is
-[`DELEGATION-V1.md`](DELEGATION-V1.md), which supersedes everything below. Two concrete
+[`DELEGATION-V1.md`](DELEGATION-V1.md), which supersedes everything below. Five concrete
 divergences, so nobody reconciles them by guessing:
 
-- **The payload map below is missing `sequence` (label 5)**, which was added by the
+- **The format is now named `lys/delegation/v1`**, and its content type is
+  `application/vnd.lys.delegation.v1+cbor`. Every occurrence of *anchor*-delegation below,
+  including this section's own heading, is the superseded name.
+- **The payload map below is missing `sequence` (label 6)**, which was added by the
   adversarial review to stop a replay that resurrects a revoked key. A four-field payload is
   the *defective* version of this format.
+- **`origin` is gone**, replaced by a typed subject: `subject_kind` (label 1) and
+  `subject_value` (label 2), so one format serves an anchor's domain and a consumer's seat
+  without either being able to masquerade as the other.
+- **The `role` vocabulary starts at `2`, not `1`** — `{2 = operational, 3 = speaks_for}`, valid
+  only paired as `(1, 2)` and `(2, 3)`. This is load-bearing rather than cosmetic and
+  `DELEGATION-V1.md` §0.5 consequence 4 has the argument: roles numbered from `1` make
+  `subject_kind == role` in every valid artifact, which renders a swap of those two fields
+  undetectable in the bytes, permanently.
 - **It types `not-before unix-ms` as `int`; the format is a `uint`** (u64, shortest-form).
 
 The sketch below is kept because its per-choice rationale is still the reasoning behind the
@@ -925,7 +936,7 @@ Assemble a `VerificationBundle` (`bundle/artifact.rs:47`) from a two-anchor casc
 `lys-anchor init | submit | checkpoint | prove | status`, plus `observe | pin` under
 `federation`. Parse and format only.
 
-### Increment 11 — `lys/anchor-delegation/v1` and genesis-as-delegation  *(core)*
+### Increment 11 — `lys/delegation/v1` and genesis-as-delegation  *(core)*
 
 The first format this crate freezes, deliberately last. `create` changes to build genesis
 from the root signer instead of taking injected bytes. **Requires an adversarial review

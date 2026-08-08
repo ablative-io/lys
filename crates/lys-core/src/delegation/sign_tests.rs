@@ -13,9 +13,17 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::*;
-use crate::delegation::artifact::DelegationRole;
+use crate::delegation::artifact::{DelegationRole, DelegationSubjectKind};
 use crate::merkle::tree::{AppendOnlyTree, RawLeaf};
 use crate::receipt;
+
+/// The subject kind every case below expects unless it is testing the kind
+/// itself. Spelled as a constant so the argument is visible at each call site
+/// rather than hidden behind a helper — it is a required argument *because* a
+/// verifier must state it.
+const DOMAIN: DelegationSubjectKind = DelegationSubjectKind::Domain;
+/// The other kind, for the cross-kind cases.
+const SEAT: DelegationSubjectKind = DelegationSubjectKind::Seat;
 
 /// The origin under test. `example.test` is a reserved name and deliberately
 /// not any configured production origin — a test carrying a real origin would
@@ -60,14 +68,44 @@ fn claim_for(origin: &str) -> DelegationClaim {
 /// vector's, chosen because it is neither 0 (indistinguishable from a field an
 /// implementation forgot to write) nor 1 (which `role` already carries, so a
 /// field swap would be masked).
-fn claim_at(origin: &str, sequence: u64) -> DelegationClaim {
+fn claim_at(subject_value: &str, sequence: u64) -> DelegationClaim {
     DelegationClaim {
-        origin: origin.to_string(),
+        subject_kind: DelegationSubjectKind::Domain,
+        subject_value: subject_value.to_string(),
         delegated_public_key: operational().public_key_bytes(),
         role: DelegationRole::Operational,
         not_before_unix_ms: 1_700_000_000_000,
         sequence,
     }
+}
+
+/// The `(seat, speaks-for)` claim for `subject_value` — the other valid pair.
+///
+/// Its default subject value is **the same string** the domain claim uses, so
+/// the cross-kind cases below turn on the kind alone. A seat identifier is
+/// arbitrary text minted elsewhere, so that collision is an attacker's choice.
+fn seat_claim_for(subject_value: &str) -> DelegationClaim {
+    DelegationClaim {
+        subject_kind: DelegationSubjectKind::Seat,
+        subject_value: subject_value.to_string(),
+        delegated_public_key: operational().public_key_bytes(),
+        role: DelegationRole::SpeaksFor,
+        not_before_unix_ms: 1_700_000_000_000,
+        sequence: 300,
+    }
+}
+
+/// The offset of the `04` role label inside a canonical payload, located by its
+/// **neighbours** rather than by a byte search, because `[0x04, 0x02]` can also
+/// occur inside the 32-byte delegated key or the subject value. The payload's
+/// tail is structurally fixed: `04 <role> 05 <not_before head> 06 <sequence
+/// head>`, and both head widths are properties of these fixtures' values.
+fn role_offset(payload: &[u8]) -> usize {
+    // `06 19 01 2c` (4) + `05 1b <8 bytes>` (10) + `04 <role>` (2) = 16.
+    let at = payload.len() - 4 - 10 - 2;
+    assert_eq!(payload[at], 0x04, "label 4 must be where the tail puts it");
+    assert_eq!(payload[at + 2], 0x05, "label 5 must follow the role value");
+    at
 }
 
 /// Sign `protected ‖ payload` for real with `key` and wrap the result in the
@@ -86,7 +124,7 @@ fn protected_for(key: &Ed25519Identity) -> Vec<u8> {
 /// A protected bucket whose `kid` is a `bstr` of `len` bytes rather than 32 —
 /// hand-assembled, because the encoder cannot emit one.
 fn protected_with_kid_len(len: u8) -> Vec<u8> {
-    let mut out = vec![0xa3, 0x01, 0x27, 0x03, 0x78, 0x2d];
+    let mut out = vec![0xa3, 0x01, 0x27, 0x03, 0x78, 0x26];
     out.extend_from_slice(encoding::CONTENT_TYPE.as_bytes());
     out.extend_from_slice(&[0x04, 0x58, len]);
     out.extend(std::iter::repeat_n(0x11u8, usize::from(len)));
@@ -102,7 +140,7 @@ fn protected_with_kid_len(len: u8) -> Vec<u8> {
 fn a_signed_delegation_verifies_and_carries_back_every_field() {
     let key = root();
     let cose = sign_delegation(&key, &claim()).unwrap();
-    let verified = verify_delegation(&cose, &key.public_key_bytes(), ORIGIN).unwrap();
+    let verified = verify_delegation(&cose, &key.public_key_bytes(), DOMAIN, ORIGIN).unwrap();
 
     assert_eq!(verified.root_public_key, key.public_key_bytes());
     assert_eq!(verified.claim, claim());
@@ -144,8 +182,8 @@ fn the_two_phase_path_produces_the_same_artifact_as_the_one_shot_path() {
     );
     assert_eq!(
         &preimage[12..14],
-        &[0x58, 0x56],
-        "the protected bstr head precedes it"
+        &[0x58, 0x4f],
+        "the protected bstr head precedes it — 79 bytes"
     );
 }
 
@@ -214,7 +252,7 @@ fn a_delegation_relabelled_as_a_receipt_is_refused_though_its_signature_is_valid
     .unwrap();
 
     assert!(matches!(
-        verify_delegation(&mutant, &key.public_key_bytes(), ORIGIN),
+        verify_delegation(&mutant, &key.public_key_bytes(), DOMAIN, ORIGIN),
         Err(TrustError::DelegationVerification)
     ));
 }
@@ -243,10 +281,10 @@ fn a_real_receipt_is_not_a_delegation_and_a_delegation_is_not_a_receipt() {
 
     // Each verifies as itself: the positive control for this test.
     receipt::verify_receipt_bytes(&receipt_bytes, b"leaf", &key.public_key_bytes()).unwrap();
-    verify_delegation(&delegation_bytes, &key.public_key_bytes(), ORIGIN).unwrap();
+    verify_delegation(&delegation_bytes, &key.public_key_bytes(), DOMAIN, ORIGIN).unwrap();
 
     // Neither verifies as the other.
-    assert!(verify_delegation(&receipt_bytes, &key.public_key_bytes(), ORIGIN).is_err());
+    assert!(verify_delegation(&receipt_bytes, &key.public_key_bytes(), DOMAIN, ORIGIN).is_err());
     assert!(
         receipt::verify_receipt_bytes(&delegation_bytes, b"leaf", &key.public_key_bytes()).is_err()
     );
@@ -275,13 +313,14 @@ fn a_delegation_signed_by_an_attacker_naming_their_own_key_is_refused() {
 
     // Internally perfect, proven rather than asserted: verified against the key
     // it names, it passes.
-    let self_consistent = verify_delegation(&forged, &evil.public_key_bytes(), ORIGIN).unwrap();
+    let self_consistent =
+        verify_delegation(&forged, &evil.public_key_bytes(), DOMAIN, ORIGIN).unwrap();
     assert_eq!(self_consistent.root_public_key, evil.public_key_bytes());
-    assert_eq!(self_consistent.claim.origin, ORIGIN);
+    assert_eq!(self_consistent.claim.subject_value, ORIGIN);
 
     // And refused the moment the caller names the root key they actually trust.
     assert!(matches!(
-        verify_delegation(&forged, &root().public_key_bytes(), ORIGIN),
+        verify_delegation(&forged, &root().public_key_bytes(), DOMAIN, ORIGIN),
         Err(TrustError::DelegationVerification)
     ));
 }
@@ -300,7 +339,7 @@ fn substituting_the_kid_in_a_genuine_delegation_breaks_the_signature_too() {
         &encoding::payload_bytes(&claim()),
         &key.sign(&delegation_preimage(&key.public_key_bytes(), &claim())),
     );
-    assert!(verify_delegation(&mutant, &evil.public_key_bytes(), ORIGIN).is_err());
+    assert!(verify_delegation(&mutant, &evil.public_key_bytes(), DOMAIN, ORIGIN).is_err());
 }
 
 #[test]
@@ -314,7 +353,7 @@ fn a_kid_that_is_not_exactly_thirty_two_bytes_is_refused() {
         let protected = protected_with_kid_len(len);
         let mutant = signed_envelope(&protected, &encoding::payload_bytes(&claim()), &key);
         assert!(
-            verify_delegation(&mutant, &key.public_key_bytes(), ORIGIN).is_err(),
+            verify_delegation(&mutant, &key.public_key_bytes(), DOMAIN, ORIGIN).is_err(),
             "a {len}-byte kid was accepted"
         );
         refused += 1;
@@ -343,7 +382,7 @@ fn an_untagged_cose_sign1_is_refused_though_its_signature_is_valid() {
     // byte, so the signature over the buckets is untouched and genuine.
     let key = root();
     let good = sign_delegation(&key, &claim()).unwrap();
-    verify_delegation(&good, &key.public_key_bytes(), ORIGIN).unwrap();
+    verify_delegation(&good, &key.public_key_bytes(), DOMAIN, ORIGIN).unwrap();
 
     assert_eq!(good[0], 0xd2, "tag 18");
     let untagged = &good[1..];
@@ -354,7 +393,7 @@ fn an_untagged_cose_sign1_is_refused_though_its_signature_is_valid() {
     );
 
     assert!(matches!(
-        verify_delegation(untagged, &key.public_key_bytes(), ORIGIN),
+        verify_delegation(untagged, &key.public_key_bytes(), DOMAIN, ORIGIN),
         Err(TrustError::DelegationVerification)
     ));
 }
@@ -372,12 +411,12 @@ fn a_delegation_for_another_origin_is_refused_though_it_is_internally_perfect() 
     let elsewhere = sign_delegation(&key, &claim_for(OTHER_ORIGIN)).unwrap();
 
     // It is a perfectly good delegation for the origin it names.
-    verify_delegation(&elsewhere, &key.public_key_bytes(), OTHER_ORIGIN).unwrap();
+    verify_delegation(&elsewhere, &key.public_key_bytes(), DOMAIN, OTHER_ORIGIN).unwrap();
 
     // And is not one for ours, even though the root key is the one we trust —
     // the case an operator sharing a root key across anchors actually hits.
     assert!(matches!(
-        verify_delegation(&elsewhere, &key.public_key_bytes(), ORIGIN),
+        verify_delegation(&elsewhere, &key.public_key_bytes(), DOMAIN, ORIGIN),
         Err(TrustError::DelegationVerification)
     ));
 
@@ -392,7 +431,7 @@ fn a_delegation_for_another_origin_is_refused_though_it_is_internally_perfect() 
     ] {
         let cose = sign_delegation(&key, &claim_for(near_miss)).unwrap();
         assert!(
-            verify_delegation(&cose, &key.public_key_bytes(), ORIGIN).is_err(),
+            verify_delegation(&cose, &key.public_key_bytes(), DOMAIN, ORIGIN).is_err(),
             "origin {near_miss:?} must not satisfy {ORIGIN:?}"
         );
         refused += 1;
@@ -414,13 +453,217 @@ fn origin_comparison_is_raw_utf8_byte_equality() {
 
     let cose = sign_delegation(&key, &claim_for(nfc)).unwrap();
     // Positive control: it verifies against its own byte string.
-    verify_delegation(&cose, &key.public_key_bytes(), nfc).unwrap();
-    assert!(verify_delegation(&cose, &key.public_key_bytes(), nfd).is_err());
+    verify_delegation(&cose, &key.public_key_bytes(), DOMAIN, nfc).unwrap();
+    assert!(verify_delegation(&cose, &key.public_key_bytes(), DOMAIN, nfd).is_err());
 
     // And the reverse direction, so neither form is privileged.
     let cose_nfd = sign_delegation(&key, &claim_for(nfd)).unwrap();
-    verify_delegation(&cose_nfd, &key.public_key_bytes(), nfd).unwrap();
-    assert!(verify_delegation(&cose_nfd, &key.public_key_bytes(), nfc).is_err());
+    verify_delegation(&cose_nfd, &key.public_key_bytes(), DOMAIN, nfd).unwrap();
+    assert!(verify_delegation(&cose_nfd, &key.public_key_bytes(), DOMAIN, nfc).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// §3.3 — cross-KIND replay, which is the point of typing the subject.
+// ---------------------------------------------------------------------------
+
+/// ⛔ **The collision case.** A seat delegation and a domain delegation naming
+/// the **same subject string** must not be interchangeable.
+///
+/// A verifier that compared only the value would accept the seat delegation as
+/// authority over the origin. This is not a contrived overlap: a seat identifier
+/// is arbitrary text minted by a registry elsewhere, so an attacker who can
+/// choose one chooses the target's origin string. The kind argument is what makes
+/// the two namespaces disjoint by construction instead of by hope.
+#[test]
+fn the_two_subject_kinds_do_not_interchange_even_at_the_same_subject_value() {
+    let key = root();
+    let expected = key.public_key_bytes();
+
+    let domain = sign_delegation(&key, &claim_for(ORIGIN)).unwrap();
+    let seat = sign_delegation(&key, &seat_claim_for(ORIGIN)).unwrap();
+
+    // The premise, asserted rather than assumed: one string, two artifacts.
+    assert_eq!(
+        AnchorDelegation::from_cose_bytes(&domain)
+            .unwrap()
+            .claim
+            .subject_value,
+        AnchorDelegation::from_cose_bytes(&seat)
+            .unwrap()
+            .claim
+            .subject_value,
+        "the two artifacts must name the same subject VALUE for this test to be \
+         about the KIND"
+    );
+    assert_ne!(domain, seat, "and they must still be different artifacts");
+
+    // Positive controls: each verifies under its own kind. Without these, a
+    // verifier that refused both would satisfy the two refusals below.
+    let ok_domain = verify_delegation(&domain, &expected, DOMAIN, ORIGIN).unwrap();
+    assert_eq!(ok_domain.claim.subject_kind, DelegationSubjectKind::Domain);
+    assert_eq!(ok_domain.claim.role, DelegationRole::Operational);
+    let ok_seat = verify_delegation(&seat, &expected, SEAT, ORIGIN).unwrap();
+    assert_eq!(ok_seat.claim.subject_kind, DelegationSubjectKind::Seat);
+    assert_eq!(ok_seat.claim.role, DelegationRole::SpeaksFor);
+
+    // And neither is accepted by the other's verifier, though both are signed by
+    // the root key that verifier trusts and both name the string it expects.
+    let mut refused = 0;
+    for (name, artifact, kind) in [
+        ("a seat delegation at a domain verifier", &seat, DOMAIN),
+        ("a domain delegation at a seat verifier", &domain, SEAT),
+    ] {
+        assert!(
+            matches!(
+                verify_delegation(artifact, &expected, kind, ORIGIN),
+                Err(TrustError::DelegationVerification)
+            ),
+            "{name} was accepted"
+        );
+        refused += 1;
+    }
+    assert_eq!(refused, 2, "both directions must have been tried");
+}
+
+// ---------------------------------------------------------------------------
+// §1.2 / §3.3 — the (subject_kind, role) pair.
+// ---------------------------------------------------------------------------
+
+/// Spec §2.3 clause 3, with a genuine signature: the two pairs outside the table
+/// whose halves are each individually recognised.
+///
+/// Only those two — the transposition cases fail *role decode* and belong to
+/// `encoding_tests::transposing_the_subject_kind_and_role_labels_fails_role_decode_not_the_pair_check`,
+/// which asserts that attribution. Bundling them here would make this test pass
+/// for the wrong reason and would leave clause 3 unproven by any single case.
+#[test]
+fn a_pair_outside_the_table_is_refused_though_its_signature_is_valid() {
+    let key = root();
+    let expected = key.public_key_bytes();
+    let canonical = encoding::payload_bytes(&claim());
+    assert_eq!(&canonical[..3], &[0xa6, 0x01, 0x01], "kind at index 2");
+    let role_at = role_offset(&canonical);
+
+    // (kind byte, role byte, why it must be refused)
+    let cases = [
+        (
+            0x01u8,
+            0x03u8,
+            "domain + speaks-for: both values valid, pair is not",
+        ),
+        (
+            0x02,
+            0x02,
+            "seat + operational: both values valid, pair is not",
+        ),
+    ];
+
+    let mut refused = 0;
+    for (kind, role, why) in cases {
+        // The premise of clause 3: each half decodes on its own.
+        let kind_enum = DelegationSubjectKind::from_wire(u64::from(kind)).expect("kind decodes");
+        let role_enum = DelegationRole::from_wire(u64::from(role)).expect("role decodes");
+        assert!(!kind_enum.permits(role_enum), "{why}");
+        let mut payload = canonical.clone();
+        payload[2] = kind;
+        payload[role_at + 1] = role;
+        assert_eq!(payload.len(), canonical.len(), "a repair, not a resize");
+        let mutant = signed_envelope(&protected_for(&key), &payload, &key);
+
+        // The mutant is cryptographically perfect: only the pair rule can refuse
+        // it. Proven rather than asserted.
+        Ed25519Identity::verify(
+            &expected,
+            &cbor::sig_structure_bytes(&protected_for(&key), &payload),
+            &mutant[mutant.len() - 64..],
+        )
+        .unwrap();
+
+        // Refused under BOTH kinds a caller could name, so no configuration
+        // accepts it.
+        for kind_expected in [DOMAIN, SEAT] {
+            assert!(
+                matches!(
+                    verify_delegation(&mutant, &expected, kind_expected, ORIGIN),
+                    Err(TrustError::DelegationVerification)
+                ),
+                "({kind}, {role}) was accepted — {why}"
+            );
+        }
+        refused += 1;
+    }
+    assert_eq!(refused, 2, "both clause-3 pairs must have been tried");
+
+    // Positive controls through the identical construction: the two VALID pairs
+    // verify. Without them these refusals would also be satisfied by a decoder
+    // that had stopped parsing payloads at all.
+    let mut accepted = 0;
+    for (kind, role, kind_expected) in [(0x01u8, 0x02u8, DOMAIN), (0x02, 0x03, SEAT)] {
+        let mut payload = canonical.clone();
+        payload[2] = kind;
+        payload[role_at + 1] = role;
+        let ok = signed_envelope(&protected_for(&key), &payload, &key);
+        verify_delegation(&ok, &expected, kind_expected, ORIGIN).unwrap();
+        accepted += 1;
+    }
+    assert_eq!(
+        accepted, 2,
+        "both valid pairs must have been controlled for"
+    );
+}
+
+/// The issuing side refuses the same pairs, through both entry points.
+///
+/// Without this, `sign_delegation` would happily mint an artifact its own
+/// `verify_delegation` refuses — the defect class `check_encodable` exists to
+/// close, arriving through the newest rule.
+#[test]
+fn issuance_refuses_an_invalid_kind_role_pair_through_both_entry_points() {
+    let key = root();
+    let root_key = key.public_key_bytes();
+
+    let mut refused = 0;
+    for (kind, role) in [
+        (DelegationSubjectKind::Domain, DelegationRole::SpeaksFor),
+        (DelegationSubjectKind::Seat, DelegationRole::Operational),
+    ] {
+        let mut c = claim();
+        c.subject_kind = kind;
+        c.role = role;
+        assert!(
+            matches!(
+                sign_delegation(&key, &c),
+                Err(TrustError::DelegationEncoding { .. })
+            ),
+            "({kind:?}, {role:?}) was issuable through the convenience path"
+        );
+        // And the air-gapped two-phase route, which does not go through
+        // `sign_delegation` at all.
+        let signature = key.sign(&delegation_preimage(&root_key, &c));
+        assert!(
+            matches!(
+                assemble_delegation(&root_key, &c, &signature),
+                Err(TrustError::DelegationEncoding { .. })
+            ),
+            "({kind:?}, {role:?}) was issuable through the two-phase path"
+        );
+        refused += 1;
+    }
+    assert_eq!(refused, 2, "both invalid pairs must have been tried");
+
+    // Positive controls: both valid pairs issue and verify end to end.
+    let mut issued = 0;
+    for (c, kind_expected) in [(claim(), DOMAIN), (seat_claim_for(ORIGIN), SEAT)] {
+        let cose = sign_delegation(&key, &c).unwrap();
+        assert_eq!(
+            verify_delegation(&cose, &root_key, kind_expected, &c.subject_value)
+                .unwrap()
+                .claim,
+            c
+        );
+        issued += 1;
+    }
+    assert_eq!(issued, 2, "both valid pairs must have been issued");
 }
 
 // ---------------------------------------------------------------------------
@@ -446,14 +689,14 @@ fn a_permuted_payload_map_is_refused_though_its_signature_is_valid() {
     let key = root();
     let claim = claim();
 
-    let mut permuted = vec![0xa5, 0x02, 0x58, 0x20];
+    let mut permuted = vec![0xa6, 0x03, 0x58, 0x20];
     permuted.extend_from_slice(&claim.delegated_public_key);
-    permuted.push(0x01);
+    permuted.extend_from_slice(&[0x01, 0x01, 0x02]);
     permuted.push(0x60 | u8::try_from(ORIGIN.len()).unwrap());
     permuted.extend_from_slice(ORIGIN.as_bytes());
-    permuted.extend_from_slice(&[0x03, 0x01, 0x04, 0x1b]);
+    permuted.extend_from_slice(&[0x04, 0x02, 0x05, 0x1b]);
     permuted.extend_from_slice(&claim.not_before_unix_ms.to_be_bytes());
-    permuted.extend_from_slice(&[0x05, 0x19, 0x01, 0x2c]);
+    permuted.extend_from_slice(&[0x06, 0x19, 0x01, 0x2c]);
 
     let canonical = encoding::payload_bytes(&claim);
     assert_eq!(
@@ -469,7 +712,7 @@ fn a_permuted_payload_map_is_refused_though_its_signature_is_valid() {
         "the mutant must be well-formed CBOR for this test to mean anything"
     );
     assert!(matches!(
-        verify_delegation(&mutant, &key.public_key_bytes(), ORIGIN),
+        verify_delegation(&mutant, &key.public_key_bytes(), DOMAIN, ORIGIN),
         Err(TrustError::DelegationVerification)
     ));
 }
@@ -488,7 +731,7 @@ fn a_non_empty_unprotected_header_is_refused_though_the_signature_still_verifies
     // riding inside a trusted artifact.
     let key = root();
     let good = sign_delegation(&key, &claim()).unwrap();
-    verify_delegation(&good, &key.public_key_bytes(), ORIGIN).unwrap();
+    verify_delegation(&good, &key.public_key_bytes(), DOMAIN, ORIGIN).unwrap();
 
     let unprotected_at = 4 + encoding::PROTECTED_LEN;
     assert_eq!(good[unprotected_at], 0xa0, "the empty map");
@@ -506,7 +749,7 @@ fn a_non_empty_unprotected_header_is_refused_though_the_signature_still_verifies
     assert_eq!(&mutant[mutant.len() - 64..], &good[good.len() - 64..]);
 
     assert!(matches!(
-        verify_delegation(&mutant, &key.public_key_bytes(), ORIGIN),
+        verify_delegation(&mutant, &key.public_key_bytes(), DOMAIN, ORIGIN),
         Err(TrustError::DelegationVerification)
     ));
 }
@@ -523,32 +766,33 @@ fn an_unknown_role_is_refused_though_its_signature_is_valid() {
     // that looks checked.
     let key = root();
     let canonical = encoding::payload_bytes(&claim());
-    let role_at = canonical
-        .windows(2)
-        .position(|w| w == [0x03, 0x01])
-        .expect("role entry present");
+    let role_at = role_offset(&canonical);
 
+    // `1` is in the list on purpose: it is the DOMAIN kind's wire value, so an
+    // artifact carrying it in the role slot is what a transposed implementation
+    // would produce. `3` is a valid role but not for a domain, so it belongs to
+    // the pair test rather than here.
     let mut refused = 0;
-    for role in [0u8, 2, 7, 23] {
+    for role in [0u8, 1, 4, 7, 23] {
         let mut payload = canonical.clone();
         payload[role_at + 1] = role;
         assert_eq!(payload.len(), canonical.len());
         let mutant = signed_envelope(&protected_for(&key), &payload, &key);
         assert!(
             matches!(
-                verify_delegation(&mutant, &key.public_key_bytes(), ORIGIN),
+                verify_delegation(&mutant, &key.public_key_bytes(), DOMAIN, ORIGIN),
                 Err(TrustError::DelegationVerification)
             ),
             "role {role} was accepted"
         );
         refused += 1;
     }
-    assert_eq!(refused, 4, "every unknown role must have been tried");
+    assert_eq!(refused, 5, "every unknown role must have been tried");
 
     // Positive control: the same construction with the known role is accepted,
     // so the refusals above are about the role and not about the construction.
     let ok = signed_envelope(&protected_for(&key), &canonical, &key);
-    verify_delegation(&ok, &key.public_key_bytes(), ORIGIN).unwrap();
+    verify_delegation(&ok, &key.public_key_bytes(), DOMAIN, ORIGIN).unwrap();
 }
 
 // ---------------------------------------------------------------------------
@@ -568,7 +812,7 @@ fn a_flipped_signature_bit_is_refused() {
             let mut mutant = good.clone();
             mutant[at + byte] ^= bit;
             assert!(
-                verify_delegation(&mutant, &key.public_key_bytes(), ORIGIN).is_err(),
+                verify_delegation(&mutant, &key.public_key_bytes(), DOMAIN, ORIGIN).is_err(),
                 "a flip of bit {bit:#04x} in signature byte {byte} was accepted"
             );
             refused += 1;
@@ -587,7 +831,7 @@ fn a_non_canonical_signature_scalar_is_refused() {
     let mut mutant = sign_delegation(&key, &claim()).unwrap();
     let last = mutant.len() - 1;
     mutant[last] |= 0xe0;
-    assert!(verify_delegation(&mutant, &key.public_key_bytes(), ORIGIN).is_err());
+    assert!(verify_delegation(&mutant, &key.public_key_bytes(), DOMAIN, ORIGIN).is_err());
 }
 
 // ---------------------------------------------------------------------------
@@ -623,7 +867,7 @@ fn a_replayed_delegation_is_byte_identical_which_is_why_sequence_exists() {
     // genuine artifact is a genuine artifact — and it is why the defence cannot
     // live in `verify_delegation`.
     for artifact in [&leaf_zero, &leaf_n, &replayed] {
-        verify_delegation(artifact, &key.public_key_bytes(), ORIGIN).unwrap();
+        verify_delegation(artifact, &key.public_key_bytes(), DOMAIN, ORIGIN).unwrap();
     }
 
     // THE property. A replay and a legitimate re-issuance of the same claim are
@@ -641,11 +885,11 @@ fn a_replayed_delegation_is_byte_identical_which_is_why_sequence_exists() {
     // replayed artifact carries a sequence already superseded, which a fold can
     // see. The ordering data is INSIDE the signed bytes, so the attacker cannot
     // alter it without the root key.
-    let replayed_seq = verify_delegation(&replayed, &key.public_key_bytes(), ORIGIN)
+    let replayed_seq = verify_delegation(&replayed, &key.public_key_bytes(), DOMAIN, ORIGIN)
         .unwrap()
         .claim
         .sequence;
-    let current_seq = verify_delegation(&leaf_n, &key.public_key_bytes(), ORIGIN)
+    let current_seq = verify_delegation(&leaf_n, &key.public_key_bytes(), DOMAIN, ORIGIN)
         .unwrap()
         .claim
         .sequence;
@@ -660,7 +904,7 @@ fn a_replayed_delegation_is_byte_identical_which_is_why_sequence_exists() {
     forged.delegated_public_key = operational().public_key_bytes();
     let forged_bytes = sign_delegation(&attacker(), &forged).unwrap();
     assert!(
-        verify_delegation(&forged_bytes, &key.public_key_bytes(), ORIGIN).is_err(),
+        verify_delegation(&forged_bytes, &key.public_key_bytes(), DOMAIN, ORIGIN).is_err(),
         "re-sequencing requires the root key"
     );
 }
@@ -686,7 +930,7 @@ fn sequence_is_signature_covered_and_survives_the_round_trip() {
         encoding::MAX_SEQUENCE - 1,
     ] {
         let cose = sign_delegation(&key, &claim_at(ORIGIN, sequence)).unwrap();
-        let verified = verify_delegation(&cose, &key.public_key_bytes(), ORIGIN).unwrap();
+        let verified = verify_delegation(&cose, &key.public_key_bytes(), DOMAIN, ORIGIN).unwrap();
         assert_eq!(verified.claim.sequence, sequence);
 
         // Two claims differing only in `sequence` must sign different bytes.
@@ -733,7 +977,7 @@ fn a_sequence_with_no_successor_cannot_be_issued_or_verified() {
         &key,
     );
     assert!(matches!(
-        verify_delegation(&mutant, &root_key, ORIGIN),
+        verify_delegation(&mutant, &root_key, DOMAIN, ORIGIN),
         Err(TrustError::DelegationVerification)
     ));
 
@@ -743,7 +987,7 @@ fn a_sequence_with_no_successor_cannot_be_issued_or_verified() {
     at_limit.sequence = encoding::MAX_SEQUENCE;
     let ok = sign_delegation(&key, &at_limit).unwrap();
     assert_eq!(
-        verify_delegation(&ok, &root_key, ORIGIN)
+        verify_delegation(&ok, &root_key, DOMAIN, ORIGIN)
             .unwrap()
             .claim
             .sequence,
@@ -777,7 +1021,7 @@ fn not_before_is_never_an_ordering_key() {
     let mut accepted = 0;
     for candidate in [earlier, same, zero, far_future, past_i64_max] {
         let cose = sign_delegation(&key, &candidate).unwrap();
-        let verified = verify_delegation(&cose, &key.public_key_bytes(), ORIGIN).unwrap();
+        let verified = verify_delegation(&cose, &key.public_key_bytes(), DOMAIN, ORIGIN).unwrap();
         assert_eq!(
             verified.claim.not_before_unix_ms,
             candidate.not_before_unix_ms
@@ -852,15 +1096,33 @@ fn signature_verification_runs_for_every_mismatch_kind() {
     bad_signature[last] ^= 0x01;
     let honest = sign_delegation(&key, &claim()).unwrap();
 
+    // ⛔ THE ARM THIS TEST WAS MISSING, and its absence is worth reading twice.
+    //
+    // `verify_delegation` grew a fourth comparison — the subject KIND — and this
+    // test was not widened with it. Every arm above is a `Domain` artifact at a
+    // `Domain` verifier, so `subject_kind_ok` was TRUE in all four: an early
+    // return added to the kind comparison could only fire for an artifact none
+    // of them produced, and the counter would have stayed at 1 throughout.
+    // **The one field the specification flags as never having been measured for
+    // leakage was the one field guarded by nothing here.**
+    //
+    // A valid seat delegation, genuinely signed, at a `Domain`-expecting
+    // verifier: it parses, its pair is in the table, its `kid` matches and its
+    // subject VALUE matches — `seat_claim_for(ORIGIN)` deliberately reuses the
+    // domain fixture's string — so the kind is the only thing wrong with it, and
+    // the signature check must still run.
+    let seat_at_a_domain_verifier = sign_delegation(&key, &seat_claim_for(ORIGIN)).unwrap();
+
     let mut measured = 0;
     for (name, artifact, should_verify) in [
         ("wrong kid", wrong_kid, false),
-        ("wrong origin", wrong_origin, false),
+        ("wrong subject value", wrong_origin, false),
+        ("wrong subject kind", seat_at_a_domain_verifier, false),
         ("bad signature", bad_signature, false),
         ("honest", honest, true),
     ] {
         let before = count();
-        let outcome = verify_delegation(&artifact, &expected, ORIGIN);
+        let outcome = verify_delegation(&artifact, &expected, DOMAIN, ORIGIN);
         let after = count();
 
         assert_eq!(
@@ -873,13 +1135,19 @@ fn signature_verification_runs_for_every_mismatch_kind() {
         assert_eq!(outcome.is_ok(), should_verify, "{name}: wrong outcome");
         measured += 1;
     }
-    assert_eq!(measured, 4, "every arm must have been measured");
+    assert_eq!(
+        measured, 5,
+        "every arm must have been measured — one per comparison in \
+         `verify_delegation` plus the honest case. Widening that function \
+         without widening this count leaves the new comparison unguarded, which \
+         is exactly how the subject-kind arm came to be missing."
+    );
 
     // The instrument's own control: a call that never reaches the verification
     // stage must NOT increment, or the counter would be measuring nothing and
     // every assertion above would pass regardless of where the check sits.
     let before = count();
-    assert!(verify_delegation(b"not cbor at all", &expected, ORIGIN).is_err());
+    assert!(verify_delegation(b"not cbor at all", &expected, DOMAIN, ORIGIN).is_err());
     assert_eq!(
         count() - before,
         0,
@@ -908,7 +1176,7 @@ fn a_wrong_kid_does_not_skip_the_signature_check() {
     both_wrong[sig_at..].copy_from_slice(&[0u8; 64]);
 
     assert!(matches!(
-        verify_delegation(&both_wrong, &key.public_key_bytes(), ORIGIN),
+        verify_delegation(&both_wrong, &key.public_key_bytes(), DOMAIN, ORIGIN),
         Err(TrustError::DelegationVerification)
     ));
 
@@ -916,7 +1184,7 @@ fn a_wrong_kid_does_not_skip_the_signature_check() {
     // the signature really is invalid — which is what proves the signature arm
     // is live rather than vestigial.
     assert!(matches!(
-        verify_delegation(&both_wrong, &evil.public_key_bytes(), ORIGIN),
+        verify_delegation(&both_wrong, &evil.public_key_bytes(), DOMAIN, ORIGIN),
         Err(TrustError::DelegationVerification)
     ));
 
@@ -924,7 +1192,7 @@ fn a_wrong_kid_does_not_skip_the_signature_check() {
     // verifies under the attacker's own key. So the refusals above are about
     // the checks and not about a mutant that is broken beyond recognition.
     let intact = sign_delegation(&evil, &claim()).unwrap();
-    verify_delegation(&intact, &evil.public_key_bytes(), ORIGIN).unwrap();
+    verify_delegation(&intact, &evil.public_key_bytes(), DOMAIN, ORIGIN).unwrap();
 }
 
 /// Every failure arm performs the *same* verification work, which is what makes
@@ -973,7 +1241,7 @@ fn the_verifier_does_the_same_work_for_every_kind_of_mismatch() {
         );
 
         assert!(matches!(
-            verify_delegation(&mutant, &expected, ORIGIN),
+            verify_delegation(&mutant, &expected, DOMAIN, ORIGIN),
             Err(TrustError::DelegationVerification)
         ));
         refused += 1;
@@ -987,8 +1255,8 @@ fn the_verifier_does_the_same_work_for_every_kind_of_mismatch() {
 
 #[test]
 fn issuance_refuses_a_claim_the_verifier_would_reject() {
-    // The defect: the artifact cap was enforced at decode only, so an origin of
-    // 3884 bytes signed and verified while 3885 signed SUCCESSFULLY and failed
+    // The defect: the artifact cap was enforced at decode only, so a subject
+    // value of 3884 bytes signed and verified while 3885 signed SUCCESSFULLY and failed
     // every verification afterwards — a file that fails at a later, far less
     // debuggable moment, which is precisely what assembling-with-verification
     // exists to prevent, arriving through the one door that check did not cover.
@@ -1005,13 +1273,13 @@ fn issuance_refuses_a_claim_the_verifier_would_reject() {
             break;
         }
     }
-    let longest_ok = longest_ok.expect("some origin length must be issuable");
+    let longest_ok = longest_ok.expect("some subject length must be issuable");
 
     // At the boundary: issuable AND verifiable. The pair is the point — either
     // one alone is what the defect looked like.
     let at_limit = claim_at(&"o".repeat(longest_ok), 300);
     let artifact = sign_delegation(&key, &at_limit).unwrap();
-    verify_delegation(&artifact, &root_key, &at_limit.origin).unwrap();
+    verify_delegation(&artifact, &root_key, DOMAIN, &at_limit.subject_value).unwrap();
 
     // One byte over: refused at ISSUANCE, with an actionable reason rather than
     // the non-oracle value. This is the operator's side; no stranger is being
@@ -1036,7 +1304,7 @@ fn issuance_refuses_a_claim_the_verifier_would_reject() {
 }
 
 #[test]
-fn issuance_refuses_an_empty_origin_and_an_unusable_delegated_key() {
+fn issuance_refuses_an_empty_subject_value_and_an_unusable_delegated_key() {
     let key = root();
     let root_key = key.public_key_bytes();
 
@@ -1099,7 +1367,7 @@ fn an_unusable_delegated_key_is_refused_at_verification_too() {
         let mutant = signed_envelope(&protected_for(&key), &payload, &key);
         assert!(
             matches!(
-                verify_delegation(&mutant, &key.public_key_bytes(), ORIGIN),
+                verify_delegation(&mutant, &key.public_key_bytes(), DOMAIN, ORIGIN),
                 Err(TrustError::DelegationVerification)
             ),
             "a delegation naming an unusable key was accepted"
@@ -1110,32 +1378,32 @@ fn an_unusable_delegated_key_is_refused_at_verification_too() {
 
     // Positive control: the same hand-assembly with the real key verifies.
     let ok = signed_envelope(&protected_for(&key), &canonical, &key);
-    verify_delegation(&ok, &key.public_key_bytes(), ORIGIN).unwrap();
+    verify_delegation(&ok, &key.public_key_bytes(), DOMAIN, ORIGIN).unwrap();
 }
 
 #[test]
-fn an_empty_origin_is_refused_at_verification_too() {
+fn an_empty_subject_value_is_refused_at_verification_too() {
     // The rule is about the VERIFIER, not the string: acceptance is a comparison
-    // against the caller's configured origin, so a verifier whose origin is
-    // unset would match an empty-origin delegation and accept it. Refusing at
+    // against the caller's configured subject, so a verifier whose subject is
+    // unset would match an empty-subject delegation and accept it. Refusing at
     // decode makes that misconfiguration fail closed.
     let key = root();
-    let mut payload = vec![0xa5, 0x01, 0x60, 0x02, 0x58, 0x20];
+    let mut payload = vec![0xa6, 0x01, 0x01, 0x02, 0x60, 0x03, 0x58, 0x20];
     payload.extend_from_slice(&operational().public_key_bytes());
-    payload.extend_from_slice(&[0x03, 0x01, 0x04, 0x1b]);
+    payload.extend_from_slice(&[0x04, 0x02, 0x05, 0x1b]);
     payload.extend_from_slice(&1_700_000_000_000u64.to_be_bytes());
-    payload.extend_from_slice(&[0x05, 0x19, 0x01, 0x2c]);
+    payload.extend_from_slice(&[0x06, 0x19, 0x01, 0x2c]);
 
     let mutant = signed_envelope(&protected_for(&key), &payload, &key);
 
     // The case that motivates the rule: a verifier that passes "" as its
-    // expected origin. Without the decode rule this would SUCCEED.
+    // expected subject value. Without the decode rule this would SUCCEED.
     assert!(matches!(
-        verify_delegation(&mutant, &key.public_key_bytes(), ""),
+        verify_delegation(&mutant, &key.public_key_bytes(), DOMAIN, ""),
         Err(TrustError::DelegationVerification)
     ));
     // And with a real origin configured, naturally.
-    assert!(verify_delegation(&mutant, &key.public_key_bytes(), ORIGIN).is_err());
+    assert!(verify_delegation(&mutant, &key.public_key_bytes(), DOMAIN, ORIGIN).is_err());
 }
 
 // ---------------------------------------------------------------------------
@@ -1150,7 +1418,7 @@ fn every_verification_failure_is_the_same_error() {
 
     // Positive control first: a verifier that refused everything would satisfy
     // every assertion below.
-    verify_delegation(&good, &expected, ORIGIN).unwrap();
+    verify_delegation(&good, &expected, DOMAIN, ORIGIN).unwrap();
 
     let wrong_root = sign_delegation(&attacker(), &claim()).unwrap();
     let wrong_origin = sign_delegation(&key, &claim_for(OTHER_ORIGIN)).unwrap();
@@ -1166,13 +1434,19 @@ fn every_verification_failure_is_the_same_error() {
     );
 
     let canonical_payload = encoding::payload_bytes(&claim());
-    let role_at = canonical_payload
-        .windows(2)
-        .position(|w| w == [0x03, 0x01])
-        .expect("role entry present");
-    let mut unknown_role_payload = canonical_payload;
+    let role_at = role_offset(&canonical_payload);
+    let mut unknown_role_payload = canonical_payload.clone();
     unknown_role_payload[role_at + 1] = 7;
     let unknown_role = signed_envelope(&protected_for(&key), &unknown_role_payload, &key);
+
+    // A pair every field of which is individually valid: domain + speaks-for.
+    let mut invalid_pair_payload = canonical_payload;
+    invalid_pair_payload[role_at + 1] = 0x03;
+    let invalid_pair = signed_envelope(&protected_for(&key), &invalid_pair_payload, &key);
+
+    // A seat delegation, genuinely signed, presented to a domain verifier that
+    // names the same subject string.
+    let wrong_kind = sign_delegation(&key, &seat_claim_for(ORIGIN)).unwrap();
 
     let unprotected_at = 4 + encoding::PROTECTED_LEN;
     let mut non_empty_unprotected = good[..unprotected_at].to_vec();
@@ -1184,10 +1458,12 @@ fn every_verification_failure_is_the_same_error() {
 
     let cases = [
         ("wrong root key", wrong_root),
-        ("wrong origin", wrong_origin),
+        ("wrong subject value", wrong_origin),
         ("forged signature", bad_signature),
         ("relabelled as a receipt", relabelled),
         ("unknown role", unknown_role),
+        ("invalid (kind, role) pair", invalid_pair),
+        ("wrong subject kind", wrong_kind),
         ("non-empty unprotected", non_empty_unprotected),
         ("trailing garbage", trailing),
         ("empty input", vec![]),
@@ -1195,7 +1471,7 @@ fn every_verification_failure_is_the_same_error() {
 
     let mut refused = 0;
     for (name, mutant) in cases {
-        let err = verify_delegation(&mutant, &expected, ORIGIN).unwrap_err();
+        let err = verify_delegation(&mutant, &expected, DOMAIN, ORIGIN).unwrap_err();
         assert!(
             matches!(err, TrustError::DelegationVerification),
             "{name} produced a distinguishable error: {err:?}"
@@ -1207,5 +1483,5 @@ fn every_verification_failure_is_the_same_error() {
         );
         refused += 1;
     }
-    assert_eq!(refused, 8, "every case must have been rejected");
+    assert_eq!(refused, 10, "every case must have been rejected");
 }

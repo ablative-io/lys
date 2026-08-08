@@ -20,7 +20,7 @@
 //! both already read. So this module introduces **no wire format at all**:
 //! there is no new domain-separation tag, no new leaf encoding, and nothing
 //! here that a later change could break a historical verification by editing.
-//! The first format this crate freezes is `lys/anchor-delegation/v1`, and it is
+//! The first format this crate freezes is `lys/delegation/v1`, and it is
 //! deliberately the last thing built.
 //!
 //! That is not frugality. A leaf encoding is frozen the moment something

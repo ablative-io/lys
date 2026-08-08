@@ -1,4 +1,4 @@
-//! `lys/anchor-delegation/v1`, judged by `veraison/go-cose` — and, more to the
+//! `lys/delegation/v1`, judged by `veraison/go-cose` — and, more to the
 //! point, by the bytes go-cose says it signed over.
 //!
 //! # The hole this exists for, stated before anything is asserted
@@ -40,10 +40,15 @@
 //!   drift table below shows which injections this gate catches *and* which the
 //!   in-crate suite already catches. Where both fire, this gate is corroboration
 //!   rather than the only witness.
-//! - **It says nothing about the semantic rules.** Cross-origin replay (spec
-//!   §3.3), unknown-role rejection (§2.3) and non-oracle failure (§3.5) are
-//!   `verify_delegation`'s job and the Go tool has no opinion about any of them;
-//!   it is handed an origin nowhere and never asked which error fired.
+//! - **It says nothing about the semantic rules.** Cross-subject and cross-kind
+//!   replay (spec §3.3), unknown-value and invalid-pair rejection (§1.2, §2.3)
+//!   and non-oracle failure (§3.5) are `verify_delegation`'s job and the Go tool
+//!   has no opinion about any of them; it is handed a subject nowhere and never
+//!   asked which error fired.
+//!
+//!   It does, however, read labels 1 and 4 independently and print both, which is
+//!   what makes `subject_kind != role` checkable by a party that did not choose
+//!   the numbering. That property is why `role` starts at 2.
 //! - **It says nothing about whether the frozen bytes were the right ones.** It
 //!   proves two implementations agree, not that they agree on a good format.
 //!   That judgement is the specification's, and the vector in
@@ -141,7 +146,8 @@ use std::path::Path;
 use harness::{build_go_tool, go_or_skip, run_built_tool};
 use lys_core::Ed25519Identity;
 use lys_core::delegation::{
-    DelegationClaim, DelegationRole, delegation_preimage, sign_delegation, verify_delegation,
+    DelegationClaim, DelegationRole, DelegationSubjectKind, delegation_preimage, sign_delegation,
+    verify_delegation,
 };
 
 /// The root seed of the specification's fixed vector: bytes `0x00..=0x1f`.
@@ -243,28 +249,41 @@ fn parse_report(stdout: &[u8]) -> BTreeMap<String, String> {
 /// not, because it reports what it finds.
 fn expected_payload_report(claim: &DelegationClaim) -> Vec<(String, String)> {
     vec![
+        // Labels 1 and 2 are the typed subject, and the kind PRECEDES the value
+        // it types. Both are reported as `uint`/`tstr` by a decoder that has
+        // never heard of lys, so a kind emitted as a tstr — or a value emitted as
+        // a uint — is a value disagreement here rather than a parse that works.
         (
             "payload_1".to_string(),
-            format!("tstr:{}", to_hex(claim.origin.as_bytes())),
+            format!("uint:{}", claim.subject_kind.wire_value()),
         ),
         (
             "payload_2".to_string(),
-            format!("bstr:{}", to_hex(&claim.delegated_public_key)),
+            format!("tstr:{}", to_hex(claim.subject_value.as_bytes())),
         ),
         (
             "payload_3".to_string(),
+            format!("bstr:{}", to_hex(&claim.delegated_public_key)),
+        ),
+        // Label 4 is the role, whose vocabulary is offset past the subject
+        // kind's — `operational` is 2, not 1 — so that no valid pair has
+        // `subject_kind == role` and a transposition of labels 1 and 4 cannot be
+        // byte-identical. This gate is where that becomes checkable by a party
+        // that reads both labels independently.
+        (
+            "payload_4".to_string(),
             format!("uint:{}", claim.role.wire_value()),
         ),
         (
-            "payload_4".to_string(),
+            "payload_5".to_string(),
             format!("uint:{}", claim.not_before_unix_ms),
         ),
-        // Label 5, added by the adversarial review: `sequence`, the value that
+        // Label 6, added by the adversarial review: `sequence`, the value that
         // orders delegations. Without it the format was replayable by an
         // attacker holding no key material — two issuances of one claim are
         // byte-identical, so a verbatim copy of a superseded delegation
         // resurrected a revoked key under last-wins-by-log-position.
-        ("payload_5".to_string(), format!("uint:{}", claim.sequence)),
+        ("payload_6".to_string(), format!("uint:{}", claim.sequence)),
     ]
 }
 
@@ -298,8 +317,8 @@ fn sweep_claims(delegated: [u8; 32]) -> Vec<DelegationClaim> {
         1_700_000_000_000,
         u64::MAX,
     ];
-    // Origin lengths: the same boundaries for a tstr head, down to the shortest
-    // origin the format permits.
+    // Subject-value lengths: the same boundaries for a tstr head, down to the
+    // shortest value the format permits.
     //
     // The empty string used to lead this list — it is where a length-prefix bug
     // is easiest to hide — and it is gone because the format now **refuses** an
@@ -307,7 +326,7 @@ fn sweep_claims(delegated: [u8; 32]) -> Vec<DelegationClaim> {
     // match one and accept it. `delegation::sign_tests` and
     // `delegation::encoding_tests` carry the dedicated rejection cases; a
     // one-character origin keeps the short-head coverage here.
-    let origins = [
+    let subject_values = [
         "x".to_string(),
         "a".repeat(23),
         "b".repeat(24),
@@ -322,13 +341,24 @@ fn sweep_claims(delegated: [u8; 32]) -> Vec<DelegationClaim> {
     // so the widest head is swept at the largest issuable value.
     let sequences = [0u64, 23, 24, 255, 300, 65_536, u64::MAX - 1];
 
+    // Both valid `(subject_kind, role)` pairs are swept, alternating, so the Go
+    // gate reads each label pair on the same axis as everything else. Only the
+    // pairs the format defines appear here: an invalid pair cannot be signed, and
+    // its rejection is `lys-core`'s own gate rather than go-cose's.
+    let pairs = [
+        (DelegationSubjectKind::Domain, DelegationRole::Operational),
+        (DelegationSubjectKind::Seat, DelegationRole::SpeaksFor),
+    ];
+
     let mut claims = Vec::new();
     for (index, not_before_unix_ms) in timestamps.into_iter().enumerate() {
-        for (offset, origin) in origins.iter().enumerate() {
+        for (offset, subject_value) in subject_values.iter().enumerate() {
+            let (subject_kind, role) = pairs[(index + offset) % pairs.len()];
             claims.push(DelegationClaim {
-                origin: origin.clone(),
+                subject_kind,
+                subject_value: subject_value.clone(),
                 delegated_public_key: delegated,
-                role: DelegationRole::Operational,
+                role,
                 not_before_unix_ms,
                 sequence: sequences[(index + offset) % sequences.len()],
             });
@@ -355,8 +385,9 @@ fn go_cose_signs_over_exactly_the_bytes_delegation_preimage_builds() {
     let claims = sweep_claims(delegated_public_key);
     let mut cases = 0usize;
     let mut wide_timestamp_cases = 0usize;
-    let mut long_origin_cases = 0usize;
+    let mut long_subject_cases = 0usize;
     let mut distinct_sequences = std::collections::BTreeSet::new();
+    let mut distinct_pairs = std::collections::BTreeSet::new();
 
     for claim in &claims {
         let artifact = sign_delegation(&root, claim).unwrap();
@@ -366,9 +397,9 @@ fn go_cose_signs_over_exactly_the_bytes_delegation_preimage_builds() {
             run_built_tool(&bin, &["delegation-verify", root_hex.as_str()], &artifact);
         assert!(
             ok,
-            "go-cose rejected a delegation lys signed (origin {} bytes, \
+            "go-cose rejected a delegation lys signed (subject {} bytes, \
              not_before {})",
-            claim.origin.len(),
+            claim.subject_value.len(),
             claim.not_before_unix_ms
         );
         let report = parse_report(&stdout);
@@ -381,8 +412,8 @@ fn go_cose_signs_over_exactly_the_bytes_delegation_preimage_builds() {
             report["sig_structure"],
             to_hex(&preimage),
             "go-cose signed over different bytes than delegation_preimage built \
-             (origin {} bytes, not_before {})",
-            claim.origin.len(),
+             (subject {} bytes, not_before {})",
+            claim.subject_value.len(),
             claim.not_before_unix_ms
         );
 
@@ -431,8 +462,18 @@ fn go_cose_signs_over_exactly_the_bytes_delegation_preimage_builds() {
             payload_fields_checked += 1;
         }
         assert_eq!(
-            payload_fields_checked, 5,
+            payload_fields_checked, 6,
             "the payload comparison must cover every field this version defines"
+        );
+        // The two fields whose wire values must differ, read out of what the Go
+        // decoder reported rather than out of our own claim. If the vocabularies
+        // were renumbered so that `subject_kind == role`, a transposition of the
+        // two labels would become undetectable and this assertion is where the
+        // second party notices.
+        assert_ne!(
+            report["payload_1"], report["payload_4"],
+            "subject_kind and role must not share a wire value, or transposing \
+             them is invisible on the wire"
         );
 
         // ---- And `kid`: compared HERE, by this test, against the key it named.
@@ -442,17 +483,25 @@ fn go_cose_signs_over_exactly_the_bytes_delegation_preimage_builds() {
         if claim.not_before_unix_ms > 65_535 {
             wide_timestamp_cases += 1;
         }
-        if claim.origin.len() > 255 {
-            long_origin_cases += 1;
+        if claim.subject_value.len() > 255 {
+            long_subject_cases += 1;
         }
         distinct_sequences.insert(claim.sequence);
+        distinct_pairs.insert((claim.subject_kind.wire_value(), claim.role.wire_value()));
         cases += 1;
     }
 
     // Count what fired. A loop that ran zero times satisfies every assertion
     // inside it, and a Go gate that never spawned looks exactly like one that
     // passed.
-    assert_eq!(cases, 72, "12 timestamps x 6 origins");
+    assert_eq!(cases, 72, "12 timestamps x 6 subject values");
+    // Both valid pairs reached the Go gate. A sweep that only ever emitted the
+    // anchor's pair would leave the seat one unread by any second party.
+    assert_eq!(
+        distinct_pairs,
+        std::collections::BTreeSet::from([(1u64, 2u64), (2, 3)]),
+        "both valid (subject_kind, role) pairs must have been read by go-cose"
+    );
     // And the sweep reached every `sequence` head width, so the newest payload
     // field is covered on the same axis as the rest rather than only at 300.
     assert_eq!(
@@ -470,8 +519,8 @@ fn go_cose_signs_over_exactly_the_bytes_delegation_preimage_builds() {
         "cases whose not_before needs a four- or eight-byte CBOR head"
     );
     assert_eq!(
-        long_origin_cases, 12,
-        "cases whose origin needs a two-byte tstr length"
+        long_subject_cases, 12,
+        "cases whose subject value needs a two-byte tstr length"
     );
 }
 
@@ -509,7 +558,8 @@ fn go_cose_refuses_a_flipped_signature_and_the_wrong_root_key() {
     let other_hex = to_hex(&other_root_public_key);
 
     let claim = DelegationClaim {
-        origin: ORIGIN.to_string(),
+        subject_kind: DelegationSubjectKind::Domain,
+        subject_value: ORIGIN.to_string(),
         delegated_public_key: delegated.public_key_bytes(),
         role: DelegationRole::Operational,
         not_before_unix_ms: 1_700_000_000_000,
@@ -554,7 +604,13 @@ fn go_cose_refuses_a_flipped_signature_and_the_wrong_root_key() {
         "go-cose accepted a delegation with a flipped signature bit"
     );
     assert!(
-        verify_delegation(&flipped, &root_public_key, ORIGIN).is_err(),
+        verify_delegation(
+            &flipped,
+            &root_public_key,
+            DelegationSubjectKind::Domain,
+            ORIGIN
+        )
+        .is_err(),
         "lys accepted a delegation with a flipped signature bit"
     );
 
@@ -581,11 +637,23 @@ fn go_cose_refuses_a_flipped_signature_and_the_wrong_root_key() {
          otherwise the refusal below is about malformedness rather than about trust"
     );
     assert!(
-        verify_delegation(&attacker, &root_public_key, ORIGIN).is_err(),
+        verify_delegation(
+            &attacker,
+            &root_public_key,
+            DelegationSubjectKind::Domain,
+            ORIGIN
+        )
+        .is_err(),
         "lys accepted a delegation signed by a root key the caller does not trust"
     );
     assert!(
-        verify_delegation(&attacker, &other_root_public_key, ORIGIN).is_ok(),
+        verify_delegation(
+            &attacker,
+            &other_root_public_key,
+            DelegationSubjectKind::Domain,
+            ORIGIN
+        )
+        .is_ok(),
         "the control failed: the attacker's own delegation must verify under \
          the attacker's own key"
     );

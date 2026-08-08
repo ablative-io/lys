@@ -1,4 +1,4 @@
-//! Byte-exact CBOR/COSE encoding for the `lys/anchor-delegation/v1` artifact.
+//! Byte-exact CBOR/COSE encoding for the `lys/delegation/v1` artifact.
 //!
 //! # Invariants
 //!
@@ -16,8 +16,24 @@
 //! - The protected header bucket is
 //!   `{1: -8 (EdDSA), 3: <content type>, 4: <bstr .size 32 Ed25519 root key>}`
 //!   in RFC 8949 §4.2 key order — exactly [`PROTECTED_LEN`] bytes. `kid` is a
-//!   byte string of exactly 32 bytes (RFC 9052 §3.1); a shorter or longer one
-//!   is refused, so a key that is not an Ed25519 key cannot occupy the slot.
+//!   byte string of exactly 32 bytes (RFC 9052 §3.1) **and a point strict
+//!   Ed25519 verification could accept**, so a key that is not an Ed25519 key
+//!   cannot occupy the slot.
+//!
+//!   ⛔ **That sentence used to end at "a shorter or longer one is refused", and
+//!   the conclusion did not follow from the premise.** Length is not keyness:
+//!   `kid = [0xff; 32]` is exactly 32 bytes and is not a usable key — `y >= p`,
+//!   so it is not a canonical encoding of any point — and it parsed. An
+//!   adversarial review found the invariant false while the payload's *other*
+//!   32-byte key slot had been validated for exactly this reason since the
+//!   review before it. The two slots now obey one rule, applied by
+//!   [`decode_protected`] and mirrored by [`check_encodable`].
+//!
+//!   Not a vulnerability in either state — [`super::sign::verify_delegation`]
+//!   compares `kid` byte-for-byte against the key the caller named, so an
+//!   unusable one can never match a key anybody trusts. It is fixed because a
+//!   documented invariant that is false is worse than an absent one, and because
+//!   tightening a decoder is free before publication and semver-bound after.
 //! - **The tag is mandatory and an untagged `COSE_Sign1` is refused.** RFC 9052
 //!   §4.2 permits either form "depending on the context", so the context has to
 //!   say — and if both were accepted, one statement would have two valid
@@ -42,20 +58,35 @@
 //!   structure, and a delegation proves nothing about a tree. Its absence also
 //!   makes this bucket a different length from a receipt's, but length is a
 //!   consequence and never the defence — the content type is.
-//! - The payload map is `{1: origin, 2: delegated key, 3: role,
-//!   4: not_before_unix_ms, 5: sequence}` — **five** entries, labels ascending.
+//! - The payload map is `{1: subject_kind, 2: subject_value,
+//!   3: delegated key, 4: role, 5: not_before_unix_ms, 6: sequence}` —
+//!   **six** entries, labels ascending. The kind precedes the value it types.
 //!   `sequence` is what orders delegations; see [`super`] for the replay defect
 //!   it closes.
+//! - **`subject_kind` and `role` are validated as a PAIR**, by
+//!   [`DelegationSubjectKind::permits`], which is the single definition of the
+//!   rule. `(1 domain, 2 operational)` and `(2 seat, 3 speaks-for)` are the only
+//!   pairs this version defines; every other combination is refused at decode
+//!   *and* at [`check_encodable`], including the two made entirely of
+//!   individually valid values.
+//! - **The two closed vocabularies are deliberately offset**, so that no valid
+//!   pair has `subject_kind == role`. Both fields are `uint`s in one map, so
+//!   numbering the roles from `1` would have made every valid `v1` payload carry
+//!   the same byte at labels 1 and 4 — and an implementation that transposed the
+//!   two fields would emit byte-identical artifacts, undetectable by any test or
+//!   vector. Offset, a transposition yields a pair outside the table and is
+//!   *refused* rather than merely different. See
+//!   [`DelegationSubjectKind::permits`].
 //! - **The payload is embedded**, not detached: there is no value a verifier
 //!   independently recomputes, so the assertion must travel with the signature.
 //!   See [`super`].
 //! - **The unprotected bucket is the empty map `0xa0`**, and [`decode_fields`]
 //!   refuses any other. Nothing unsigned may ride in this artifact.
-//! - **An empty origin is refused**, and the reason is about the *verifier*
-//!   rather than about the string. Acceptance is a comparison against the
-//!   caller's configured origin, so a verifier whose origin is unset would match
-//!   an empty-origin delegation and accept it. Refusing the empty string at
-//!   decode makes that misconfiguration fail closed.
+//! - **An empty subject value is refused**, and the reason is about the
+//!   *verifier* rather than about the string. Acceptance is a comparison against
+//!   the caller's configured subject, so a verifier whose subject is unset would
+//!   match an empty-subject delegation and accept it. Refusing the empty string
+//!   at decode makes that misconfiguration fail closed.
 //! - **The delegated key must be one `verify_strict` could accept** — canonical
 //!   decompression, not small-order. See [`decode_payload`].
 //! - Every decode failure collapses to
@@ -65,7 +96,7 @@
 //! # Canonical encoding is a requirement on the artifact, not a side effect
 //!
 //! **RFC 8949 §4.2 core deterministic encoding is normative on the wire for
-//! this format.** A `lys/anchor-delegation/v1` artifact that is not canonically
+//! this format.** A `lys/delegation/v1` artifact that is not canonically
 //! encoded is not a valid artifact, whoever is reading it. That sentence is the
 //! rule; everything below is about how this implementation enforces it and what
 //! would go wrong without it.
@@ -134,11 +165,11 @@ use crate::cbor::{
     MAJOR_ARRAY, MAJOR_MAP, MAJOR_TAG, MAJOR_UNSIGNED, write_bytes, write_head, write_i64,
     write_text,
 };
-use crate::delegation::artifact::{DelegationClaim, DelegationRole};
+use crate::delegation::artifact::{DelegationClaim, DelegationRole, DelegationSubjectKind};
 use crate::error::{TrustError, TrustResult};
 use crate::keys::identity::is_usable_ed25519_public_key;
 
-/// The `lys/anchor-delegation/v1` domain discriminator: the protected content
+/// The `lys/delegation/v1` domain discriminator: the protected content
 /// type (COSE header label 3). Signature-covered.
 ///
 /// This string is a frozen wire contract — evolving the artifact means a new
@@ -146,25 +177,25 @@ use crate::keys::identity::is_usable_ed25519_public_key;
 /// separating a delegation from a receipt, a consistency receipt or an
 /// attestation, all of which are `COSE_Sign1` messages signed by the same kind
 /// of Ed25519 key and whose signing preimages share their first twelve bytes.
-pub(crate) const CONTENT_TYPE: &str = "application/vnd.lys.anchor-delegation.v1+cbor";
+pub(crate) const CONTENT_TYPE: &str = "application/vnd.lys.delegation.v1+cbor";
 
 /// Length of a raw Ed25519 public key, and so of both `kid` and the delegated
 /// key in the payload.
 pub(crate) const KEY_LEN: usize = 32;
 
 /// Exact length of the protected bucket: `map(3)` head, `1 => -8` (2 bytes),
-/// `3 => text(45)` (3 + 45), `4 => bstr(32)` (3 + 32).
+/// `3 => text(38)` (3 + 38), `4 => bstr(32)` (3 + 32).
 ///
 /// Fixed because every component is fixed — the content type is a constant and
 /// the key is always 32 bytes. Pinned as a constant so a change to any of them
 /// is a visible change here rather than a silent one on the wire.
-pub(crate) const PROTECTED_LEN: usize = 86;
+pub(crate) const PROTECTED_LEN: usize = 79;
 
-/// Hard input cap for [`decode_fields`]. A canonical delegation is the 86-byte
-/// protected bucket, a payload of roughly 50 bytes plus the origin, a 64-byte
-/// signature and a handful of heads. This bound is far above that and rejects
-/// oversize input before parsing; it is also the only bound on the origin
-/// string, which this format otherwise treats as opaque text.
+/// Hard input cap for [`decode_fields`]. A canonical delegation is the 79-byte
+/// protected bucket, a payload of roughly 55 bytes plus the subject value, a
+/// 64-byte signature and a handful of heads. This bound is far above that and
+/// rejects oversize input before parsing; it is also the only bound on the
+/// subject value, which this format otherwise treats as opaque text.
 pub(crate) const MAX_ARTIFACT_LEN: usize = 4096;
 
 /// CBOR tag number for `COSE_Sign1` (RFC 9052 §2). The artifact is always
@@ -187,24 +218,29 @@ const HEADER_LABEL_KID: u64 = 4;
 /// both accept it.
 const ALG_EDDSA: i64 = -8;
 
-/// Payload map label 1: the origin the delegation is scoped to.
-const PAYLOAD_LABEL_ORIGIN: u64 = 1;
-/// Payload map label 2: the raw 32-byte key being delegated **to**.
-const PAYLOAD_LABEL_DELEGATED_KEY: u64 = 2;
-/// Payload map label 3: the role, a closed enum.
-const PAYLOAD_LABEL_ROLE: u64 = 3;
-/// Payload map label 4: `not_before_unix_ms` — a claim by the signer, never an
+/// Payload map label 1: `subject_kind` — what kind of thing label 2 is. A
+/// closed enum, and the kind **precedes** the value it types.
+const PAYLOAD_LABEL_SUBJECT_KIND: u64 = 1;
+/// Payload map label 2: the subject the delegation is scoped to.
+const PAYLOAD_LABEL_SUBJECT_VALUE: u64 = 2;
+/// Payload map label 3: the raw 32-byte key being delegated **to**.
+const PAYLOAD_LABEL_DELEGATED_KEY: u64 = 3;
+/// Payload map label 4: the role, a closed enum whose vocabulary is scoped per
+/// subject kind.
+const PAYLOAD_LABEL_ROLE: u64 = 4;
+/// Payload map label 5: `not_before_unix_ms` — a claim by the signer, never an
 /// ordering key.
-const PAYLOAD_LABEL_NOT_BEFORE: u64 = 4;
-/// Payload map label 5: `sequence` — the value that *does* order delegations.
-const PAYLOAD_LABEL_SEQUENCE: u64 = 5;
+const PAYLOAD_LABEL_NOT_BEFORE: u64 = 5;
+/// Payload map label 6: `sequence` — the value that *does* order delegations.
+const PAYLOAD_LABEL_SEQUENCE: u64 = 6;
 
 /// The largest `sequence` this format accepts: `u64::MAX - 1`.
 ///
 /// **`u64::MAX` is refused so that a successor always exists.** `sequence` is
-/// strictly increasing per `(origin, role)`, and the maximum has no successor —
-/// a signer who issued there would permanently disable rotation for that origin,
-/// with no in-band way out.
+/// strictly increasing per `(subject_kind, subject_value, role)`, and the maximum
+/// has no successor —
+/// a signer who issued there would permanently disable rotation for that
+/// subject, with no in-band way out.
 ///
 /// It is a foot-gun rather than a vulnerability: nothing attacker-reachable
 /// leads here, since issuing any delegation needs the offline root key. It is
@@ -242,24 +278,28 @@ pub(crate) fn protected_bytes(content_type: &str, root_public_key: &[u8; KEY_LEN
 }
 
 /// Build the embedded payload map
-/// `{1: origin, 2: delegated_key, 3: role, 4: not_before_unix_ms, 5: sequence}`
-/// in canonical key order.
+/// `{1: subject_kind, 2: subject_value, 3: delegated_key, 4: role,
+/// 5: not_before_unix_ms, 6: sequence}` in canonical key order.
 ///
-/// The role is written from [`DelegationRole::wire_value`] rather than from a
-/// number the caller supplied, so no value outside the closed enum can be
-/// emitted by this crate at all.
+/// The subject kind and the role are written from
+/// [`DelegationSubjectKind::wire_value`] and [`DelegationRole::wire_value`]
+/// rather than from numbers the caller supplied, so no value outside either
+/// closed enum can be emitted by this crate at all.
 ///
-/// **Encoding stays infallible and total over the field types.** The two field
-/// constraints this format adds — a non-empty origin and a usable delegated key
-/// — are enforced by [`check_encodable`] on the issuing path rather than here,
-/// so that this function keeps the property the whole byte-exactness argument
-/// rests on: it cannot fail, so there is no encoding failure mode to reason
-/// about and canonicality is a property of the construction.
+/// **Encoding stays infallible and total over the field types.** The field
+/// constraints this format adds — a non-empty subject value, a usable delegated
+/// key, and a `(subject_kind, role)` pair this version defines — are enforced by
+/// [`check_encodable`] on the issuing path rather than here, so that this
+/// function keeps the property the whole byte-exactness argument rests on: it
+/// cannot fail, so there is no encoding failure mode to reason about and
+/// canonicality is a property of the construction.
 pub(crate) fn payload_bytes(claim: &DelegationClaim) -> Vec<u8> {
-    let mut out = Vec::with_capacity(claim.origin.len() + 80);
-    write_head(&mut out, MAJOR_MAP, 5);
-    write_head(&mut out, MAJOR_UNSIGNED, PAYLOAD_LABEL_ORIGIN);
-    write_text(&mut out, &claim.origin);
+    let mut out = Vec::with_capacity(claim.subject_value.len() + 80);
+    write_head(&mut out, MAJOR_MAP, 6);
+    write_head(&mut out, MAJOR_UNSIGNED, PAYLOAD_LABEL_SUBJECT_KIND);
+    write_head(&mut out, MAJOR_UNSIGNED, claim.subject_kind.wire_value());
+    write_head(&mut out, MAJOR_UNSIGNED, PAYLOAD_LABEL_SUBJECT_VALUE);
+    write_text(&mut out, &claim.subject_value);
     write_head(&mut out, MAJOR_UNSIGNED, PAYLOAD_LABEL_DELEGATED_KEY);
     write_bytes(&mut out, &claim.delegated_public_key);
     write_head(&mut out, MAJOR_UNSIGNED, PAYLOAD_LABEL_ROLE);
@@ -277,9 +317,9 @@ pub(crate) fn payload_bytes(claim: &DelegationClaim) -> Vec<u8> {
 ///
 /// Encode and decode were allowed to disagree once, and the shape of the
 /// resulting defect is worth keeping in front of anyone who edits either side.
-/// The artifact cap was enforced at decode only, so an origin of 3884 bytes
-/// signed and verified while 3885 signed *successfully* and then failed every
-/// verification afterwards. That is exactly the "file that fails verification at
+/// The artifact cap was enforced at decode only, so a subject value of 3884
+/// bytes signed and verified while 3885 signed *successfully* and then failed
+/// every verification afterwards. That is exactly the "file that fails verification at
 /// some later, less debuggable moment" that
 /// [`super::sign::assemble_delegation`]'s signature check exists to prevent,
 /// arriving through the one door that check does not cover.
@@ -287,8 +327,20 @@ pub(crate) fn payload_bytes(claim: &DelegationClaim) -> Vec<u8> {
 /// So the rule is: **every constraint the decoder enforces is refused here
 /// too**, and the two lists are kept together in one function so a new decode
 /// rule that is not mirrored is a visible omission rather than an invisible one.
+/// The `kid` point check was added here in the same change that added it to
+/// [`decode_protected`], for exactly that reason: a decode rule landing without
+/// its encode mirror would have made *this* invariant false while repairing
+/// another.
+///
+/// **A rule enforced in two places is proven by neither of the obvious cases**,
+/// which is why the `(subject_kind, role)` pair has exactly one *definition* —
+/// [`DelegationSubjectKind::permits`] — called from here and from
+/// [`decode_payload`]. Deleting either call site leaves the other, so the
+/// isolating tests are written at each site directly rather than through an
+/// entry point that passes both.
+///
 /// The size bound is *derived* from the encoded artifact rather than from a
-/// precomputed origin length, because the derived limit moves whenever a payload
+/// precomputed subject-value length, because the derived limit moves whenever a payload
 /// field is added — `sequence` moved it — and a hardcoded bound would have gone
 /// stale silently.
 ///
@@ -300,11 +352,30 @@ pub(crate) fn check_encodable(
     root_public_key: &[u8; KEY_LEN],
     claim: &DelegationClaim,
 ) -> TrustResult<()> {
-    if claim.origin.is_empty() {
+    if !is_usable_ed25519_public_key(root_public_key) {
         return Err(TrustError::DelegationEncoding {
-            reason: "the origin is empty: a verifier whose configured origin is unset would \
-                     match it, so the format refuses it at both ends"
+            reason: "the root public key going into the protected `kid` is not one strict \
+                     Ed25519 verification could ever accept (non-canonical encoding, or a \
+                     small-order point): no signature could verify under it, so the artifact \
+                     would be refused by its own decoder"
                 .to_string(),
+        });
+    }
+    if claim.subject_value.is_empty() {
+        return Err(TrustError::DelegationEncoding {
+            reason: "the subject value is empty: a verifier whose configured subject is unset \
+                     would match it, so the format refuses it at both ends"
+                .to_string(),
+        });
+    }
+    if !claim.subject_kind.permits(claim.role) {
+        return Err(TrustError::DelegationEncoding {
+            reason: format!(
+                "subject kind {:?} does not confer role {:?}: the two are validated as a pair, \
+                 because a subject combined with an authority nothing defines over it is a \
+                 signed statement with no meaning",
+                claim.subject_kind, claim.role
+            ),
         });
     }
     if !is_usable_ed25519_public_key(&claim.delegated_public_key) {
@@ -320,7 +391,7 @@ pub(crate) fn check_encodable(
             reason: format!(
                 "sequence {} is the maximum a u64 can hold, and sequence must strictly \
                  increase — issuing here would leave no successor and permanently disable \
-                 rotation for this origin; the largest issuable value is {MAX_SEQUENCE}",
+                 rotation for this subject; the largest issuable value is {MAX_SEQUENCE}",
                 claim.sequence
             ),
         });
@@ -332,7 +403,7 @@ pub(crate) fn check_encodable(
         return Err(TrustError::DelegationEncoding {
             reason: format!(
                 "the encoded artifact would be {encoded_len} bytes, over the \
-                 {MAX_ARTIFACT_LEN}-byte cap the decoder enforces — shorten the origin"
+                 {MAX_ARTIFACT_LEN}-byte cap the decoder enforces — shorten the subject value"
             ),
         });
     }
@@ -376,7 +447,7 @@ pub(crate) struct DecodedFields {
     /// Raw 32-byte Ed25519 root key from the protected `kid`. A **claim**, not
     /// an authority — see [`super::sign::verify_delegation`].
     pub(crate) root_public_key: [u8; KEY_LEN],
-    /// The four signature-covered payload fields.
+    /// The six signature-covered payload fields.
     pub(crate) claim: DelegationClaim,
     /// 64-byte Ed25519 signature (`COSE_Sign1` item 3).
     pub(crate) signature: [u8; 64],
@@ -425,10 +496,25 @@ fn unsigned(value: &Value) -> TrustResult<u64> {
 /// Decode the protected bucket, returning the root key from `kid`.
 ///
 /// Pins `alg = -8`, [`CONTENT_TYPE`], and a `bstr` `kid` of **exactly** 32
-/// bytes, in exactly that order and with no additional entries. The content type is checked against
-/// this module's own constant, so a receipt, a consistency receipt or an
-/// attestation is refused here — before any signature is examined and
-/// regardless of whether it would have verified.
+/// bytes **that is a point strict Ed25519 verification could accept**, in
+/// exactly that order and with no additional entries. The content type is
+/// checked against this module's own constant, so a receipt, a consistency
+/// receipt or an attestation is refused here — before any signature is examined
+/// and regardless of whether it would have verified.
+///
+/// # Why `kid` is point-validated and not merely length-checked
+///
+/// The payload's delegated key has been validated this way since an earlier
+/// review; `kid` was not, and the module docs claimed the length check made it
+/// unnecessary. It does not: `[0xff; 32]` is 32 bytes and is not a canonical
+/// encoding of any point. Two 32-byte key slots in one artifact obeying two
+/// different rules is a difference somebody will eventually read as meaningful,
+/// so they now obey one.
+///
+/// This is consistency and a false invariant repaired, **not** a vulnerability
+/// closed: [`super::sign::verify_delegation`] compares `kid` byte-for-byte
+/// against the caller's expected key, so an unusable `kid` could never have
+/// matched a key anyone trusts.
 fn decode_protected(protected_raw: &[u8]) -> TrustResult<[u8; KEY_LEN]> {
     let Value::Map(protected) = parse_value(protected_raw)? else {
         return Err(reject());
@@ -446,12 +532,16 @@ fn decode_protected(protected_raw: &[u8]) -> TrustResult<[u8; KEY_LEN]> {
         return Err(reject());
     }
     require_integer(kid_key, i128::from(HEADER_LABEL_KID))?;
-    fixed_bytes(kid)
+    let root_public_key: [u8; KEY_LEN] = fixed_bytes(kid)?;
+    if !is_usable_ed25519_public_key(&root_public_key) {
+        return Err(reject());
+    }
+    Ok(root_public_key)
 }
 
 /// Decode the embedded payload map into a [`DelegationClaim`].
 ///
-/// Three rules here refuse a *well-formed* value rather than a malformed one,
+/// Five rules here refuse a *well-formed* value rather than a malformed one,
 /// and each is a case of the same principle — **a signed unchecked value looks
 /// checked**, so a field this version cannot act on must not be carried past
 /// the signature that lends it authority.
@@ -460,13 +550,27 @@ fn decode_protected(protected_raw: &[u8]) -> TrustResult<[u8; KEY_LEN]> {
 ///    `role: 7` is a decode failure. Accepting and passing it on would hand a
 ///    consumer a cryptographically perfect artifact whose meaning nobody in the
 ///    system defines. Adding a role is a `v2`.
-/// 2. **An empty origin.** Not because the empty string is malformed, but
+/// 2. **Unknown subject kinds**, through
+///    [`DelegationSubjectKind::from_wire`], on exactly the same reasoning:
+///    `subject_kind: 3` names a namespace nothing in this version can interpret,
+///    so a value carried past the signature would look checked and be nothing of
+///    the sort. Adding a kind is a `v3`.
+/// 3. **A `(subject_kind, role)` pair this version does not define**, through
+///    [`DelegationSubjectKind::permits`]. This is the one rule here that refuses
+///    a payload every *individual* field of which is valid — `(domain,
+///    speaks-for)` and `(seat, operational)` are the two cases — and it is what
+///    makes a subject's authority a property of the artifact rather than of
+///    whoever reads it. It is also the only field rule at this level that the
+///    caller's re-encode-and-byte-compare cannot mask: the canonical re-encoding
+///    of an invalid pair is the invalid pair, so if this check were deleted the
+///    artifact-level entry points would accept it.
+/// 4. **An empty subject value.** Not because the empty string is malformed, but
 ///    because of what it does to a *misconfigured verifier*: acceptance is a
-///    comparison against the caller's configured origin, so a verifier whose
-///    origin is unset matches an empty-origin delegation and accepts it. This is
-///    the "no default origin" rule enforced from the other side, and it makes
+///    comparison against the caller's configured subject, so a verifier whose
+///    subject is unset matches an empty-subject delegation and accepts it. This
+///    is the "no default origin" rule enforced from the other side, and it makes
 ///    that misconfiguration fail closed rather than silently succeed.
-/// 3. **A delegated key strict Ed25519 could never accept** — a non-canonical
+/// 5. **A delegated key strict Ed25519 could never accept** — a non-canonical
 ///    encoding (`y >= p`, of which all-`0xff` is the easy example) or a
 ///    small-order point, the identity among them. Such a key cannot verify
 ///    anything, so a delegation naming it is a signed statement that can never
@@ -496,17 +600,18 @@ fn decode_protected(protected_raw: &[u8]) -> TrustResult<[u8; KEY_LEN]> {
 ///    compares raw bytes against a configured value, so a second spelling fails
 ///    closed rather than matching.
 ///
-/// A fourth rule bounds `sequence` at [`MAX_SEQUENCE`], so that a successor
+/// A sixth rule bounds `sequence` at [`MAX_SEQUENCE`], so that a successor
 /// always exists. Its *monotonicity* is not checked here and cannot be: this
-/// function sees one delegation, and "strictly increasing per `(origin, role)`"
-/// is a property of a set. That, and the equivocation rule, are a fold's
+/// function sees one delegation, and "strictly increasing per
+/// `(subject_kind, subject_value, role)`" is a property of a set. That, and the equivocation rule, are a fold's
 /// obligations, stated in [`super`].
 fn decode_payload(payload_raw: &[u8]) -> TrustResult<DelegationClaim> {
     let Value::Map(payload) = parse_value(payload_raw)? else {
         return Err(reject());
     };
     let [
-        (origin_key, origin),
+        (subject_kind_key, subject_kind),
+        (subject_value_key, subject_value),
         (delegated_key_key, delegated_key),
         (role_key, role),
         (not_before_key, not_before),
@@ -515,11 +620,14 @@ fn decode_payload(payload_raw: &[u8]) -> TrustResult<DelegationClaim> {
     else {
         return Err(reject());
     };
-    require_integer(origin_key, i128::from(PAYLOAD_LABEL_ORIGIN))?;
-    let Value::Text(origin) = origin else {
+    require_integer(subject_kind_key, i128::from(PAYLOAD_LABEL_SUBJECT_KIND))?;
+    let subject_kind =
+        DelegationSubjectKind::from_wire(unsigned(subject_kind)?).ok_or_else(reject)?;
+    require_integer(subject_value_key, i128::from(PAYLOAD_LABEL_SUBJECT_VALUE))?;
+    let Value::Text(subject_value) = subject_value else {
         return Err(reject());
     };
-    if origin.is_empty() {
+    if subject_value.is_empty() {
         return Err(reject());
     }
     require_integer(delegated_key_key, i128::from(PAYLOAD_LABEL_DELEGATED_KEY))?;
@@ -529,6 +637,12 @@ fn decode_payload(payload_raw: &[u8]) -> TrustResult<DelegationClaim> {
     }
     require_integer(role_key, i128::from(PAYLOAD_LABEL_ROLE))?;
     let role = DelegationRole::from_wire(unsigned(role)?).ok_or_else(reject)?;
+    // THE pair check, and it lives here because this is where a stranger's
+    // artifact arrives. `check_encodable` refuses the same pair on the issuing
+    // side; the rule itself is defined once, in `DelegationSubjectKind::permits`.
+    if !subject_kind.permits(role) {
+        return Err(reject());
+    }
     require_integer(not_before_key, i128::from(PAYLOAD_LABEL_NOT_BEFORE))?;
     let not_before_unix_ms = unsigned(not_before)?;
     require_integer(sequence_key, i128::from(PAYLOAD_LABEL_SEQUENCE))?;
@@ -537,7 +651,8 @@ fn decode_payload(payload_raw: &[u8]) -> TrustResult<DelegationClaim> {
         return Err(reject());
     }
     Ok(DelegationClaim {
-        origin: origin.clone(),
+        subject_kind,
+        subject_value: subject_value.clone(),
         delegated_public_key,
         role,
         not_before_unix_ms,
@@ -546,11 +661,12 @@ fn decode_payload(payload_raw: &[u8]) -> TrustResult<DelegationClaim> {
 }
 
 /// Decode a delegation into its fields, enforcing the exact
-/// `lys/anchor-delegation/v1` shape: the input cap; tag 18 over a 4-array; the
-/// protected map pinned to `{1: -8, 3: CONTENT_TYPE, 4: bstr(32)}`; an
+/// `lys/delegation/v1` shape: the input cap; tag 18 over a 4-array; the
+/// protected map pinned to `{1: -8, 3: CONTENT_TYPE, 4: usable bstr(32) key}`;
+/// an
 /// **empty** unprotected map; an embedded `bstr` payload pinned to
-/// `{1: non-empty tstr, 2: usable bstr(32) key, 3: known role, 4: uint,
-/// 5: uint}`; a 64-byte signature.
+/// `{1: known subject kind, 2: non-empty tstr, 3: usable bstr(32) key,
+/// 4: known role the kind permits, 5: uint, 6: uint}`; a 64-byte signature.
 ///
 /// Canonical-encoding strictness is the caller's byte-compare — this function
 /// accepts what ciborium parses.

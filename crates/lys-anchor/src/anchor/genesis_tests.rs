@@ -15,13 +15,16 @@
 //! # Where the second party comes from
 //!
 //! - **`DELEGATION-V1.md` §3.2 and §3.3, as prose.** `verify_delegation` takes
-//!   the expected root key and the expected origin as required arguments
-//!   *because* an artifact verifies against whatever key it carries and for
-//!   whatever origin it names. This file uses that requirement as the instrument:
-//!   the root key it names is the one the **root signer** reported, and the origin
-//!   it names is the literal this file handed `FileLeafStore::create`. A `create`
-//!   that put its own operational key in `kid`, or a constant origin in the
-//!   payload, fails against arguments it never got to choose.
+//!   the expected root key, the expected subject **kind** and the expected subject
+//!   **value** as required arguments *because* an artifact verifies against
+//!   whatever key it carries, for whatever subject it names, under whatever kind it
+//!   claims. This file uses that requirement as the instrument: the root key it
+//!   names is the one the **root signer** reported, the value it names is the
+//!   literal this file handed `FileLeafStore::create`, and the kind it names is
+//!   `Domain` because §5 makes that normative for genesis. A `create` that put its
+//!   own operational key in `kid`, a constant origin in the payload, or a `Seat`
+//!   kind in the one leaf that can never be corrected, fails against arguments it
+//!   never got to choose.
 //! - **The signers' own public keys.** `delegated_public_key` is checked against
 //!   `operational.public_key()` — the value the signer computed from its seed —
 //!   and against `root.public_key()` for *inequality*, over two distinct seeds,
@@ -53,6 +56,7 @@
 //! | `delegated_public_key` becomes the **root** key | `leaf_zero_is_a_delegation…` only |
 //! | `not_before_unix_ms` is off by one | `leaf_zero_is_a_delegation…` only |
 //! | the origin becomes a committed constant | `the_delegations_origin_is_the_stores…` **only** |
+//! | `subject_kind` becomes `Seat` | `leaf_zero_is_a_delegation…` only (the pair moves with it, so the artifact stays valid — which is exactly why this needs asserting) |
 //! | the log is appended to on the signing-failure path | `a_root_signer_that_declines…` only |
 //!
 //! ⚠️ **The origin row is the one worth reading twice, and it is why the
@@ -92,7 +96,7 @@
 use std::path::Path;
 
 use lys_core::checkpoint::{NoteVerifierKey, verify_checkpoint};
-use lys_core::delegation::{DelegationRole, verify_delegation};
+use lys_core::delegation::{DelegationRole, DelegationSubjectKind, verify_delegation};
 use lys_core::error::TrustError;
 use lys_log_store::{FileLeafStore, LeafStore};
 use tempfile::TempDir;
@@ -237,8 +241,13 @@ fn leaf_zero_is_a_delegation_from_the_root_key_to_the_operational_key_for_the_st
     // `verify_delegation` is `lys-core`'s third-party entry point. Both of the
     // arguments it requires are values this file chose: the root signer's own
     // public key, and the origin literal handed to `FileLeafStore::create`.
-    let delegation = verify_delegation(&leaf_zero_from_disk(dir), &root_key, ORIGIN)
-        .expect("leaf 0 must verify as a delegation from the root key for the store's origin");
+    let delegation = verify_delegation(
+        &leaf_zero_from_disk(dir),
+        &root_key,
+        DelegationSubjectKind::Domain,
+        ORIGIN,
+    )
+    .expect("leaf 0 must verify as a delegation from the root key for the store's origin");
 
     assert_eq!(delegation.root_public_key, root_key);
     assert_eq!(delegation.claim.delegated_public_key, operational_key);
@@ -251,9 +260,32 @@ fn leaf_zero_is_a_delegation_from_the_root_key_to_the_operational_key_for_the_st
     // pinned.
     assert_eq!(delegation.claim.sequence, 0);
 
-    // And the origin arrived in the signed payload, not merely as the argument
-    // that was compared against it.
-    assert_eq!(delegation.claim.origin, ORIGIN);
+    // And the origin arrived in the signed payload as the subject VALUE, not
+    // merely as the argument that was compared against it.
+    assert_eq!(delegation.claim.subject_value, ORIGIN);
+
+    // ⛔ The subject KIND. An anchor's genesis must be a DOMAIN delegation, and
+    // this is the one leaf that can never be corrected — so a constructor that
+    // wrote a seat here would produce a perfectly signed, internally valid
+    // artifact (`(seat, speaks-for)` is in `lys-core`'s pair table) that no
+    // verifier would flag. Asserted as the enum variant this file names, not read
+    // back from whatever the constructor chose.
+    assert_eq!(delegation.claim.subject_kind, DelegationSubjectKind::Domain);
+
+    // And the seat verifier refuses it, over the same subject string — so the kind
+    // is doing work here rather than merely being present. `verify_delegation`
+    // requires the kind as an argument precisely because a value-only check would
+    // accept a seat delegation whose identifier equalled this origin.
+    assert!(
+        verify_delegation(
+            &leaf_zero_from_disk(dir),
+            &root_key,
+            DelegationSubjectKind::Seat,
+            ORIGIN
+        )
+        .is_err(),
+        "an anchor's genesis must not verify as a seat delegation"
+    );
 }
 
 #[test]
@@ -268,11 +300,17 @@ fn an_anchor_created_under_one_root_key_does_not_verify_against_another() {
     assert_ne!(root_key, other_root_key);
 
     // Positive control: the instrument accepts the key that actually signed.
-    assert!(verify_delegation(&leaf, &root_key, ORIGIN).is_ok());
+    assert!(verify_delegation(&leaf, &root_key, DelegationSubjectKind::Domain, ORIGIN).is_ok());
 
     // The one difference: a different root key is named.
     assert!(
-        verify_delegation(&leaf, &other_root_key, ORIGIN).is_err(),
+        verify_delegation(
+            &leaf,
+            &other_root_key,
+            DelegationSubjectKind::Domain,
+            ORIGIN
+        )
+        .is_err(),
         "a genesis delegation must not verify against a root key that did not sign it"
     );
 
@@ -281,7 +319,7 @@ fn an_anchor_created_under_one_root_key_does_not_verify_against_another() {
     // implementation that had written the wrong key into `kid` would have failed
     // the positive control above rather than this line.
     assert_eq!(
-        verify_delegation(&leaf, &root_key, ORIGIN)
+        verify_delegation(&leaf, &root_key, DelegationSubjectKind::Domain, ORIGIN)
             .unwrap()
             .root_public_key,
         root_key
@@ -307,9 +345,9 @@ fn the_delegations_origin_is_the_stores_and_two_stores_produce_two_delegations()
         let root_key = root(dir).public_key();
 
         // Positive control: it verifies under its own store's origin.
-        let delegation = verify_delegation(&leaf, &root_key, origin)
+        let delegation = verify_delegation(&leaf, &root_key, DelegationSubjectKind::Domain, origin)
             .expect("a delegation must verify under the origin its store was created with");
-        assert_eq!(delegation.claim.origin, origin);
+        assert_eq!(delegation.claim.subject_value, origin);
 
         artifacts.push((leaf, root_key));
     }
@@ -324,12 +362,138 @@ fn the_delegations_origin_is_the_stores_and_two_stores_produce_two_delegations()
     assert_eq!(artifacts[0].1, artifacts[1].1);
     assert_ne!(artifacts[0].0, artifacts[1].0);
     assert!(
-        verify_delegation(&artifacts[0].0, &artifacts[0].1, origins[1]).is_err(),
+        verify_delegation(
+            &artifacts[0].0,
+            &artifacts[0].1,
+            DelegationSubjectKind::Domain,
+            origins[1]
+        )
+        .is_err(),
         "a delegation for one origin must not verify for another"
     );
     assert!(
-        verify_delegation(&artifacts[1].0, &artifacts[1].1, origins[0]).is_err(),
+        verify_delegation(
+            &artifacts[1].0,
+            &artifacts[1].1,
+            DelegationSubjectKind::Domain,
+            origins[0]
+        )
+        .is_err(),
         "a delegation for one origin must not verify for another"
+    );
+}
+
+/// ⛔ The root key and the operational key may not be the same key, in either
+/// order, and nothing is written when they are.
+///
+/// # Why this needs a test rather than a comment
+///
+/// The artifact this would produce is **valid**. Not malformed, not unsigned,
+/// not mispaired — a correct `lys/delegation/v1` domain delegation that
+/// `verify_delegation` accepts, saying the offline root key has delegated the
+/// operational role to itself. DP16's two-key model would be void and **no
+/// verifier anywhere could tell**, because there is nothing wrong with the
+/// bytes. It would sit at leaf 0, which `LeafStore` can never correct.
+///
+/// So the only place the fault is visible is the constructor, and the only
+/// evidence that it is visible is this test. Both orders are exercised because
+/// "the root signer is also the operational signer" and "the operational signer
+/// is also the root signer" are the same defect reached by two different
+/// operator mistakes, and a check written against one variable would catch one.
+#[test]
+fn a_root_signer_that_is_also_the_operational_signer_is_refused_without_writing() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    // The control, in its own directory: two DISTINCT signers over the same
+    // seeds are accepted, so the refusals below are about the collision and not
+    // about this setup being unable to create an anchor.
+    let control = TempDir::new().unwrap();
+    assert!(create_delegated(control.path(), ORIGIN).is_ok());
+    assert_ne!(
+        root(dir).public_key(),
+        operational(dir).public_key(),
+        "the honest fixture must use two different keys, or the control is the \
+         very case under test"
+    );
+
+    // Both orders: the operational key used as root, and the root key used as
+    // operational. Each is a different operator mistake reaching one defect.
+    let mut refused = 0;
+    for (label, root_seed, operational_seed) in [
+        (
+            "the operational key used as the root key",
+            OPERATIONAL_SEED,
+            OPERATIONAL_SEED,
+        ),
+        (
+            "the root key used as the operational key",
+            ROOT_SEED,
+            ROOT_SEED,
+        ),
+    ] {
+        let case = TempDir::new().unwrap();
+        let case_dir = case.path();
+        let root_signer = signer_from(case_dir, "r.key", root_seed);
+        let operational_signer = signer_from(case_dir, "o.key", operational_seed);
+        assert_eq!(
+            root_signer.public_key(),
+            operational_signer.public_key(),
+            "{label}: the fixture must actually collide"
+        );
+
+        let store = FileLeafStore::create(case_dir, ORIGIN).unwrap();
+        match Anchor::create_with_delegated_genesis(
+            store,
+            &root_signer,
+            NOT_BEFORE,
+            operational_signer,
+            AcceptAll,
+            AnchorConfig::unconfigured(),
+        ) {
+            Err(AnchorError::GenesisRootKeyIsOperationalKey { origin }) => {
+                assert_eq!(origin, ORIGIN, "{label}");
+            }
+            other => panic!("{label}: expected GenesisRootKeyIsOperationalKey, got {other:?}"),
+        }
+
+        // Nothing was appended, so the store can still be given a correct
+        // genesis — the same invariant the declining-signer case asserts, and
+        // the reason the comparison happens before anything is built.
+        assert_eq!(
+            FileLeafStore::open(case_dir).unwrap().extent(),
+            0,
+            "{label}"
+        );
+        refused += 1;
+    }
+    assert_eq!(refused, 2, "both orders must have been tried");
+
+    // And the log left empty by a refusal still accepts an honest genesis, so
+    // the refusal cost the operator nothing but the mistake.
+    let store = FileLeafStore::create(dir, ORIGIN).unwrap();
+    let anchor = Anchor::create_with_delegated_genesis(
+        store,
+        &root(dir),
+        NOT_BEFORE,
+        operational(dir),
+        AcceptAll,
+        AnchorConfig::unconfigured(),
+    )
+    .expect("two distinct signers must still be accepted");
+    assert_eq!(anchor.tree_size(), 1);
+    drop(anchor);
+    let delegation = verify_delegation(
+        &leaf_zero_from_disk(dir),
+        &root(dir).public_key(),
+        DelegationSubjectKind::Domain,
+        ORIGIN,
+    )
+    .unwrap();
+    assert_ne!(
+        delegation.claim.delegated_public_key,
+        root(dir).public_key(),
+        "an honest genesis delegates to a key that is NOT the root key"
     );
 }
 
@@ -414,7 +578,13 @@ fn a_root_signer_that_declines_leaves_a_log_that_can_still_be_given_genesis() {
 
     // And what it ended up with is a real delegation, so the retry produced an
     // anchor rather than merely a `tree_size` of 1.
-    verify_delegation(&leaf_zero_from_disk(dir), &root(dir).public_key(), ORIGIN).unwrap();
+    verify_delegation(
+        &leaf_zero_from_disk(dir),
+        &root(dir).public_key(),
+        DelegationSubjectKind::Domain,
+        ORIGIN,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -497,7 +667,13 @@ fn a_delegated_genesis_is_written_even_under_a_policy_that_would_refuse_it() {
     // establishes that genesis did not slip past the policy by being small.
     let leaf = leaf_zero_from_disk(dir);
     assert!(leaf.len() > 100);
-    verify_delegation(&leaf, &root(dir).public_key(), ORIGIN).unwrap();
+    verify_delegation(
+        &leaf,
+        &root(dir).public_key(),
+        DelegationSubjectKind::Domain,
+        ORIGIN,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -533,8 +709,13 @@ fn an_anchor_whose_leaf_zero_is_a_delegation_is_still_a_working_anchor() {
     // ROOT key delegated to in leaf 0 is the key that signed this checkpoint.
     // The verifier above was built from `operational(dir)`, and the delegation is
     // read back off disk, so the two values reach this line by different routes.
-    let delegation =
-        verify_delegation(&leaf_zero_from_disk(dir), &root(dir).public_key(), ORIGIN).unwrap();
+    let delegation = verify_delegation(
+        &leaf_zero_from_disk(dir),
+        &root(dir).public_key(),
+        DelegationSubjectKind::Domain,
+        ORIGIN,
+    )
+    .unwrap();
     assert_eq!(
         delegation.claim.delegated_public_key,
         operational(dir).public_key(),

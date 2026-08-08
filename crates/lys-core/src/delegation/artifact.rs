@@ -1,5 +1,5 @@
 //! [`AnchorDelegation`], [`DelegationClaim`] and [`DelegationRole`] — the
-//! parsed form of the `lys/anchor-delegation/v1` tagged `COSE_Sign1` artifact.
+//! parsed form of the `lys/delegation/v1` tagged `COSE_Sign1` artifact.
 //!
 //! # Invariants
 //!
@@ -9,7 +9,8 @@
 //!   exist alongside the frozen COSE artifact.
 //! - **Round-trip identity:** `from_cose_bytes(x.to_cose_bytes()) == x` for
 //!   every `AnchorDelegation` whose fields satisfy the format's constraints —
-//!   a non-empty origin, a delegated key strict Ed25519 could accept, and an
+//!   a non-empty subject value, a delegated key strict Ed25519 could accept,
+//!   a `(subject_kind, role)` pair this version defines, and an
 //!   encoded length within the artifact cap — and `to_cose_bytes` of a parsed
 //!   delegation reproduces the input bytes exactly.
 //!
@@ -17,7 +18,8 @@
 //!   violated.** [`AnchorDelegation::to_cose_bytes`] is infallible by design, so
 //!   a hand-built value outside those constraints still encodes; the decoder
 //!   then refuses what the encoder produced. The unqualified claim was false for
-//!   an origin of 3885 bytes. Every issuing entry point in [`super::sign`]
+//!   a subject value of 3885 bytes. Every issuing entry point in
+//!   [`super::sign`]
 //!   refuses such a claim up front, so the only way to reach the gap is to
 //!   construct the struct literal yourself and call `to_cose_bytes` on it.
 //! - **Canonical-encoding strictness:** [`AnchorDelegation::from_cose_bytes`]
@@ -47,7 +49,8 @@
 //!   RFC 9052 §4.2 allows both forms and accepting both would give one
 //!   statement two encodings.
 //! - **Parsing is not verification.** `from_cose_bytes` checks no signature and
-//!   knows no expected root key or origin, and is named for parsing to say so.
+//!   knows no expected root key and no expected subject, and is named for
+//!   parsing to say so.
 //!   Its output is attacker-chosen data until [`super::sign::verify_delegation`]
 //!   has run.
 //! - Every parse failure collapses to [`TrustError::DelegationVerification`]
@@ -56,8 +59,161 @@
 use crate::delegation::encoding::{self, KEY_LEN};
 use crate::error::{TrustError, TrustResult};
 
+/// What kind of thing a delegation's subject is. A **closed** enum, exactly as
+/// [`DelegationRole`] is: a value on the wire that is not listed here is a
+/// decode failure, never a value carried through.
+///
+/// # Why the subject carries a kind at all
+///
+/// An earlier draft of this format had a single `origin` field whose documented
+/// meaning was fixed — a DNS-style origin — so "a lapsed domain orphans every
+/// proof" was a property of the *artifact*. Generalising that field to a bare
+/// string would have moved the protection out of the format and into the
+/// caller: an anchor could pass a seat identifier, or a seat consumer a domain,
+/// and **nothing would notice**. The delegation would verify perfectly and mean
+/// something no verifier could pin down — a signed value whose semantics live
+/// nowhere, which is the same failure the closed [`DelegationRole`] refuses.
+///
+/// So the subject carries its kind alongside its value, and
+/// [`verify_delegation`](super::sign::verify_delegation) requires the caller to
+/// **state the kind it expects**. Cross-kind confusion is refused at decode
+/// rather than discovered downstream: a seat delegation cannot be presented to
+/// a domain verifier and a domain delegation cannot be presented to a seat one,
+/// for the same structural reason an inclusion receipt cannot be re-labelled as
+/// a consistency receipt.
+///
+/// The kind set is closed and unknown kinds are refused. **Both inhabitants
+/// therefore had to ship in `v1`**: adding a kind later is a compatibility
+/// event, because an old verifier refuses what it does not recognise, so a `v1`
+/// with one kind would still have needed a `v2` for the second — which defeats
+/// the point of the mechanism. A third kind is a `v3`, and that is what
+/// versioned wire contracts are for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum DelegationSubjectKind {
+    /// `1` — a DNS-style origin, for example `"example.test"`: the subject an
+    /// anchor's delegations name, and the value a checkpoint's origin line
+    /// carries.
+    ///
+    /// Pick the domain you will still control in twenty years. A lapsed domain
+    /// orphans every proof issued under it, and nothing in this format can
+    /// repair that.
+    Domain,
+
+    /// `2` — a seat identifier: arbitrary text minted by whatever registry owns
+    /// the seat, and opaque here.
+    ///
+    /// The structure this exists for is *"the registry pins the handle; a
+    /// delegation extends that pin one hop to a seat"*, so a verifier walks
+    /// envelope → delegation → registry pin. Because the identifier is text
+    /// chosen elsewhere, it can be made to collide with a domain string — which
+    /// is exactly why the kind is a required argument at verification and not an
+    /// inference from the value.
+    Seat,
+}
+
+impl DelegationSubjectKind {
+    /// The unsigned integer this kind is encoded as in the payload map.
+    ///
+    /// Encoding goes through this function rather than through a caller-supplied
+    /// number, so no value outside the enum can be emitted by this crate at all.
+    pub fn wire_value(self) -> u64 {
+        match self {
+            Self::Domain => 1,
+            Self::Seat => 2,
+        }
+    }
+
+    /// The kind for a wire value, or `None` if the value is not one this version
+    /// defines.
+    ///
+    /// Returns `Option` rather than a `TrustResult` so this type carries no
+    /// opinion about which artifact class is decoding it; the caller supplies
+    /// its own non-oracle failure value.
+    pub fn from_wire(value: u64) -> Option<Self> {
+        match value {
+            1 => Some(Self::Domain),
+            2 => Some(Self::Seat),
+            _ => None,
+        }
+    }
+
+    /// Whether `role` is a role this kind of subject can confer.
+    ///
+    /// | `subject_kind` | valid `role` | meaning |
+    /// |---|---|---|
+    /// | `1` [`Domain`](Self::Domain) | `2` [`Operational`](DelegationRole::Operational) | the key signs checkpoints and receipts for this origin |
+    /// | `2` [`Seat`](Self::Seat) | `3` [`SpeaksFor`](DelegationRole::SpeaksFor) | the key may sign on behalf of this seat |
+    ///
+    /// # This is the pair, and the pair is the security property
+    ///
+    /// **`subject_kind` and `role` are validated together, never
+    /// independently.** Each kind has exactly one meaningful role today, which
+    /// makes `role` *look* redundant — but the two axes are genuinely
+    /// independent (a domain could later want a witness or a revocation role),
+    /// so the field stays and the **pair** is what is checked. `(domain,
+    /// speaks-for)` and `(seat, operational)` are made of individually valid
+    /// values and are refused anyway: each would be a signed statement combining
+    /// a subject with an authority nobody in the system defines over it, which is
+    /// the "a signed unchecked value looks checked" failure arriving through a
+    /// pair rather than through a field.
+    ///
+    /// # ⛔ Why `role` starts at 2, which looks arbitrary and is the opposite
+    ///
+    /// **Do not "tidy" [`Operational`](DelegationRole::Operational) back to 1.**
+    /// A draft numbered `domain = 1, operational = 1` and `seat = 2,
+    /// speaks-for = 2`, which made `subject_kind == role` for **every valid `v1`
+    /// artifact** — the two fields encode to the same byte. An implementation
+    /// that wired payload label 1 into its role and label 4 into its kind would
+    /// then emit byte-identical output for every valid delegation, so **no test
+    /// and no golden vector could ever detect the swap.** It would stay latent
+    /// until a `v2` introduced a pair whose members differ, at which point every
+    /// `v1`-era implementation would be carrying a silent field transposition
+    /// through frozen bytes.
+    ///
+    /// Offsetting the role vocabulary by one buys two properties, and they are
+    /// the reason for the numbering:
+    ///
+    /// - **No valid pair has `kind == role`**, so a field swap changes the bytes
+    ///   of *every* case rather than of none.
+    /// - **Every swap produces a pair outside this table** — `(1, 2)` transposed
+    ///   is `(2, 1)`, `(2, 3)` is `(3, 2)` — so a swapped implementation is
+    ///   *refused at decode* rather than merely producing different bytes. The
+    ///   wiring is checked by the same rule that checks the semantics, which is
+    ///   the strongest form this could take.
+    ///
+    /// A test vector cannot substitute for either property: the defect was in the
+    /// numbering, so no choice of vector reaches it.
+    ///
+    /// # There is deliberately no wildcard arm
+    ///
+    /// Every combination is written out, so adding an inhabitant to either enum
+    /// is a compile error **here** — at the table that decides which pairs are
+    /// meaningful — rather than a new pair silently inheriting whichever default
+    /// a `_` arm happened to choose. That is the difference between a closed
+    /// vocabulary and a vocabulary that merely looks closed.
+    pub fn permits(self, role: DelegationRole) -> bool {
+        match (self, role) {
+            (Self::Domain, DelegationRole::Operational)
+            | (Self::Seat, DelegationRole::SpeaksFor) => true,
+            (Self::Domain, DelegationRole::SpeaksFor)
+            | (Self::Seat, DelegationRole::Operational) => false,
+        }
+    }
+}
+
 /// The role a delegation confers. A **closed** enum: a value on the wire that
 /// is not listed here is a decode failure, never a value carried through.
+///
+/// The vocabulary is **scoped per subject kind** and the two are checked as a
+/// pair — see [`DelegationSubjectKind::permits`], which holds the table.
+///
+/// ⛔ **The vocabulary starts at `2`, not at `1`, and that is load-bearing.**
+/// `1` is deliberately *not* a role: it is
+/// [`DelegationSubjectKind::Domain`]'s wire value, and numbering the roles from
+/// `1` would have made `subject_kind == role` for every valid `v1` delegation,
+/// rendering a field swap between the two undetectable in the encoded bytes.
+/// [`DelegationSubjectKind::permits`] carries the full argument. A wire `role`
+/// of `1` is therefore a **decode failure**.
 ///
 /// # Why unknown roles are refused rather than passed along
 ///
@@ -74,9 +230,29 @@ use crate::error::{TrustError, TrustResult};
 /// over.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum DelegationRole {
-    /// `1` — the operational key: the online key that signs an anchor's
-    /// day-to-day artifacts, delegated by the offline root key.
+    /// `2` — the operational key: the online key that signs an anchor's
+    /// day-to-day artifacts, delegated by the offline root key. Valid only for
+    /// a [`Domain`](DelegationSubjectKind::Domain) subject, whose own wire value
+    /// is `1` — see the type docs for why these two must differ.
     Operational,
+
+    /// `3` — the key may sign on behalf of a
+    /// [`Seat`](DelegationSubjectKind::Seat).
+    ///
+    /// ⚠️ **This role has defined semantics, no implementation and no
+    /// consumer.** Nothing in this workspace reads it, and no consumer outside
+    /// it does either. It exists because unknown roles are refused at decode, so
+    /// **adding it later would be a compatibility event** — an old verifier
+    /// would refuse a seat delegation — and it must therefore exist before the
+    /// format freezes even though it cannot be consumed until after.
+    ///
+    /// That is the same admitted cost `sequence` carries, and it is admitted on
+    /// the same terms: the semantics are written down (a delegation names a seat,
+    /// and a verifier walking envelope → delegation → registry pin learns that
+    /// the delegated key may sign for it), only the implementation is pending.
+    /// The alternative is a format that can never express the case at all.
+    /// **Do not invent a consumer for it.**
+    SpeaksFor,
 }
 
 impl DelegationRole {
@@ -86,25 +262,31 @@ impl DelegationRole {
     /// number, so no value outside the enum can be emitted by this crate at all.
     pub fn wire_value(self) -> u64 {
         match self {
-            Self::Operational => 1,
+            Self::Operational => 2,
+            Self::SpeaksFor => 3,
         }
     }
 
     /// The role for a wire value, or `None` if the value is not one this
     /// version defines.
     ///
+    /// A value this returns `Some` for is still not necessarily acceptable: it
+    /// must also be a role the subject's kind permits. See
+    /// [`DelegationSubjectKind::permits`].
+    ///
     /// Returns `Option` rather than a `TrustResult` so this type carries no
     /// opinion about which artifact class is decoding it; the caller supplies
     /// its own non-oracle failure value.
     pub fn from_wire(value: u64) -> Option<Self> {
         match value {
-            1 => Some(Self::Operational),
+            2 => Some(Self::Operational),
+            3 => Some(Self::SpeaksFor),
             _ => None,
         }
     }
 }
 
-/// The four signature-covered payload fields of a delegation — the statement
+/// The six signature-covered payload fields of a delegation — the statement
 /// itself, without the signer's identity or the signature.
 ///
 /// The root key is **not** a field here. It is the identity of whoever is
@@ -112,26 +294,49 @@ impl DelegationRole {
 /// well as in the protected `kid` would create two places for one value to live
 /// and therefore a way for them to disagree. The signing and verifying entry
 /// points in [`super::sign`] take it alongside a claim.
+///
+/// # An invalid `(subject_kind, role)` pair is representable here and refused everywhere else
+///
+/// The fields are public, so a struct literal can pair a
+/// [`Domain`](DelegationSubjectKind::Domain) with
+/// [`SpeaksFor`](DelegationRole::SpeaksFor). Every issuing entry point in
+/// [`super::sign`] refuses such a claim before it signs, and the decoder refuses
+/// it on the way back in, so the pair cannot reach the wire through this crate
+/// or be accepted off the wire by it. See [`DelegationSubjectKind::permits`] for
+/// the rule and why it is checked as a pair.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DelegationClaim {
-    /// The origin this delegation is scoped to — for example
-    /// `"example.test"`. Opaque text to this format: it is compared against the
-    /// origin the verifier names by **raw UTF-8 byte equality** and never
-    /// parsed, case-folded, Unicode-normalised, or stripped of a trailing dot,
-    /// port or scheme. See [`super::sign`] for why the strict comparison is the
-    /// safe one.
+    /// What kind of thing [`Self::subject_value`] is. Closed enum; see
+    /// [`DelegationSubjectKind`].
     ///
-    /// Scoping is what stops a delegation issued for anchor A from being a
-    /// valid delegation for anchor B whenever B's operator holds the same root
+    /// It is signature-covered and it is a **required argument** at
+    /// verification, so the two subject namespaces are disjoint by construction
+    /// rather than by the hope that a domain and a seat identifier never
+    /// collide.
+    pub subject_kind: DelegationSubjectKind,
+
+    /// The subject this delegation is scoped to — an origin such as
+    /// `"example.test"` when [`Self::subject_kind`] is
+    /// [`Domain`](DelegationSubjectKind::Domain), a seat identifier when it is
+    /// [`Seat`](DelegationSubjectKind::Seat).
+    ///
+    /// Opaque text to this format: it is compared against the value the verifier
+    /// names by **raw UTF-8 byte equality** and never parsed, case-folded,
+    /// Unicode-normalised, or stripped of a trailing dot, port or scheme. See
+    /// [`super::sign`] for why the strict comparison is the safe one.
+    ///
+    /// Scoping is what stops a delegation issued for subject A from being a
+    /// valid delegation for subject B whenever B's operator holds the same root
     /// key. It rides in the signature-covered payload, and it is a
     /// runtime-configured value reaching signed bytes rather than a committed
     /// constant.
-    pub origin: String,
+    pub subject_value: String,
 
     /// The raw 32-byte Ed25519 public key being delegated **to**.
     pub delegated_public_key: [u8; KEY_LEN],
 
-    /// The role conferred.
+    /// The role conferred. Valid only in combination with
+    /// [`Self::subject_kind`] — see [`DelegationSubjectKind::permits`].
     pub role: DelegationRole,
 
     /// Unix milliseconds from which the signer states the delegation takes
@@ -145,7 +350,12 @@ pub struct DelegationClaim {
     pub not_before_unix_ms: u64,
 
     /// The value that **orders** delegations: strictly increasing per
-    /// `(origin, role)`.
+    /// `(subject_kind, subject_value, role)`.
+    ///
+    /// **The partition includes the kind, and leaving it out would be a bug.** A
+    /// domain and a seat whose identifier strings collide would otherwise share
+    /// one counter — which is exactly the collision the typed subject exists to
+    /// stop being left to chance.
     ///
     /// # Why this field exists — it closes a keyless replay attack
     ///
@@ -176,7 +386,7 @@ pub struct DelegationClaim {
     ///
     /// The largest issuable value is `u64::MAX - 1`, enforced at both encode and
     /// decode. Strictly-increasing has no successor at the maximum, so a signer
-    /// who issued there would permanently disable rotation for that origin with
+    /// who issued there would permanently disable rotation for that subject with
     /// no in-band way out. Nothing attacker-reachable leads there — issuing needs
     /// the offline root key — so it is a foot-gun rather than a vulnerability,
     /// and it is forbidden anyway because the check costs one comparison now and
@@ -186,7 +396,8 @@ pub struct DelegationClaim {
     ///
     /// Monotonicity, because a single delegation cannot exhibit it. That is a
     /// fold's obligation, along with the two-branch equivocation rule in
-    /// [`super`] — **byte-identical** payloads at one `(origin, role, sequence)`
+    /// [`super`] — **byte-identical** payloads at one
+    /// `(subject_kind, subject_value, role, sequence)`
     /// are a duplicate to ignore, **differing** payloads are equivocation to
     /// refuse. Collapsing those two branches into "any collision ⇒ refuse" is a
     /// denial of service the same keyless attacker can mount; see [`super`] for
@@ -195,7 +406,7 @@ pub struct DelegationClaim {
 }
 
 /// A root key's Ed25519-signed delegation, carried on the wire as a tagged
-/// `COSE_Sign1` (RFC 9052) — the `lys/anchor-delegation/v1` artifact.
+/// `COSE_Sign1` (RFC 9052) — the `lys/delegation/v1` artifact.
 ///
 /// Constructed by parsing artifact bytes with [`Self::from_cose_bytes`] or by
 /// verifying them with [`super::sign::verify_delegation`]; produced by
@@ -236,7 +447,7 @@ impl AnchorDelegation {
         encoding::artifact_bytes(&self.root_public_key, &self.claim, &self.signature)
     }
 
-    /// Parse a tagged `COSE_Sign1` `lys/anchor-delegation/v1` artifact.
+    /// Parse a tagged `COSE_Sign1` `lys/delegation/v1` artifact.
     ///
     /// Enforces the full structural algorithm: the input cap, the required tag
     /// 18, the exact protected header pin (`alg = -8`, the v1 delegation content
@@ -257,7 +468,7 @@ impl AnchorDelegation {
     /// while every one of those properties still held.
     ///
     /// This performs **no signature verification**, and knows neither the root
-    /// key nor the origin the caller expects — follow with
+    /// key nor the subject the caller expects — follow with
     /// [`super::sign::verify_delegation`], which is the only entry point that
     /// can establish anything. A parsed delegation's fields are attacker-chosen
     /// values until then, including `root_public_key`.
@@ -266,7 +477,9 @@ impl AnchorDelegation {
     ///
     /// Returns [`TrustError::DelegationVerification`] for every rejected input —
     /// oversize, malformed CBOR, wrong shape, wrong header pins, unknown role,
-    /// an empty origin, an unusable delegated key, a non-empty unprotected
+    /// an empty subject value, an unknown subject kind, an invalid
+    /// `(subject_kind, role)` pair, an unusable delegated key, a non-empty
+    /// unprotected
     /// bucket and non-canonical encoding all return that one value.
     ///
     /// **"Same error value" is not the same as "indistinguishable", and the

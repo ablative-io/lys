@@ -1,4 +1,4 @@
-//! Genesis as a delegation: leaf 0 **is** a `lys/anchor-delegation/v1`
+//! Genesis as a delegation: leaf 0 **is** a `lys/delegation/v1`
 //! artifact, signed by the anchor's offline root key, delegating to its
 //! operational key.
 //!
@@ -64,16 +64,53 @@
 //!   that can still be given a genesis delegation later. Appending first and
 //!   signing second would produce a log permanently holding a leaf 0 that is not
 //!   a delegation, with no way back.
-//! - **The origin in the delegation is the store's origin, never a
-//!   configuration field and never a constant.** It is read through
+//! - **The subject is the store's origin under `subject_kind = domain`, never a
+//!   configuration field and never a constant.** The value is read through
 //!   `Log::origin` → `LeafStore::origin`, fixed when the store was created.
 //!   DP15 forbids a committed origin and [`AnchorConfig`] has no field for one,
 //!   so the store's value is the only one in existence for this crate to put in
 //!   the payload. This is DP15 working the way it was meant to: a
 //!   runtime-configured value reaching signed bytes.
+//! - ⛔ **The subject kind is fixed at
+//!   [`Domain`](lys_core::delegation::DelegationSubjectKind::Domain) and the role
+//!   at [`Operational`](lys_core::delegation::DelegationRole::Operational) — the
+//!   pair `(1, 2)` — and NEITHER is a parameter.** This is the most consequential
+//!   of the fixings, and the reason is that **leaf 0 is the one leaf that can
+//!   never be corrected**: `LeafStore` has no insert and no rewrite.
+//!
+//!   A constructor that took the kind from a caller would let **a single
+//!   mis-passed argument produce an anchor whose genesis permanently claims to
+//!   delegate a *seat*.** There would be no recovery path, and — this is the part
+//!   worth sitting with — **no verifier would flag it.** The artifact would be
+//!   perfectly signed and internally valid, because `(2 seat, 3 speaks-for)` is in
+//!   `lys-core`'s pair table; the delegation would simply mean something an anchor
+//!   has no use for, in the one position nothing can revise. Fixing the kind here
+//!   is what makes *"an anchor's genesis is a domain delegation"* a property of
+//!   the code rather than of the caller.
+//!
+//!   It is also the *consistent* choice rather than merely the safe one: the
+//!   store's origin is a domain, so a seat genesis would put a domain string in a
+//!   field typed as a seat identifier — the "signed value that reads as something
+//!   it is not" failure the typed subject exists to prevent, committed by the very
+//!   code that was supposed to prevent it.
+//!
+//!   `lys-core` validates `(kind, role)` as a pair, so this crate could not pick
+//!   one of the two independently even if it wanted to; the pair is chosen once,
+//!   here, in one expression.
 //! - **The delegated key is the operational signer's own public key**, read from
 //!   the signer this anchor will publish under. There is no parameter for it, so
 //!   an anchor cannot be created delegating to a key it does not hold.
+//! - ⛔ **The two keys must differ, and a request to make them the same is
+//!   refused.** A delegation from the root key to the root key is a *valid*
+//!   `lys/delegation/v1` artifact — correct pair, correct subject, verifies —
+//!   that voids DP16's entire reason for two keys while leaving nothing
+//!   malformed for any verifier to flag. It would sit at leaf 0, which cannot be
+//!   corrected. This is the same argument that fixes the subject kind above,
+//!   applied to the axis the constructor had left open, and it is checked
+//!   **before** anything is built or signed. `lys-core` still permits the shape:
+//!   whether a subject may delegate to its own signer is a format question and
+//!   the format has not ruled on it, whereas DP16's two-key model is this
+//!   crate's and lives here.
 //! - **The root signer is a parameter and is never retained.** See below.
 //! - **A root signer whose `public_key` disagrees with its `sign` is caught
 //!   here.** [`Signer`]'s contract requires them to agree; this path does not
@@ -133,7 +170,8 @@
 //!
 //! What *is* decided here is that the value is not a parameter. Two reasons:
 //!
-//! - Genesis is the first delegation for its `(origin, role)` by construction —
+//! - Genesis is the first delegation for its `(subject_kind, subject_value,
+//!   role)` by construction —
 //!   there is no earlier position for one to occupy, because leaf 0 is the first
 //!   leaf. Starting anywhere above 0 creates a range below the first delegation
 //!   into which nothing can ever be written, which is a gap with no meaning.
@@ -161,7 +199,8 @@
 //! to be handed a `not_before` it has no use for, on every call, forever.
 
 use lys_core::delegation::{
-    DelegationClaim, DelegationRole, assemble_delegation, delegation_preimage,
+    DelegationClaim, DelegationRole, DelegationSubjectKind, assemble_delegation,
+    delegation_preimage,
 };
 use lys_log_store::{LeafStore, Log};
 
@@ -176,7 +215,7 @@ use super::Anchor;
 ///
 /// A **convention of this crate**, not a claim the artifact makes — the format
 /// has no genesis marker, so nothing downstream can conclude from `sequence = 0`
-/// that it is looking at the first delegation for an origin. It is named as a
+/// that it is looking at the first delegation for a subject. It is named as a
 /// constant so that the convention has one definition, and so that a future fold
 /// which wants to *assume* the minimum has somewhere to find what this crate
 /// actually wrote.
@@ -187,9 +226,11 @@ pub const GENESIS_SEQUENCE: u64 = 0;
 
 impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     /// Creates an anchor over `store` whose leaf 0 **is** a
-    /// `lys/anchor-delegation/v1` delegation from `root_signer` to `signer`'s
-    /// public key, for the store's origin, at role `Operational` and
-    /// [`GENESIS_SEQUENCE`].
+    /// `lys/delegation/v1` delegation from `root_signer` to `signer`'s
+    /// public key, for the store's origin as a
+    /// [`Domain`](lys_core::delegation::DelegationSubjectKind::Domain) subject,
+    /// at role [`Operational`](lys_core::delegation::DelegationRole::Operational)
+    /// and [`GENESIS_SEQUENCE`].
     ///
     /// This is the DP16 constructor. [`create`](Self::create) is the one that
     /// takes uninterpreted bytes; the [module docs](self) explain why both exist
@@ -219,6 +260,10 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     ///
     /// - [`AnchorError::GenesisAlreadyWritten`] if the store already holds
     ///   leaves.
+    /// - [`AnchorError::GenesisRootKeyIsOperationalKey`] if `root_signer` and
+    ///   `signer` advertise the same public key. Checked before anything is
+    ///   built or signed; see the [module docs](self) for why a valid-looking
+    ///   artifact is the worst possible outcome here.
     /// - Whatever `root_signer` returned, unchanged, if it declined to sign. The
     ///   error is the signer implementation's own and is propagated rather than
     ///   wrapped: a remote signer's reason for refusing is the only account of
@@ -247,18 +292,35 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
             });
         }
 
-        // The origin comes from storage and from nowhere else. There is no
-        // origin field on this crate to prefer over it and no constant to fall
-        // back to.
+        // ⛔ The two keys must differ, and this is the last moment anyone can
+        // require it. A delegation from the root key to the root key is a
+        // perfectly valid artifact that says nothing — DP16's two-key model
+        // void, with no malformedness for any verifier to notice — written to
+        // the one leaf a `LeafStore` can never correct.
+        //
+        // Compared through each signer's own `public_key()`, which is the same
+        // value that reaches `kid` and the payload respectively, so this cannot
+        // pass by comparing something other than what gets signed.
+        let root_public_key = root_signer.public_key();
+        if root_public_key == signer.public_key() {
+            return Err(AnchorError::GenesisRootKeyIsOperationalKey {
+                origin: log.origin().to_string(),
+            });
+        }
+
+        // The subject VALUE comes from storage and from nowhere else. There is
+        // no origin field on this crate to prefer over it and no constant to fall
+        // back to. The subject KIND is fixed: an anchor's subject is a domain,
+        // never a seat, and leaf 0 is the one leaf that can never be corrected.
         let claim = DelegationClaim {
-            origin: log.origin().to_string(),
+            subject_kind: DelegationSubjectKind::Domain,
+            subject_value: log.origin().to_string(),
             delegated_public_key: signer.public_key(),
             role: DelegationRole::Operational,
             not_before_unix_ms,
             sequence: GENESIS_SEQUENCE,
         };
 
-        let root_public_key = root_signer.public_key();
         let signature = root_signer.sign(&delegation_preimage(&root_public_key, &claim))?;
         // `assemble_delegation` re-verifies the signature against
         // `root_public_key` before returning bytes, so a signer whose advertised

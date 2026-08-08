@@ -31,13 +31,14 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::*;
+use crate::delegation::artifact::DelegationSubjectKind;
 use crate::delegation::encoding::{CONTENT_TYPE, MAX_ARTIFACT_LEN, MAX_SEQUENCE, PROTECTED_LEN};
 
 const ROOT_KEY: [u8; KEY_LEN] = [0xa1; KEY_LEN];
 const SIGNATURE: [u8; 64] = [0x5e; 64];
 
 /// Offset of the protected bucket's first byte inside the artifact: the four
-/// bytes `d2 84 58 56` precede it.
+/// bytes `d2 84 58 4f` precede it.
 const PROTECTED_AT: usize = 4;
 /// Offset of the unprotected bucket byte.
 const UNPROTECTED_AT: usize = PROTECTED_AT + PROTECTED_LEN;
@@ -53,13 +54,31 @@ fn delegated_key() -> [u8; KEY_LEN] {
         .public_key_bytes()
 }
 
-fn claim_for(origin: &str, not_before_unix_ms: u64, sequence: u64) -> DelegationClaim {
+fn claim_for(subject_value: &str, not_before_unix_ms: u64, sequence: u64) -> DelegationClaim {
     DelegationClaim {
-        origin: origin.to_string(),
+        subject_kind: DelegationSubjectKind::Domain,
+        subject_value: subject_value.to_string(),
         delegated_public_key: delegated_key(),
         role: DelegationRole::Operational,
         not_before_unix_ms,
         sequence,
+    }
+}
+
+/// The `(seat, speaks-for)` sample, so the round trip is exercised on both valid
+/// pairs rather than only on the one an anchor happens to use.
+fn seat_sample() -> AnchorDelegation {
+    AnchorDelegation {
+        root_public_key: ROOT_KEY,
+        claim: DelegationClaim {
+            subject_kind: DelegationSubjectKind::Seat,
+            subject_value: "a-seat-identifier".to_string(),
+            delegated_public_key: delegated_key(),
+            role: DelegationRole::SpeaksFor,
+            not_before_unix_ms: 1_700_000_000_000,
+            sequence: 300,
+        },
+        signature: SIGNATURE,
     }
 }
 
@@ -84,9 +103,53 @@ fn artifact_with_payload(payload: &[u8]) -> Vec<u8> {
 
 #[test]
 fn round_trip_is_identity_on_the_value() {
-    let delegation = sample();
-    let parsed = AnchorDelegation::from_cose_bytes(&delegation.to_cose_bytes()).unwrap();
-    assert_eq!(parsed, delegation);
+    let mut checked = 0;
+    for delegation in [sample(), seat_sample()] {
+        let parsed = AnchorDelegation::from_cose_bytes(&delegation.to_cose_bytes()).unwrap();
+        assert_eq!(parsed, delegation);
+        checked += 1;
+    }
+    assert_eq!(checked, 2, "both valid pairs must have round-tripped");
+}
+
+#[test]
+fn a_hand_built_invalid_kind_role_pair_encodes_and_is_then_refused() {
+    // `to_cose_bytes` is infallible by design, so a struct literal can pair a
+    // domain with speaks-for and encode it. The decoder refuses it, which is what
+    // makes the pair rule a property of the format rather than of the issuing
+    // path — an artifact minted by another implementation is refused too.
+    //
+    // Note what does NOT save us here: the byte-compare cannot, because the
+    // canonical re-encoding of an invalid pair is the invalid pair. If
+    // `decode_payload`'s pair check were deleted, this test would fail and the
+    // envelope sweep would not.
+    let mut refused = 0;
+    for (kind, role) in [
+        (DelegationSubjectKind::Domain, DelegationRole::SpeaksFor),
+        (DelegationSubjectKind::Seat, DelegationRole::Operational),
+    ] {
+        let mut delegation = sample();
+        delegation.claim.subject_kind = kind;
+        delegation.claim.role = role;
+        let bytes = delegation.to_cose_bytes();
+        assert!(
+            ciborium::de::from_reader::<ciborium::value::Value, _>(bytes.as_slice()).is_ok(),
+            "the mutant must be well-formed CBOR for this test to mean anything"
+        );
+        assert!(
+            matches!(
+                AnchorDelegation::from_cose_bytes(&bytes),
+                Err(TrustError::DelegationVerification)
+            ),
+            "({kind:?}, {role:?}) parsed back"
+        );
+        refused += 1;
+    }
+    assert_eq!(refused, 2, "both invalid pairs must have been tried");
+
+    // Positive controls: the two valid pairs parse back through the same route.
+    AnchorDelegation::from_cose_bytes(&sample().to_cose_bytes()).unwrap();
+    AnchorDelegation::from_cose_bytes(&seat_sample().to_cose_bytes()).unwrap();
 }
 
 #[test]
@@ -100,10 +163,11 @@ fn round_trip_is_identity_on_the_bytes() {
 
 #[test]
 fn round_trip_holds_across_the_interesting_shapes() {
-    // The origin lengths straddle every CBOR text head width the artifact cap
-    // permits, and both integers straddle every unsigned head width. The empty
-    // origin is absent deliberately — it is refused now, and
-    // `encoding_tests::decode_refuses_an_empty_origin_*` is where that lives.
+    // The subject-value lengths straddle every CBOR text head width the artifact
+    // cap permits, and both integers straddle every unsigned head width. The empty
+    // value is absent deliberately — it is refused now, and
+    // `encoding_tests::decode_refuses_an_empty_subject_value_*` is where that
+    // lives.
     let cases: Vec<(String, u64, u64)> = vec![
         ("a".to_string(), 0, 0),
         ("b".repeat(23), 23, 23),
@@ -147,7 +211,7 @@ fn the_envelope_malleability_sweep_is_refused() {
 
     // The head widths the canonical form uses, so the mutants below are known to
     // be *widenings* rather than corrections.
-    assert_eq!(&good[..4], &[0xd2, 0x84, 0x58, 0x56]);
+    assert_eq!(&good[..4], &[0xd2, 0x84, 0x58, 0x4f]);
 
     let mut mutants: Vec<(&str, Vec<u8>)> = Vec::new();
 
@@ -168,15 +232,15 @@ fn the_envelope_malleability_sweep_is_refused() {
     m.push(0xff);
     mutants.push(("indefinite outer array", m));
 
-    // 4. Indefinite-length protected bstr: `5f 58 56 <86 bytes> ff`.
-    let mut m = vec![0xd2, 0x84, 0x5f, 0x58, 0x56];
+    // 4. Indefinite-length protected bstr: `5f 58 4f <79 bytes> ff`.
+    let mut m = vec![0xd2, 0x84, 0x5f, 0x58, 0x4f];
     m.extend_from_slice(&protected);
     m.push(0xff);
     m.extend_from_slice(&good[PROTECTED_AT + PROTECTED_LEN..]);
     mutants.push(("indefinite protected bstr", m));
 
-    // 5. Non-minimal protected bstr length head: `59 00 56` instead of `58 56`.
-    let mut m = vec![0xd2, 0x84, 0x59, 0x00, 0x56];
+    // 5. Non-minimal protected bstr length head: `59 00 4f` instead of `58 4f`.
+    let mut m = vec![0xd2, 0x84, 0x59, 0x00, 0x4f];
     m.extend_from_slice(&protected);
     m.extend_from_slice(&good[PROTECTED_AT + PROTECTED_LEN..]);
     mutants.push(("non-minimal protected bstr head", m));
@@ -258,19 +322,25 @@ fn the_envelope_malleability_sweep_is_refused() {
 
 #[test]
 fn an_oversized_integer_head_in_the_payload_is_refused() {
-    // Encode the role `1` as `19 00 01` (two-byte head) rather than `01`. The
+    // Encode the role `2` as `19 00 02` (two-byte head) rather than `02`. The
     // value is identical; the bytes are not shortest-form, so the same statement
     // would have two encodings.
+    //
+    // The role entry is located by its neighbours, not by a byte search: the same
+    // two bytes can occur inside the delegated key or the subject value, and a
+    // fixture where they do not is a fixture rather than a property.
     let payload = encoding::payload_bytes(&sample().claim);
-    let matches = payload.windows(2).filter(|w| *w == [0x03, 0x01]).count();
-    assert_eq!(matches, 1, "the role entry must be locatable unambiguously");
-    let role_at = payload
-        .windows(2)
-        .position(|w| w == [0x03, 0x01])
-        .expect("role entry present");
+    // `06 19 01 2c` (4) + `05 1b <8 bytes>` (10) + `04 <role>` (2) = 16.
+    let role_at = payload.len() - 4 - 10 - 2;
+    assert_eq!(
+        payload[role_at], 0x04,
+        "label 4 must be where the tail puts it"
+    );
+    assert_eq!(payload[role_at + 1], 0x02, "operational is wire value 2");
+    assert_eq!(payload[role_at + 2], 0x05, "label 5 follows the role value");
 
     let mut fat = payload[..role_at].to_vec();
-    fat.extend_from_slice(&[0x03, 0x19, 0x00, 0x01]);
+    fat.extend_from_slice(&[0x04, 0x19, 0x00, 0x02]);
     fat.extend_from_slice(&payload[role_at + 2..]);
 
     let mutant = artifact_with_payload(&fat);
@@ -312,7 +382,7 @@ fn a_detached_nil_payload_is_not_a_delegation() {
     // The shape a receipt uses. A delegation's assertion cannot be recomputed by
     // anyone, so an artifact that does not carry its payload asserts nothing.
     let protected = encoding::protected_bytes(CONTENT_TYPE, &ROOT_KEY);
-    let mut mutant = vec![0xd2, 0x84, 0x58, 0x56];
+    let mut mutant = vec![0xd2, 0x84, 0x58, 0x4f];
     mutant.extend_from_slice(&protected);
     mutant.push(0xa0);
     mutant.push(0xf6);
@@ -387,12 +457,12 @@ fn to_cose_bytes_stays_infallible_which_is_why_the_round_trip_claim_is_qualified
     };
     assert!(AnchorDelegation::from_cose_bytes(&over_cap.to_cose_bytes()).is_err());
 
-    let empty_origin = AnchorDelegation {
+    let empty_subject = AnchorDelegation {
         root_public_key: ROOT_KEY,
         claim: claim_for("", 0, 0),
         signature: SIGNATURE,
     };
-    assert!(AnchorDelegation::from_cose_bytes(&empty_origin.to_cose_bytes()).is_err());
+    assert!(AnchorDelegation::from_cose_bytes(&empty_subject.to_cose_bytes()).is_err());
 
     // Whereas a value that does satisfy them round-trips, which is the invariant
     // as it is actually stated.

@@ -85,7 +85,7 @@ use crate::error::AnchorResult;
 /// genesis became a delegation. `Anchor::create_with_delegated_genesis` (named
 /// in plain text: a link from these ungated docs to a gated item resolves under
 /// `--all-features` and breaks the default `cargo doc`, which is a gate) hands
-/// it the RFC 9052 `Sig_structure` for a `lys/anchor-delegation/v1` claim and
+/// it the RFC 9052 `Sig_structure` for a `lys/delegation/v1` claim and
 /// takes 64 bytes back, so **an offline or remote root signer can issue an
 /// anchor's genesis delegation today** with no `Ed25519Identity` in the path.
 ///

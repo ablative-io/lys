@@ -1,11 +1,49 @@
-//! Anchor key delegation: the `lys/anchor-delegation/v1` tagged `COSE_Sign1`
-//! artifact (RFC 9052) by which the holder of an anchor's **offline root key**
-//! states that another key holds a role for an origin.
+//! Key delegation: the `lys/delegation/v1` tagged `COSE_Sign1` artifact
+//! (RFC 9052) by which the holder of an **offline root key** states that
+//! another key holds a role for a **typed subject**.
 //!
 //! A delegation says exactly one thing: *"the holder of root key `K_root`
-//! states that, for origin `O`, key `K_op` holds role `R` from time `T`
-//! onward, at sequence `S`."* It is a single signed claim, never mutated —
-//! revocation is an append of a later, superseding entry.
+//! states that, for subject `S` of kind `K`, key `K_op` holds role `R` from
+//! time `T` onward, at sequence `N`."* It is a single signed claim, never
+//! mutated — revocation is an append of a later, superseding entry.
+//!
+//! # The subject is typed, and the type is half the security content
+//!
+//! The subject is an **opaque typed string**: an anchor passes a *domain* (a
+//! DNS-style origin), a seat consumer passes a *seat identifier*. Both kinds
+//! ship in `v1` because unknown kinds are refused, so adding the second one
+//! later would be a compatibility event rather than an extension.
+//!
+//! **The `typed` half is load-bearing and a bare string would have lost a
+//! security property.** With a fixed single meaning, "this is a domain, and a
+//! lapsed domain orphans every proof" was a property of the artifact. As a bare
+//! string, an anchor could pass a seat identifier or a consumer a domain and
+//! *nothing would notice* — the delegation would verify perfectly and mean
+//! something no verifier could pin down. So the kind rides beside the value,
+//! [`verify_delegation`] requires the caller to **name the kind it expects**, and
+//! cross-kind confusion is refused at decode rather than discovered downstream.
+//! That is the discipline this crate applies *between* COSE artifact kinds,
+//! applied *within* one.
+//!
+//! Two rules make that structural rather than documented, and both live in
+//! [`DelegationSubjectKind`]:
+//!
+//! - **`(subject_kind, role)` is validated as a PAIR** — `(1 domain,
+//!   2 operational)` and `(2 seat, 3 speaks-for)` are the only pairs `v1`
+//!   defines, and `(domain, speaks-for)` / `(seat, operational)` are refused
+//!   despite being made of individually valid values.
+//! - **The two vocabularies are offset so that no valid pair has
+//!   `subject_kind == role`.** Both are `uint`s in one map; numbering roles from
+//!   `1` would have made the two fields encode to the same byte in every valid
+//!   artifact, so an implementation that transposed them would be
+//!   byte-identical and undetectable. Offset, a transposition lands outside the
+//!   pair table and is refused. See [`DelegationSubjectKind::permits`] — and do
+//!   not renumber [`DelegationRole::Operational`] to `1` to make the table look
+//!   tidier.
+//!
+//! ⚠️ **[`DelegationRole::SpeaksFor`] has defined semantics, no implementation
+//! and no consumer.** Nothing reads it. It is here because adding it later would
+//! be a compatibility event; do not invent a consumer for it.
 //!
 //! # ⛔ `sequence` orders delegations. Log position cannot, and assuming it could was exploitable
 //!
@@ -29,7 +67,8 @@
 //! A replay and a legitimate re-delegation to `K1` produce identical bytes, so
 //! **no fold over the log can distinguish them**. There is nothing to detect.
 //!
-//! With `sequence` (payload label 5, strictly increasing per `(origin, role)`),
+//! With `sequence` (payload label 6, strictly increasing per
+//! `(subject_kind, subject_value, role)`),
 //! a replay carries a number already superseded and loses, and a replay of the
 //! *current* delegation is byte-identical to what is already current and changes
 //! nothing. **Replay becomes a no-op rather than a rollback.**
@@ -45,9 +84,11 @@
 //! a single artifact cannot express. **They differ on one word, and getting that
 //! word wrong hands the attacker back the capability `sequence` just removed:**
 //!
-//! - **Byte-identical payloads at the same `(origin, role, sequence)` ⇒ ignore
-//!   as a duplicate.** This is the replay, and it is *supposed* to be a no-op.
-//! - **Differing payloads at the same `(origin, role, sequence)` ⇒ REFUSE.**
+//! - **Byte-identical payloads at the same
+//!   `(subject_kind, subject_value, role, sequence)` ⇒ ignore as a duplicate.**
+//!   This is the replay, and it is *supposed* to be a no-op.
+//! - **Differing payloads at the same
+//!   `(subject_kind, subject_value, role, sequence)` ⇒ REFUSE.**
 //!   That is root-key equivocation: the root key has said two incompatible
 //!   things at one position. Not "prefer the earlier", not "prefer the longer
 //!   chain" — refuse. A derived view may refuse on its own authority and must
@@ -59,8 +100,8 @@
 //! **The obvious rule — "more than one entry at this key ⇒ refuse" — is a
 //! denial of service that the same keyless attacker can mount.** A replay is
 //! byte-identical by construction; that is the property this whole section
-//! exists because of. So a fold that dedupes on `(origin, role, sequence)` alone
-//! and refuses on any collision can be permanently jammed by re-appending the
+//! exists because of. So a fold that dedupes on the sequence key alone and
+//! refuses on any collision can be permanently jammed by re-appending the
 //! *current* delegation, whose bytes are public.
 //!
 //! This is the **second-order form of the very defect the review had just
@@ -80,13 +121,15 @@
 //! Recorded here because both become *harder* to answer later, not easier:
 //!
 //! - **Whether the counter is shared across roles or restarts per role must be
-//!   decided WITH the `v2` that adds a role, never after it.** `sequence` is
-//!   specified as increasing per `(origin, role)`, but [`DelegationRole`] has
-//!   exactly one inhabitant, so today the partition is per-origin and the
-//!   distinction is untestable. The moment a second role exists, the question is
-//!   about *already-signed* `v1` entries whose sequences were allocated under a
-//!   one-role regime — a compatibility question about frozen bytes, which is the
-//!   worst kind to answer retroactively.
+//!   decided WITH the `v2` that adds a role to an existing kind, never after
+//!   it.** `sequence` is specified as increasing per
+//!   `(subject_kind, subject_value, role)`, and each kind `v1` defines has
+//!   exactly **one** permitted role, so today the partition is effectively
+//!   per-subject and the distinction is untestable. The moment a kind gains a
+//!   second role, the question is about *already-signed* `v1` entries whose
+//!   sequences were allocated under a one-role-per-kind regime — a compatibility
+//!   question about frozen bytes, which is the worst kind to answer
+//!   retroactively.
 //! - **Nothing marks a genesis delegation.** `sequence = 0` is a convention, not
 //!   a claim the format can make. A fold reading from a non-zero log offset
 //!   therefore cannot tell whether it has seen the true minimum. This is not
@@ -99,11 +142,11 @@
 //! - **The artifact is the only durable form.** [`AnchorDelegation`] implements
 //!   no `serde`; the wire shape is exactly the tagged `COSE_Sign1` emitted by
 //!   [`AnchorDelegation::to_cose_bytes`] — protected headers
-//!   `{1: -8 (EdDSA), 3: "application/vnd.lys.anchor-delegation.v1+cbor",
+//!   `{1: -8 (EdDSA), 3: "application/vnd.lys.delegation.v1+cbor",
 //!   4: <raw 32-byte root key>}`, an **empty** unprotected map, an **embedded**
-//!   payload `{1: origin, 2: delegated key, 3: role, 4: not_before_unix_ms,
-//!   5: sequence}`, and a 64-byte Ed25519 signature over the RFC 9052 §4.4
-//!   `Sig_structure` with `external_aad = h''`.
+//!   payload `{1: subject_kind, 2: subject_value, 3: delegated key, 4: role,
+//!   5: not_before_unix_ms, 6: sequence}`, and a 64-byte Ed25519 signature over
+//!   the RFC 9052 §4.4 `Sig_structure` with `external_aad = h''`.
 //! - **The unprotected header is empty and a non-empty one is refused.** See
 //!   below; this is a requirement, not a default.
 //! - **Canonical encoding is normative on the wire.** RFC 8949 §4.2 core
@@ -118,16 +161,21 @@
 //!   Every failure collapses to the single
 //!   [`TrustError::DelegationVerification`] value, and [`verify_delegation`]
 //!   additionally runs its signature check unconditionally so that a wrong root
-//!   key, a wrong origin and a bad signature cost the same. A collapsed error
+//!   key, a wrong subject and a bad signature cost the same. A collapsed error
 //!   type alone is not a non-oracle; see [`sign`].
-//! - **Verification names both the root key and the origin it expects.**
-//!   [`verify_delegation`] takes both as required arguments. There is no
-//!   unattributed verify; see [`sign`].
-//! - **Unknown roles are refused at decode**, not carried. See
-//!   [`DelegationRole`].
+//! - **Verification names the root key, the subject KIND and the subject VALUE
+//!   it expects.** [`verify_delegation`] takes all three as required arguments.
+//!   There is no unattributed verify; see [`sign`]. The kind is not redundant
+//!   with the value: a seat identifier is text chosen elsewhere, so a value-only
+//!   verifier can be handed a seat delegation whose identifier equals the origin
+//!   it cares about, and that collision is an attacker's choice rather than an
+//!   accident.
+//! - **Unknown roles and unknown subject kinds are refused at decode**, not
+//!   carried, and so is any `(subject_kind, role)` pair outside the table. See
+//!   [`DelegationRole`] and [`DelegationSubjectKind`].
 //! - **Every constraint the decoder enforces is refused at encode too** — a
-//!   non-empty origin, a delegated key strict Ed25519 could accept, and the
-//!   artifact size cap. An issuing path that can emit what the verifying path
+//!   non-empty subject value, a `(subject_kind, role)` pair this version defines,
+//!   a delegated key strict Ed25519 could accept, and the artifact size cap. An issuing path that can emit what the verifying path
 //!   refuses is a defect, and it was one.
 //!
 //! # Why the payload is embedded, when a receipt's is detached
@@ -136,7 +184,7 @@
 //! value — it *recomputes* a Merkle root from leaves it already holds, and the
 //! signature is checked against what the verifier derived. There is no
 //! equivalent here. A delegation's payload is an **assertion**: nobody can
-//! recompute "this key is operational for this origin from this time" from
+//! recompute "this key holds this role for this subject from this time" from
 //! anything else they hold. An assertion nobody can independently derive must
 //! travel with the signature that carries it, so the payload is embedded and
 //! signature-covered.
@@ -197,5 +245,5 @@ pub mod artifact;
 mod encoding;
 pub mod sign;
 
-pub use artifact::{AnchorDelegation, DelegationClaim, DelegationRole};
+pub use artifact::{AnchorDelegation, DelegationClaim, DelegationRole, DelegationSubjectKind};
 pub use sign::{assemble_delegation, delegation_preimage, sign_delegation, verify_delegation};

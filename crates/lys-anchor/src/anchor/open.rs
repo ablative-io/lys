@@ -12,7 +12,7 @@
 //! `Anchor::create_with_delegated_genesis` — named in plain text because a link
 //! from these ungated docs to a gated item resolves under `--all-features` and
 //! breaks the default `cargo doc`, which is a gate — builds leaf 0 as a
-//! `lys/anchor-delegation/v1` artifact signed by the anchor's offline root key.
+//! `lys/delegation/v1` artifact signed by the anchor's offline root key.
 //! It is the DP16 constructor and it lives behind `unstable-anchor`, because the
 //! delegation format does.
 //!

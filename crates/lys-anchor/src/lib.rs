@@ -11,7 +11,7 @@
 //!   never.** [`Anchor::create`] appends the caller's genesis bytes as leaf 0
 //!   and does not interpret them; `Anchor::create_with_delegated_genesis` —
 //!   plain text, because linking from these ungated docs to a gated item breaks
-//!   the default `cargo doc` — makes leaf 0 a `lys/anchor-delegation/v1`
+//!   the default `cargo doc` — makes leaf 0 a `lys/delegation/v1`
 //!   artifact signed by the anchor's offline root key, which is what DP16 asks
 //!   for and is behind `unstable-anchor` because the format is.
 //!   **A default-features build has only the uninterpreted form**, and

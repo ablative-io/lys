@@ -1,4 +1,4 @@
-// Delegation mode for cosetool: verify lys/anchor-delegation/v1 tagged
+// Delegation mode for cosetool: verify lys/delegation/v1 tagged
 // COSE_Sign1 artifacts with the veraison/go-cose reference implementation, and
 // return the bytes go-cose actually signed over, VERBATIM.
 //
@@ -84,7 +84,14 @@ import (
 // This is the one payload-adjacent thing the tool does pin, and it is pinned on
 // purpose: the content type is the version, so a payload that gained a field
 // without the type changing is a format that broke its own contract.
-const delegationContentType = "application/vnd.lys.anchor-delegation.v1+cbor"
+//
+// It was `application/vnd.lys.anchor-delegation.v1+cbor` while the format served
+// anchors only. The rename happened before publication, when the payload gained
+// a typed subject and the format stopped being anchor-specific; this constant
+// tracks the SPECIFICATION's §1.1 table, and is not imported from lys. Editing it
+// to make a gate pass would destroy the gate — editing it because the document it
+// transcribes changed is the only reason it may move.
+const delegationContentType = "application/vnd.lys.delegation.v1+cbor"
 
 // capturingVerifier records the ToBeSigned go-cose constructs, then defers the
 // actual signature check to the real Ed25519 verifier.

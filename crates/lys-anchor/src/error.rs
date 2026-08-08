@@ -210,6 +210,58 @@ pub enum AnchorError {
         source: TrustError,
     },
 
+    /// Creation was asked to delegate an anchor's operational role **to its own
+    /// root key** — the two signers advertise the same public key.
+    ///
+    /// # Why this is refused rather than merely discouraged
+    ///
+    /// The artifact it would produce is **perfectly valid and completely
+    /// hollow**. It is a well-formed `lys/delegation/v1` domain delegation, it
+    /// verifies, its pair is in the table, and it says the offline root key has
+    /// delegated the operational role to the offline root key. DP16's entire
+    /// reason for two keys — that the key which signs every checkpoint is *not*
+    /// the key an operator can keep air-gapped — is void, and **nothing
+    /// downstream can tell.** There is no verifier that would flag it, because
+    /// there is nothing malformed to flag.
+    ///
+    /// That lands at leaf 0, which `LeafStore` can never correct: no insert, no
+    /// rewrite. So this is refused at the one moment refusing is still possible,
+    /// on exactly the argument that fixes the subject kind in the same
+    /// constructor — a single mis-passed argument must not be able to make an
+    /// anchor permanently mean something other than what it appears to mean.
+    ///
+    /// # Why the check lives here and not in `lys-core`
+    ///
+    /// A delegation whose subject delegates to the signing key is a *format*
+    /// question, and the format has not ruled on it: there may be subjects for
+    /// which self-delegation is meaningful. What is not in question is DP16's
+    /// two-key model, and that model lives in this constructor. So
+    /// `sign_delegation` and `assemble_delegation` still permit it and this
+    /// entry point does not.
+    ///
+    /// Descriptive rather than collapsed, for the same reason as
+    /// [`Self::GenesisDelegation`]: this is an issuing-path fault on the
+    /// operator's own store with the operator's own keys, so naming it costs
+    /// nothing and saves an operator staring at a valid-looking anchor.
+    ///
+    /// **Nothing was appended.** The comparison happens before the claim is
+    /// built.
+    ///
+    /// `#[cfg(feature = "unstable-anchor")]` because the delegation format is,
+    /// so the default build has no call site and could not construct this.
+    #[cfg(feature = "unstable-anchor")]
+    #[error(
+        "the root signer and the operational signer for {origin} advertise the same public key, \
+         so leaf 0 would delegate the operational role to the root key itself: DP16's two-key \
+         model would be void in a delegation nothing can distinguish from an honest one, at the \
+         one position a log can never correct"
+    )]
+    GenesisRootKeyIsOperationalKey {
+        /// The origin of the log genesis was being written into, as its store
+        /// reports it.
+        origin: String,
+    },
+
     /// Creation was asked to write genesis into a log that already has entries.
     ///
     /// Appending here would put the genesis bytes at whatever the next free
