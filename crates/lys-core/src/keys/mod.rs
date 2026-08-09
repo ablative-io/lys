@@ -1,6 +1,7 @@
 //! Ed25519 key management and the Ed25519-to-X25519 derivation used by sealed
 //! payload transport.
 
+pub(crate) mod compare;
 pub mod identity;
 pub mod ssh;
 

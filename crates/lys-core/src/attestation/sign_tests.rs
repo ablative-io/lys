@@ -207,3 +207,153 @@ fn verify_attestation_bytes_rejects_wrong_payload_and_malformed_bytes() {
     let err = verify_attestation_bytes(&tampered, b"right payload").unwrap_err();
     assert!(matches!(err, TrustError::InvalidSignature));
 }
+
+// ---------------------------------------------------------------------------
+// The attributing verifier.
+//
+// The gap these cover is the one `verify_attestation` cannot: an attestation
+// that is cryptographically perfect and signed by the WRONG PERSON. Every test
+// above passes on such an artifact, correctly — self-consistency is all they
+// claim. So each test here names the impostor case it exists for, and each
+// rejection is paired with the near-miss that must still be ACCEPTED, because a
+// verifier that refused everything would satisfy the rejections alone.
+// ---------------------------------------------------------------------------
+
+/// The headline: a perfectly valid attestation from someone else is refused,
+/// and the same artifact under the right expectation is accepted.
+#[test]
+fn an_impostor_signs_a_flawless_attestation_and_is_still_refused() {
+    let trusted = identity();
+    let impostor = identity();
+    let payload = b"i am the trusted signer, honest";
+
+    // The impostor signs the very same payload with their own key. Nothing is
+    // tampered with: this artifact is internally perfect.
+    let forged = sign_attestation(payload, &impostor);
+    verify_attestation(&forged, payload)
+        .expect("the unattributed verifier accepts it, which is the whole problem");
+
+    // The authenticating verifier refuses it.
+    let err =
+        verify_attestation_by_signer(&forged, payload, &trusted.public_key_bytes()).unwrap_err();
+    assert!(matches!(err, TrustError::InvalidSignature));
+
+    // POSITIVE CONTROL: the genuine article under the same expectation is
+    // accepted. Without this the test above is satisfied by a function that
+    // returns Err unconditionally.
+    let genuine = sign_attestation(payload, &trusted);
+    verify_attestation_by_signer(&genuine, payload, &trusted.public_key_bytes())
+        .expect("the trusted signer's own attestation must verify");
+
+    // ...and the impostor's expectation accepts the impostor's artifact, so the
+    // refusal above is attributable to the KEY and not to anything else about
+    // the two artifacts.
+    verify_attestation_by_signer(&forged, payload, &impostor.public_key_bytes())
+        .expect("keyed on what the other side supplied, not on our own substitution");
+}
+
+/// The bytes-in form must refuse the same impostor, since that is the form a
+/// consumer holding a `.cose` file actually calls.
+#[test]
+fn the_bytes_form_refuses_the_impostor_and_returns_the_parsed_artifact_otherwise() {
+    let trusted = identity();
+    let impostor = identity();
+    let payload = b"dispatch attestation";
+
+    let forged = sign_attestation(payload, &impostor).to_cose_bytes();
+    let err = verify_attestation_bytes_by_signer(&forged, payload, &trusted.public_key_bytes())
+        .unwrap_err();
+    assert!(matches!(err, TrustError::InvalidSignature));
+
+    let genuine = sign_attestation(payload, &trusted).to_cose_bytes();
+    let parsed = verify_attestation_bytes_by_signer(&genuine, payload, &trusted.public_key_bytes())
+        .expect("the genuine artifact must verify and parse back");
+    assert_eq!(parsed.signer_public_key, trusted.public_key_bytes());
+}
+
+/// Every failure returns the one value, so a prober cannot learn which key the
+/// verifier holds by watching the error.
+#[test]
+fn wrong_signer_is_indistinguishable_from_wrong_payload_and_bad_signature() {
+    let trusted = identity();
+    let impostor = identity();
+    let expected = trusted.public_key_bytes();
+
+    let mut bad_signature = sign_attestation(b"p", &trusted);
+    bad_signature.signature[0] ^= 0x01;
+
+    let failures = [
+        verify_attestation_by_signer(&sign_attestation(b"p", &impostor), b"p", &expected),
+        verify_attestation_by_signer(&sign_attestation(b"p", &trusted), b"q", &expected),
+        verify_attestation_by_signer(&bad_signature, b"p", &expected),
+    ];
+
+    let mut refusals = 0usize;
+    for outcome in &failures {
+        assert!(matches!(outcome, Err(TrustError::InvalidSignature)));
+        refusals += 1;
+    }
+    assert_eq!(refusals, 3, "every arm must have been exercised");
+}
+
+/// ⭐ THE DRIFT TEST. An early return on the signer comparison changes no
+/// outcome, so no assertion above can see it. This one counts the work.
+///
+/// Injecting `if !signer_ok { return Err(..) }` before `verify_attestation` is
+/// called makes the count 0 and fails exactly this test and no other.
+#[test]
+fn the_signature_check_still_runs_when_the_signer_is_wrong() {
+    use super::SIGNATURE_VERIFICATIONS;
+
+    let trusted = identity();
+    let impostor = identity();
+    let payload = b"work must be done even for a stranger";
+    let forged = sign_attestation(payload, &impostor);
+
+    SIGNATURE_VERIFICATIONS.with(|count| count.set(0));
+    let err =
+        verify_attestation_by_signer(&forged, payload, &trusted.public_key_bytes()).unwrap_err();
+    assert!(matches!(err, TrustError::InvalidSignature));
+
+    let performed = SIGNATURE_VERIFICATIONS.with(std::cell::Cell::get);
+    assert_eq!(
+        performed, 1,
+        "the signature must be verified even though the signer was already known \
+         to be wrong; a count of 0 means an early return was reintroduced"
+    );
+
+    // POSITIVE CONTROL FOR THE INSTRUMENT ITSELF: a counter that never
+    // increments would also report 1 if it started at 1, and one that is never
+    // read would prove nothing. Verify it moves, and moves by the right amount.
+    SIGNATURE_VERIFICATIONS.with(|count| count.set(0));
+    let genuine = sign_attestation(payload, &trusted);
+    verify_attestation_by_signer(&genuine, payload, &trusted.public_key_bytes()).unwrap();
+    assert_eq!(
+        SIGNATURE_VERIFICATIONS.with(std::cell::Cell::get),
+        1,
+        "the instrument must also count the accepting path"
+    );
+}
+
+/// A payload mismatch DOES short-circuit before the signature check, and that
+/// is pre-existing behaviour rather than something the attributing verifier
+/// introduced. Pinned so the distinction is deliberate: the claim made in the
+/// docs is about the SIGNER comparison, not about the payload hash.
+#[test]
+fn a_payload_mismatch_still_short_circuits_and_that_is_the_documented_shape() {
+    use super::SIGNATURE_VERIFICATIONS;
+
+    let trusted = identity();
+    let att = sign_attestation(b"the real payload", &trusted);
+
+    SIGNATURE_VERIFICATIONS.with(|count| count.set(0));
+    let err =
+        verify_attestation_by_signer(&att, b"a different payload", &trusted.public_key_bytes())
+            .unwrap_err();
+    assert!(matches!(err, TrustError::InvalidSignature));
+    assert_eq!(
+        SIGNATURE_VERIFICATIONS.with(std::cell::Cell::get),
+        0,
+        "documenting the existing early return on the hash comparison, not endorsing it"
+    );
+}

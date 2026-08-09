@@ -100,6 +100,7 @@ use crate::cbor;
 use crate::delegation::artifact::{Delegation, DelegationClaim, DelegationSubjectKind};
 use crate::delegation::encoding::{self, KEY_LEN};
 use crate::error::{TrustError, TrustResult};
+use crate::keys::compare::bytes_eq_no_early_exit as bytes_eq;
 use crate::keys::identity::Ed25519Identity;
 
 /// The RFC 9052 §4.4 `Sig_structure` bytes a delegation's signature covers:
@@ -346,30 +347,12 @@ fn check_signature(delegation: &Delegation) -> bool {
     outcome
 }
 
-/// Byte-slice equality that visits every byte of the shorter slice rather than
-/// stopping at the first difference.
-///
-/// Used for the `kid` and subject-value comparisons in [`verify_delegation`].
-/// The values are not secret — the *expected* ones are, in the sense that whether
-/// a verifier holds them is the thing an attacker is probing — so what matters is
-/// that a near-miss costs the same as a far-miss.
-///
-/// **This is early-exit removal, not a constant-time guarantee.** The length
-/// comparison is a branch, and a subject value's length is already observable
-/// from the artifact's size; the optimiser may reintroduce branching in the loop. A real
-/// constant-time claim needs a primitive that can forbid that, which this crate
-/// does not depend on. Stated plainly because the previous version of this
-/// module overclaimed a related property and was wrong.
-fn bytes_eq(left: &[u8], right: &[u8]) -> bool {
-    if left.len() != right.len() {
-        return false;
-    }
-    let mut difference = 0u8;
-    for (l, r) in left.iter().zip(right.iter()) {
-        difference |= l ^ r;
-    }
-    difference == 0
-}
+// The comparison used for the `kid` and subject-value checks in
+// `verify_delegation` moved to `keys::compare`: the attestation verifier needs
+// the same primitive, and two copies of it would be guarded by neither. Its
+// caveat — early-exit removal is NOT a constant-time guarantee — travelled with
+// it and is restated there in full rather than summarised, because merging two
+// copies is precisely when such a caveat gets dropped as boilerplate.
 
 #[cfg(test)]
 #[path = "sign_tests.rs"]

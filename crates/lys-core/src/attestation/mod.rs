@@ -59,14 +59,45 @@
 //! nothing. This is the same trap as a self-signed certificate.
 //!
 //! **Every caller must compare `attestation.signer_public_key` against a key it
-//! independently trusts.** Nothing in this module does it for you, and the
-//! signature check passing is not that comparison.
+//! independently trusts.** Nothing in the two functions named above does it for
+//! you, and the signature check passing is not that comparison.
 //!
-//! The newer artifact classes close this in their APIs — `receipt` and
-//! `delegation` both *require* the expected key as an argument and have no
-//! unattributed verify at all. This module cannot follow them: it is ungated,
-//! shipped and semver-bound, so the fix is a `v3` signature rather than a
-//! change here, and until then the warning is the mitigation.
+//! ## ✅ 2026-08-09 — there is now an attributing verifier, and the paragraph that said there could not be was reasoning from a false premise
+//!
+//! [`verify_attestation_by_signer`] and [`verify_attestation_bytes_by_signer`]
+//! take the expected key as an argument, compare it without an early exit, and
+//! collapse an unexpected signer into the same [`TrustError::InvalidSignature`]
+//! as a bad signature — so a prober cannot learn which key the verifier holds.
+//!
+//! ⛔ **What this section used to say, and why it was wrong.** It read: *"This
+//! module cannot follow them: it is ungated, shipped and semver-bound, so the
+//! fix is a `v3` signature rather than a change here, and until then the warning
+//! is the mitigation."* Every fact in that sentence is true and the conclusion
+//! does not follow. Being semver-bound forbids **changing** `verify_attestation`'s
+//! signature; it does not forbid **adding** a function beside it, which is
+//! additive and needs no new version of anything — not of the API and certainly
+//! not of the wire format, which is untouched.
+//!
+//! ⭐ **The limitation read as unfixable because it had been framed as a change
+//! to the existing function.** Having named the only fix and found it blocked,
+//! the paragraph stopped looking — and "until then the warning is the
+//! mitigation" then made a documented hole read as a decision someone had taken
+//! deliberately. **A documented limitation whose stated reason is wrong is worse
+//! than an undocumented one: it survives review, because the reader checks the
+//! reason rather than the claim.**
+//!
+//! ## The residual weakness, which is real and is NOT closed
+//!
+//! `receipt` and `delegation` have **no** unattributed verify. This module still
+//! does, it still ships, and it still has the shorter name — so the default
+//! remains the one that authenticates nothing, and the safe call is the longer
+//! one a hurried integrator will not reach for. That asymmetry cannot be fixed
+//! additively.
+//!
+//! Removing or deprecating [`verify_attestation`] is a **breaking change to a
+//! published crate** and therefore a release decision, not one this module can
+//! take. It is recorded here as an open question for `0.3.0` rather than
+//! resolved quietly in either direction.
 //!
 //! ## What this module PROVIDES, and what it merely PERMITS
 //!
@@ -112,4 +143,7 @@ mod encoding;
 pub mod sign;
 
 pub use artifact::Attestation;
-pub use sign::{sign_attestation, verify_attestation, verify_attestation_bytes};
+pub use sign::{
+    sign_attestation, verify_attestation, verify_attestation_by_signer, verify_attestation_bytes,
+    verify_attestation_bytes_by_signer,
+};
