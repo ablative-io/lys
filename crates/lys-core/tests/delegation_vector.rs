@@ -1,9 +1,10 @@
 //! The `lys/delegation/v1` fixed vectors, pinned as literal hex.
 //!
-//! Three vectors are frozen here — **A** (domain), **B** (seat) and **C** — and
-//! two more are specified but deliberately not generated. What each is *for* is
-//! recorded below, because a vector whose purpose is not written down is a
-//! vector somebody later "simplifies".
+//! Five vectors are frozen here — **A** (domain), **B** (seat), **C** (wide
+//! heads), **D** (the `tstr` inline boundary) and **F** (the `uint` inline
+//! boundary). What each is *for* is recorded
+//! below, because a vector whose purpose is not written down is a vector
+//! somebody later "simplifies".
 //!
 //! # This vector was regenerated for the fourth time, and the fourth time matters
 //!
@@ -67,27 +68,53 @@
 //!   only, so an implementation correct for integers and wrong for lengths was
 //!   invisible to both.
 //!
-//! # Vectors D and E are specified and NOT generated
+//! - **D — the `tstr` inline boundary, from BELOW.** A 23-byte `subject_value`
+//!   (`0x77`) is the largest CBOR encodes inline; 24 is the first needing an
+//!   argument byte. A (12), B (`7820`) and C (`79012c`) all jump clear over it,
+//!   so an encoder switching one value early is invisible to every one of them.
+//!   D also carries `sequence = 0`, pinning the genesis *shape* — `(1, 2, 0)`.
 //!
-//! Stated here rather than left to be inferred, because a reader who finds three
-//! vectors and no note assumes the set is complete. Specification §6.1.1 defines
-//! two more that this file does **not** carry:
+//!   ⚠️ D isolates the **length** path only. Its companion **F** carries
+//!   `not_before = 23` and isolates the **integer** path, and the two are
+//!   separate artifacts because 23 is the only value at the top of the inline
+//!   range: one artifact holding it in both fields puts the same number in two
+//!   fields of the vector written to pin that number. Measured, not assumed —
+//!   breaking only the length path moves D and not F, and only the integer path
+//!   moves F and not D, while A and B miss both.
 //!
-//! - **D — genesis.** `sequence = 0`, a 23-byte `subject_value`,
-//!   `not_before_unix_ms = 23`. It closes the *low* side of the inline boundary
-//!   and is the only vector that would pin the shape an anchor's leaf 0 actually
-//!   takes.
-//! - **E — `not_before_unix_ms = 2⁶³`.** The value §1.2 argues the `u64` bound
-//!   over: wire-legal, and undecodable by any implementation modelling the field
-//!   as `i64`. Nothing in this crate tests it as a frozen vector.
+//! # What the set does NOT cover, stated so it cannot read as complete
 //!
-//! ⚠️ **And the honest measure of what three vectors buy: head width is a
-//! property of a range, but shortest-form is a property of a boundary — the
-//! format has ten of them (four each in `not_before_unix_ms` and `sequence` at
-//! 23|24, 255|256, 65535|65536 and 2³²−1|2³², plus two in the `subject_value`
-//! length, the third being unreachable under the 4096-byte cap), and A+B+C place
-//! a value immediately adjacent to exactly one of them — `sequence = 24` — from
-//! above only, with no vector on any low side.**
+//! Head width is a property of a *range*; shortest-form is a property of a
+//! *boundary*. The format has **eight** reachable ones — four each in
+//! `not_before_unix_ms` and `sequence` at 23|24, 255|256, 65535|65536 and
+//! 2³²−1|2³², plus the `subject_value` length at 23|24 and at 255|256.
+//!
+//! A+B+C place a value adjacent to exactly one, from above only (`sequence = 24`).
+//! D and F add the low side of the 23|24 boundary in both paths. **Everything at
+//! 255|256 and above remains untouched.**
+//!
+//! ⚠️ Two cases that look like gaps and are not, so they stop being counted:
+//! there is **no inline representation of 24** (`0x18` in the low bits *is* the
+//! one-argument-byte marker), so an encoder cannot emit one and the only
+//! expressible error at that boundary is the non-minimal form for values ≤ 23 —
+//! which is the side D and F cover. And the `bstr` inline boundary is
+//! unreachable in this format at all: every `bstr` here is 0, 32, 64, 79, or a
+//! payload whose minimum is far above 23.
+//!
+//! ⚠️ **D and F add no new `(major type, argument width)` pair over A and B.**
+//! Their entire value is the boundary, not the width. Recorded because a reader
+//! counting vectors would otherwise credit them with coverage they do not add.
+//!
+//! # Vector E is specified and NOT generated
+//!
+//! **E — `not_before_unix_ms = 2⁶³`**, the value §1.2 argues the `u64` bound
+//! over. Its bytes were computed and agreed by both parties, and it is not
+//! frozen here because **it cannot measure the claim it exists for**: an `i64`
+//! implementation cannot represent 2⁶³ at all, so it can never be asked to
+//! encode E, and every available encoder emits the same eight bytes by
+//! construction. The discriminating test is a *decoder* property — decode E with
+//! label 5 as `uint64` and assert equality, and as `int64` and assert it fails —
+//! and no golden vector can contain it.
 //!
 //! # Provenance — where these bytes came from, and why that is the whole point
 //!
@@ -324,6 +351,54 @@ const C_SUBJECT_VALUE_LEN: usize = 300;
 const C_SEQUENCE: u64 = 70_000;
 
 // ---------------------------------------------------------------------------
+// Vector D — the `tstr` inline boundary, isolated. Spec §6.1.1.
+//
+// A `tstr` length of 23 is the largest CBOR encodes inline (`0x77`); 24 is the
+// first needing an argument byte. An encoder that switches one value early
+// emits `7817` here, and A (12 bytes), B (`7820`) and C (`79012c`) all jump
+// clear over the boundary and cannot see it.
+//
+// ⚠️ D isolates the LENGTH path only. Its companion F carries `not_before = 23`
+// and isolates the INTEGER path, because 23 is the only value at the top of the
+// inline range and one artifact holding it in both fields would have been a
+// coincidence rather than a control — measured: deliberately breaking only the
+// length path moves D and not F, and only the integer path moves F and not D.
+//
+// ⚠️ `not_before` is deliberately A's value and NOT 23. An earlier draft used
+// 23 for both, which put the same number in two fields of the one artifact
+// written to pin that number.
+// ---------------------------------------------------------------------------
+
+/// Vector D's `subject_value` — **exactly 23 bytes**, the top of the CBOR
+/// inline `tstr` range, with `tstr` head `0x77`.
+///
+/// The text states its own length on purpose. The specification originally
+/// said only "a 23-byte value" and the dispatch acting on it supplied a
+/// 20-byte one; both independent parties caught it, and neither adjusted it
+/// silently. **A specified length is not a specified value** — where the point
+/// of a vector *is* a length, the length must be checkable by counting the
+/// literal rather than by trusting the adjective beside it.
+///
+/// It is also a plain domain. The 23-byte replacement first chosen was
+/// `lys-seat-…` under `subject_kind = 1 (domain)` — a seat-shaped string in a
+/// domain slot, which is the confusable pairing §3.3 exists to prevent, in the
+/// vector most likely to be copied as a starting point.
+const D_SUBJECT_VALUE: &str = "twenty-three-bytes.test";
+
+/// Vector D's `sequence`: `0`, encoded inline as `0x00`.
+///
+/// §6.1 refused a zero sequence for its own vector, because a zero field is
+/// indistinguishable from one an implementation forgot to write. That was
+/// correct with one vector and is spent with four: A, B and C all carry nonzero
+/// sequences, so a defaulting bug already fails three times. D therefore pins
+/// the genesis *shape* — `(kind, role, sequence) = (1, 2, 0)`.
+///
+/// ⚠️ It does **not** pin genesis's payload. §5 fixes three of the six fields;
+/// `subject_value`, `not_before` and the delegated key are the operator's, and
+/// DP15 forbids committing a real origin.
+const D_SEQUENCE: u64 = 0;
+
+// ---------------------------------------------------------------------------
 // The vectors' outputs. Literal hex; nothing here is computed from lys-core.
 // ---------------------------------------------------------------------------
 
@@ -440,6 +515,96 @@ const C_HEX_ARTIFACT: &str = "d284584fa301270378266170706c69636174696f6e2f766e64
 616103582029acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd70402051b0000018bcfe56800\
 061a0001117058405a949d8ba76fe8fb6549b7be732cabbcd6f29934cdf883fac361d6d693375b85b79162844027d48710\
 75dd2328f9db64d12fbf53a53253986d47c2e9ccc07f0e";
+
+/// Vector D's protected bucket, 79 bytes — byte-identical to A's, since D
+/// changes only payload fields and both use the same root key.
+const D_HEX_PROTECTED: &str = "a301270378266170706c69636174696f6e2f766e642e6c79732e64656c65676174696f6e2e76312b63626f7204\
+582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8";
+
+/// Vector D's payload, 77 bytes. The `tstr` head over the 23-byte subject is
+/// `0x77` — inline, at the boundary — and `sequence` is the inline `0x00`.
+///
+/// 77 is two clear of the protected bucket's 79. That matters: a 24-byte
+/// subject would make this payload exactly 79, putting `584f` on both `bstr`
+/// heads in the preimage and hiding any implementation that derived one length
+/// from the other. Measured across 22–26 bytes; 24 is the unique collision, and
+/// it is the obvious next vector.
+const D_HEX_PAYLOAD: &str = "a6010102777477656e74792d74687265652d62797465732e7465737403582029acbae141bccaf0b22e1a94d34d\
+0bc7361e526d0bfe12c89794bc9322966dd70402051b0000018bcfe568000600";
+
+/// Vector D's `Sig_structure` preimage, 173 bytes.
+const D_HEX_PREIMAGE: &str = "846a5369676e617475726531584fa301270378266170706c69636174696f6e2f766e642e6c79732e64656c6567\
+6174696f6e2e76312b63626f7204582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b840584da601010277747765\
+6e74792d74687265652d62797465732e7465737403582029acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd70402051b\
+0000018bcfe568000600";
+
+/// Vector D's Ed25519 signature over the preimage, 64 bytes.
+const D_HEX_SIGNATURE: &str = "e980df078644729e05f13ff40c8e46bc837e678fcbfa4d6db475909d6861b059cabc8d277429eb40f89965\
+762d0eaf0479457057c1e4d5bf4832088249e54607";
+
+// ---------------------------------------------------------------------------
+// Vector F — the `uint` inline boundary, isolated. Spec §6.1.1.
+// ---------------------------------------------------------------------------
+
+/// Vector F's `not_before_unix_ms`: **23**, encoded inline as `0x17` — the
+/// largest `uint` CBOR encodes without an argument byte.
+///
+/// B's `sequence = 24` (`1818`) pins this boundary from *above*; nothing pinned
+/// it from below, and an encoder that switches to an argument byte one value
+/// early emits `1817` here and passes A, B and C.
+const F_NOT_BEFORE_UNIX_MS: u64 = 23;
+
+/// Vector F's `sequence`: **8**.
+///
+/// ⛔ **It was `1`, and `subject_kind` is also `1`.** Both encode the byte
+/// `0x01`, so transposing the values at labels 1 and 6 left F **byte-identical**
+/// — measured by both independent parties, not argued — as did the derived-field
+/// bugs `sequence := subject_kind` and `subject_kind := sequence`. The ruling
+/// that chose `1` claimed in terms that it had removed every such collision,
+/// having counted only the three *varying* numbers and omitted the two the
+/// format pins.
+///
+/// ⭐ **A distinctness claim must count the fields that are FIXED, not just the
+/// ones you chose.** The omitted values were the two present in every artifact,
+/// which is precisely why they did not feel like variables.
+///
+/// `8` is inline, so F's boundary isolation is untouched; it equals no other
+/// field value, no label number `1`–`6`, and no length anywhere in the artifact.
+/// The transposed payload now carries `subject_kind = 8`, which `v1` does not
+/// define, so it is **refused at decode** rather than merely differing.
+const F_SEQUENCE: u64 = 8;
+
+/// Vector D's complete tagged `COSE_Sign1`, 229 bytes.
+const D_HEX_ARTIFACT: &str = "d284584fa301270378266170706c69636174696f6e2f766e642e6c79732e64656c65676174696f6e2e76312b\
+63626f7204582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8a0584da6010102777477656e74792d7468726565\
+2d62797465732e7465737403582029acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd70402051b0000018bcfe5680006\
+005840e980df078644729e05f13ff40c8e46bc837e678fcbfa4d6db475909d6861b059cabc8d277429eb40f89965762d0eaf0479457057c1e4d5bf\
+4832088249e54607";
+
+/// Vector F's protected bucket, 79 bytes — identical to A's and D's.
+const F_HEX_PROTECTED: &str = "a301270378266170706c69636174696f6e2f766e642e6c79732e64656c65676174696f6e2e76312b63626f7204\
+582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8";
+
+/// Vector F's payload, 58 bytes. The tail reads `05 17 06 08` — four distinct
+/// bytes, so a one-byte-shifted read of the label/value stream changes the
+/// parse. Under the superseded `sequence = 1` it read `05 17 06 01`.
+const F_HEX_PAYLOAD: &str = "a60101026c6578616d706c652e7465737403582029acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c897\
+94bc9322966dd7040205170608";
+
+/// Vector F's `Sig_structure` preimage, 154 bytes.
+const F_HEX_PREIMAGE: &str = "846a5369676e617475726531584fa301270378266170706c69636174696f6e2f766e642e6c79732e64656c6567\
+6174696f6e2e76312b63626f7204582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b840583aa60101026c657861\
+6d706c652e7465737403582029acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd7040205170608";
+
+/// Vector F's Ed25519 signature over the preimage, 64 bytes.
+const F_HEX_SIGNATURE: &str = "fb9bab17314e935a27a5ebb0f1db0b07d238d484c65bbd7f2620b55820f478bbf6a2754ed8318b19dc4e8b\
+2bba070772b014c7662c153c45766b468ca478f20e";
+
+/// Vector F's complete tagged `COSE_Sign1`, 210 bytes.
+const F_HEX_ARTIFACT: &str = "d284584fa301270378266170706c69636174696f6e2f766e642e6c79732e64656c65676174696f6e2e76312b\
+63626f7204582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8a0583aa60101026c6578616d706c652e74657374\
+03582029acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd70402051706085840fb9bab17314e935a27a5ebb0f1db0b07\
+d238d484c65bbd7f2620b55820f478bbf6a2754ed8318b19dc4e8b2bba070772b014c7662c153c45766b468ca478f20e";
 
 // ---------------------------------------------------------------------------
 // Helpers. None of these calls into `lys-core`.
@@ -638,8 +803,44 @@ fn vector_c() -> FrozenVector {
     }
 }
 
+fn vector_d() -> FrozenVector {
+    FrozenVector {
+        name: "D (tstr inline boundary)",
+        subject_kind: DelegationSubjectKind::Domain,
+        subject_kind_wire: SUBJECT_KIND_WIRE_VALUE,
+        subject_value: D_SUBJECT_VALUE.to_string(),
+        role: DelegationRole::Operational,
+        role_wire: ROLE_WIRE_VALUE,
+        not_before_unix_ms: NOT_BEFORE_UNIX_MS,
+        sequence: D_SEQUENCE,
+        hex_protected: D_HEX_PROTECTED,
+        hex_payload: D_HEX_PAYLOAD,
+        hex_preimage: D_HEX_PREIMAGE,
+        hex_signature: D_HEX_SIGNATURE,
+        hex_artifact: D_HEX_ARTIFACT,
+    }
+}
+
+fn vector_f() -> FrozenVector {
+    FrozenVector {
+        name: "F (uint inline boundary)",
+        subject_kind: DelegationSubjectKind::Domain,
+        subject_kind_wire: SUBJECT_KIND_WIRE_VALUE,
+        subject_value: ORIGIN.to_string(),
+        role: DelegationRole::Operational,
+        role_wire: ROLE_WIRE_VALUE,
+        not_before_unix_ms: F_NOT_BEFORE_UNIX_MS,
+        sequence: F_SEQUENCE,
+        hex_protected: F_HEX_PROTECTED,
+        hex_payload: F_HEX_PAYLOAD,
+        hex_preimage: F_HEX_PREIMAGE,
+        hex_signature: F_HEX_SIGNATURE,
+        hex_artifact: F_HEX_ARTIFACT,
+    }
+}
+
 fn all_vectors() -> Vec<FrozenVector> {
-    vec![vector_a(), vector_b(), vector_c()]
+    vec![vector_a(), vector_b(), vector_c(), vector_d(), vector_f()]
 }
 
 // ---------------------------------------------------------------------------
@@ -892,7 +1093,7 @@ fn the_frozen_hex_encodes_the_specification_table_in_shortest_form() {
 
         checked += 1;
     }
-    assert_eq!(checked, 3, "every frozen vector must have been walked");
+    assert_eq!(checked, 5, "every frozen vector must have been walked");
 }
 
 /// The two `bstr` heads inside each `Sig_structure` are distinguishable.
@@ -924,7 +1125,7 @@ fn no_vector_ties_the_protected_and_payload_bstr_heads() {
         );
         checked += 1;
     }
-    assert_eq!(checked, 3, "every frozen vector must have been checked");
+    assert_eq!(checked, 5, "every frozen vector must have been checked");
 }
 
 /// Both key derivations reach the public keys every vector names.
@@ -976,7 +1177,7 @@ fn delegation_preimage_matches_the_frozen_sig_structure() {
         );
         checked += 1;
     }
-    assert_eq!(checked, 3, "every frozen vector must have been reproduced");
+    assert_eq!(checked, 5, "every frozen vector must have been reproduced");
 }
 
 /// Every whole artifact, and the signature inside it, equals the frozen vector.
@@ -1017,7 +1218,7 @@ fn sign_delegation_reproduces_the_frozen_artifacts() {
         );
         checked += 1;
     }
-    assert_eq!(checked, 3, "every frozen vector must have been signed");
+    assert_eq!(checked, 5, "every frozen vector must have been signed");
 }
 
 /// The positive control: every frozen artifact verifies, and parses back to the
@@ -1073,7 +1274,7 @@ fn the_frozen_artifacts_verify_and_parse_back() {
         kinds.insert(v.subject_kind_wire);
         checked += 1;
     }
-    assert_eq!(checked, 3, "every frozen vector must have been verified");
+    assert_eq!(checked, 5, "every frozen vector must have been verified");
     assert_eq!(
         kinds.len(),
         2,
