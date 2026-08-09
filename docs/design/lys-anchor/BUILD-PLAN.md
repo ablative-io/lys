@@ -16,6 +16,13 @@
 > *before* the code exists, not review comments to be raised after. Two of the findings
 > in §1 are marked **OPEN AND BLOCKING** and are addressed to the operator: the
 > increments they gate must not start until they are ruled on.
+>
+> ✅ **BOTH WERE RULED ON, 2026-08-08 — F1 by DP23, F2 by DP24. Nothing in §1 is blocking
+> any more, and F3 and F4 were settled the same day by DP25 and DP26.** This banner and
+> six downstream markers went on saying otherwise for a day, which is why the correction
+> is recorded here rather than by deleting the sentence: **a resolved blocker still flying
+> its blocking flag stops work with the full authority of a live one**, and the only
+> defence against that is making the propagation failure visible where it happened.
 
 ---
 
@@ -52,9 +59,23 @@ format is asserted from memory.
 These come before the design because three of them change what gets built, and two of
 them stop work until they are ruled on.
 
-### F1 — 🔴 OPEN AND BLOCKING (increment 6b) — DP9's certificate gate and DP13's domain-agnosticism cannot both be a shipped default
+### F1 — ✅ SETTLED 2026-08-08 by DP23 — DP9's certificate gate and DP13's domain-agnosticism cannot both be a shipped default
 
-**Addressed to the operator. Increment 6b must not start until this is ruled on.**
+> ✅ **DP23: admission is an `AdmissionPolicy` trait and NO DEFAULT SHIPS.** The core stays
+> ignorant of who submitters are; the cert-gated rule becomes one policy among several. Under
+> the complete-version ruling **both halves land together** — the trait *and* the certificate
+> policy, increments 6a and 6b, rather than the trait now and the policy behind a later
+> decision. No deployment can inherit an admission rule nobody chose.
+>
+> ⛔ **The constraint that arrives with it, and it has an expiry date already written into
+> the code:** this crate's argument that its detailed error variants are not a parsing oracle
+> rests on **no variant being a function of the submitted bytes** — and an admission policy is
+> exactly a function of the submitted bytes. Its refusals must collapse to one
+> indistinguishable value. That expiry was recorded in `error.rs`'s module docs *before* the
+> policy existed, and 6b is where it comes due.
+>
+> The finding is kept below as asked, because the shape it offered was *input to* the ruling
+> and not the ruling.
 
 DP9 (`DECISIONS.md:166`) rules the write path "certificate-gated, now that G1 makes a
 certificate mean something… deliberately *after* the receipt and bundle work." That
@@ -81,10 +102,29 @@ to name one.
 runs", or leave it intact as a property of every lys anchor? Increments 1–6a and 7–11 do
 not depend on the answer. 6b does, entirely.
 
-### F2 — 🔴 OPEN AND BLOCKING (increment 12) — "the witness API ships in v1" does not say whether it means the contract or a transport
+### F2 — ✅ SETTLED 2026-08-08 by DP24, **against the recommendation below** — "the witness API ships in v1" does not say whether it means the contract or a transport
 
-**Addressed to the operator. Increment 12 must not start, and must not be assumed absent,
-until this is ruled on.**
+> ⛔ **This section flew a `🔴 OPEN AND BLOCKING` flag and the words *"increment 12 must not
+> start"* for a full day after it had been ruled on.** The ruling landed in
+> `DECISIONS.md` and nothing propagated back here, so the plan went on naming a blocker
+> that no longer existed. **A stale document is a confident source** — and a *resolved*
+> blocker still displaying its blocking flag is worse than a missing one, because it stops
+> work with the full authority of a live constraint. Corrected 2026-08-09.
+>
+> **DP24 rules the second reading: the witness API means a transport, and it ships.** My
+> contract-only recommendation was overturned. Its four supporting points — DP5's parsing
+> oracle, a submission endpoint being that oracle in sharper form, the read path needing no
+> server, DP17's "run privately" being a directory and a binary — **all survive as
+> engineering constraints on the transport, not as reasons to omit it.**
+>
+> **Carried forward as non-negotiable:** one refusal status for every substantive refusal,
+> or the transport rebuilds the oracle the library spent effort removing. C2SP's
+> distinguished codes are the sole candidate exception, and adopting them is adopting the
+> oracle knowingly — to be recorded as such at the point it happens.
+>
+> The question and the two readings are kept below **exactly as they were asked**, because
+> the recommendation was overturned and a record that quietly re-reads as the accepted
+> answer is how an overturned recommendation comes back.
 
 DP16 (`DECISIONS.md:227-231`) binds the witness API to v1 "even if zero witnesses run at
 first — retrofitting it later is painful, and until it exists every claim made is weaker
@@ -105,7 +145,11 @@ gives the argument for it; the argument is not a ruling and is not treated as on
 
 **What is being asked:** does DP16 require an HTTP witness endpoint in v1?
 
-### F3 — the strawman's *reason* for "the parent must NOT verify the child" is factually wrong; DP18's reason is not, and the two are compatible
+### F3 — ✅ SETTLED 2026-08-08 by DP25 — the strawman's *reason* for "the parent must NOT verify the child" is factually wrong; DP18's reason is not, and the two are compatible
+
+> ✅ **DP25 adopts the recommendation: record, then check, then report.** A witness's own
+> prior `(size, root)` is precisely something it observed, so the check compares two things it
+> personally holds and sits **inside** DP18 rather than against it.
 
 `STRAWMAN-SESSION.md:129-151` takes the position that a parent stores what it is handed
 and does not check the child's internal consistency, with the reason: *"verification would
@@ -166,7 +210,27 @@ records the recommendation as unruled.
 **§3.2 of the strawman was never ruled on** in any case: it is item 2 of "What I am asking
 for from the session" (`STRAWMAN-SESSION.md:213-214`), and DP13–DP17 do not mention it.
 
-### F4 — DP16's "rotation is an append" is not expressible in the frozen-draft bundle
+### F4 — ✅ SETTLED 2026-08-08 by DP26 — DP16's "rotation is an append" is not expressible in the frozen-draft bundle
+
+> ✅ **DP26 adopts revocation-is-an-append as a design *premise*** — with no CRL and no OCSP
+> there is no other shape available. ⚠️ Its provenance is recorded in `DECISIONS.md` because
+> the inference was **mine**: it circulated to two seats, was endorsed, and came back to me as
+> another seat's constraint, which I then argued against on the merits before withdrawing it
+> and putting it to Tom. **This ruling is what makes it a premise; it was never one before.**
+>
+> Two consequences now ruled rather than derived, and both bear directly on the key-history
+> fold this finding is really about:
+> - **The revocable unit and the claim unit are the same unit.**
+> - **Freshness tolerance is an input to the verification call, never a judgement on its
+>   output.** No default tolerance ships; the log size `N` is in the answer type from the
+>   first version. A derived view may **refuse** on its own authority and may **never
+>   permit** on it — so a permission must walk the tail from the view's stamped position to
+>   the current tip, bounded by entries-since-snapshot and never by history.
+>
+> ⭐ **That last clause is a hard constraint on the fold's output type**, not advice: an
+> answer that does not carry the position it was computed at cannot be tail-walked, and a
+> caller free to ignore `N` is an obligation documented on the caller. See
+> `KEY-HISTORY-FOLD-QUESTIONS.md` Q5 and Q6.
 
 DP16 rules a root identity that only signs key-delegation entries into the log, and an
 operational key signing day-to-day checkpoints, so that "the key history *is* log history."
@@ -391,7 +455,7 @@ crates/lys-anchor/
 
     policy/mod.rs
     policy/admission.rs           `AdmissionPolicy` trait + MaxSize, AcceptAll  (~130)
-    policy/certificate.rs         DP9 cert-gated policy  [BLOCKED ON F1]        (~220)
+    policy/certificate.rs         DP9 cert-gated policy  [DP23: ships with 6a]  (~220)
 
     witness/mod.rs                [fed]
     witness/projection.rs         [fed] origin → last observed (size, root),
@@ -907,9 +971,17 @@ only specialised tooling can check violates verification must outlive the vendor
 
 Trait plus `MaxSize` and `AcceptAll`.
 
-### Increment 6b — the cert-gated policy (DP9)  🔴 **BLOCKED ON F1**
+### Increment 6b — the cert-gated policy (DP9)  ✅ **UNBLOCKED — F1 settled by DP23**
 
-Must not start until F1 is ruled on.
+DP23 rules that the trait and the certificate-gated policy **land together**, so 6b is no
+longer gated behind a decision and no longer optional relative to 6a.
+
+⛔ **Its one hard constraint, due here and nowhere else:** the policy's refusals must collapse
+to **one indistinguishable value**. This crate's claim that its detailed error variants are
+not a parsing oracle rests entirely on no variant being a function of the submitted bytes, and
+an admission policy is precisely that function. The expiry was written into `error.rs`'s
+module docs before the policy existed — 6b is when it comes due, and a per-reason refusal set
+here silently invalidates the oracle argument for the whole crate.
 
 ### Increment 7 — the witness projection and observation path  *(federation)*
 
@@ -942,9 +1014,22 @@ The first format this crate freezes, deliberately last. `create` changes to buil
 from the root signer instead of taking injected bytes. **Requires an adversarial review
 before landing (CLAUDE.md) and must not be signed outside tests (DP17).**
 
-### Increment 12 — transport  🔴 **BLOCKED ON F2**
+### Increment 12 — transport  ✅ **UNBLOCKED — F2 settled by DP24: the transport ships**
 
-Neither started nor assumed absent until F2 is ruled on.
+⚠️ **But it is no longer next, and the reorder is deliberate.** The key-history artifact and
+the fold over it come **first**. `sequence` is carried by `lys/delegation/v1` and consumed by
+no code (`DELEGATION-V1.md` §1.2, §2.4.1), so the replay defence of §2.2 is a property of a
+fold that does not exist — the format's central security claim is currently held up by prose.
+Building transport first would put a network surface in front of a key history whose ordering
+rule nothing enforces.
+
+The fold is also what unblocks publishing `lys-core 0.3.0`, which is held for exactly this
+reason. See `KEY-HISTORY-FOLD-QUESTIONS.md` for the rules it must enforce and the seven
+questions a design has to answer before it can be built.
+
+**When increment 12 does start**, DP24's constraint binds from the first commit: one refusal
+status per substantive refusal. It is far cheaper to design the status set once than to
+collapse a four-way mapping afterwards.
 
 ---
 
@@ -1110,7 +1195,7 @@ harnesses set the identical environment. Do not leave it unremarked.
 | **Consistency receipts (`vdp -2`) issued** | DP2's launch scope (`DECISIONS.md:44-58`). Implemented in `lys-core` (`receipt/consistency.rs:153`) and unused by the anchor. Distinct from the witness path, which *consumes* a consistency proof and issues none. |
 | **SCRAPI / RFC 9943 transparent statements** | `STRAWMAN-SESSION.md:161-169`: SCITT answers "what registration policy did this satisfy", and this anchor has no selective policy to describe. |
 | **OpenTimestamps counter-anchor** | The bundle slot exists and a populated one is *refused* (`bundle/verify.rs:~177-180`), so nothing is retrofitted. DP11 (`DECISIONS.md:168`). |
-| **Cert-gated admission (DP9)** | Trait ships in 6a; the policy is 6b. 🔴 **Blocked on F1.** |
+| **Cert-gated admission (DP9)** | Trait ships in 6a; the policy is 6b. ✅ **DP23: both land together, and no default policy ships.** Refusals must collapse to one value — see 6b. |
 | **Threshold witnesses** | `STRAWMAN-SESSION.md:60-62` — open question; the lean is one witness with format room for more. |
 | **Executing a key rotation** | The delegation *format* ships (increment 11). Rotating a live key is an operator ceremony (DP6, `DECISIONS.md:164`) needing a production key, which is Tom's (`DECISIONS.md:252-255`). |
 | **A key-history artifact** | **F4** — DP16's verifiability needs one and the bundle has no slot. Its own v1, later. Do not amend `lys/verification-bundle/v1`. |
@@ -1125,15 +1210,24 @@ harnesses set the identical environment. Do not leave it unremarked.
 Not review comments for afterwards. Each of these is cheaper to lose now than to unpick
 later.
 
-1. **F1 — DP9 vs DP13.** 🔴 Open and blocking increment 6b. Not resolved here; a possible
-   shape is offered as input to the ruling, not as a position.
-2. **F2 — does "the witness API ships in v1" mean an HTTP endpoint?** 🔴 Open and blocking
-   increment 12. §5.3 argues one reading; the argument is not a ruling.
-3. **F3's recommendation — record, then check, then report.** Not yet ruled. DP18 does not
-   decide it either way, and the compatibility argument (checking against what the witness
-   itself observed stays inside what a witness can honestly know) is the part most worth
-   attacking. If it is rejected, step 2 of §4.3 disappears and nothing else in the plan
-   moves — which is itself evidence the boundary is in the right place.
+✅ **Disputes 1–3 were had, and lost or won on 2026-08-08. They are kept with their outcomes
+attached rather than deleted, because the point of §9 was to have them before the code
+existed — and a dispute list that erases its resolved entries cannot be checked against what
+was actually decided.**
+
+1. **F1 — DP9 vs DP13.** ✅ **Settled by DP23.** An `AdmissionPolicy` trait, **no default
+   shipped**, trait and certificate policy landing together. The shape offered here was input
+   to the ruling and was substantially the shape taken — which is not the same as it having
+   been the position, and is not evidence the method works on one sample.
+2. **F2 — does "the witness API ships in v1" mean an HTTP endpoint?** ✅ **Settled by DP24 —
+   yes, and against my recommendation.** I argued contract-only from DP5's parsing oracle;
+   every supporting point survives as an engineering constraint on the transport rather than
+   as a reason to omit it. ⛔ **One refusal status per substantive refusal** is the
+   non-negotiable that comes with it.
+3. **F3's recommendation — record, then check, then report.** ✅ **Settled by DP25 — adopted.**
+   A witness's own prior `(size, root)` is something it personally observed, so checking
+   against it sits *inside* DP18 rather than against it. The compatibility argument was the
+   part I flagged as most worth attacking; it held.
 4. **§4.2 — that a receipt *is* a countersignature, so v1 needs no cosignature format.** If
    wrong, the witness surface grows a wire format nobody here has read the spec for, and
    DP18's structural guard reverts to careful wording.

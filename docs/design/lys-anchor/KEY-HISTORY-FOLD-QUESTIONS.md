@@ -102,6 +102,31 @@ break the chain. Non-contiguity is safe against that and blind to suppression. *
 and say what the fold is therefore NOT claiming** — a fold that cannot detect suppression
 must not present its answer as "the current key" without qualification.
 
+### ⛔ Amendment — DP26 already constrains Q5 and Q6 harder than I first wrote them
+
+Found while sweeping stale blockers in `BUILD-PLAN.md`, *after* Parts 1–2 were written, and
+recorded as an amendment rather than edited in silently — a rubric that quietly grows the
+answers it was supposed to be testing against is no longer a second party.
+
+DP26 (`DECISIONS.md:400`, settling F4) rules:
+
+- **Freshness tolerance is an input to the verification call, never a judgement on its
+  output.** No default tolerance ships. **The log size `N` is in the answer type from the
+  first version.**
+- **A derived view may refuse on its own authority and may never permit on it** — so a
+  *permission* must **walk the tail** from the view's stamped position to the current tip,
+  bounded by entries-since-snapshot and never by history.
+
+So Q5 is not open on whether the output carries its position: **it must**, or it cannot be
+tail-walked. And Q6's incremental option is not merely permitted but effectively *required*
+in shape — a stamped snapshot plus a bounded tail walk is exactly what DP26 describes. What
+stays open in Q6 is what re-derives the snapshot from scratch and how often.
+
+⚠️ **This also sharpens Q4.** The tail walk is the suppression defence for *permissions*
+specifically: staleness fails open for revocation and closed for grants. It does **not** rescue
+a fold shown a truncated log, because a truncated log has a tip too. Any design claiming DP26
+handles suppression must say which of the two it is handling.
+
 ### Q5 — What does the fold return, and can a stranger re-verify it?
 
 The one rule that governs everything: *its entire value is that strangers can verify it.*
