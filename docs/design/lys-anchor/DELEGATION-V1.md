@@ -390,19 +390,41 @@ promoted one instance to a law.
 **The maximum is a function of the other fields' encoded widths:**
 
 ```text
-artifact = 150 + head(payload_len) + payload_len
-payload_len = 45 + width(not_before) + width(sequence) + head(L) + L
+artifact    = 150 + head(payload_len) + payload_len
+payload_len =  43 + width(not_before) + width(sequence) + head(L) + L
 ```
 
 where `width(v)` is the shortest-form encoded size of `v` (1, 2, 3, 5 or 9 bytes) and `head(n)`
-is the CBOR head size for a length of `n`. The largest `L` satisfying `artifact ≤ 4096` is the
-maximum, and it **moves with the other two fields**:
+is the CBOR head size for a length of `n`. The `43` is `1` (map head) + `6` (the six label
+bytes) + `1` (`subject_kind`'s value) + `34` (the delegated key's `5820` head and 32 bytes) +
+`1` (`role`'s value). The largest `L` satisfying `artifact ≤ 4096` is the maximum, and it
+**moves with the other two fields**:
 
 | `not_before` / `sequence` | widths | max `subject_value` |
 |---|---|---|
 | vector A (`1700000000000`, `300`) | 9 + 3 | **3885** |
-| vector D (`23`, `0`) — both inline | 1 + 1 | **3895** |
+| vector D (`1700000000000`, `0`) | 9 + 1 | **3887** |
+| vector F (`23`, `8`) — both inline | 1 + 1 | **3895** |
 | both near `u64::MAX` | 9 + 9 | **3879** |
+
+⛔⛔ **THIS FORMULA SAID `45` FOR ONE DAY AND WAS WRONG BY TWO, AND THE PARAGRAPH BELOW ORDERS
+IMPLEMENTERS TO USE IT.** Found independently by **both** vector parties. The base is `43`;
+`45` yields a maximum two bytes short in every configuration — 3883 instead of 3885, 3893
+instead of 3895 — so **a faithful stranger who obeys the "MUST derive" instruction refuses two
+valid lengths per configuration** that `lys-core` issues artifacts at.
+
+⭐ **This is the defect the correction was written to remove, reintroduced by the correction,
+one step down.** The original error promoted a constant to a law. Its replacement was a law
+with a wrong constant inside it — which is *worse*, because a formula reads as derived and
+therefore as checked, and because the instruction to use it converts the error into an
+obligation. It fails closed rather than open, which is the only mitigating fact.
+
+⚠️ **The document already disagreed with itself and nobody noticed for a day.** §6.1.1's worked
+payload lengths for vector B (79/80/81 for 31/32/33-byte values) are base-`43` numbers, and the
+maxima table above is base-`43` too. Only the formula was base-`45`. **A derivation that
+contradicts the worked examples printed beside it is checkable by anyone who tries one — which
+is exactly what nobody does with a formula, because a formula looks like the thing the examples
+were derived *from*.**
 
 ⭐ **Sixteen lengths on which two conforming implementations disagree**, in *both* directions —
 which is the same defect class the correction below was written to fix, reintroduced by the
@@ -1176,20 +1198,33 @@ read as handled:
 
 | uncovered | witness | note |
 |---|---|---|
-| `uint` 23 (low side) | `17` vs `1817` | see above; closed by **vector D** |
-| `tstr` 23 / 24 | `77…` vs `7818…` | the same boundary in the **length** path — C proved the 2-byte *width* transfers across major types, never that the inline boundary does. Closed by **D** |
+| `uint` 23 (low side) | `17` vs `1817` | ✅ closed by **vector F**. ⚠️ This row said "**vector D**" for a day *after* the ruling below split D and moved the `uint` boundary to F — the table was stale against a decision printed further down the same file, in the section whose entire subject is stale-vector survival |
+| `tstr` 23 (low side) | `77…` vs `7817…` | ✅ closed by **vector D**. The same boundary in the **length** path — C proved the 2-byte *width* transfers across major types, never that the inline boundary does |
+| ⛔ ~~`tstr` / `uint` 24 (the UPPER side)~~ — **NOT A GAP, removed** | ~~`7818`, `1818`~~ | **CBOR has no inline representation of 24**, so an encoder cannot emit one: `0x18` in the low bits *is* the one-argument-byte marker. The only expressible error at this boundary is the non-minimal form for values ≤ 23 (`1817`, `7817`), which is the side D and F cover. Both parties reached this independently, one after starting to write it up as a gap and withdrawing it. Listing an unreachable case as uncovered inflates the gap count and makes the reachable ones look proportionally smaller |
 | ⛔ ~~`uint` 2⁶³~~ — **MISFILED, removed from this table** | `1b8000000000000000` | **Nothing changes head width at 2⁶³.** `1b7fff…` and `1b8000…` are both eight argument bytes, so this is not a shortest-form boundary at all — it is a **type-modelling** boundary (`u64` vs `i64`), which belongs to §1.2 and not to a table of encoding widths. Listing it here made this axis look better covered than it is: a reader counting closed rows counts one that was never on the axis. Vector E still exists and is still worth having — see below for what it does and does not measure |
 | `uint` 255/256, 65535/65536, 2³²−1/2³² | `18ff`/`190100`, `19ffff`/`1a00010000`, `1affffffff`/`1b…` | argument-width transitions. **Left uncovered**, recorded here rather than closed |
 | `tstr` 255/256 | `78ff`/`790100` | argument-width transition. **Left uncovered** |
 | ⛔ the cap boundary, wherever it falls | `790f2d`/`790f2e` for A's field values | **This row used to read "`3885`/`3886` … the newly-pinned cap", inheriting §1.2's false constant.** The boundary is a *function* of `not_before` and `sequence`, so there is no single pair of lengths to cover — a vector pinning `3885/3886` would pin one point on a curve and read as pinning the rule. **Left uncovered, and now for a second reason: what to cover is itself undecided** |
 
-**Vector D — the cheap low-side boundaries.** Inputs as A except
+**Vector D — the `tstr` inline boundary.** Inputs as A except
 
 ```text
 subject_value       = "twenty-three-bytes.test"   / exactly 23 bytes, tstr head 0x77 /
-not_before_unix_ms  = 23                          / uint head 0x17, inline /
+not_before_unix_ms  = 1700000000000               / as A — see the warning below /
 sequence            = 0
 ```
+
+⛔ **This block said `not_before_unix_ms = 23` for a day after the ruling further down moved
+that value to vector F, so the document carried TWO LIVE, CONTRADICTORY DEFINITIONS OF D** with
+neither struck through nor cross-referenced. The blind party — which builds only from this
+document — flagged that an implementer reading top-to-bottom **hits the superseded block
+first**, and that it is written in the imperative code-block form that reads as normative. It
+built the ruling-table D only because its brief named the inputs explicitly.
+
+⭐ **A ruling that adds a table does not retract the prose above it.** The correction and the
+thing corrected were four hundred lines apart in one file, and the earlier one is the one a
+reader reaches first. This is the same failure this very section is about, committed one
+section later, by the author writing about it.
 
 ⛔ **The value is written out because the previous version of this line said only "a **23-byte**
 value" and the dispatch that acted on it supplied `lys-seat-00000000000` — twenty bytes.** Both
@@ -1254,11 +1289,35 @@ the top of the inline range, so both boundaries want the same number, and neithe
 | | `subject_value` | `not_before_unix_ms` | `sequence` |
 |---|---|---|---|
 | **D** — the `tstr` inline boundary | `"twenty-three-bytes.test"` (**23**) | `1700000000000` (as A) | `0` |
-| **F** — the `uint` inline boundary | `"example.test"` (12, as A) | **23** | `1` |
+| **F** — the `uint` inline boundary | `"example.test"` (12, as A) | **23** | `8` |
 
-No two fields in either vector now share a value, so a mismatch names its own cause. D keeps
-`sequence = 0` and therefore the genesis shape; F carries `sequence = 1` so that its three
-numbers — 12, 23, 1 — are pairwise distinct.
+D keeps `sequence = 0` and therefore the genesis shape.
+
+⛔⛔ **F's `sequence` WAS `1`, AND THAT WAS A COLLISION THIS RULING EXPLICITLY CLAIMED IT HAD
+REMOVED.** The ruling read: *"No two fields in either vector now share a value … F carries
+`sequence = 1` so that its three numbers — 12, 23, 1 — are pairwise distinct."* It counted the
+three **varying** numbers and silently omitted `subject_kind`, which is also a payload field and
+is also `1`. F's actual field-value multiset was `{kind 1, role 2, not_before 23, sequence 1,
+len 12}`.
+
+**Both parties measured the consequence rather than arguing it: swapping the values at labels 1
+and 6 leaves F BYTE-IDENTICAL.** So do the derived-field bugs `sequence := subject_kind` and
+`subject_kind := sequence`. All three are visible in D — the transposed D has `subject_kind = 0`,
+which is refused at decode — so the D+F *pair* still catches it. F alone does not, and **F is
+the vector most likely to be lifted as a starting point**, because it reuses A's subject.
+
+`sequence = 8` is the fix: still inline, so F's `uint` boundary isolation is untouched, and it
+collides with no other field value and with no label number `1`–`6`.
+
+⭐ **A distinctness claim must count the fields that are FIXED, not just the ones you chose.**
+The omitted values were the two the format pins — which is exactly why they did not feel like
+variables, and exactly why they are in every artifact. This is §0.5 consequence 4 in miniature,
+committed inside the ruling written to remove a coincidence.
+
+⚠️ **One collision remains in both D and F and cannot be removed:** `role = 2` sits in the
+payload while `2` is also a label number, so a label-shifted stream is not distinguished. The
+phrase "no label equals its own value" does not cover it. Recorded, not fixed — `role`'s value
+is frozen.
 
 ⚠️ **And a limit on what either proves, which party 2 could see and party 1 could not.** In
 `lys-core` both crossings go through a **single `cbor::write_head`**. For this implementation
@@ -1272,6 +1331,31 @@ differently from ours.
 That asymmetry is worth naming: party 2's was an *implementation fact* it obtained by reading
 the crate, party 1's a *methodology argument* from the spec alone — the party forbidden to read
 `crates/` could not have found it, and the finding is not a mark against it.
+
+✅ **The split was then MEASURED rather than assumed, by building deliberately broken encoders
+and asking which vectors notice:**
+
+| injected bug | A | B | D | F |
+|---|---|---|---|---|
+| one argument byte from `arg ≥ 23`, **both** paths | miss | miss | **DETECT** | **DETECT** |
+| same bug, **integers only** (major 0) | miss | miss | miss | **DETECT** |
+| same bug, **lengths only** (majors 2/3) | miss | miss | **DETECT** | miss |
+| fixed 8-byte head for every `uint` | DETECT | DETECT | DETECT | DETECT |
+
+D moves only on the length path, F only on the integer path, and **A and B miss both** — which
+is the isolation the split was for, and it is now a measurement rather than a claim.
+
+⚠️ **What D and F do NOT add:** walking all four artifacts, their union of
+`(major type, argument width)` pairs is **unchanged** by adding D and F. Their entire value is
+the *boundary*, not the width — an independent confirmation of this section's own finding that
+a completed axis may be complete because it is coarse.
+
+⚠️ **A hazard sitting one byte from D, recorded so the next vector does not step on it.** With
+D's `not_before` and `sequence`, a `subject_value` of **24 bytes** — the obvious next vector —
+makes the payload exactly **79 bytes**, so the payload `bstr` head and the protected `bstr` head
+would **both be `584f`** and an implementation deriving one length from the other becomes
+invisible. Measured across 22–26 bytes; 24 is the unique collision. This is the trap that moved
+vector B's subject from 31 to 32. D itself sits at 77 (`584d`) — two bytes clear.
 
 ⭐ **The lesson is about the claim, not the gap.** §6.1.1 was written to close a hole vector A
 admitted, and it asserted completeness in the same breath — **claiming coverage immediately after
