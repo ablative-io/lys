@@ -224,3 +224,179 @@ fn attestation_bytes_concatenates_in_declared_order() {
     );
     assert_eq!(&bytes[32 + env.ciphertext.len()..], env.nonce.as_slice());
 }
+
+// ---------------------------------------------------------------------------
+// ⭐ THE KDF GOLDEN VECTOR — the second party `seal` did not have.
+//
+// Until this existed, NOTHING pinned the key-derivation construction. Every
+// test above round-trips through `seal` and `open`, and both call the same
+// `derive_key_and_nonce` — so any SYMMETRIC change is invisible to all of
+// them. Swapping the two public keys in the `info` input, renaming the
+// domain-separation tag, or dropping the tag entirely leaves the whole suite
+// green, because both sides derive the same wrong key and the payload still
+// comes back.
+//
+// That is the round-trip trap in its purest form: a round trip through your own
+// encoder and decoder proves nothing about the wire. What it needs is a value
+// this crate did not compute.
+//
+// PROVENANCE OF THE EXPECTED BYTES: computed by a hand-written RFC 5869
+// HKDF-SHA256 in Python — not the `hkdf` crate, not this code — and that
+// implementation was first validated against RFC 5869 Appendix A test cases 1
+// and 3 (case 3 is the zero-length-salt case, which is exactly what
+// `Hkdf::new(None, ..)` performs here), and shown able to disagree when its
+// `info` was perturbed. So the axis of independence is IMPLEMENTATION AND
+// LIBRARY. It is not independence of platform: one machine, one Python.
+//
+// WHAT THIS VECTOR PINS, each of which was previously unpinned:
+//   1. the exact bytes of SEAL_INFO,
+//   2. that the tag is present and comes FIRST,
+//   3. the ORDER ephemeral-then-recipient (the two inputs are distinct here on
+//      purpose, so a swap changes the output),
+//   4. the absent/zero salt,
+//   5. the OKM split — key is the first 32 bytes, nonce the last 12.
+// ---------------------------------------------------------------------------
+
+/// Distinct, non-uniform, and different from each other so that a swap, a
+/// repeated buffer, or a dropped input all change the answer.
+const KDF_SHARED_SECRET: [u8; 32] = [
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+];
+const KDF_EPHEMERAL_PK: [u8; 32] = [
+    0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
+    0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f,
+];
+const KDF_RECIPIENT_PK: [u8; 32] = [
+    0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f,
+    0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7a, 0x7b, 0x7c, 0x7d, 0x7e, 0x7f,
+];
+
+/// The frozen output of `HKDF-SHA256(ikm = shared, salt = none,
+/// info = "lys-sealed-envelope/v1" ‖ ephemeral ‖ recipient, L = 44)`.
+const KDF_EXPECTED_KEY: &str = "2174f9e33ad52c304ce42776fdcc71edd909c28bc12712802f1c6eb0960a08bf";
+const KDF_EXPECTED_NONCE: &str = "9676a253de3231538aa9c948";
+
+fn hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    bytes.iter().fold(String::new(), |mut acc, b| {
+        // Writing into a String is infallible; the Result is discarded rather
+        // than unwrapped so this helper cannot panic inside a failing test and
+        // obscure the assertion that was actually being made.
+        let _ = write!(acc, "{b:02x}");
+        acc
+    })
+}
+
+#[test]
+fn the_kdf_reproduces_bytes_this_crate_did_not_compute() {
+    let (key, nonce) =
+        derive_key_and_nonce(&KDF_SHARED_SECRET, &KDF_EPHEMERAL_PK, &KDF_RECIPIENT_PK)
+            .expect("HKDF expansion of 44 bytes is well within the SHA-256 output limit");
+
+    assert_eq!(
+        hex(key.as_slice()),
+        KDF_EXPECTED_KEY,
+        "the derived AES key no longer matches the independently computed HKDF output — \
+         the info input, its ordering, the tag, or the OKM split has changed"
+    );
+    assert_eq!(
+        hex(&nonce),
+        KDF_EXPECTED_NONCE,
+        "the derived nonce no longer matches; note the nonce is the LAST 12 bytes of the \
+         44-byte OKM, so a changed split moves it even when the key still matches"
+    );
+}
+
+/// ⛔ **This test is ORDER-SENSITIVITY only, and its previous name —
+/// `swapping_the_two_public_keys_changes_the_derived_key` — claimed more than
+/// it measures.**
+///
+/// It was renamed after an injection refuted it. Swapping the two
+/// `extend_from_slice` calls inside `derive_key_and_nonce` failed the golden
+/// vector and **left this test green**, because it compares
+/// `derive(s, e, r)` against `derive(s, r, e)`: when the implementation
+/// swaps, both sides swap with it and the two are still different. It can
+/// therefore detect an implementation that ignores order altogether — one that
+/// sorted or xor-ed the two keys — and it can **never** detect a wrong order.
+///
+/// ⭐ A test that varies an input symmetrically with the code under test is
+/// blind to any change the code applies to both sides. Only the golden vector,
+/// whose expected bytes came from outside this crate, catches a swap — which
+/// is why the swap injection fails exactly one test and it is that one.
+///
+/// It is kept, at its honest name, for a narrower reason: if the golden vector
+/// is ever deleted or regenerated from this code (the usual way a golden
+/// vector dies), this still refuses an order-blind derivation.
+#[test]
+fn the_info_input_is_order_sensitive_which_is_weaker_than_catching_a_swap() {
+    let (straight, _) =
+        derive_key_and_nonce(&KDF_SHARED_SECRET, &KDF_EPHEMERAL_PK, &KDF_RECIPIENT_PK).unwrap();
+    let (swapped, _) =
+        derive_key_and_nonce(&KDF_SHARED_SECRET, &KDF_RECIPIENT_PK, &KDF_EPHEMERAL_PK).unwrap();
+
+    assert_ne!(
+        hex(straight.as_slice()),
+        hex(swapped.as_slice()),
+        "the info input must be order-sensitive; if it is not, the ephemeral and recipient \
+         keys are interchangeable and the NaCl crypto_box_seal binding is not present"
+    );
+
+    // POSITIVE CONTROL: the same inputs twice must agree, or `assert_ne` above
+    // would pass for a function that simply returned fresh randomness.
+    let (again, _) =
+        derive_key_and_nonce(&KDF_SHARED_SECRET, &KDF_EPHEMERAL_PK, &KDF_RECIPIENT_PK).unwrap();
+    assert_eq!(
+        hex(straight.as_slice()),
+        hex(again.as_slice()),
+        "derivation must be deterministic"
+    );
+}
+
+/// Every input must actually reach the derivation. A parameter that is
+/// accepted and then ignored is indistinguishable from one that is used, until
+/// something varies it.
+#[test]
+fn each_input_independently_changes_the_output() {
+    let (base, base_nonce) =
+        derive_key_and_nonce(&KDF_SHARED_SECRET, &KDF_EPHEMERAL_PK, &KDF_RECIPIENT_PK).unwrap();
+
+    let mut varied = 0usize;
+
+    let mut secret = KDF_SHARED_SECRET;
+    secret[0] ^= 0x01;
+    let (k, _) = derive_key_and_nonce(&secret, &KDF_EPHEMERAL_PK, &KDF_RECIPIENT_PK).unwrap();
+    assert_ne!(
+        hex(base.as_slice()),
+        hex(k.as_slice()),
+        "shared secret ignored"
+    );
+    varied += 1;
+
+    let mut ephemeral = KDF_EPHEMERAL_PK;
+    ephemeral[31] ^= 0x01;
+    let (k, _) = derive_key_and_nonce(&KDF_SHARED_SECRET, &ephemeral, &KDF_RECIPIENT_PK).unwrap();
+    assert_ne!(
+        hex(base.as_slice()),
+        hex(k.as_slice()),
+        "ephemeral key ignored"
+    );
+    varied += 1;
+
+    let mut recipient = KDF_RECIPIENT_PK;
+    recipient[31] ^= 0x01;
+    let (k, n) = derive_key_and_nonce(&KDF_SHARED_SECRET, &KDF_EPHEMERAL_PK, &recipient).unwrap();
+    assert_ne!(
+        hex(base.as_slice()),
+        hex(k.as_slice()),
+        "recipient key ignored"
+    );
+    assert_ne!(
+        hex(&base_nonce),
+        hex(&n),
+        "the nonce must move with the info too"
+    );
+    varied += 1;
+
+    assert_eq!(varied, 3, "every input must have been varied exactly once");
+}
