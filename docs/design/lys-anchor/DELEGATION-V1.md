@@ -378,9 +378,56 @@ and arguably likelier, since a seat name has no DNS registration to make its abs
 
 **The `4096`-byte cap is on the ARTIFACT, not on `subject_value`**, mirroring the receipt's. It
 is enforced on **both encode and decode**, on the same reasoning §1.2 gives for `u64::MAX`.
-`subject_value` is bounded only transitively, and **the derived maximum is `3885` bytes** — every
-other field is fixed-width, so the artifact reaches exactly `4096` at that length and `4097` at
-`3886`.
+`subject_value` is bounded only transitively.
+
+⛔⛔ **CORRECTED 2026-08-09 — this paragraph used to say "the derived maximum is `3885` bytes —
+every other field is fixed-width", and BOTH HALVES ARE FALSE.** `not_before_unix_ms` and
+`sequence` are `u64` in shortest form, so each occupies **1 to 9 bytes** depending on its
+value. They are not fixed-width, and the maximum `subject_value` is therefore **not a
+constant**. `3885` is the maximum *for vector A's field values specifically*, and the sentence
+promoted one instance to a law.
+
+**The maximum is a function of the other fields' encoded widths:**
+
+```text
+artifact = 150 + head(payload_len) + payload_len
+payload_len = 45 + width(not_before) + width(sequence) + head(L) + L
+```
+
+where `width(v)` is the shortest-form encoded size of `v` (1, 2, 3, 5 or 9 bytes) and `head(n)`
+is the CBOR head size for a length of `n`. The largest `L` satisfying `artifact ≤ 4096` is the
+maximum, and it **moves with the other two fields**:
+
+| `not_before` / `sequence` | widths | max `subject_value` |
+|---|---|---|
+| vector A (`1700000000000`, `300`) | 9 + 3 | **3885** |
+| vector D (`23`, `0`) — both inline | 1 + 1 | **3895** |
+| both near `u64::MAX` | 9 + 9 | **3879** |
+
+⭐ **Sixteen lengths on which two conforming implementations disagree**, in *both* directions —
+which is the same defect class the correction below was written to fix, reintroduced by the
+sentence that fixed it. An implementation enforcing `L ≤ 3885` as a constant:
+
+- **refuses `3886`–`3895`** — ten lengths this crate issues valid artifacts at;
+- **accepts `3879`–`3884`** — six lengths at which the artifact overflows the cap, reaching up
+  to `4102` bytes, and then fails every verification afterwards.
+
+**`lys-core` is CORRECT and only the specification was wrong.** `check_encodable` derives the
+bound by encoding the artifact and measuring it (`encoding.rs:399` — *"Derived, never
+hardcoded: the bound shifts whenever the payload gains a field"*), so no shipped code carries
+the constant. That is the opposite direction from this document's worst previous error, where
+the prose was laxer than the code — here the prose is **wrong in a way that makes a faithful
+implementer diverge from us**.
+
+⚠️ **An independent party instantiated the predicted defect while believing it was following
+the specification.** One of the two vector parties listed *"`subject_value` ≤ 3885 bytes (§1.2
+derived max)"* among the rules it enforced during construction — it read this paragraph, took
+`3885` as a constant, and hard-coded it. The prediction and its confirmation arrived in the
+same exercise, from parties that never communicated.
+
+**A conforming implementation MUST derive this bound rather than hard-code any number in the
+table above**, including `3885`. The table exists to make the variation visible, not to be
+copied.
 
 ⛔ **The referent used to be ambiguous, and the ambiguity was wire-visible — in the paragraph
 written to prevent exactly that.** The old wording, *"`subject_value` is bounded by the artifact
@@ -393,8 +440,24 @@ Found by the independent encoder, which computed both boundaries rather than rea
 twice; **an ambiguity is invisible to a reader who resolves it on first pass, and every reader
 resolves it the same way they wrote it.**
 
-The maximum is stated as a number above rather than left as a derivation, because a limit each
-implementation computes for itself is a limit each implementation gets to compute differently.
+⛔ **This paragraph used to end: *"The maximum is stated as a number above rather than left as a
+derivation, because a limit each implementation computes for itself is a limit each
+implementation gets to compute differently."* That sentence is the direct cause of the error
+corrected above**, and it is kept because the reasoning is seductive and half right.
+
+It is true that an under-specified derivation lets implementations diverge. It does not follow
+that a constant is the remedy, and **here the quantity simply is not constant** — so stating a
+number did not remove the divergence, it *guaranteed* one, in the direction of a faithful
+implementer disagreeing with us. The correct remedy for an ambiguous derivation is a
+**specified** derivation: the formula and the worked table above, which any implementation can
+evaluate and none can resolve two ways.
+
+⭐ **Replacing a derivation with a constant is only safe when you have checked that the
+quantity is invariant** — and the sentence that did it asserted the invariance ("every other
+field is fixed-width") in the same breath, from the same author, with nothing able to
+disagree. The `211 lengths` figure in the correction above has the same flaw for the same
+reason: its `3886` lower bound is A-specific, so the true disputed range moves with
+`not_before` and `sequence` too.
 
 **`subject_value` comparison is raw UTF-8 byte equality** (§3.3). Not case-folded, not
 Unicode-normalised, no trailing-dot or port or scheme handling for a domain, and no
@@ -1081,7 +1144,7 @@ Three producible widths appear in neither vector:
 | missing | reachable by | witness |
 |---|---|---|
 | `uint`, **four** argument bytes (`1a`) | `not_before` or `sequence` in `[65536, 2³²−1]` | `sequence = 70000` → `1a00011170` |
-| `tstr`, **two** argument bytes (`79`) | `subject_value` of 256–3885 bytes | 300 bytes → `79012c` |
+| `tstr`, **two** argument bytes (`79`) | `subject_value` of 256 bytes up to the derived maximum (§1.2 — **not** a constant `3885`) | 300 bytes → `79012c` |
 | `bstr`, **two** argument bytes (`59`) | the payload `bstr` once `subject_value` passes 255 | → `59016f` |
 
 ⛔ **The `uint` four-byte gap is the one that matters**, because A and B between them cover zero,
@@ -1115,37 +1178,134 @@ read as handled:
 |---|---|---|
 | `uint` 23 (low side) | `17` vs `1817` | see above; closed by **vector D** |
 | `tstr` 23 / 24 | `77…` vs `7818…` | the same boundary in the **length** path — C proved the 2-byte *width* transfers across major types, never that the inline boundary does. Closed by **D** |
-| ⭐ `uint` 2⁶³ | `1b8000000000000000` | **§1.2 argues this exact value** as the reason the fields are `u64` and not `i64` — "two conforming implementations disagreeing about a well-formed artifact" — and then tests it nowhere. Closed by **vector E** |
+| ⛔ ~~`uint` 2⁶³~~ — **MISFILED, removed from this table** | `1b8000000000000000` | **Nothing changes head width at 2⁶³.** `1b7fff…` and `1b8000…` are both eight argument bytes, so this is not a shortest-form boundary at all — it is a **type-modelling** boundary (`u64` vs `i64`), which belongs to §1.2 and not to a table of encoding widths. Listing it here made this axis look better covered than it is: a reader counting closed rows counts one that was never on the axis. Vector E still exists and is still worth having — see below for what it does and does not measure |
 | `uint` 255/256, 65535/65536, 2³²−1/2³² | `18ff`/`190100`, `19ffff`/`1a00010000`, `1affffffff`/`1b…` | argument-width transitions. **Left uncovered**, recorded here rather than closed |
-| `tstr` 255/256, 3885/3886 | `78ff`/`790100`, `790f2d`/`790f2e` | the second drags the payload `bstr` with it and is the newly-pinned cap. **Left uncovered** |
+| `tstr` 255/256 | `78ff`/`790100` | argument-width transition. **Left uncovered** |
+| ⛔ the cap boundary, wherever it falls | `790f2d`/`790f2e` for A's field values | **This row used to read "`3885`/`3886` … the newly-pinned cap", inheriting §1.2's false constant.** The boundary is a *function* of `not_before` and `sequence`, so there is no single pair of lengths to cover — a vector pinning `3885/3886` would pin one point on a curve and read as pinning the rule. **Left uncovered, and now for a second reason: what to cover is itself undecided** |
 
-**Vector D — genesis, and the cheap boundaries, in one artifact.** Inputs as A except
-`subject_value` = a **23-byte** value, `not_before_unix_ms = 23`, and `sequence = 0`. This closes
-the two low-side boundaries above *and* pins genesis's exact payload — §5 fixes genesis at
-`(1, 2)` with `sequence = 0`, and leaf 0 is the one position `LeafStore` can never correct. §6.1
-refused `sequence = 0` for its own vector because a zero field is indistinguishable from one an
-implementation forgot to write; **that reasoning was correct with one vector and is now spent**,
-since A, B and C all carry nonzero sequences and a defaulting bug already fails three times.
+**Vector D — the cheap low-side boundaries.** Inputs as A except
 
-**Vector E — the `u64` boundary the specification argues and never tested.** Inputs as A except
-`not_before_unix_ms = 9223372036854775808` (2⁶³). It exists because §1.2's `i64` argument is a
-claim about *interoperability*, not about our encoder, and an untested interoperability claim is
-the class of defect this document exists to prevent.
+```text
+subject_value       = "twenty-three-bytes.test"   / exactly 23 bytes, tstr head 0x77 /
+not_before_unix_ms  = 23                          / uint head 0x17, inline /
+sequence            = 0
+```
+
+⛔ **The value is written out because the previous version of this line said only "a **23-byte**
+value" and the dispatch that acted on it supplied `lys-seat-00000000000` — twenty bytes.** Both
+independent parties measured it, both refused to adjust silently, and both computed the 23-byte
+and 20-byte readings side by side rather than picking one. The 20-byte value has `tstr` head
+`0x74`: inside the inline range, nowhere near its edge, and therefore **already covered by
+vector A's 12-byte value**. The integer half still works, so a naive check goes green and
+§6.1.1 records the `tstr` boundary as closed by an artifact that never crosses it.
+⭐ **A specified length is not a specified value.** Where the point of a vector *is* a length,
+the length must be checkable by counting the literal.
+
+⛔⛔ **And the literal I chose to correct it with was ALSO wrong, in a worse way — caught by
+the same two parties, independently, from two different sections.** `lys-seat-…` under
+`subject_kind = 1 (domain)` is **a seat-shaped string in a domain slot**: precisely the
+confusable pairing §0.5.1 and §3.3 spend paragraphs defending against, about to be frozen into
+the vector most likely to be copy-pasted as a starting point. It would have taught every
+implementer the shape the format exists to prevent. The replacement is a plain domain whose
+text states the property the vector is *for*, so a reader who miscounts is corrected by the
+string itself.
+
+**Vector E — the `u64` boundary the specification argues.** Inputs as A except
+`not_before_unix_ms = 9223372036854775808` (2⁶³), head `1b8000000000000000`.
+
+⚠️ **E does not measure what it was written to measure, and that has to be said here rather
+than discovered.** Its stated purpose is §1.2's *interoperability* claim — that a `u64`-vs-`i64`
+disagreement is possible at ≥ 2⁶³. But an `i64` implementation **cannot represent 2⁶³ at all**,
+so it can never be asked to encode E; every available encoder emits the same eight bytes by
+construction, and the one foreign decoder in the exercise (`fxamacker/cbor`) models label 5 as
+`uint64` and passes trivially. **The vector pins our bytes and leaves the claim untested.**
+
+The discriminating test, specified so it is not re-derived: decode E into a struct with label 5
+as `uint64` and assert equality, **and** decode it into one with `int64` and assert that it
+*fails*. Only the second half measures the claim, and no golden vector can contain it — it is a
+property of the decoder, not of the bytes.
+
+⭐ **A vector can pin an artifact perfectly and still not test the sentence it was written
+for.** "Untested claim" and "unpinned bytes" are different defects, and closing the second is
+what makes the first stop looking urgent.
+
+#### 🔨 RULING — D is SPLIT into D and F, because one artifact cannot isolate two boundaries
+
+The two parties disagreed, and the disagreement is the useful part.
+
+D as first specified put `not_before_unix_ms = 23` next to a `subject_value` of **23 bytes** —
+the same number in two fields, in the one artifact written to pin the value `23`.
+
+- **Party 1 recorded it as an explicit non-finding**: the major type separates the two, so a
+  positional decoder with pinned types refuses a label-2/label-5 swap on type. That is the
+  *guarded* case.
+- **Party 2 recorded it as a finding**: an implementation that wrote `subject_value`'s length
+  into label 5, or derived either from the other, produces D's exact bytes. Only the label byte
+  and the position separate them. That is the *unguarded* case, and it is a different bug from
+  the swap party 1 answered.
+
+Both are right about the case each considered. **The ruling follows this document's own rule —
+"for each collision, name what else separates the two values; if the answer is nothing, change
+one"** — and the honest answer here is that the collision is *forced*: `23` is the only value at
+the top of the inline range, so both boundaries want the same number, and neither can move.
+
+**So the artifact moves instead. One boundary each:**
+
+| | `subject_value` | `not_before_unix_ms` | `sequence` |
+|---|---|---|---|
+| **D** — the `tstr` inline boundary | `"twenty-three-bytes.test"` (**23**) | `1700000000000` (as A) | `0` |
+| **F** — the `uint` inline boundary | `"example.test"` (12, as A) | **23** | `1` |
+
+No two fields in either vector now share a value, so a mismatch names its own cause. D keeps
+`sequence = 0` and therefore the genesis shape; F carries `sequence = 1` so that its three
+numbers — 12, 23, 1 — are pairwise distinct.
+
+⚠️ **And a limit on what either proves, which party 2 could see and party 1 could not.** In
+`lys-core` both crossings go through a **single `cbor::write_head`**. For this implementation
+they are one rule exercised twice, so D's `tstr` coverage is *inference from a shared code
+path*, not an independent measurement — and splitting the vectors does not change that, because
+the split separates the artifacts and not the function. It is an independent measurement only
+against an implementation that encodes lengths and integers separately. **Claim the axis you
+have:** these vectors pin bytes for everyone and isolate rules only for implementations built
+differently from ours.
+
+That asymmetry is worth naming: party 2's was an *implementation fact* it obtained by reading
+the crate, party 1's a *methodology argument* from the spec alone — the party forbidden to read
+`crates/` could not have found it, and the finding is not a mark against it.
 
 ⭐ **The lesson is about the claim, not the gap.** §6.1.1 was written to close a hole vector A
 admitted, and it asserted completeness in the same breath — **claiming coverage immediately after
 closing one hole is what lets the remaining holes read as handled.** State which widths are
 covered and let the gaps be visible, or a reader checks the sentence instead of the set.
 
-#### Vector D — genesis, recommended and not yet specified
+#### Vector D and genesis — ⛔ the claim that it "pins genesis's exact payload" was OVERSTATED
 
-§5 fixes genesis at `(kind, role) = (1, 2)` with `sequence = 0`, and §6.1 refuses `sequence = 0`
-for its own vector because a zero field is indistinguishable from one an implementation forgot to
-write. **That reasoning was correct with one vector and is now spent**: A and B both carry nonzero
-sequences, so a defaulting bug already fails twice, and a `sequence = 0` vector no longer risks
-hiding one. Leaf 0 is the single position `LeafStore` can never correct, and its exact bytes are
-pinned by no vector today. Raised by the independent encoder; recorded here rather than built,
-because vectors are not frozen and this one can be added after the format is.
+D carries `sequence = 0`, and §6.1's refusal of a zero sequence for its own vector — *a zero
+field is indistinguishable from one an implementation forgot to write* — **was correct with one
+vector and is now spent**: A, B and C all carry nonzero sequences, so a defaulting bug already
+fails three times and a `sequence = 0` vector no longer risks hiding one. That much stands, and
+it is why D is the right place to put the zero.
+
+⛔ **What does NOT stand is "pins genesis's exact payload", and both parties refuted it by
+different routes.** §5 fixes **three of the six payload fields** — `subject_kind = 1`,
+`role = 2`, `sequence = 0`. The other three are free:
+
+- `subject_value` is the operator's own origin, supplied at creation;
+- `not_before_unix_ms` is a caller parameter;
+- `delegated_public_key` is whatever key the operator generated.
+
+So no vector can pin leaf 0's bytes, **and DP15 forbids committing a real origin anyway.** D
+pins the *shape* genesis takes — the fixed three, plus a zero sequence encoded inline — and that
+is worth having. It is not the same claim, and the stronger one is what makes leaf 0 read as
+covered when it is not. ⭐ **"Pins the fields that are fixed" and "pins the payload" differ by
+exactly the fields an operator chooses, which are the ones a vector was never able to reach.**
+
+⚠️ **A gap that can never be closed, and should stop being listed as open.** §6.1.1's
+label-versus-value ambiguity at `a6 01 01` (does an implementation write the value, or the label
+twice?) is closed by B — but **every genesis payload that will ever exist opens `a6 01 01`**,
+since §5 freezes `subject_kind = 1` and §1.2 freezes it at label 1. For the one position
+`LeafStore` can never correct, that gap is permanent and no vector can close it. Recording it as
+"closed by B" would let the case that matters most read as handled.
 
 ⚠️ **B must be generated by the same two independent parties as A, and neither may copy the
 other.** It is a new vector, not a variant — the fact that A matched proves nothing about B.
@@ -1226,7 +1386,7 @@ For those, isolation comes from making the artifact *valid* rather than from low
 | **labels `1` and `4` swapped, giving `(2, 1)`** | §2.3 clause 2, *not* clause 3 — `1` fails role decode before any pair is formed. Recorded as its own row because the whole point of §0.5 consequence 4 is that this injection is *reachable at all*: under roles-from-`1` the swapped artifact would have been byte-identical to a valid one and no injection could have existed to write |
 | **`sequence` set to `u64::MAX`** | §1.2 — refused on **both** encode and decode |
 | **`subject_value` set to the empty string** | §1.2 — the fail-closed rule for a verifier whose subject is unset |
-| **`subject_value` at 3886 bytes** (artifact 4097) | §1.2 — one byte over the cap, on both encode and decode |
+| **`subject_value` one byte past the derived maximum** (artifact 4097) | §1.2 — one byte over the cap, on both encode and decode. ⚠️ The injection must **derive** that length from the `not_before` and `sequence` it uses, not hard-code `3886`: with both fields inline the first refused length is `3896`, so a `3886`-byte injection is a *valid* artifact and the row would silently stop testing anything |
 | **`subject_value` containing invalid UTF-8** | §1.2 — the byte-oriented decoder that skips validation; §3.4's re-encode passes it |
 | **delegated key (label 3) with a non-canonical `y`** (`[0xff; 32]`) | §1.2 — key-slot validation |
 | **`kid` with a non-canonical `y`** | §1.2 — the *other* key slot, which went unvalidated while label 3 did not |
