@@ -2,7 +2,7 @@
 
 Rendered from `IDENTITY-001.json`; edit the JSON source, then regenerate this file.
 
-Revision 4. Status: **approved_row_01_blocked_on_upstream_security_release**. Owner: Chippy. Reviewer: Waffles. Date: 2026-09-22 Australia/Melbourne.
+Revision 5. Status: **row_01_closed_revision_5_awaiting_row_02_recheck**. Owner: Chippy. Reviewer: Waffles. Date: 2026-09-22 Australia/Melbourne.
 
 Authority: [../STATEMENT-2026-09-22.md](../STATEMENT-2026-09-22.md).
 
@@ -18,14 +18,17 @@ An operator installs the product without Cambium or Manifold, signs in, explicit
 - Tom 15:20, clarified by Waffles 15:21 in Dot: shared design, distinct product accents; Cambium green, Aion blue/black, Argus light blue, Haematite mustard. The new product's accent is orange, confirmed by Tom at 15:21:43. Do not silently make every product Aion-blue.
 - Waffles approved revision 2 at 15:22:45, Cambium post a1d511ca4ce5ed95cfd577c5d89341a6f16387c6b38dad037b2419b83b65f519: rows 01 and 02 start; ceiling 48 hours, one implementer, one row/gate at a time. The subsequent colour update comes from Tom and Waffles and does not expand implementation scope.
 - Waffles at door time 15:30:50, post d7cb4eb8f7463169da3395617b17b4d7f0b0882a96c7604e69679f209aa4cdbf: maintained fork branch ablative from v0.36.2; main is untouched upstream mirror; release-tag rebases only with their own gated row; no cherry-picks. Row03 adds users API type, migration inserts and admin UserInfo paths. Commit/push docs and pin without a gate; venue recursive-clone proof moves to row02 gate. Archie retains step04; Chippy rows pause if usage ends. Argus gate timeout belongs to Heimdall; no gate submission until resolved.
+- Waffles ruling at door time15:36:25, post6591ea53d3ee6890121409cad43a0ec8a4770a9a451dc8aa34cf22cafef3b323: row01 accepted; isolated development installs and test-account demonstrations in rows02–05 may use v0.36.2. IDENTITY-001-UPSTREAM-AUTH-STATE binds real sign-in row06 and install row07. Add a separately gated rebase row onto an upstream release carrying #1696 and #1728; if no release by row05 showing, Tom decides nightly versus waiting. Release/advisory check before every install. Recursive-clone proof is due at row02 gate, not a row02 start blocker.
+- Waffles15:38:49, postb02ebd241e1a19d45446218e372dcf504db44c3b3559e137b852c14051ec4098: no Python/provisioning shell; PostgreSQL init SQL, existing lys CLI prepare/configure/health subcommands, Rust integration tests; name exact module manifest before writes. Replace health.sh and external tests/identity_deployment. Re-estimate row02 and escalate any total above48 hours.
+- Waffles at door time15:40:29, post4df1345f7fa1aee5880a1c46640ba591147284abaf7904d015f4e2e25b64c7ef: release rebase becomes separate future brief IDENTITY-002, opened only when a suitable upstream release exists; its4-hour estimate is recorded beside the blocker. IDENTITY-001 row02 is8 hours, total44.5 against48 ceiling,3.5 contingency. Rows06/07 depend on IDENTITY-002. Commit revision5/module manifest for re-check before row02 source starts.
 
 ## Ceiling
 
-- Estimate: 40 focused implementer hours across seven rows; ceiling 48 hours including 8 hours contingency. Row figures below include implementation, review fixes and active validation/install work. Venue queue time, operator/provider setup waits and review waits are reported separately, not represented as productive hours or promised delivery dates. Report a row overrun when known; crossing 48 hours requires a revised ceiling before more implementation.
+- Estimate:44.5 focused implementer hours (original40 minus row02 original3.5 plus row02 Rust implementation8); ceiling48 hours, contingency3.5. The release-rebase work is a separate future brief IDENTITY-002, estimated4 hours outside this ceiling, opened only when a suitable upstream release exists. Report a row overrun as soon as known; Waffles takes any required ceiling change to Tom. External queue/release/operator/review waits are reported separately.
 - One implementer, Chippy; no builders or additional sub-agents. Archie owns a separate concurrent memory/context lane. Shared contract edits are coordinated before either author writes them.
 - One row in implementation and one gate invocation at a time in this lane. Gate/build venue scheduling is coordinated with Waffles, not assumed exclusive across the estate.
 - Edit main in the main Mac checkout. No worktree, tree copy to a laptop, or SSH build. Release builds, checks and tests run through the gate workflow on a laptop fetching exact pushed refs. At most one light local cargo check, with no heavy work beside it.
-- Seven ordered rows below. A row that needs any file outside its wall stops and names it; reviewer approves a brief revision before that file is edited. Directory walls for wholly new modules allow only the named responsibility and require an exact file manifest before their row starts.
+- Seven ordered rows below; real sign-in/production rows06 and07 additionally depend on separate future brief IDENTITY-002. A row that needs any file outside its wall stops and names it; reviewer approves a brief revision before that file is edited. Directory walls for wholly new modules allow only the named responsibility and require an exact file manifest before their row starts.
 - Step 1 creates directory records, sign-in and minimum identity audit. Capability certificates, arbitrary grants, session launch/stop, runtime adapters, credential handles, memory, context assembly, lanterns and production anchoring remain subsequent briefs.
 - SpiceDB and its durable database are installed and checked in row 2 as Waffles requested. Step 2 still owns live capability policy and its enforcement; merely running SpiceDB is not permission enforcement.
 - No production Cambium auth cutover or restart before the scratch acceptance, review and Gypsy's coordinated install. No upstream contribution is a prerequisite. No product name is selected by technical crate or directory names.
@@ -44,6 +47,7 @@ An operator installs the product without Cambium or Manifold, signs in, explicit
 - Use Aion's appearance as the reference for structure, typography, spacing and interaction, while preserving each product's own accent. Configure the Cambium Rauthy client green; give the identity client its own Ablative accent (orange, confirmed by Tom at 15:21:43). Exact accessible light/dark accent values are declared and reviewed before theme acceptance. Rauthy's fonts and page layout remain upstream's. Neither client nor the standalone screens require a build dependency on Cambium or Aion; extracting a shared design-system package stays a separate open decision.
 - Estate guide now includes identity at ablative-docs 385916e (Waffles 15:24:18): accent #D4975A, deep #A86B2E, wash #3D2A17, separately keyed from Manifold copper. Rows 02 and 05 read those values and the shared foundation from docs/design-system-v2/palette/estate-colour-tokens.json; estate-colour-family.html renders the reference. Use Aion for layout/type/interaction, not a copied application dependency. Do not copy its remaining purple status token: the estate guide explicitly bans purple.
 - Archie and Chippy agreed at 15:31 on one reviewed versioned envelope with typed audit/context payloads, log coordinate in the returned receipt outside the leaf and service-attested human actions. Exact encoding and fields remain joint-review work. Name the commitment hash explicitly; do not confuse SHA-256 attestation commitments with BLAKE3 content addresses. Row04 currently means lys-log-store file storage, not an already-proved Haematite backend.
+- Development isolation is explicit: rows02–05 use only disposable test identities and test provider registrations, no live Cambium participant migration, production tokens or real business sign-in. Each development install checks current releases/advisories and records the accepted v0.36.2 exception. The upstream-auth-state blocker still binds06/07; no implicit acceptance of a nightly base.
 
 ## Contract shared with the context lane
 
@@ -52,6 +56,10 @@ An operator installs the product without Cambium or Manifold, signs in, explicit
 - A future execution/fork ID refers to its enduring identity and, for a fork, its parent execution. Step 1 reserves that distinction in the contract but does not implement session history or launch.
 - Audit receipts carry a version, stable operation ID, actor, affected identity, operation, payload commitment and resulting log coordinate/checkpoint. Secrets and whole context objects are excluded. Exact signed encoding is reviewed before use, not frozen by this draft.
 - An uncertain append is reconciled using the existing Lys log's reopen rules before its projection answers as current. No retry under a fresh operation ID; no success before durable evidence. Named pending/refused outcomes stay visible until resolved.
+
+## External dependencies
+
+- **IDENTITY-002** (not_opened_waiting_for_upstream_release, estimated 4 hours): blocks rows 06, 07. Rebase ablative onto an upstream release carrying #1696 and #1728, exact-ref gate and three named account-status/redirect/logout guards. Open the brief only when that release exists; see RAUTHY-BASELINE.md. No nightly/cherry-pick substitution without Tom ruling.
 
 ## Source evidence
 
@@ -92,11 +100,11 @@ Provenance: Statement: Not decided (Rauthy decision 14:35-14:38); Waffles 15:03 
 - Replace the partial reading extract as implementation authority with the actual pinned checkout. Inventory every link/login/unlink/admin/import/export consumer of the single provider fields and both supported migration paths.
 - Record machine-principal facilities, confidential-client authentication and challenge configuration from source. Record the exact existing upstream files row 3 must touch in the brief before row 3 starts.
 - Verify the native-events findings below against the fork commit; compare a minimal extension of existing event storage/transport with a dedicated link outbox. Record the least invasive design that atomically retains each committed link/unlink through receiver outages; no table is added just because the first draft named one.
-- Source review found deployed-path security fixes in later upstream989f9ff9: logged-out session guard, authorization-code account rechecks and exact per-code redirect binding. Treat v0.36.2 installation as blocked; latest published release still0.36.2 at the check. Escalate to Waffles and wait for an acceptable upstream release, with no cherry-pick. See RAUTHY-BASELINE.md for scope and unproved runtime reachability.
+- Review later security fixes against deployed paths and preserve IDENTITY-001-UPSTREAM-AUTH-STATE. Waffles accepted row01 after the pin, branch and findings were recorded. The defect blocks real sign-in/production rows06/07; development rows02–05 continue under the15:36:25 ruling. No cherry-picks; an upstream release containing both hardening commits must pass separate IDENTITY-002 before row06.
 
 ### Acceptance
 
-- A fresh recursive clone resolves the same fork commit without the .work reading extract; submodule object and upstream ancestry are recorded.
+- The pin and branch are verified locally and remotely. Fresh recursive-clone acceptance is carried to the row02 venue gate by Waffles15:36:25; it does not hold the start of row02.
 - The baseline report names release, commit, licence, maintenance owner, policy for security updates and every legacy provider-field consumer; no assumption that a tree SHA is a commit SHA.
 
 ### Acceptance greps (locators, not test verdicts)
@@ -105,7 +113,7 @@ Provenance: Statement: Not decided (Rauthy decision 14:35-14:38); Waffles 15:03 
 
 ## Row 02 — Install the standalone service dependencies with durable storage
 
-Estimated focused hours: **3.5**. Depends on: 01.
+Estimated focused hours: **8**. Depends on: 01.
 
 Provenance: Statement: Permissions; Two rules from Tom; Road adjustment 1; Waffles 15:04:12 deployment order (SpiceDB deployment brought forward, capability enforcement remains step 2).
 
@@ -117,18 +125,59 @@ Provenance: Statement: Permissions; Two rules from Tom; Road adjustment 1; Waffl
 - `deploy/identity/versions.json`
 - `deploy/identity/config.example.toml`
 - `deploy/identity/README.md`
-- `deploy/identity/health.sh`
-- `tests/identity_deployment/`
 - `docs/design/identity/reports/IDENTITY-001-deployment.md`
 - `deploy/identity/rauthy-themes.json`
 - `deploy/identity/theme-map.md`
+- `deploy/identity/postgres-init.sql`
+- `Cargo.toml`
+- `Cargo.lock`
+- `crates/lys/Cargo.toml`
+- `crates/lys/src/main.rs`
+- `crates/lys/src/cli.rs`
+- `crates/lys/src/commands/error.rs`
+- `crates/lys/src/identity/mod.rs`
+- `crates/lys/src/identity/cli.rs`
+- `crates/lys/src/identity/config.rs`
+- `crates/lys/src/identity/credentials.rs`
+- `crates/lys/src/identity/private_files.rs`
+- `crates/lys/src/identity/prepare.rs`
+- `crates/lys/src/identity/configure.rs`
+- `crates/lys/src/identity/rauthy.rs`
+- `crates/lys/src/identity/themes.rs`
+- `crates/lys/src/identity/health.rs`
+- `crates/lys/src/identity/error.rs`
+- `crates/lys/tests/identity_deploy.rs`
+- `crates/lys/tests/identity_refusals.rs`
+- `crates/lys/tests/identity_theme.rs`
+- `crates/lys/tests/identity_shared_db.rs`
+- `crates/lys/tests/identity_restart.rs`
+- `crates/lys/tests/identity_support/mod.rs`
+- `crates/lys/tests/identity_support/fixtures.rs`
+- `crates/lys/tests/identity_support/server.rs`
+- `crates/lys/tests/identity_support/compose.rs`
+
+### Module responsibilities
+
+- `mod.rs`: Declarations and re-exports only.
+- `cli.rs`: Identity subcommand argument declarations.
+- `config.rs`: Typed deployment configuration and validation; no secret values in diagnostics.
+- `credentials.rs`: Zeroizing/redacted credential material and stable reuse.
+- `private_files.rs`: Restricted-mode durable file creation and outcome reconciliation.
+- `prepare.rs`: Validate inputs and materialise the declared private deployment artifacts.
+- `configure.rs`: Idempotent client/theme reconciliation with stable operation identifiers.
+- `rauthy.rs`: Typed Rauthy API requests/responses, named status errors and uncertain-outcome read-back.
+- `themes.rs`: Read the declared estate palette mapping and validate both client themes.
+- `health.rs`: Named readiness checks for the declared services.
+- `error.rs`: Typed errors carrying operation/resource/path, never secret bytes.
 
 ### Work
 
+- Prepare and install an isolated development instance on the Mac, using test identities only. Keep release builds/checks/tests on the laptop workflow; do not use the development exception to bypass the gate path. Check upstream releases and advisories before every install and record the security exception.
 - Package maintained Rauthy and SpiceDB against one PostgreSQL service and one durable database, with separate least-privilege roles/schema namespaces, explicitly configured credentials and documented local/TLS origins. Verify both migration runners and connection search paths coexist before claiming one-database readiness. These are three dependency processes beside the platform door; Cambium, Manifold, Argus and Aion servers are not runtime dependencies.
 - Define readiness, migration order, named configuration failures, stop/start and backup/restore checks. Keep generated credentials out of Git and logs; health output excludes secrets.
 - Register separate platform and Cambium OIDC clients with exact redirect URIs and RS256 where the Cambium verifier requires it. Google/GitHub federation credentials belong to Rauthy; Google API consent remains a different client purpose.
 - Configure both Rauthy client themes using Aion's pinned neutral/text/radius design vocabulary and each client's own product accent: Cambium green, identity product accent separately declared (orange confirmed by Tom). Map text, text_high, bg, bg_high, action, accent and error into HSL for light and dark, plus button text colour and border radius. Record every source token and colour conversion; verify readable contrast. Colours mirror each product, not a universal Aion-blue. Fonts and page layout remain Rauthy's; no font/layout patch or cross-application build dependency enters the fork.
+- Implement lys identity prepare/configure/health in the existing CLI using the module manifest below. Preparation validates declared config and materialises private files with restricted modes; configure reconciles two clients and themes with stable operation IDs and read-back after uncertain transport outcomes; health names service/database readiness failures. PostgreSQL runs postgres-init.sql through its own init directory. No Python or shell provisioning engine.
 
 ### Acceptance
 
@@ -137,10 +186,11 @@ Provenance: Statement: Permissions; Two rules from Tom; Road adjustment 1; Waffl
 - Dependency artifact digests, versions, resolved configuration without secrets and backup/restore result are recorded. This row does not claim the product directory exists yet.
 - ID001_THEME: inspect both client login pages in light and dark mode; all seven HSL fields, button text and border radius match the declared mapping, persist after restart and retain readable contrast. Record the source-token ref and Rauthy theme export without credentials.
 - ID001_SHARED_DB: prove Rauthy and SpiceDB both write/reopen against the same PostgreSQL database, migrations do not collide and the service roles cannot read the other schema. Restore the database plus documented key/config/cache dependencies and repeat readiness.
+- ID001_PIN_CLONE: the venue fetches the exact pushed Lys ref with recursive submodules and verifies the expected Rauthy commit on ablative without using the Mac reading copy.
 
 ### Acceptance greps (locators, not test verdicts)
 
-- rg -n 'ID001_DEPLOY|ID001_DEPLOY_REFUSAL|ID001_THEME|ID001_SHARED_DB' tests/identity_deployment
+- rg -n 'ID001_DEPLOY|ID001_DEPLOY_REFUSAL|ID001_THEME|ID001_SHARED_DB|ID001_PIN_CLONE' crates/lys/tests/identity_*.rs
 
 ## Row 04 — Build the directory contract and signed authoritative changes
 
@@ -275,7 +325,7 @@ Provenance: Statement: beyond just a login page; Road adjustment 1; lifecycle sc
 
 ## Row 06 — Connect Cambium without changing its people or Google API ownership
 
-Estimated focused hours: **4**. Depends on: 05.
+Estimated focused hours: **4**. Depends on: 05, IDENTITY-002.
 
 Provenance: Statement: Cambium first connected customer, independent operation retained; DOOR-TRANSITION-2026-09-21 explicit linking, read with today's issuer decision.
 
@@ -339,7 +389,7 @@ Provenance: Statement: Cambium first connected customer, independent operation r
 
 ## Row 07 — Gate, install and demonstrate the exact release
 
-Estimated focused hours: **5**. Depends on: 06.
+Estimated focused hours: **5**. Depends on: 06, IDENTITY-002.
 
 Provenance: Statement: each step installed and shown on a screen; Waffles 15:04:12 venue rules; Gypsy 15:02 runtime ownership.
 
@@ -385,8 +435,8 @@ Provenance: Statement: each step installed and shown on a screen; Waffles 15:04:
 
 ## Current evidence and limits
 
-- Row01 fork creation and exact submodule pin are complete as operations; the row is not accepted. Branch ablative is pushed at dd61ac3. Deployed-path security gaps block installation of this baseline; row02 has not started. No source patches, compiler, tests, gate or install performed.
+- Row01 accepted by Waffles15:36:25. Fork ablative and Lys pin are pushed at dd61ac3/146796f. Row02 preparation is running for isolated development only. No application patches, compiler invocation, tests, gate, service install or production sign-in change has occurred.
 - Cambium source already implements explicit OIDC linking; that is reused, not claimed as new work. Its current Google API code still uses sign-in client/provider settings, requiring separation before issuer cutover.
 - Rauthy v0.36.2 clients.rs validate_code_challenge is configuration-driven; authorization-code client authentication and challenge validation are separate. The saved source extract is read-only evidence, not the fork checkout.
 - The existing Lys log retains leaves in memory; this step uses small identity/audit records and makes no claim of unlimited history or production anchoring.
-- Revision4 records the settled fork branch/upgrade policy, approved row03 wall additions, exact orange guide values and shared-envelope agreement. Docs/pin commit and push are explicitly authorised; fresh recursive-clone acceptance remains due at the row02 venue gate. Archie acknowledged the full handoff and has what he needs for step04.
+- Revision5 includes the approved Rust CLI deployment shape and exact row02 module manifest; no product source has been written. Total44.5 hours fits48 with3.5 contingency. The four-hour release rebase is future IDENTITY-002 outside this brief and blocks06/07. Row01 accepted; row02 source starts after Waffles re-checks this commit. Venue gate path remains with Heimdall.

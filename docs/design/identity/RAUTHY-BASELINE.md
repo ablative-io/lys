@@ -2,6 +2,16 @@
 
 Observed 22 September 2026, Melbourne. **In progress; no gate or deployment passed.**
 
+## Current binding — Waffles, door time 15:36:25
+
+Ceiling clarification at door time **15:40:29**: the release rebase is a separate future brief **IDENTITY-002**, estimated **4 focused hours**, opened only when upstream publishes the suitable release. It is not an eighth row hidden inside IDENTITY-001. Rows06 and07 explicitly depend on its accepted gate. Its three guard acceptance cases are named below. IDENTITY-001 now estimates **44.5 hours** with the revised Rust CLI deployment row, within its48-hour ceiling and3.5-hour contingency.
+
+**Row01 is accepted. Row02 development preparation is running.** The security blocker below binds **rows06 and07**, not isolated development rows02–05. Those development deployments/showings may use v0.36.2 with test identities only; no real-person sign-in or live Cambium migration is permitted under that exception. No development instance has yet been installed.
+
+Before row06, separate future brief **IDENTITY-002** rebases `ablative` onto an upstream **release tag** containing both `c44f7cac` (#1696, 26 August) and `989f9ff9` (#1728, 18 September), with its own exact-ref gate. Its acceptance explicitly tests account disabled/expired between authorization and exchange, exact per-code redirect binding, and refusal to revive a logged-out session. No cherry-pick. If no suitable release exists at the row05 showing, **Tom decides nightly versus waiting**; the development exception does not answer that choice.
+
+Release and advisory reads recur before every installation. Recursive-clone proof is deferred to the row02 venue gate and does not block preparation. Heimdall owns the Argus schema timeout; no gate submission or local replacement until that path is repaired. Source-reading attribution: Chippy read the 24-commit inventory and selected #1728 diffs; Waffles independently checked #1696 and #1728. Do not represent that as Chippy having reviewed every diff in all24 commits.
+
 ## Latest ruling and security blocker
 
 Waffles settled the maintenance base at door time 15:30:50: `ablative` starts at v0.36.2, fork main stays untouched, release-tag rebases only, no cherry-picks. **Branch `ablative` was created and pushed at `dd61ac3`; `.gitmodules` tracks that branch while pinning its exact commit.** Earlier unresolved-base wording below is superseded. The three omitted row03 files below are now approved and included in brief revision4.

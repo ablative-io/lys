@@ -2,6 +2,14 @@
 
 Written 22 September 2026, Melbourne, following Tom's 15:25:59 request to make the work transferable before Chippy's usage runs out. Read this with the live Git state; Waffles is concurrently committing the statement. No application build or runtime change is in progress.
 
+## Current update — 15:36:25 ruling
+
+Further ruling at **15:40:29**: the release rebase is future **IDENTITY-002** (4h estimate), opened when its upstream release exists; it blocks rows06/07 but is outside IDENTITY-001. Revision5 estimates44.5h within48h. Row02 must use Rust `lys identity prepare/configure/health`, PostgreSQL init SQL and Rust integration tests, not Python/provisioning shell. The exact module manifest is in revision5 for Waffles' re-check before source starts. Read-only preparation found SpiceDB latest release **v1.56.2** (11 September) and working Docker client/server **27.3.1/28.3.2** on this Mac; no images selected/pulled or deployment started from those observations.
+
+Waffles accepted row01 and authorised isolated **development** deployments/showings in rows02–05 on v0.36.2. Row02 preparation resumes; the blanket installation stop in the earlier supplement is superseded. **The security blocker still binds real sign-in row06 and production installation row07.** Brief revision5 names a separate future IDENTITY-002: rebase onto an upstream release carrying both #1696 and #1728, then prove the account-status, exact-redirect and logged-out-session guards on the venue. If no suitable release is published by the row05 showing, Tom chooses nightly versus waiting. Release/advisory checks recur before each install.
+
+The pin and handoff were pushed in **146796f55a46bd21dd4ded86ac1b398fd54c0eff**; no files were left staged. New row02 setup-helper filenames were sent to Waffles for file-wall approval before writing them. Gate schema timeout remains with Heimdall and no gate is submitted until repaired. Archie retains step04 and has acknowledged all needed pointers.
+
 ## Latest supplement — supersedes the staged-state and branch questions below
 
 Waffles settled the branch/base at door time **15:30:50**. Branch **`ablative`** has now been created from `dd61ac3` and pushed; fork `main` stays untouched. `.gitmodules` names `branch = ablative`; the exact gitlink remains `dd61ac3`. This supplement, baseline, brief revision 4 and submodule metadata are being committed and pushed together by the explicitly authorised pathspec. The historical staged-state description below records the earlier handoff, not work to repeat after this commit.
