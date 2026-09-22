@@ -55,14 +55,31 @@ The lys roadmap's own next step is the first consumer integration, and it names 
 
 The home and the anchoring are direction. They are designed with Tom before they are built.
 
-## What is built first
+## What exists and what is missing
 
-| Row | What it proves | Hours |
-| --- | --- | ---: |
-| Identity proof | A person with 2 sign-ins is 1 identity. An agent that loses a permission between step 1 and step 2 of a task keeps step 1 and is refused step 2. A rotated credential keeps the agent's history. SpiceDB runs beside the door and the door asks it. The agent's identity is a lys certificate with a capability claim, the first capability type lys carries. | 8 to 10 |
-| Secrets broker | The store, the handle, the proxy, the SpiceDB check, the audit line, rotation under one handle, and the seat's own login through the proxy proved or ruled out. Replaces the pool file. | 8 to 12 |
+Tom, 13:41: "I don't think you've looked properly at what's there. Most of it's already there." Read on 22 September, 13:43, from the code in this repository, the cambium door, manifold and haematite.
 
-The admission procedure (who may join a place and how) is settled with Tom next, from Chippy's draft of 22 September. The audit of the existing apps against this design comes after the rows above.
+| Part of the design | State | Where |
+| --- | --- | --- |
+| The agent's key: Ed25519 identity with X25519 derivation | built and tested | lys-core keys |
+| Certificate authority, certificate requests, validity checks, claims carried in extensions under our own OID arc | built and tested; the claim bytes are opaque | lys-core ca |
+| Delegation of a seat as a typed subject, version 1, with conformance against the Go implementation | built and tested | lys-core delegation |
+| Sealed envelopes and authenticated seal | built and tested | lys-core seal |
+| Signed attestations, the Merkle log with inclusion and consistency proofs, signed checkpoints, proof artifacts, receipts, verification bundles | built and tested | lys-core |
+| The anchor: genesis, append, submit, checkpoint, open, status, admission policy on certificates, upward pinning of anchors to anchors, a witness | built and tested, not deployed | lys-anchor |
+| A log store | built | lys-log-store |
+| The verifier's command line | built | lys |
+| Every manifold envelope signed with the lys identity | in use | manifold-core |
+| Sign-in with Google, account linking, seats, agent seats, sessions, project membership | in use | cambium door |
+| An append-only event store | in use | haematite |
+| A typed capability claim in the certificate | missing; the claim bytes are opaque and the lys roadmap names this as its own next gap | lys-core ca |
+| Revocation as a store, with the live set folded from the log | ruled (DP26), not built | lys |
+| The live permission decision (SpiceDB beside the door) | not started | cambium door |
+| The secrets broker: the store, the handle, the proxy, rotation under one handle | not started | cambium door |
+| A runtime writing its session events into a lys log, and haematite as the store behind it | not started; lys phase 3 | door, manifold, haematite |
+| Anchoring in production | not started | lys-anchor |
+
+So the first step joins existing pieces rather than building new ones: the capability claim type in the certificate, and the runtime writing into the log. No step starts before Tom says so. The admission procedure (who may join a place and how) is settled with Tom from Chippy's draft of 22 September. The audit of the existing apps against this design comes after.
 
 ## Not decided
 
