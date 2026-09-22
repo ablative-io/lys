@@ -78,6 +78,8 @@ The home and the anchoring are direction. They are designed with Tom before they
 
 Chippy, 14:37, having traced the Merkle tree, log, proof and checkpoint code: the primitives are there, and what needs designing is the context record that uses them. When a session starts, the context builder selects the permitted instructions, memories and documents within the model's budget and records their exact versions, order and any summaries; the runtime records the final context it submitted; lys signs those records into the append-only history. That proves what a session was given and where it came from, not that the model understood it or that a summary was accurate. Compaction is a new derived record pointing at its sources, never a rewrite. Private content stays encrypted; an anchor receives a checkpoint, never a transcript. One limit: the current lys log loads every leaf into memory, so it is not an unlimited transcript store until that changes.
 
+Chippy, 14:40: that limit need not block the context record. The encrypted context objects live in durable storage; lys holds small, versioned receipts that refer to them. The whole transcript is never loaded into the Merkle log. Those receipt logs still grow and need a scaling plan.
+
 ## What exists and what is missing
 
 Tom, 13:41: "I don't think you've looked properly at what's there. Most of it's already there." Read on 22 September, 13:43, from the code in this repository, the cambium door, manifold and haematite.
