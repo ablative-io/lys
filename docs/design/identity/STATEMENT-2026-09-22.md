@@ -84,6 +84,20 @@ Chippy, 14:37, having traced the Merkle tree, log, proof and checkpoint code: th
 
 Chippy, 14:40: that limit need not block the context record. The encrypted context objects live in durable storage; lys holds small, versioned receipts that refer to them. The whole transcript is never loaded into the Merkle log. Those receipt logs still grow and need a scaling plan.
 
+### The home is portable: lanterns, translation and forks (Tom, 14:45)
+
+Tom, 14:45 to 14:46: the innovative feature to put in here is the work on the Norn memory system and lanterns in the ablative directory; it "changes the perspective on how an agent" exists: "being able to translate between harnesses, to translate sessions, files, so say to move Claude Code to OpenAI ChatGPT. Perhaps more than that, to be able to deploy forks of yourself to different environments... a virtual machine, isolated sandboxes, work in a different node in the network. Really changes what an agent footprint could be."
+
+What is already there, read 14:46. Tom's definition of 8 August 2026, in the Norn memory design: "A memory is a way of storing a note against something, so you can retrieve that note against that thing. A lantern comes with an annotation like the note, but is a pathway back to have a conversation with the previous self through a fork." Lanterns are declared on purpose at moments of completion, success or learning, never automatically; their notes grow over time ("what wound up happening"); vector retrieval is in, so memories aware of time and place make themselves known; time means position in the work's history, never wall-clock age. The lantern tool design (Cally Ray with Tom, 5 September 2026, nothing built) makes one primitive of it: cut a session tree at a coordinate, seed a fork from the cut, run it under a lens on chosen weights with read-only tools, get a structured answer back, write the event on the parent's timeline. Its verbs: ask, sound off and compare, light a lantern, add an epilogue, commune with it, and the one fork with hands, the delegate, which does a piece of work and returns. It measured 3 session formats, Claude Code's JSONL (already a tree: every record carries its parent), Norn's session tree and codex, with a converter between them, so translating a session between harnesses is designed there.
+
+How it sits in this platform. The context record above is what makes all of it possible: a session is a signed record of exactly what was given, in what versions and order, held under the identity and not under any harness. So:
+
+- **Translation** is reading the context record out in another harness's shape. What each destination can resume is measured per harness, and what was lost in the cut is recorded, never hidden.
+- **A fork** is a spawn under the same identity from a coordinate in its history. It carries a delegation from the parent with its own lease (uses, time, spend) and its own handles, so a fork in a sandbox or on another node has exactly the access it was given and its every act lands on the same log, attributed to the fork and traceable to the parent. Ending the fork is the same laptop-back act as ending an agent.
+- **A lantern** is a declared coordinate in that record with a note, and communing with it is a read-only fork at that coordinate.
+
+This is direction, designed with Tom before it is built. Chippy is reading the memory design and the translation and branching work now (14:46).
+
 ## What exists and what is missing
 
 Tom, 13:41: "I don't think you've looked properly at what's there. Most of it's already there." Read on 22 September, 13:43, from the code in this repository, the cambium door, manifold and haematite.
