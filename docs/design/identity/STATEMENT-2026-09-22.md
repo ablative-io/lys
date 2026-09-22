@@ -57,7 +57,7 @@ Chippy, 13:52, in the Dot room: revoking a proxy handle stops future calls, but 
 
 ## Lifecycle, budgets and leases: the discussion of 14:00
 
-Tom asked, not ruling: is this product responsible for agent lifecycle, and where are the lines. Positions given in the room, for Tom to settle:
+Tom asked at 14:00, not ruling: is this product responsible for agent lifecycle, and where are the lines. Settled 15:01, Tom: "the lifecycle, yes, I agree with everything that's been discussed, so let's move ahead." The three positions below stand together as the design: the record and the decision live here, the runtime carries them out and reports, and Chippy's distinctions hold. Positions as given in the room:
 
 - **Waffles.** Lifecycle belongs here as the record and the decision, never as the process. HR decides who is hired, the role, the access, the budget and the leaving date, and takes the laptop back; IT runs the laptop. So this service owns the agent's record and its states (commissioned, provisioned, active, suspended, ended). The engine asks it "may I start this agent, with what environment and what handles" and reports started and ended as signed events into the log. Ending is the laptop coming back: certificate revoked, every handle dropped, context sealed and archived under the identity. Budgets sit here because the proxy attributes every call to an identity. Everything handed out is a lease: a number of uses, a time window, a spend cap; the time window lives in the signed delegation, uses and spend are counted by the door because a signed object cannot count. Argus manages the live context of a running session; this service keeps the durable context across sessions. People get the same record, engine and leases, and the proxy is where a person's delegated credentials across providers live too. The cure for permission dread is a model that reads as sentences and a screen that answers "why can this identity do this".
 - **Buckley.** Identity versus execution: the identity platform answers who this is, what it may hold and for how long; the engine answers where it is running and what it is doing now. Seat spawn and seat end are enforcement points that consult the record, like a door reader checking a badge HR issued. Offboarding is one revoke at the identity side and every runtime enforces it by refusing the next call. Provider secrets are never stored in agents: an agent holds an identity token and exchanges it for a scoped, time-boxed, use-counted lease on the real credential; the same exchange serves people. Onboarding is adding one relation, offboarding is deleting the subject. Caution on forking an identity provider: a fork carries its security patches forever; test first whether an agent can be a first-class principal without one.
@@ -125,9 +125,11 @@ Tom, 13:41: "I don't think you've looked properly at what's there. Most of it's 
 
 So the first step joins existing pieces rather than building new ones: the capability claim type in the certificate, and the runtime writing into the log. No step starts before Tom says so. The admission procedure (who may join a place and how) is settled with Tom from Chippy's draft of 22 September. The audit of the existing apps against this design comes after.
 
-## The road: proposed 14:51, for Tom to settle
+## The road: settled 15:01
 
 Tom, 14:51: "What does the road map look like and how do we take useful steps along the way without requiring the whole thing to be done first?" Two answers were given in the room. They agree on the order and differ on the cut lines. Each step is installed and shown on a screen before the next, and each stands on its own.
+
+Tom, 15:01: "I agree with everything that's been discussed, so let's move ahead." The 7 steps with Chippy's 4 adjustments are the road. Two lines of work run concurrently: identity, access and the broker (steps 1 to 3) with Chippy, who stays across cambium because the platform integrates with it; memory, context and lanterns (steps 4 and 5) with Archie, whom Tom brings online and the room brings up to speed. The lifecycle screen (step 7) is shared.
 
 **Waffles, 7 steps.**
 
