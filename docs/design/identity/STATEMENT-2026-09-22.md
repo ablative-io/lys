@@ -8,6 +8,8 @@ One identity service for people and agents. It holds five things about every ide
 
 The functions that hang off an identity are the ones a company hangs off a person: commissioning an agent from text, its environment, its learning, its records. Tom's name for it: cyborg relations.
 
+Tom, 14:38 to 14:42: the product is the whole identity, access, permissions and agent lifecycle platform, "beyond just a login page", a full standalone application valuable in its own right. What makes it valuable in its own right is the agent lifecycle, the memory and the secret management together: what tools an agent is provisioned with, what skills and MCP servers, what access to the AI, what goes into its system prompt, what is in its memory, and the context engineering behind all of that. Sign-in is one piece inside it.
+
 ## Permissions
 
 SpiceDB is the permission engine. Tom, 13:13: "I'm happy to go with SpiceDB." It is a Go service and cannot be compiled into our Rust binary, so it runs as one process beside the door. Chippy, 14:37: SpiceDB's production storage is an external database and it has no embedded option, so it brings a database with it. With Rauthy (decided 14:35, embedded storage of its own) the installation is 3 processes beside the door: Rauthy, SpiceDB and SpiceDB's database. The earlier line that SpiceDB was the only outside process was wrong. Its revision token is what lets a read be at least as fresh as a named change, which the admission proof needs.
