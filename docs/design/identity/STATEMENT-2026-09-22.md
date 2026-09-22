@@ -125,6 +125,32 @@ Tom, 13:41: "I don't think you've looked properly at what's there. Most of it's 
 
 So the first step joins existing pieces rather than building new ones: the capability claim type in the certificate, and the runtime writing into the log. No step starts before Tom says so. The admission procedure (who may join a place and how) is settled with Tom from Chippy's draft of 22 September. The audit of the existing apps against this design comes after.
 
+## The road: proposed 14:51, for Tom to settle
+
+Tom, 14:51: "What does the road map look like and how do we take useful steps along the way without requiring the whole thing to be done first?" Two answers were given in the room. They agree on the order and differ on the cut lines. Each step is installed and shown on a screen before the next, and each stands on its own.
+
+**Waffles, 7 steps.**
+
+1. **Sign-in.** Our Rauthy fork beside the door, cambium signs people in through it, the fork links 2 providers to 1 person. Useful alone: a person with Google and GitHub is 1 identity.
+2. **The agent's certificate.** The typed capability claim in the lys certificate, an agent seat gets one at spawn, SpiceDB as the second service, the door asks it on every call. Useful alone: an agent that loses a permission in the middle of a 2 step task is refused on the next call; the screen answers why this identity can do this.
+3. **The secrets broker.** Store, handle, proxy, rotation under 1 handle. Useful alone: the pool file is gone, no real key in any seat's environment, every call attributed to an identity.
+4. **The flight recorder.** The door and the runtime write session events and audit lines into a lys log stored in haematite, with the context record as receipts. Useful alone: open any session and see what it was given and what it did.
+5. **The home.** Context objects under the identity; spawning the agent on a laptop pulls its context down. Then translation, forks and lanterns, each its own step.
+6. **Anchoring in production.**
+7. **The lifecycle screen**, running through all of them: create an agent, run it, inspect it, change its access, retire it, gaining a piece at each step.
+
+Steps 1 to 3 are the platform without any of the memory work.
+
+**Chippy, 5 releases, each completing a real journey, each with a small brief (screen journey, ownership boundaries, acceptance demonstration).**
+
+1. **A standalone identity and access application.** Sign in, register people and existing agents, assign access, see why it is granted, revoke it, in one connected application: the maintained Rauthy fork, the first product screens, SpiceDB with its durable storage chosen, stable identities connected to lys; linking and migration proved without duplicate people. Value: one place to administer access.
+2. **Managed credentials.** One provider, one useful operation: issue a time-limited or use-limited handle, enforce it through the proxy, record the account used, demonstrate revocation and recovery after a crash. Useful to people and existing agents before any agent is launched by us.
+3. **Create and operate an agent.** One template, one runtime adapter, one complete path: configure instructions, tools and MCP access, provision, start a session, inspect state and usage, stop or suspend with confirmed outcomes. Manifold optional. Hard spending caps ship only where reservation and enforcement are proved.
+4. **Durable memory and context.** Preserve sessions, attach notes to their sources, retrieve permitted material, record what each run received; the existing lys primitives throughout, this release adding the context records and the storage integration. Searchable, correctable memory before automatic recall.
+5. **Portability and lanterns.** Prove one harness translation, then a separately authorised working fork into one isolated environment, then a read-only conversation with a past session; widen from working examples.
+
+The two map onto each other: Chippy's release 1 is steps 1 and 2; release 2 is step 3; release 3 is step 7 brought forward; release 4 is steps 4 and 5; release 5 is the tail of step 5. Anchoring (step 6) is in neither release list and sits where Tom puts it.
+
 ## Not decided
 
 - Decided 14:35, Tom: "knowing that we're gonna use Rauthy". Rauthy authenticates people. Required: Rauthy runs beside the door with SpiceDB as the second service; the one-provider-per-user limit in v0.36.2 ("user is already federated") is changed in a fork of our own that we maintain (Tom, 14:38: "we won't be making a contribution to Rauthy upstream. We can give it a try, but it's very unlikely that it'll be accepted... much more likely that we would need to keep maintaining our own fork"); Rauthy is the login piece inside the platform, and the platform, identity, access, permissions and agent lifecycle, is the standalone product, "beyond just a login page"; the door's Google sign-in becomes sign-in through Rauthy; an agent as a first-class principal in Rauthy is proved before the identity proof leans on it; whether Rauthy's own sign-in pages can carry our styling or our own page drives its API is read from its code before it is promised. Read 14:38 from Rauthy v0.36.2's theme entity: a theme is per client, and it carries 7 colours as HSL for light and for dark (text, text_high, bg, bg_high, action, accent, error), the button text colour, the sun and moon icons and the border radius, built into CSS variables. No font, no layout and no custom CSS. So Rauthy's pages can wear our colours and corner radius; fonts and layout stay Rauthy's. Our own sign-in page in front of Rauthy is not verified as possible and is not promised.
