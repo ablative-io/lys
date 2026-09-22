@@ -1,0 +1,4 @@
+[submodule "vendor/rauthy"]
+	path = vendor/rauthy
+	url = https://github.com/ablative-io/rauthy.git
+	branch = ablative

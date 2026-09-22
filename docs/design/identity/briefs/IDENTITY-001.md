@@ -2,7 +2,7 @@
 
 Rendered from `IDENTITY-001.json`; edit the JSON source, then regenerate this file.
 
-Revision 3. Status: **approved_rows_01_02_in_progress**. Owner: Chippy. Reviewer: Waffles. Date: 2026-09-22 Australia/Melbourne.
+Revision 4. Status: **approved_row_01_blocked_on_upstream_security_release**. Owner: Chippy. Reviewer: Waffles. Date: 2026-09-22 Australia/Melbourne.
 
 Authority: [../STATEMENT-2026-09-22.md](../STATEMENT-2026-09-22.md).
 
@@ -16,8 +16,8 @@ An operator installs the product without Cambium or Manifold, signs in, explicit
 - Waffles review delivered 15:15:58 Melbourne (message 547f599c630df31282d33912c99a8342062cfbf637031437a5ba89f13d5e472d, signed 15:17): reorder 01,02,04,03,05,06,07; inspect native events before enlarging fork; one PostgreSQL; Rauthy themes; per-row hours and live demonstrations. His earlier 15:05 wording is corrected to the door timestamp 15:04:12.
 - Tom 15:18 and Waffles 15:19 in Dot: consistent appearance across products, Aion's browser appearance preferred, Cambium not yet the reference. Identity screens follow Aion colours/type/spacing without a Cambium surface build dependency; Rauthy uses the same colours. Shared design-system extraction remains open and outside this brief.
 - Tom 15:20, clarified by Waffles 15:21 in Dot: shared design, distinct product accents; Cambium green, Aion blue/black, Argus light blue, Haematite mustard. The new product's accent is orange, confirmed by Tom at 15:21:43. Do not silently make every product Aion-blue.
-
 - Waffles approved revision 2 at 15:22:45, Cambium post a1d511ca4ce5ed95cfd577c5d89341a6f16387c6b38dad037b2419b83b65f519: rows 01 and 02 start; ceiling 48 hours, one implementer, one row/gate at a time. The subsequent colour update comes from Tom and Waffles and does not expand implementation scope.
+- Waffles at door time 15:30:50, post d7cb4eb8f7463169da3395617b17b4d7f0b0882a96c7604e69679f209aa4cdbf: maintained fork branch ablative from v0.36.2; main is untouched upstream mirror; release-tag rebases only with their own gated row; no cherry-picks. Row03 adds users API type, migration inserts and admin UserInfo paths. Commit/push docs and pin without a gate; venue recursive-clone proof moves to row02 gate. Archie retains step04; Chippy rows pause if usage ends. Argus gate timeout belongs to Heimdall; no gate submission until resolved.
 
 ## Ceiling
 
@@ -31,9 +31,9 @@ An operator installs the product without Cambium or Manifold, signs in, explicit
 - No production Cambium auth cutover or restart before the scratch acceptance, review and Gypsy's coordinated install. No upstream contribution is a prerequisite. No product name is selected by technical crate or directory names.
 - Live installed demonstrations to Tom are required at the end of row 03 and row 05, before proceeding beyond those milestones; row 07 is the final combined release proof, not their first showing.
 
-## Design choices proposed for review
+## Design choices and reviewed rulings
 
-- Use vendor/rauthy as a pinned submodule of the maintained ablative-io/rauthy fork, based on verified upstream v0.36.2 commit. The saved dd61ac3 tree identifier is not presented as a commit pin.
+- Maintained fork is ablative-io/rauthy branch ablative, created and pushed from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662. Fork main remains an untouched upstream mirror. Lys vendor/rauthy pins an exact commit on ablative; upgrades rebase onto upstream release tags only, each in its own gated row. No reset of main and no cherry-picking unpublished security changes.
 - Use one PostgreSQL service and one durable database for Rauthy and SpiceDB, with isolated roles/schema namespaces and verified migration/search-path behavior. Pin supported releases and image digests in row 02. Rauthy v0.36.2 database.rs supports PostgreSQL; its internal Hiqlite cache/node still starts in that mode and is not a second authoritative identity database. Document required cache/key/config files and restore behavior rather than claiming a SQL dump alone backs up the whole product. No Hiqlite identity datastore in the installed configuration.
 - Keep people authenticated by Rauthy; register enduring agents as first-class directory principals. Registration is not issuance of a Rauthy login, a runtime credential or a capability certificate. Row 1 records the evidence on Rauthy's machine-principal facilities for step 2.
 - Bootstrap the initial directory administrator by an explicitly configured issuer/subject, never by email or first visitor. Step-1 directory maintenance has this bounded administrator policy; general assignment and why-access views arrive in step 2. Reject unauthenticated and non-administrator mutations.
@@ -42,8 +42,8 @@ An operator installs the product without Cambium or Manifold, signs in, explicit
 - The service signs an attestation naming the authenticated human actor and authentication provenance. Do not claim the human personally signed bytes with a private key they do not hold. Agent registration by an administrator likewise records the administrator, not an invented agent signature.
 - Native Rauthy events were inspected before retaining a link-audit addition: no provider-link/unlink EventType exists; mutation paths do not emit such an event; existing persistence is asynchronous and severity-filtered, with age-based cleanup. The stock stream cannot establish the required durable outcome. Retain a narrowly scoped same-transaction link audit record/outbox with stable operation IDs and explicit pending/acknowledged state, subject to row-01 exact-source inventory and review of the minimal diff. Reuse native transport where it can meet replay/acknowledgement requirements; do not build a general replacement event service or audit unrelated Rauthy operations.
 - Use Aion's appearance as the reference for structure, typography, spacing and interaction, while preserving each product's own accent. Configure the Cambium Rauthy client green; give the identity client its own Ablative accent (orange, confirmed by Tom at 15:21:43). Exact accessible light/dark accent values are declared and reviewed before theme acceptance. Rauthy's fonts and page layout remain upstream's. Neither client nor the standalone screens require a build dependency on Cambium or Aion; extracting a shared design-system package stays a separate open decision.
-
 - Estate guide now includes identity at ablative-docs 385916e (Waffles 15:24:18): accent #D4975A, deep #A86B2E, wash #3D2A17, separately keyed from Manifold copper. Rows 02 and 05 read those values and the shared foundation from docs/design-system-v2/palette/estate-colour-tokens.json; estate-colour-family.html renders the reference. Use Aion for layout/type/interaction, not a copied application dependency. Do not copy its remaining purple status token: the estate guide explicitly bans purple.
+- Archie and Chippy agreed at 15:31 on one reviewed versioned envelope with typed audit/context payloads, log coordinate in the returned receipt outside the leaf and service-attested human actions. Exact encoding and fields remain joint-review work. Name the commitment hash explicitly; do not confuse SHA-256 attestation commitments with BLAKE3 content addresses. Row04 currently means lys-log-store file storage, not an already-proved Haematite backend.
 
 ## Contract shared with the context lane
 
@@ -53,7 +53,7 @@ An operator installs the product without Cambium or Manifold, signs in, explicit
 - Audit receipts carry a version, stable operation ID, actor, affected identity, operation, payload commitment and resulting log coordinate/checkpoint. Secrets and whole context objects are excluded. Exact signed encoding is reviewed before use, not frozen by this draft.
 - An uncertain append is reconciled using the existing Lys log's reopen rules before its projection answers as current. No retry under a fresh operation ID; no success before durable evidence. Named pending/refused outcomes stay visible until resolved.
 
-## Source evidence read for revision 2
+## Source evidence
 
 - [https://raw.githubusercontent.com/sebadob/rauthy/v0.36.2/src/data/src/events/event.rs](https://raw.githubusercontent.com/sebadob/rauthy/v0.36.2/src/data/src/events/event.rs) — lines 141-168,403-412,538-577. EventType has no provider-linked or provider-unlinked variant. Event has id, timestamp, severity/type, IP, numeric data and text, not a typed provider-subject link payload. Its insertion is a separate database call.
 - [https://raw.githubusercontent.com/sebadob/rauthy/v0.36.2/src/data/src/entity/auth_providers.rs](https://raw.githubusercontent.com/sebadob/rauthy/v0.36.2/src/data/src/entity/auth_providers.rs) — lines 1167-1180. Explicit linking assigns the user provider ID and federation UID for a later save. That branch emits no link event.
@@ -64,7 +64,6 @@ An operator installs the product without Cambium or Manifold, signs in, explicit
 - [https://raw.githubusercontent.com/sebadob/rauthy/v0.36.2/src/data/src/database.rs](https://raw.githubusercontent.com/sebadob/rauthy/v0.36.2/src/data/src/database.rs) — lines 68-91,226-239. PostgreSQL is supported and has its own migration runner. Hiqlite starts internally even in PostgreSQL mode for cache/node functions; this does not require keeping the identity records in a separate embedded database.
 - [https://raw.githubusercontent.com/sebadob/rauthy/v0.36.2/src/data/src/entity/theme.rs](https://raw.githubusercontent.com/sebadob/rauthy/v0.36.2/src/data/src/entity/theme.rs) — lines 19-28,93-100. Theme configuration is per client with light/dark values and border radius. The supported palette mapping does not replace fonts or layout.
 - [/Users/tom/Developer/ablative/stack/aion/apps/aion-ops-console/src/index.css](/Users/tom/Developer/ablative/stack/aion/apps/aion-ops-console/src/index.css) — lines 1-180; last file commit 3b622599a. Read the clean source: self-hosted DM Sans and JetBrains Mono, radius and spacing ladders, explicit dark and light palettes with strategy-blue action accent and terracotta attention. Use this as the visual reference, not an endorsement of all Aion frontend implementation choices. Record the full source ref when deriving themes.
-
 - [/Users/tom/Developer/ablative/docs/design-system-v2/palette/estate-colour-tokens.json](/Users/tom/Developer/ablative/docs/design-system-v2/palette/estate-colour-tokens.json) — lines 1-28. Verified updated guide at ablative-docs 385916e: identity orange #D4975A, deep #A86B2E and wash #3D2A17 are now an explicit entry alongside the shared foundation. Waffles owns this addition; the brief consumes it without rewriting the guide.
 
 ## Row 01 — Establish the maintained fork and exact source baseline
@@ -93,6 +92,7 @@ Provenance: Statement: Not decided (Rauthy decision 14:35-14:38); Waffles 15:03 
 - Replace the partial reading extract as implementation authority with the actual pinned checkout. Inventory every link/login/unlink/admin/import/export consumer of the single provider fields and both supported migration paths.
 - Record machine-principal facilities, confidential-client authentication and challenge configuration from source. Record the exact existing upstream files row 3 must touch in the brief before row 3 starts.
 - Verify the native-events findings below against the fork commit; compare a minimal extension of existing event storage/transport with a dedicated link outbox. Record the least invasive design that atomically retains each committed link/unlink through receiver outages; no table is added just because the first draft named one.
+- Source review found deployed-path security fixes in later upstream989f9ff9: logged-out session guard, authorization-code account rechecks and exact per-code redirect binding. Treat v0.36.2 installation as blocked; latest published release still0.36.2 at the check. Escalate to Waffles and wait for an acceptable upstream release, with no cherry-pick. See RAUTHY-BASELINE.md for scope and unproved runtime reachability.
 
 ### Acceptance
 
@@ -211,6 +211,9 @@ Provenance: Statement: Rauthy decision and Road step 1; existing source refuses 
 - `migrations/hiqlite/32_identity_links.sql`
 - `migrations/postgres/V27__identity_links.sql`
 - `tests/identity_links/`
+- `src/api_types/src/users.rs`
+- `src/data/src/migration/inserts.rs`
+- `frontend/src/lib/admin/users/UserInfo.svelte`
 
 **lys**
 
@@ -382,8 +385,8 @@ Provenance: Statement: each step installed and shown on a screen; Waffles 15:04:
 
 ## Current evidence and limits
 
-- Brief approved for rows 01 and 02. The ablative-io/rauthy fork was created and verified against upstream v0.36.2; the submodule checkout is being installed. No fork application-source changes, compiler invocation, gate, service install or production change yet.
+- Row01 fork creation and exact submodule pin are complete as operations; the row is not accepted. Branch ablative is pushed at dd61ac3. Deployed-path security gaps block installation of this baseline; row02 has not started. No source patches, compiler, tests, gate or install performed.
 - Cambium source already implements explicit OIDC linking; that is reused, not claimed as new work. Its current Google API code still uses sign-in client/provider settings, requiring separation before issuer cutover.
 - Rauthy v0.36.2 clients.rs validate_code_challenge is configuration-driven; authorization-code client authentication and challenge validation are separate. The saved source extract is read-only evidence, not the fork checkout.
 - The existing Lys log retains leaves in memory; this step uses small identity/audit records and makes no claim of unlimited history or production anchoring.
-- Revision 3 retains the five review corrections and order 01,02,04,03,05,06,07, and incorporates Tom's 15:18-15:20 direction: Aion's overall design with distinct product accents. Native event limitations are verified from source; no fork changes have been made. Orange was confirmed by Tom at 15:21:43; the existing estate colour guide has been located. Shared design-system extraction remains outside the brief.
+- Revision4 records the settled fork branch/upgrade policy, approved row03 wall additions, exact orange guide values and shared-envelope agreement. Docs/pin commit and push are explicitly authorised; fresh recursive-clone acceptance remains due at the row02 venue gate. Archie acknowledged the full handoff and has what he needs for step04.

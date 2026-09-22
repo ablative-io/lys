@@ -2,6 +2,26 @@
 
 Observed 22 September 2026, Melbourne. **In progress; no gate or deployment passed.**
 
+## Latest ruling and security blocker
+
+Waffles settled the maintenance base at door time 15:30:50: `ablative` starts at v0.36.2, fork main stays untouched, release-tag rebases only, no cherry-picks. **Branch `ablative` was created and pushed at `dd61ac3`; `.gitmodules` tracks that branch while pinning its exact commit.** Earlier unresolved-base wording below is superseded. The three omitted row03 files below are now approved and included in brief revision4.
+
+Read the actual diff of upstream `989f9ff9a2e18a9a3195084a86541c14f890a9e2`, compared its relevant paths with the pinned baseline, and found:
+
+| Intended deployed path | Later change | Baseline implication |
+| --- | --- | --- |
+| `src/service/src/oidc/grant_types/authorization_code.rs` | Rechecks `user.check_enabled()` and `check_expired()` immediately before token creation | The pinned exchange reads the user then creates tokens without those rechecks; a status change between authorization and exchange needs protection |
+| Same grant path plus `src/data/src/entity/auth_codes.rs` | Stores and validates the exact redirect URI used for that code | The pin checks the client's allowed URI list, not the URI bound to that authorization code; relevance increases with multiple allowed callbacks |
+| `src/data/src/entity/sessions.rs` | Refuses `SessionState::LoggedOut` in `set_authenticated` | The pinned setter writes Auth and is called by authorization-code exchange; logout-state revival protection is missing on an intended path |
+| `src/service/src/oidc/validation.rs`, refresh-token entities | Reworks atomic refresh-token consumption, expiry and ownership checks | Refresh is an intended path; additional semantic review and regression proof are required before a safety claim |
+| `src/data/src/entity/auth_providers.rs` | Adds missing PostgreSQL delete argument and normalizes upstream email | Both provider administration and Google/GitHub federation are intended deployment paths |
+| `src/api/src/sessions.rs`, `src/service/src/oidc/logout.rs` | Carries device-token revocation policy and corrects logout response/backchannel behavior | Session/logout paths are deployed; device-specific impact depends on enabled flows |
+| Provider login/start and callback ATProto branches | Removes panic/unwrap outcomes | Outside the planned Google/GitHub provider configuration; not used as the primary blocker |
+
+**Named blocker: `IDENTITY-001-UPSTREAM-AUTH-STATE`.** The first and third findings concern the planned sign-in/session authority, not an unused extension. Stop installation of this baseline and take the upstream release decision to Waffles. These are source-level findings, not a completed exploit demonstration or severity assignment. No local patch or cherry-pick was applied. The GitHub latest-release API still reports `v0.36.2`; no newer release was available at this read. Reported to Waffles in post `59ddadc6b1446d4e7f19f803b2eccee0c211f273b28a998eb6c65ddc2b8614cc`.
+
+Additional commands: `git switch -c ablative dd61ac3...` and `git push -u origin ablative` both succeeded; `git show --no-ext-diff --format= 989f9ff9 -- <named paths>` and baseline source reads succeeded; `gh api repos/sebadob/rauthy/releases/latest` returned v0.36.2. No runtime or test invocation was made.
+
 Fork: <https://github.com/ablative-io/rauthy>, parent `sebadob/rauthy`. Selected tag `v0.36.2` resolves to commit `dd61ac3c84d6b238108dc8438b53043b5177a662`, subject `Prepare v0.36.2 (#1695)`. The Lys submodule at `vendor/rauthy` is pinned to that commit; fork main remains upstream's later `989f9ff9a2e18a9a3195084a86541c14f890a9e2` and needs an explicit maintenance-base decision before fork edits. No reset/force-push performed.
 
 Licence: Apache-2.0, verified from `LICENSE` and workspace metadata. Cargo edition 2024, declared Rust minimum **1.95.0**. The upstream code-style workflow uses `ghcr.io/sebadob/rauthy-builder:20260519`, runs `just build-wasm`, installs frontend dependencies and builds UI before backend fmt/clippy and frontend format/check. These are source findings, not proof the laptop venue supplies that toolchain. No new lint exemptions inherit legitimacy from upstream's existing code.

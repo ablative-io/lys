@@ -2,6 +2,18 @@
 
 Written 22 September 2026, Melbourne, following Tom's 15:25:59 request to make the work transferable before Chippy's usage runs out. Read this with the live Git state; Waffles is concurrently committing the statement. No application build or runtime change is in progress.
 
+## Latest supplement — supersedes the staged-state and branch questions below
+
+Waffles settled the branch/base at door time **15:30:50**. Branch **`ablative`** has now been created from `dd61ac3` and pushed; fork `main` stays untouched. `.gitmodules` names `branch = ablative`; the exact gitlink remains `dd61ac3`. This supplement, baseline, brief revision 4 and submodule metadata are being committed and pushed together by the explicitly authorised pathspec. The historical staged-state description below records the earlier handoff, not work to repeat after this commit.
+
+Upgrades are rebases onto **upstream release tags only**, each with its own row and gate. No cherry-picks. Read-only review of `989f9ff9` found fixes on our intended deployed paths, so **installing v0.36.2 is blocked pending an acceptable upstream release and Waffles' ruling**. Latest release API still reports v0.36.2. See the baseline supplement for source-level evidence; no exploit or runtime proof has run.
+
+Archie acknowledged the full handoff at **15:30:58** and all three additional pointers at **15:31:45**; his post `687aeb89af243283f3bacb794b10a704491e6c20ec88b100d40e622e6d27bdc1` confirms nothing more is needed. **He retains step 04 only. Chippy's rows pause if usage ends and resume with Chippy unless Tom changes ownership.**
+
+Shared-envelope intent is now jointly agreed: typed audit/context payloads, coordinate in the returned receipt outside the leaf, service-attested human actions. Exact fields/encoding still require joint review. Add explicit hash-algorithm identity; SHA-256 attestation commitment and BLAKE3 content address are different facts. Row04's existing log-store path means the **file store**, not a proven Haematite backend. Archie's Haematite observations are a handoff finding requiring re-verification at an exact commit before adopting that backend.
+
+The three row03 wall additions are approved and in revision4. Waffles explicitly authorises committing/pushing docs and the pin without a gate; fresh recursive clone is proved at the row02 venue gate. Heimdall owns the Argus schema timeout. **No gate submission from this lane until that defect is resolved; no local substitute.**
+
 ## Start here
 
 1. `docs/design/identity/STATEMENT-2026-09-22.md` is the agreed product direction, maintained by Waffles.
