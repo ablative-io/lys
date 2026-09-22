@@ -92,11 +92,12 @@ What is already there, read 14:46. Tom's definition of 8 August 2026, in the Nor
 
 How it sits in this platform. The context record above is what makes all of it possible: a session is a signed record of exactly what was given, in what versions and order, held under the identity and not under any harness. So:
 
-- **Translation** is reading the context record out in another harness's shape. What each destination can resume is measured per harness, and what was lost in the cut is recorded, never hidden.
-- **A fork** is a spawn under the same identity from a coordinate in its history. It carries a delegation from the parent with its own lease (uses, time, spend) and its own handles, so a fork in a sandbox or on another node has exactly the access it was given and its every act lands on the same log, attributed to the fork and traceable to the parent. Ending the fork is the same laptop-back act as ending an agent.
-- **A lantern** is a declared coordinate in that record with a note, and communing with it is a read-only fork at that coordinate.
+- **Translation** is reading the context record out in another harness's shape. The original session stays intact and each translation is a derived version with an explicit account of what it preserved, transformed and could not carry; a common format alone does not guarantee faithful continuation (Chippy, 14:48). What each destination can resume is measured per harness.
+- **A fork** is a spawn from a coordinate in the agent's history, presented under the same enduring agent but with its own execution identity and credential linked to the parent (the lantern design already gives the delegate its own key). It carries a delegation from the parent with its own lease (uses, time, spend) and its own handles, so a fork in a sandbox or on another node has exactly the access it was given, and its actions are never indistinguishable from the parent's. Each branch gets its own history; lys records the ancestry and the result references without forking or rewriting an existing log. Ending the fork is the same laptop-back act as ending an agent.
+- **A lantern** is a declared coordinate in that record with a note, and communing with it is a read-only fork at that coordinate, briefed on what changed since. Institutional memory becomes something to investigate, with later outcomes attached to the original decision.
+- **Recall** is a dedicated read-only fork that searches the agent's permitted history and returns evidence with citations, so the main session never absorbs what the search examined. Replaying an old failure with and without a lesson measures whether the lesson helps.
 
-This is direction, designed with Tom before it is built. Chippy is reading the memory design and the translation and branching work now (14:46).
+Norn already has anchored branches, inherited context, permission propagation and cancellation in code; the cross-harness product is work to build. This is direction, designed with Tom before it is built.
 
 ## What exists and what is missing
 
