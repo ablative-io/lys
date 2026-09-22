@@ -151,6 +151,15 @@ Steps 1 to 3 are the platform without any of the memory work.
 
 The two map onto each other: Chippy's release 1 is steps 1 and 2; release 2 is step 3; release 3 is step 7 brought forward; release 4 is steps 4 and 5; release 5 is the tail of step 5. Anchoring (step 6) is in neither release list and sits where Tom puts it.
 
+**Chippy, 14:56, keeping the 7 step sequence with 4 adjustments, all accepted by Waffles:**
+
+1. Step 1 already carries the standalone application's directory of people and agents. Cambium is its first connected customer; someone installs and understands the product without installing cambium.
+2. The minimum signed audit record comes forward to the first identity or grant change, in step 1; step 4 grows it into the full session recorder. Who granted access or issued a credential is never reconstructed after the fact.
+3. The enduring agent and each execution credential stay distinct from step 2 on: spawning another session never creates another enduring agent, and provisioning an agent is possible before it runs. Step 2's deployment work includes SpiceDB's durable database.
+4. Step 3's promise carries the login exception already recorded above: provider credentials used through the proxy stay on the server; the harness login token still reaches its process. The pool file is retired once its consumers have migrated. Waffles' spoken line "no real key in any seat's environment" was wrong against Tom's 13:32 ruling and is corrected here.
+
+Every step leaves Tom with a useful operation he can complete and an honest view of what has happened.
+
 ## Not decided
 
 - Decided 14:35, Tom: "knowing that we're gonna use Rauthy". Rauthy authenticates people. Required: Rauthy runs beside the door with SpiceDB as the second service; the one-provider-per-user limit in v0.36.2 ("user is already federated") is changed in a fork of our own that we maintain (Tom, 14:38: "we won't be making a contribution to Rauthy upstream. We can give it a try, but it's very unlikely that it'll be accepted... much more likely that we would need to keep maintaining our own fork"); Rauthy is the login piece inside the platform, and the platform, identity, access, permissions and agent lifecycle, is the standalone product, "beyond just a login page"; the door's Google sign-in becomes sign-in through Rauthy; an agent as a first-class principal in Rauthy is proved before the identity proof leans on it; whether Rauthy's own sign-in pages can carry our styling or our own page drives its API is read from its code before it is promised. Read 14:38 from Rauthy v0.36.2's theme entity: a theme is per client, and it carries 7 colours as HSL for light and for dark (text, text_high, bg, bg_high, action, accent, error), the button text colour, the sun and moon icons and the border radius, built into CSS variables. No font, no layout and no custom CSS. So Rauthy's pages can wear our colours and corner radius; fonts and layout stay Rauthy's. Our own sign-in page in front of Rauthy is not verified as possible and is not promised.
