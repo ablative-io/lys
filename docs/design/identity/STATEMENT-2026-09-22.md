@@ -32,7 +32,19 @@ The same shape, and better than a static key. The refresh token sits in the stor
 
 ### The seat's own login
 
-The Claude Code account a seat runs on is the one place the credential has to reach the process itself. Tom, 13:32: the seat uses the long-lived OAuth token Claude Code generates, "which is what we do for that", and it works like that. The door puts that token into the seat's environment at spawn, read from the store. This is how manifold reads the pool file today, moved into the store. It rotates at spawn, not per call.
+The Claude Code account a seat runs on is the one place the credential has to reach the process itself. Tom, 13:32: the seat uses the long-lived OAuth token Claude Code generates, "which is what we do for that", and it works like that. The door puts that token into the seat's environment at spawn, read from the store. This is what the account pool file does today, moved into the store. It rotates at spawn, not per call.
+
+## Two rules from Tom, 13:55
+
+1. **Manifold is an optional execution engine, never a structural part of this.** "It's in the stack as an optional execution engine, but it's not mandatory... I don't want anybody really planning it as a structural cog." Wherever this statement says a seat is started or ended, the engine that does it is whichever one runs the agent: manifold, aion, or a customer's own.
+2. **Every project in the stack works without the others.** Lys, cambium, Argus, haematite, Solon and the rest: "each one of them should be able to function without the other." This identity service standalone is certificates, permissions, secrets and records. Cambium without it signs people in as it does today. An engine without it reads its own pool file as it does today.
+
+## Lifecycle, budgets and leases: the discussion of 14:00
+
+Tom asked, not ruling: is this product responsible for agent lifecycle, and where are the lines. Positions given in the room, for Tom to settle:
+
+- **Waffles.** Lifecycle belongs here as the record and the decision, never as the process. HR decides who is hired, the role, the access, the budget and the leaving date, and takes the laptop back; IT runs the laptop. So this service owns the agent's record and its states (commissioned, provisioned, active, suspended, ended). The engine asks it "may I start this agent, with what environment and what handles" and reports started and ended as signed events into the log. Ending is the laptop coming back: certificate revoked, every handle dropped, context sealed and archived under the identity. Budgets sit here because the proxy attributes every call to an identity. Everything handed out is a lease: a number of uses, a time window, a spend cap; the time window lives in the signed delegation, uses and spend are counted by the door because a signed object cannot count. Argus manages the live context of a running session; this service keeps the durable context across sessions. People get the same record, engine and leases, and the proxy is where a person's delegated credentials across providers live too. The cure for permission dread is a model that reads as sentences and a screen that answers "why can this identity do this".
+- **Buckley.** Identity versus execution: the identity platform answers who this is, what it may hold and for how long; the engine answers where it is running and what it is doing now. Seat spawn and seat end are enforcement points that consult the record, like a door reader checking a badge HR issued. Offboarding is one revoke at the identity side and every runtime enforces it by refusing the next call. Provider secrets are never stored in agents: an agent holds an identity token and exchanges it for a scoped, time-boxed, use-counted lease on the real credential; the same exchange serves people. Onboarding is adding one relation, offboarding is deleting the subject. Caution on forking an identity provider: a fork carries its security patches forever; test first whether an agent can be a first-class principal without one.
 
 A second way stays open to prove later: the seat holds a handle in the token variable and its base URL points at the proxy, which swaps in the real account per request. That is not tested with a subscription login and nothing depends on it.
 
@@ -45,7 +57,7 @@ Keys that cannot be rotated, and memories an identity wants kept secret, are sea
 Chippy, 13:52, in the Dot room: revoking a proxy handle stops future calls, but a login token or sealed knowledge already handed to a process needs a different revocation story. It splits into 3.
 
 1. **A handle.** Dropping it refuses every new call, because the process never had the credential. A call already admitted by the proxy is not stopped by the drop; the proxy has an explicit cancellation rule for calls in flight, and that rule is part of the broker's design.
-2. **The login token.** It is in the process. The store records which token went to which seat. Manifold ends the seat on its own. Whether revoking the token at the provider makes the seat's next call fail is proved with the provider before it is promised.
+2. **The login token.** It is in the process. The store records which token went to which seat. The engine that runs the seat ends it on its own. Whether revoking the token at the provider makes the seat's next call fail is proved with the provider before it is promised.
 3. **Sealed knowledge.** Once read it is in the process's context. Permission controls the disclosure and the audit line records it; neither takes back what was read. So a key is never read, it is used through the proxy even when it cannot rotate; only memories are read, in the smallest piece asked for.
 
 ## Where it lives: lys
