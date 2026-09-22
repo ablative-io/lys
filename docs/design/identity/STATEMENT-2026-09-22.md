@@ -129,7 +129,7 @@ So the first step joins existing pieces rather than building new ones: the capab
 
 Tom, 14:51: "What does the road map look like and how do we take useful steps along the way without requiring the whole thing to be done first?" Two answers were given in the room. They agree on the order and differ on the cut lines. Each step is installed and shown on a screen before the next, and each stands on its own.
 
-Tom, 15:01: "I agree with everything that's been discussed, so let's move ahead." The 7 steps with Chippy's 4 adjustments are the road. Two lines of work run concurrently: identity, access and the broker (steps 1 to 3) with Chippy, who stays across cambium because the platform integrates with it; memory, context and lanterns (steps 4 and 5) with Archie, whom Tom brings online and the room brings up to speed. The lifecycle screen (step 7) is shared.
+Tom, 15:01: "I agree with everything that's been discussed, so let's move ahead." The 7 steps with Chippy's 4 adjustments are the road. Two lines of work run concurrently: identity, access and the broker (steps 1 to 3) with Chippy, who stays across cambium because the platform integrates with it; memory, context and lanterns (steps 4 and 5) with Archie, whom Tom brought into the room at 15:08 and Waffles and Chippy brought up to speed there. The lifecycle screen (step 7) is shared.
 
 **Waffles, 7 steps.**
 
