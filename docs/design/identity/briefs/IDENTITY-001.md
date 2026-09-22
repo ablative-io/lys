@@ -2,7 +2,7 @@
 
 Rendered from `IDENTITY-001.json`; edit the JSON source, then regenerate this file.
 
-Revision 2. Status: **draft_for_waffles_review_no_rows_started**. Owner: Chippy. Reviewer: Waffles. Date: 2026-09-22 Australia/Melbourne.
+Revision 3. Status: **approved_rows_01_02_in_progress**. Owner: Chippy. Reviewer: Waffles. Date: 2026-09-22 Australia/Melbourne.
 
 Authority: [../STATEMENT-2026-09-22.md](../STATEMENT-2026-09-22.md).
 
@@ -15,6 +15,9 @@ An operator installs the product without Cambium or Manifold, signs in, explicit
 - Waffles 15:03 and 15:04:12, Cambium posts 23288c37ba8d29a01db477e738bdca659ac971d56d55ca788c8ac8885c02e0a9 and 95beb81d0590b794b3ccd72269d673e4ee99131fa7fce677868ff9aa6edac385: complete brief reviewed before any row, including fork creation; fork, service deployment, standalone directory with audit, then Cambium integration.
 - Waffles review delivered 15:15:58 Melbourne (message 547f599c630df31282d33912c99a8342062cfbf637031437a5ba89f13d5e472d, signed 15:17): reorder 01,02,04,03,05,06,07; inspect native events before enlarging fork; one PostgreSQL; Rauthy themes; per-row hours and live demonstrations. His earlier 15:05 wording is corrected to the door timestamp 15:04:12.
 - Tom 15:18 and Waffles 15:19 in Dot: consistent appearance across products, Aion's browser appearance preferred, Cambium not yet the reference. Identity screens follow Aion colours/type/spacing without a Cambium surface build dependency; Rauthy uses the same colours. Shared design-system extraction remains open and outside this brief.
+- Tom 15:20, clarified by Waffles 15:21 in Dot: shared design, distinct product accents; Cambium green, Aion blue/black, Argus light blue, Haematite mustard. The new product's accent is orange, confirmed by Tom at 15:21:43. Do not silently make every product Aion-blue.
+
+- Waffles approved revision 2 at 15:22:45, Cambium post a1d511ca4ce5ed95cfd577c5d89341a6f16387c6b38dad037b2419b83b65f519: rows 01 and 02 start; ceiling 48 hours, one implementer, one row/gate at a time. The subsequent colour update comes from Tom and Waffles and does not expand implementation scope.
 
 ## Ceiling
 
@@ -38,7 +41,9 @@ An operator installs the product without Cambium or Manifold, signs in, explicit
 - Use a versioned domain event envelope outside lys-core. One signed committed directory event is both the identity change and its audit record; rebuild the directory projection from those events. Do not implement a database change followed by a best-effort log append.
 - The service signs an attestation naming the authenticated human actor and authentication provenance. Do not claim the human personally signed bytes with a private key they do not hold. Agent registration by an administrator likewise records the administrator, not an invented agent signature.
 - Native Rauthy events were inspected before retaining a link-audit addition: no provider-link/unlink EventType exists; mutation paths do not emit such an event; existing persistence is asynchronous and severity-filtered, with age-based cleanup. The stock stream cannot establish the required durable outcome. Retain a narrowly scoped same-transaction link audit record/outbox with stable operation IDs and explicit pending/acknowledged state, subject to row-01 exact-source inventory and review of the minimal diff. Reuse native transport where it can meet replay/acknowledgement requirements; do not build a general replacement event service or audit unrelated Rauthy operations.
-- Row 02 maps Aion's light/dark tokens to Rauthy's supported theme fields for both OIDC clients; fonts and page layout remain Rauthy's. Row 05 follows Aion's colours, typography and spacing from a pinned source snapshot without a build dependency on Cambium or Aion's application. Extracting a shared design-system package remains an open separate decision, not a blocker for this brief or an implicit new row.
+- Use Aion's appearance as the reference for structure, typography, spacing and interaction, while preserving each product's own accent. Configure the Cambium Rauthy client green; give the identity client its own Ablative accent (orange, confirmed by Tom at 15:21:43). Exact accessible light/dark accent values are declared and reviewed before theme acceptance. Rauthy's fonts and page layout remain upstream's. Neither client nor the standalone screens require a build dependency on Cambium or Aion; extracting a shared design-system package stays a separate open decision.
+
+- Estate guide now includes identity at ablative-docs 385916e (Waffles 15:24:18): accent #D4975A, deep #A86B2E, wash #3D2A17, separately keyed from Manifold copper. Rows 02 and 05 read those values and the shared foundation from docs/design-system-v2/palette/estate-colour-tokens.json; estate-colour-family.html renders the reference. Use Aion for layout/type/interaction, not a copied application dependency. Do not copy its remaining purple status token: the estate guide explicitly bans purple.
 
 ## Contract shared with the context lane
 
@@ -59,6 +64,8 @@ An operator installs the product without Cambium or Manifold, signs in, explicit
 - [https://raw.githubusercontent.com/sebadob/rauthy/v0.36.2/src/data/src/database.rs](https://raw.githubusercontent.com/sebadob/rauthy/v0.36.2/src/data/src/database.rs) — lines 68-91,226-239. PostgreSQL is supported and has its own migration runner. Hiqlite starts internally even in PostgreSQL mode for cache/node functions; this does not require keeping the identity records in a separate embedded database.
 - [https://raw.githubusercontent.com/sebadob/rauthy/v0.36.2/src/data/src/entity/theme.rs](https://raw.githubusercontent.com/sebadob/rauthy/v0.36.2/src/data/src/entity/theme.rs) — lines 19-28,93-100. Theme configuration is per client with light/dark values and border radius. The supported palette mapping does not replace fonts or layout.
 - [/Users/tom/Developer/ablative/stack/aion/apps/aion-ops-console/src/index.css](/Users/tom/Developer/ablative/stack/aion/apps/aion-ops-console/src/index.css) — lines 1-180; last file commit 3b622599a. Read the clean source: self-hosted DM Sans and JetBrains Mono, radius and spacing ladders, explicit dark and light palettes with strategy-blue action accent and terracotta attention. Use this as the visual reference, not an endorsement of all Aion frontend implementation choices. Record the full source ref when deriving themes.
+
+- [/Users/tom/Developer/ablative/docs/design-system-v2/palette/estate-colour-tokens.json](/Users/tom/Developer/ablative/docs/design-system-v2/palette/estate-colour-tokens.json) — lines 1-28. Verified updated guide at ablative-docs 385916e: identity orange #D4975A, deep #A86B2E and wash #3D2A17 are now an explicit entry alongside the shared foundation. Waffles owns this addition; the brief consumes it without rewriting the guide.
 
 ## Row 01 — Establish the maintained fork and exact source baseline
 
@@ -121,7 +128,7 @@ Provenance: Statement: Permissions; Two rules from Tom; Road adjustment 1; Waffl
 - Package maintained Rauthy and SpiceDB against one PostgreSQL service and one durable database, with separate least-privilege roles/schema namespaces, explicitly configured credentials and documented local/TLS origins. Verify both migration runners and connection search paths coexist before claiming one-database readiness. These are three dependency processes beside the platform door; Cambium, Manifold, Argus and Aion servers are not runtime dependencies.
 - Define readiness, migration order, named configuration failures, stop/start and backup/restore checks. Keep generated credentials out of Git and logs; health output excludes secrets.
 - Register separate platform and Cambium OIDC clients with exact redirect URIs and RS256 where the Cambium verifier requires it. Google/GitHub federation credentials belong to Rauthy; Google API consent remains a different client purpose.
-- Configure Rauthy's themes for the platform and Cambium OIDC clients from Aion's pinned apps/aion-ops-console/src/index.css token source: text, text_high, bg, bg_high, action, accent and error in HSL for both light and dark; button text colour and border radius. Record every source-token mapping and colour conversion. Fonts and layout remain Rauthy's; no font/layout patch enters the fork. Static theme configuration creates no build dependency on another application's surface.
+- Configure both Rauthy client themes using Aion's pinned neutral/text/radius design vocabulary and each client's own product accent: Cambium green, identity product accent separately declared (orange confirmed by Tom). Map text, text_high, bg, bg_high, action, accent and error into HSL for light and dark, plus button text colour and border radius. Record every source token and colour conversion; verify readable contrast. Colours mirror each product, not a universal Aion-blue. Fonts and page layout remain Rauthy's; no font/layout patch or cross-application build dependency enters the fork.
 
 ### Acceptance
 
@@ -249,7 +256,7 @@ Provenance: Statement: beyond just a login page; Road adjustment 1; lifecycle sc
 ### Work
 
 - Build sign-in, directory of people and agents, record detail, register/edit agent, linked-account entry point and signed change history. Generate boundary types from the server schema. Preserve shared lifecycle extension points without implementing Archie's screens.
-- Follow Aion's appearance using the colours, DM Sans/JetBrains Mono typography, radii and spacing read from its source. Keep a named, pinned provenance record for the selected design values, with no build dependency on Cambium or Aion's application. Central design-system extraction is outside this brief. Show provider-link audit pending, unavailable services and named refusals accurately.
+- Follow Aion's structure, DM Sans/JetBrains Mono typography, radii, spacing and browser interaction conventions, with the identity product's own accent instead of inheriting Aion-blue. Keep pinned provenance for neutral design values and separately declared accent values, without a build dependency on Cambium or Aion. Central design-system extraction is outside this brief. Show provider-link audit pending, unavailable services and named refusals accurately.
 - Registration states what has been created. Controls for launch, live permissions, secrets and memory are not presented as working in step 1.
 
 ### Acceptance
@@ -375,8 +382,8 @@ Provenance: Statement: each step installed and shown on a screen; Waffles 15:04:
 
 ## Current evidence and limits
 
-- Draft only. No fork, application source, schema migration, compiler invocation, gate, service install or production change performed under this brief.
+- Brief approved for rows 01 and 02. The ablative-io/rauthy fork was created and verified against upstream v0.36.2; the submodule checkout is being installed. No fork application-source changes, compiler invocation, gate, service install or production change yet.
 - Cambium source already implements explicit OIDC linking; that is reused, not claimed as new work. Its current Google API code still uses sign-in client/provider settings, requiring separation before issuer cutover.
 - Rauthy v0.36.2 clients.rs validate_code_challenge is configuration-driven; authorization-code client authentication and challenge validation are separate. The saved source extract is read-only evidence, not the fork checkout.
 - The existing Lys log retains leaves in memory; this step uses small identity/audit records and makes no claim of unlimited history or production anchoring.
-- Revision 2 incorporates the five review requests, retaining row IDs but executing 01,02,04,03,05,06,07, plus Tom's 15:18 Aion styling direction. The native-event limitation is verified from upstream source; no fork changes have been made. Shared design-system extraction remains outside the brief.
+- Revision 3 retains the five review corrections and order 01,02,04,03,05,06,07, and incorporates Tom's 15:18-15:20 direction: Aion's overall design with distinct product accents. Native event limitations are verified from source; no fork changes have been made. Orange was confirmed by Tom at 15:21:43; the existing estate colour guide has been located. Shared design-system extraction remains outside the brief.
