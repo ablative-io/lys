@@ -104,6 +104,6 @@ So the first step joins existing pieces rather than building new ones: the capab
 
 ## Not decided
 
-- Which service authenticates people (Google and GitHub sign-in to one identity). The identity proof row states the requirement; the engine is chosen after it.
+- Decided 14:35, Tom: "knowing that we're gonna use Rauthy". Rauthy authenticates people. Required: Rauthy runs beside the door with SpiceDB as the second service; the one-provider-per-user limit in v0.36.2 ("user is already federated") is tested first without a fork and changed as an upstream contribution if it must be; the door's Google sign-in becomes sign-in through Rauthy; an agent as a first-class principal in Rauthy is proved before the identity proof leans on it; whether Rauthy's own sign-in pages can carry our styling or our own page drives its API is read from its code before it is promised.
 - The name of the identity service.
 - Which anchor the first agents pin to: our hosted anchor, a self-hosted one, or both. Lys leaves this as a product decision and so does this statement.
