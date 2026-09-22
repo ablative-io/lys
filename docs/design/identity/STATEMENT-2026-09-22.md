@@ -28,6 +28,8 @@ Revoking is dropping the handle. That is instant, and it is instant for a static
 
 The handle is the stable name. Behind it the store keeps a set of real accounts. The proxy takes the next one in turn for each call and logs which one served it. So usage is attributed in one place, the spread across accounts is enforced at the proxy instead of trusted to each worker, and resting an account is a change in the store with no file copied to any laptop. This replaces the account pool file.
 
+Tom, 17:00, in the room with Archie, Chippy and Waffles: the workers that run the Claude sessions and the builders carry a token revolver, an ordered list of accounts walked when a session prints its usage-limit words; "that's exactly the kind of thing that we'd want to plug into this, to be able to draw in from there". So the revolver is the first consumer of the handle: the worker asks the broker for its next account instead of walking its own list.
+
 ### OAuth
 
 The same shape, and better than a static key. The refresh token sits in the store. The proxy swaps the handle for a live access token and refreshes it itself when it expires. The seat never sees the refresh token. Revoking drops the handle and can also revoke the grant upstream.
