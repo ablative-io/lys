@@ -44,9 +44,9 @@ Keys that cannot be rotated, and memories an identity wants kept secret, are sea
 
 Chippy, 13:52, in the Dot room: revoking a proxy handle stops future calls, but a login token or sealed knowledge already handed to a process needs a different revocation story. It splits into 3.
 
-1. **A handle.** Revoking is complete, because the process never had the credential.
-2. **The login token.** It is in the process. The store records which token went to which seat; revoking that token at the provider makes the seat's next call fail, and manifold ends the seat.
-3. **Sealed knowledge.** Once read it is in the process's context and cannot be revoked. So a key is never read, it is used through the proxy even when it cannot rotate; only memories are read, in the smallest piece asked for, and the audit line is the control.
+1. **A handle.** Dropping it refuses every new call, because the process never had the credential. A call already admitted by the proxy is not stopped by the drop; the proxy has an explicit cancellation rule for calls in flight, and that rule is part of the broker's design.
+2. **The login token.** It is in the process. The store records which token went to which seat. Manifold ends the seat on its own. Whether revoking the token at the provider makes the seat's next call fail is proved with the provider before it is promised.
+3. **Sealed knowledge.** Once read it is in the process's context. Permission controls the disclosure and the audit line records it; neither takes back what was read. So a key is never read, it is used through the proxy even when it cannot rotate; only memories are read, in the smallest piece asked for.
 
 ## Where it lives: lys
 
