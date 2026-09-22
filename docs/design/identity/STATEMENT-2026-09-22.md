@@ -40,6 +40,14 @@ A second way stays open to prove later: the seat holds a handle in the token var
 
 Keys that cannot be rotated, and memories an identity wants kept secret, are sealed records in the same store. The door keeps them encrypted and tags each in SpiceDB with which identities may read it. A seat asks for one by name; the door checks the relation, returns the text, and writes one audit line. A sealed record never sits in plain text in a memory file. Each identity's sealed records are its own.
 
+### What revoking reaches
+
+Chippy, 13:52, in the Dot room: revoking a proxy handle stops future calls, but a login token or sealed knowledge already handed to a process needs a different revocation story. It splits into 3.
+
+1. **A handle.** Revoking is complete, because the process never had the credential.
+2. **The login token.** It is in the process. The store records which token went to which seat; revoking that token at the provider makes the seat's next call fail, and manifold ends the seat.
+3. **Sealed knowledge.** Once read it is in the process's context and cannot be revoked. So a key is never read, it is used through the proxy even when it cannot rotate; only memories are read, in the smallest piece asked for, and the audit line is the control.
+
 ## Where it lives: lys
 
 Tom, 13:32: "the natural home for this should be in lys", and the ledger and the shared chains in it are important. Lys is the trust library and anchor service in the stack (the crates lys-core, lys-anchor, lys-anchor-cli and lys-log-store). Read against this statement, the parts fit together like this:
