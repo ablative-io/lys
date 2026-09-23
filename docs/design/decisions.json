@@ -85,6 +85,62 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-006",
+      "title": "A role changes only by a deliberate, explicit act",
+      "status": "decided",
+      "scope": "identity",
+      "date": "2026-09-23",
+      "decided_by": "Tom",
+      "context": "Version 4 of the identity mock-up gave roles a builder. At 18:54 on 23 September the room asked Tom whether editing a role changes every holder at once or leaves each holder with the copy made when they got it.",
+      "decision": "Editing a role makes a new version of it, and a holder never changes version silently as a side effect of the edit. A holder moves between versions either by a deliberate, recorded act or by an explicit rule shown in advance to the person the holder answers to, such as a move at the holding's next renewal. Which of the two is the default is open. A provisional role is a role held under a grant with an end date: when the date passes the holding lapses, and nothing renews it unless someone grants it again.",
+      "quote": "whichever way you went, you'd want it to be deliberate, … and if not deliberate, then explicit … their old lease expires and they don't get a new one",
+      "consequences": [
+        "The role screen shows which version each holder is on, and who still holds an older one.",
+        "A holding's end date belongs to its grant, not to the role version: a version change never extends a provisional holding.",
+        "A lapsed provisional holding leaves the audit record of its end, and the grants it carried stop at the next check.",
+        "Whether a role is a live group or a template copied at grant time stays open."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-007",
+      "title": "The product starts an agent by giving its start command, never by running it",
+      "status": "decided",
+      "scope": "identity",
+      "date": "2026-09-23",
+      "decided_by": "Tom",
+      "context": "On 22 September Tom settled that the product owns an agent's lifecycle as its record and decision, with a runtime carrying it out (ADR-004). On 23 September at 18:56 he asked how a person actually starts a new agent from it.",
+      "decision": "The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.",
+      "quote": "I don't want this to become like an execution kind of engine … in the first instance, it's starting out with basically like, cool, here's the command that you need to start Waffles",
+      "consequences": [
+        "Every agent carries a launch record: the machine, the runtime, the program, its arguments, the working directory and the handles it needs, by name.",
+        "A session is shown running only after the agent reports its start, signed with its own key and naming its launch record; a report that is not authenticated as that identity and that launch record is refused. Copying the command is not a start.",
+        "A session that never reports stays unconfirmed."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-008",
+      "title": "An agent's file shows its lys certificate",
+      "status": "decided",
+      "scope": "identity",
+      "date": "2026-09-23",
+      "decided_by": "Tom",
+      "context": "Reviewing version 4 of the identity mock-up at 18:55 on 23 September, Tom asked that the lys certificate and receipt work be part of the product.",
+      "decision": "An agent's file shows its lys certificate once one is issued: what it claims, who signed it, when it was issued and when it expires, with the signed receipts of the changes made to it. An agent registered before any key or proof of possession was supplied shows its certificate as not issued, never a placeholder.",
+      "quote": "just making sure that sort of like the original lys certificating stuff is in there",
+      "consequences": [
+        "A change to its grants or role version issues a new certificate; the old one is withdrawn in the log, never edited.",
+        "Anyone can verify the certificate and its inclusion in the log offline with standard tools.",
+        "Production keys and receipts outside tests remain Tom's acts.",
+        "The conformance list checks that a registered agent's certificate, or its not-issued state, and its receipts can be read from its file."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
