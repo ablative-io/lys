@@ -1,0 +1,73 @@
+{
+  "project": "lys",
+  "updated": "2026-09-23",
+  "decisions": [
+    {
+      "id": "ADR-001",
+      "title": "Secrets are held behind a handle the door swaps for the credential",
+      "status": "decided",
+      "scope": "secrets",
+      "date": "2026-09-22",
+      "decided_by": "Tom",
+      "context": "Agents need to use credentials without ever holding them, and revoking access must be instant even for a static key.",
+      "decision": "A seat holds a short-lived handle bound to its identity. The real credential sits in the door's encrypted store and never leaves the server. The door's proxy checks SpiceDB, swaps the handle for the credential, forwards the call and writes one audit line. Built in Rust inside the door; no OpenBao unless credentials minted on demand are later needed.",
+      "quote": "use something with the service, like a temporary key, and that is then mapped so the actual credential can be used.",
+      "consequences": [
+        "Revoking is dropping the handle, instant for a static key too.",
+        "The real key is rotated upstream only when it is suspected leaked.",
+        "A key that cannot rotate is still used through the proxy and never read."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-002",
+      "title": "The token revolver is the first consumer of the handle",
+      "status": "decided",
+      "scope": "secrets",
+      "date": "2026-09-22",
+      "decided_by": "Tom",
+      "context": "The workers that run Claude sessions and builders walk their own ordered list of accounts when a session prints its usage-limit words.",
+      "decision": "The worker asks the broker for its next account instead of walking its own list; the store keeps the set of real accounts behind one handle and the proxy takes the next in turn and logs which one served each call. This replaces the account pool file.",
+      "quote": "that's exactly the kind of thing that we'd want to plug into this, to be able to draw in from there",
+      "consequences": [
+        "Usage is attributed in one place.",
+        "Resting an account is a change in the store, with no file copied to any machine."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-003",
+      "title": "Everything is pegged to a human authority",
+      "status": "decided",
+      "scope": "identity",
+      "date": "2026-09-22",
+      "decided_by": "Tom",
+      "context": "Agents are provisioned under people and act with delegated access.",
+      "decision": "A person signs in first; an agent is provisioned under that person with its own identity; the person's permissions are the ceiling and the agent holds an explicit subset; every grant says who may exercise it and who may pass it on; withdrawing the authority stops every grant derived from it. The exact delegation schema is not settled by this decision.",
+      "quote": "Basically everything needs to be pegged against the human's base permissions.",
+      "consequences": [
+        "A handle is issued only under a grant that traces to a person."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-004",
+      "title": "Manifold is optional and every project stands alone",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-22",
+      "decided_by": "Tom",
+      "context": "The statement names seats being started and ended.",
+      "decision": "The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.",
+      "quote": "It's in the stack as an optional execution engine, but it's not mandatory... I don't want anybody really planning it as a structural cog.",
+      "consequences": [
+        "No broker requirement depends on manifold being present."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    }
+  ]
+}
