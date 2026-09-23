@@ -1,0 +1,25 @@
+{
+  "cluster": "directory",
+  "personas": [
+    {
+      "name": "Responsible person",
+      "role": "Signs in and provisions agents under their own authority",
+      "stories": [
+        {
+          "id": "S1",
+          "text": "As the responsible person, I want every grant my agent holds to trace back to me, so that withdrawing my authority stops everything derived from it."
+        }
+      ]
+    },
+    {
+      "name": "Reviewer",
+      "role": "Reviews a brief before any of its rows is dispatched",
+      "stories": [
+        {
+          "id": "S2",
+          "text": "As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria."
+        }
+      ]
+    }
+  ]
+}

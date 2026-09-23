@@ -68,6 +68,23 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-005",
+      "title": "The identity database is PostgreSQL, possibly on a network device",
+      "status": "decided",
+      "scope": "identity",
+      "date": "2026-09-23",
+      "decided_by": "Tom",
+      "context": "At 14:08 in the Dot room Tom said he had hoped to get rid of PostgreSQL, and asked whether the team thought it was the best solution. The working team decision was one PostgreSQL service and one database for Rauthy and SpiceDB, with separate roles and schema namespaces.",
+      "decision": "PostgreSQL is used for the identity product's database. It may be set up on one of the network devices rather than on Tom's Mac.",
+      "quote": "Yeah, so we can use Postgres, that's fine. We might just set it up on one of the network devices so it doesn't have to run here.",
+      "consequences": [
+        "Row 02's one PostgreSQL service and database stands.",
+        "The host is not assumed to be Tom's Mac; the deployment names its database address as configuration."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
