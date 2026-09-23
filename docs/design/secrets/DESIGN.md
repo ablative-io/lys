@@ -59,6 +59,9 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 | `docs/design/secrets/CHECKLIST.md` | rendered checklist | SECRETS-001 |
 | `docs/design/secrets/stories.json` | stories; gains the broker implementation stories | SECRETS-001 |
 | `docs/design/secrets/USER-STORIES.md` | rendered stories | SECRETS-001 |
+| `crates/lys-core/src/delegation/mod.rs` | lys/delegation/v1; its docs record the handle and the lease's time window as applications of the delegation format (SECRETS-002 R1, R9) | SECRETS-002 |
+| `docs/design/WIRE-FORMATS.md` | the lys wire-format register; records the handle, sealed-record and lease formats before any is signed (SECRETS-002 R1, R6, R9) | SECRETS-002 |
+| `crates/lys-core/src/seal/mod.rs` | sealed envelopes; its docs record the sealed record as an application of lys/sealed-envelope/v1 (SECRETS-002 R6) | SECRETS-002 |
 
 ## Inventory
 

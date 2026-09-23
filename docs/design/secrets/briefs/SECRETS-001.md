@@ -55,6 +55,23 @@ THE SYSTEM SHALL have a brief docs/design/secrets/briefs/SECRETS-002.json, valid
 **Stories:**
 - S1 (Reviewer, Reviews a brief before any of its rows is dispatched) — As the reviewer, I want the secrets broker's implementation brief in the design-system form, with numbered requirements and criteria, so that its rows can be reviewed and dispatched one at a time.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1 met: SECRETS-002.json exists, and validate.py prints 'design/secrets/briefs/SECRETS-002.json: OK [brief.schema.json]'. Row 2 met: C1's eight parts map to R1 to R9, with the revocation part split into R7 (the three cases) and R8 (in-flight cancellation). Each requirement has 3 to 7 acceptance criteria. R1, R6 and R9 list lys files in files. R2, R3, R4, R5, R7 and R8 name only door paths (for example crates/cambium-door/src/http/secrets_proxy.rs and crates/cambium-store/src/traits/secrets.rs), in their spec text, as R1's own rule requires. Row 3 met: every path has an owner and a citation to the statement by line (for example :25, :27, :82) or to the source. Lys paths are in files and structure. Door paths are named in the spec with the door repository (cambium, read at cbcd2cc9d) and cited against crates/cambium-store/src/traits/mod.rs, crates/cambium-door/src/http/router.rs and crates/cambium-door/src/http/agent_seat.rs:13-15. No files entry or structure row carries a root token. Row 4 met: the cancellation rule is R8, with three acceptance criteria of its own. Row 5 met: the delegation schema is recorded OPEN in R1 and R9. Provider revocation of a login token is OPEN in R5 and R7. The proxy-handle login path is OPEN in R5. Points the source raised are also recorded open: the seat/speaks-for role has no consumer (crates/lys-core/src/delegation/artifact.rs:242-254); v1 has no expiry (crates/lys-core/src/delegation/mod.rs:218-221); sealed-envelope/v1 seals with an empty AAD (crates/lys-core/src/seal/sealed_envelope.rs:180-183, docs/design/WIRE-FORMATS.md:18); the audit line's signer (statement :80 against agent_seat.rs:13-15) and its schema (:187); the file for the revocation fold; the revolver's worker-side owner; and the cancellation rule itself until its review. Row 6 met: check-coverage.py exits 0 with no structure failure. Row 7 met: the cluster holds no credential values, and a grep for common token shapes found nothing.
+- Deviation: (1) Six requirements (R2, R3, R4, R5, R7, R8) have empty files arrays. They touch only door-owned files, which R1's spec says must be named in the spec text and not in files until a door root is set. Their 'at least one file path' is the door path in their spec. (2) validate.py exits 1 for the cluster because of design.json's existing `gate` field, which is not mine to change. Every document of this round validates OK. (3) The worker side of the token revolver lives in manifold (crates/manifold-node/src/seat/launcher.rs:31-40 at 3df5ac5f64). The design inventory names no engine repository, so I read it only to show that its owner is open.
+- Files changed:
+  - created: `docs/design/secrets/briefs/SECRETS-002.json` — The implementation brief: nine requirements R1 to R9 in EARS form. Each carries acceptance criteria, owners with citations and open points. Blocked by Waffles' review, SpiceDB beside the door, the door root not being set, the delegation schema, and the lys-core release that freezes lys/delegation/v1.
+  - created: `docs/design/secrets/briefs/SECRETS-002.md` — The brief rendered from its JSON by render-cluster.py.
+  - modified: `docs/design/secrets/design.json` — Gains three structure rows with brief SECRETS-002, one per lys path the brief lists in files: crates/lys-core/src/delegation/mod.rs, docs/design/WIRE-FORMATS.md, crates/lys-core/src/seal/mod.rs. The existing gate field is untouched.
+  - modified: `docs/design/secrets/DESIGN.md` — Re-rendered with the three new structure rows.
+- Checklist delivery:
+  - [x] C1 — SECRETS-002 is a design-system brief with one numbered requirement, carrying acceptance criteria and file paths, for each part of the temporary key model: the handle and the proxy swap with its audit line; rotation under one handle; the token revolver as the first consumer; OAuth refresh at the proxy; the seat's own login put into its environment at spawn; sealed knowledge tagged in SpiceDB; the three revocation cases, including the cancellation rule for calls in flight; and leases counted by uses, time window and spend. — R1 to R9 cover the eight parts. The cancellation rule is R8, on its own.
+- Story delivery:
+  - [x] S1 (Reviewer, Reviews a brief before any of its rows is dispatched) — As the reviewer, I want the secrets broker's implementation brief in the design-system form, with numbered requirements and criteria, so that its rows can be reviewed and dispatched one at a time. — Nine numbered requirements with acceptance criteria and blockers, so a reviewer can take them one row at a time; CN2 is repeated in blocked_by and boundaries.
+
 ### R2: Record the broker's checklist items and stories and cover them
 
 THE SYSTEM SHALL add to checklist.json a section of the broker's implementation items and to stories.json the personas and stories of the people and agents who use the broker (a person granting an agent access, an agent using a handle, an operator resting an account, a reviewer reading the audit). Every item and story added SHALL be named by at least one SECRETS-002 requirement, and the rendered markdown SHALL match the JSON.
@@ -76,6 +93,24 @@ THE SYSTEM SHALL add to checklist.json a section of the broker's implementation 
 
 **Stories:**
 - S1 (Reviewer, Reviews a brief before any of its rows is dispatched) — As the reviewer, I want the secrets broker's implementation brief in the design-system form, with numbered requirements and criteria, so that its rows can be reviewed and dispatched one at a time.
+
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1 met: check-coverage.py exits 0. It reports 'Coverage clean: all items covered, briefs consistent': 14 items and 11 stories, with C4 to C14 and S2 to S11 each named by at least one SECRETS-002 requirement and no unknown ids. Row 2 met: render-cluster.py exits 0, and a second run leaves the rendered markdown byte-identical (same checksum before and after), so the markdown matches the JSON. Row 3 met: S6, of the Token revolver persona, reads 'when a session prints its usage-limit words, I want to ask the broker for my next account instead of walking my own list', and R3 carries it.
+- Deviation: (none)
+- Files changed:
+  - modified: `docs/design/secrets/checklist.json` — Adds the section 'The broker's implementation' with items C4 to C14: one per part, plus C13 (open points stay open) and C14 (no engine dependency).
+  - modified: `docs/design/secrets/CHECKLIST.md` — Re-rendered from checklist.json.
+  - modified: `docs/design/secrets/stories.json` — Adds personas Person, AI Agent, Token revolver, Engine, Operator and a Reviewer who reads the audit, with stories S2 to S11.
+  - modified: `docs/design/secrets/USER-STORIES.md` — Re-rendered from stories.json.
+- Checklist delivery:
+  - [x] C2 — Every checklist item and user story the broker's implementation needs is recorded in this cluster and covered by a SECRETS-002 requirement. — C4 to C14 and S2 to S11 are recorded and each is covered by a SECRETS-002 requirement; coverage exits 0.
+  - [x] C3 — The rendered markdown of this cluster matches its JSON. — Re-rendering changes nothing.
+- Story delivery:
+  - [x] S1 (Reviewer, Reviews a brief before any of its rows is dispatched) — As the reviewer, I want the secrets broker's implementation brief in the design-system form, with numbered requirements and criteria, so that its rows can be reviewed and dispatched one at a time. — The rendered SECRETS-002.md shows every requirement next to the item and story ids it covers.
 
 ## Boundaries
 
