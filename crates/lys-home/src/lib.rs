@@ -20,6 +20,7 @@
 //!
 //! Design: `docs/design/home/` in the lys repository (brief HOME-001).
 
+pub mod cli;
 pub mod error;
 pub mod harness;
 pub mod record;
