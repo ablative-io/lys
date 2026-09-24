@@ -12,6 +12,7 @@ leg() {
   echo "--- status $code: $* ---"
   [ "$code" -eq 0 ] || status=1
 }
+leg sh scripts/design/gate.sh
 leg cargo fmt --check
 leg cargo clippy --all-targets --all-features -- -D warnings
 leg cargo clippy --all-targets -- -D warnings

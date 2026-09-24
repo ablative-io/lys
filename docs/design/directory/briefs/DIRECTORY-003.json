@@ -171,7 +171,7 @@
   ],
   "verification": [
     "From the repository root: cargo fmt --check; cargo clippy --all-targets --all-features -- -D warnings; cargo clippy --all-targets -- -D warnings; cargo test --workspace --all-features; cargo doc --no-deps --all-features; cargo doc --no-deps, all clean (CLAUDE.md, gates before any commit).",
-    "From docs/: python3 $DS2_METHOD/scripts/validate.py design/directory and python3 $DS2_METHOD/scripts/check-coverage.py design/directory exit 0.",
+    "From the repository root: python3 scripts/design/validate.py docs/design/directory and python3 scripts/design/check-coverage.py docs/design/directory exit 0.",
     "From the repository root: rg -n 'ID001_DIRECTORY|ID001_AUDIT_FAULTS|ID001_ADMIN|ID001_RECEIPT|ID001_RECEIVER' crates/lys-identity tests/identity_contract finds each identifier in a test.",
     "A search of every file this row touches finds no credential, token or key value."
   ]

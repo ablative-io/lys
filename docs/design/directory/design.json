@@ -546,7 +546,7 @@
       "legs": [
         {
           "name": "render",
-          "command": "sh -c ': \"${DS2_METHOD:?DS2_METHOD names the design method tree on the machine serving the round}\"; exec python3 \"$DS2_METHOD/scripts/render-cluster.py\" design/directory'",
+          "command": "python3 ../scripts/design/render-cluster.py design/directory",
           "requires": [
             "place:here"
           ],
@@ -554,7 +554,7 @@
         },
         {
           "name": "validate",
-          "command": "sh -c ': \"${DS2_METHOD:?DS2_METHOD names the design method tree on the machine serving the round}\"; exec python3 \"$DS2_METHOD/scripts/validate.py\" design/directory'",
+          "command": "python3 ../scripts/design/validate.py design/directory",
           "requires": [
             "place:here"
           ],
@@ -562,7 +562,7 @@
         },
         {
           "name": "coverage",
-          "command": "sh -c ': \"${DS2_METHOD:?DS2_METHOD names the design method tree on the machine serving the round}\"; exec python3 \"$DS2_METHOD/scripts/check-coverage.py\" design/directory'",
+          "command": "python3 ../scripts/design/check-coverage.py design/directory",
           "requires": [
             "place:here"
           ],

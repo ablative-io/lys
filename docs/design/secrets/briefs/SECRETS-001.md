@@ -72,6 +72,29 @@ THE SYSTEM SHALL have a brief docs/design/secrets/briefs/SECRETS-002.json, valid
 - Story delivery:
   - [x] S1 (Reviewer, Reviews a brief before any of its rows is dispatched) — As the reviewer, I want the secrets broker's implementation brief in the design-system form, with numbered requirements and criteria, so that its rows can be reviewed and dispatched one at a time. — Nine numbered requirements with acceptance criteria and blockers, so a reviewer can take them one row at a time; CN2 is repeated in blocked_by and boundaries.
 
+**Review (recorded):**
+
+- Alignment: fixed
+- Acceptance verdicts:
+  - [x] docs/design/secrets/briefs/SECRETS-002.json exists and validate.py reports it valid. — With DS2_METHOD=/Users/tom/Developer/projects/deno_rust/meridian/.meridian/design-system-v2, validate.py design/secrets prints 'design/secrets/briefs/SECRETS-002.json: OK [brief.schema.json]' and 'All 5 document(s) valid.' It exits 0, before and after the harden edits.
+  - [x] SECRETS-002 has a requirement for each of the eight parts named in C1, each with at least one acceptance criterion and at least one file path. — The parts map to R1 to R9: handle and proxy (R1), rotation (R2), revolver (R3), OAuth (R4), spawn login (R5), sealed records (R6), revocation (R7, plus R8 for in-flight calls) and leases (R9). Each has 3 to 7 acceptance criteria. R1, R6 and R9 list lys paths in files. R2, R3, R4, R5, R7 and R8 name door paths in their spec text, as SECRETS-001 R1's spec requires, for example crates/cambium-door/src/http/secrets_rotation.rs in R2 and secrets_in_flight.rs in R8.
+  - [x] Every file SECRETS-002 names carries its owning repository with a citation to the statement or the source; lys-owned files are in files and structure, door-owned files are in the spec text only, and no structure row or files entry in this cluster carries a root token. — The lys paths delegation/mod.rs, seal/mod.rs and WIRE-FORMATS.md are in files and in design.json structure. Door paths appear only in the spec text, each under the prefix 'Door-owned, named here only (the door repository ... read at cbcd2cc9d)'. I checked cbcd2cc9d in apps/cambium: agent_seat.rs:13-15 says the private key is never persisted, and the store traits' mod.rs has no secrets module. A script check found no files entry beginning with /, $, < or ~ and none containing '..'. The design.json structure paths are all relative to the repository root.
+  - [x] The cancellation rule for calls already admitted by the proxy is a requirement of its own with its own acceptance criteria. — SECRETS-002 R8, 'State and enforce the cancellation rule for calls already admitted', has 3 acceptance criteria of its own and cites the statement at :55.
+  - [x] Each point the statement leaves open appears in SECRETS-002 as open and is not decided there. — The delegation schema (:21) is OPEN in R1(a) and R9. Provider revocation of a login token (:56) is OPEN in R5(b) and R7(a). The proxy-handle login path (:45) is OPEN in R5(a). The audit event schema (:187) is OPEN in R1(e). After the harden fix, R7 no longer chooses how an engine learns of a revocation.
+  - [x] check-coverage.py reports every SECRETS-002 path present in design.json structure. — check-coverage.py design/secrets reports 'Coverage clean: all items covered, briefs consistent.' and exits 0. The 3 lys paths in SECRETS-002's files are structure rows with brief SECRETS-002.
+  - [x] No file in the cluster contains a credential, token or key value. — A grep -rE across docs/design/secrets/ found no matches (exit 1). It looked for sk-, ghp_, eyJ, AKIA, BEGIN key blocks, xox tokens and hex runs of 40 or more characters.
+- Checklist verified: C1
+- Stories verified: S1
+- Issues:
+  - R8 cited statement :156 for Chippy's release 2, 'demonstrate revocation and recovery after a crash'. That quotation is on line 155; line 156 is release 3.
+  - R9 acceptance fixed its one-use race test at 'over 100 repetitions of the race'. That count traces to nothing in the statement, the design or the brief, and a race that is not forced may never fire.
+  - R7 acceptance 2 wrote '(the test double engine receives the end request)'. That decides that the door sends the engine an end request. The statement (:56) says only that the engine that runs the seat ends it on its own.
+- Fixes:
+  - Changed R8's citation to docs/design/identity/STATEMENT-2026-09-22.md:155.
+  - Removed the repetition count of 100 from R9's race criterion. Both requests are now held at the use check until both have arrived, so the race fires on every run.
+  - Removed the end-request parenthetical from R7 acceptance 2. The criterion now asserts only that the door names the seat and ends no process.
+  - Re-rendered SECRETS-002.md with render-cluster.py; a second run was byte-identical.
+
 ### R2: Record the broker's checklist items and stories and cover them
 
 THE SYSTEM SHALL add to checklist.json a section of the broker's implementation items and to stories.json the personas and stories of the people and agents who use the broker (a person granting an agent access, an agent using a handle, an operator resting an account, a reviewer reading the audit). Every item and story added SHALL be named by at least one SECRETS-002 requirement, and the rendered markdown SHALL match the JSON.
@@ -111,6 +134,16 @@ THE SYSTEM SHALL add to checklist.json a section of the broker's implementation 
   - [x] C3 — The rendered markdown of this cluster matches its JSON. — Re-rendering changes nothing.
 - Story delivery:
   - [x] S1 (Reviewer, Reviews a brief before any of its rows is dispatched) — As the reviewer, I want the secrets broker's implementation brief in the design-system form, with numbered requirements and criteria, so that its rows can be reviewed and dispatched one at a time. — The rendered SECRETS-002.md shows every requirement next to the item and story ids it covers.
+
+**Review (recorded):**
+
+- Alignment: aligned
+- Acceptance verdicts:
+  - [x] check-coverage.py on the cluster exits 0: no item or story is unassigned and no brief names an unknown id. — check-coverage.py with the ledger's DS2_METHOD reports 14 checklist items, 11 user stories, 2 briefs and 'Coverage clean', and exits 0. C4 to C14 and S2 to S11 are each named by a SECRETS-002 requirement.
+  - [x] render-cluster.py on the cluster leaves the rendered markdown unchanged after the commit. — render-cluster.py exits 0. The md5 of every .md file was identical before and after a second run, both before and after the harden edits. git status showed no further change.
+  - [x] The stories include the token revolver asking for its next account. — stories.json has the persona 'Token revolver' with S6: 'I want to ask the broker for my next account instead of walking my own list'. SECRETS-002 R3 names S6.
+- Checklist verified: C2, C3
+- Stories verified: S1
 
 ## Boundaries
 

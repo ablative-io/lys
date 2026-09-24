@@ -96,7 +96,7 @@
           {
             "criterion": "validate.py reports decisions.json and design.json valid.",
             "met": true,
-            "evidence": "From docs/: validate.py design/decisions.json -> 'design/decisions.json: OK [decisions.schema.json] All 1 document(s) valid.' (exit 0); validate.py design/directory -> 'design/directory/design.json: OK [design.schema.json]', all 8 valid (exit 0)."
+            "evidence": "From docs/: validate.py docs/design/decisions.json -> 'design/decisions.json: OK [decisions.schema.json] All 1 document(s) valid.' (exit 0); validate.py docs/design/directory -> 'design/directory/design.json: OK [design.schema.json]', all 8 valid (exit 0)."
           },
           {
             "criterion": "Every ADR added cites its source, and the lifecycle states ADR is status proposed.",
@@ -233,7 +233,7 @@
           {
             "criterion": "DIRECTORY-002 to DIRECTORY-005 exist and validate.py reports each valid.",
             "met": true,
-            "evidence": "validate.py design/directory: DIRECTORY-002.json to DIRECTORY-005.json each 'OK [brief.schema.json]', exit 0 (re-run after the harden edit)."
+            "evidence": "validate.py docs/design/directory: DIRECTORY-002.json to DIRECTORY-005.json each 'OK [brief.schema.json]', exit 0 (re-run after the harden edit)."
           },
           {
             "criterion": "Each ID001 acceptance identifier of rows 02, 04, 03 and 05 appears in its brief.",
@@ -440,12 +440,12 @@
           {
             "criterion": "check-coverage.py exits 0.",
             "met": true,
-            "evidence": "From docs/: check-coverage.py design/directory -> 20 items, 7 stories, 5 briefs, 'Coverage clean', exit 0. Two legal warnings: S1 and S3 are each claimed by more than one brief."
+            "evidence": "From docs/: check-coverage.py docs/design/directory -> 20 items, 7 stories, 5 briefs, 'Coverage clean', exit 0. Two legal warnings: S1 and S3 are each claimed by more than one brief."
           },
           {
             "criterion": "render-cluster.py leaves the rendered markdown unchanged after the commit.",
             "met": true,
-            "evidence": "After the harden edit and one render, I took md5 of every .md in docs/design/directory and briefs, ran render-cluster.py design/directory again and re-hashed: no difference ('RENDER-STABLE')."
+            "evidence": "After the harden edit and one render, I took md5 of every .md in docs/design/directory and briefs, ran render-cluster.py docs/design/directory again and re-hashed: no difference ('RENDER-STABLE')."
           }
         ],
         "checklist": [
@@ -468,8 +468,8 @@
     "No row brief is dispatched until Waffles has reviewed it."
   ],
   "verification": [
-    "From docs/: python3 $DS2_METHOD/scripts/validate.py design/directory exits 0.",
-    "From docs/: python3 $DS2_METHOD/scripts/validate.py design/decisions.json exits 0.",
-    "From docs/: python3 $DS2_METHOD/scripts/check-coverage.py design/directory exits 0."
+    "From the repository root: python3 scripts/design/validate.py docs/design/directory exits 0.",
+    "From the repository root: python3 scripts/design/validate.py docs/design/decisions.json exits 0.",
+    "From the repository root: python3 scripts/design/check-coverage.py docs/design/directory exits 0."
   ]
 }
