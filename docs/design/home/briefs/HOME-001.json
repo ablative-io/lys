@@ -17,7 +17,8 @@
     "C8",
     "C9",
     "C10",
-    "C11"
+    "C11",
+    "C12"
   ],
   "stories": [
     "S1",
@@ -25,7 +26,8 @@
     "S3",
     "S4",
     "S5",
-    "S6"
+    "S6",
+    "S7"
   ],
   "design_anchor": [
     "ADR-003",
@@ -329,6 +331,36 @@
       "stories": [
         "S3"
       ]
+    },
+    {
+      "id": "R11",
+      "title": "The handover: an outgoing session's letter seeds its successor as inherited memory",
+      "spec": "Define the custom entry lys.inherited: data {from_session, from_entry, provider, api, model, written_at}, followed by the letter's message entry copied whole (its thinking blocks with their signatures, its text). WHEN `lys-home handover --home <dir> --from <session> --letter <entry id>` is run, THE SYSTEM SHALL copy that turn from the outgoing session into a new successor home as its first entries, a lys.inherited entry then the message, and SHALL record in the successor's session_info that its first memory is inherited. The letter is elicited by a person or the harness with a real prompt to the outgoing session before compaction or retirement (what it knows, what it got wrong and why, how the people like things done, what it wishes it had known); THE SYSTEM SHALL NOT compose, edit or author the letter or any thinking block, and SHALL refuse a letter entry whose assistant message carries provider `authored`. WHILE rendering a successor for Claude Code, THE SYSTEM SHALL apply R4's rule: the inherited thinking renders whole only to the same provider, api and model, otherwise as text with opaque blocks dropped and named in the loss account. The proof SHALL measure first whether 2.1.281 replays a signed thinking block from a resumed file at all (unknown on 24 September), and then run one card twice, seeded and plain, counting fix rounds and unverified claims, in docs/design/home/PROOF-HANDOVER.md.",
+      "acceptance": [
+        "`lys-home handover` on the walrus continuation's real turn produces a successor home whose first entry is lys.inherited naming that session and entry, whose second is the copied message with a thinking block whose signature equals the source byte for byte, and whose session_info says inherited.",
+        "`lys-home handover` with a letter entry whose message carries provider `authored` exits non-zero naming the entry and writes nothing.",
+        "PROOF-HANDOVER.md states whether a signed thinking block in a resumed file was replayed by 2.1.281 (measured: the block is present in the continuation's next request as recorded by R10's proxy or, before that exists, by the harness's own file), and records the seeded and plain counts of fix rounds and unverified claims for one named card.",
+        "Rendering the successor for a different model produces a loss account entry for the inherited thinking block and a text part in its place."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/record/handover.rs",
+          "docs/design/home/PROOF-HANDOVER.md"
+        ],
+        "modify": [
+          "crates/lys-home/src/record/entries.rs",
+          "crates/lys-home/src/cli.rs",
+          "docs/design/home/RECORD.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C12"
+      ],
+      "stories": [
+        "S7",
+        "S2"
+      ]
     }
   ],
   "boundaries": [
@@ -341,7 +373,8 @@
     "No proof runs against a session that is currently running, and no credential is copied anywhere.",
     "The design's structure array is the whole file list; a path outside it is not created.",
     "Not a sub-agent platform: nothing here spawns, schedules or supervises agents; it holds sessions neatly and renders them (Tom, Dot 13:33).",
-    "Resume is Claude Code's own `--resume <path>`; no launcher, copy or rewrite of a passed file is built."
+    "Resume is Claude Code's own `--resume <path>`; no launcher, copy or rewrite of a passed file is built.",
+    "No thinking block is ever authored, edited or synthesised; a letter is only what a model produced in a real turn."
   ],
   "verification": [
     "From docs/: python3 $DS2_METHOD/scripts/validate.py design/home exits 0.",

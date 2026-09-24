@@ -12,6 +12,10 @@
         {
           "id": "S2",
           "text": "As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it."
+        },
+        {
+          "id": "S7",
+          "text": "As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs."
         }
       ]
     },
