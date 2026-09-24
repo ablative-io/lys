@@ -6,7 +6,7 @@
 
 **S2.** As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
 
-**S7.** As a new session, I want to start from the series of examples that carry what every session before me learned, short and to the point, with each example naming where it came from, so that our learning is in one another and I know which of it is mine.
+**S7.** As a new session, I want to start from the canon, the series of examples that carry what every session before me learned, each a rule stated short with a real exchange that shows it lived and naming where it came from, so that our learning is in one another and I know which of it is mine.
 
 ## Tom — Owns the platform and reads what a session was given
 

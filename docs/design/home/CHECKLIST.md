@@ -23,6 +23,6 @@
 - [ ] **C9** — A proxy call record (lys.call) names its request and response blocks by hash with provider, api, model and timing, and can be ingested from a captured request and response pair.
 - [ ] **C11** — The little proxy passes Messages, Chat Completions and Responses streams through unchanged and appends one lys.call entry per call under the session it links to.
 
-## The inheritance
+## The canon
 
-- [ ] **C12** — One curated, shared series of short examples that combine the rules and distil the collective experience seeds every new session as lys.inherited entries naming each example's source; nothing in it is authored thinking; seeded against plain is measured on a card.
+- [ ] **C12** — The canon, one curated versioned series of short examples (a rule stated short plus a real exchange that shows it lived), drawn from every agent's sessions and changed only through review, seeds every new session as lys.inherited entries naming each example's source; nothing in it is authored thinking; canon-seeded against plain is measured on a card.
