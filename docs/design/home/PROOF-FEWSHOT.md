@@ -37,7 +37,7 @@ So 2.1.281 tolerates a leading `custom` record (it resumes and answers) but does
 
 ## What this proves and what it does not
 
-- Claude Code 2.1.281 resumes from a file path given to `--resume`, from a working directory unrelated to the file, and writes its continuation beside the file. Nothing under `~/.claude/projects` was written for this cwd.
+- Claude Code 2.1.281 resumes from a file path given to `--resume`, from a working directory unrelated to the file, and writes its continuation beside the file. Under `~/.claude/projects` it created the directory for the run's cwd (`-…-proof5-elsewhere`) holding only an empty `memory` directory: no transcript record was written there (checked 15:30).
 - A hand-authored exchange is read as history: the answer came from the file's last exchange and from nowhere else.
 - The authored records are never mistaken for a model's: they keep model `authored` in the continuation, and R3 imports them behind one `lys.authored` entry with provider, api and model `authored`.
 - It does not prove anything about tools: the authored file holds no tool actions, so the repeated-tool-action question belongs to PROOF-RESUME.md.
