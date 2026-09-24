@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Cluster Design",
+  "description": "The architectural anchor for a cluster. JSON is the source of truth; DESIGN.md is rendered. Decisions live in the project decision ledger and are cited by ADR ID, never restated. The structure array is machine-checkable: every brief file path is verified against it.",
+  "type": "object",
+  "required": ["cluster", "title", "intention", "problem", "solution", "principles", "decisions", "goals", "non_goals", "structure", "inventory", "constraints"],
+  "additionalProperties": false,
+  "properties": {
+    "cluster": {
+      "type": "string",
+      "description": "Cluster name, matching the directory under docs/design/"
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable title"
+    },
+    "intention": {
+      "type": "string",
+      "description": "The spirit of the work — what the world looks like when this is done. The anchor for every judgment call the documents don't explicitly cover. One to three paragraphs."
+    },
+    "problem": {
+      "type": "string",
+      "description": "What is broken or missing, who it affects, why now. Vague problems produce vague solutions — be specific about the pain."
+    },
+    "solution": {
+      "type": "string",
+      "description": "The design itself: how the pieces fit, integration points, data flow. Structure and rationale, not syntax — no code snippets or type signatures."
+    },
+    "principles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^P\\d+$" },
+          "text": { "type": "string" }
+        }
+      },
+      "description": "Governing principles for this cluster (5-10 max) that resolve review questions before they are asked. Empty array when the project-level ADRs suffice."
+    },
+    "decisions": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^ADR-\\d{3}$" },
+      "description": "ADR IDs this cluster introduced or is bound by. The ledger holds the content."
+    },
+    "goals": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "What success looks like, 3-7 entries, each verifiable — you can tell whether it was achieved"
+    },
+    "non_goals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["text", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "text": { "type": "string", "description": "The reasonable thing we are deliberately not doing" },
+          "reason": { "type": "string", "description": "Why it is excluded; empty string when obvious" }
+        }
+      },
+      "description": "Scope protection — things a reader might expect to be in scope"
+    },
+    "structure": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "note", "brief"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "description": "Repo-root-relative file or directory path, or a rooted one. A path outside the repository this design lives in is spelled with a root token at its head ($NAME/...), which the ledger resolves from the launch settings of the machine serving the round and refuses by name when that machine set none. An absolute path is refused at validation: it is one machine's, and the same design is fired on a lane's own clone." },
+          "note": { "type": "string", "description": "One line: what lives here" },
+          "brief": { "type": "string", "description": "Brief ID that introduces this path; empty string for pre-existing paths" }
+        }
+      },
+      "description": "The file layout, flat and machine-checkable. Every file path in every brief is verified against this list; two briefs claiming to create the same path is a check failure."
+    },
+    "inventory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "note"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "description": "Repo-root-relative file or directory path, or a rooted one. A path outside the repository this design lives in is spelled with a root token at its head ($NAME/...), which the ledger resolves from the launch settings of the machine serving the round and refuses by name when that machine set none. An absolute path is refused at validation: it is one machine's, and the same design is fired on a lane's own clone." },
+          "note": { "type": "string", "description": "What exists here today and its state" }
+        }
+      },
+      "description": "What exists before this cluster touches it. Essential for porting/extraction work — kills false 'create' claims. Empty array for greenfield."
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^CN\\d+$" },
+          "text": { "type": "string", "description": "Specific and checkable — 'sub-millisecond normalization for paths under 1000 chars', not 'good performance'" }
+        }
+      },
+      "description": "Things that must not change: security requirements, performance expectations, cross-cutting conventions"
+    },
+    "gate": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "title": "the three-line shorthand",
+            "type": "object",
+            "required": ["tree", "fmt", "lint", "tests"],
+            "additionalProperties": false,
+            "properties": {
+              "tree": { "type": "string", "description": "The working tree this gate measures: a path relative to the repository root, or a rooted one. A path outside the repository this design lives in is spelled with a root token at its head ($NAME/...), which the ledger resolves from the launch settings of the machine serving the round and refuses by name when that machine set none. An absolute path is refused at validation: it is one machine's, and the same design is fired on a lane's own clone." },
+              "fmt": { "type": "string", "description": "The formatting command line, run in the tree with no shell. A tool that lives outside the tree is named at the head of the line under a root token the same way a tree is, so no command line names a machine either." },
+              "lint": { "type": "string", "description": "The lint command line, run in the tree with no shell" },
+              "tests": { "type": "string", "description": "The test command line, run in the tree with no shell" }
+            },
+            "description": "Three named legs written short: fmt, lint and tests, each at the place the ledger itself runs, each every round. A repository whose gate is these three lines is written this way and is measured exactly as it always was."
+          },
+          {
+            "title": "the legs the repository declares",
+            "type": "object",
+            "required": ["tree", "legs"],
+            "additionalProperties": false,
+            "properties": {
+              "tree": { "type": "string", "description": "The working tree these legs measure, spelled the same way as in the three-line shorthand: relative to the repository root, or under a root token the ledger resolves from its launch settings. An absolute path is refused at validation." },
+              "shorthand": { "type": "object", "description": "Names this entry gives to requirement sets that recur across its legs, as name to an array of requirements. A shorthand is a name for a set and never a kind of its own: every member is a requirement spelled kind:value, so a shorthand cannot be written in terms of another." },
+              "legs": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": ["name", "command", "requires", "cadence"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": { "type": "string", "description": "What this leg is called. An outcome names one leg, so a name is used once in an entry." },
+                    "command": { "type": "string", "description": "The command line this leg is, run in the tree with no shell. A tool that lives outside the tree is named at the head of the line under a root token, so no command line names a machine." },
+                    "requires": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": { "type": "string" },
+                      "description": "What this leg requires of a place, each spelled kind:value — tool, toolchain, target, lockfile, quiet, place — or the name of a shorthand this entry declares. A leg that declares nothing is refused: it does not default to wherever the ledger happens to be running. A leg no configured venue satisfies is unmeasured by name and stops the round."
+                    },
+                    "cadence": { "type": "string", "enum": ["round", "demand"], "description": "Whether this leg runs every round, or only on demand. A leg that answers a question nobody asked this round would monopolise the round to do it; the shape says so instead of the leg having to pass to get out of the way." }
+                  }
+                },
+                "description": "Every leg of this tree's gate, named. If the repository has sixteen legs this array has sixteen entries: a round that did not run one of them cannot report green."
+              }
+            }
+          }
+        ],
+        "description": "One working tree and the gate it is measured by, written either as the three-line shorthand or as the legs the repository declares."
+      },
+      "description": "How each working tree of this cluster is measured. The gate runs exactly the legs named here and assumes no tool: a tree named here is measured, a tree not named here is refused, and a leg no place satisfies is reported unmeasured rather than skipped."
+    }
+  }
+}
