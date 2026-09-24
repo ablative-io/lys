@@ -7,7 +7,7 @@ from card/home-001 at 19e3ffe8 and Pi's own reader at `3d5cbe98`.
 
 `loadEntriesFromFile`, `parseSessionEntries` and `buildSessionContext` from
 `packages/coding-agent/src/core/session-manager.ts` at `3d5cbe98` (a scratch
-clone fetched from the checkout at `/Users/tom/Developer/tools/harness/pi`),
+clone of github.com/earendil-works/pi),
 run under `bun run <scratch>/pi-parse.ts <file>...`. The script loads each file
 with Pi's loader, then builds the context from the leaf named in the file's
 `.head` sidecar, exactly as lys-home does.

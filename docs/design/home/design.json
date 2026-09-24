@@ -312,7 +312,7 @@
     },
     {
       "path": "$PI/packages/coding-agent/src/core/session-manager.ts",
-      "note": "Pi's session tree at 3d5cbe98 (checkout /Users/tom/Developer/tools/harness/pi, earendil-works/pi): header, entries, leaf (branch at :1125 moves an in-memory cursor; _buildIndex:754 restores the last physical entry on reopen; loadEntriesFromFile:438 reads the whole file)"
+      "note": "Pi's session tree at 3d5cbe98 (github.com/earendil-works/pi): header, entries, leaf (branch at :1125 moves an in-memory cursor; _buildIndex:754 restores the last physical entry on reopen; loadEntriesFromFile:438 reads the whole file)"
     },
     {
       "path": "$PI/packages/ai/src/api/transform-messages.ts",
@@ -324,7 +324,7 @@
     },
     {
       "path": "$CCFLARE/README.md",
-      "note": "ccflare at 95c4c6a (/Users/tom/Developer/tools/proxy/ccflare): the concept of a native pass-through that keeps request history; reference only, not used (Tom, Dot 13:34)"
+      "note": "ccflare at 95c4c6a (github.com/snipeship/ccflare): the concept of a native pass-through that keeps request history; reference only, not used (Tom, Dot 13:34)"
     }
   ],
   "constraints": [
