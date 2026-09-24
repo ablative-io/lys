@@ -36,6 +36,10 @@
     {
       "id": "P8",
       "text": "A sandbox or a VM is a target profile the launch template renders into, never a special case in the core; credentials are supplied at launch on the target and never carried in the home (Tom, Dot 13:30; CONTEXT-ROADMAP stage 3)."
+    },
+    {
+      "id": "P9",
+      "text": "A handover is a letter the outgoing session writes to its successor in its own real thinking and answer; it enters the successor as a lys.inherited entry marked as a predecessor's memory, never as the successor's own experience, and replays only to the same provider, api and model. No thinking is ever authored; only thinking a model produced is kept (Tom, Dot 13:38 to 13:40: 'you are waking up ... I am another one, I'm helping you have part of my memory ... like a parent imparting a wish to a child'; Waffles 52d53451)."
     }
   ],
   "decisions": [
@@ -47,7 +51,8 @@
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
     "One real Claude Code session imported into the common record, rendered back, and resumed under a new id on 2.1.281 without repeating a completed tool action, with the original file's hash unchanged.",
     "One seat with a subscription login making calls through a pass-through proxy, so the tee has somewhere to live.",
-    "A written loss account for every derived record: what a render or translation preserved, transformed and could not carry."
+    "A written loss account for every derived record: what a render or translation preserved, transformed and could not carry.",
+    "A handover letter from an outgoing session seeds its successor as inherited memory, with the model's own thinking intact, and the effect is measured on a card against a plain start."
   ],
   "non_goals": [
     {
@@ -200,6 +205,16 @@
     {
       "path": "docs/design/home/PROOF-FEWSHOT.md",
       "note": "the first proof: a hand-written few-shot session file resumed by path from a directory outside the config root",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/record/handover.rs",
+      "note": "the handover: take the outgoing session's letter turn (thinking intact) and seed the successor with it as lys.inherited",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "docs/design/home/PROOF-HANDOVER.md",
+      "note": "measured: a successor seeded with an inherited letter, whether 2.1.281 replays the signed thinking, and seeded against plain on one card",
       "brief": "HOME-001"
     }
   ],

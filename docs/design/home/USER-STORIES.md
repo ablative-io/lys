@@ -6,6 +6,8 @@
 
 **S2.** As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
 
+**S7.** As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+
 ## Tom — Owns the platform and reads what a session was given
 
 **S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
