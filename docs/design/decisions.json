@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-23",
+  "updated": "2026-09-24",
   "decisions": [
     {
       "id": "ADR-001",
@@ -138,6 +138,59 @@
         "Anyone can verify the certificate and its inclusion in the log offline with standard tools.",
         "Production keys and receipts outside tests remain Tom's acts.",
         "The conformance list checks that a registered agent's certificate, or its not-issued state, and its receipts can be read from its file."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-009",
+      "title": "People sign in through a maintained Rauthy fork of our own",
+      "status": "decided",
+      "scope": "identity",
+      "date": "2026-09-22",
+      "decided_by": "Tom (the fork, 14:35 to 14:42); Waffles (its branch and upgrade rule, 15:30:50)",
+      "context": "Rauthy v0.36.2 refuses a second provider for a user ('user is already federated'), so linking Google and GitHub to one person needs a change Rauthy upstream is unlikely to accept. Sources: docs/design/identity/STATEMENT-2026-09-22.md:191 (Decided 14:35, Tom); IDENTITY-001 authority (docs/design/identity/briefs/IDENTITY-001.json:10, Tom 14:35 to 14:42; docs/design/identity/briefs/IDENTITY-001.json:17, Waffles 15:30:50) and review_decisions (docs/design/identity/briefs/IDENTITY-001.json:35).",
+      "decision": "Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.",
+      "quote": "we won't be making a contribution to Rauthy upstream. We can give it a try, but it's very unlikely that it'll be accepted... much more likely that we would need to keep maintaining our own fork",
+      "consequences": [
+        "The fork carries its security fixes for as long as it lives: its maintenance owner is Chippy, with Waffles reviewing security and update decisions (docs/design/identity/RAUTHY-BASELINE.md:39), and the release-and-advisory check recurs before every install (docs/design/identity/STATEMENT-2026-09-22.md:177).",
+        "Real sign-in waits on a rebase onto an upstream release carrying both hardening commits, the separate future brief IDENTITY-002 (docs/design/identity/briefs/IDENTITY-001.json:462-473).",
+        "A change inside the fork belongs to the fork's own repository: a brief of this repository names such a file with its owner and never lists it as its own file."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-010",
+      "title": "Every product shares one design and keeps its own accent; the identity product's is orange",
+      "status": "decided",
+      "scope": "identity",
+      "date": "2026-09-22",
+      "decided_by": "Tom (15:18, 15:20 and 15:21:43), relayed by Waffles (15:19 and 15:21)",
+      "context": "Tom asked for a consistent design across the products and named Aion's browser appearance as the one he is happiest with; Cambium is not yet the reference. Sources: docs/design/identity/STATEMENT-2026-09-22.md:194; IDENTITY-001 authority (docs/design/identity/briefs/IDENTITY-001.json:14-15) and review_decisions (docs/design/identity/briefs/IDENTITY-001.json:43-44).",
+      "decision": "The identity screens follow Aion's structure, typography, spacing and interaction, and Rauthy's client themes take the same colours, with no build dependency on Cambium or Aion. Each product keeps its own accent within the estate colour family: Cambium green, Aion blue and black, Argus light blue, Haematite mustard. The identity product's accent is orange (accent #D4975A, deep #A86B2E, wash #3D2A17 in the estate colour tokens), set apart from Manifold's copper. No product is silently made Aion-blue, and purple is not used.",
+      "quote": "I would like a consistent design across all of them. They don't have that at the moment and it's potentially worth extracting out",
+      "consequences": [
+        "Rauthy's pages carry our colours and corner radius only; their fonts and layout stay upstream's (docs/design/identity/STATEMENT-2026-09-22.md:191).",
+        "Exact accessible light and dark accent values are declared and reviewed before a theme is accepted.",
+        "Whether one design system is extracted for every product is not settled by this decision."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-011",
+      "title": "An identity is registered, active, suspended or retired",
+      "status": "proposed",
+      "scope": "identity",
+      "date": "2026-09-22",
+      "decided_by": "Archie, for the working team (proposal of 17:10); not ruled by Tom",
+      "context": "Tom, 17:08, put identity, access, permissions and the start of lifecycle management before everything else (docs/design/identity/STATEMENT-2026-09-22.md:183). Archie proposed these states so the directory has something to register an identity into; the document calls itself 'a proposal for the room, not a settled design' (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:1-8).",
+      "decision": "An identity is in one of four states: registered (exists in the directory, no grants, no credential handle, may not act), active (may act within its grants), suspended (kept whole, grants kept but not effective) and retired (permanent, history kept, never reactivated; a new identity is made instead). Register, activate, suspend, reinstate and retire are the only transitions, each one signed audit record naming the authenticated actor and their provenance, the identity, from, to, when and reason. Having a grant or a credential is a fact beside the state, not a state. A person is registered by first sign-in; an agent is registered by a signed-in person, who carries it as its responsible person for life and may cause every transition of their own agents. Source: docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:71-95.",
+      "quote": "We got to talk about identity access management, permissions, and the start of lifecycle management before we get to the nitty gritty of the lifecycle that we're actually managing",
+      "consequences": [
+        "DIRECTORY-003 records the state beside each identity; no check reads it until the permission work of road step 2.",
+        "The room's own questions stay with the proposal: whether a reason is mandatory on suspend and retire, and whether activation needs a credential handle (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:101-103)."
       ],
       "supersedes": [],
       "superseded_by": ""

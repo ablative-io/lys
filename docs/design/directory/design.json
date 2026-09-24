@@ -3,7 +3,7 @@
   "title": "The standalone identity directory, with every grant rooted in a person",
   "intention": "An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change.",
   "problem": "IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands.",
-  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, revised for the grant ruling, the PostgreSQL ruling and the lifecycle states, with the decisions in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.",
+  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.",
   "principles": [
     {
       "id": "P1",
@@ -15,7 +15,7 @@
     },
     {
       "id": "P3",
-      "text": "A person or agent may be registered before any session exists; registration creates no running state and no credential."
+      "text": "A person or agent may be registered before any session exists; registration creates no running state and issues no Rauthy login, runtime credential or capability certificate."
     },
     {
       "id": "P4",
@@ -24,17 +24,39 @@
     {
       "id": "P5",
       "text": "No success before durable evidence; an uncertain append is reconciled before its projection answers as current, and pending or refused outcomes stay visible until resolved."
+    },
+    {
+      "id": "P6",
+      "text": "A future execution or fork ID refers to its enduring identity and, for a fork, its parent execution; step 1 reserves that distinction in the contract and implements neither session history nor launch."
+    },
+    {
+      "id": "P7",
+      "text": "An audit receipt carries a version, a stable operation ID, the actor, the affected identity, the operation, a payload commitment and the resulting log coordinate or checkpoint; secrets and whole context objects are excluded, and its exact signed encoding is reviewed before use."
+    },
+    {
+      "id": "P8",
+      "text": "The service attests the authenticated human actor and their authentication provenance; it never claims a person signed bytes with a key they do not hold, and a registration records the person who made it, never an invented agent signature."
+    },
+    {
+      "id": "P9",
+      "text": "The initial directory administrator is bootstrapped by an explicitly configured issuer and subject, never by email or first visitor; every other mutation caller is refused in step 1."
     }
   ],
   "decisions": [
     "ADR-003",
     "ADR-004",
-    "ADR-005"
+    "ADR-005",
+    "ADR-007",
+    "ADR-008",
+    "ADR-009",
+    "ADR-010",
+    "ADR-011"
   ],
   "goals": [
-    "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, in its dependency order.",
-    "The grant path (create an agent under a person, grant it a project, the action is allowed, revoke or suspend, the same action is refused) is a requirement of the row that owns it, with acceptance criteria.",
-    "Every decision still open for Tom is recorded as open and decided nowhere in this cluster."
+    "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
+    "The grant path (create an agent under a person, grant it a project, the action is allowed, revoke or suspend, the same action is refused) is a requirement of the row that owns it, with acceptance criteria; where the sources do not settle the row, it is recorded open for Tom in DIRECTORY-003 with its criteria drafted.",
+    "Every decision still open for Tom is recorded as open and decided nowhere in this cluster.",
+    "The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6)."
   ],
   "non_goals": [
     {
@@ -43,11 +65,43 @@
     },
     {
       "text": "Row 03's changes inside the Rauthy fork",
-      "reason": "The fork is its own repository under vendor/rauthy; a row whose files live there needs its own cluster in the fork. Its brief here records the fork files as named work, not as files of this repository."
+      "reason": "The fork is its own repository under vendor/rauthy; a row whose files live there needs its own brief in the fork, which does not yet exist and blocks DIRECTORY-004. DIRECTORY-004 names the fork files as work with their owner, not as files of this repository."
     },
     {
-      "text": "Choosing the grant representation, suspension semantics, the service name or the anchor",
-      "reason": "Open for Tom."
+      "text": "The grant representation: how one grant records who may exercise it, whether it may be passed on (person, agent or nobody), what it derives from, and whether it can be bounded. OPEN for Tom.",
+      "reason": "The statement leaves the exact delegation schema unsettled (docs/design/identity/STATEMENT-2026-09-22.md:21; ADR-003); AGENT-PARITY-2026-09-23's questions (docs/design/identity/AGENT-PARITY-2026-09-23.md:17-23) are inputs to it, not answers."
+    },
+    {
+      "text": "Suspension semantics: whether suspending a person also ends their sign-in session at Rauthy or only makes our checks refuse, and what else stops with a suspended identity. OPEN for Tom.",
+      "reason": "The lifecycle document asks it of the room (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:99-100, docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:104-105) and its states are only proposed (ADR-011); two systems, one decision."
+    },
+    {
+      "text": "The name of the identity service. OPEN for Tom.",
+      "reason": "The statement lists it as not decided (docs/design/identity/STATEMENT-2026-09-22.md:192); no crate or directory name selects it."
+    },
+    {
+      "text": "Which anchor the first agents pin to: our hosted anchor, a self-hosted one, or both. OPEN for Tom.",
+      "reason": "Lys leaves it as a product decision and so does the statement (docs/design/identity/STATEMENT-2026-09-22.md:193)."
+    },
+    {
+      "text": "A nightly Rauthy base versus waiting for an upstream release carrying #1696 and #1728. OPEN for Tom.",
+      "reason": "Waffles' ruling of 15:36:25: if upstream has published no such release by the row 05 showing, Tom decides (docs/design/identity/briefs/IDENTITY-001.json:18; docs/design/identity/STATEMENT-2026-09-22.md:177); rows 02 to 05 run on v0.36.2 meanwhile."
+    },
+    {
+      "text": "Road step 2 onward: capability certificates, arbitrary grants and their enforcement, session launch and stop, credential handles, memory, context assembly, lanterns and anchoring in production",
+      "reason": "Revision 5 keeps them out of step 1 (docs/design/identity/briefs/IDENTITY-001.json:29-30); ADR-007 (the start command) and ADR-008 (the certificate on an agent's file) govern what the step-1 screens do not present as working."
+    },
+    {
+      "text": "The examples in AGENT-PARITY-2026-09-23 (abilities with an assignment or project, seat provisioning within a budget, private and shared notes)",
+      "reason": "Tom gave them as not yet decided (docs/design/identity/AGENT-PARITY-2026-09-23.md:11-15); they are never turned into requirements."
+    },
+    {
+      "text": "A production Cambium auth cutover, and any upstream Rauthy contribution as a prerequisite",
+      "reason": "Revision 5 forbids both before scratch acceptance, review and Gypsy's coordinated install (docs/design/identity/briefs/IDENTITY-001.json:31)."
+    },
+    {
+      "text": "A shared design-system package extracted for every product",
+      "reason": "Tom left it as a thing to look at, not a row (ADR-010)."
     }
   ],
   "structure": [
@@ -88,7 +142,7 @@
     },
     {
       "path": "docs/design/directory/briefs/DIRECTORY-002.json",
-      "note": "a row brief converted from IDENTITY-001",
+      "note": "row 02 of IDENTITY-001, converted",
       "brief": "DIRECTORY-001"
     },
     {
@@ -98,7 +152,7 @@
     },
     {
       "path": "docs/design/directory/briefs/DIRECTORY-003.json",
-      "note": "a row brief converted from IDENTITY-001",
+      "note": "row 04 of IDENTITY-001, converted",
       "brief": "DIRECTORY-001"
     },
     {
@@ -108,7 +162,7 @@
     },
     {
       "path": "docs/design/directory/briefs/DIRECTORY-004.json",
-      "note": "a row brief converted from IDENTITY-001",
+      "note": "row 03 of IDENTITY-001, converted",
       "brief": "DIRECTORY-001"
     },
     {
@@ -118,13 +172,243 @@
     },
     {
       "path": "docs/design/directory/briefs/DIRECTORY-005.json",
-      "note": "a row brief converted from IDENTITY-001",
+      "note": "row 05 of IDENTITY-001, converted",
       "brief": "DIRECTORY-001"
     },
     {
       "path": "docs/design/directory/briefs/DIRECTORY-005.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-001"
+    },
+    {
+      "path": "Cargo.toml",
+      "note": "workspace manifest; gains the identity dependencies (DIRECTORY-002) and the directory crates (DIRECTORY-003)",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "Cargo.lock",
+      "note": "lock file; follows Cargo.toml (DIRECTORY-002, DIRECTORY-003)",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/Cargo.toml",
+      "note": "the CLI crate's manifest; gains the identity subcommand's dependencies",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/main.rs",
+      "note": "the CLI entry; dispatches lys identity",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/cli.rs",
+      "note": "the CLI arguments; gains the identity subcommand",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/commands/error.rs",
+      "note": "the CLI error type; carries the identity errors",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/mod.rs",
+      "note": "declarations and re-exports only",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/cli.rs",
+      "note": "identity subcommand argument declarations",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/config.rs",
+      "note": "typed deployment configuration and validation; no secret values in diagnostics",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/credentials.rs",
+      "note": "Zeroizing, redacted credential material and stable reuse",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/private_files.rs",
+      "note": "restricted-mode durable file creation and outcome reconciliation",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/prepare.rs",
+      "note": "validates inputs and materialises the declared private deployment artifacts",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/configure.rs",
+      "note": "idempotent client and theme reconciliation with stable operation identifiers",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/rauthy.rs",
+      "note": "typed Rauthy API requests and responses, named status errors, read-back after an uncertain outcome",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/themes.rs",
+      "note": "reads the declared estate palette mapping and validates both client themes",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/health.rs",
+      "note": "named readiness checks for the declared services; SpiceDB readiness only",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/error.rs",
+      "note": "typed errors carrying operation, resource and path, never secret bytes",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/tests/identity_deploy.rs",
+      "note": "ID001_DEPLOY",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/tests/identity_refusals.rs",
+      "note": "ID001_DEPLOY_REFUSAL",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/tests/identity_theme.rs",
+      "note": "ID001_THEME",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/tests/identity_shared_db.rs",
+      "note": "ID001_SHARED_DB",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/tests/identity_restart.rs",
+      "note": "restart and restore of the dependencies",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/tests/identity_support/mod.rs",
+      "note": "shared test support for the identity tests",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/tests/identity_support/fixtures.rs",
+      "note": "test identities and configuration fixtures, never real credentials",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/tests/identity_support/server.rs",
+      "note": "test server harness",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/tests/identity_support/compose.rs",
+      "note": "compose harness for the three dependencies",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "deploy/identity/compose.yaml",
+      "note": "Rauthy, SpiceDB and one PostgreSQL service (DIRECTORY-002); gains the directory service (DIRECTORY-003)",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "deploy/identity/versions.json",
+      "note": "pinned releases and image digests",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "deploy/identity/config.example.toml",
+      "note": "example configuration without secrets, the database address included (DIRECTORY-002, DIRECTORY-003)",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "deploy/identity/postgres-init.sql",
+      "note": "roles and schema namespaces for Rauthy and SpiceDB in one database",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "deploy/identity/README.md",
+      "note": "install, readiness, backup and restore, and SpiceDB's step-1 sentence (DIRECTORY-002); the directory (DIRECTORY-003) and the screens (DIRECTORY-005)",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "deploy/identity/rauthy-themes.json",
+      "note": "both Rauthy client themes",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "deploy/identity/theme-map.md",
+      "note": "source tokens and colour conversions of the themes",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "docs/design/identity/reports/IDENTITY-001-deployment.md",
+      "note": "row 02's report: digests, versions, resolved configuration without secrets, restore result",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys-identity/",
+      "note": "directory records, typed API and event projection; exact manifest reviewed before the row starts",
+      "brief": "DIRECTORY-003"
+    },
+    {
+      "path": "crates/lys-identity-server/",
+      "note": "OIDC session handling, administrator admission and the link-audit receiver (DIRECTORY-003); routes and assets of the screens (DIRECTORY-005)",
+      "brief": "DIRECTORY-003"
+    },
+    {
+      "path": "tests/identity_contract/",
+      "note": "the directory's contract tests: ID001_DIRECTORY, ID001_AUDIT_FAULTS, ID001_ADMIN, ID001_RECEIPT, ID001_RECEIVER and the lifecycle transitions",
+      "brief": "DIRECTORY-003"
+    },
+    {
+      "path": "docs/design/identity/DIRECTORY-CONTRACT.md",
+      "note": "the directory contract: identifiers, bindings, responsible person, lifecycle state",
+      "brief": "DIRECTORY-003"
+    },
+    {
+      "path": "docs/design/identity/IDENTITY-EVENTS.md",
+      "note": "the versioned event envelope, reviewed jointly with Archie",
+      "brief": "DIRECTORY-003"
+    },
+    {
+      "path": "vendor/rauthy",
+      "note": "the maintained fork's pin (ADR-009); moves to the gated fork commit that links two providers",
+      "brief": "DIRECTORY-004"
+    },
+    {
+      "path": "docs/design/identity/PROVIDER-LINK-CONTRACT.md",
+      "note": "the typed contract between the fork's link audit and the receiver",
+      "brief": "DIRECTORY-004"
+    },
+    {
+      "path": "docs/design/identity/reports/IDENTITY-001-links.md",
+      "note": "row 03's report: pinned fork commit, gate result, counted legs",
+      "brief": "DIRECTORY-004"
+    },
+    {
+      "path": "surface/identity/",
+      "note": "the standalone screens; exact manifest reviewed before the row starts",
+      "brief": "DIRECTORY-005"
+    },
+    {
+      "path": "crates/lys-identity-server/src/assets.rs",
+      "note": "serves the screens' assets",
+      "brief": "DIRECTORY-005"
+    },
+    {
+      "path": "crates/lys-identity-server/src/routes.rs",
+      "note": "the screens' routes",
+      "brief": "DIRECTORY-005"
+    },
+    {
+      "path": "docs/design/identity/reports/IDENTITY-001-standalone.md",
+      "note": "row 05's report: screenshots, observed actions, artifact hashes",
+      "brief": "DIRECTORY-005"
     }
   ],
   "inventory": [
@@ -151,6 +435,10 @@
     {
       "path": "docs/design/identity/AGENT-PARITY-2026-09-23.md",
       "note": "Tom's 23 September ruling: 'If a human can do it through the UI, then I want an agent to be able to do it'; whether an agent may is a permission question. Input to the directory and permission rows. Its examples are recorded as undecided and are never turned into requirements."
+    },
+    {
+      "path": "docs/design/identity/RAUTHY-BASELINE.md",
+      "note": "the fork baseline: pin, maintenance owner, the IDENTITY-001-UPSTREAM-AUTH-STATE blocker; read, never changed"
     }
   ],
   "constraints": [
@@ -177,6 +465,26 @@
     {
       "id": "CN6",
       "text": "The live demonstrations ID001_LINK_LIVE (after row 03) and ID001_DIRECTORY_LIVE (after row 05) are mandatory operator hold points: the brief that follows each is blocked by it until Tom's demonstration receipt is recorded; a loop completion never stands in for one."
+    },
+    {
+      "id": "CN7",
+      "text": "Revision 5's ceiling stands: 48 focused implementer hours for IDENTITY-001 (row 01 1.5, closed; 02 8; 04 10; 03 10; 05 6; 06 4; 07 5; total 44.5, contingency 3.5), with IDENTITY-002's 4 hours outside it. An overrun is reported as soon as it is known, and Waffles takes any ceiling change to Tom (docs/design/identity/briefs/IDENTITY-001.json:24)."
+    },
+    {
+      "id": "CN8",
+      "text": "One implementer, one row in implementation and one gate invocation at a time in this lane; release builds, checks and tests run through the gate workflow at the venue, and a development exception never bypasses it (docs/design/identity/briefs/IDENTITY-001.json:25-27, docs/design/identity/briefs/IDENTITY-001.json:135)."
+    },
+    {
+      "id": "CN9",
+      "text": "A row that needs a file outside its wall stops and names it, and the reviewer approves a brief revision before that file is edited; a directory wall for a wholly new module allows only its named responsibility and needs an exact file manifest reviewed before its row starts (docs/design/identity/briefs/IDENTITY-001.json:28)."
+    },
+    {
+      "id": "CN10",
+      "text": "Rows 02 to 05 run on Rauthy v0.36.2 under Waffles' ruling of 15:36:25; each development install checks current releases and advisories and records the accepted exception; IDENTITY-001-UPSTREAM-AUTH-STATE binds real sign-in and install, rows 06 and 07 (docs/design/identity/briefs/IDENTITY-001.json:18, docs/design/identity/briefs/IDENTITY-001.json:46)."
+    },
+    {
+      "id": "CN11",
+      "text": "Step 1 is directory records, sign-in and the minimum signed identity audit. SpiceDB is installed and checked in row 02 and enforces nothing in step 1; live capability policy and its enforcement are step 2's, and running SpiceDB is not permission enforcement (docs/design/identity/briefs/IDENTITY-001.json:29-30)."
     }
   ],
   "gate": [
