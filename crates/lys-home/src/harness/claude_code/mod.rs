@@ -11,6 +11,7 @@
 //! continuation beside that file as `<sessionId>.jsonl`, leaving the passed
 //! file unchanged.
 
+pub mod events;
 pub mod import;
 #[cfg(test)]
 pub(crate) mod import_tests;

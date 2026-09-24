@@ -20,7 +20,7 @@ use crate::error::HomeError;
 use crate::harness::claude_code::{API, PROVIDER, projects_slug};
 use crate::record::blocks::Hash;
 use crate::record::entries::{CUSTOM_AUTHORED, EntryBody};
-use crate::record::{Session, fresh_id};
+use crate::record::{Session, fresh_id, safe_component};
 
 /// Where and for whom to render.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -36,6 +36,8 @@ pub struct RenderTarget {
     /// Where to write; `None` means Claude Code's own place for `cwd`,
     /// `~/.claude/projects/<slug>/<session_id>.jsonl`.
     pub out: Option<PathBuf>,
+    /// The canon to place first, before the session's own entries (R11).
+    pub canon: Option<PathBuf>,
 }
 
 /// One thing a render could not carry.
@@ -64,16 +66,23 @@ pub struct RenderReport {
     pub dropped: u64,
     /// Whether the session is a hand-authored demonstration.
     pub authored: bool,
+    /// Canon examples placed before the session's own entries.
+    pub inherited: u64,
 }
 
-/// The default place for a session file.
-#[must_use]
-pub fn default_path(home_dir: &Path, cwd: &str, session_id: &str) -> PathBuf {
-    home_dir
+/// The default place for a session file: Claude Code's own directory for the
+/// cwd. The session id must be one safe path component, and the slug is one
+/// by construction (every `/` becomes `-`); both are checked, so no id can
+/// name a path outside that directory.
+pub fn default_path(home_dir: &Path, cwd: &str, session_id: &str) -> Result<PathBuf, HomeError> {
+    safe_component("session id", session_id)?;
+    let slug = projects_slug(cwd);
+    safe_component("projects slug", &slug)?;
+    Ok(home_dir
         .join(".claude")
         .join("projects")
-        .join(projects_slug(cwd))
-        .join(format!("{session_id}.jsonl"))
+        .join(slug)
+        .join(format!("{session_id}.jsonl")))
 }
 
 /// Render the session's context path for Claude Code.
@@ -82,14 +91,21 @@ pub fn render_claude_code(
     target: &RenderTarget,
     user_home: &Path,
 ) -> Result<RenderReport, HomeError> {
-    let path = target
-        .out
-        .clone()
-        .unwrap_or_else(|| default_path(user_home, &target.cwd, &target.session_id));
+    let path = match &target.out {
+        Some(out) => out.clone(),
+        None => default_path(user_home, &target.cwd, &target.session_id)?,
+    };
     if path.exists() {
         return Err(HomeError::Exists { path });
     }
-    let entries = session.context_path()?;
+    let mut entries = Vec::new();
+    let mut inherited = 0u64;
+    if let Some(canon_path) = &target.canon {
+        let canon = crate::record::canon::load(canon_path)?;
+        inherited = canon.examples().len() as u64;
+        entries.extend(canon.entries);
+    }
+    entries.extend(session.context_path()?);
     let authored = entries.iter().any(|e| e.is_custom(CUSTOM_AUTHORED));
     let mut records: Vec<Value> = Vec::new();
     let mut losses: Vec<Loss> = Vec::new();
@@ -240,6 +256,7 @@ pub fn render_claude_code(
         thinking_as_text: as_text,
         dropped: losses.len() as u64,
         authored,
+        inherited,
     })
 }
 

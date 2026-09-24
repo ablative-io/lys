@@ -28,5 +28,6 @@ pub mod record;
 pub use error::HomeError;
 pub use record::blocks::{BlockStore, Hash, Put};
 pub use record::call::{Api, CallMeta, CallRecord, CallStatus, IngestReport, OutcomeMeta};
+pub use record::canon::{AddReport, Canon, Inherited};
 pub use record::entries::{Entry, EntryBase, EntryBody, SessionHeader};
 pub use record::{Home, Session};

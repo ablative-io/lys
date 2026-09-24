@@ -20,7 +20,7 @@ fn meta(api: Api, call_id: &str) -> CallMeta {
         model: "m".into(),
         started_at: "2026-09-24T03:00:00Z".into(),
         duration_ms: 12,
-        stream: true,
+        stream: false,
     }
 }
 
@@ -38,6 +38,7 @@ fn a_resent_conversation_adds_only_the_new_turn_as_part_blocks_and_raw_bodies_ap
         &meta(Api::Messages, "call-1"),
         &serde_json::to_vec(&first).unwrap(),
         &serde_json::to_vec(&reply1).unwrap(),
+        None,
     )
     .unwrap();
     assert_eq!((r1.request_parts, r1.response_parts), (2, 1));
@@ -56,6 +57,7 @@ fn a_resent_conversation_adds_only_the_new_turn_as_part_blocks_and_raw_bodies_ap
         &meta(Api::Messages, "call-2"),
         &serde_json::to_vec(&second).unwrap(),
         &serde_json::to_vec(&reply2).unwrap(),
+        None,
     )
     .unwrap();
     assert_eq!(r2.request_parts, 4);
@@ -100,18 +102,19 @@ fn chat_completions_and_responses_bodies_split_into_their_items() {
         &meta(Api::ChatCompletions, "chat-1"),
         &serde_json::to_vec(&chat).unwrap(),
         &serde_json::to_vec(&chat_reply).unwrap(),
+        None,
     )
     .unwrap();
     assert_eq!((r.request_parts, r.response_parts), (3, 1));
     let responses = json!({"model":"m","instructions":"i","input":[{"role":"user","content":"u"},{"type":"reasoning","encrypted_content":"x"}]});
-    let responses_reply =
-        json!({"output":[{"type":"message","content":[{"type":"output_text","text":"t"}]}]});
+    let responses_reply = json!({"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"t"}]}]});
     let r = ingest_call(
         &mut s,
         &blocks,
         &meta(Api::Responses, "resp-1"),
         &serde_json::to_vec(&responses).unwrap(),
         &serde_json::to_vec(&responses_reply).unwrap(),
+        None,
     )
     .unwrap();
     assert_eq!((r.request_parts, r.response_parts), (3, 1));
@@ -121,6 +124,7 @@ fn chat_completions_and_responses_bodies_split_into_their_items() {
         &meta(Api::Messages, "bad-1"),
         b"{\"model\":\"m\"}",
         b"",
+        None,
     )
     .unwrap_err()
     .to_string();
@@ -290,7 +294,7 @@ fn an_outcome_that_did_not_complete_records_absence_and_never_response_parts() {
 
 #[test]
 fn a_call_is_found_after_a_crash_before_the_head_advanced_and_after_the_head_moved() {
-    use crate::record::index::{Index, write_head};
+    use crate::record::index::write_head;
     let dir = tempfile::tempdir().unwrap();
     let home = Home::open(dir.path().join("home")).unwrap();
     let blocks = home.blocks().unwrap();
@@ -310,7 +314,8 @@ fn a_call_is_found_after_a_crash_before_the_head_advanced_and_after_the_head_mov
             &blocks,
             &meta(Api::Messages, "crash-1"),
             &req,
-            b"{}",
+            b"{\"content\":[{\"type\":\"text\",\"text\":\"a\"}]}",
+            None,
         )
         .unwrap();
         // Simulate the crash: the entry and its index row are durable, the head file still names the label.
@@ -351,11 +356,11 @@ fn a_call_is_found_after_a_crash_before_the_head_advanced_and_after_the_head_mov
         &blocks,
         &meta(Api::Messages, "crash-1"),
         b"{\"model\":\"m\",\"messages\":[]}",
-        b"{}",
+        b"{\"content\":[]}",
+        None,
     )
     .unwrap();
     assert!(again.already_recorded);
-    let _ = Index::index_path(&file);
     drop(s);
     dir.close().unwrap();
 }
@@ -407,6 +412,135 @@ fn a_complete_call_never_hides_a_malformed_or_missing_response() {
     .unwrap_err()
     .to_string();
     assert!(err.contains("nope.json"), "{err}");
+    drop(s);
+    dir.close().unwrap();
+}
+
+#[test]
+fn a_complete_call_from_bytes_refuses_a_malformed_or_partless_response_and_a_stream_without_parts()
+{
+    let dir = tempfile::tempdir().unwrap();
+    let home = Home::open(dir.path().join("home")).unwrap();
+    let blocks = home.blocks().unwrap();
+    let mut s = home.create_session("c7", "/w", None).unwrap();
+    let req = serde_json::to_vec(&json!({"model":"m","messages":[{"role":"user","content":"u"}]}))
+        .unwrap();
+    let mut m = meta(Api::Messages, "bytes-bad");
+    m.stream = false;
+    let err = ingest_call(&mut s, &blocks, &m, &req, b"{not json", None)
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("not JSON"), "{err}");
+    let err = ingest_call(&mut s, &blocks, &m, &req, b"{}", None)
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("content is not an array"), "{err}");
+    let err = ingest_call(&mut s, &blocks, &m, &req, b"{\"content\":null}", None)
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("content is not an array"), "{err}");
+    let mut chat = meta(Api::ChatCompletions, "chat-bad");
+    chat.stream = false;
+    let chat_req =
+        serde_json::to_vec(&json!({"model":"m","messages":[{"role":"user","content":"u"}]}))
+            .unwrap();
+    let err = ingest_call(
+        &mut s,
+        &blocks,
+        &chat,
+        &chat_req,
+        b"{\"choices\":[{}]}",
+        None,
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(err.contains("without a message"), "{err}");
+    let err = ingest_call(&mut s, &blocks, &chat, &chat_req, b"{\"choices\":[]}", None)
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("no choices"), "{err}");
+    let mut resp = meta(Api::Responses, "resp-bad");
+    resp.stream = false;
+    let resp_req = serde_json::to_vec(&json!({"model":"m","input":"u"})).unwrap();
+    let err = ingest_call(
+        &mut s,
+        &blocks,
+        &resp,
+        &resp_req,
+        b"{\"status\":\"failed\",\"output\":[]}",
+        None,
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(err.contains("not completed"), "{err}");
+    let err = ingest_call(
+        &mut s,
+        &blocks,
+        &m,
+        &req,
+        b"{\"type\":\"error\",\"error\":{\"type\":\"x\"}}",
+        None,
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(err.contains("error body"), "{err}");
+    m.stream = true;
+    let err = ingest_call(&mut s, &blocks, &m, &req, b"event: x\n", None)
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("assembled parts"), "{err}");
+    assert_eq!(s.customs_everywhere(CUSTOM_CALL).unwrap().len(), 0);
+    // The proxy's assembled parts stand in for the stream body.
+    let r = ingest_call(
+        &mut s,
+        &blocks,
+        &m,
+        &req,
+        b"event: x\n",
+        Some(vec![json!({"type":"text","text":"a"})]),
+    )
+    .unwrap();
+    assert_eq!((r.response_parts, r.already_recorded), (1, false));
+    // An outcome whose request file is a directory is an I/O error, not an absence.
+    let dirpath = dir.path().join("a-directory");
+    std::fs::create_dir(&dirpath).unwrap();
+    let err = ingest_outcome(
+        &mut s,
+        &blocks,
+        &OutcomeMeta {
+            call_id: "io-2".into(),
+            provider: "anthropic".into(),
+            api: Api::Messages,
+            status: CallStatus::Partial,
+            started_at: "t".into(),
+            duration_ms: None,
+            stream: true,
+        },
+        Some(&dirpath),
+        None,
+    )
+    .unwrap_err();
+    assert!(matches!(err, crate::error::HomeError::Io { .. }), "{err}");
+    // A request file that is not JSON is recorded as absence.
+    let half = dir.path().join("half.json");
+    std::fs::write(&half, b"{\"model\":\"m\",\"mess").unwrap();
+    let r = ingest_outcome(
+        &mut s,
+        &blocks,
+        &OutcomeMeta {
+            call_id: "io-3".into(),
+            provider: "anthropic".into(),
+            api: Api::Messages,
+            status: CallStatus::Lost,
+            started_at: "t".into(),
+            duration_ms: None,
+            stream: true,
+        },
+        Some(&half),
+        None,
+    )
+    .unwrap();
+    assert_eq!((r.request_parts, r.response_parts, r.raw_blocks), (0, 0, 1));
     drop(s);
     dir.close().unwrap();
 }

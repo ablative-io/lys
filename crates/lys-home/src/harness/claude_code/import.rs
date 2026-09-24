@@ -7,8 +7,12 @@
 //! becomes a compaction entry. A sidechain (a subagent's records) hangs under
 //! the last main-path message before it with a label naming the agent. Every
 //! content part is also stored as a block, so a proxy call that resends the
-//! conversation adds no new blocks. Every other record type is counted and
-//! left in the byte-for-byte original; R8 maps the harness events among them.
+//! conversation adds no new blocks. `attachment`, `system` and
+//! `permission-mode` records become `lys.harness_event` entries (R8, see
+//! [`super::events`]): the first two sit on the file's chain under their own
+//! uuid, so a message whose parent is one of them still finds it; the last is
+//! a side leaf. Every other record type is counted and left in the
+//! byte-for-byte original.
 //!
 //! An assistant record whose model is `authored` marks a hand-written
 //! demonstration: it imports with provider, api and model `authored` behind
@@ -22,9 +26,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::error::HomeError;
+use crate::harness::claude_code::events::{HarnessEvent, event_of, tool_completed};
 use crate::harness::claude_code::{API, AUTHORED, PROVIDER};
 use crate::record::blocks::BlockStore;
-use crate::record::entries::{CUSTOM_AUTHORED, Entry, EntryBase, EntryBody};
+use crate::record::entries::{CUSTOM_AUTHORED, CUSTOM_HARNESS_EVENT, Entry, EntryBase, EntryBody};
 use crate::record::{Session, fresh_id};
 
 /// What an import reported: counts only, no text.
@@ -48,6 +53,8 @@ pub struct ImportReport {
     pub authored: bool,
     /// Sidechains attached, by agent id count.
     pub sidechains: u64,
+    /// Harness events written, by kind (R8).
+    pub events: BTreeMap<String, u64>,
 }
 
 /// Import one Claude Code JSONL into an open, empty session.
@@ -62,6 +69,8 @@ pub fn import_claude_code(
     let mut report = ImportReport::default();
     let mut tool_names: HashMap<String, String> = HashMap::new();
     let mut last_main: Option<String> = None;
+    // The last entry on the file's chain: where the head goes when the import ends.
+    let mut chain_leaf: Option<String> = session.head()?.map(str::to_owned);
     let mut authored_marked = false;
     let start_len = session_len(session)?;
     for (n, line) in reader.lines().enumerate() {
@@ -100,7 +109,7 @@ pub fn import_claude_code(
                     .unwrap_or(false);
                 let parent_id = match parent {
                     Some(p) => {
-                        if !session.contains(&p) {
+                        if !session.contains(&p)? {
                             return Err(HomeError::UnknownParent {
                                 id: uuid,
                                 parent: p,
@@ -164,9 +173,7 @@ pub fn import_claude_code(
                             authored_marked = true;
                         }
                     }
-                    let (content, stored) =
-                        assistant_content(message, blocks, &mut tool_names, &mut report)?;
-                    let _ = stored;
+                    let content = assistant_content(message, blocks, &mut tool_names, &mut report)?;
                     let pi = json!({
                         "role": "assistant",
                         "content": content,
@@ -188,17 +195,24 @@ pub fn import_claude_code(
                     session.append_entry(&entry)?;
                     report.entries += 1;
                 } else {
-                    // A user record: tool results first (each its own message), then the user's own parts.
+                    // A user record: tool results first (each its own message), then the
+                    // user's own parts. Whichever entry comes last for the record carries
+                    // the record's uuid, so the next record's parentUuid lands on the leaf.
                     let (user_parts, results) =
                         user_content(message, blocks, &tool_names, &mut report)?;
                     let mut chain = parent_for_next;
-                    let mut wrote_user = false;
+                    let last_result_is_leaf = user_parts.is_empty();
+                    let result_count = results.len();
+                    let mut completed = Vec::new();
                     for (i, result) in results.into_iter().enumerate() {
-                        let id = if i == 0 && user_parts.is_empty() {
+                        let id = if last_result_is_leaf && i + 1 == result_count {
                             uuid.clone()
                         } else {
                             format!("{uuid}-r{i}")
                         };
+                        let tool_id = result["toolCallId"].as_str().unwrap_or("").to_owned();
+                        let tool_name = result["toolName"].as_str().unwrap_or("").to_owned();
+                        let is_error = result["isError"].as_bool().unwrap_or(false);
                         let entry = Entry {
                             base: EntryBase {
                                 id: id.clone(),
@@ -209,26 +223,32 @@ pub fn import_claude_code(
                         };
                         session.append_entry(&entry)?;
                         report.entries += 1;
+                        completed.push((id.clone(), tool_id, tool_name, is_error));
                         chain = Some(id);
-                        wrote_user = true;
                     }
-                    if !user_parts.is_empty() || !wrote_user {
+                    if !last_result_is_leaf {
                         let pi = json!({"role": "user", "content": user_parts, "timestamp": ms});
                         let entry = Entry {
                             base: EntryBase {
                                 id: uuid.clone(),
                                 parent_id: chain,
-                                timestamp,
+                                timestamp: timestamp.clone(),
                             },
                             body: EntryBody::Message { message: pi },
                         };
                         session.append_entry(&entry)?;
                         report.entries += 1;
                     }
+                    // One tool_completed event under each tool result message, as side leaves.
+                    for (under, tool_id, tool_name, is_error) in completed {
+                        let event = tool_completed(&tool_id, &tool_name, is_error, &uuid);
+                        append_event(session, &event, Some(under), &timestamp, &mut report)?;
+                    }
                 }
                 if !sidechain {
-                    last_main = Some(uuid);
+                    last_main = Some(uuid.clone());
                 }
+                chain_leaf = Some(uuid);
             }
             "summary" => {
                 let summary = record
@@ -256,13 +276,85 @@ pub fn import_claude_code(
                 };
                 session.append_entry(&entry)?;
                 report.entries += 1;
-                last_main = Some(id);
+                last_main = Some(id.clone());
+                chain_leaf = Some(id);
             }
-            other => count(&mut report, other),
+            other => {
+                let Some(event) = event_of(&record, blocks)? else {
+                    count(&mut report, other);
+                    continue;
+                };
+                let timestamp = record
+                    .get("timestamp")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_owned();
+                match event.source_uuid.clone() {
+                    // A record on the file's chain: at its exact place, under its own uuid.
+                    Some(uuid) => {
+                        let parent = record
+                            .get("parentUuid")
+                            .and_then(Value::as_str)
+                            .map(str::to_owned);
+                        if let Some(p) = &parent
+                            && !session.contains(p)?
+                        {
+                            return Err(HomeError::UnknownParent {
+                                id: uuid,
+                                parent: p.clone(),
+                            });
+                        }
+                        let parent = parent.or_else(|| chain_leaf.clone());
+                        append_event_as(session, &event, &uuid, parent, &timestamp, &mut report)?;
+                        chain_leaf = Some(uuid);
+                    }
+                    // A record without a uuid: a side leaf under the chain's leaf.
+                    None => {
+                        append_event(session, &event, chain_leaf.clone(), &timestamp, &mut report)?;
+                    }
+                }
+            }
         }
     }
+    session.move_head(chain_leaf.as_deref())?;
     report.bytes_out = session_len(session)?.saturating_sub(start_len);
     Ok(report)
+}
+
+fn append_event(
+    session: &mut Session,
+    event: &HarnessEvent,
+    parent_id: Option<String>,
+    timestamp: &str,
+    report: &mut ImportReport,
+) -> Result<(), HomeError> {
+    let id = fresh_id();
+    append_event_as(session, event, &id, parent_id, timestamp, report)
+}
+
+fn append_event_as(
+    session: &mut Session,
+    event: &HarnessEvent,
+    id: &str,
+    parent_id: Option<String>,
+    timestamp: &str,
+    report: &mut ImportReport,
+) -> Result<(), HomeError> {
+    let entry = Entry {
+        base: EntryBase {
+            id: id.to_owned(),
+            parent_id,
+            timestamp: timestamp.to_owned(),
+        },
+        body: EntryBody::Custom {
+            custom_type: CUSTOM_HARNESS_EVENT.to_owned(),
+            data: Some(event.data()?),
+        },
+    };
+    session.append_entry(&entry)?;
+    report.entries += 1;
+    *report.events.entry(event.kind.clone()).or_insert(0) += 1;
+    Ok(())
 }
 
 fn count(report: &mut ImportReport, kind: &str) {
@@ -343,9 +435,8 @@ fn assistant_content(
     blocks: &BlockStore,
     tool_names: &mut HashMap<String, String>,
     report: &mut ImportReport,
-) -> Result<(Vec<Value>, u64), HomeError> {
+) -> Result<Vec<Value>, HomeError> {
     let mut out = Vec::new();
-    let mut stored = 0u64;
     let parts: Vec<Value> = match message.get("content") {
         Some(Value::Array(a)) => a.clone(),
         Some(Value::String(s)) => vec![json!({"type": "text", "text": s})],
@@ -353,7 +444,6 @@ fn assistant_content(
     };
     for part in &parts {
         store_part(part, blocks, report)?;
-        stored += 1;
         let kind = part.get("type").and_then(Value::as_str).unwrap_or("");
         let mapped = match kind {
             "text" => {
@@ -387,7 +477,7 @@ fn assistant_content(
         };
         out.push(mapped);
     }
-    Ok((out, stored))
+    Ok(out)
 }
 
 /// Claude Code user parts into Pi's: the user's own parts, and one

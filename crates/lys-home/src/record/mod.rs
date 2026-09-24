@@ -5,6 +5,18 @@
 //! A [`Session`] is one open session file: append a child of the head, move
 //! the head, read the path from the head to the root by seeking, and build the
 //! context path the way Pi's `buildSessionContext` does.
+//!
+//! One owner at a time: opening or creating a session takes an exclusive lock
+//! on `<id>.lock` beside the file (held by the process for as long as the
+//! [`Session`] lives), so two owners in one process or two processes cannot
+//! both append with their own idea of where the file ends. A second opener is
+//! refused by name ([`HomeError::SessionHeld`]).
+//!
+//! An append is durable in three steps: the entry line, then its index row,
+//! then the head. When a later step fails after the line is durable, the
+//! session reconciles itself from the file before it admits anything else
+//! (the index is rebuilt by scanning, the head re-read), so what the process
+//! believes about the file never runs ahead of or behind the disk.
 
 pub mod blocks;
 #[cfg(test)]
@@ -12,6 +24,9 @@ mod blocks_tests;
 pub mod call;
 #[cfg(test)]
 mod call_tests;
+pub mod canon;
+#[cfg(test)]
+mod canon_tests;
 pub mod entries;
 pub mod index;
 #[cfg(test)]
@@ -26,6 +41,30 @@ use crate::error::HomeError;
 use crate::record::blocks::BlockStore;
 use crate::record::entries::{Entry, EntryBase, EntryBody, SessionHeader};
 use crate::record::index::{Index, IndexRow, read_head, write_head};
+
+/// The most bytes a session or block name may have.
+pub const MAX_NAME_BYTES: usize = 200;
+
+/// Check that a name is one safe path component: letters, digits, `.`, `_`
+/// and `-`, not beginning with `.`, non-empty and at most [`MAX_NAME_BYTES`].
+/// Every name that is joined onto a directory passes through here, so `..`,
+/// `/` and an absolute path can never leave the directory chosen.
+pub fn safe_component(what: &'static str, name: &str) -> Result<(), HomeError> {
+    let ok = !name.is_empty()
+        && name.len() <= MAX_NAME_BYTES
+        && !name.starts_with('.')
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'-');
+    if ok {
+        Ok(())
+    } else {
+        Err(HomeError::BadName {
+            what,
+            name: name.to_owned(),
+        })
+    }
+}
 
 /// The version of Pi's file format this crate writes: the tree format.
 pub const PI_FORMAT_VERSION: u32 = 2;
@@ -59,10 +98,11 @@ impl Home {
         BlockStore::open(self.root.join("blocks"))
     }
 
-    /// The path of a session file by id.
-    #[must_use]
-    pub fn session_path(&self, id: &str) -> PathBuf {
-        self.root.join("sessions").join(format!("{id}.jsonl"))
+    /// The path of a session file by id; an id that is not one safe path
+    /// component is refused by name.
+    pub fn session_path(&self, id: &str) -> Result<PathBuf, HomeError> {
+        safe_component("session id", id)?;
+        Ok(self.root.join("sessions").join(format!("{id}.jsonl")))
     }
 
     /// Create a session: writes the header line, an empty index and a head.
@@ -80,12 +120,12 @@ impl Home {
             cwd: cwd.to_owned(),
             parent_session: parent_session.map(str::to_owned),
         };
-        Session::create(self.session_path(id), header)
+        Session::create(self.session_path(id)?, header)
     }
 
     /// Open a session by id.
     pub fn open_session(&self, id: &str) -> Result<Session, HomeError> {
-        Session::open(self.session_path(id))
+        Session::open(self.session_path(id)?)
     }
 }
 
@@ -98,12 +138,20 @@ pub struct Session {
     head: Option<String>,
     /// Whether opening had to rebuild the index from the file.
     rebuilt: bool,
+    /// The exclusive lock on `<id>.lock`, held for the life of this owner.
+    lock: std::fs::File,
+    /// Set when an append left the index or head behind the file; cleared by
+    /// [`Session::reconcile`], which runs before anything else is admitted.
+    stale: bool,
+    /// How many times this owner reconciled from the file.
+    reconciliations: u64,
 }
 
 impl Session {
     /// Create a session file at `file` with this header.
     pub fn create(file: impl Into<PathBuf>, header: SessionHeader) -> Result<Self, HomeError> {
         let file = file.into();
+        let lock = take_lock(&file)?;
         if file.exists() {
             return Err(HomeError::Exists { path: file });
         }
@@ -126,6 +174,9 @@ impl Session {
             index,
             head: None,
             rebuilt: false,
+            lock,
+            stale: false,
+            reconciliations: 0,
         })
     }
 
@@ -133,15 +184,16 @@ impl Session {
     /// reading its persisted head.
     pub fn open(file: impl Into<PathBuf>) -> Result<Self, HomeError> {
         let file = file.into();
-        let (header, index, rebuilt) = Index::load(&file)?;
+        let lock = take_lock(&file)?;
+        let (header, index, rebuilt) = load_checked(&file)?;
         let head = read_head(&file, &index)?;
-        if let Some(id) = &head {
-            if index.row(id).is_none() {
-                return Err(HomeError::UnknownEntry {
-                    session: header.id,
-                    id: id.clone(),
-                });
-            }
+        if let Some(id) = &head
+            && index.row(id).is_none()
+        {
+            return Err(HomeError::UnknownEntry {
+                session: header.id,
+                id: id.clone(),
+            });
         }
         Ok(Self {
             file,
@@ -149,7 +201,59 @@ impl Session {
             index,
             head,
             rebuilt,
+            lock,
+            stale: false,
+            reconciliations: 0,
         })
+    }
+
+    /// Bring the index and head back in step with the file after an append
+    /// failed part way. Runs before any other act when the session is stale;
+    /// a session that cannot reconcile stays stale and refuses by name.
+    fn reconcile(&mut self) -> Result<(), HomeError> {
+        if !self.stale {
+            return Ok(());
+        }
+        let (header, index, _) = load_checked(&self.file)?;
+        let head = read_head(&self.file, &index)?;
+        if let Some(id) = &head
+            && index.row(id).is_none()
+        {
+            return Err(HomeError::UnknownEntry {
+                session: header.id,
+                id: id.clone(),
+            });
+        }
+        self.header = header;
+        self.index = index;
+        self.head = head;
+        self.stale = false;
+        self.reconciliations += 1;
+        Ok(())
+    }
+
+    /// A read on a stale session is refused by name rather than answered
+    /// from an index that is behind the file.
+    fn fresh(&self) -> Result<(), HomeError> {
+        if self.stale {
+            return Err(HomeError::StaleIndex {
+                path: self.file.clone(),
+                reason: "an append left the index behind the file and reconciling failed; the next append or head move retries it",
+            });
+        }
+        Ok(())
+    }
+
+    /// How many times this owner had to reconcile from the file.
+    #[must_use]
+    pub fn reconciliations(&self) -> u64 {
+        self.reconciliations
+    }
+
+    /// The lock file this owner holds.
+    #[must_use]
+    pub fn lock_file(&self) -> &std::fs::File {
+        &self.lock
     }
 
     /// The session file.
@@ -164,22 +268,23 @@ impl Session {
         &self.header
     }
 
-    /// The head entry's id; `None` when the head is the header.
-    #[must_use]
-    pub fn head(&self) -> Option<&str> {
-        self.head.as_deref()
+    /// The head entry's id; `None` when the head is the header. Refused while
+    /// the session is stale, like every read.
+    pub fn head(&self) -> Result<Option<&str>, HomeError> {
+        self.fresh()?;
+        Ok(self.head.as_deref())
     }
 
     /// How many entries the file holds.
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.index.len()
+    pub fn len(&self) -> Result<usize, HomeError> {
+        self.fresh()?;
+        Ok(self.index.len())
     }
 
     /// Whether the file holds no entries.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.index.is_empty()
+    pub fn is_empty(&self) -> Result<bool, HomeError> {
+        self.fresh()?;
+        Ok(self.index.is_empty())
     }
 
     /// Whether opening rebuilt the index from the whole file.
@@ -189,15 +294,16 @@ impl Session {
     }
 
     /// Whether an entry of this id is on record.
-    #[must_use]
-    pub fn contains(&self, id: &str) -> bool {
-        self.index.row(id).is_some()
+    pub fn contains(&self, id: &str) -> Result<bool, HomeError> {
+        self.fresh()?;
+        Ok(self.index.row(id).is_some())
     }
 
     /// Append an entry as a child of the head, with a fresh id and the current
     /// time, and advance the head to it. The entry line is durable before the
     /// index row, which is durable before the head.
     pub fn append(&mut self, body: EntryBody) -> Result<String, HomeError> {
+        self.reconcile()?;
         let id = fresh_id();
         let entry = Entry {
             base: EntryBase {
@@ -215,34 +321,49 @@ impl Session {
     /// an importer does, and advance the head to it. The parent must be on
     /// record or `None`.
     pub fn append_entry(&mut self, entry: &Entry) -> Result<(), HomeError> {
-        if let Some(parent) = entry.parent_id() {
-            if self.index.row(parent).is_none() {
-                return Err(HomeError::UnknownParent {
-                    id: entry.id().to_owned(),
-                    parent: parent.to_owned(),
-                });
-            }
+        self.reconcile()?;
+        if self.index.row(entry.id()).is_some() {
+            return Err(HomeError::DuplicateEntry {
+                session: self.header.id.clone(),
+                id: entry.id().to_owned(),
+            });
+        }
+        if let Some(parent) = entry.parent_id()
+            && self.index.row(parent).is_none()
+        {
+            return Err(HomeError::UnknownParent {
+                id: entry.id().to_owned(),
+                parent: parent.to_owned(),
+            });
         }
         let line = to_line(entry, &self.file)?;
         let offset = self.index.end();
-        {
-            let mut f = std::fs::OpenOptions::new()
-                .append(true)
-                .open(&self.file)
-                .map_err(|e| HomeError::io("opening the session file", &self.file, e))?;
-            f.write_all(line.as_bytes())
-                .map_err(|e| HomeError::io("appending an entry", &self.file, e))?;
-            f.sync_all()
-                .map_err(|e| HomeError::io("syncing the session file", &self.file, e))?;
+        // A failure to open, write or sync may leave none, some or all of the
+        // line on disk: the session is stale until it has looked at the file.
+        if let Err(e) = write_durable(&self.file, &line) {
+            self.stale = true;
+            self.reconcile()?;
+            return Err(e);
         }
-        self.index.append(IndexRow {
+        // From here the line is durable. A failure below leaves the index or the
+        // head behind the file: mark stale and reconcile at once; if that fails
+        // too, the session stays stale until the next act reconciles it.
+        if let Err(e) = self.index.append(IndexRow {
             id: entry.id().to_owned(),
             parent: entry.parent_id().map(str::to_owned),
             offset,
             len: line.len() as u64,
             custom: custom_type_of(entry),
-        })?;
-        write_head(&self.file, Some(entry.id()))?;
+        }) {
+            self.stale = true;
+            self.reconcile()?;
+            drop(e);
+        }
+        if let Err(e) = write_head(&self.file, Some(entry.id())) {
+            self.stale = true;
+            self.reconcile()?;
+            return Err(e);
+        }
         self.head = Some(entry.id().to_owned());
         Ok(())
     }
@@ -250,21 +371,29 @@ impl Session {
     /// Move the head to an entry on record (or to the header with `None`).
     /// Nothing in the file changes.
     pub fn move_head(&mut self, id: Option<&str>) -> Result<(), HomeError> {
-        if let Some(id) = id {
-            if self.index.row(id).is_none() {
-                return Err(HomeError::UnknownEntry {
-                    session: self.header.id.clone(),
-                    id: id.to_owned(),
-                });
-            }
+        self.reconcile()?;
+        if let Some(id) = id
+            && self.index.row(id).is_none()
+        {
+            return Err(HomeError::UnknownEntry {
+                session: self.header.id.clone(),
+                id: id.to_owned(),
+            });
         }
-        write_head(&self.file, id)?;
+        // A head that could not be published (or whose directory sync failed)
+        // may or may not stand on disk: reconcile from the file before answering.
+        if let Err(e) = write_head(&self.file, id) {
+            self.stale = true;
+            self.reconcile()?;
+            return Err(e);
+        }
         self.head = id.map(str::to_owned);
         Ok(())
     }
 
     /// One entry by id, read by seeking to it.
     pub fn entry(&self, id: &str) -> Result<Entry, HomeError> {
+        self.fresh()?;
         let row = self.index.row(id).ok_or_else(|| HomeError::UnknownEntry {
             session: self.header.id.clone(),
             id: id.to_owned(),
@@ -279,6 +408,7 @@ impl Session {
     /// The entries from the root to the head, root first, read by seeking to
     /// each; the second value is how many bytes of the file were read.
     pub fn path(&self) -> Result<(Vec<Entry>, u64), HomeError> {
+        self.fresh()?;
         let Some(head) = &self.head else {
             return Ok((Vec::new(), 0));
         };
@@ -332,10 +462,49 @@ impl Session {
     /// Every durable custom entry of a given custom type in the file, on any
     /// branch and whatever the head, in file order, read by seeking to each.
     pub fn customs_everywhere(&self, custom_type: &str) -> Result<Vec<Entry>, HomeError> {
+        self.fresh()?;
         let rows = self.index.rows_of_custom(custom_type);
         let (entries, _) = self.index.read_rows_from(&self.file, &rows)?;
         Ok(entries)
     }
+}
+
+/// Append a line to the session file and sync it.
+fn write_durable(file: &Path, line: &str) -> Result<(), HomeError> {
+    let mut f = std::fs::OpenOptions::new()
+        .append(true)
+        .open(file)
+        .map_err(|e| HomeError::io("opening the session file", file, e))?;
+    f.write_all(line.as_bytes())
+        .map_err(|e| HomeError::io("appending an entry", file, e))?;
+    f.sync_all()
+        .map_err(|e| HomeError::io("syncing the session file", file, e))
+}
+
+/// Take the exclusive lock beside a session file, or refuse by name when
+/// another owner holds it. The lock is advisory and per open file, so it
+/// refuses a second owner in this process as well as in another.
+fn take_lock(file: &Path) -> Result<std::fs::File, HomeError> {
+    let path = Index::lock_path(file);
+    let lock = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(&path)
+        .map_err(|e| HomeError::io("opening the session lock", &path, e))?;
+    match lock.try_lock() {
+        Ok(()) => Ok(lock),
+        Err(std::fs::TryLockError::WouldBlock) => Err(HomeError::SessionHeld {
+            path: file.to_path_buf(),
+        }),
+        Err(std::fs::TryLockError::Error(e)) => Err(HomeError::io("locking the session", &path, e)),
+    }
+}
+
+/// Load the index, rebuilding when it is missing or lags the file.
+fn load_checked(file: &Path) -> Result<(SessionHeader, Index, bool), HomeError> {
+    Index::load(file)
 }
 
 fn custom_type_of(entry: &Entry) -> Option<String> {

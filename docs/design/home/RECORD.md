@@ -54,8 +54,27 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   `lost`; only `complete` carries a full response list. No header is ever
   stored. The ingest report counts `part_blocks_new`, `part_blocks_reused` and
   `raw_blocks` separately.
-- `lys.harness_event` (R8), `lys.authored` (R3, R4), `lys.inherited` (R11):
-  written up with their requirements.
+- `lys.harness_event` (R8): `{kind, harness: "claude-code", source_uuid,
+  record, detail}`. `kind` is `hook`, `attachment`, `system`,
+  `permission_mode` or `tool_completed`; `record` is the whole source record
+  as a block, by hash; `detail` holds names, ids, exit codes and counts only,
+  never output or a body, and the serialised data is at most 512 bytes. A
+  record that carries a uuid (`attachment`, `system`) sits at its exact place
+  on the file's chain under that uuid, since a message's parentUuid may name
+  it; a `permission-mode` record (no uuid) and each `tool_completed` (one per
+  tool result) hang under the entry they followed as side leaves, off the
+  context path.
+- `lys.authored` (R3, R4): no data. Precedes the first authored message entry
+  of a session; every authored assistant message carries provider, api and
+  model `authored`, so a demonstration is never mistaken for history.
+- `lys.inherited` (R11): `{authored, from_session, from_entries, provider, api,
+  model, curated_at, curated_by, rule}`. One per example in the canon
+  (`canon/canon.jsonl`), followed by the example's message entries copied
+  whole with their ids, thinking blocks and signatures; an authored example
+  has `authored: true`, no source, and provider, api and model `authored`.
+  The canon is appended only, through the repository's review, and rendered
+  first (before a session's own entries) when a render is given `--canon`;
+  R4's thinking rule applies to every inherited thinking block.
 
 ## The loss account
 

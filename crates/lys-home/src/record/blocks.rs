@@ -94,7 +94,12 @@ impl BlockStore {
         let dir = self.root.join(&hash.as_str()[..2]);
         fs::create_dir_all(&dir)
             .map_err(|e| HomeError::io("creating a block directory", &dir, e))?;
-        let tmp = dir.join(format!(".{}.{}.tmp", hash.as_str(), std::process::id()));
+        let tmp = dir.join(format!(
+            ".{}.{}.{}.tmp",
+            hash.as_str(),
+            std::process::id(),
+            fresh_nonce()
+        ));
         {
             let mut file =
                 fs::File::create(&tmp).map_err(|e| HomeError::io("creating a block", &tmp, e))?;
@@ -107,8 +112,8 @@ impl BlockStore {
             Ok(()) => {}
             Err(e) if path.is_file() => {
                 // Another writer landed the same bytes first; ours is surplus.
-                let _ = fs::remove_file(&tmp);
                 drop(e);
+                discard(&tmp)?;
                 return Ok(Put { hash, new: false });
             }
             Err(e) => return Err(HomeError::io("placing a block", &path, e)),
@@ -151,7 +156,7 @@ impl BlockStore {
         let hash = Hash(hex_of(&hasher.finalize()));
         let path = self.path_of(&hash);
         if path.is_file() {
-            let _ = fs::remove_file(&tmp);
+            discard(&tmp)?;
             return Ok(Put { hash, new: false });
         }
         let dir = self.root.join(&hash.as_str()[..2]);
@@ -159,8 +164,9 @@ impl BlockStore {
             .map_err(|e| HomeError::io("creating a block directory", &dir, e))?;
         match fs::rename(&tmp, &path) {
             Ok(()) => {}
-            Err(_) if path.is_file() => {
-                let _ = fs::remove_file(&tmp);
+            Err(e) if path.is_file() => {
+                drop(e);
+                discard(&tmp)?;
                 return Ok(Put { hash, new: false });
             }
             Err(e) => return Err(HomeError::io("placing a block", &path, e)),
@@ -215,6 +221,16 @@ impl BlockStore {
             }
         }
         Ok(out)
+    }
+}
+
+/// Remove a surplus temporary file; one already gone is fine, any other
+/// failure is reported, since a leftover in the store is not nothing.
+fn discard(tmp: &Path) -> Result<(), HomeError> {
+    match fs::remove_file(tmp) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(HomeError::io("discarding a surplus block", tmp, e)),
     }
 }
 

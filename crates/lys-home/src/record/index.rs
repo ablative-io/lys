@@ -61,6 +61,12 @@ impl Index {
         sibling(session_file, "head")
     }
 
+    /// The lock file beside a session file: held open by the session's one owner.
+    #[must_use]
+    pub fn lock_path(session_file: &Path) -> PathBuf {
+        sibling(session_file, ".lock")
+    }
+
     /// An empty index for a session file that holds only its header line.
     pub(crate) fn new(session_file: &Path, header_len: u64) -> Self {
         Self {
@@ -161,6 +167,24 @@ impl Index {
                     }
                     _ => None,
                 };
+                if index.by_id.contains_key(&entry.base.id) {
+                    return Err(HomeError::Malformed {
+                        path: session_file.to_path_buf(),
+                        line: n,
+                        what: "session entry",
+                        reason: "its id is already on record".to_owned(),
+                    });
+                }
+                if let Some(parent) = &entry.base.parent_id
+                    && !index.by_id.contains_key(parent)
+                {
+                    return Err(HomeError::Malformed {
+                        path: session_file.to_path_buf(),
+                        line: n,
+                        what: "session entry",
+                        reason: "its parent is not on record before it".to_owned(),
+                    });
+                }
                 index.push_row(IndexRow {
                     id: entry.base.id,
                     parent: entry.base.parent_id,

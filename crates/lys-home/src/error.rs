@@ -119,6 +119,49 @@ pub enum HomeError {
         /// What disagreed.
         reason: &'static str,
     },
+
+    /// The session file is held open by another owner, in this process or another.
+    #[error("session {} is held by another owner; one owner at a time", path.display())]
+    SessionHeld {
+        /// The session file.
+        path: PathBuf,
+    },
+
+    /// An entry id is already on record in this session.
+    #[error("session {session} already holds an entry `{id}`")]
+    DuplicateEntry {
+        /// The session id.
+        session: String,
+        /// The entry id offered again.
+        id: String,
+    },
+
+    /// A name that must be one safe path component is not.
+    #[error(
+        "{what} `{name}` is not a safe name: letters, digits, `.`, `_` and `-`, not beginning with `.`, at most 200 bytes"
+    )]
+    BadName {
+        /// What was being named.
+        what: &'static str,
+        /// The name offered.
+        name: String,
+    },
+
+    /// A harness event's data would exceed the size an event may carry.
+    #[error("harness event from record `{uuid}` would be {len} bytes of data, over the limit")]
+    EventTooLarge {
+        /// The source record's uuid, empty when it had none.
+        uuid: String,
+        /// The serialised size.
+        len: usize,
+    },
+
+    /// A forked file repeats tool actions of the file it was forked from.
+    #[error("{count} tool actions in the fork repeat ones in the rendered file")]
+    RepeatedToolActions {
+        /// How many `tool_use` ids appear more times in the fork than in the rendered file.
+        count: u64,
+    },
 }
 
 impl HomeError {

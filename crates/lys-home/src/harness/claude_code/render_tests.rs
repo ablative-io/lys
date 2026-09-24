@@ -18,6 +18,7 @@ fn target(model: &str, out: std::path::PathBuf) -> RenderTarget {
         model: model.into(),
         version: "2.1.281".into(),
         out: Some(out),
+        canon: None,
     }
 }
 

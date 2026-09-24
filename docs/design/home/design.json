@@ -213,6 +213,11 @@
       "brief": "HOME-001"
     },
     {
+      "path": "crates/lys-home/src/record/canon_tests.rs",
+      "note": "gates on the canon: copied whole, never twice, no authored thinking, rendered first",
+      "brief": "HOME-001"
+    },
+    {
       "path": "docs/design/home/PROOF-CANON.md",
       "note": "measured: a session started from the canon against a plain start, on one card",
       "brief": "HOME-001"
@@ -239,7 +244,27 @@
     },
     {
       "path": "crates/lys-home/src/proxy/stream.rs",
-      "note": "the three event-stream grammars read as they pass, assembling response parts for the sink",
+      "note": "the coordinator of the stream readers: picks the grammar by api and hands each frame on as it passes",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/stream_sse.rs",
+      "note": "SSE framing: events and data lines out of a byte stream, retaining byte order, encoding and trailers",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/stream_messages.rs",
+      "note": "the Messages event grammar assembled into response parts",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/stream_chat.rs",
+      "note": "the Chat Completions chunk grammar assembled into response parts",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/stream_responses.rs",
+      "note": "the Responses event grammar assembled into response parts",
       "brief": "HOME-001"
     },
     {

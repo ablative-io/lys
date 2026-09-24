@@ -3,6 +3,7 @@
 //! counts, never transcript, block or body content. A missing required
 //! argument is refused by clap with exit code 2, naming the argument.
 
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand};
@@ -13,6 +14,7 @@ use crate::harness::claude_code::AUTHORED;
 use crate::harness::claude_code::import::import_claude_code;
 use crate::harness::claude_code::render::{RenderTarget, render_claude_code};
 use crate::record::call::{Api, CallMeta, ingest_call_files};
+use crate::record::canon::Role;
 use crate::record::{Home, fresh_id, now};
 
 /// The home: sessions held under an identity, in Pi's session tree.
@@ -22,6 +24,41 @@ pub struct Cli {
     /// What to do.
     #[command(subcommand)]
     pub command: Command,
+}
+
+/// The canon's own commands.
+#[derive(Debug, Subcommand)]
+pub enum CanonAction {
+    /// Create an empty canon file with its header.
+    Create {
+        /// The canon file to create.
+        #[arg(long)]
+        canon: PathBuf,
+    },
+    /// Add one example: entries copied whole from a session of a home, or an authored turns file.
+    Add {
+        /// The canon file.
+        #[arg(long)]
+        canon: PathBuf,
+        /// The home holding the source session.
+        #[arg(long, requires = "from", conflicts_with = "authored")]
+        home: Option<PathBuf>,
+        /// The source session id.
+        #[arg(long, requires = "home", conflicts_with = "authored")]
+        from: Option<String>,
+        /// The entry ids to copy, in order.
+        #[arg(long, num_args = 1.., requires = "from", conflicts_with = "authored")]
+        entries: Vec<String>,
+        /// A turns file for an authored example.
+        #[arg(long)]
+        authored: Option<PathBuf>,
+        /// The rule this example shows, stated short.
+        #[arg(long)]
+        rule: String,
+        /// Who is curating it.
+        #[arg(long)]
+        by: String,
+    },
 }
 
 /// The commands.
@@ -62,6 +99,15 @@ pub enum Command {
         /// The Claude Code version to write into records.
         #[arg(long, default_value = "2.1.281")]
         version: String,
+        /// A canon file whose examples go first, before the session's own entries.
+        #[arg(long)]
+        canon: Option<PathBuf>,
+    },
+    /// The canon: the curated examples every new session starts from.
+    Canon {
+        /// What to do with it.
+        #[command(subcommand)]
+        action: CanonAction,
     },
     /// Write a hand-authored few-shot Claude Code JSONL from a turns file.
     Fewshot {
@@ -143,6 +189,7 @@ pub fn run(cli: Cli) -> Result<Value, HomeError> {
             model,
             out,
             version,
+            canon,
         } => {
             let home = Home::open(home)?;
             let s = home.open_session(&session)?;
@@ -154,14 +201,51 @@ pub fn run(cli: Cli) -> Result<Value, HomeError> {
                 model,
                 version,
                 out,
+                canon,
             };
             let report = render_claude_code(&s, &target, &user_home)?;
             Ok(json!({"command": "render", "report": report}))
         }
+        Command::Canon { action } => match action {
+            CanonAction::Create { canon } => {
+                crate::record::canon::create(&canon)?;
+                Ok(json!({"command": "canon create", "canon": canon}))
+            }
+            CanonAction::Add {
+                canon,
+                home,
+                from,
+                entries,
+                authored,
+                rule,
+                by,
+            } => {
+                let report = match (authored, home, from) {
+                    (Some(turns), _, _) => {
+                        crate::record::canon::add_authored(&canon, &turns, &rule, &by)?
+                    }
+                    (None, Some(home), Some(from)) => {
+                        let home = Home::open(home)?;
+                        let s = home.open_session(&from)?;
+                        crate::record::canon::add_from(&canon, &s, &entries, &rule, &by)?
+                    }
+                    (None, _, _) => {
+                        return Err(HomeError::BodyShape {
+                            api: "canon",
+                            reason: "an example comes from --home/--from/--entries or from --authored",
+                        });
+                    }
+                };
+                Ok(json!({"command": "canon add", "report": report}))
+            }
+        },
         Command::Fewshot { out, turns, cwd } => {
             let written = fewshot(&out, &turns, &cwd)?;
-            println!("claude --resume {}", out.display());
-            Ok(json!({"command": "fewshot", "file": out, "records": written, "authored": true}))
+            // The person's own command, carried in the one JSON report; never run here.
+            let resume = format!("claude --resume {}", out.display());
+            Ok(
+                json!({"command": "fewshot", "file": out, "records": written, "authored": true, "resume": resume}),
+            )
         }
         Command::IngestCall {
             home,
@@ -216,8 +300,13 @@ pub fn run(cli: Cli) -> Result<Value, HomeError> {
             Ok(json!({"command": "ingest-call", "report": report}))
         }
         Command::ResumeCheck { rendered, forked } => {
-            let repeated = repeated_tool_actions(&rendered, &forked)?;
-            Ok(json!({"command": "resume-check", "repeated_tool_actions": repeated}))
+            let check = resume_check(&rendered, &forked)?;
+            if check.repeated_tool_use_ids != 0 {
+                return Err(HomeError::RepeatedToolActions {
+                    count: check.repeated_tool_use_ids,
+                });
+            }
+            Ok(json!({"command": "resume-check", "report": check}))
         }
     }
 }
@@ -225,56 +314,25 @@ pub fn run(cli: Cli) -> Result<Value, HomeError> {
 /// Write the authored file: user records as plain strings, assistant records
 /// with model `authored`, the parent chain intact, a fresh session id.
 fn fewshot(out: &Path, turns: &Path, cwd: &str) -> Result<u64, HomeError> {
-    if out.exists() {
-        return Err(HomeError::Exists {
-            path: out.to_path_buf(),
-        });
-    }
-    let text = std::fs::read_to_string(turns)
-        .map_err(|e| HomeError::io("reading the turns file", turns, e))?;
+    let turns = crate::record::canon::parse_turns(turns)?;
     let session_id = uuid_shaped();
     let mut prev: Option<String> = None;
     let mut lines = Vec::new();
-    for (n, line) in text.lines().enumerate() {
-        let line = line.trim_end();
-        if line.is_empty() {
-            continue;
-        }
-        let (role, body) = line.split_once(": ").ok_or_else(|| HomeError::Malformed {
-            path: turns.to_path_buf(),
-            line: n + 1,
-            what: "turn (`user: text` or `assistant: text`)",
-            reason: "no `role: ` prefix".to_owned(),
-        })?;
-        if body.contains("\"type\":\"thinking\"") || body.contains("\"type\": \"thinking\"") {
-            return Err(HomeError::Malformed {
-                path: turns.to_path_buf(),
-                line: n + 1,
-                what: "turn",
-                reason: "a thinking block is never authored".to_owned(),
-            });
-        }
+    for (n, (role, body)) in turns.into_iter().enumerate() {
         let uuid = uuid_shaped();
-        let message = match role {
-            "user" => json!({"role": "user", "content": body}),
-            "assistant" => {
+        let (kind, message) = match role {
+            Role::User => ("user", json!({"role": "user", "content": body})),
+            Role::Assistant => (
+                "assistant",
                 json!({"id": format!("msg_authored_{n}"), "type": "message", "role": "assistant", "model": AUTHORED,
                 "content": [{"type": "text", "text": body}], "stop_reason": "end_turn", "stop_sequence": null,
-                "usage": {"input_tokens": 0, "output_tokens": 0}})
-            }
-            _ => {
-                return Err(HomeError::Malformed {
-                    path: turns.to_path_buf(),
-                    line: n + 1,
-                    what: "turn",
-                    reason: "role must be user or assistant".to_owned(),
-                });
-            }
+                "usage": {"input_tokens": 0, "output_tokens": 0}}),
+            ),
         };
         lines.push(json!({
             "parentUuid": prev, "isSidechain": false, "userType": "external", "cwd": cwd,
             "sessionId": session_id, "version": "2.1.281", "gitBranch": "", "uuid": uuid,
-            "timestamp": now(), "type": role, "message": message,
+            "timestamp": now(), "type": kind, "message": message,
         }));
         prev = Some(uuid);
     }
@@ -290,7 +348,29 @@ fn fewshot(out: &Path, turns: &Path, cwd: &str) -> Result<u64, HomeError> {
         })?);
         body.push('\n');
     }
-    std::fs::write(out, body).map_err(|e| HomeError::io("writing the authored file", out, e))?;
+    // Never over an existing transcript: the create is exclusive, so a second
+    // writer between a check and a write cannot slip in; then the file and its
+    // directory are synced before the path is reported.
+    let mut file = match std::fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(out)
+    {
+        Ok(f) => f,
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            return Err(HomeError::Exists {
+                path: out.to_path_buf(),
+            });
+        }
+        Err(e) => return Err(HomeError::io("creating the authored file", out, e)),
+    };
+    file.write_all(body.as_bytes())
+        .map_err(|e| HomeError::io("writing the authored file", out, e))?;
+    file.sync_all()
+        .map_err(|e| HomeError::io("syncing the authored file", out, e))?;
+    if let Some(dir) = out.parent() {
+        crate::record::blocks::sync_dir(dir)?;
+    }
     Ok(lines.len() as u64)
 }
 
@@ -307,41 +387,99 @@ fn uuid_shaped() -> String {
     )
 }
 
-/// Tool-use ids in the forked file that also appear in the rendered file.
-fn repeated_tool_actions(rendered: &Path, forked: &Path) -> Result<u64, HomeError> {
-    let ids = |path: &Path| -> Result<Vec<String>, HomeError> {
-        let text = std::fs::read_to_string(path)
-            .map_err(|e| HomeError::io("reading a transcript", path, e))?;
-        let mut out = Vec::new();
-        for line in text.lines() {
-            let Ok(v) = serde_json::from_str::<Value>(line) else {
-                continue;
-            };
-            if let Some(parts) = v
-                .get("message")
-                .and_then(|m| m.get("content"))
-                .and_then(Value::as_array)
-            {
-                for p in parts {
-                    if p.get("type").and_then(Value::as_str) == Some("tool_use") {
-                        if let Some(id) = p.get("id").and_then(Value::as_str) {
-                            out.push(id.to_owned());
-                        }
-                    }
+/// What a resume check measured. `repeated_tool_use_ids` is exactly that: ids
+/// that appear more times in the fork than in the rendered file; it says
+/// nothing about an action repeated under a fresh id. `new_tool_uses` counts
+/// every `tool_use` part in the fork's own records (those not copied from the
+/// rendered file), which for a one-turn question answerable without tools is
+/// expected to be 0.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
+pub struct ResumeReport {
+    /// Records in the rendered file.
+    pub rendered_records: u64,
+    /// Records in the fork.
+    pub forked_records: u64,
+    /// Records in the fork whose uuid is not in the rendered file.
+    pub forked_new_records: u64,
+    /// `tool_use` ids appearing more times in the fork than in the rendered file.
+    pub repeated_tool_use_ids: u64,
+    /// `tool_use` parts in the fork's new records.
+    pub new_tool_uses: u64,
+}
+
+/// One record's uuid and its `tool_use` ids.
+fn tool_uses(path: &Path) -> Result<Vec<(String, Vec<String>)>, HomeError> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|e| HomeError::io("reading a transcript", path, e))?;
+    let mut out = Vec::new();
+    for (n, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let v: Value = serde_json::from_str(line).map_err(|e| HomeError::Malformed {
+            path: path.to_path_buf(),
+            line: n + 1,
+            what: "Claude Code record",
+            reason: e.to_string(),
+        })?;
+        let uuid = v
+            .get("uuid")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_owned();
+        let mut ids = Vec::new();
+        if let Some(parts) = v
+            .get("message")
+            .and_then(|m| m.get("content"))
+            .and_then(Value::as_array)
+        {
+            for p in parts {
+                if p.get("type").and_then(Value::as_str) == Some("tool_use")
+                    && let Some(id) = p.get("id").and_then(Value::as_str)
+                {
+                    ids.push(id.to_owned());
                 }
             }
         }
-        Ok(out)
+        out.push((uuid, ids));
+    }
+    Ok(out)
+}
+
+fn resume_check(rendered: &Path, forked: &Path) -> Result<ResumeReport, HomeError> {
+    let before = tool_uses(rendered)?;
+    let after = tool_uses(forked)?;
+    let rendered_uuids: std::collections::BTreeSet<&str> =
+        before.iter().map(|(u, _)| u.as_str()).collect();
+    let count = |records: &[(String, Vec<String>)], id: &str| -> u64 {
+        u64::try_from(
+            records
+                .iter()
+                .flat_map(|(_, ids)| ids.iter())
+                .filter(|x| x.as_str() == id)
+                .count(),
+        )
+        .unwrap_or(u64::MAX)
     };
-    let before = ids(rendered)?;
-    let after = ids(forked)?;
     // A tool action the fork *inherited* by copying the rendered records is not a repeat;
     // a repeat is an id that appears more times in the fork than in the rendered file.
     let mut repeated = 0u64;
-    for id in before.iter().collect::<std::collections::BTreeSet<_>>() {
-        let b = before.iter().filter(|x| *x == id).count();
-        let a = after.iter().filter(|x| *x == id).count();
-        repeated += u64::try_from(a.saturating_sub(b)).unwrap_or(u64::MAX);
+    for id in before
+        .iter()
+        .flat_map(|(_, ids)| ids.iter())
+        .collect::<std::collections::BTreeSet<_>>()
+    {
+        repeated += count(&after, id).saturating_sub(count(&before, id));
     }
-    Ok(repeated)
+    let new: Vec<&(String, Vec<String>)> = after
+        .iter()
+        .filter(|(u, _)| !rendered_uuids.contains(u.as_str()))
+        .collect();
+    Ok(ResumeReport {
+        rendered_records: before.len() as u64,
+        forked_records: after.len() as u64,
+        forked_new_records: new.len() as u64,
+        repeated_tool_use_ids: repeated,
+        new_tool_uses: new.iter().map(|(_, ids)| ids.len() as u64).sum(),
+    })
 }

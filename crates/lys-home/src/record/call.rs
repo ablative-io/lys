@@ -177,10 +177,12 @@ pub fn request_model(body: &Value) -> Option<String> {
     body.get("model").and_then(Value::as_str).map(str::to_owned)
 }
 
+/// Read a body file as JSON. A file that cannot be read (missing, a
+/// directory, a failing disk) is an I/O error; one that reads but does not
+/// parse is a JSON error; callers tell the two apart.
 fn read_json(path: &Path, reason: &'static str) -> Result<Value, HomeError> {
-    let file =
-        std::fs::File::open(path).map_err(|e| HomeError::io("opening a body file", path, e))?;
-    serde_json::from_reader(std::io::BufReader::new(file)).map_err(|source| HomeError::Json {
+    let bytes = std::fs::read(path).map_err(|e| HomeError::io("reading a body file", path, e))?;
+    serde_json::from_slice(&bytes).map_err(|source| HomeError::Json {
         context: reason,
         source,
     })
@@ -236,40 +238,85 @@ fn request_parts_of(api: Api, json: &Value) -> Result<Vec<Value>, HomeError> {
     Ok(parts)
 }
 
-/// Split a JSON response body into its parts, in order, by api. A body that
-/// is not JSON (a raw event stream) yields no parts here: the proxy, which
-/// reads the stream as it forwards it, supplies the parts it assembled
-/// through [`ingest_call_files`]'s `response_parts`.
-#[must_use]
-pub fn response_parts(api: Api, body: &[u8]) -> Vec<Value> {
-    serde_json::from_slice::<Value>(body)
-        .map_or_else(|_| Vec::new(), |json| response_parts_of(api, &json))
+/// Split a complete JSON response body into its parts, in order, by api. A
+/// body that is not JSON, or not the shape the api answers with (an error
+/// body, an empty object), is refused by name: a complete call's response is
+/// never recorded from a body that holds no parts. A raw event stream never
+/// comes here: the proxy, which reads the stream as it forwards it, supplies
+/// the parts it assembled as `response_parts` to [`ingest_call`] or
+/// [`ingest_call_files`].
+pub fn response_parts(api: Api, body: &[u8]) -> Result<Vec<Value>, HomeError> {
+    let json = serde_json::from_slice::<Value>(body).map_err(|source| HomeError::Json {
+        context: "the response is not JSON",
+        source,
+    })?;
+    response_parts_of(api, &json)
 }
 
-fn response_parts_of(api: Api, json: &Value) -> Vec<Value> {
+fn response_parts_of(api: Api, json: &Value) -> Result<Vec<Value>, HomeError> {
     let mut parts = Vec::new();
+    let shape = |reason: &'static str| HomeError::BodyShape {
+        api: api.as_str(),
+        reason,
+    };
     match api {
+        // Each api's successful shape is required, not merely its member found:
+        // an error body, a null content, a choice without a message or a
+        // response whose status is not completed is no complete response.
         Api::Messages => {
-            if let Some(content) = json.get("content") {
-                push_content(content, &mut parts);
+            if json.get("type").and_then(Value::as_str) == Some("error") {
+                return Err(shape("an error body is not a complete response"));
             }
+            let content = json
+                .get("content")
+                .and_then(Value::as_array)
+                .ok_or_else(|| shape("content is not an array"))?;
+            parts.extend(content.iter().cloned());
         }
         Api::ChatCompletions => {
-            if let Some(choices) = json.get("choices").and_then(Value::as_array) {
-                for choice in choices {
-                    if let Some(message) = choice.get("message") {
-                        parts.push(message.clone());
-                    }
-                }
+            let choices = json
+                .get("choices")
+                .and_then(Value::as_array)
+                .filter(|c| !c.is_empty())
+                .ok_or_else(|| shape("no choices"))?;
+            for choice in choices {
+                let message = choice
+                    .get("message")
+                    .filter(|m| m.is_object())
+                    .ok_or_else(|| shape("a choice without a message"))?;
+                parts.push(message.clone());
             }
         }
         Api::Responses => {
-            if let Some(output) = json.get("output").and_then(Value::as_array) {
-                parts.extend(output.iter().cloned());
+            if json.get("status").and_then(Value::as_str) != Some("completed") {
+                return Err(shape("status is not completed"));
             }
+            let output = json
+                .get("output")
+                .and_then(Value::as_array)
+                .ok_or_else(|| shape("no output array"))?;
+            parts.extend(output.iter().cloned());
         }
     }
-    parts
+    Ok(parts)
+}
+
+/// The response parts of a complete call: the proxy's assembled parts when it
+/// supplied them, else the parts of the JSON body; a streamed call without
+/// assembled parts is refused, as is a body that holds no parts.
+fn complete_response_parts(
+    meta: &CallMeta,
+    supplied: Option<Vec<Value>>,
+    body: impl FnOnce() -> Result<Value, HomeError>,
+) -> Result<Vec<Value>, HomeError> {
+    match supplied {
+        Some(parts) => Ok(parts),
+        None if meta.stream => Err(HomeError::BodyShape {
+            api: meta.api.as_str(),
+            reason: "a streamed response needs the proxy's assembled parts",
+        }),
+        None => response_parts_of(meta.api, &body()?),
+    }
 }
 
 fn push_content(content: &Value, parts: &mut Vec<Value>) {
@@ -287,10 +334,9 @@ pub fn find_call(session: &Session, call_id: &str) -> Result<Option<String>, Hom
         if let EntryBody::Custom {
             data: Some(data), ..
         } = &entry.body
+            && data.get("call_id").and_then(Value::as_str) == Some(call_id)
         {
-            if data.get("call_id").and_then(Value::as_str) == Some(call_id) {
-                return Ok(Some(entry.id().to_owned()));
-            }
+            return Ok(Some(entry.id().to_owned()));
         }
     }
     Ok(None)
@@ -304,12 +350,18 @@ pub fn ingest_call(
     meta: &CallMeta,
     request_body: &[u8],
     response_body: &[u8],
+    response_parts: Option<Vec<Value>>,
 ) -> Result<IngestReport, HomeError> {
     if let Some(entry_id) = find_call(session, &meta.call_id)? {
         return Ok(already(entry_id));
     }
     let req = request_parts(meta.api, request_body)?;
-    let resp = response_parts(meta.api, response_body);
+    let resp = complete_response_parts(meta, response_parts, || {
+        serde_json::from_slice::<Value>(response_body).map_err(|source| HomeError::Json {
+            context: "the response is not JSON",
+            source,
+        })
+    })?;
     let raw_req = blocks.put(request_body)?;
     let raw_resp = blocks.put(response_body)?;
     let record = CallRecord {
@@ -353,19 +405,9 @@ pub fn ingest_call_files(
         return Ok(already(entry_id));
     }
     let req = request_parts_file(meta.api, request_file)?;
-    let resp = match response_parts {
-        Some(parts) => parts,
-        None if meta.stream => {
-            return Err(HomeError::BodyShape {
-                api: meta.api.as_str(),
-                reason: "a streamed response needs the proxy's assembled parts",
-            });
-        }
-        None => response_parts_of(
-            meta.api,
-            &read_json(response_file, "the response is not JSON")?,
-        ),
-    };
+    let resp = complete_response_parts(meta, response_parts, || {
+        read_json(response_file, "the response is not JSON")
+    })?;
     let raw_req = blocks.put_file(request_file)?;
     let raw_resp = blocks.put_file(response_file)?;
     let record = CallRecord {
@@ -413,13 +455,17 @@ pub fn ingest_outcome(
     if let Some(entry_id) = find_call(session, &meta.call_id)? {
         return Ok(already(entry_id));
     }
+    // A request that is not JSON, or not the api's shape, is recorded as absence
+    // (a half-written file is the usual case); a request that cannot be read
+    // is an error, since absence and an unreadable disk are not the same thing.
     let (req, model) = match request_file {
         Some(path) => match read_json(path, "the request is not JSON") {
             Ok(json) => (
                 request_parts_of(meta.api, &json).unwrap_or_default(),
                 request_model(&json),
             ),
-            Err(_) => (Vec::new(), None),
+            Err(HomeError::Json { .. }) => (Vec::new(), None),
+            Err(e) => return Err(e),
         },
         None => (Vec::new(), None),
     };
