@@ -1,0 +1,61 @@
+{
+  "trees": [
+    {
+      "tree": ".",
+      "shorthand": {
+        "rust-build": ["toolchain:rust", "lockfile:Cargo.lock"]
+      },
+      "legs": [
+        {
+          "name": "fmt",
+          "command": "cargo fmt --all",
+          "requires": ["tool:cargo", "tool:rustfmt"],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy-all-features",
+          "command": "cargo clippy --all-targets --all-features -- -D warnings",
+          "requires": ["rust-build"],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy",
+          "command": "cargo clippy --all-targets -- -D warnings",
+          "requires": ["rust-build"],
+          "cadence": "round"
+        },
+        {
+          "name": "tests",
+          "command": "cargo test --workspace --all-features",
+          "requires": ["rust-build"],
+          "cadence": "round"
+        },
+        {
+          "name": "doc-all-features",
+          "command": "cargo doc --no-deps --all-features",
+          "requires": ["rust-build"],
+          "cadence": "round"
+        },
+        {
+          "name": "doc",
+          "command": "cargo doc --no-deps",
+          "requires": ["rust-build"],
+          "cadence": "round"
+        },
+        {
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
+          "requires": ["tool:sh", "tool:python3"],
+          "cadence": "round"
+        }
+      ]
+    }
+  ],
+  "roots": {
+    "aion": "/Users/tom/Developer/ablative/stack/aion",
+    "argus": "/Users/tom/Developer/ablative/tools/argus",
+    "cambium": "/Users/tom/Developer/ablative/apps/cambium",
+    "haematite": "/Users/tom/Developer/ablative/stack/haematite",
+    "method": "/Users/tom/Developer/ablative/tools/design-system"
+  }
+}

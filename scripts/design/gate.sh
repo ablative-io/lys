@@ -10,6 +10,7 @@ cd "$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)" || exit 2
 here=scripts/design
 status=0
 python3 "$here/validate.py" docs/design/decisions.json || status=1
+python3 "$here/validate.py" docs/design/project.json || status=1
 tmp=$(mktemp -d) || exit 2
 mkdir -p "$tmp/docs" && cp -R docs/design "$tmp/docs/design" || exit 2
 for cluster in docs/design/*/; do
@@ -17,7 +18,7 @@ for cluster in docs/design/*/; do
   python3 "$here/validate.py" "$cluster" || status=1
   python3 "$here/check-coverage.py" "$cluster" || status=1
   python3 "$here/render-cluster.py" "$tmp/$cluster" >/dev/null || status=1
-  for md in $(cd "$cluster" && find . -name '*.md'); do
+  for md in $(cd "$tmp/$cluster" && find . -name '*.md'); do
     if ! cmp -s "$tmp/$cluster/$md" "$cluster/$md"; then
       echo "rendered markdown differs from the committed file: $cluster$md"; status=1
     fi
