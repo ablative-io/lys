@@ -39,7 +39,7 @@
     },
     {
       "id": "P9",
-      "text": "A handover is a letter the outgoing session writes to its successor in its own real thinking and answer; it enters the successor as a lys.inherited entry marked as a predecessor's memory, never as the successor's own experience, and replays only to the same provider, api and model. No thinking is ever authored; only thinking a model produced is kept (Tom, Dot 13:38 to 13:40: 'you are waking up ... I am another one, I'm helping you have part of my memory ... like a parent imparting a wish to a child'; Waffles 52d53451)."
+      "text": "The inheritance is not a letter from one session to its successor. It is one curated, shared series of examples, short and sharpened to the point, that combines our rules and distils the collective experience of every session so far, and every new session born after it starts from it: 'our learnings in one another' (Tom, Dot 13:44 to 13:46, correcting the handover reading). Examples are real exchanges or clearly authored ones; thinking is never authored, and a model's own thinking is kept only where a real turn produced it and replays only to the same provider, api and model."
     }
   ],
   "decisions": [
@@ -52,7 +52,7 @@
     "One real Claude Code session imported into the common record, rendered back, and resumed under a new id on 2.1.281 without repeating a completed tool action, with the original file's hash unchanged.",
     "One seat with a subscription login making calls through a pass-through proxy, so the tee has somewhere to live.",
     "A written loss account for every derived record: what a render or translation preserved, transformed and could not carry.",
-    "A handover letter from an outgoing session seeds its successor as inherited memory, with the model's own thinking intact, and the effect is measured on a card against a plain start."
+    "A curated, shared inheritance of distilled examples seeds every new session, each example naming its source, and the effect is measured on a card against a plain start."
   ],
   "non_goals": [
     {
@@ -208,13 +208,13 @@
       "brief": "HOME-001"
     },
     {
-      "path": "crates/lys-home/src/record/handover.rs",
-      "note": "the handover: take the outgoing session's letter turn (thinking intact) and seed the successor with it as lys.inherited",
+      "path": "crates/lys-home/src/record/inheritance.rs",
+      "note": "the inheritance: the curated shared series of examples every new session starts from; lys.inherited entries name the source of each example",
       "brief": "HOME-001"
     },
     {
-      "path": "docs/design/home/PROOF-HANDOVER.md",
-      "note": "measured: a successor seeded with an inherited letter, whether 2.1.281 replays the signed thinking, and seeded against plain on one card",
+      "path": "docs/design/home/PROOF-INHERITANCE.md",
+      "note": "measured: a session started from the inheritance against a plain start, on one card",
       "brief": "HOME-001"
     }
   ],

@@ -25,7 +25,7 @@ title: Build the home record on Pi's session tree, with the Claude Code importer
 > - C9 — A proxy call record (lys.call) names its request and response blocks by hash with provider, api, model and timing, and can be ingested from a captured request and response pair.
 > - C10 — A hand-written few-shot session file resumes Claude Code by path from a directory outside the config root; the source is unchanged and the session reports authored.
 > - C11 — The little proxy passes Messages, Chat Completions and Responses streams through unchanged and appends one lys.call entry per call under the session it links to.
-> - C12 — At compaction or retirement the outgoing session's letter to its successor, with its real thinking, becomes the successor's first entry as lys.inherited; it is never authored and replays only to the same provider, api and model; seeded against plain is measured on a card.
+> - C12 — One curated, shared series of short examples that combine the rules and distil the collective experience seeds every new session as lys.inherited entries naming each example's source; nothing in it is authored thinking; seeded against plain is measured on a card.
 > **Stories:**
 > - S1 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
 > - S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
@@ -33,7 +33,7 @@ title: Build the home record on Pi's session tree, with the Claude Code importer
 > - S4 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
 > - S5 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
 > - S6 (Tom, Owns the platform and reads what a session was given) — As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
-> - S7 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+> - S7 (Agent, Runs in a harness and wants to continue somewhere else) — As a new session, I want to start from the series of examples that carry what every session before me learned, short and to the point, with each example naming where it came from, so that our learning is in one another and I know which of it is mine.
 
 ## Purpose
 
@@ -280,28 +280,29 @@ Build lys-proxy: an HTTP server that forwards every request to the provider name
 **Stories:**
 - S3 (Tom, Owns the platform and reads what a session was given) — As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
 
-### R11: The handover: an outgoing session's letter seeds its successor as inherited memory
+### R11: The inheritance: a curated, shared series of examples every new session starts from
 
-Define the custom entry lys.inherited: data {from_session, from_entry, provider, api, model, written_at}, followed by the letter's message entry copied whole (its thinking blocks with their signatures, its text). WHEN `lys-home handover --home <dir> --from <session> --letter <entry id>` is run, THE SYSTEM SHALL copy that turn from the outgoing session into a new successor home as its first entries, a lys.inherited entry then the message, and SHALL record in the successor's session_info that its first memory is inherited. The letter is elicited by a person or the harness with a real prompt to the outgoing session before compaction or retirement (what it knows, what it got wrong and why, how the people like things done, what it wishes it had known); THE SYSTEM SHALL NOT compose, edit or author the letter or any thinking block, and SHALL refuse a letter entry whose assistant message carries provider `authored`. WHILE rendering a successor for Claude Code, THE SYSTEM SHALL apply R4's rule: the inherited thinking renders whole only to the same provider, api and model, otherwise as text with opaque blocks dropped and named in the loss account. The proof SHALL measure first whether 2.1.281 replays a signed thinking block from a resumed file at all (unknown on 24 September), and then run one card twice, seeded and plain, counting fix rounds and unverified claims, in docs/design/home/PROOF-HANDOVER.md.
+Define the inheritance as a home file of its own under the identity's home (inheritance.jsonl, in Pi's grammar), holding a curated series of short examples: each example is one or more message entries preceded by a custom entry lys.inherited whose data names the source {from_session, from_entry, provider, api, model, curated_at, curated_by}, or {authored: true, curated_at, curated_by} for a clearly authored example. WHEN `lys-home inherit --home <dir> --from <session> --entries <id>...` is run, THE SYSTEM SHALL copy those entries whole (thinking blocks with their signatures included) into the inheritance, each preceded by its lys.inherited entry; WHEN `lys-home inherit --authored <turns file>` is run, THE SYSTEM SHALL add the authored example with provider, api and model `authored` and SHALL refuse a turns file that contains a thinking block. WHEN a new session is rendered for a harness with `--inherit`, THE SYSTEM SHALL place the inheritance's entries first, before the session's own, and apply R4's thinking rule to every inherited thinking block (whole only to the same provider, api and model; otherwise text, opaque dropped and named in the loss account). THE SYSTEM SHALL NOT compose, edit or author any thinking block, and SHALL NOT alter an example's text when copying it. Curation is a person's act: the tool copies what it is told to and records who told it. The proof runs one card twice, from the inheritance and plain, counting fix rounds and unverified claims, in docs/design/home/PROOF-INHERITANCE.md, after first measuring whether 2.1.281 replays a signed thinking block from a resumed file at all (unknown on 24 September).
 
 **Acceptance:**
-- `lys-home handover` on the walrus continuation's real turn produces a successor home whose first entry is lys.inherited naming that session and entry, whose second is the copied message with a thinking block whose signature equals the source byte for byte, and whose session_info says inherited.
-- `lys-home handover` with a letter entry whose message carries provider `authored` exits non-zero naming the entry and writes nothing.
-- PROOF-HANDOVER.md states whether a signed thinking block in a resumed file was replayed by 2.1.281 (measured: the block is present in the continuation's next request as recorded by R10's proxy or, before that exists, by the harness's own file), and records the seeded and plain counts of fix rounds and unverified claims for one named card.
-- Rendering the successor for a different model produces a loss account entry for the inherited thinking block and a text part in its place.
+- `lys-home inherit --from <the walrus continuation> --entries <its real turn>` adds to inheritance.jsonl one lys.inherited entry naming that session and entry and one message entry whose thinking block signature equals the source byte for byte.
+- `lys-home inherit --authored` with a turns file that contains a thinking block exits non-zero naming the line and writes nothing; without one, it adds a lys.inherited entry with authored: true and message entries carrying provider, api and model `authored`.
+- Rendering a session with --inherit for Claude Code writes the inheritance's message entries before the session's own, with the parentUuid chain running through them.
+- Rendering with --inherit for a different model than an inherited thinking block's produces a loss account entry for that block and a text part in its place.
+- PROOF-INHERITANCE.md states whether a signed thinking block in a resumed file was replayed by 2.1.281 (measured through R10's proxy, or before it exists through the harness's own file), and records the inherited and plain counts of fix rounds and unverified claims for one named card.
 
 **Files:**
-- create: crates/lys-home/src/record/handover.rs
-- create: docs/design/home/PROOF-HANDOVER.md
+- create: crates/lys-home/src/record/inheritance.rs
+- create: docs/design/home/PROOF-INHERITANCE.md
 - modify: crates/lys-home/src/record/entries.rs
 - modify: crates/lys-home/src/cli.rs
 - modify: docs/design/home/RECORD.md
 
 **Checklist:**
-- C12 — At compaction or retirement the outgoing session's letter to its successor, with its real thinking, becomes the successor's first entry as lys.inherited; it is never authored and replays only to the same provider, api and model; seeded against plain is measured on a card.
+- C12 — One curated, shared series of short examples that combine the rules and distil the collective experience seeds every new session as lys.inherited entries naming each example's source; nothing in it is authored thinking; seeded against plain is measured on a card.
 
 **Stories:**
-- S7 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+- S7 (Agent, Runs in a harness and wants to continue somewhere else) — As a new session, I want to start from the series of examples that carry what every session before me learned, short and to the point, with each example naming where it came from, so that our learning is in one another and I know which of it is mine.
 - S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
 
 ## Boundaries
@@ -316,7 +317,7 @@ Define the custom entry lys.inherited: data {from_session, from_entry, provider,
 - The design's structure array is the whole file list; a path outside it is not created.
 - Not a sub-agent platform: nothing here spawns, schedules or supervises agents; it holds sessions neatly and renders them (Tom, Dot 13:33).
 - Resume is Claude Code's own `--resume <path>`; no launcher, copy or rewrite of a passed file is built.
-- No thinking block is ever authored, edited or synthesised; a letter is only what a model produced in a real turn.
+- No thinking block is ever authored, edited or synthesised; an example's thinking is only what a model produced in a real turn, and an example's text is copied, never rewritten.
 
 ## Verification
 
