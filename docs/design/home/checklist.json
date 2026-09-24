@@ -1,0 +1,80 @@
+{
+  "cluster": "home",
+  "sections": [
+    {
+      "name": "The common record",
+      "items": [
+        {
+          "id": "C1",
+          "text": "The home record is Pi's session tree: a home file parses with Pi's parser unchanged, and lys's harness events and call records are custom entries.",
+          "done": false
+        },
+        {
+          "id": "C2",
+          "text": "Content blocks are stored once by SHA-256 and referenced; an identical block put twice occupies one entry.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Claude Code in and out",
+      "items": [
+        {
+          "id": "C3",
+          "text": "A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original.",
+          "done": false
+        },
+        {
+          "id": "C4",
+          "text": "Events render to a Claude Code JSONL under a chosen uuid at the harness path, with a loss account beside it.",
+          "done": false
+        },
+        {
+          "id": "C5",
+          "text": "Provider-native opaque blocks are kept whole, keyed by provider, model family and branch, and rendered only to their own provider with the intervening events.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "The two proofs",
+      "items": [
+        {
+          "id": "C10",
+          "text": "A hand-written few-shot session file resumes Claude Code by path from a directory outside the config root; the source is unchanged and the session reports authored.",
+          "done": false
+        },
+        {
+          "id": "C6",
+          "text": "One real session imported, rendered and resumed with --fork-session on Claude Code 2.1.281: it continues, no completed tool action repeats, the original's hash is unchanged.",
+          "done": false
+        },
+        {
+          "id": "C7",
+          "text": "One seat with a subscription login completes a call through a pass-through proxy; the measurement is written down.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "The two captures",
+      "items": [
+        {
+          "id": "C8",
+          "text": "Claude Code's harness-local records (hook outcomes, permission mode, tool completion) become lys.harness_event entries attached under the message entry they followed.",
+          "done": false
+        },
+        {
+          "id": "C9",
+          "text": "A proxy call record (lys.call) names its request and response blocks by hash with provider, api, model and timing, and can be ingested from a captured request and response pair.",
+          "done": false
+        },
+        {
+          "id": "C11",
+          "text": "The little proxy passes Messages, Chat Completions and Responses streams through unchanged and appends one lys.call entry per call under the session it links to.",
+          "done": false
+        }
+      ]
+    }
+  ]
+}

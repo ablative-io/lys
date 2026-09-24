@@ -1,0 +1,278 @@
+{
+  "cluster": "home",
+  "title": "The home: a session held under its identity, resumable by any harness that can be measured",
+  "intention": "A session's history lives under the agent's identity, not under a harness. The record is what the model was given and what came back, in order, with each provider's native blocks kept whole. A harness's own resume file is rendered from that record on demand, so an agent moves machines, harnesses or providers and continues; the original bytes are never rewritten.",
+  "problem": "Today a session exists only as its harness's file. Archie's Claude Code file measured 141,931,097 bytes on 24 September 2026: the conversation itself is under 3% of it, tool results 14%, thinking 6%, and about 60% is harness bookkeeping the model never sees; Waffles' file is 3.37 GB and Claude Code loads it whole. Nothing central holds a session, so nothing can render a smaller working session, move one to another device, swap provider and come back, or say what a session was given. Norn already has the canonical event model (SessionEvent, conversion to provider messages, compaction as a derived event, provider epoch boundaries) proved by its own tests; Claude Code has no importer to it and no renderer from it.",
+  "solution": "Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree, not Norn): one append-only JSONL per session, a header line, then entries each carrying id, parentId and timestamp, a leaf pointer for the current position, forks by moving the pointer, compaction and branch summaries as entries that keep their originals. lys adds nothing to that grammar: harness events (approvals, tool completion) and proxy call records ride Pi's custom entry type under lys customType names, so a home file stays readable by Pi's own parser. Two captures feed it: the model traffic through the door's proxy (the same process that swaps the credential, SECRETS-002 R1), and the harness's own events from its transcript. Content blocks are stored once by hash; entries reference them. A harness resume file is a rendered projection of the root-to-leaf path: for Claude Code, a JSONL written under a chosen uuid at the harness's own path, then resumed by that id with --fork-session. Provider-native reasoning stays on the message with its provider, api and model and is rendered whole only to the same three; another model gets readable thinking as text and opaque blocks dropped, each named in a loss account. lys grants say who may read and resume. Every resume path is measured on a named harness version before anything relies on it.",
+  "principles": [
+    {
+      "id": "P1",
+      "text": "The original bytes are never rewritten. A rendered resume file, a compaction and a translation are derived records stored beside their source and pointing at it (CONTEXT-ROADMAP-2026-09-22.md stage 4)."
+    },
+    {
+      "id": "P2",
+      "text": "The record is Pi's session tree as read from the Pi checkout at 3d5cbe98 (packages/coding-agent/src/core/session-manager.ts: SessionHeader, SessionEntryBase {type, id, parentId, timestamp}, message, model_change, compaction {summary, firstKeptEntryId}, branch_summary {fromId, summary}, label, custom {customType, data}). lys adds entry kinds only as custom entries; it never adds a field to Pi's grammar and never adopts Norn's SessionEvent (Tom, Dot 13:28)."
+    },
+    {
+      "id": "P3",
+      "text": "A provider's opaque blocks (Anthropic signed thinking, OpenAI encrypted reasoning) stay on the assistant message with its provider, api and model, and are rendered whole only when all three match the target (Pi transform-messages.ts:95-109); another model gets readable thinking as plain text and opaque blocks dropped, each named by hash in the loss account (Tom, Dot 13:24: keep reasoning traces per provider so a session can swap and swap back)."
+    },
+    {
+      "id": "P4",
+      "text": "A content block is stored once by its hash; requests that resend the whole conversation reference blocks, they do not copy them."
+    },
+    {
+      "id": "P5",
+      "text": "Capture the model traffic and the harness's local events both, so the two can be mapped against each other (Tom, Dot 13:23); neither alone is the record."
+    },
+    {
+      "id": "P6",
+      "text": "A resume path is a per-harness, per-version measurement, never an assumption: Claude Code 2.1.281's --resume takes a session id and reads ~/.claude/projects/<cwd-slug>/<id>.jsonl; a seeded two-record file resumed there at 13:25 on 24 September and answered from its content."
+    },
+    {
+      "id": "P7",
+      "text": "Transcript contents never appear in a post, a log line, an error, a test name or a rendered page; status carries hashes, counts and offsets only (CONTEXT-001 privacy rule)."
+    },
+    {
+      "id": "P8",
+      "text": "A sandbox or a VM is a target profile the launch template renders into, never a special case in the core; credentials are supplied at launch on the target and never carried in the home (Tom, Dot 13:30; CONTEXT-ROADMAP stage 3)."
+    }
+  ],
+  "decisions": [
+    "ADR-001",
+    "ADR-003",
+    "ADR-004"
+  ],
+  "goals": [
+    "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
+    "One real Claude Code session imported into the common record, rendered back, and resumed under a new id on 2.1.281 without repeating a completed tool action, with the original file's hash unchanged.",
+    "One seat with a subscription login making calls through a pass-through proxy, so the tee has somewhere to live.",
+    "A written loss account for every derived record: what a render or translation preserved, transformed and could not carry."
+  ],
+  "non_goals": [
+    {
+      "text": "Anchoring, signing or receipts into a lys log (CONTEXT-ROADMAP stage 6; when asked for).",
+      "reason": "Signing comes when asked for (Tom, 22 September 16:27); every stage here works without it."
+    },
+    {
+      "text": "Encryption at rest and moving a home between devices (stage 3 preconditions).",
+      "reason": "Stage 3's three preconditions (identity and read authority, encryption before bytes leave, the resume evidence) are their own brief."
+    },
+    {
+      "text": "Harnesses other than Claude Code, and Chat Completions or Responses translation beyond keeping the raw call bytes.",
+      "reason": "One harness proved first; each other harness is its own profile and its own measurement."
+    },
+    {
+      "text": "Lanterns and forks at a coordinate (stages 5 and 5b).",
+      "reason": "Lanterns and forks stand on a proved resume; this brief supplies that proof."
+    },
+    {
+      "text": "Adopting, wrapping or calling Norn's session code; Pi's code is read as the reference and not vendored.",
+      "reason": "Tom, Dot 13:28: not Norn. Pi's tree is the reference."
+    }
+  ],
+  "structure": [
+    {
+      "path": "docs/design/home/briefs/HOME-001.json",
+      "note": "the first brief: common record, Claude Code importer and renderer, the two proofs",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-001.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "docs/design/home/PROOF-RESUME.md",
+      "note": "the measured Claude Code resume: version, command, hashes before and after, what repeated",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "docs/design/home/PROOF-PROXY.md",
+      "note": "the measured subscription login through a pass-through proxy: version, headers that mattered, what failed",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "docs/design/home/LOSS-ACCOUNT.md",
+      "note": "what the Claude Code render preserves, transforms and cannot carry",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/record/blocks.rs",
+      "note": "content-addressed block store: put by SHA-256, get by hash, never rewritten",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/import.rs",
+      "note": "Claude Code JSONL into SessionEvents plus blocks",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render.rs",
+      "note": "SessionEvents into a Claude Code JSONL under a chosen uuid, with the loss account",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/mod.rs",
+      "note": "the Claude Code harness profile: transcript root, cwd slug, version measured",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/cli.rs",
+      "note": "import, render, resume-check subcommands",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/examples/passthrough.rs",
+      "note": "a pass-through HTTP proxy that forwards to the provider unchanged, for the proof only",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/tests/claude_code_round_trip.rs",
+      "note": "import then render equals the model-visible content; opaque blocks kept whole",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/record/mod.rs",
+      "note": "the home record: Pi's session tree read and written, leaf pointer, root-to-leaf path",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/record/entries.rs",
+      "note": "Pi's entry types as Rust types, plus the lys custom entries lys.harness_event and lys.call",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/record/call.rs",
+      "note": "a proxy call record: request and response block hashes, provider, api, model, timing",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/events.rs",
+      "note": "Claude Code's harness-local records (hooks, permission mode, tool completion) as lys.harness_event entries",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "docs/design/home/RECORD.md",
+      "note": "the home record written down: Pi's grammar as adopted, the two lys custom entries, the block store, the loss account",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/lib.rs",
+      "note": "module wiring: record and harness",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/harness/mod.rs",
+      "note": "harness profiles; Claude Code first",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/Cargo.toml",
+      "note": "the crate manifest; gains the passthrough example",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/README.md",
+      "note": "what the tool does and does not do",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/record/index.rs",
+      "note": "the offset index and the persisted head: a path is read by seeking, never by loading the file",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/mod.rs",
+      "note": "the little proxy: pass the stream through unchanged, record each call as a lys.call entry under the session it belongs to",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/link.rs",
+      "note": "how a call is linked to a session: the measured request key (Claude Code's request metadata) now, the seat's handle when the door's proxy exists",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/bin/lys-proxy.rs",
+      "note": "the proxy binary",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "docs/design/home/PROOF-FEWSHOT.md",
+      "note": "the first proof: a hand-written few-shot session file resumed by path from a directory outside the config root",
+      "brief": "HOME-001"
+    }
+  ],
+  "inventory": [
+    {
+      "path": "docs/design/identity/STATEMENT-2026-09-22.md",
+      "note": "the authority: 'The home', 'The home is portable: lanterns, translation and forks', and steps 4 and 5"
+    },
+    {
+      "path": "docs/design/identity/CONTEXT-ROADMAP-2026-09-22.md",
+      "note": "Archie's roadmap; this cluster is its stage 4 and the resume half of stage 3"
+    },
+    {
+      "path": "docs/design/identity/briefs/CONTEXT-001.json",
+      "note": "stage 1, byte-for-byte capture and the lys-home crate this cluster extends"
+    },
+    {
+      "path": "docs/design/secrets/briefs/SECRETS-002.json",
+      "note": "the door's proxy (R1) that the tee joins once it exists"
+    },
+    {
+      "path": "$PI/packages/coding-agent/src/core/session-manager.ts",
+      "note": "Pi's session tree at 3d5cbe98 (checkout /Users/tom/Developer/tools/harness/pi, earendil-works/pi): header, entries, leaf (branch at :1125 moves an in-memory cursor; _buildIndex:754 restores the last physical entry on reopen; loadEntriesFromFile:438 reads the whole file)"
+    },
+    {
+      "path": "$PI/packages/ai/src/api/transform-messages.ts",
+      "note": "per-provider thinking: same provider, api and model keeps blocks whole; otherwise text, opaque dropped"
+    },
+    {
+      "path": "$PI/packages/coding-agent/src/core/branch-summarization.ts",
+      "note": "how an abandoned branch's work is carried into the new one"
+    },
+    {
+      "path": "$CCFLARE/README.md",
+      "note": "ccflare at 95c4c6a (/Users/tom/Developer/tools/proxy/ccflare): the concept of a native pass-through that keeps request history; reference only, not used (Tom, Dot 13:34)"
+    }
+  ],
+  "constraints": [
+    {
+      "id": "CN1",
+      "text": "No file under ~/.claude/projects is rewritten or truncated by this cluster; a render writes a new file under a new uuid only, and refuses an existing path by name."
+    },
+    {
+      "id": "CN2",
+      "text": "A rendered file never carries a provider-native opaque block that came from a different provider or model family than the one it is rendered for; the loss account names each block dropped by hash."
+    },
+    {
+      "id": "CN3",
+      "text": "Transcript contents never appear in output, logs, errors, test names or pages; hashes, counts, offsets and event ids only."
+    },
+    {
+      "id": "CN4",
+      "text": "Every home file parses with Pi's parseSessionEntries at 3d5cbe98 unchanged: the header line first, every entry with id, parentId and timestamp, lys data only inside custom entries."
+    },
+    {
+      "id": "CN5",
+      "text": "The pass-through proxy forwards every header and the streamed body unchanged and stores nothing but the measurement; it is an example binary, never a service."
+    },
+    {
+      "id": "CN6",
+      "text": "No Norn crate is a dependency of lys-home and no Norn type is copied into it."
+    },
+    {
+      "id": "CN7",
+      "text": "Reading the root-to-leaf path of a home file reads only the entries on that path plus the index, never the whole file (Pi loads the whole journal; Chippy 13:33); the head is persisted beside the file, never inferred from the last physical entry on reopen."
+    }
+  ],
+  "gate": [
+    {
+      "tree": ".",
+      "fmt": "cargo fmt --all -- --check",
+      "lint": "cargo clippy --all-targets -- -D warnings",
+      "tests": "cargo test --workspace"
+    }
+  ]
+}
