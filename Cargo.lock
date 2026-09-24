@@ -855,6 +855,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "lys-home"
+version = "0.2.0"
+dependencies = [
+ "rand",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.19",
+ "time",
+]
+
+[[package]]
 name = "lys-log-store"
 version = "0.2.0"
 dependencies = [

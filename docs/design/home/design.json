@@ -189,7 +189,7 @@
     },
     {
       "path": "crates/lys-home/src/proxy/mod.rs",
-      "note": "the little proxy: pass the stream through unchanged, record each call as a lys.call entry under the session it belongs to",
+      "note": "the proxy module: declarations only",
       "brief": "HOME-001"
     },
     {
@@ -220,6 +220,51 @@
     {
       "path": "canon/canon.jsonl",
       "note": "the canon itself, versioned by the repository, changed only through src_commit and review",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/forward.rs",
+      "note": "forward a request to the provider and stream the response back unchanged",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/capture.rs",
+      "note": "bounded spooling of request and response bodies to files while forwarding, handed to the R6 sink",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/journal.rs",
+      "note": "the open-call journal: a call id written before forwarding, retired after ingest, so a restart records lost calls once",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/stream.rs",
+      "note": "the three event-stream grammars read as they pass, assembling response parts for the sink",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/error.rs",
+      "note": "the proxy's errors and outcomes, named",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/forward_tests.rs",
+      "note": "forwarding against a loopback fake",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/stream_tests.rs",
+      "note": "the three grammars, partial streams",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/link_tests.rs",
+      "note": "linking by the measured key; unlinked; never inferred",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/journal_tests.rs",
+      "note": "recovery after a kill: one lost record per open call",
       "brief": "HOME-001"
     }
   ],

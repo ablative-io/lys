@@ -80,13 +80,22 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `crates/lys-home/Cargo.toml` | the crate manifest; gains the passthrough example | HOME-001 |
 | `crates/lys-home/README.md` | what the tool does and does not do | HOME-001 |
 | `crates/lys-home/src/record/index.rs` | the offset index and the persisted head: a path is read by seeking, never by loading the file | HOME-001 |
-| `crates/lys-home/src/proxy/mod.rs` | the little proxy: pass the stream through unchanged, record each call as a lys.call entry under the session it belongs to | HOME-001 |
+| `crates/lys-home/src/proxy/mod.rs` | the proxy module: declarations only | HOME-001 |
 | `crates/lys-home/src/proxy/link.rs` | how a call is linked to a session: the measured request key (Claude Code's request metadata) now, the seat's handle when the door's proxy exists | HOME-001 |
 | `crates/lys-home/src/bin/lys-proxy.rs` | the proxy binary | HOME-001 |
 | `docs/design/home/PROOF-FEWSHOT.md` | the first proof: a hand-written few-shot session file resumed by path from a directory outside the config root | HOME-001 |
 | `crates/lys-home/src/record/canon.rs` | the canon: copy chosen real exchanges (or a clearly authored example) into canon.jsonl with a lys.inherited entry naming each source; seed a new session from it | HOME-001 |
 | `docs/design/home/PROOF-CANON.md` | measured: a session started from the canon against a plain start, on one card | HOME-001 |
 | `canon/canon.jsonl` | the canon itself, versioned by the repository, changed only through src_commit and review | HOME-001 |
+| `crates/lys-home/src/proxy/forward.rs` | forward a request to the provider and stream the response back unchanged | HOME-001 |
+| `crates/lys-home/src/proxy/capture.rs` | bounded spooling of request and response bodies to files while forwarding, handed to the R6 sink | HOME-001 |
+| `crates/lys-home/src/proxy/journal.rs` | the open-call journal: a call id written before forwarding, retired after ingest, so a restart records lost calls once | HOME-001 |
+| `crates/lys-home/src/proxy/stream.rs` | the three event-stream grammars read as they pass, assembling response parts for the sink | HOME-001 |
+| `crates/lys-home/src/proxy/error.rs` | the proxy's errors and outcomes, named | HOME-001 |
+| `crates/lys-home/src/proxy/forward_tests.rs` | forwarding against a loopback fake | HOME-001 |
+| `crates/lys-home/src/proxy/stream_tests.rs` | the three grammars, partial streams | HOME-001 |
+| `crates/lys-home/src/proxy/link_tests.rs` | linking by the measured key; unlinked; never inferred | HOME-001 |
+| `crates/lys-home/src/proxy/journal_tests.rs` | recovery after a kill: one lost record per open call | HOME-001 |
 
 ## Inventory
 
