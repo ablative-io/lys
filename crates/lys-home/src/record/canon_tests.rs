@@ -268,3 +268,47 @@ fn a_render_with_the_canon_places_it_first_and_applies_the_thinking_rule_to_it()
     drop(own);
     dir.close().unwrap();
 }
+
+#[test]
+fn duplicate_ids_in_one_example_a_self_parent_and_a_second_adder_are_each_refused_by_name() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = Home::open(dir.path().join("home")).unwrap();
+    let canon = dir.path().join("canon.jsonl");
+    create(&canon).unwrap();
+    let (session, ids) = thinking_exchange(&home);
+    let s = home.open_session(&session).unwrap();
+    // The same id twice in one request is refused before anything is written.
+    let twice = vec![ids[0].clone(), ids[0].clone()];
+    let err = add_from(&canon, &s, &twice, "twice", "tom").unwrap_err();
+    assert!(
+        matches!(err, crate::error::HomeError::DuplicateEntry { .. }),
+        "{err}"
+    );
+    assert_eq!(load(&canon).unwrap().entries.len(), 0);
+    // A second adder holding the canon is refused by name, and nothing is written.
+    let holder = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&canon)
+        .unwrap();
+    holder.try_lock().unwrap();
+    let err = add_from(&canon, &s, &ids, "held", "tom").unwrap_err();
+    assert!(
+        matches!(err, crate::error::HomeError::SessionHeld { .. }),
+        "{err}"
+    );
+    drop(holder);
+    assert_eq!(load(&canon).unwrap().entries.len(), 0);
+    add_from(&canon, &s, &ids, "verify before claiming", "tom").unwrap();
+    assert_eq!(load(&canon).unwrap().entries.len(), 3);
+    // A file whose entry names itself as its parent is refused on load.
+    let bent = dir.path().join("bent.jsonl");
+    std::fs::write(
+        &bent,
+        "{\"type\":\"session\",\"version\":2,\"id\":\"canon\",\"timestamp\":\"t\",\"cwd\":\"/c\"}\n{\"type\":\"label\",\"id\":\"x\",\"parentId\":\"x\",\"timestamp\":\"t\",\"targetId\":\"x\",\"label\":null}\n",
+    )
+    .unwrap();
+    let err = load(&bent).unwrap_err().to_string();
+    assert!(err.contains("not on record before it"), "{err}");
+    drop(s);
+    dir.close().unwrap();
+}

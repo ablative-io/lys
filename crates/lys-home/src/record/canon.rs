@@ -10,9 +10,12 @@
 //! instead of a source, and may hold no thinking block, because thinking is
 //! never authored.
 //!
-//! The canon is read and appended as a plain file: it has no index, head or
-//! lock beside it, since it lives in a repository and is small. Curation is a
-//! person's act: the tool copies what it is told to and records who told it.
+//! The canon is read and appended as a plain file: it has no index or head
+//! beside it, since it lives in a repository and is small. An add holds an
+//! exclusive lock on the canon file itself for the whole of its read, check
+//! and append, so two adds cannot read the same leaf and interleave; a second
+//! adder is refused by name. Curation is a person's act: the tool copies what
+//! it is told to and records who told it.
 
 use std::io::Write;
 use std::path::Path;
@@ -152,7 +155,7 @@ pub fn load(path: &Path) -> Result<Canon, HomeError> {
             what: "canon entry",
             reason: e.to_string(),
         })?;
-        if !seen.insert(entry.id().to_owned()) {
+        if seen.contains(entry.id()) {
             return Err(HomeError::Malformed {
                 path: path.to_path_buf(),
                 line: n + 1,
@@ -160,6 +163,8 @@ pub fn load(path: &Path) -> Result<Canon, HomeError> {
                 reason: "its id is already on record".to_owned(),
             });
         }
+        // The parent is checked before this id is recorded, so an entry that
+        // names itself as its parent is refused like any other unknown parent.
         if let Some(parent) = entry.parent_id()
             && !seen.contains(parent)
         {
@@ -170,6 +175,7 @@ pub fn load(path: &Path) -> Result<Canon, HomeError> {
                 reason: "its parent is not on record before it".to_owned(),
             });
         }
+        seen.insert(entry.id().to_owned());
         entries.push(entry);
     }
     Ok(Canon { header, entries })
@@ -191,6 +197,15 @@ pub fn add_from(
             api: "canon",
             reason: "an example needs at least one entry",
         });
+    }
+    let mut asked = std::collections::HashSet::with_capacity(entry_ids.len());
+    for id in entry_ids {
+        if !asked.insert(id.as_str()) {
+            return Err(HomeError::DuplicateEntry {
+                session: CANON_ID.to_owned(),
+                id: id.clone(),
+            });
+        }
     }
     let mut copied = Vec::with_capacity(entry_ids.len());
     for id in entry_ids {
@@ -326,9 +341,27 @@ fn append_example(
     inherited: &Inherited,
     mut entries: Vec<Entry>,
 ) -> Result<AddReport, HomeError> {
+    // One adder at a time: the canon file is held exclusively from before the
+    // read to after the sync, so no other add can read the same leaf.
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(canon_path)
+        .map_err(|e| HomeError::io("opening the canon", canon_path, e))?;
+    match file.try_lock() {
+        Ok(()) => {}
+        Err(std::fs::TryLockError::WouldBlock) => {
+            return Err(HomeError::SessionHeld {
+                path: canon_path.to_path_buf(),
+            });
+        }
+        Err(std::fs::TryLockError::Error(e)) => {
+            return Err(HomeError::io("locking the canon", canon_path, e));
+        }
+    }
     let canon = load(canon_path)?;
+    let mut fresh = std::collections::HashSet::with_capacity(entries.len());
     for entry in &entries {
-        if canon.entries.iter().any(|e| e.id() == entry.id()) {
+        if canon.entries.iter().any(|e| e.id() == entry.id()) || !fresh.insert(entry.id()) {
             return Err(HomeError::DuplicateEntry {
                 session: CANON_ID.to_owned(),
                 id: entry.id().to_owned(),
@@ -357,10 +390,6 @@ fn append_example(
         prev.clone_from(&entry.base.id);
         thinking_copied += thinking_blocks(entry);
     }
-    let mut file = std::fs::OpenOptions::new()
-        .append(true)
-        .open(canon_path)
-        .map_err(|e| HomeError::io("opening the canon", canon_path, e))?;
     write_line(&mut file, &mark, canon_path)?;
     for entry in &entries {
         write_line(&mut file, entry, canon_path)?;
