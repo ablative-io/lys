@@ -66,6 +66,10 @@ claude -p --resume <scratch>/proof5/resume/rendered/478d9617-9050-453d-bb94-b843
 | new_tool_uses | 0 (the fork's own records hold no tool_use part at all, which is the stronger statement for a one-turn question answerable without tools) |
 | exit | 0 (non-zero when repeated_tool_use_ids is not 0, tested with a synthetic duplicate in `tests/claude_code_round_trip.rs`) |
 
+## The fork imported back (R3)
+
+`lys-home import` of the fork into the same home: 93 records, 105 entries (35 messages, 13 attachment, 1 hook, 1 system, 24 tool_completed events), 66 content parts of which 16 were already held and 50 were new. The 64 copied records' message content is identical to the rendered file's (checked record by record), so the 50 new blocks are not Claude Code's doing: they are the 24 tool_result and 24 tool_use parts, which the renderer writes in its own shape from Pi's toolResult and toolCall messages rather than in the source record's bytes, plus the new turn's 2 parts. The 16 reused are the user and assistant text parts. A renderer that emitted a tool part from the block the importer stored for it would make a round trip add only the new turn; that is a change to R4 for review, not made here.
+
 ## What 2.1.281 did with the signed thinking
 
 The rendered file carried 17 assistant records whose content is one signed thinking block each (Claude Code writes thinking as its own assistant record). The fork copied 64 of the 81 records: every user and text record, and none of the 17 thinking records. So 2.1.281 does not carry signed thinking blocks from a resumed file into its continuation. Whether it sent them to the model on the first turn cannot be seen from the files; that is R10's measurement (through the proxy) and PROOF-CANON.md records it as open.
