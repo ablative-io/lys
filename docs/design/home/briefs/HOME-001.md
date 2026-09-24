@@ -48,7 +48,7 @@ Extend the lys-home crate (CONTEXT-001 creates it; if it is not yet on main, cre
 Define the home record as Pi's session tree: a header line {type:"session", version, id, timestamp, cwd, parentSession?} then entries, each {type, id, parentId, timestamp}, of the kinds message, model_change, compaction {summary, firstKeptEntryId, tokensBefore}, branch_summary {fromId, summary}, label, custom {customType, data} and session_info, with a leaf pointer kept beside the file. WHEN an entry is appended, THE SYSTEM SHALL write it as a child of the leaf and advance the leaf; WHEN the leaf is moved to an earlier entry, THE SYSTEM SHALL rewrite nothing. THE SYSTEM SHALL provide the root-to-leaf path and the context path (entries from the latest compaction's firstKeptEntryId onward, plus the compaction summary) as Pi's buildSessionPath and buildContextEntries do. THE SYSTEM SHALL NOT add a field to the header or to any entry outside custom.data, and SHALL NOT depend on any Norn crate. THE SYSTEM SHALL keep an offset index (entry id to byte offset and parentId) and a persisted head file beside the home file, so that reading the root-to-leaf path seeks to the path's entries only and never loads the whole file, and so that reopening restores the persisted head, not the last physical entry.
 
 **Acceptance:**
-- A fixture file written by lys-home with 12 entries, one compaction and one moved leaf parses with Pi's parseSessionEntries at b4559750 (run through node against the cloned checkout in the proof step) with 12 entries and no migration.
+- A fixture file written by lys-home with 12 entries, one compaction and one moved leaf loads with Pi's loadEntriesFromFile at the checkout 3d5cbe98 (packages/coding-agent/src/core/session-manager.ts:438, parseSessionEntries at :284; run through node against /Users/tom/Developer/tools/harness/pi in the proof step) with 12 entries and no migration, and buildSessionContext (:315) on it yields the same message list as lys-home's context_path().
 - `context_path()` on that fixture returns the compaction summary entry followed by every entry from firstKeptEntryId to the leaf and nothing before it.
 - Moving the leaf to entry 4 and appending entry 13 leaves bytes 0..N of the file identical (N = the length before the move) and entry 13's parentId equal to entry 4's id.
 - `Cargo.toml` of lys-home lists no dependency whose name starts with `norn`.
@@ -160,10 +160,10 @@ Import one real session of Archie's, render it for the same model under a fresh 
 
 ### R6: Define the proxy call record and ingest a captured pair
 
-Define the custom entry lys.call: data {provider, api, model, request: [block hash], response: [block hash], status, started_at, duration_ms, stream: bool}. WHEN given a captured request body and response body (files) with the provider, api and model, THE SYSTEM SHALL split the request into its message parts, store each as a block (so a resent conversation adds no new blocks), store the response parts, and append one lys.call entry under the leaf. THE SYSTEM SHALL support the Messages, Chat Completions and Responses request shapes for the split and SHALL keep the raw request and response bodies as blocks too. THE SYSTEM SHALL NOT store any header, and SHALL NOT forward, replay or modify a call.
+Define the custom entry lys.call: data {provider, api, model, request: [block hash], response: [block hash], status, started_at, duration_ms, stream: bool}. WHEN given a captured request body and response body (files) with the provider, api and model, THE SYSTEM SHALL split the request into its message parts, store each as a block (so a resent conversation adds no new blocks), store the response parts, and append one lys.call entry under the leaf. THE SYSTEM SHALL support the Messages, Chat Completions and Responses request shapes for the split and SHALL keep the raw request and response bodies as blocks too. THE SYSTEM SHALL NOT store any header, and SHALL NOT forward, replay or modify a call. The ingest report SHALL count part blocks new and reused separately from raw body blocks.
 
 **Acceptance:**
-- Ingesting two consecutive captured Messages requests where the second resends the first's conversation plus one turn adds exactly the new turn's parts as new blocks (block count delta equals the new parts).
+- Ingesting two consecutive captured Messages requests where the second resends the first's conversation plus one turn adds, among part blocks, exactly the new turn's parts (the report's `part_blocks_new` equals the new parts and `part_blocks_reused` equals the resent parts); the raw request and response bodies are two further blocks each time and are counted under `raw_blocks`, never under part blocks.
 - A Chat Completions and a Responses fixture each ingest to one lys.call entry whose request array length equals the fixture's message or input item count.
 - An ingested pair's raw bodies are retrievable by the hashes named in the entry and hash to those names.
 - The entry's data contains no key named authorization, cookie or x-api-key (a test checks the serialised entry).
@@ -186,7 +186,7 @@ Write examples/passthrough.rs: an HTTP server that forwards every request to the
 **Acceptance:**
 - PROOF-PROXY.md exists and states one of `completed` or `failed` with the status codes seen.
 - The passthrough example's source contains no code path that writes a header value or a body byte to a file, stderr or stdout (review reads the file; the only writes are the four-field line).
-- `cargo run --example passthrough -- https://example.invalid` starts and answers a GET / with the upstream's error status, proving the forward path, without a provider.
+- With a loopback fake upstream (a test server on 127.0.0.1 answering GET / with status 418 and a fixed 3-chunk streamed body), `cargo run --example passthrough -- http://127.0.0.1:<port>` answers GET / with status 418 and the same 3 chunks in order, proving the forward path without a provider.
 
 **Files:**
 - create: crates/lys-home/examples/passthrough.rs
@@ -219,18 +219,17 @@ Define the custom entry lys.harness_event: data {kind, harness: "claude-code", s
 **Stories:**
 - S3 (Tom, Owns the platform and reads what a session was given) — As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
 
-### R9: The CLI: import, render, ingest-call, resume-check, and resume by path
+### R9: The CLI: import, render, ingest-call, resume-check; resume is Claude Code's own --resume <path>
 
-Add subcommands to the lys-home binary: `import --home <dir> --claude-code <file>`, `render --home <dir> --claude-code --uuid <uuid> --cwd <dir> --model <id>`, `ingest-call --home <dir> --provider <p> --api <a> --model <m> --request <file> --response <file>`, `resume-check <rendered> <forked>`. Every subcommand SHALL print a JSON report of hashes, counts and paths and SHALL NOT print any transcript, block or body content. IF a required argument is missing, THEN THE SYSTEM SHALL exit 2 naming it. Add `resume --claude-code <path to a session file> [--cwd <dir>]`: WHEN given a Claude Code JSONL anywhere on disk, THE SYSTEM SHALL choose a fresh uuid, place a copy at ~/.claude/projects/<cwd-slug>/<uuid>.jsonl with sessionId and cwd rewritten to the chosen values and the parentUuid chain intact, and then, as the person's own launch in the foreground, exec `claude --resume <uuid> --fork-session` in that cwd; with --print-command it SHALL print that command instead and exit 0. This is a person's tool, not the platform starting an agent (ADR-007 governs the platform; the person runs this). This is Tom's ask of 24 September 13:34: construct a session file by hand and resume Claude Code with it from anywhere by giving the path.
+Add subcommands to the lys-home binary: `import --home <dir> --claude-code <file>`, `render --home <dir> --claude-code --uuid <uuid> --cwd <dir> --model <id>`, `ingest-call --home <dir> --provider <p> --api <a> --model <m> --request <file> --response <file>`, `resume-check <rendered> <forked>`. Every subcommand SHALL print a JSON report of hashes, counts and paths and SHALL NOT print any transcript, block or body content. IF a required argument is missing, THEN THE SYSTEM SHALL exit 2 naming it. There is no resume launcher: Claude Code 2.1.281 resumes directly from a file path (`claude --resume <path>`), measured by Waffles at 13:36 and by Archie at 13:37 on 24 September, even though --help names only a session id; the continuation is written beside the passed file as <sessionId>.jsonl in the same directory (the authored records copied in, then the new turn), and the passed file is unchanged. THE SYSTEM SHALL provide `fewshot --out <path>` that writes a hand-authored Claude Code JSONL from a turns file (role and text per line), with sessionId a fresh uuid, cwd as given, the parentUuid chain intact, every assistant record's model set to `authored`, and the marker described in R4 (a first record of type custom, customType lys.authored, if 2.1.281 accepts it; else the model value `authored` is the marker and the proof says which).
 
 **Acceptance:**
 - `lys-home render` without --uuid exits 2 and names `--uuid`.
 - Each subcommand's stdout parses as JSON and contains no key named text, content or body.
 - `lys-home import` on the R3 fixture prints the same counts as the R3 report.
-- `lys-home resume --claude-code <file> --cwd <dir>` places the copy at the slug path, prints `claude --resume <uuid>`, and the copy's records all carry the new sessionId and cwd with the same parentUuid chain as the source.
+- `lys-home fewshot --out f.jsonl` from a 6-turn turns file writes 6 records whose parentUuid chain is intact and whose assistant records carry model `authored`.
+- PROOF-FEWSHOT.md records the first proof: the authored 6-turn file, the directory it was run from (neither the file's directory nor ~/.claude), the exact command `claude -p --resume <path> ...`, the one-word answer, the source hash before and after (equal), the continuation's path (beside the source, named <sessionId>.jsonl) and line count, and which marker 2.1.281 accepted.
 - The resume proof in PROOF-RESUME.md is run from a working directory that is neither the file's directory nor the session's cwd, and records that directory.
-- `lys-home resume --claude-code <file> --cwd <dir> --print-command` spawns no process and leaves the source file's hash unchanged.
-- PROOF-FEWSHOT.md records the first proof: a hand-written file of three exchanges, the directory it was run from (outside ~/.claude), the command, the one-word answer, the source hash before and after (equal), and `authored: true`.
 
 **Files:**
 - create: docs/design/home/PROOF-FEWSHOT.md
@@ -248,7 +247,7 @@ Add subcommands to the lys-home binary: `import --home <dir> --claude-code <file
 
 ### R10: The little proxy: pass the stream through and record each call under its session
 
-Build lys-proxy: an HTTP server that forwards every request to the provider named by its path prefix (/anthropic, /openai) with headers and streamed body unchanged and returns the response unchanged, and, after the response completes, appends one lys.call entry (R6) under the home of the session the call belongs to. WHEN a request carries Claude Code's session key (measured first: the request metadata field 2.1.281 sends; the exact field and format are recorded in PROOF-PROXY.md before this is built), THE SYSTEM SHALL link the call to that session's home; IF no key is present, THEN THE SYSTEM SHALL append the call under an `unlinked` home named by the day and say so in its report. THE SYSTEM SHALL support the Messages, Chat Completions and Responses streams, SHALL NOT buffer a streamed response before forwarding it, SHALL NOT store any header, SHALL NOT retry, balance or swap accounts (ccflare is the concept, not the design), and SHALL NOT alter a byte of a request or response.
+Build lys-proxy: an HTTP server that forwards every request to the provider named by its path prefix (/anthropic, /openai) with headers and streamed body unchanged and returns the response unchanged, and, after the response completes, appends one lys.call entry (R6) under the home of the session the call belongs to. WHEN a request carries Claude Code's session key (measured first: the request metadata field 2.1.281 sends; the exact field and format are recorded in PROOF-PROXY.md before this is built), THE SYSTEM SHALL link the call to that session's home; IF no key is present, THEN THE SYSTEM SHALL append the call under an `unlinked` home named by the day and say so in its report. THE SYSTEM SHALL support the Messages, Chat Completions and Responses streams, SHALL NOT buffer a streamed response before forwarding it, SHALL NOT store any header, SHALL NOT retry, balance or swap accounts (ccflare is the concept, not the design), and SHALL NOT alter a byte of a request or response. Outcomes: a call record's status SHALL be one of complete, cancelled (client closed before the response ended), partial (the upstream stream ended early or malformed), unrecorded (the capture write failed after forwarding) or lost (the process died mid-call, detected on restart from a journal of open calls), and only complete SHALL carry a full response block list; THE SYSTEM SHALL NOT report a call complete on any other path. Capture SHALL be bounded: at most N calls (a command-line value, default 64) pending write; above it the proxy still forwards and marks the call unrecorded rather than growing a backlog. A call SHALL be linked only by the key it carries; THE SYSTEM SHALL NOT infer a session from timing, cwd or a previous call.
 
 **Acceptance:**
 - A streamed Messages response of 200 SSE events is forwarded with the first event delivered before the last is received (measured with a slow upstream fake).
@@ -256,6 +255,11 @@ Build lys-proxy: an HTTP server that forwards every request to the provider name
 - A request without the session key lands under the unlinked home and the proxy's report line names `unlinked`.
 - The proxy's source has no code path that writes a header value to disk or to a log; review reads proxy/mod.rs and link.rs.
 - The proxy exposes no account list, no retry and no routing table (grep for `accounts`, `retry`, `failover` in crates/lys-home/src/proxy returns nothing).
+- A client that closes mid-stream produces one lys.call with status cancelled and no full response block list.
+- An upstream fake that ends the SSE stream early produces status partial.
+- A capture directory made read-only during a call produces status unrecorded while the client still receives the full response.
+- Killing the proxy mid-call and restarting produces one lys.call with status lost for that call, from the open-call journal.
+- Two consecutive calls without a key from the same client land under `unlinked`, never under the session of an earlier keyed call.
 
 **Files:**
 - create: crates/lys-home/src/proxy/mod.rs
@@ -282,6 +286,7 @@ Build lys-proxy: an HTTP server that forwards every request to the provider name
 - No proof runs against a session that is currently running, and no credential is copied anywhere.
 - The design's structure array is the whole file list; a path outside it is not created.
 - Not a sub-agent platform: nothing here spawns, schedules or supervises agents; it holds sessions neatly and renders them (Tom, Dot 13:33).
+- Resume is Claude Code's own `--resume <path>`; no launcher, copy or rewrite of a passed file is built.
 
 ## Verification
 
