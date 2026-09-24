@@ -30,6 +30,8 @@ Warnings (reported, not failures):
 Also prints the brief dependency chain.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import sys

@@ -20,6 +20,8 @@ DESIGN.md sections follow schema order: intention, problem, solution,
 principles, decisions (as ADR refs), goals, non_goals, structure (as a
 path|note|brief table), inventory, constraints.
 """
+from __future__ import annotations
+
 import argparse
 import json
 import sys

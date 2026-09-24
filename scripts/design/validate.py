@@ -46,6 +46,8 @@ that already carries an execution record: what a round measured is kept
 as written, absolute paths and all.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import re

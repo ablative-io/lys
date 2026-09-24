@@ -15,6 +15,8 @@ scout/dev/review blocks and the brief-level execution block are rendered
 in clearly-marked sections, so an enriched brief reads as
 spec-then-record.
 """
+from __future__ import annotations
+
 import argparse
 import json
 import sys
