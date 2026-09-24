@@ -1,0 +1,1680 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Identity: mock-up v5</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Aion ops console tokens (apps/aion-ops-console/src/index.css), with the identity
+   product's own accent in place of Aion's blue: #D4975A, deep #A86B2E, wash #3D2A17. */
+:root {
+  --radius-sm: .375rem; --radius-md: .5rem; --radius-lg: .625rem;
+  --background: #121218;
+  --surface-base: #0f0f14; --surface-default: #18181f; --surface-card: #1a1a22;
+  --surface-hover: #252530; --surface-code: #0d0d12;
+  --border-subtle: rgba(255,255,255,.04); --border-default: rgba(255,255,255,.08);
+  --text-primary: #f4f4f5; --text-secondary: #a1a1aa; --text-muted: #71717a;
+  --accent: #D4975A; --accent-deep: #A86B2E; --accent-wash: #3D2A17;
+  --accent-glow: rgba(212,151,90,.12); --focus: rgba(212,151,90,.5);
+  --ok: #74b584; --ok-glow: rgba(116,181,132,.12);
+  --warn: #fbbf24; --warn-glow: rgba(251,191,36,.12);
+  --danger: #f87171;
+  --muted-dot: #71717a;
+  --shadow-lg: 0 4px 8px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.35);
+  --glass-bg: rgba(24,24,31,.9);
+  --spring: cubic-bezier(.2,.9,.25,1.05);
+  --rail: 48px; --rail-open: 196px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--background); color: var(--text-primary); font: 13px/1.6 "DM Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
+.mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
+
+.shell { display: flex; height: 100vh; }
+.shell.dock-right { flex-direction: row-reverse; }
+.rail { width: var(--rail); flex: none; background: var(--surface-base); border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; padding: 12px 8px; gap: 2px; transition: width .32s var(--spring); overflow: hidden; }
+.dock-right .rail { border-right: 0; border-left: 1px solid var(--border-subtle); }
+.rail.open { width: var(--rail-open); }
+.mark { height: 32px; display: flex; align-items: center; gap: 10px; padding: 0 7px; margin-bottom: 10px; font-weight: 600; font-size: 12px; white-space: nowrap; }
+.mark .seal { width: 18px; height: 18px; flex: none; border: 1.5px solid var(--accent); border-radius: 50%; display: grid; place-items: center; font: 600 8px "JetBrains Mono"; color: var(--accent); }
+.rail a, .rail button.rb { display: flex; align-items: center; gap: 12px; height: 32px; padding: 0 8px; border-radius: var(--radius-md); color: var(--text-muted); text-decoration: none; white-space: nowrap; position: relative; }
+.rail a:hover, .rail button.rb:hover, .rail button.rb.on { color: var(--text-primary); background: var(--surface-hover); }
+.rail a.on { color: var(--text-primary); background: var(--surface-hover); }
+.rail a.on::before { content: ""; position: absolute; left: -8px; top: 8px; bottom: 8px; width: 2px; border-radius: 2px; background: var(--accent); }
+.dock-right .rail a.on::before { left: auto; right: -8px; }
+.rail svg { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.rail .lbl { opacity: 0; transition: opacity .15s; font-size: 12.5px; }
+.rail.open .lbl { opacity: 1; transition-delay: .08s; }
+.rail .grow { flex: 1; }
+.rail .sep { height: 1px; background: var(--border-subtle); margin: 8px 4px; }
+.kbd { font: 10px "JetBrains Mono"; color: var(--text-muted); border: 1px solid var(--border-default); border-radius: 4px; padding: 0 4px; margin-left: auto; }
+
+.screen { flex: 1; overflow: auto; position: relative; }
+.page { padding: 26px 32px 64px; }
+.eyebrow { font: 500 10px "JetBrains Mono"; letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted); }
+.eyebrow a { text-decoration: none; }
+h1 { font-size: 20px; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; margin: 6px 0 4px; }
+h2 { font-size: 14px; font-weight: 600; letter-spacing: -.01em; margin: 0; }
+.sub { color: var(--text-secondary); margin: 0 0 18px; }
+.head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.seg { display: inline-flex; background: var(--surface-default); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 3px; gap: 2px; }
+.seg button, .seg a { padding: 3px 10px; border-radius: var(--radius-sm); color: var(--text-muted); font-size: 12px; text-decoration: none; }
+.seg .on { background: var(--surface-hover); color: var(--text-primary); }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-default); background: var(--surface-default); font-size: 12.5px; color: var(--text-primary); text-decoration: none; }
+.btn:hover { background: var(--surface-hover); }
+.btn.primary { background: var(--accent); color: #17110b; border-color: transparent; font-weight: 600; }
+.btn.primary:hover { background: #e0a870; }
+.btn.danger { color: var(--danger); border-color: rgba(248,113,113,.25); }
+
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-weight: 500; color: var(--text-secondary); font-size: 12.5px; padding: 8px 10px; border-bottom: 1px solid var(--border-default); white-space: nowrap; }
+td { padding: 8px 10px; border-bottom: 1px solid var(--border-subtle); white-space: nowrap; }
+tbody tr[data-href] { cursor: pointer; }
+tbody tr:hover td { background: rgba(255,255,255,.02); }
+tbody tr.cursor td { background: rgba(212,151,90,.07); }
+tbody tr.cursor td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+.dim { color: var(--text-muted); }
+.sec { color: var(--text-secondary); }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
+.s-active { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-glow); }
+.s-commissioned, .s-registered { background: var(--muted-dot); }
+.s-suspended { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-glow); }
+.s-retired { background: transparent; border: 1px solid var(--muted-dot); }
+.kind { font: 10px "JetBrains Mono"; letter-spacing: .08em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--border-default); color: var(--text-secondary); }
+.kind.agent { color: var(--accent); border-color: rgba(212,151,90,.3); }
+.pill { display: inline-block; padding: 0 8px; border-radius: 999px; border: 1px solid var(--border-default); background: var(--surface-default); font-size: 12px; margin: 2px 4px 2px 0; }
+.pill.human { border-color: rgba(212,151,90,.4); color: var(--accent); text-decoration: none; }
+.pill.off { opacity: .45; text-decoration: line-through; }
+
+/* The file: a record with a folder tab and a file number. The one flourish kept. */
+.file { position: relative; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: 0 var(--radius-lg) var(--radius-lg) var(--radius-lg); padding: 18px 22px; margin-top: 22px; }
+.file::before { content: attr(data-tab); position: absolute; top: -21px; left: -1px; height: 21px; padding: 0 12px; display: flex; align-items: center; background: var(--surface-card); border: 1px solid var(--border-default); border-bottom: 0; border-radius: var(--radius-md) var(--radius-md) 0 0; font: 500 10px "JetBrains Mono"; letter-spacing: .14em; color: var(--text-muted); text-transform: uppercase; }
+.fileno { font: 500 11px "JetBrains Mono"; color: var(--text-muted); letter-spacing: .06em; }
+.state { display: inline-flex; align-items: center; font: 500 11px "JetBrains Mono"; letter-spacing: .12em; text-transform: uppercase; padding: 3px 9px; border: 1px solid currentColor; border-radius: 4px; }
+.state.active { color: var(--ok); } .state.suspended { color: var(--warn); } .state.retired, .state.commissioned { color: var(--text-muted); }
+.verdict-mark { display: inline-block; font: 600 11px "JetBrains Mono"; letter-spacing: .14em; text-transform: uppercase; padding: 3px 10px; border: 1.5px solid currentColor; border-radius: 4px; }
+.verdict-mark.yes { color: var(--ok); } .verdict-mark.no { color: var(--danger); }
+.verdict-mark.land { animation: land .35s var(--spring); }
+@keyframes land { from { transform: scale(1.35); opacity: 0; } }
+.sealed { display: inline-block; height: 11px; background: #0a0a0d; border: 1px solid var(--border-default); border-radius: 2px; vertical-align: -1px; }
+
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border-default); margin: 16px 0 18px; overflow-x: auto; }
+.tabs a { padding: 8px 12px; color: var(--text-muted); text-decoration: none; font-size: 12.5px; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tabs a:hover { color: var(--text-primary); }
+.tabs a.on { color: var(--text-primary); border-bottom-color: var(--accent); }
+.tabs .n { font: 10px "JetBrains Mono"; color: var(--text-muted); margin-left: 5px; }
+.grid2 { display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; align-items: start; }
+.facts { display: grid; grid-template-columns: 150px 1fr; gap: 8px 14px; margin: 0; }
+.facts dt { color: var(--text-muted); font-size: 12px; }
+.facts dd { margin: 0; }
+.card { background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 14px 16px; }
+.card + .card { margin-top: 12px; }
+.card h2 { margin-bottom: 8px; }
+.section-h { font: 500 10px "JetBrains Mono"; letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted); margin: 20px 0 8px; display: flex; justify-content: space-between; align-items: center; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.row + .row { border-top: 1px solid var(--border-subtle); }
+.note { color: var(--text-muted); font-size: 11.5px; }
+.chain { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.chain .arr { color: var(--text-muted); font-size: 11px; }
+ul.plain { margin: 0; padding-left: 18px; } ul.plain li { margin: 3px 0; }
+.ver { font: 10.5px "JetBrains Mono"; color: var(--text-muted); border: 1px solid var(--border-default); border-radius: 3px; padding: 0 5px; }
+.code { background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 12px 14px; font: 11.5px/1.7 "JetBrains Mono"; color: var(--text-secondary); white-space: pre-wrap; overflow-x: auto; }
+.code .k { color: var(--accent); }
+.mem { padding: 9px 0; }
+.mem + .mem { border-top: 1px solid var(--border-subtle); }
+.mem .meta { color: var(--text-muted); font-size: 11.5px; margin-top: 2px; display: flex; gap: 12px; flex-wrap: wrap; }
+.tag { font: 10px "JetBrains Mono"; letter-spacing: .06em; padding: 0 5px; border-radius: 3px; border: 1px solid var(--border-default); color: var(--text-secondary); }
+.tag.inf { color: var(--warn); border-color: rgba(251,191,36,.3); }
+.tag.obs { color: var(--ok); border-color: rgba(116,181,132,.3); }
+.timeline { border-left: 1px dashed var(--border-default); margin-left: 5px; padding-left: 16px; }
+.tl { position: relative; padding: 4px 0 10px; }
+.tl::before { content: ""; position: absolute; left: -20px; top: 10px; width: 7px; height: 7px; border-radius: 50%; background: var(--surface-hover); border: 1px solid var(--text-muted); }
+.tl.now::before { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-glow); }
+.tl .when { font: 11px "JetBrains Mono"; color: var(--text-muted); }
+.check { border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 14px; background: var(--surface-default); margin-top: 14px; }
+.check .q { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.check select { background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 5px 8px; font: 12.5px "DM Sans"; }
+.check .answer { min-height: 40px; display: flex; gap: 14px; align-items: center; margin-top: 12px; }
+.check .why { color: var(--text-secondary); font-size: 12px; }
+
+.drawer { position: fixed; top: 0; bottom: 0; right: 0; width: 440px; background: var(--glass-bg); backdrop-filter: blur(12px); border-left: 1px solid var(--border-default); box-shadow: var(--shadow-lg); transform: translateX(105%); transition: transform .34s var(--spring); padding: 22px; overflow: auto; z-index: 20; }
+.dock-right .drawer { right: auto; left: 0; border-left: 0; border-right: 1px solid var(--border-default); transform: translateX(-105%); }
+.drawer.open { transform: none; }
+.scrim { position: fixed; inset: 0; background: rgba(0,0,0,.4); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 30; }
+.scrim.open { opacity: 1; pointer-events: auto; }
+.palette { position: fixed; left: 50%; top: 14vh; width: 560px; max-width: 92vw; transform: translate(-50%, -8px) scale(.98); opacity: 0; pointer-events: none; transition: all .22s var(--spring); background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--border-default); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); z-index: 31; overflow: hidden; }
+.palette.open { opacity: 1; pointer-events: auto; transform: translate(-50%, 0) scale(1); }
+.palette input { width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--border-default); padding: 14px 16px; color: var(--text-primary); font: 14px "DM Sans"; outline: none; }
+.palette .grp { font: 500 10px "JetBrains Mono"; letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted); padding: 10px 16px 4px; }
+.palette .it { padding: 7px 16px; display: flex; justify-content: space-between; cursor: pointer; }
+.palette .it.sel { background: rgba(212,151,90,.1); }
+.palette .list { max-height: 50vh; overflow: auto; padding-bottom: 6px; }
+.field { display: grid; gap: 4px; margin-top: 12px; }
+.field label { font-size: 12px; color: var(--text-secondary); }
+.field input, .field select, .field textarea { background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 7px 10px; font: 13px "DM Sans"; }
+.field textarea { min-height: 96px; resize: vertical; line-height: 1.5; }
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translate(-50%, 20px); opacity: 0; transition: all .3s var(--spring); background: var(--surface-card); border: 1px solid var(--border-default); border-radius: 999px; padding: 6px 14px; font-size: 12px; box-shadow: var(--shadow-lg); z-index: 40; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.open-q { color: var(--accent); font: 10px "JetBrains Mono"; letter-spacing: .08em; border: 1px dashed rgba(212,151,90,.45); border-radius: 3px; padding: 0 5px; }
+.set-grid { display: grid; grid-template-columns: 200px 1fr; gap: 24px; }
+.set-nav a { display: block; padding: 6px 10px; border-radius: var(--radius-md); color: var(--text-muted); text-decoration: none; font-size: 12.5px; }
+.set-nav a.on { background: var(--surface-hover); color: var(--text-primary); }
+.set-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 0; }
+.set-row + .set-row { border-top: 1px solid var(--border-subtle); }
+.set-row .d { color: var(--text-muted); font-size: 12px; }
+.rail .cnt { font: 10px "JetBrains Mono"; color: #17110b; background: var(--accent); border-radius: 8px; padding: 0 5px; margin-left: auto; }
+.rail:not(.open) .cnt { position: absolute; top: 3px; right: 3px; font-size: 8.5px; padding: 0 3.5px; }
+.rail.open .cnt + .kbd { margin-left: 6px; }
+.svc { font: 10px "JetBrains Mono"; letter-spacing: .06em; padding: 0 6px; border-radius: 3px; border: 1px solid var(--border-default); color: var(--text-secondary); white-space: nowrap; }
+.svc.built-in { color: var(--accent); border-color: rgba(212,151,90,.3); }
+.enf { font-size: 12px; white-space: nowrap; }
+.enf.enforcing { color: var(--ok); } .enf.registered { color: var(--warn); } .enf.awaiting { color: var(--text-muted); }
+.meta-line { font: 11px "JetBrains Mono"; color: var(--text-muted); margin-top: 6px; display: flex; gap: 14px; flex-wrap: wrap; }
+.answer-box { margin-top: 12px; }
+.answer-box .answer { margin-top: 0; }
+.pass { color: var(--ok); } .fail { color: var(--danger); }
+.diff-add { color: var(--ok); } .diff-del { color: var(--danger); }
+.rq { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+table.wrap td { white-space: normal; }
+.file { margin-top: 30px; }
+.empty-note { border: 1px dashed var(--border-default); border-radius: var(--radius-lg); padding: 12px 14px; color: var(--text-secondary); font-size: 12.5px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: opacity .15s !important; } }
+/* v4: the dock (help or assistant, one at a time), explain mode, builders, graph, network. */
+.dock { width: 0; flex: none; overflow: hidden; background: var(--surface-base); border-left: 1px solid var(--border-subtle); transition: width .32s var(--spring); }
+.dock-right .dock { border-left: 0; border-right: 1px solid var(--border-subtle); }
+.dock.open { width: 380px; }
+.dock-in { width: 380px; height: 100%; display: flex; flex-direction: column; }
+.dock-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); }
+.dock-body { flex: 1; overflow: auto; padding: 12px 14px; }
+.dock-foot { border-top: 1px solid var(--border-subtle); padding: 10px 14px; }
+.icon-btn { width: 26px; height: 26px; display: grid; place-items: center; border-radius: var(--radius-sm); color: var(--text-muted); }
+.icon-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
+.concept { padding: 7px 8px; border-radius: var(--radius-md); cursor: pointer; }
+.concept:hover { background: var(--surface-hover); }
+.concept .t { font-size: 12.5px; } .concept .s { font-size: 11.5px; color: var(--text-muted); }
+.sheet p { color: var(--text-secondary); font-size: 12.5px; line-height: 1.6; margin: 0 0 10px; }
+.search { width: 100%; background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 6px 10px; font: 12.5px "DM Sans"; }
+.xlayer { position: fixed; inset: 0; pointer-events: none; z-index: 25; }
+.xm { pointer-events: auto; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: #17110b; font: 600 10px "JetBrains Mono"; display: grid; place-items: center; box-shadow: 0 0 0 3px rgba(212,151,90,.18); animation: land .3s var(--spring); }
+.xm:hover, .xm:focus-visible { transform: scale(1.15); }
+.xcard { position: absolute; width: 260px; background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 10px 12px; box-shadow: var(--shadow-lg); font-size: 12px; }
+.xcard b { font-weight: 500; display: block; margin-bottom: 3px; }
+.xbar { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); pointer-events: auto; background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--border-default); border-radius: 999px; padding: 6px 8px 6px 14px; font-size: 12px; display: flex; gap: 10px; align-items: center; box-shadow: var(--shadow-lg); }
+.xtarget { outline: 1.5px dashed var(--accent) !important; outline-offset: 3px; border-radius: 4px; }
+.msg { margin: 0 0 12px; font-size: 12.5px; line-height: 1.55; }
+.msg.me { background: var(--surface-hover); border-radius: var(--radius-lg); padding: 8px 11px; margin-left: 36px; }
+.msg.ai { color: var(--text-secondary); }
+.msg.ai b { color: var(--text-primary); font-weight: 500; }
+.consent { border: 1px solid rgba(212,151,90,.35); background: rgba(212,151,90,.06); border-radius: var(--radius-lg); padding: 10px 12px; margin: 8px 0 12px; font-size: 12px; }
+.ctx { display: inline-flex; gap: 6px; align-items: center; font: 10.5px "JetBrains Mono"; color: var(--text-muted); border: 1px solid var(--border-default); border-radius: 999px; padding: 1px 8px; }
+.composer { display: flex; gap: 8px; }
+.composer textarea { flex: 1; min-height: 38px; max-height: 120px; resize: vertical; background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 8px 10px; font: 12.5px/1.45 "DM Sans"; }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
+.preview { position: sticky; top: 0; }
+.builder { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 18px; align-items: start; }
+.listnav a { display: flex; justify-content: space-between; align-items: center; padding: 7px 10px; border-radius: var(--radius-md); color: var(--text-secondary); text-decoration: none; font-size: 12.5px; }
+.listnav a.on { background: var(--surface-hover); color: var(--text-primary); box-shadow: inset 2px 0 0 var(--accent); }
+.listnav a:hover { background: var(--surface-hover); }
+.edit-list { display: grid; gap: 6px; }
+.edit-list input, .inline-in { background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 6px 9px; font: 12.5px "DM Sans"; width: 100%; }
+.chk { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border: 1px solid var(--border-default); border-radius: 999px; margin: 3px 4px 3px 0; font-size: 12px; cursor: pointer; user-select: none; }
+.chk.on { border-color: rgba(212,151,90,.5); color: var(--accent); background: rgba(212,151,90,.07); }
+.var { color: var(--accent); }
+.path { font: 12px "JetBrains Mono"; }
+.path .dim { color: var(--text-muted); }
+.graph-wrap { position: relative; background: var(--surface-base); border: 1px solid var(--border-default); border-radius: var(--radius-lg); overflow: hidden; }
+.graph-wrap svg { display: block; width: 100%; height: 100%; }
+.gn { cursor: pointer; }
+.gn text { font: 11px "DM Sans"; fill: var(--text-secondary); pointer-events: none; }
+.gn.dimmed { opacity: .18; } .ge.dimmed { opacity: .07; }
+.ge { stroke: rgba(255,255,255,.14); stroke-width: 1.2; fill: none; }
+.ge.grant { stroke: rgba(212,151,90,.55); }
+.ge.void { stroke: rgba(248,113,113,.5); stroke-dasharray: 4 3; }
+.ge.answers { stroke: rgba(255,255,255,.1); stroke-dasharray: 2 3; }
+.ge.hot { stroke: var(--accent); stroke-width: 2; opacity: 1; }
+.legend { position: absolute; left: 12px; bottom: 10px; display: flex; gap: 14px; font-size: 11px; color: var(--text-muted); }
+.legend i { display: inline-block; width: 16px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 5px; }
+.node-card { background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 12px 14px; }
+.node-card + .node-card { margin-top: 12px; }
+.meter { height: 5px; background: #0a0a0d; border-radius: 3px; overflow: hidden; margin-top: 4px; }
+.meter i { display: block; height: 100%; background: var(--accent); }
+.future { opacity: .75; border-style: dashed !important; }
+.stat-strip { display: flex; gap: 10px; margin: 0 0 16px; flex-wrap: wrap; }
+.stat { background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 8px 14px; min-width: 120px; }
+.stat .n { font: 500 18px "DM Sans"; letter-spacing: -.02em; }
+.stat .l { font-size: 11px; color: var(--text-muted); }
+input[type=radio] { accent-color: var(--accent); }
+body:has(.shell:not(.dock-right) .dock.open) #mockTag { right: 394px !important; }
+.shell:has(.dock.open) .split { grid-template-columns: minmax(0, 1fr); }
+.shell:has(.dock.open) .split > .preview { display: none; }
+.why-not { border-top: 1px solid var(--border-subtle); padding: 7px 0; font-size: 12px; }
+.why-not b { font-weight: 500; font-family: "JetBrains Mono"; font-size: 11.5px; }
+</style>
+</head>
+<body>
+<div class="shell" id="shell">
+  <nav class="rail" id="rail" aria-label="Main">
+    <div class="mark"><span class="seal">ID</span><span class="lbl">Identity <span class="open-q">name open</span></span></div>
+    <a href="#/me" data-nav="me" title="You (g u)"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1-4 3.8-6 7-6s6 2 7 6"/></svg><span class="lbl">You</span><span class="kbd lbl">g u</span></a>
+    <a href="#/people" data-nav="people" title="People and agents (g p)"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.2c2.3.2 4 1.8 4.6 4.8"/></svg><span class="lbl">People and agents</span><span class="kbd lbl">g p</span></a>
+    <a href="#/roles" data-nav="roles" title="Roles (g o)"><svg viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="12" rx="2"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"/><path d="M4 12h16"/></svg><span class="lbl">Roles</span><span class="kbd lbl">g o</span></a>
+    <div class="sep"></div>
+    <a href="#/resources" data-nav="resources" title="Resources (g r)"><svg viewBox="0 0 24 24"><path d="M12 3 20 7.5 12 12 4 7.5z"/><path d="M4 12l8 4.5 8-4.5M4 16.5 12 21l8-4.5"/></svg><span class="lbl">Resources</span><span class="kbd lbl">g r</span></a>
+    <a href="#/access" data-nav="access" title="Access (g a)"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="3.5"/><path d="M10.5 12.5 19 4M16 7l2.5 2.5M14 9l2 2"/></svg><span class="lbl">Access</span><span class="kbd lbl">g a</span></a>
+    <a href="#/graph" data-nav="graph" title="Graph (g h)"><svg viewBox="0 0 24 24"><circle cx="6" cy="7" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="17" r="2"/><circle cx="19" cy="16" r="1.6"/><path d="M8 7.5l8-1M7 9l4 6.5M17 8l-4 7.5M14 17l3.5-.8"/></svg><span class="lbl">Graph</span><span class="kbd lbl">g h</span></a>
+    <a href="#/requests" data-nav="requests" title="Requests (g q)"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M12 8v3M12 13.5v.01"/></svg><span class="lbl">Requests</span><span class="cnt" id="cntReq"></span><span class="kbd lbl">g q</span></a>
+    <a href="#/reviews" data-nav="reviews" title="Reviews (g w)"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4v2h6V4M8.5 12l2 2 4-4.5"/></svg><span class="lbl">Reviews</span><span class="cnt" id="cntRev"></span><span class="kbd lbl">g w</span></a>
+    <div class="sep"></div>
+    <a href="#/secrets" data-nav="secrets" title="Secrets (g v)"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15" r="1.3"/></svg><span class="lbl">Secrets</span><span class="kbd lbl">g v</span></a>
+    <a href="#/connections" data-nav="connections" title="Connections (g n)"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.3 11 15.7 7M8.3 13l7.4 4"/></svg><span class="lbl">Connections</span><span class="kbd lbl">g n</span></a>
+    <a href="#/network" data-nav="network" title="Network (g t)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="5" rx="1"/><rect x="14" y="4" width="7" height="5" rx="1"/><rect x="8.5" y="15" width="7" height="5" rx="1"/><path d="M6.5 9v3h11V9M12 12v3"/></svg><span class="lbl">Network</span><span class="kbd lbl">g t</span></a>
+    <a href="#/sessions" data-nav="sessions" title="Sessions (g x)"><svg viewBox="0 0 24 24"><path d="M4 12h3l2-5 4 10 2-5h5"/></svg><span class="lbl">Sessions</span><span class="kbd lbl">g x</span></a>
+    <div class="sep"></div>
+    <a href="#/model" data-nav="model" title="Model (g m)"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.2"/><circle cx="18" cy="6" r="2.2"/><circle cx="12" cy="18" r="2.2"/><path d="M8 6.5h8M7 8l4 8M17 8l-4 8"/></svg><span class="lbl">Model</span><span class="kbd lbl">g m</span></a>
+    <div class="grow"></div>
+    <button class="rb" data-dockbtn="help" title="Help (?)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.4M12 16.8v.01"/></svg><span class="lbl">Help</span><span class="kbd lbl">?</span></button>
+    <button class="rb" data-dockbtn="assistant" title="Assistant"><svg viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="10" rx="3"/><path d="M12 4v4M9.5 12.5v.5M14.5 12.5v.5M3 13v2M21 13v2"/></svg><span class="lbl">Assistant</span></button>
+    <a href="#/settings" data-nav="settings" title="Configuration (g s)"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span class="lbl">Configuration</span><span class="kbd lbl">g s</span></a>
+    <div class="sep"></div>
+    <button class="rb" id="palBtn" title="Command palette (⌘K)"><svg viewBox="0 0 24 24"><path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3z"/></svg><span class="lbl">Command</span><span class="kbd lbl">⌘K</span></button>
+    <button class="rb" id="railBtn" title="Rail labels ([)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg><span class="lbl">Collapse</span><span class="kbd lbl">[</span></button>
+  </nav>
+  <main class="screen" id="screen" tabindex="-1"></main>
+  <aside class="dock" id="dock" aria-label="Help and assistant"></aside>
+</div>
+<aside class="drawer" id="drawer" aria-label="Detail"></aside>
+<div class="scrim" id="scrim"></div>
+<div class="palette" id="palette" role="dialog" aria-label="Command palette"><input id="palIn" placeholder="Find a person, an agent, a resource, or an act…" autocomplete="off"><div class="list" id="palList"></div></div>
+<div class="toast" id="toast"></div>
+<div id="mockTag" style="position:fixed;top:10px;right:14px;z-index:15" class="open-q" title="Every name, number and date on these screens is invented for the mock-up">mock-up · sample data</div>
+
+<script>
+// ---------- Sample data. Standalone first: the built-in types work with no service connected.
+// Cambium, Aion and Manifold appear only as services that registered their own types.
+const hhmm = (plus = 0) => new Date(Date.now() + plus * 60000).toTimeString().slice(0, 5);
+let S = {
+  change: 1841, model: 'v12',
+  ids: [
+    { id: 'P-0001', kind: 'person', name: 'Tom Whiting', state: 'active', human: null, role: 'owner', file: 'P/0001', since: '19 Aug' },
+    { id: 'P-0002', kind: 'person', name: 'Dana Reyes', state: 'active', human: null, role: 'reviewer', file: 'P/0002', since: '2 Sep' },
+    { id: 'P-0003', kind: 'person', name: 'Sam Ortiz', state: 'retired', human: null, role: 'reviewer', file: 'P/0003', since: '1 Jul' },
+    { id: 'A-0007', kind: 'agent', name: 'Archie', state: 'active', human: 'P-0001', role: 'identity-lead', file: 'A/0007', since: '22 Sep' },
+    { id: 'A-0011', kind: 'agent', name: 'Waffles', state: 'active', human: 'P-0001', role: 'design-lead', file: 'A/0011', since: '22 Sep' },
+    { id: 'A-0012', kind: 'agent', name: 'Chippy', state: 'active', human: 'P-0001', role: 'verifier', file: 'A/0012', since: '22 Sep' },
+    { id: 'A-0014', kind: 'agent', name: 'Accounts assistant', state: 'active', human: 'P-0002', role: 'accounts', file: 'A/0014', since: '20 Sep' },
+    { id: 'A-0009', kind: 'agent', name: 'Weekly report writer', state: 'active', human: 'P-0003', role: 'reporter', file: 'A/0009', since: '3 Jul' },
+    { id: 'A-0003', kind: 'agent', name: 'Night builder', state: 'suspended', human: 'P-0001', role: 'builder', file: 'A/0003', since: '4 Sep' },
+    { id: 'A-0002', kind: 'agent', name: 'Old triage bot', state: 'retired', human: 'P-0001', role: 'builder', file: 'A/0002', since: '11 Aug' },
+  ],
+  roles: {
+    'owner': { title: 'Owner', resp: ['Holds the organisation\'s root authority', 'Answers for every agent registered under them'], goals: ['Agents do useful work within clear bounds'], practice: ['Grants the least that does the job'] },
+    'reviewer': { title: 'Reviewer', resp: ['Reviews plans and work before it ships'], goals: ['Nothing unreviewed reaches production'], practice: ['Reviews against the stated acceptance, not taste'] },
+    'identity-lead': { title: 'Identity lead', resp: ['Leads the identity and access product', 'Writes briefs; reviews builders\' work', 'Keeps the statement and the design in step'], goals: ['First release: sign in, register an agent, grant, revoke, refuse by name', 'A home for every agent\'s context'], practice: ['Cite the source for every claim', 'Never hold a credential value', 'Plainest thing that meets the need first'] },
+    'design-lead': { title: 'Design lead', resp: ['Owns the design method and the configuration'], goals: ['Every card fires from a reviewed brief'], practice: ['One tree, one gate, measured not attested'] },
+    'verifier': { title: 'Verifier', resp: ['Independently checks every change before it lands'], goals: ['No claim without its evidence'], practice: ['Reads the bytes, not the summary'] },
+    'accounts': { title: 'Accounts assistant', resp: ['Reconciles invoices against the ledger', 'Drafts supplier replies for a person to send'], goals: ['Month-end closed on day three'], practice: ['Never pays; proposes payments for approval'] },
+    'reporter': { title: 'Report writer', resp: ['Writes the weekly accounts summary'], goals: ['A summary every Friday'], practice: ['Reads; never changes the ledger'] },
+    'builder': { title: 'Builder', resp: ['Builds one card in its own worktree'], goals: ['Measured green, reviewed, landed'], practice: ['Runs only the checks the workflow measures'] },
+  },
+  grants: [
+    { id: 'G-1', holder: 'P-0001', rel: 'owner', obj: 'org:ablative', from: null, pass: 'human, agent', live: true },
+    { id: 'G-2', holder: 'P-0001', rel: 'owner', obj: 'project:identity', from: 'G-1', pass: 'human, agent', live: true },
+    { id: 'G-3', holder: 'A-0007', rel: 'editor', obj: 'project:identity', from: 'G-2', pass: 'not passable', live: true, lease: 'no end', used: 'today' },
+    { id: 'G-4', holder: 'A-0011', rel: 'editor', obj: 'project:identity', from: 'G-2', pass: 'agent', live: true, lease: 'no end', used: 'today' },
+    { id: 'G-5', holder: 'A-0012', rel: 'viewer', obj: 'project:identity', from: 'G-2', pass: 'not passable', live: true, lease: 'no end', used: 'today' },
+    { id: 'G-6', holder: 'P-0002', rel: 'owner', obj: 'project:accounts', from: 'G-1', pass: 'human, agent', live: true },
+    { id: 'G-7', holder: 'A-0014', rel: 'editor', obj: 'project:accounts', from: 'G-6', pass: 'not passable', live: true, lease: 'ends with assignment', used: 'yesterday' },
+    { id: 'G-8', holder: 'A-0009', rel: 'viewer', obj: 'project:accounts', from: 'G-6', pass: 'not passable', live: true, lease: 'no end', used: '19 Sep' },
+    { id: 'G-10', holder: 'P-0002', rel: 'viewer', obj: 'project:identity', from: 'G-2', pass: 'not passable', live: true, lease: 'until 30 Sep', used: 'today' },
+    { id: 'G-9', holder: 'A-0003', rel: 'editor', obj: 'project:identity', from: 'G-2', pass: 'not passable', live: true, lease: 'no end', used: '4 Sep' },
+  ],
+  // Objects. Built-in types need nothing else installed; the rest were registered by a service.
+  res: [
+    { id: 'org:ablative', type: 'organisation', name: 'ablative', parent: null },
+    { id: 'project:identity', type: 'project', name: 'identity', parent: 'org:ablative' },
+    { id: 'project:accounts', type: 'project', name: 'accounts', parent: 'org:ablative' },
+    { id: 'channel:identity', type: 'channel', name: '#identity', parent: 'project:identity' },
+    { id: 'channel:accounts', type: 'channel', name: '#accounts', parent: 'project:accounts' },
+    { id: 'workflow:card_build', type: 'workflow', name: 'card_build', parent: 'project:identity' },
+    { id: 'workflow:month_end', type: 'workflow', name: 'month_end', parent: 'project:accounts' },
+    { id: 'seat:build-1', type: 'seat', name: 'build-1', parent: 'project:identity' },
+  ],
+  services: {
+    cambium: { name: 'Cambium', status: 'enforcing', types: ['channel'], since: 'registered 22 Sep, approved by Tom Whiting', last: 'asked 312 times today, last at 17:10', note: 'Asks before every read, post and moderation.' },
+    aion: { name: 'Aion', status: 'registered', types: ['workflow'], since: 'registered 23 Sep, approved by Tom Whiting', last: 'has not asked yet', note: 'Its types are in the model, but it does not ask before acting yet. Answers about Aion are not enforced there.' },
+    manifold: { name: 'Manifold', status: 'awaiting', types: ['seat'], since: 'asked 23 Sep 16:40', last: '—', note: 'Asked to register seat and use. No check uses them until a person approves.' },
+  },
+  requests: [
+    { id: 'R-1', who: 'A-0012', rel: 'editor', obj: 'project:identity', dur: '2 hours', why: 'Land the grant card after review.', at: '17:05', state: 'waiting' },
+    { id: 'R-2', who: 'A-0014', rel: 'viewer', obj: 'project:identity', dur: '1 day', why: 'Read the invoice format in the identity spec.', at: '16:48', state: 'waiting' },
+    { id: 'R-3', who: 'A-0011', rel: 'owner', obj: 'project:identity', dur: '1 hour', why: 'Move the method folders.', at: '15:20', state: 'denied', note: 'Tom Whiting: editor is enough for that' },
+  ],
+  review: { title: 'September review', due: '30 Sep', done: {} },
+  // Sample review records for each profile version; the start checks read these, never infer them.
+  reviews: { 'A-0007': 'v7 reviewed by Tom Whiting, 22 Sep', 'A-0011': 'v4 reviewed by Tom Whiting, 20 Sep', 'A-0012': 'v3 reviewed by Tom Whiting, 19 Sep', 'A-0014': 'v2 reviewed by Dana Reyes, 18 Sep', 'A-0003': 'v2 reviewed by Tom Whiting, 4 Sep' },
+  prov: {
+    'A-0007': { ver: 'v7', model: 'claude-opus-5-5', tools: ['Read', 'Edit', 'Bash (worktree only)', 'Web search'], skills: ['design-system briefs', 'code review'], mcp: ['identity (this service)', 'git host'], prompt: 'You are Archie, identity lead. You answer to Tom Whiting. Cite a source for every claim…', cwd: '~/work/identity', env: ['LANG', 'DS2_METHOD'] },
+    'A-0011': { ver: 'v4', model: 'claude-opus-5-5', tools: ['Read', 'Edit', 'Bash'], skills: ['design-system briefs'], mcp: ['identity (this service)'], prompt: 'You are Waffles, design lead…', cwd: '~/work/design', env: ['LANG'] },
+    'A-0012': { ver: 'v3', model: 'claude-opus-5-5', tools: ['Read', 'Bash (read-only)'], skills: ['verification'], mcp: ['identity (this service)'], prompt: 'You are Chippy, verifier…', cwd: '~/work/verify', env: ['LANG'] },
+    'A-0003': { ver: 'v2', model: 'claude-sonnet-5', tools: ['Read', 'Edit', 'Bash (worktree only)'], skills: ['code review'], mcp: ['git host'], prompt: 'You are the night builder. You build one card in its own worktree…', cwd: '~/work/cards', env: ['LANG'] },
+    'A-0014': { ver: 'v2', model: 'claude-sonnet-5', tools: ['Read', 'Spreadsheet'], skills: ['reconciliation'], mcp: ['accounting system'], prompt: 'You are the accounts assistant for Dana Reyes. You never pay…', cwd: '~/work/accounts', env: ['LANG'] },
+    'A-0009': { ver: 'v1', model: 'claude-sonnet-5', tools: ['Read'], skills: ['summaries'], mcp: ['accounting system'], prompt: 'You write the weekly accounts summary…', cwd: '~/work/reports', env: ['LANG'] },
+  },
+  memory: {
+    'A-0007': [
+      { t: 'Tom wants plain wording: a refusal says the reason and the fix, never the escape.', src: 'conversation, 16 Sep', kind: 'obs', seen: 'only me' },
+      { t: 'The identity product is HR for agents: "cyborg relations".', src: 'statement, 22 Sep', kind: 'obs', seen: 'identity team' },
+      { t: 'Tom prefers the simplest thing first; crypto and receipts when asked.', src: 'inferred from corrections, 22 Sep', kind: 'inf', seen: 'only me' },
+    ],
+  },
+  sealed: { 'A-0007': 2, 'A-0011': 1, 'A-0012': 0, 'A-0014': 1 },
+  handles: {
+    'A-0007': [{ name: 'model-access', note: '3 accounts behind one handle, next in turn', lease: 'no end', uses: '—', age: '31 days', rot: 'rotated 23 Aug' }, { name: 'git-host', note: 'OAuth, refreshed by the service', lease: '7 days', uses: '41 this week', age: '2 hours', rot: 'refreshed hourly' }],
+    'A-0011': [{ name: 'model-access', note: '3 accounts behind one handle', lease: 'no end', uses: '—', age: '31 days', rot: 'rotated 23 Aug' }],
+    'A-0012': [{ name: 'model-access', note: '3 accounts behind one handle', lease: 'no end', uses: '—', age: '31 days', rot: 'rotated 23 Aug' }],
+    'A-0014': [{ name: 'accounting-api', note: 'static key, used through the proxy, never read', lease: '30 days, $50 spend cap', uses: '12', age: '212 days', rot: 'never rotated', stale: true }],
+    'A-0009': [{ name: 'accounting-api', note: 'read-only key, through the proxy', lease: '30 days', uses: '3', age: '64 days', rot: 'rotated 20 Jul' }],
+  },
+  sessions: [
+    { who: 'A-0007', where: 'this Mac', runtime: 'local launcher', started: '16:34', status: 'running', ctx: 'profile v7, 3 memories, statement' },
+    { who: 'A-0011', where: 'this Mac', runtime: 'local launcher', started: '16:05', status: 'running', ctx: 'profile v4' },
+    { who: 'A-0012', where: 'build box', runtime: 'workflow engine', started: '16:45', status: 'running', ctx: 'profile v3' },
+    { who: 'A-0003', where: 'laptop 2', runtime: 'local launcher', started: '13:40', status: 'stop unconfirmed', ctx: 'profile v2' },
+  ],
+  history: {
+    'A-0007': [['22 Sep 17:16', 'registered by Tom Whiting from a brief'], ['22 Sep 17:16', 'provisioned: profile v1'], ['22 Sep 17:17', 'activated'], ['23 Sep 16:27', 'role changed to identity lead'], ['23 Sep 16:30', 'profile v7: added design-system briefs skill']],
+  },
+};
+
+// The model: each type, where it comes from, and which relations give each permission.
+const V = ['viewer', 'editor', 'owner'], E = ['editor', 'owner'], O = ['owner'];
+const TYPES = {
+  organisation: { from: 'built-in', rel: 'owner', perm: { administer: O } },
+  project: { from: 'built-in', rel: 'owner, editor, viewer; in an organisation', perm: { view: V, edit: E, grant: O } },
+  person: { from: 'built-in', rel: 'member of an organisation', perm: {} },
+  agent: { from: 'built-in', rel: 'responsible person (for life)', perm: {} },
+  role: { from: 'built-in', rel: 'holder', perm: {} },
+  credential: { from: 'built-in', rel: 'handle holder; issuer', perm: {} },
+  channel: { from: 'cambium', rel: 'in a project', perm: { read: V, post: E, moderate: O } },
+  workflow: { from: 'aion', rel: 'in a project', perm: { view: V, start: E, cancel: O } },
+  seat: { from: 'manifold', rel: 'in a project', perm: { use: E } },
+};
+const RELWORD = { viewer: 'viewers', editor: 'editors', owner: 'owners' };
+const svcOf = r => TYPES[r.type].from;
+const status = svc => svc === 'built-in' ? 'enforcing' : S.services[svc].status;
+const svcName = svc => svc === 'built-in' ? 'This service' : S.services[svc].name;
+const inModel = r => status(svcOf(r)) !== 'awaiting';
+
+const byId = id => S.ids.find(x => x.id === id);
+const nameOf = id => (byId(id) || {}).name || id;
+const resById = id => S.res.find(r => r.id === id);
+const resName = id => { const r = resById(id); return r ? (r.type === 'project' || r.type === 'organisation' ? id : r.name) : id; };
+const grantById = id => S.grants.find(g => g.id === id);
+const grantsOf = id => S.grants.filter(g => g.holder === id);
+const ancestors = r => { const o = []; let c = r.type === 'project' || r.type === 'organisation' ? r : resById(r.parent); while (c) { o.push(c.id); c = c.parent ? resById(c.parent) : null; } return o; };
+function standing(g) {
+  const h = byId(g.holder);
+  if (!g.live) return { ok: false, kind: 'grant revoked', why: `grant ${g.id} was revoked at ${g.revokedAt}` };
+  if (h.state === 'registered') return { ok: false, kind: 'identity not active', why: `${h.name} is registered, not yet active` };
+  if (h.state === 'suspended') return { ok: false, kind: 'identity not active', why: `${h.name} is suspended`, open: true };
+  if (h.state === 'retired') return { ok: false, kind: 'identity not active', why: `${h.name} is retired` };
+  if (g.from) { const up = grantById(g.from); const s = standing(up); if (!s.ok) return { ok: false, kind: 'authority withdrawn upstream', why: `it derives from ${up.id}, held by ${nameOf(up.holder)}, which no longer stands (${s.why})` }; }
+  return { ok: true };
+}
+const chainOf = g => { const o = []; let c = g; while (c) { o.unshift(c); c = c.from ? grantById(c.from) : null; } return o; };
+function can(id, perm, resId) {
+  const x = byId(id), r = resById(resId), allowed = TYPES[r.type].perm[perm] || [];
+  const out = { id, perm, res: resId, t: hhmm(), change: S.change, model: S.model, svc: svcOf(r) };
+  if (!inModel(r)) return { ...out, ok: false, kind: 'type not approved', why: `${svcName(svcOf(r))} has not been approved to register ${r.type}, so the model has no ${r.type}` };
+  const anc = ancestors(r);
+  const gs = grantsOf(id).filter(g => anc.includes(g.obj) && allowed.includes(g.rel));
+  if (!gs.length) return { ...out, ok: false, kind: 'no grant', why: `${x.name} holds no grant that gives ${perm} on ${r.name}. ${perm} needs ${allowed.map(a => RELWORD[a]).join(' or ')} of ${anc[0]}` };
+  const good = gs.find(g => standing(g).ok);
+  if (!good) { const s = standing(gs[0]); return { ...out, ok: false, kind: s.kind, why: s.why, open: s.open }; }
+  return { ...out, ok: true, cond: good.cond, grant: good.id, chain: chainOf(good), via: anc[0] !== r.id ? `${r.name} is in ${anc[0]}` : '', rule: `${perm} needs ${allowed.map(a => RELWORD[a]).join(' or ')}` };
+}
+const permsOf = r => Object.keys(TYPES[r.type].perm);
+function reach(id) {
+  return S.res.filter(inModel).map(r => ({ r, ps: permsOf(r).map(p => can(id, p, r.id)).filter(c => c.ok) })).filter(e => e.ps.length);
+}
+function whoCan(resId) {
+  const r = resById(resId);
+  return S.ids.map(x => ({ x, ps: permsOf(r).map(p => can(x.id, p, resId)).filter(c => c.ok) })).filter(e => e.ps.length);
+}
+const orphans = () => S.ids.filter(a => a.kind === 'agent' && a.state !== 'retired' && a.human && byId(a.human).state !== 'active');
+const bump = () => ++S.change;
+
+// ---------- Shell preferences, as the Aion console has them.
+const pref = (k, d) => { try { return localStorage.getItem('iam.' + k) || d; } catch { return d; } };
+const setPref = (k, v) => { try { localStorage.setItem('iam.' + k, v); } catch {} };
+function applyShell() {
+  document.getElementById('shell').classList.toggle('dock-right', pref('dock', 'left') === 'right');
+  document.getElementById('rail').classList.toggle('open', pref('labels', 'icons') === 'labels');
+}
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let rows = [], cursor = 0, filterKind = 'all';
+const svcTag = svc => `<span class="svc ${svc}">${svc === 'built-in' ? 'built in' : esc(S.services[svc].name)}</span>`;
+const enfTag = svc => { const s = status(svc); return `<span class="enf ${s}">${s === 'enforcing' ? '● enforced' : s === 'registered' ? '◐ in the model, not enforced' : '○ awaiting approval'}</span>`; };
+const pillFor = (id, extra = '') => { const x = byId(id); return `<a class="pill ${x.kind === 'person' ? 'human' : ''} ${extra}" href="#/file/${id}" style="text-decoration:none">${esc(x.name)}</a>`; };
+const chainHtml = ch => `<span class="chain">${ch.map((c, i) => `${i ? '<span class="arr">→</span>' : ''}<span class="pill ${byId(c.holder).kind === 'person' ? 'human' : ''} ${standing(c).ok ? '' : 'off'}">${esc(nameOf(c.holder))} · ${c.rel} of ${c.obj}</span>`).join('')}</span>`;
+</script>
+<script>
+// ---------- More of the frame: teams, found agents, outward connections, acts awaiting a person, rules.
+Object.assign(S, {
+  teams: [
+    { id: 'T-1', name: 'Identity', members: ['P-0001', 'A-0007', 'A-0011', 'A-0012'], note: 'Owns project:identity' },
+    { id: 'T-2', name: 'Accounts', members: ['P-0002', 'A-0014', 'A-0009'], note: 'Owns project:accounts' },
+  ],
+  found: [
+    { where: 'laptop 2', runtime: 'local launcher', seen: 'today 15:02', what: 'a session with no identity, using the git-host token of a person', guess: 'a builder' },
+    { where: 'build box', runtime: 'workflow engine', seen: '21 Sep', what: 'a scheduled job calling the accounting API with an old key', guess: 'a report writer' },
+  ],
+  outward: [
+    { name: 'Git host', kind: 'OAuth app', used: ['A-0007'], how: 'short-lived tokens, refreshed here', scopes: 'repo read and write on 3 repositories' },
+    { name: 'Accounting system', kind: 'API key', used: ['A-0014', 'A-0009'], how: 'key stays here; calls go through the proxy', scopes: 'read ledger; draft payments' },
+    { name: 'Model access', kind: 'accounts pool', used: ['A-0007', 'A-0011', 'A-0012'], how: '3 accounts behind one handle', scopes: 'per-agent spend caps' },
+    { name: 'Docs MCP server', kind: 'MCP server', used: ['A-0007', 'A-0011'], how: 'token exchanged per call', scopes: 'per tool: search, read (write not granted)' },
+  ],
+  acts: [
+    { id: 'Q-1', who: 'A-0014', act: 'Send a payment proposal of $4,180 to a supplier', why: 'Invoice 2291 is matched and due Friday.', at: '16:52', state: 'waiting' },
+    { id: 'Q-2', who: 'A-0007', act: 'Delete the stale branch card/IDENTITY-001', why: 'Landed on main at 14:10.', at: '16:10', state: 'approved', note: 'Tom Whiting, once' },
+  ],
+  rules: [
+    { t: 'Whoever proposes a payment may not approve it', kind: 'separation of duties', breaches: 0 },
+    { t: 'No agent holds owner of anything', kind: 'standing rule', breaches: 0 },
+    { t: 'Temporary access is at most 8 hours', kind: 'limit (example value, proposed)', breaches: 0 },
+  ],
+  budget: { 'A-0007': [118, 300], 'A-0011': [64, 300], 'A-0012': [41, 150], 'A-0014': [9, 50], 'A-0009': [2, 20] },
+});
+// An ordinary application, not one of ours, joins the same way the others do.
+S.services.invoicing = { name: 'Invoicing app', status: 'enforcing', types: ['invoice'], since: 'registered 18 Sep, approved by Dana Reyes', last: 'asked 40 times today, last at 16:58' };
+TYPES.invoice = { from: 'invoicing', rel: 'in a project', perm: { view: V, approve: O } };
+S.res.push({ id: 'invoice:2291', type: 'invoice', name: 'invoice 2291', parent: 'project:accounts' });
+Object.assign(S.services.cambium, { signin: 'people sign in through this service', ident: 'service identity, short-lived token', ver: 'v12' });
+Object.assign(S.services.aion, { signin: 'not set up', ident: 'service identity, short-lived token', ver: 'v11: behind' });
+Object.assign(S.services.manifold, { signin: 'not set up', ident: 'proposed', ver: '—' });
+Object.assign(S.services.invoicing, { signin: 'people sign in through this service', ident: 'API client, rotated monthly', ver: 'v12' });
+S.maint = { 'A-0007': 'P-0001', 'A-0011': 'P-0001', 'A-0012': 'P-0001', 'A-0014': 'P-0002', 'A-0009': 'P-0002', 'A-0003': 'P-0001', 'A-0002': 'P-0001' };
+grantById('G-7').cond = 'weekdays, 8am to 6pm, needs the time of the request';
+S.sessions.forEach(s => s.forWho = s.who === 'A-0014' ? 'Dana Reyes' : s.who === 'A-0003' ? '—' : 'Tom Whiting');
+
+// ---------- People and agents
+function viewPeople() {
+  if (filterKind === 'teams') return viewTeams();
+  if (filterKind === 'found') return viewFound();
+  const list = S.ids.filter(x => filterKind === 'all' || x.kind === filterKind);
+  rows = list.map(x => '#/file/' + x.id);
+  cursor = Math.min(cursor, Math.max(0, rows.length - 1));
+  return `<div class="page">${peopleHead()}
+    <table><thead><tr><th>Name</th><th>Kind</th><th>Role</th><th>State</th><th>Answers to</th><th>Reaches</th><th>Sessions</th><th>Since</th></tr></thead>
+    <tbody>${list.map((x, i) => {
+      const r = reach(x.id).length, ss = S.sessions.filter(s => s.who === x.id), unc = ss.filter(s => s.status !== 'running').length;
+      const h = x.human && byId(x.human), orphan = h && h.state !== 'active' && x.state !== 'retired';
+      return `<tr class="${i === cursor ? 'cursor' : ''}" data-href="#/file/${x.id}">
+        <td>${esc(x.name)}</td><td><span class="kind ${x.kind}">${x.kind}</span></td>
+        <td class="sec">${esc(S.roles[x.role].title)}</td>
+        <td><span class="dot s-${x.state}"></span>${x.state}</td>
+        <td class="sec">${h ? esc(h.name) + (orphan ? ` <span style="color:var(--warn)">(${h.state})</span>` : '') : '<span class="dim">—</span>'}</td>
+        <td class="mono">${r} ${r === 1 ? 'resource' : 'resources'}</td>
+        <td class="mono">${ss.length - unc}${unc ? ` <span style="color:var(--warn)">+${unc} unconfirmed</span>` : ''}</td>
+        <td class="dim">${x.since}</td></tr>`; }).join('')}</tbody></table></div>`;
+}
+function peopleHead() {
+  const f = [['all', 'All'], ['person', 'People'], ['agent', 'Agents'], ['teams', 'Teams'], ['found', `Found <span class="mono" style="color:var(--warn)">${S.found.length}</span>`]];
+  return `<div class="head"><div><div class="eyebrow">Directory</div><h1>People and agents</h1>
+      <p class="sub">Everyone who works here, human or not. Every agent answers to a person.</p></div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <div class="seg">${f.map(([k, l]) => `<button data-kind="${k}" class="${filterKind === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+      <button class="btn primary" data-act="commission">Register an agent</button></div></div>`;
+}
+function viewTeams() {
+  rows = [];
+  return `<div class="page">${peopleHead()}
+    <table><thead><tr><th>Team</th><th>Members</th><th>What it owns</th></tr></thead><tbody>
+    ${S.teams.map(t => `<tr><td>${esc(t.name)}</td><td>${t.members.map(m => pillFor(m)).join('')}</td><td class="sec">${esc(t.note)}</td></tr>`).join('')}
+    </tbody></table><p class="note" style="margin-top:10px">A team can answer for an agent together, and can hold access that its members inherit.</p></div>`;
+}
+function viewFound() {
+  rows = [];
+  return `<div class="page">${peopleHead()}
+    <div class="empty-note" style="margin-bottom:14px">Seen by a runtime or a connection, but not in the directory. Nothing here holds access of its own; each one is using someone else's.</div>
+    <table><thead><tr><th>Where</th><th>Runtime</th><th>Last seen</th><th>What was seen</th><th></th></tr></thead><tbody>
+    ${S.found.map((f, i) => `<tr><td>${f.where}</td><td class="sec">${f.runtime}</td><td class="mono">${f.seen}</td><td class="sec" style="white-space:normal">${esc(f.what)}</td><td><button class="btn" data-act="commission" data-guess="${esc(f.guess)}">Register</button> <a href="#" data-act="toast" data-t="Marked as not ours; the connection owner is told" class="dim">Not ours</a></td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+// ---------- The file: one identity's whole record, by section, each section its own address.
+const TABS = [['profile', 'Role'], ['access', 'Access'], ['provisioning', 'Provisioning'], ['memory', 'Memory and context'], ['credentials', 'Credentials'], ['sessions', 'Sessions'], ['record', 'Record']];
+const ACTIONS = { registered: ['activate', 'retire'], active: ['suspend', 'retire'], suspended: ['reinstate', 'retire'], retired: [] };
+let lastCheck = null;
+
+function viewFile(id, tab) {
+  const x = byId(id); if (!x) return `<div class="page"><h1>Not found</h1><p class="sub">${esc(id)} is not in the directory.</p></div>`;
+  rows = []; tab = tab || 'profile';
+  const count = { access: grantsOf(id).length, memory: (S.memory[id] || []).length + (S.sealed[id] || 0), credentials: (S.handles[id] || []).length, sessions: S.sessions.filter(s => s.who === id).length };
+  const body = { profile: tabProfile, access: tabAccess, provisioning: tabProv, memory: tabMemory, credentials: tabCreds, sessions: tabSessions, certificate: typeof tabCert === 'function' ? tabCert : () => '', record: tabRecord }[tab](x);
+  const h = x.human && byId(x.human);
+  return `<div class="page">
+    <div class="eyebrow"><a href="#/people">People and agents</a> / ${x.file}</div>
+    <div class="file" data-tab="${x.kind} file · ${x.file}">
+      <div class="head">
+        <div><h1 style="font-size:24px;margin-top:0">${esc(x.name)}</h1>
+          <div class="sec">${esc(S.roles[x.role].title)}${h ? ` · answers to ${pillFor(h.id)}${h.state !== 'active' ? ` <span style="color:var(--warn)">${h.state}: needs a new person</span>` : ''}` : ''} <span class="dim">· since ${x.since}</span></div></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="state ${x.state}" id="state">${x.state}</span>
+          ${ACTIONS[x.state].map(a => `<button class="btn ${a === 'suspend' || a === 'retire' ? 'danger' : 'primary'}" data-act="${a}" data-id="${x.id}">${a[0].toUpperCase() + a.slice(1)}</button>`).join('')}
+          ${x.kind === 'agent' && x.state === 'active' ? `<button class="btn danger" data-act="stop" data-id="${x.id}" title="Revoke its tokens and ask every runtime to end its sessions">Emergency stop</button>` : ''}
+        </div>
+      </div>
+      <nav class="tabs">${TABS.map(([k, l]) => `<a href="#/file/${id}/${k}" class="${tab === k ? 'on' : ''}">${l}${count[k] !== undefined ? `<span class="n">${count[k]}</span>` : ''}</a>`).join('')}</nav>
+      ${body}
+    </div></div>`;
+}
+
+function tabProfile(x) {
+  const r = S.roles[x.role];
+  return `<div class="grid2"><div>
+      <div class="card"><h2>Responsibilities</h2><ul class="plain">${r.resp.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>
+      <div class="card"><h2>Goals</h2><ul class="plain">${r.goals.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>
+      <div class="card"><h2>Professional practice</h2><ul class="plain">${r.practice.map(t => `<li>${esc(t)}</li>`).join('')}</ul><div class="note" style="margin-top:6px">Rendered into the agent's instructions as part of its profile.</div></div>
+    </div><div>
+      <div class="card"><dl class="facts">
+        <dt>Kind</dt><dd><span class="kind ${x.kind}">${x.kind}</span></dd>
+        <dt>Role</dt><dd><a href="#/roles">${esc(r.title)}</a></dd>
+        <dt>Answers to</dt><dd>${x.human ? `${pillFor(x.human)} <span class="note">decides renewal and retirement; a transfer is its own act</span>` : '<span class="dim">A person answers for themselves</span>'}</dd>
+        ${S.maint[x.id] ? `<dt>Maintained by</dt><dd>${pillFor(S.maint[x.id])} <span class="note">may change its configuration; answering for it is separate</span></dd>` : ''}
+        <dt>Teams</dt><dd>${S.teams.filter(t => t.members.includes(x.id)).map(t => `<span class="pill">${esc(t.name)}</span>`).join('') || '<span class="dim">none</span>'}</dd>
+        <dt>State</dt><dd>${x.state} <span class="note">· authority only; it does not say anything is running</span></dd>
+      </dl></div>
+      ${x.kind === 'person' ? `<div class="card"><h2>Agents answering to ${esc(x.name.split(' ')[0])}</h2>${S.ids.filter(a => a.human === x.id).map(a => `<div class="row"><a href="#/file/${a.id}" style="text-decoration:none">${esc(a.name)}</a><span><span class="dot s-${a.state}"></span><span class="dim">${a.state}</span></span></div>`).join('') || '<div class="dim">None yet.</div>'}</div>` : ''}
+    </div></div>`;
+}
+
+function grantCard(g, withRevoke) {
+  const s = standing(g), x = byId(g.holder);
+  return `<div class="card" style="${s.ok ? '' : 'opacity:.72'}">
+    <div class="row" style="padding:0"><span class="mono"><b style="color:var(--accent);font-weight:500">${g.rel}</b> of ${g.obj}</span>${s.ok ? '<span class="dot s-active" title="stands"></span>' : '<span class="verdict-mark no" style="font-size:9px;padding:1px 6px">void</span>'}</div>
+    <div style="margin-top:8px">${chainHtml(chainOf(g))}</div>
+    <div class="note" style="margin-top:6px;display:flex;gap:14px;flex-wrap:wrap"><span>Passable: ${g.pass}</span>${g.lease ? `<span>Lasts: ${g.lease}</span>` : ''}${g.used ? `<span>Last used: ${g.used}</span>` : ''}${g.cond ? `<span>When: ${esc(g.cond)}</span>` : ''}<span class="mono">${g.id}</span>${withRevoke && g.live && x.state !== 'retired' ? `<a href="#" data-act="revoke" data-g="${g.id}" style="color:var(--danger)">Revoke</a>` : ''}</div>
+    ${s.ok ? '' : `<div class="note" style="color:var(--danger);margin-top:4px">${esc(s.why)}${s.open ? ' <span class="open-q">what suspension refuses: open</span>' : ''}</div>`}
+    ${g.live ? '' : revocationView(g)}</div>`;
+}
+// After a revoke, the policy change and each service's own checks are told apart.
+function revocationView(g) {
+  const under = S.res.filter(r => ancestors(r).includes(g.obj) && r.type !== 'project' && r.type !== 'organisation');
+  const svcs = [...new Set(under.map(svcOf))];
+  return `<div class="card" style="margin-top:8px;background:var(--surface-default)"><div class="note">Policy changed at ${g.revokedAt}, change ${g.revokedChg}. Every check from here on refuses.</div>
+    ${svcs.map(sv => `<div class="row" style="padding:5px 0"><span>${svcTag(sv)}</span><span class="note">${status(sv) === 'enforcing' ? `asks with change ${g.revokedChg} or later, so its next check refuses` : status(sv) === 'registered' ? 'does not ask yet: nothing refuses there' : 'not in the model'}</span></div>`).join('')}
+    <div class="note">Calls already admitted before the change: <span class="open-q">to design</span></div></div>`;
+}
+
+function tabAccess(x) {
+  const gs = grantsOf(x.id), rs = reach(x.id);
+  return `<div class="grid2"><div>
+    <div class="section-h" style="margin-top:0"><span>Grants</span><span class="open-q" title="The grant representation is not yet decided">draft form</span></div>
+    ${gs.map(g => grantCard(g, true)).join('') || '<div class="dim">No grants.</div>'}
+    ${x.kind === 'agent' && x.state !== 'retired' ? `<div style="margin-top:12px;display:flex;gap:8px"><button class="btn" data-act="grant" data-id="${x.id}">Grant access</button><button class="btn" data-act="toast" data-t="Temporary access goes through Requests, approved by the person it traces to">Temporary access…</button></div>` : ''}
+    </div><div>
+    <div class="section-h" style="margin-top:0"><span>What ${esc(x.name.split(' ')[0])} can reach</span><a href="#/access/reach/${x.id}" class="note" style="letter-spacing:0;text-transform:none">open in Access</a></div>
+    <div class="card">${reachTable(rs)}</div>
+    ${checkBox(x)}
+    </div></div>`;
+}
+function reachTable(rs) {
+  return rs.length ? `<table><tbody>${rs.map(e => `<tr data-href="#/resources/${e.r.id}"><td>${esc(e.r.type === 'project' || e.r.type === 'organisation' ? e.r.id : e.r.name)}</td><td>${svcTag(svcOf(e.r))}</td><td class="mono">${e.ps.map(c => c.perm).join(', ')}</td><td>${status(svcOf(e.r)) === 'enforcing' ? '' : '<span class="enf registered">not enforced</span>'}</td></tr>`).join('')}</tbody></table>` : '<div class="dim">Nothing.</div>';
+}
+function checkBox(x) {
+  const opts = S.res.filter(inModel);
+  return `<div class="check"><h2>Can ${esc(x.name.split(' ')[0])} do this?</h2>
+    <div class="q" style="margin-top:10px">
+      <select id="cRes" data-act-change="perms">${opts.map(r => `<option value="${r.id}" ${r.id === 'channel:identity' ? 'selected' : ''}>${esc(r.type === 'project' || r.type === 'organisation' ? r.id : r.name + ' (' + r.type + ')')}</option>`).join('')}</select>
+      <select id="cPerm">${permsOf(resById('channel:identity')).map(p => `<option ${p === 'post' ? 'selected' : ''}>${p}</option>`).join('')}</select>
+      <button class="btn" data-act="check" data-id="${x.id}">Check <span class="kbd">c</span></button></div>
+    <div class="answer-box" id="answer">${lastCheck && lastCheck.id === x.id ? answerHtml(lastCheck, false) : '<span class="note">The answer shows the path to a person, or the reason it is refused, and which version of the model it used.</span>'}</div></div>`;
+}
+function answerHtml(c, land) {
+  const head = c.ok ? `<div class="answer"><span class="verdict-mark ${c.cond ? '' : 'yes'} ${land ? 'land' : ''}" style="${c.cond ? 'color:var(--warn)' : ''}">${c.cond ? 'Yes, if' : 'Yes'}</span>${c.cond ? `<span class="why">${esc(c.cond)}.</span>` : ''}<span class="why">${esc(c.rule)}. ${esc(c.via)}</span></div><div style="margin-top:8px">${chainHtml(c.chain)}</div>`
+    : `<div class="answer"><span class="verdict-mark no ${land ? 'land' : ''}">No</span><span class="tag">${esc(c.kind || '')}</span><span class="why">${esc(c.why)}.${c.open ? ' <span class="open-q">what suspension refuses: open</span>' : ''}</span></div>`;
+  const enf = status(c.svc);
+  return head + `<div class="meta-line"><span>model ${c.model}</span><span>change ${c.change}</span><span>checked ${c.t}</span><span>${svcTag(c.svc)} ${enf === 'enforcing' ? 'asks before acting' : enf === 'registered' ? 'does not ask yet: this answer is not enforced there' : ''}</span></div>`;
+}
+
+function tabProv(x) {
+  const p = S.prov[x.id]; if (!p) return '<div class="dim">A person has no provisioning profile. Their own tools are their own.</div>';
+  const b = S.budget[x.id];
+  return `<div class="grid2"><div>
+    <div class="card"><div class="row" style="padding:0 0 6px"><h2>Profile <span class="ver">${p.ver}</span></h2><span class="note">Versioned. Every change is reviewable and can be rolled back.</span></div>
+      <dl class="facts"><dt>Model access</dt><dd class="mono">${p.model}</dd>
+      <dt>Tools</dt><dd>${p.tools.map(t => `<span class="pill">${esc(t)}</span>`).join('')}</dd>
+      <dt>Skills</dt><dd>${p.skills.map(t => `<span class="pill">${esc(t)}</span>`).join('')}</dd>
+      <dt>MCP servers</dt><dd>${p.mcp.map(t => `<span class="pill">${esc(t)}</span>`).join('')}</dd>
+      <dt>Environment</dt><dd class="mono dim">${p.env.join(', ')} <span class="note">names only; values by handle</span></dd>
+      ${b ? `<dt>Spend this month</dt><dd><span class="mono">$${b[0]} of $${b[1]}</span> <span class="sealed" style="width:80px;background:linear-gradient(90deg,var(--accent) ${Math.round(b[0] / b[1] * 100)}%,#0a0a0d 0)"></span></dd>` : ''}</dl></div>
+    <div class="card"><h2>Instructions</h2><div class="code">${esc(p.prompt)}\n\n<span class="k">+ role</span> responsibilities, goals, practice\n<span class="k">+ context</span> selected at session start (see Memory and context)</div>
+      <div class="note" style="margin-top:6px">A sentence in a prompt cannot grant or withhold access. A restriction the runtime cannot enforce is flagged here before provisioning.</div></div>
+    </div><div>
+    <div class="card"><h2>Render for a runtime</h2><div class="seg" style="margin:4px 0 10px"><button class="on">Local launcher</button><button>Workflow engine</button><button>Your own</button></div>
+      <div class="code"><span class="k">cwd</span>      ${esc(p.cwd)}
+<span class="k">model</span>    ${p.model}
+<span class="k">prompt</span>   profile ${p.ver} + role + context
+<span class="k">mcp</span>      ${p.mcp.length} servers, rendered config
+<span class="k">env</span>      ${p.env.join(' ')}
+<span class="k">secrets</span>  by handle: ${(S.handles[x.id] || []).map(h => h.name).join(', ') || 'none'}</div>
+      <div class="note" style="margin-top:6px">A command template, not a new protocol. Whichever runtime starts the agent takes it; the identity stays the same on any of them.</div></div>
+  </div></div>`;
+}
+
+function tabMemory(x) {
+  const m = S.memory[x.id] || [];
+  return `<div class="grid2"><div>
+    <div class="section-h" style="margin-top:0"><span>Memories</span><span class="note" style="letter-spacing:0;text-transform:none">where each came from, and who can see it</span></div>
+    <div class="card">${m.map(e => `<div class="mem"><div>${esc(e.t)}</div><div class="meta"><span class="tag ${e.kind}">${e.kind === 'obs' ? 'observed' : 'inferred'}</span><span>${esc(e.src)}</span><span>seen by ${esc(e.seen)}</span><a href="#" data-act="toast" data-t="Correcting keeps the original and records the correction">Correct</a><a href="#" data-act="toast" data-t="Retired memories stay in the record, out of context">Retire</a></div></div>`).join('') || '<div class="dim">No memories yet.</div>'}</div>
+    <div class="note" style="margin-top:8px">Session notes never become shared knowledge by default.</div>
+    </div><div>
+    <div class="card"><h2>The home</h2><dl class="facts">
+      <dt>Transcripts</dt><dd>${x.kind === 'agent' ? '14 sessions, sealed' : '—'} <span class="sealed" style="width:60px"></span></dd>
+      <dt>Sealed records</dt><dd>${S.sealed[x.id] || 0} <span class="note">read by name, one record line each</span></dd>
+      <dt>Configuration</dt><dd>${S.prov[x.id] ? 'profile ' + S.prov[x.id].ver : '—'}</dd>
+      <dt>On any device</dt><dd class="sec">the same agent: a new session pulls its home down</dd></dl></div>
+    <div class="card"><h2>Last context given</h2><div class="sec">${esc((S.sessions.find(s => s.who === x.id) || {}).ctx || 'No session yet.')}</div>
+      <div class="note" style="margin-top:6px">What was included, summarised or left out, with exact versions, so a session can be explained later.</div></div>
+  </div></div>`;
+}
+
+function tabCreds(x) {
+  const hs = S.handles[x.id] || [];
+  return `<div class="card"><div class="row" style="padding:0 0 6px"><h2>Handles</h2><span class="note">An agent holds a handle, never the credential. Dropping the handle ends its use.</span></div>
+    <table><thead><tr><th>Handle</th><th>Behind it</th><th>Value</th><th>Lease</th><th>Use</th><th></th></tr></thead><tbody>
+    ${hs.map(h => `<tr><td class="mono">${h.name}</td><td class="sec">${esc(h.note)}</td><td><span class="sealed" style="width:90px"></span></td><td class="sec">${h.lease}</td><td class="mono">${h.uses}</td><td><a href="#" data-act="toast" data-t="Handle dropped. Calls already in flight: open" style="color:var(--danger)">Drop</a></td></tr>`).join('') || '<tr><td colspan="6" class="dim">No handles. An agent can be active with nothing to hold.</td></tr>'}
+    </tbody></table></div>`;
+}
+
+function sessionRow(s, withWho) {
+  return `<tr ${withWho ? `data-href="#/file/${s.who}/sessions"` : ''}>${withWho ? `<td>${esc(nameOf(s.who))}</td>` : ''}<td>${s.where}</td><td class="sec">${s.runtime}</td><td class="sec">${s.forWho}</td><td class="mono">${s.started}</td><td>${s.status === 'running' ? '<span class="dot s-active"></span>running' : `<span class="dot s-suspended"></span><span style="color:var(--warn)">${s.status}</span>`}</td>${withWho ? '' : `<td class="sec">${esc(s.ctx)}</td>`}</tr>`;
+}
+function tabSessions(x) {
+  const ss = S.sessions.filter(s => s.who === x.id);
+  return `<div class="card"><div class="row" style="padding:0 0 6px"><h2>Sessions</h2><span class="note">As the runtimes report them. Stopped only when the runtime confirms it.</span></div>
+    <table><thead><tr><th>Where</th><th>Runtime</th><th>Acting for</th><th>Started</th><th>Status</th><th>Context given</th></tr></thead><tbody>
+    ${ss.map(s => sessionRow(s, false)).join('') || '<tr><td colspan="6" class="dim">No sessions.</td></tr>'}
+    </tbody></table></div>`;
+}
+
+function tabRecord(x) {
+  const h = S.history[x.id] || [['—', 'registered']];
+  return `<div class="grid2"><div><div class="card"><h2>Lifecycle</h2>
+      <div class="sec" style="margin-bottom:10px">registered → active ⇄ suspended → retired</div>
+      <div class="timeline">${h.map(([w, t], i) => `<div class="tl ${i === h.length - 1 ? 'now' : ''}"><div class="when">${w}</div><div>${esc(t)}</div></div>`).join('')}</div></div></div>
+    <div><div class="card"><h2>Evidence</h2><div class="sec">Every change to this file is kept as an append-only entry, for when you need it.</div></div></div></div>`;
+}
+
+// ---------- Roles and templates
+function viewRoles() {
+  rows = [];
+  const pkg = { 'identity-lead': 'editor of project:identity', 'design-lead': 'editor of project:identity', 'verifier': 'viewer of project:identity', 'accounts': 'editor of project:accounts', 'reporter': 'viewer of project:accounts', 'builder': 'editor of one project, 8 hours' };
+  return `<div class="page"><div class="eyebrow">Directory</div><h1>Roles</h1><p class="sub">A role is a job description and a template: responsibilities, goals and practice, the profile a new agent starts from, and the access it usually needs.</p>
+    <table><thead><tr><th>Role</th><th>Responsibilities</th><th>Usual access</th><th>Held by</th></tr></thead><tbody>
+    ${Object.entries(S.roles).map(([k, r]) => `<tr><td>${esc(r.title)}</td><td class="sec" style="white-space:normal">${esc(r.resp.join('; '))}</td><td class="mono dim">${pkg[k] || '—'}</td><td>${S.ids.filter(x => x.role === k).map(x => pillFor(x.id)).join('')}</td></tr>`).join('')}
+    </tbody></table><p class="note" style="margin-top:10px">Usual access is proposed when an agent is registered in a role. It is never granted without a person approving it.</p></div>`;
+}
+
+// ---------- Resources: every object in the model, and who can reach each one.
+function viewResources(id) {
+  if (id) return viewResource(id);
+  rows = S.res.map(r => '#/resources/' + r.id);
+  cursor = Math.min(cursor, rows.length - 1);
+  return `<div class="page"><div class="eyebrow">Access</div><h1>Resources</h1><p class="sub">Everything access can be granted on. This service's own types need nothing else installed; other products add theirs when they connect.</p>
+    <table><thead><tr><th>Resource</th><th>Type</th><th>From</th><th>Inside</th><th>Enforcement</th><th>Who can reach it</th></tr></thead><tbody>
+    ${S.res.map((r, i) => `<tr class="${i === cursor ? 'cursor' : ''}" data-href="#/resources/${r.id}"><td>${esc(r.type === 'project' || r.type === 'organisation' ? r.id : r.name)}</td><td class="mono sec">${r.type}</td><td>${svcTag(svcOf(r))}</td><td class="mono dim">${r.parent || '—'}</td><td>${enfTag(svcOf(r))}</td><td class="mono">${inModel(r) ? whoCan(r.id).length : '—'}</td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+function viewResource(id) {
+  rows = [];
+  const r = resById(id); if (!r) return `<div class="page"><h1>Not found</h1></div>`;
+  const w = inModel(r) ? whoCan(id) : [];
+  return `<div class="page"><div class="eyebrow"><a href="#/resources">Resources</a> / ${esc(r.type)}</div>
+    <div class="head"><div><h1>${esc(r.type === 'project' || r.type === 'organisation' ? r.id : r.name)}</h1><p class="sub">${esc(r.type)} ${r.parent ? `in <a href="#/resources/${r.parent}">${r.parent}</a>` : ''} · ${svcTag(svcOf(r))} · ${enfTag(svcOf(r))}</p></div></div>
+    <div class="grid2"><div>
+      <div class="section-h" style="margin-top:0"><span>Who can reach it, and why</span></div>
+      <div class="card">${w.length ? `<table><thead><tr><th>Who</th><th>Can</th><th>Through</th></tr></thead><tbody>${w.map(e => `<tr><td>${pillFor(e.x.id)}</td><td class="mono">${e.ps.map(c => c.perm).join(', ')}</td><td class="sec" style="white-space:normal">${e.ps[0].chain.map(g => esc(nameOf(g.holder)) + ' · ' + g.rel).join(' → ')}</td></tr>`).join('')}</tbody></table>` : '<div class="dim">Nobody. ' + (inModel(r) ? '' : 'Its type is not in the model until a person approves the service.') + '</div>'}</div>
+    </div><div>
+      <div class="card"><h2>What each permission needs</h2>${Object.entries(TYPES[r.type].perm).map(([p, rels]) => `<div class="row"><span class="mono">${p}</span><span class="sec">${rels.map(a => RELWORD[a]).join(' or ')} of ${esc(ancestors(r)[0] || r.id)}</span></div>`).join('') || '<div class="dim">No permissions of its own.</div>'}
+      <div class="note" style="margin-top:6px">Plain language here; the raw schema is under <a href="#/model">Model</a>.</div></div>
+    </div></div></div>`;
+}
+
+// ---------- Access: ask in all three directions; every grant below.
+let accessMode = 'can';
+function viewAccess(mode, arg) {
+  rows = []; mode = mode || accessMode; accessMode = mode;
+  const segs = [['can', 'Can someone…'], ['reach', 'What can someone reach'], ['who', 'Who can reach something']];
+  let q = '';
+  if (mode === 'can') q = checkBoxFree();
+  if (mode === 'reach') { const id = arg || 'A-0007'; q = `<div class="q" style="display:flex;gap:8px;align-items:center"><span class="sec">What can</span><select data-nav-select="#/access/reach/">${S.ids.map(x => `<option value="${x.id}" ${x.id === id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select><span class="sec">reach?</span></div><div class="card" style="margin-top:12px">${reachTable(reach(id))}</div>`; }
+  if (mode === 'who') { const id = arg || 'channel:identity'; q = `<div class="q" style="display:flex;gap:8px;align-items:center"><span class="sec">Who can reach</span><select data-nav-select="#/access/who/">${S.res.filter(inModel).map(r => `<option value="${r.id}" ${r.id === id ? 'selected' : ''}>${esc(r.type === 'project' || r.type === 'organisation' ? r.id : r.name)}</option>`).join('')}</select><span class="sec">?</span></div><div class="card" style="margin-top:12px">${whoCan(id).map(e => `<div class="row"><span>${pillFor(e.x.id)}</span><span class="mono">${e.ps.map(c => c.perm).join(', ')}</span></div>`).join('') || '<div class="dim">Nobody.</div>'}</div>`; }
+  return `<div class="page"><div class="eyebrow">Access</div><h1>Access</h1><p class="sub">Ask it any way round. Every answer traces to a person, or says why not.</p>
+    <div class="seg" style="margin-bottom:14px">${segs.map(([k, l]) => `<a href="#/access/${k}" class="${mode === k ? 'on' : ''}">${l}</a>`).join('')}</div>
+    <div class="check" style="margin-top:0">${q}</div>
+    <div class="section-h"><span>Every grant</span><span class="open-q">draft form</span></div>
+    <table><thead><tr><th>Grant</th><th>Holder</th><th>Relation</th><th>On</th><th>Derives from</th><th>May pass on</th><th>Lasts</th><th>Last used</th><th>Stands</th></tr></thead><tbody>
+    ${S.grants.map(g => { const s = standing(g); return `<tr data-href="#/file/${g.holder}/access"><td class="mono">${g.id}</td><td>${esc(nameOf(g.holder))}</td><td class="mono">${g.rel}</td><td class="mono">${g.obj}</td><td class="sec">${g.from ? g.from + ' · ' + esc(nameOf(grantById(g.from).holder)) : '<span class="dim">root</span>'}</td><td class="sec">${g.pass}</td><td class="sec">${g.lease || '—'}</td><td class="sec">${g.used || '—'}</td><td>${s.ok ? '<span class="dot s-active"></span>yes' : `<span style="color:var(--danger)">no</span>`}</td></tr>`; }).join('')}
+    </tbody></table></div>`;
+}
+function checkBoxFree() {
+  const opts = S.res.filter(inModel);
+  return `<div class="q"><span class="sec">Can</span><select id="cWho">${S.ids.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select>
+    <select id="cPerm">${permsOf(resById('channel:identity')).map(p => `<option ${p === 'post' ? 'selected' : ''}>${p}</option>`).join('')}</select>
+    <select id="cRes" data-act-change="perms">${opts.map(r => `<option value="${r.id}" ${r.id === 'channel:identity' ? 'selected' : ''}>${esc(r.type === 'project' || r.type === 'organisation' ? r.id : r.name + ' (' + r.type + ')')}</option>`).join('')}</select>
+    <button class="btn" data-act="check">Check <span class="kbd">c</span></button></div>
+    <div class="answer-box" id="answer">${lastCheck && lastCheck.free ? answerHtml(lastCheck, false) : ''}</div>`;
+}
+
+// ---------- Requests: access for a while, and single acts that need a person first.
+let reqTab = 'access';
+function approverOf(obj) { const root = S.grants.find(g => g.obj === obj && g.rel === 'owner' && byId(g.holder).kind === 'person' && standing(g).ok); return root ? root.holder : 'P-0001'; }
+function viewRequests(tab) {
+  rows = []; tab = tab || reqTab; reqTab = tab;
+  const body = tab === 'access' ? `<table><thead><tr><th>Who</th><th>Asks for</th><th>For</th><th>Why</th><th>Approver</th><th>Asked</th><th>State</th><th></th></tr></thead><tbody>
+    ${S.requests.map(r => `<tr><td>${pillFor(r.who)}</td><td class="mono">${r.rel} of ${r.obj}</td><td class="sec">${r.dur}</td><td class="sec" style="white-space:normal">${esc(r.why)}</td><td>${pillFor(approverOf(r.obj))}</td><td class="mono dim">${r.at}</td><td>${reqState(r)}</td><td>${r.state === 'waiting' ? `<button class="btn primary" data-act="approve" data-r="${r.id}">Review</button>` : ''}</td></tr>`).join('')}</tbody></table>
+    <p class="note" style="margin-top:10px">The approver is the person the access would trace to. Approved access ends by itself; nobody has to remember to take it back.</p>`
+  : `<table><thead><tr><th>Who</th><th>Wants to</th><th>Why</th><th>Approver</th><th>Asked</th><th>State</th><th></th></tr></thead><tbody>
+    ${S.acts.map(q => `<tr><td>${pillFor(q.who)}</td><td style="white-space:normal">${esc(q.act)}</td><td class="sec" style="white-space:normal">${esc(q.why)}</td><td>${pillFor(byId(q.who).human)}</td><td class="mono dim">${q.at}</td><td>${reqState(q)}</td><td>${q.state === 'waiting' ? `<button class="btn primary" data-act="actok" data-q="${q.id}">Approve once</button> <button class="btn" data-act="actno" data-q="${q.id}">Decline</button>` : ''}</td></tr>`).join('')}</tbody></table>
+    <p class="note" style="margin-top:10px">Some acts need a person each time, whatever the agent holds. The agent waits; the person answers here or from their phone.</p>`;
+  return `<div class="page"><div class="eyebrow">Access</div><h1>Requests</h1><p class="sub">Asked by people and agents alike, through the screen or through their tools.</p>
+    <div class="seg" style="margin-bottom:14px"><a href="#/requests/access" class="${tab === 'access' ? 'on' : ''}">Access for a while</a><a href="#/requests/acts" class="${tab === 'acts' ? 'on' : ''}">Acts needing a person</a></div>${body}</div>`;
+}
+const reqState = r => r.state === 'waiting' ? '<span style="color:var(--accent)">waiting</span>' : r.state === 'approved' ? `<span class="pass">approved</span>${r.note ? ` <span class="note">${esc(r.note)}</span>` : ''}` : `<span class="dim">declined</span>${r.note ? ` <span class="note">${esc(r.note)}</span>` : ''}`;
+
+// ---------- Reviews: people confirm what their agents hold; orphans; standing rules.
+function viewReviews() {
+  rows = [];
+  const due = S.grants.filter(g => byId(g.holder).kind === 'agent' && g.live && byId(g.holder).state !== 'retired');
+  const done = S.review.done;
+  return `<div class="page"><div class="eyebrow">Access</div><h1>Reviews</h1><p class="sub">Each person confirms, now and then, what the agents they answer for still need.</p>
+    <div class="grid2"><div>
+      <div class="section-h" style="margin-top:0"><span>${S.review.title} · due ${S.review.due}</span><span class="note" style="letter-spacing:0;text-transform:none">${Object.keys(done).length} of ${due.length} decided</span></div>
+      <table><thead><tr><th>Agent</th><th>Holds</th><th>Last used</th><th>Suggests</th><th>Reviewer</th><th></th></tr></thead><tbody>
+      ${due.map(g => { const a = byId(g.holder), rv = a.human; return `<tr><td>${pillFor(a.id)}</td><td class="mono">${g.rel} of ${g.obj}</td><td class="sec">${g.used || '—'}</td><td class="note">${/today|yesterday/.test(g.used || '') ? 'in use' : !g.used || g.used === 'not yet' ? 'too new to tell' : `<span style="color:var(--warn)">not seen since ${g.used}</span>`}</td><td>${pillFor(rv)}${byId(rv).state !== 'active' ? ' <span style="color:var(--warn)">left</span>' : ''}</td><td>${done[g.id] ? `<span class="${done[g.id] === 'keep' ? 'pass' : 'fail'}">${done[g.id] === 'keep' ? 'kept' : 'dropped'}</span>` : `<button class="btn" data-act="keep" data-g="${g.id}">Keep</button> <button class="btn danger" data-act="drop" data-g="${g.id}">Drop</button>`}</td></tr>`; }).join('')}
+      </tbody></table>
+      <div class="note" style="margin-top:8px">Last used is what the enforcing products reported in the past 30 days; a product that does not ask cannot report use, so "not seen" is not "never used".</div><div class="note" style="margin-top:4px">Not decided by the due date: <span class="open-q">lapse or stay: open</span></div>
+    </div><div>
+      <div class="card"><h2>No one answering</h2>${orphans().map(a => `<div class="row"><span>${pillFor(a.id)} <span class="note">${esc(nameOf(a.human))} is ${byId(a.human).state}</span></span><span><button class="btn" data-act="transfer" data-id="${a.id}">Hand over</button></span></div>`).join('') || '<div class="dim">Every agent has an active person.</div>'}
+        <div class="note" style="margin-top:6px">What happens to an agent whose person leaves: <span class="open-q">open</span></div></div>
+      <div class="card"><h2>Standing rules</h2>${S.rules.map(r => `<div class="row"><span>${esc(r.t)}<div class="note">${r.kind}</div></span><span class="${r.breaches ? 'fail' : 'pass'} mono">${r.breaches ? r.breaches + ' breaches' : 'held'}</span></div>`).join('')}
+        <div class="note" style="margin-top:6px">Checked on every grant and every request, not only at review time.</div></div>
+    </div></div></div>`;
+}
+
+// ---------- Credentials, connections, sessions
+function viewVault() {
+  rows = [];
+  const all = Object.entries(S.handles).flatMap(([id, hs]) => hs.map(h => ({ id, ...h })));
+  return `<div class="page"><div class="eyebrow">Runtime</div><h1>Credentials</h1><p class="sub">The real credentials stay in this service. Agents use them through handles and short-lived tokens; nobody reads a key.</p>
+    <table><thead><tr><th>Handle</th><th>Held by</th><th>Behind it</th><th>Value</th><th>Age</th><th>Rotation</th><th>Lease</th><th>Use</th></tr></thead><tbody>
+    ${all.map(h => `<tr data-href="#/file/${h.id}/credentials"><td class="mono">${h.name}</td><td>${esc(nameOf(h.id))}</td><td class="sec">${esc(h.note)}</td><td><span class="sealed" style="width:90px"></span></td><td class="mono">${h.age || '—'}</td><td class="${h.stale ? '' : 'sec'}" style="${h.stale ? 'color:var(--warn)' : ''}">${h.rot || '—'}${h.stale ? ' <button class="btn" data-act="toast" data-t="Rotated. The new value went straight into the vault; no one saw it.">Rotate</button>' : ''}</td><td class="sec">${h.lease}</td><td class="mono">${h.uses}</td></tr>`).join('')}
+    </tbody></table><p class="note" style="margin-top:10px">Values never leave this service, so rotating one changes nothing for the agents using it.</p></div>`;
+}
+function viewConnections() {
+  rows = [];
+  return `<div class="page"><div class="eyebrow">Runtime</div><h1>Connections</h1><p class="sub">Both directions: products that ask this service before they act, and systems agents reach through it.</p>
+    <div class="section-h" style="margin-top:0"><span>Products that ask before acting</span><span class="note" style="letter-spacing:0;text-transform:none">none are needed; each adds its own types</span></div>
+    <table class="wrap"><thead><tr><th>Product</th><th>Types it adds</th><th>Sign-in</th><th>Its own identity</th><th>Model version</th><th>Enforcement</th><th>Asking</th><th></th></tr></thead><tbody>
+    ${Object.entries(S.services).map(([k, v]) => `<tr><td>${esc(v.name)}</td><td class="mono">${v.types.map(t => `${t}: ${Object.keys(TYPES[t].perm).join(', ')}`).join('; ')}</td><td class="sec">${esc(v.signin)}</td><td class="sec">${esc(v.ident)}</td><td class="mono ${String(v.ver).includes('behind') ? '' : 'dim'}" style="${String(v.ver).includes('behind') ? 'color:var(--warn)' : ''}">${esc(v.ver)}</td><td>${enfTag(k)}</td><td class="sec">${esc(v.last)}</td><td>${v.status === 'awaiting' ? `<button class="btn primary" data-act="approvesvc" data-s="${k}">Review</button>` : ''}</td></tr>`).join('')}
+    </tbody></table>
+    <div class="note" style="margin-top:8px">Any application can join, ours or not. It proposes its types; a person approves them before any check uses them. Sign-in working does not mean enforcement is: "in the model, not enforced" means answers exist but that product does not ask yet. A product behind on the model version is still answering from the old one.</div>
+    <div class="section-h"><span>Systems agents reach through this service</span></div>
+    <table><thead><tr><th>System</th><th>Kind</th><th>How</th><th>Scope</th><th>Used by</th></tr></thead><tbody>
+    ${S.outward.map(o => `<tr><td>${esc(o.name)}</td><td class="sec">${o.kind}</td><td class="sec">${esc(o.how)}</td><td class="sec" style="white-space:normal">${esc(o.scopes)}</td><td>${o.used.map(u => pillFor(u)).join('')}</td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+function viewSessions() {
+  rows = [];
+  return `<div class="page"><div class="eyebrow">Runtime</div><h1>Sessions</h1><p class="sub">Who is working where, and for whom, as each runtime reports it. The live stream of what they are doing belongs to the runtime.</p>
+    <table><thead><tr><th>Who</th><th>Where</th><th>Runtime</th><th>Acting for</th><th>Started</th><th>Status</th></tr></thead><tbody>
+    ${S.sessions.map(s => sessionRow(s, true)).join('')}
+    </tbody></table></div>`;
+}
+
+// ---------- Model: the types, where each comes from, and trying a change before it is made.
+function viewModel(tab) {
+  rows = []; tab = tab || 'types';
+  const types = `<div class="empty-note" style="margin-bottom:14px">With no products connected, this service still has its own types: organisations, projects, people, agents, roles and credentials, and the grants between them. Everything above works on those alone.</div>
+    <table><thead><tr><th>Type</th><th>From</th><th>Relations</th><th>Permissions</th><th>Enforcement</th></tr></thead><tbody>
+    ${Object.entries(TYPES).map(([k, t]) => `<tr><td class="mono">${k}</td><td>${svcTag(t.from)}</td><td class="sec">${esc(t.rel)}</td><td class="sec" style="white-space:normal">${Object.entries(t.perm).map(([p, r]) => `<span class="mono">${p}</span>: ${r.map(a => RELWORD[a]).join(' or ')}`).join(' · ') || '—'}</td><td>${enfTag(t.from)}</td></tr>`).join('')}
+    </tbody></table>
+    <div class="section-h"><span>Schema</span><span class="note" style="letter-spacing:0;text-transform:none">model ${S.model} · change ${S.change}</span></div>
+    <div class="code"><span class="k">definition</span> project {
+  relation parent: organisation
+  relation owner: person | agent
+  relation editor: person | agent | team#member
+  relation viewer: person | agent | team#member
+  permission view = viewer + edit
+  permission edit = editor + grant
+  permission grant = owner + parent->administer
+}
+<span class="k">definition</span> channel {        <span class="dim">// registered by Cambium</span>
+  relation project: project
+  permission read = project->view
+  permission post = project->edit
+  permission moderate = project->grant
+}</div>`;
+  return `<div class="page"><div class="eyebrow">Model</div><h1>Model</h1><p class="sub">What can be granted, on what, and what each grant allows. Versioned; every change is tried first.</p>
+    <div class="seg" style="margin-bottom:14px"><a href="#/model/types" class="${tab === 'types' ? 'on' : ''}">Types</a><a href="#/model/try" class="${tab === 'try' ? 'on' : ''}">Try a change</a></div>
+    ${tab === 'try' ? viewTry() : types}</div>`;
+}
+const CHANGES = [
+  { t: 'Revoke Tom Whiting\'s owner of project:identity', f: () => { grantById('G-2').live = false; grantById('G-2').revokedAt = 'now'; } },
+  { t: 'Grant Chippy owner of project:identity', f: () => S.grants.push({ id: 'G-X', holder: 'A-0012', rel: 'owner', obj: 'project:identity', from: 'G-2', pass: 'not passable', live: true }) },
+  { t: 'Retire Dana Reyes', f: () => { byId('P-0002').state = 'retired'; } },
+];
+const ASSERTS = [
+  { t: 'Archie can post in #identity', f: () => can('A-0007', 'post', 'channel:identity').ok },
+  { t: 'No agent can cancel a workflow', f: () => !S.ids.some(x => x.kind === 'agent' && can(x.id, 'cancel', 'workflow:card_build').ok) },
+  { t: 'Old triage bot can reach nothing', f: () => reach('A-0002').length === 0 },
+  { t: 'Every agent has an active person answering for it', f: () => orphans().length === 0 },
+];
+let trySel = 0, tryOut = null;
+function viewTry() {
+  return `<div class="grid2"><div><div class="card"><h2>A change</h2>
+      <div class="field"><select id="tryC">${CHANGES.map((c, i) => `<option value="${i}" ${i === trySel ? 'selected' : ''}>${esc(c.t)}</option>`).join('')}</select></div>
+      <div style="margin-top:12px"><button class="btn primary" data-act="try">Try it</button> <span class="note">Nothing is written.</span></div></div>
+      ${tryOut ? `<div class="card"><h2>What would change</h2>${tryOut.gain.map(t => `<div class="diff-add">+ ${esc(t)}</div>`).join('')}${tryOut.lose.map(t => `<div class="diff-del">− ${esc(t)}</div>`).join('')}${!tryOut.gain.length && !tryOut.lose.length ? '<div class="dim">No one gains or loses anything.</div>' : ''}</div>` : ''}
+    </div><div><div class="card"><h2>Assertions</h2>${ASSERTS.map((a, i) => { const before = a.f(), after = tryOut ? tryOut.asserts[i] : null; return `<div class="row"><span>${esc(a.t)}</span><span class="mono">${before ? '<span class="pass">holds</span>' : '<span class="fail">fails</span>'}${after === null ? '' : ` → ${after ? '<span class="pass">holds</span>' : '<span class="fail">fails</span>'}`}</span></div>`; }).join('')}
+      <div class="note" style="margin-top:6px">Kept with the model and run on every change, like tests.</div></div></div></div>`;
+}
+function runTry(i) {
+  const flat = () => S.ids.flatMap(x => reach(x.id).flatMap(e => e.ps.map(c => `${x.name} can ${c.perm} ${e.r.type === 'project' || e.r.type === 'organisation' ? e.r.id : e.r.name}`)));
+  const snap = JSON.stringify(S), before = new Set(flat());
+  CHANGES[i].f();
+  const after = new Set(flat()), asserts = ASSERTS.map(a => a.f());
+  S = JSON.parse(snap);
+  tryOut = { gain: [...after].filter(t => !before.has(t)), lose: [...before].filter(t => !after.has(t)), asserts };
+}
+
+// ---------- Configuration
+const SET = [['layout', 'Layout'], ['signin', 'Sign-in'], ['directory', 'Directory'], ['permissions', 'Permissions'], ['secrets', 'Secrets'], ['runtimes', 'Runtimes'], ['storage', 'Storage and keys']];
+function viewSettings(sec) {
+  rows = []; sec = sec || 'layout';
+  const d = pref('dock', 'left'), l = pref('labels', 'icons');
+  const row = (t, dsc, v) => `<div class="set-row"><div><div>${t}</div><div class="d">${dsc}</div></div>${v}</div>`;
+  const open = '<span class="open-q">open</span>';
+  const bodies = {
+    layout: row('Dock side', 'Which edge the rail and its drawer occupy. The screen takes the other.', `<div class="seg"><button data-dock="left" class="${d === 'left' ? 'on' : ''}">Left</button><button data-dock="right" class="${d === 'right' ? 'on' : ''}">Right</button></div>`)
+      + row('Rail labels', 'Show the name beside every icon in the rail.', `<div class="seg"><button data-labels="icons" class="${l === 'icons' ? 'on' : ''}">Icons</button><button data-labels="labels" class="${l === 'labels' ? 'on' : ''}">Labels</button></div>`),
+    signin: row('Sign-in providers', 'How people sign in. Agents never sign in; they are registered.', '<span class="sec">Google, GitHub</span>') + row('Suspending a person', 'Also end their sign-in session, or only refuse checks.', open),
+    directory: row('Reason required', 'On suspend and retire.', '<span class="sec">Yes (proposed)</span>') + row('Register an agent for someone else', 'The registering person answers for it.', '<span class="sec">No (proposed)</span>') + row('When a person leaves', 'Their agents pass to someone else, or stop.', open) + row('Look for unregistered agents', 'Runtimes and connections report sessions with no identity.', '<span class="sec">On</span>'),
+    permissions: row('Grant granularity', 'Per kind of act, or finer.', open) + row('Freshness', 'A check is at least as fresh as the change it follows.', '<span class="sec">Always</span>') + row('Longest temporary access', 'Approved requests end by themselves.', '<span class="sec">8 hours (proposed)</span>') + row('Review cadence', 'How often people confirm what their agents hold.', '<span class="sec">Monthly (proposed)</span>') + row('Emergency access', 'Who may act when the usual approver cannot be reached.', open),
+    secrets: row('Leases', 'Counted by uses, time window and spend.', '<span class="sec">On</span>') + row('Calls in flight on revoke', 'The rule for calls already admitted.', '<span class="open-q">to design</span>'),
+    runtimes: row('Runtimes', 'Anything that can start a session from a rendered profile and report back. None is required.', '<span class="sec">Local launcher, workflow engine</span>'),
+    storage: row('Database', 'PostgreSQL, possibly on a network device (Tom, 23 Sep 14:14).', '<span class="sec">Not configured</span>'),
+  };
+  return `<div class="page"><div class="eyebrow">Configuration</div><h1>Configuration</h1><p class="sub">How this service runs. It stands on its own; nothing else needs to be installed for it to be useful.</p>
+    <div class="set-grid"><nav class="set-nav">${SET.map(([k, t]) => `<a href="#/settings/${k}" class="${sec === k ? 'on' : ''}">${t}</a>`).join('')}</nav><div class="card">${bodies[sec]}</div></div></div>`;
+}
+
+// ---------- Router
+function route() {
+  const [, view, a, b] = (location.hash || '#/people').split('/');
+  document.querySelectorAll('.rail a').forEach(el => el.classList.toggle('on', el.dataset.nav === (view === 'file' ? 'people' : view)));
+  const V = { file: () => viewFile(a, b), roles: viewRoles, resources: () => viewResources(a), access: () => viewAccess(a, b), requests: () => viewRequests(a), reviews: viewReviews, vault: viewVault, connections: viewConnections, sessions: viewSessions, model: () => viewModel(a), settings: () => viewSettings(a) };
+  $('#screen').innerHTML = (V[view] || viewPeople)();
+  const nReq = S.requests.filter(r => r.state === 'waiting').length + S.acts.filter(q => q.state === 'waiting').length;
+  const nRev = S.grants.filter(g => byId(g.holder).kind === 'agent' && g.live && byId(g.holder).state !== 'retired' && !S.review.done[g.id]).length;
+  $('#cntReq').textContent = nReq || ''; $('#cntReq').style.display = nReq ? '' : 'none';
+  $('#cntRev').textContent = nRev || ''; $('#cntRev').style.display = nRev ? '' : 'none';
+}
+window.addEventListener('hashchange', () => { closeAll(); route(); });
+</script>
+<script>
+// ---------- Acts
+function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => el.classList.remove('show'), 2600); }
+let opener = null;
+function drawer(html) { opener = opener || document.activeElement; $('#drawer').innerHTML = html; $('#drawer').classList.add('open'); const f = $('#drawer').querySelector('textarea,input,select,button'); f && f.focus(); }
+function closeAll() {
+  const was = $('#drawer').classList.contains('open') || $('#palette').classList.contains('open');
+  $('#drawer').classList.remove('open'); $('#palette').classList.remove('open'); $('#scrim').classList.remove('open');
+  if (was) (opener && document.contains(opener) ? opener : $('#screen')).focus();
+  opener = null;
+}
+const hist = (id, t) => (S.history[id] = S.history[id] || []).push([hhmm(), t]);
+const dHead = (eyebrow, title, sub) => `<div class="eyebrow">${eyebrow}</div><h2 style="margin-top:6px;font-size:16px">${title}</h2>${sub ? `<p class="sub" style="margin-top:6px">${sub}</p>` : ''}`;
+const dButtons = (primary, act, extra = '') => `<div style="margin-top:14px;display:flex;gap:8px;align-items:center"><button class="btn primary" data-act="${act}" ${extra}>${primary}</button><button class="btn" data-act="close">Cancel</button></div>`;
+// What a grant would add, before it is saved.
+function effectOf(holder, rel, obj) {
+  const snap = JSON.stringify(S), before = new Set(reach(holder).flatMap(e => e.ps.map(c => c.perm + ' ' + resName(e.r.id))));
+  S.grants.push({ id: 'G-try', holder, rel, obj, from: (S.grants.find(g => g.obj === obj && g.rel === 'owner' && byId(g.holder).kind === 'person') || {}).id || null, pass: 'not passable', live: true });
+  const hold = byId(holder).state; byId(holder).state = 'active';
+  const after = reach(holder).flatMap(e => e.ps.map(c => ({ t: c.perm + ' ' + resName(e.r.id), svc: c.svc })));
+  S = JSON.parse(snap); void hold;
+  const add = after.filter(a => !before.has(a.t));
+  return `<div class="section-h">What this adds</div><div class="card">${add.map(a => `<div class="row" style="padding:4px 0"><span class="diff-add">+ ${esc(a.t)}</span>${svcTag(a.svc)}</div>`).join('') || '<div class="dim">Nothing it cannot already do.</div>'}
+    <div class="note" style="margin-top:6px">${S.rules.length} standing rules checked: none broken.</div></div>`;
+}
+
+function act(a, el) {
+  const id = el && el.dataset.id, x = id && byId(id);
+  if (a === 'toast') return toast(el.dataset.t);
+  if (a === 'close') return closeAll();
+  if (a === 'commission') return drawer(dHead('New agent', 'Register an agent', 'Describe the job. The service proposes a role, a profile and the access it usually needs; nothing is granted until you approve it. You answer for this agent.')
+      + `<div class="field"><label>The job, in your words</label><textarea id="cText">${el && el.dataset.guess ? 'Found running as ' + esc(el.dataset.guess) + '. ' : ''}Reconcile supplier invoices against the ledger each week and draft replies for me to send. It must never pay anything.</textarea></div>
+      <div style="margin-top:12px;display:flex;gap:8px"><button class="btn primary" data-act="propose">Propose</button><button class="btn" data-act="close">Cancel</button></div><div id="proposal"></div>`);
+  if (a === 'propose') {
+    $('#proposal').innerHTML = `<div class="section-h">Proposed</div><div class="card"><dl class="facts">
+      <dt>Name</dt><dd><input value="Invoice clerk" id="cName" style="background:var(--surface-code);border:1px solid var(--border-default);border-radius:6px;color:inherit;padding:4px 8px"></dd>
+      <dt>Role</dt><dd>Accounts assistant</dd><dt>Responsibilities</dt><dd class="sec">Reconcile invoices; draft supplier replies</dd>
+      <dt>Practice</dt><dd class="sec">Never pays; proposes payments for approval</dd>
+      <dt>Provisioning</dt><dd><span class="pill">Read</span><span class="pill">Spreadsheet</span><span class="pill">accounting system (MCP)</span></dd>
+      <dt>Usual access</dt><dd class="mono">editor of project:accounts</dd>
+      <dt>Answers to</dt><dd><span class="pill human">Tom Whiting</span></dd></dl></div>
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center"><button class="btn primary" data-act="create">Register</button><span class="note">It starts registered, with no access.</span></div>`; return;
+  }
+  if (a === 'create') {
+    const nid = 'A-00' + (20 + S.ids.length);
+    S.ids.push({ id: nid, kind: 'agent', name: ($('#cName').value || 'New agent').trim(), state: 'registered', human: 'P-0001', role: 'accounts', file: 'A/' + nid.slice(2), since: 'today' });
+    S.prov[nid] = { ver: 'v1 draft', model: 'claude-sonnet-5', tools: ['Read', 'Spreadsheet'], skills: ['reconciliation'], mcp: ['accounting system'], prompt: 'You reconcile supplier invoices… You never pay.', cwd: '~/work/accounts', env: ['LANG'] };
+    S.maint[nid] = 'P-0001';
+    S.history[nid] = [[hhmm(), 'registered by Tom Whiting from a description'], [hhmm(), 'provisioned: profile v1 draft']];
+    bump(); closeAll(); location.hash = '#/file/' + nid; return toast('Registered. Grant it access, then activate it.');
+  }
+  if (a === 'grant') return drawer(dHead('Access', `Grant access to ${esc(x.name)}`, 'Derived from a grant you hold. It can never be more than you hold.')
+      + `<div class="field"><label>Relation</label><select id="gRel" data-act-change="effect"><option>editor</option><option>viewer</option></select></div>
+      <div class="field"><label>On</label><select id="gObj" data-act-change="effect"><option>project:identity</option><option>project:accounts</option></select></div>
+      <div class="field"><label>May be passed on</label><select id="gPass"><option>not passable</option><option>agent</option><option>human, agent</option></select></div>
+      <div class="field"><label>Lasts</label><select id="gLease"><option>no end</option><option>ends with assignment</option><option>7 days</option></select></div>
+      <div id="effect">${effectOf(id, 'editor', 'project:identity')}</div>` + dButtons('Grant', 'grantdo', `data-id="${id}"`));
+  if (a === 'effect') { const h = $('[data-act="grantdo"]').dataset.id; $('#effect').innerHTML = effectOf(h, $('#gRel').value, $('#gObj').value); return; }
+  if (a === 'grantdo') {
+    const obj = $('#gObj').value, root = S.grants.find(g => g.obj === obj && g.rel === 'owner' && byId(g.holder).kind === 'person');
+    S.grants.push({ id: 'G-' + (S.grants.length + 1), holder: id, rel: $('#gRel').value, obj, from: root ? root.id : null, pass: $('#gPass').value, lease: $('#gLease').value, live: true });
+    hist(id, `granted ${$('#gRel').value} of ${obj}`); bump();
+    closeAll(); location.hash = `#/file/${id}/access`; route(); return toast('Granted');
+  }
+  if (a === 'activate' || a === 'reinstate') { x.state = 'active'; S.vcreds.filter(v => v.holder === id && /^held/.test(v.state)).forEach(v => v.state = 'active'); hist(id, a + 'd'); bump(); route(); return toast(`${x.name} is active`); }
+  if (a === 'suspend') return drawer(dHead('Lifecycle', `Suspend ${esc(x.name)}`, 'Suspending is a state change. What it refuses is not decided yet.')
+      + `<div class="field"><label>Reason</label><textarea id="why" style="min-height:60px">Behaving unexpectedly on the build box.</textarea></div>
+      <div class="section-h">Open for Tom</div><div class="card">
+        <div class="row"><span>Are all its grants refused at the next check?</span><span class="open-q">open</span></div>
+        <div class="row"><span>Are its sessions asked to stop?</span><span class="open-q">open</span></div>
+        <div class="row"><span>Does what it passed on fall too?</span><span class="open-q">open</span></div></div>
+      <div class="note" style="margin-top:8px">This mock-up shows a suspended identity's grants as refused, marked open wherever it does.</div>` + dButtons('Suspend', 'suspenddo', `data-id="${id}"`));
+  if (a === 'suspenddo') { x.state = 'suspended'; hist(id, 'suspended: ' + ($('#why').value || 'no reason')); bump(); closeAll(); route(); return toast(`${x.name} is suspended`); }
+  if (a === 'retire') {
+    const passed = S.grants.filter(g => g.from && grantById(g.from).holder === id), hs = S.handles[id] || [], ss = S.sessions.filter(s => s.who === id), mine = S.ids.filter(b => b.human === id && b.state !== 'retired');
+    return drawer(dHead('Lifecycle', `Retire ${esc(x.name)}`, 'Everything that depends on this identity, before it goes.')
+      + `<div class="field"><label>Reason</label><textarea id="why" style="min-height:60px">No longer needed.</textarea></div>
+      <div class="card" style="margin-top:12px"><dl class="facts">
+        <dt>Grants it holds</dt><dd>${grantsOf(id).filter(g => g.live).length} <span class="note">revoked with it</span></dd>
+        <dt>Grants it passed on</dt><dd>${passed.length ? passed.map(g => `<span class="pill">${esc(nameOf(g.holder))} · ${g.rel}</span>`).join('') : '<span class="dim">none</span>'}</dd>
+        <dt>Agents it answers for</dt><dd>${mine.length ? mine.map(b => pillFor(b.id)).join('') + ' <span class="note">need another person first</span>' : '<span class="dim">none</span>'}</dd>
+        <dt>Handles</dt><dd>${hs.length ? hs.map(h => `<span class="pill mono">${h.name}</span>`).join('') + ' <span class="note">dropped</span>' : '<span class="dim">none</span>'}</dd>
+        <dt>Sessions</dt><dd>${ss.length ? ss.map(s => `<span class="pill">${s.where}: ${s.status}</span>`).join('') + ' <span class="note">runtimes asked to stop; shown until they confirm</span>' : '<span class="dim">none</span>'}</dd></dl></div>` + dButtons('Retire', 'retiredo', `data-id="${id}"`));
+  }
+  if (a === 'retiredo') { x.state = 'retired'; grantsOf(id).forEach(g => { if (g.live) { g.live = false; g.revokedAt = hhmm(); g.revokedChg = S.change + 1; } }); hist(id, 'retired: ' + ($('#why').value || 'no reason')); bump(); closeAll(); route(); return toast(`${x.name} is retired. Revocations still outstanding are listed on its file.`); }
+  if (a === 'stop') return drawer(dHead('Emergency', `Stop ${esc(x.name)} now`, 'For when something is going wrong. Every token it holds is revoked and every runtime is asked to end its sessions.')
+      + `<div class="card"><dl class="facts"><dt>Tokens and handles</dt><dd>${(S.handles[id] || []).length} revoked at once</dd><dt>Sessions</dt><dd>${S.sessions.filter(s => s.who === id).length} asked to stop, each shown as unconfirmed until its runtime says so</dd><dt>Grants</dt><dd>kept, so it can be reinstated</dd></dl></div>
+      <div class="note" style="margin-top:8px">Who may press this, and whether it also suspends: <span class="open-q">open</span></div>` + dButtons('Stop it now', 'stopdo', `data-id="${id}"`));
+  if (a === 'stopdo') { S.sessions.filter(s => s.who === id).forEach(s => s.status = 'stop asked, unconfirmed'); hist(id, 'emergency stop'); bump(); closeAll(); location.hash = `#/file/${id}/sessions`; route(); return toast('Tokens revoked. Sessions asked to stop; waiting for the runtimes to confirm.'); }
+  if (a === 'revoke') { const g = grantById(el.dataset.g); g.live = false; g.revokedAt = hhmm(); g.revokedChg = bump(); hist(g.holder, `revoked ${g.id}`); route(); return toast(`Revoked ${g.id}. Everything derived from it goes with it.`); }
+  if (a === 'perms') { const r = resById($('#cRes').value); $('#cPerm').innerHTML = permsOf(r).map(p => `<option>${p}</option>`).join(''); return; }
+  if (a === 'check') {
+    const who = id || $('#cWho').value, c = can(who, $('#cPerm').value, $('#cRes').value);
+    c.id = who; c.free = !id; lastCheck = c; $('#answer').innerHTML = answerHtml(c, true); return;
+  }
+  if (a === 'approve') {
+    const r = S.requests.find(q => q.id === el.dataset.r);
+    return drawer(dHead('Request', `${esc(nameOf(r.who))} asks for ${r.rel} of ${r.obj}`, esc(r.why))
+      + `<div class="field"><label>For</label><select id="rDur"><option>${r.dur}</option><option>1 hour</option><option>8 hours</option></select></div>
+      <div class="note" style="margin-top:6px">It ends by itself. You can take it back sooner.</div>${effectOf(r.who, r.rel, r.obj)}`
+      + `<div style="margin-top:14px;display:flex;gap:8px"><button class="btn primary" data-act="approvedo" data-r="${r.id}">Approve</button><button class="btn" data-act="denydo" data-r="${r.id}">Decline</button></div>`);
+  }
+  if (a === 'approvedo' || a === 'denydo') {
+    const r = S.requests.find(q => q.id === el.dataset.r);
+    if (a === 'approvedo') {
+      const dur = $('#rDur').value, mins = /hour/.test(dur) ? parseInt(dur) * 60 : 24 * 60, root = S.grants.find(g => g.obj === r.obj && g.rel === 'owner' && byId(g.holder).kind === 'person');
+      S.grants.push({ id: 'G-' + (S.grants.length + 1), holder: r.who, rel: r.rel, obj: r.obj, from: root ? root.id : null, pass: 'not passable', live: true, lease: 'until ' + hhmm(mins) + (mins >= 1440 ? ' tomorrow' : ''), used: 'not yet' });
+      r.state = 'approved'; r.note = 'ends ' + hhmm(mins); hist(r.who, `temporary ${r.rel} of ${r.obj}, approved`); bump();
+    } else { r.state = 'denied'; r.note = 'by ' + nameOf(approverOf(r.obj)); }
+    closeAll(); route(); return toast(a === 'approvedo' ? 'Approved. It ends by itself.' : 'Declined. The agent is told why.');
+  }
+  if (a === 'actok' || a === 'actno') { const q = S.acts.find(z => z.id === el.dataset.q); q.state = a === 'actok' ? 'approved' : 'denied'; q.note = a === 'actok' ? 'once' : ''; route(); return toast(a === 'actok' ? 'Approved once. The agent carries on.' : 'Declined. The agent is told.'); }
+  if (a === 'keep' || a === 'drop') {
+    S.review.done[el.dataset.g] = a;
+    if (a === 'drop') { const g = grantById(el.dataset.g); g.live = false; g.revokedAt = hhmm(); g.revokedChg = bump(); hist(g.holder, `${g.id} dropped at review`); }
+    route(); return;
+  }
+  if (a === 'transfer') return drawer(dHead('Responsibility', `Hand over ${esc(x.name)}`, `${esc(nameOf(x.human))} has left. Someone must answer for this agent before it does anything else.`)
+      + `<div class="field"><label>New person</label><select id="tTo">${S.ids.filter(p => p.kind === 'person' && p.state === 'active').map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div>
+      <div class="note" style="margin-top:6px">They see its file, its access and its sessions before accepting.</div>` + dButtons('Ask them to accept', 'transferdo', `data-id="${id}"`));
+  if (a === 'transferdo') { const to = $('#tTo').value; x.human = to; hist(id, 'now answers to ' + nameOf(to)); bump(); closeAll(); route(); return toast(`${x.name} now answers to ${nameOf(to)}`); }
+  if (a === 'approvesvc') {
+    const k = el.dataset.s, v = S.services[k];
+    return drawer(dHead('Connection', `${esc(v.name)} asks to join`, 'It proposes types and actions. Nothing it adds is used until you approve it.')
+      + `<div class="card">${v.types.map(t => `<div class="row"><span class="mono">${t}</span><span class="sec">${Object.entries(TYPES[t].perm).map(([p, r]) => `${p}: ${r.map(z => RELWORD[z]).join(' or ')}`).join(' · ')}</span></div>`).join('')}</div>
+      <div class="note" style="margin-top:6px">It can add its own types. It cannot change anyone else's.</div>` + dButtons('Approve', 'svcdo', `data-s="${k}"`));
+  }
+  if (a === 'svcdo') { const v = S.services[el.dataset.s]; v.status = 'registered'; v.since = 'approved just now'; v.ver = S.model; bump(); closeAll(); route(); return toast(`${v.name}'s types are in the model. It is not enforcing until it starts asking.`); }
+  if (a === 'try') { trySel = +$('#tryC').value; runTry(trySel); route(); return; }
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act],[data-kind],[data-dock],[data-labels],[data-href]');
+  if (!t) return;
+  if (t.tagName === 'SELECT') return;
+  if (t.dataset.act) { e.preventDefault(); return act(t.dataset.act, t); }
+  if (t.dataset.kind) { filterKind = t.dataset.kind; cursor = 0; if (!/^#\/people/.test(location.hash)) location.hash = '#/people'; return route(); }
+  if (t.dataset.dock) { setPref('dock', t.dataset.dock); applyShell(); return route(); }
+  if (t.dataset.labels) { setPref('labels', t.dataset.labels); applyShell(); return route(); }
+  if (t.dataset.href && !e.target.closest('a,button')) location.hash = t.dataset.href;
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.actChange) return act(t.dataset.actChange, t);
+  if (t.dataset.navSelect) location.hash = t.dataset.navSelect + t.value;
+});
+$('#railBtn').onclick = () => { setPref('labels', pref('labels', 'icons') === 'labels' ? 'icons' : 'labels'); applyShell(); };
+$('#palBtn').onclick = () => openPalette();
+$('#scrim').onclick = closeAll;
+
+// ---------- Palette
+let palItems = [], palSel = 0;
+const PAGES = [['People and agents', '#/people'], ['Roles', '#/roles'], ['Resources', '#/resources'], ['Access', '#/access'], ['Requests', '#/requests'], ['Reviews', '#/reviews'], ['Credentials', '#/vault'], ['Connections', '#/connections'], ['Sessions', '#/sessions'], ['Model', '#/model'], ['Try a change', '#/model/try'], ['Configuration', '#/settings']];
+function palSource() {
+  const o = [];
+  S.ids.forEach(x => o.push({ g: 'People and agents', t: x.name, d: `${S.roles[x.role].title} · ${x.state}`, go: () => location.hash = '#/file/' + x.id }));
+  S.res.forEach(r => o.push({ g: 'Resources', t: resName(r.id), d: `${r.type} · ${svcName(svcOf(r))}`, go: () => location.hash = '#/resources/' + r.id }));
+  S.ids.forEach(x => o.push({ g: 'Ask', t: `What can ${x.name} reach?`, d: '', go: () => location.hash = '#/access/reach/' + x.id }));
+  o.push({ g: 'Acts', t: 'Register an agent', d: 'from a description', go: () => act('commission') });
+  o.push({ g: 'Acts', t: 'Toggle dock side', d: '\\', go: () => { setPref('dock', pref('dock', 'left') === 'left' ? 'right' : 'left'); applyShell(); } });
+  o.push({ g: 'Acts', t: 'Toggle rail labels', d: '[', go: () => $('#railBtn').click() });
+  PAGES.forEach(([t, h]) => o.push({ g: 'Go to', t, d: h, go: () => location.hash = h }));
+  return o;
+}
+function openPalette() { opener = document.activeElement; $('#palette').classList.add('open'); $('#scrim').classList.add('open'); $('#palIn').value = ''; palSel = 0; renderPal(); $('#palIn').focus(); }
+function renderPal() {
+  const q = $('#palIn').value.toLowerCase();
+  palItems = palSource().filter(i => (i.t + ' ' + i.d + ' ' + i.g).toLowerCase().includes(q));
+  palSel = Math.min(palSel, Math.max(0, palItems.length - 1));
+  let g = '', h = '';
+  palItems.forEach((i, n) => { if (i.g !== g) { g = i.g; h += `<div class="grp">${g}</div>`; } h += `<div class="it ${n === palSel ? 'sel' : ''}" data-n="${n}"><span>${esc(i.t)}</span><span class="dim mono">${esc(i.d)}</span></div>`; });
+  $('#palList').innerHTML = h || '<div class="it dim">Nothing by that name.</div>';
+  const sel = $('#palList .sel'); sel && sel.scrollIntoView({ block: 'nearest' });
+}
+$('#palIn').addEventListener('input', () => { palSel = 0; renderPal(); });
+$('#palList').addEventListener('click', e => { const it = e.target.closest('.it[data-n]'); if (it) { const i = palItems[+it.dataset.n]; closeAll(); i.go(); } });
+
+// ---------- Keys: one registry, Command as the primary modifier.
+let pendingG = false;
+const GO = { p: '#/people', o: '#/roles', r: '#/resources', a: '#/access', q: '#/requests', w: '#/reviews', v: '#/vault', n: '#/connections', x: '#/sessions', m: '#/model', s: '#/settings' };
+document.addEventListener('keydown', e => {
+  const pal = $('#palette').classList.contains('open');
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); return pal ? closeAll() : openPalette(); }
+  if (e.key === 'Escape') return closeAll();
+  if (pal) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); palSel = Math.min(palSel + 1, palItems.length - 1); renderPal(); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); palSel = Math.max(palSel - 1, 0); renderPal(); }
+    if (e.key === 'Enter' && palItems[palSel]) { e.preventDefault(); const i = palItems[palSel]; closeAll(); i.go(); }
+    return;
+  }
+  if (/input|select|textarea/i.test(e.target.tagName)) return;
+  if (e.key === 'Enter' && e.target.closest('button,a')) return;
+  if (pendingG) { pendingG = false; if (GO[e.key]) { location.hash = GO[e.key]; return; } }
+  if (e.key === 'g') { pendingG = true; setTimeout(() => pendingG = false, 900); return; }
+  if (e.key === '[') return $('#railBtn').click();
+  if (e.key === '\\') { setPref('dock', pref('dock', 'left') === 'left' ? 'right' : 'left'); applyShell(); return; }
+  if (e.key === 'c') { const b = document.querySelector('[data-act="check"]'); if (b) act('check', b); return; }
+  const [, view, id] = (location.hash || '').split('/');
+  if (view === 'file' && /^[1-7]$/.test(e.key)) { location.hash = `#/file/${id}/${TABS[+e.key - 1][0]}`; return; }
+  if (rows.length && (e.key === 'j' || e.key === 'k')) { cursor = Math.max(0, Math.min(rows.length - 1, cursor + (e.key === 'j' ? 1 : -1))); return route(); }
+  if (rows.length && e.key === 'Enter') location.hash = rows[cursor];
+});
+applyShell();
+route();
+</script>
+<script>
+// ================= v4. Overrides are assignments, so each wraps the v3 function it replaces.
+// ---------- Data: secrets, virtual credentials, nodes, role templates.
+Object.assign(S, {
+  store: [
+    { path: 'org/accounting/api-key', kind: 'API key', scope: 'org', owner: 'P-0002', ver: 3, age: '212 days', rot: 'never rotated', policy: 'every 90 days (proposed)', stale: true },
+    { path: 'org/git/oauth-client', kind: 'OAuth client', scope: 'org', owner: 'P-0001', ver: 2, age: '40 days', rot: 'rotated 14 Aug', policy: 'yearly' },
+    { path: 'org/models/pool', kind: 'account pool (3)', scope: 'org', owner: 'P-0001', ver: 5, age: '31 days', rot: 'rotated 23 Aug', policy: 'on provider change' },
+    { path: 'team/identity/docs-mcp', kind: 'MCP server token', scope: 'team', team: 'Identity', owner: 'P-0001', ver: 1, age: '6 days', rot: 'not yet due', policy: 'every 30 days' },
+    { path: 'team/accounts/bank-portal', kind: 'password', scope: 'team', team: 'Accounts', owner: 'P-0002', ver: 4, age: '19 days', rot: 'rotated 4 Sep', policy: 'every 30 days', lend: 'no: team rule, people only, never agents' },
+    { path: 'user/tom/github-token', kind: 'personal token', scope: 'user', owner: 'P-0001', ver: 1, age: '88 days', rot: 'never rotated', policy: 'owner decides' },
+    { path: 'user/dana/supplier-portal', kind: 'password', scope: 'user', owner: 'P-0002', ver: 2, age: '12 days', rot: 'rotated 11 Sep', policy: 'owner decides' },
+  ],
+  vcreds: [
+    { id: 'VC-1', from: 'org/accounting/api-key', holder: 'A-0014', forWho: 'P-0002', mode: 'proxied', limits: 'read ledger, draft payments; $50 a month', lease: '30 days, 18 left', uses: 12, state: 'active' },
+    { id: 'VC-2', from: 'org/git/oauth-client', holder: 'A-0007', forWho: 'P-0001', mode: 'short-lived token, minted per session', limits: '3 repositories; 1 hour each', lease: '7 days, 5 left', uses: 41, state: 'active' },
+    { id: 'VC-3', from: 'org/models/pool', holder: 'A-0007', forWho: 'P-0001', mode: 'proxied, next account in turn', limits: '$300 a month', lease: 'no end', uses: '—', state: 'active' },
+    { id: 'VC-4', from: 'team/identity/docs-mcp', holder: 'A-0011', forWho: 'P-0001', mode: 'token exchanged per call', limits: 'tools: search, read', lease: '30 days, 24 left', uses: 9, state: 'active' },
+    { id: 'VC-5', from: 'user/tom/github-token', holder: 'A-0003', forWho: 'P-0001', mode: 'proxied', limits: '1 repository', lease: '7 days, 2 left', uses: 0, state: 'held: its holder is suspended' },
+    { id: 'VC-6', from: 'org/accounting/api-key', holder: 'A-0009', forWho: 'P-0002', mode: 'proxied, read only', limits: 'read ledger', lease: '30 days, 3 left', uses: 3, state: 'active' },
+  ],
+  nodes: [
+    { id: 'N-1', name: 'Studio Mac', kind: 'desktop', where: 'home office', runtime: 'Manifold', rstate: 'reporting', slots: [2, 3], allowed: 'identity and design roles', egress: 'git host, model providers, docs', sessions: ['A-0007', 'A-0011'] },
+    { id: 'N-2', name: 'Laptop A', kind: 'laptop', where: 'travels', runtime: 'Manifold', rstate: 'reporting', slots: [0, 2], allowed: 'builders', egress: 'git host, model providers, package registries', sessions: [] },
+    { id: 'N-3', name: 'Laptop B', kind: 'laptop', where: 'travels', runtime: 'Manifold', rstate: 'not reporting since 13:52', slots: [1, 2], allowed: 'builders', egress: 'git host, model providers, package registries', sessions: ['A-0003'] },
+    { id: 'N-4', name: 'Build box', kind: 'server', where: 'rack', runtime: 'Liminal', rstate: 'reporting', slots: [1, 4], allowed: 'verifiers, builders, accounts', egress: 'git host, accounting system', sessions: ['A-0012'] },
+    { id: 'N-5', name: 'Storage', kind: 'NAS', where: 'rack', runtime: 'none', rstate: '—', slots: [0, 0], allowed: 'no agents run here', egress: 'none; holds the database', sessions: [] },
+  ],
+});
+S.roleVer = { owner: 3, reviewer: 2, 'identity-lead': 7, 'design-lead': 4, verifier: 3, accounts: 2, reporter: 1, builder: 5 };
+S.roleAccess = {
+  'identity-lead': [['editor', 'the project it is assigned to', 'no'], ['viewer', 'the organisation\'s projects', 'no']],
+  'design-lead': [['editor', 'the project it is assigned to', 'to agents']],
+  verifier: [['viewer', 'the project it is assigned to', 'no']],
+  accounts: [['editor', 'project:accounts', 'no'], ['view', 'invoices in project:accounts', 'no']],
+  reporter: [['viewer', 'project:accounts', 'no']],
+  builder: [['editor', 'one project, for 8 hours (proposed)', 'no']],
+  owner: [['owner', 'the organisation', 'to people and agents']], reviewer: [['viewer', 'projects under review', 'no']],
+};
+PAGES.push(['Graph', '#/graph'], ['Secrets', '#/secrets'], ['Network', '#/network']);
+Object.assign(GO, { h: '#/graph', v: '#/secrets', t: '#/network', u: '#/me' }); PAGES.push(['You', '#/me']);
+const pctBar = (a, b) => `<div class="meter"><i style="width:${b ? Math.round(a / b * 100) : 0}%"></i></div>`;
+const scopeName = s => s.scope === 'org' ? 'Organisation' : s.scope === 'team' ? 'Team: ' + s.team : 'Personal: ' + nameOf(s.owner);
+
+// ---------- People: a split view; the list on the left, the selected one on the right.
+const viewPeopleV3 = viewPeople;
+viewPeople = function () {
+  if (filterKind === 'teams' || filterKind === 'found') return viewPeopleV3();
+  const list = S.ids.filter(x => filterKind === 'all' || x.kind === filterKind);
+  rows = list.map(x => '#/file/' + x.id); cursor = Math.min(cursor, Math.max(0, rows.length - 1));
+  const sel = list[cursor];
+  const nA = S.ids.filter(x => x.kind === 'agent' && x.state === 'active').length, nP = S.ids.filter(x => x.kind === 'person' && x.state === 'active').length;
+  return `<div class="page">${peopleHead()}
+    <div class="stat-strip"><div class="stat"><div class="n">${nP}</div><div class="l">people active</div></div><div class="stat"><div class="n">${nA}</div><div class="l">agents active</div></div><div class="stat"><div class="n" style="color:var(--warn)">${orphans().length}</div><div class="l">with no one answering</div></div><div class="stat"><div class="n" style="color:var(--warn)">${S.found.length}</div><div class="l">found, not registered</div></div><div class="stat"><div class="n">${S.sessions.filter(s => s.status === 'running').length}</div><div class="l">sessions running</div></div></div>
+    <div class="split"><div><table><thead><tr><th>Name</th><th>Kind</th><th>Role</th><th>State</th><th>Answers to</th><th>Reaches</th></tr></thead>
+    <tbody>${list.map((x, i) => { const h = x.human && byId(x.human), orphan = h && h.state !== 'active' && x.state !== 'retired'; return `<tr class="${i === cursor ? 'cursor' : ''}" data-href="#/file/${x.id}" data-pick="${i}">
+      <td>${esc(x.name)}</td><td><span class="kind ${x.kind}">${x.kind}</span></td><td class="sec">${esc(S.roles[x.role].title)}</td>
+      <td><span class="dot s-${x.state}"></span>${x.state}</td><td class="sec">${h ? esc(h.name) + (orphan ? ` <span style="color:var(--warn)">(${h.state})</span>` : '') : '<span class="dim">—</span>'}</td>
+      <td class="mono">${reach(x.id).length}</td></tr>`; }).join('')}</tbody></table>
+      <p class="note" style="margin-top:8px">j and k move, Enter opens. Hover a row to preview it.</p></div>
+    <div class="preview">${sel ? personPreview(sel) : ''}</div></div></div>`;
+};
+function personPreview(x) {
+  const rs = reach(x.id), ss = S.sessions.filter(s => s.who === x.id), vc = S.vcreds.filter(v => v.holder === x.id);
+  return `<div class="card"><div class="row" style="padding:0 0 8px"><h2>${esc(x.name)}</h2><span class="state ${x.state}">${x.state}</span></div>
+    <div class="sec" style="margin-bottom:10px">${esc(S.roles[x.role].title)}${x.human ? ' · answers to ' + pillFor(x.human) : ''}</div>
+    <div class="section-h" style="margin-top:6px">Reaches</div>${rs.slice(0, 6).map(e => `<div class="row" style="padding:4px 0"><span>${esc(resName(e.r.id))}</span><span class="mono dim">${e.ps.map(c => c.perm).join(', ')}</span></div>`).join('') || '<div class="dim">Nothing.</div>'}
+    ${x.kind === 'agent' ? `<div class="section-h">Now</div><div class="sec">${ss.length ? ss.map(s => `${s.where}: ${s.status}`).join('<br>') : 'Not running'}</div><div class="note" style="margin-top:4px">${vc.length} virtual credentials · profile ${S.prov[x.id] ? S.prov[x.id].ver : '—'}</div>` : ''}
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><a class="btn" href="#/file/${x.id}">Open file</a><a class="btn" href="#/graph/${x.id}">Show in graph</a>${x.kind === 'agent' && x.state === 'active' ? `<button class="btn" data-act="start" data-id="${x.id}">Start…</button>` : ''}</div></div>`;
+}
+document.addEventListener('mouseover', e => { const tr = e.target.closest('tr[data-pick]'); if (!tr || +tr.dataset.pick === cursor) return; cursor = +tr.dataset.pick; const x = S.ids.filter(y => filterKind === 'all' || y.kind === filterKind)[cursor]; document.querySelectorAll('tr[data-pick]').forEach(r => r.classList.toggle('cursor', +r.dataset.pick === cursor)); const p = $('.preview'); if (p && x) p.innerHTML = personPreview(x); });
+
+// ---------- Role builder: a role is a named, versioned set of grant templates plus the profile an agent starts from.
+let roleSel = 'identity-lead', roleTab = 'job';
+viewRoles = function (id, tab) {
+  rows = []; roleSel = id && S.roles[id] ? id : roleSel; roleTab = tab || roleTab;
+  const r = S.roles[roleSel], holders = S.ids.filter(x => x.role === roleSel), p = S.prov[holders.find(h => S.prov[h.id])?.id] || S.prov['A-0007'];
+  const T = [['job', 'Job'], ['profile', 'Profile'], ['access', 'Access'], ['versions', 'Versions'], ['preview', 'Preview']];
+  const list = (label, arr) => `<div class="field"><label>${label}</label><div class="edit-list">${arr.map(t => `<input value="${esc(t)}">`).join('')}<input placeholder="Add another…"></div></div>`;
+  const body = {
+    job: `<div class="grid2"><div>${list('Responsibilities', r.resp)}${list('Goals', r.goals)}${list('Professional practice', r.practice)}</div>
+      <div><div class="card"><dl class="facts"><dt>Title</dt><dd><input class="inline-in" value="${esc(r.title)}"></dd><dt>Version</dt><dd><span class="ver">v${S.roleVer[roleSel]}</span> <span class="note">draft v${S.roleVer[roleSel] + 1} when you change anything</span></dd><dt>Who may assign it</dt><dd class="sec">owners of the project it is assigned in</dd><dt>Held by</dt><dd>${holders.map(h => pillFor(h.id)).join('') || '<span class="dim">no one yet</span>'}</dd></dl></div>
+      <div class="note" style="margin-top:8px">The job words become part of every holder's instructions. People can hold roles too; for them the profile and instructions are not used.</div></div></div>`,
+    profile: `<div class="grid2"><div class="card"><dl class="facts">
+      <dt>Harness</dt><dd><div class="seg"><button class="on">Claude Code</button><button>Codex</button><button>Your own</button></div></dd>
+      <dt>Model access</dt><dd><select class="inline-in" style="width:auto"><option>${p.model}</option></select> <span class="note">through the model-access pool</span></dd>
+      <dt>Tools</dt><dd>${['Read', 'Edit', 'Bash', 'Web search', 'Spreadsheet'].map(t => `<span class="chk ${p.tools.some(x => x.startsWith(t)) ? 'on' : ''}" data-toggle>${t}</span>`).join('')}</dd>
+      <dt>Skills</dt><dd>${['design-system briefs', 'code review', 'verification', 'reconciliation', 'summaries'].map(t => `<span class="chk ${p.skills.includes(t) ? 'on' : ''}" data-toggle>${t}</span>`).join('')}</dd>
+      <dt>MCP servers</dt><dd>${['identity (this service)', 'git host', 'accounting system', 'docs'].map(t => `<span class="chk ${p.mcp.includes(t) ? 'on' : ''}" data-toggle>${t}</span>`).join('')}</dd>
+      <dt>Secrets</dt><dd class="sec">by virtual credential only; chosen per agent, never here</dd>
+      <dt>Working directory</dt><dd><input class="inline-in mono" value="~/work/{{project}}"></dd>
+      <dt>Budget</dt><dd><input class="inline-in" style="width:90px" value="$300"> a month per agent</dd></dl></div>
+      <div class="card"><h2>Instructions</h2><textarea class="inline-in mono" style="min-height:190px;font-size:11.5px;line-height:1.6">You are {{agent.name}}, {{role.title}}. You answer to {{agent.person}}.
+
+Your responsibilities:
+{{role.responsibilities}}
+
+How you work:
+{{role.practice}}</textarea><div class="note" style="margin-top:6px"><span class="var">{{…}}</span> is filled from the role and the agent at start. A sentence here cannot grant or withhold access; the Access tab does that.</div></div></div>`,
+    access: `<div class="card"><div class="row" style="padding:0 0 6px"><h2>What holding this role grants</h2><span class="open-q" title="Whether a role is a live group, so editing it changes every holder at once, or a template copied at grant time">role as group or template: open</span></div>
+      <table><thead><tr><th>Relation</th><th>On</th><th>May pass on</th><th></th></tr></thead><tbody>${(S.roleAccess[roleSel] || []).map(g => `<tr><td class="mono" style="color:var(--accent)">${g[0]}</td><td>${esc(g[1])}</td><td class="sec">${g[2]}</td><td><a href="#" data-act="toast" data-t="Removed from the draft" class="dim">Remove</a></td></tr>`).join('')}</tbody></table>
+      <div style="margin-top:10px"><button class="btn" data-act="toast" data-t="Add a grant template: a relation, a kind of resource, and whether it may be passed on">Add a grant</button></div>
+      <p class="note" style="margin-top:10px">Assigning the role makes real grants that trace to the person who assigned it, so "why can X do this" is still one chain. Proposed; no role model is decided yet.</p></div>`,
+    preview: `<div class="grid2"><div class="card"><h2>What an agent in this role receives</h2><div class="code">You are Archie, ${esc(r.title)}. You answer to Tom Whiting.
+
+Your responsibilities:
+${r.resp.map(t => '- ' + esc(t)).join('\n')}
+
+How you work:
+${r.practice.map(t => '- ' + esc(t)).join('\n')}</div></div>
+      <div><div class="card"><h2>Saving v${S.roleVer[roleSel] + 1}</h2><div class="sec">${holders.length} ${holders.length === 1 ? 'holder' : 'holders'}. Each gets a new profile version to review; nothing changes under a running session.</div>
+      <div style="margin-top:12px;display:flex;gap:8px"><button class="btn primary" data-act="toast" data-t="Mock-up: not kept. A real save makes draft v${S.roleVer[roleSel] + 1}. Holders' profiles are offered the change, not forced">Save draft</button><a class="btn" href="#/model/try">Try it against the model</a></div></div></div></div>`,
+    versions: typeof roleVersions === 'function' ? roleVersions(roleSel) : '',
+  }[roleTab];
+  return `<div class="page"><div class="head"><div><div class="eyebrow">Directory</div><h1>Roles</h1><p class="sub">A role is a job and a starting point: what the holder is for, the profile an agent starts from, and the grants it usually needs. <span class="open-q">proposed</span> <span class="open-q" title="Save draft, New role and Add grant only show a message here">mock-up: edits are not kept</span></p></div><button class="btn primary" data-act="toast" data-t="New role: start from a description of the job, or copy an existing role">New role</button></div>
+    <div class="builder"><nav class="listnav">${Object.entries(S.roles).map(([k, v]) => `<a href="#/roles/${k}" class="${k === roleSel ? 'on' : ''}"><span>${esc(v.title)}</span><span class="mono dim">${S.ids.filter(x => x.role === k).length}</span></a>`).join('')}</nav>
+    <div><nav class="tabs" style="margin-top:0">${T.map(([k, l]) => `<a href="#/roles/${roleSel}/${k}" class="${roleTab === k ? 'on' : ''}">${l}</a>`).join('')}</nav>${body}</div></div></div>`;
+};
+document.addEventListener('click', e => { const c = e.target.closest('[data-toggle]'); if (c) c.classList.toggle('on'); });
+</script>
+<script>
+// ---------- Me: the signed-in person's own view. Many people use this, each with their own agents.
+let meId = 'P-0001';
+function viewMe() {
+  rows = [];
+  const me = byId(meId), mine = grantsOf(meId).filter(g => standing(g).ok), agents = S.ids.filter(a => a.human === meId && a.state !== 'retired');
+  const linked = meId === 'P-0001' ? [['Google', 'tom@…', 'signs you in'], ['GitHub', 'tomw', 'signs you in; your repositories'], ['Microsoft', '—', 'not linked']] : [['Google', 'dana@…', 'signs you in'], ['GitHub', '—', 'not linked'], ['Microsoft', 'dana@…', 'signs you in']];
+  const svc = meId === 'P-0001'
+    ? [['GitHub app', 'ablative-ci', 'push to ablative repositories', 'to agents, as a virtual credential'], ['Model providers', 'models pool', 'model access for your agents', 'to agents, as a virtual credential'], ['Accounting system', 'finance-readonly', 'read reports', 'no: use only, lent to you by Dana Reyes']]
+    : [['Accounting system', 'accounts-bot', 'read and post journals', 'to agents, as a virtual credential'], ['Bank portal', 'accounts team login', 'view statements', 'no: use only, team rule']];
+  const passable = g => /agent/.test(g.pass);
+  return `<div class="page"><div class="head"><div><div class="eyebrow">Signed in as</div><h1>${esc(me.name)}</h1><p class="sub">Your accounts, what you hold, and what you have given your agents. You can only pass on what you hold and are allowed to pass on.</p></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:22px"><span class="open-q" title="Not a feature: nobody can see this page as someone else">mock-up only · view as</span><div class="seg">${S.ids.filter(p => p.kind === 'person' && p.state === 'active').map(p => `<button data-me="${p.id}" class="${p.id === meId ? 'on' : ''}">${esc(p.name.split(' ')[0])}</button>`).join('')}</div></div></div>
+    <div class="grid2"><div>
+      <div class="section-h" style="margin-top:0"><span>What you hold</span></div>
+      <table><thead><tr><th>Relation</th><th>On</th><th>From</th><th>You may pass it on</th><th></th></tr></thead><tbody>
+      ${mine.map(g => `<tr><td class="mono" style="color:var(--accent)">${g.rel}</td><td class="mono">${g.obj}</td><td class="sec">${g.from ? esc(nameOf(grantById(g.from).holder)) : 'root'}</td><td>${passable(g) ? '<span class="pass">yes, to agents</span>' : '<span class="dim">no</span>'}</td><td>${passable(g) && agents.length ? `<button class="btn" data-act="delegate" data-g="${g.id}">Give to an agent…</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="dim">Nothing yet.</td></tr>'}</tbody></table>
+      <div class="section-h"><span>Your agents</span><button class="btn primary" data-act="commission">Register an agent</button></div>
+      <table><tbody>${agents.map(a => `<tr data-href="#/file/${a.id}"><td>${esc(a.name)}</td><td><span class="dot s-${a.state}"></span>${a.state}</td><td class="sec">${grantsOf(a.id).filter(g => g.live).map(g => g.rel + ' of ' + g.obj).join('; ') || 'no access'}</td></tr>`).join('') || '<tr><td class="dim">None.</td></tr>'}</tbody></table>
+    </div><div>
+      <div class="card"><h2>Sign-in identities</h2><div class="note" style="margin:2px 0 6px">Accounts that prove you are you. Never lent to an agent.</div>${linked.map(([p, who, what]) => `<div class="row"><span>${p} <span class="note">${what}</span></span>${who === '—' ? `<button class="btn" data-act="toast" data-t="You would sign in to ${p} once; the link is kept here, the password never is">Link</button>` : `<span class="mono dim">${who}</span>`}</div>`).join('')}
+        <div class="note" style="margin-top:6px">Several sign-in providers per person needs our fork of the sign-in service. <span class="open-q">not decided</span></div></div>
+      <div class="card"><h2>Service accounts you may use</h2><div class="note" style="margin:2px 0 6px">Accounts in other systems you are authorised to act through. Using one is not the same as being allowed to pass it on.</div>${svc.map(([sys, acct, what, pass]) => `<div class="row" style="align-items:flex-start"><span>${sys} <span class="mono dim">${acct}</span><div class="note">${what}</div></span><span class="${/^no/.test(pass) ? 'dim' : 'pass'}" style="text-align:right;max-width:46%;font-size:12px">${/^no/.test(pass) ? '' : 'passable '}${pass}</span></div>`).join('')}</div>
+      <div class="card"><h2>Your personal secrets</h2>${S.store.filter(s => s.scope === 'user' && s.owner === meId).map(s => `<div class="row"><span class="path">${esc(s.path)}</span><span class="sec">${S.vcreds.filter(v => v.from === s.path).length} lent</span></div>`).join('') || '<div class="dim">None.</div>'}<div class="note" style="margin-top:6px">Yours alone. An agent uses one only through a virtual credential you issue.</div><a class="btn" style="margin-top:8px" href="#/secrets">Open secrets</a></div>
+    </div></div></div>`;
+}
+
+// ---------- Secrets: the store underneath, virtual credentials made from it, and the leases on them.
+let secTab = 'store', secScope = 'all';
+function viewSecrets(tab) {
+  rows = []; secTab = tab || secTab;
+  const inScope = s => secScope === 'all' || (secScope === 'org' && s.scope === 'org') || (secScope === 'team' && s.scope === 'team') || (secScope === 'mine' && s.scope === 'user' && s.owner === meId);
+  const store = S.store.filter(inScope);
+  const T = [['store', 'Store'], ['virtual', 'Virtual credentials'], ['leases', 'Leases']];
+  const body = secTab === 'store' ? `<table><thead><tr><th>Secret</th><th>Kind</th><th>Scope</th><th>Owner</th><th>Value</th><th>Versions</th><th>Age</th><th>Rotation</th><th>Lent as</th></tr></thead><tbody>
+      ${store.map(s => `<tr><td class="path">${esc(s.path.split('/').slice(0, -1).join('/'))}/<b style="font-weight:500">${esc(s.path.split('/').pop())}</b></td><td class="sec">${s.kind}</td><td class="sec">${scopeName(s)}</td><td>${pillFor(s.owner)}</td><td><span class="sealed" style="width:70px"></span></td><td class="mono">${s.ver}</td><td class="mono">${s.age}</td><td style="${s.stale ? 'color:var(--warn)' : ''}" class="${s.stale ? '' : 'sec'}">${s.rot}<div class="note">${esc(s.policy)}</div></td><td class="mono">${S.vcreds.filter(v => v.from === s.path).map(v => v.id).join(' ') || '—'}</td></tr>`).join('')}</tbody></table>
+      <p class="note" style="margin-top:10px">A value goes in once and is never shown again, to anyone. Rotating it changes nothing for the agents using it: they hold virtual credentials, not the value.</p>`
+    : secTab === 'virtual' ? `<table><thead><tr><th>Credential</th><th>Made from</th><th>Held by</th><th>Acting for</th><th>How it works</th><th>Limits</th><th>Lease</th><th>Use</th><th>State</th></tr></thead><tbody>
+      ${S.vcreds.filter(v => inScope(S.store.find(s => s.path === v.from))).map(v => `<tr><td class="mono">${v.id}</td><td class="path">${esc(v.from)}</td><td>${pillFor(v.holder)}</td><td>${pillFor(v.forWho)}</td><td class="sec" style="white-space:normal">${esc(v.mode)}</td><td class="sec" style="white-space:normal">${esc(v.limits)}</td><td class="sec">${v.lease}</td><td class="mono">${v.uses}</td><td>${v.state === 'active' ? '<span class="pass">active</span>' : `<span style="color:var(--warn)">${esc(v.state)}</span>`}</td></tr>`).join('')}</tbody></table>
+      <p class="note" style="margin-top:10px">A virtual credential stands in for a secret: scoped to one holder, acting for one person, with its own limits and lease. Revoking it leaves the secret and every other credential alone.</p>`
+    : `<table><thead><tr><th>Lease</th><th>On</th><th>Holder</th><th>Ends</th><th>Revocation</th><th></th></tr></thead><tbody>
+      ${S.vcreds.filter(v => inScope(S.store.find(s => s.path === v.from))).map(v => { const src = S.store.find(s => s.path === v.from), mayRev = v.forWho === meId || (src && src.owner === meId); return `<tr><td class="mono">L-${v.id.slice(3)}</td><td class="mono">${v.id}</td><td>${pillFor(v.holder)}</td><td class="sec">${v.lease}</td><td class="sec">${v.revoked || '—'}</td><td>${v.revoked ? '' : mayRev ? `<button class="btn danger" data-act="revlease" data-v="${v.id}">Revoke</button>` : `<span class="note">${esc(nameOf(src.owner))} revokes</span>`}</td></tr>`; }).join('')}</tbody></table>
+      <p class="note" style="margin-top:10px">Revoking is two facts: this service stops issuing at once; the system behind it confirms separately. Until it does, the lease shows as pending.</p>`;
+  return `<div class="page"><div class="head"><div><div class="eyebrow">Runtime</div><h1>Secrets</h1><p class="sub">The store holds the real values. Everything anyone uses is made from it, scoped, and can be taken back.</p></div>
+    <div style="display:flex;gap:10px;align-items:center"><div class="seg">${[['all', 'All'], ['org', 'Organisation'], ['team', 'Teams'], ['mine', 'Mine']].map(([k, l]) => `<button data-scope="${k}" class="${secScope === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <button class="btn" data-act="addsecret">Add a secret</button><button class="btn primary" data-act="issue">Issue a virtual credential</button></div></div>
+    <div class="stat-strip"><div class="stat"><div class="n">${S.store.length}</div><div class="l">secrets stored</div></div><div class="stat"><div class="n">${S.vcreds.filter(v => v.state === 'active').length}</div><div class="l">virtual credentials active</div></div><div class="stat"><div class="n" style="color:var(--warn)">${S.store.filter(s => s.stale).length}</div><div class="l">overdue for rotation</div></div><div class="stat"><div class="n">0</div><div class="l">values ever shown</div></div></div>
+    <nav class="tabs" style="margin-top:0">${T.map(([k, l]) => `<a href="#/secrets/${k}" class="${secTab === k ? 'on' : ''}">${l}</a>`).join('')}</nav>${body}</div>`;
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-scope]'); if (b) { secScope = b.dataset.scope; route(); } const m = e.target.closest('[data-me]'); if (m) { meId = m.dataset.me; route(); } });
+
+// ---------- Graph: who relates to what, laid out by a small force simulation.
+let gFocus = null, gShow = { grants: true, parents: true, answers: true };
+function graphModel() {
+  const nodes = [], edges = [], at = {};
+  const add = (id, label, kind, extra = {}) => { at[id] = nodes.length; nodes.push({ id, label, kind, ...extra }); };
+  S.ids.forEach(x => add(x.id, x.name, x.kind, { state: x.state }));
+  S.res.filter(inModel).forEach(r => add(r.id, resName(r.id), r.type === 'project' || r.type === 'organisation' ? 'container' : 'resource', { svc: svcOf(r) }));
+  if (gShow.grants) S.grants.forEach(g => at[g.obj] !== undefined && edges.push({ a: g.holder, b: g.obj, kind: standing(g).ok ? 'grant' : 'void', label: g.rel, g: g.id }));
+  if (gShow.parents) S.res.filter(inModel).forEach(r => r.parent && at[r.parent] !== undefined && edges.push({ a: r.id, b: r.parent, kind: 'parent' }));
+  if (gShow.answers) S.ids.filter(x => x.human).forEach(x => edges.push({ a: x.id, b: x.human, kind: 'answers' }));
+  return { nodes, edges, at };
+}
+function layout(m, W, H) {
+  let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  m.nodes.forEach(n => { n.x = W / 2 + (rnd() - .5) * W * .6; n.y = H / 2 + (rnd() - .5) * H * .6; n.vx = 0; n.vy = 0; });
+  for (let it = 0; it < 420; it++) {
+    const k = 1 - it / 420;
+    for (let i = 0; i < m.nodes.length; i++) for (let j = i + 1; j < m.nodes.length; j++) {
+      const a = m.nodes[i], b = m.nodes[j]; let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy + .01, f = 5200 / d2;
+      const d = Math.sqrt(d2); dx /= d; dy /= d; a.vx += dx * f; a.vy += dy * f; b.vx -= dx * f; b.vy -= dy * f;
+    }
+    m.edges.forEach(e => { const a = m.nodes[m.at[e.a]], b = m.nodes[m.at[e.b]]; const dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) || 1, rest = e.kind === 'parent' ? 70 : 120, f = (d - rest) * .02; a.vx += dx / d * f * d * .05; a.vy += dy / d * f * d * .05; b.vx -= dx / d * f * d * .05; b.vy -= dy / d * f * d * .05; });
+    m.nodes.forEach(n => { n.vx += (W / 2 - n.x) * .004; n.vy += (H / 2 - n.y) * .004; n.x += Math.max(-12, Math.min(12, n.vx * k)); n.y += Math.max(-12, Math.min(12, n.vy * k)); n.vx *= .6; n.vy *= .6; n.x = Math.max(40, Math.min(W - 40, n.x)); n.y = Math.max(30, Math.min(H - 30, n.y)); });
+  }
+}
+function viewGraph(focus) {
+  rows = []; gFocus = focus || null;
+  const W = 1000, H = 600, m = graphModel(); layout(m, W, H);
+  let hot = null;
+  if (gFocus && byId(gFocus)) { hot = new Set([gFocus]); reach(gFocus).forEach(e => { hot.add(e.r.id); e.ps.forEach(c => c.chain.forEach(g => { hot.add(g.holder); hot.add(g.obj); })); ancestors(e.r).forEach(a => hot.add(a)); }); }
+  else if (gFocus && resById(gFocus)) { hot = new Set([gFocus]); ancestors(resById(gFocus)).forEach(a => hot.add(a)); whoCan(gFocus).forEach(e => { hot.add(e.x.id); e.ps.forEach(c => c.chain.forEach(g => { hot.add(g.holder); hot.add(g.obj); })); }); }
+  const col = n => n.kind === 'person' ? 'var(--accent)' : n.kind === 'agent' ? '#e8c9a6' : n.kind === 'container' ? '#8b8b96' : '#5f7f9a';
+  const shape = n => n.kind === 'container' ? `<rect x="-9" y="-9" width="18" height="18" rx="4" fill="var(--surface-card)" stroke="${col(n)}" stroke-width="1.5"/>` : n.kind === 'resource' ? `<rect x="-6" y="-6" width="12" height="12" rx="2" transform="rotate(45)" fill="var(--surface-card)" stroke="${col(n)}" stroke-width="1.5"/>` : `<circle r="${n.kind === 'person' ? 9 : 7}" fill="${n.state === 'active' ? col(n) : 'var(--surface-card)'}" stroke="${col(n)}" stroke-width="1.5" ${n.state === 'retired' ? 'stroke-dasharray="2 2"' : ''}/>`;
+  const svg = `<svg viewBox="0 0 ${W} ${H}" id="gsvg">${m.edges.map(e => { const a = m.nodes[m.at[e.a]], b = m.nodes[m.at[e.b]], on = hot && hot.has(e.a) && hot.has(e.b); return `<line class="ge ${e.kind} ${hot ? (on ? 'hot' : 'dimmed') : ''}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}"><title>${e.label ? esc(nameOf(e.a)) + ' is ' + e.label + ' of ' + e.b : ''}</title></line>`; }).join('')}
+    ${m.nodes.map(n => `<g class="gn ${hot && !hot.has(n.id) ? 'dimmed' : ''}" transform="translate(${n.x.toFixed(1)},${n.y.toFixed(1)})" data-gnode="${n.id}">${shape(n)}<text x="13" y="4">${esc(n.label)}</text></g>`).join('')}</svg>`;
+  const side = gFocus ? (byId(gFocus) ? `<div class="node-card"><h2>${esc(nameOf(gFocus))}</h2><div class="note" style="margin:4px 0 8px">Highlighted: everything it can reach, and the grants that give it.</div>${reach(gFocus).map(e => `<a class="row" style="padding:6px 0;text-decoration:none;color:inherit;align-items:flex-start" href="#/resources/${e.r.id}"><span>${esc(e.r.type === 'project' || e.r.type === 'organisation' ? e.r.id : e.r.name)}<div style="margin-top:3px">${svcTag(svcOf(e.r))}${status(svcOf(e.r)) === 'enforcing' ? '' : ' <span class="enf registered">not enforced</span>'}</div></span><span class="mono dim" style="text-align:right">${e.ps.map(c => c.perm).join(', ')}</span></a>`).join('') || '<div class="dim">Nothing.</div>'}<div style="margin-top:10px;display:flex;gap:8px"><a class="btn" href="#/file/${gFocus}/access">Open file</a><a class="btn" href="#/graph">Clear</a></div></div>`
+      : `<div class="node-card"><h2>${esc(resName(gFocus))}</h2><div class="note" style="margin:4px 0 8px">Highlighted: everyone who can reach it, and why.</div>${whoCan(gFocus).map(e => `<div class="row" style="padding:4px 0"><span>${pillFor(e.x.id)}</span><span class="mono dim">${e.ps.map(c => c.perm).join(', ')}</span></div>`).join('') || '<div class="dim">Nobody.</div>'}<div style="margin-top:10px;display:flex;gap:8px"><a class="btn" href="#/resources/${gFocus}">Open resource</a><a class="btn" href="#/graph">Clear</a></div></div>`)
+    : `<div class="node-card"><h2>Click anything</h2><div class="note">A person or agent lights up what it can reach. A resource lights up who can reach it. The same answers as the Access page, drawn.</div></div>`;
+  return `<div class="page"><div class="head"><div><div class="eyebrow">Access</div><h1>Graph</h1><p class="sub">Every person, agent and resource, and the relations between them.</p></div>
+    <div style="display:flex;gap:6px">${[['grants', 'Grants'], ['parents', 'Containment'], ['answers', 'Who answers for whom']].map(([k, l]) => `<span class="chk ${gShow[k] ? 'on' : ''}" data-gshow="${k}">${l}</span>`).join('')}</div></div>
+    <div class="split" style="grid-template-columns:minmax(0,1fr) 300px"><div class="graph-wrap" style="height:calc(100vh - 170px);min-height:460px">${svg}
+      <div class="legend"><span><i style="border-color:rgba(212,151,90,.7)"></i>grant</span><span><i style="border-color:rgba(248,113,113,.6);border-top-style:dashed"></i>does not stand</span><span><i style="border-color:rgba(255,255,255,.25)"></i>inside</span><span><i style="border-color:rgba(255,255,255,.18);border-top-style:dotted"></i>answers to</span><span>● person · ● agent · ■ project · ◆ resource</span></div></div>
+    <div>${side}</div></div></div>`;
+}
+document.addEventListener('click', e => { const n = e.target.closest('[data-gnode]'); if (n) location.hash = '#/graph/' + n.dataset.gnode; const s = e.target.closest('[data-gshow]'); if (s) { gShow[s.dataset.gshow] = !gShow[s.dataset.gshow]; route(); } });
+</script>
+<script>
+// ---------- Network: the machines, what each may reach, and where agents may run. Proposed.
+function viewNetwork() {
+  rows = [];
+  const W = 640, H = 300, pos = { 'N-1': [120, 90], 'N-2': [120, 210], 'N-3': [300, 250], 'N-4': [480, 90], 'N-5': [480, 220] };
+  const topo = `<svg viewBox="0 0 ${W} ${H}"><circle cx="300" cy="150" r="30" fill="none" stroke="rgba(255,255,255,.12)" stroke-dasharray="3 3"/><text x="300" y="154" text-anchor="middle" style="font:10px 'JetBrains Mono';fill:var(--text-muted)">home net</text>
+    <line x1="300" y1="120" x2="300" y2="24" class="ge"/><rect x="250" y="6" width="100" height="20" rx="10" fill="var(--surface-card)" stroke="rgba(255,255,255,.12)"/><text x="300" y="20" text-anchor="middle" style="font:10.5px 'DM Sans';fill:var(--text-secondary)">internet, by allowlist</text>
+    ${S.nodes.map(n => { const [x, y] = pos[n.id], ok = n.rstate === 'reporting'; return `<line x1="300" y1="150" x2="${x}" y2="${y}" class="ge ${ok ? 'grant' : n.runtime === 'none' ? '' : 'void'}"/><g class="gn" data-act="node" data-n="${n.id}" transform="translate(${x},${y})"><rect x="-58" y="-20" width="116" height="40" rx="8" fill="var(--surface-card)" stroke="${ok ? 'rgba(212,151,90,.5)' : 'rgba(255,255,255,.14)'}"/><text x="0" y="-3" text-anchor="middle" style="fill:var(--text-primary)">${esc(n.name)}</text><text x="0" y="12" text-anchor="middle" style="font:9.5px 'JetBrains Mono';fill:${ok ? 'var(--text-muted)' : 'var(--warn)'}">${n.runtime === 'none' ? 'no runtime' : n.runtime + (ok ? ' · ' + n.slots[0] + '/' + n.slots[1] : ' · silent')}</text></g>`; }).join('')}</svg>`;
+  return `<div class="page"><div class="head"><div><div class="eyebrow">Runtime</div><h1>Network</h1><p class="sub">The machines agents can run on, what each may reach, and which agents may run where. <span class="open-q">proposed</span></p></div><button class="btn" data-act="toast" data-t="Add a machine: install a runtime on it (Manifold, Liminal or your own) and approve it here">Add a machine</button></div>
+    <div class="split" style="grid-template-columns:minmax(0,1fr) 360px"><div>
+      <div class="graph-wrap" style="height:300px">${topo}</div>
+      <table style="margin-top:14px"><thead><tr><th>Machine</th><th>Runtime</th><th>Reporting</th><th>Slots</th><th>May run</th><th>May reach</th><th>Running now</th></tr></thead><tbody>
+      ${S.nodes.map(n => `<tr data-act="node" data-n="${n.id}" style="cursor:pointer"><td>${esc(n.name)} <span class="note">${n.kind}</span></td><td class="sec">${n.runtime}</td><td>${n.rstate === 'reporting' ? '<span class="dot s-active"></span>yes' : n.runtime === 'none' ? '<span class="dim">—</span>' : `<span style="color:var(--warn)">${esc(n.rstate)}</span>`}</td><td style="min-width:70px"><span class="mono">${n.slots[0]}/${n.slots[1]}</span>${pctBar(n.slots[0], n.slots[1])}</td><td class="sec" style="white-space:normal">${esc(n.allowed)}</td><td class="sec" style="white-space:normal">${esc(n.egress)}</td><td>${n.sessions.map(s => pillFor(s)).join('') || '<span class="dim">—</span>'}</td></tr>`).join('')}</tbody></table>
+    </div><div>
+      <div class="node-card"><h2>Where agents may run</h2>${[['Accounts assistant', 'Build box only: it handles the ledger'], ['Builders', 'Laptop A, Laptop B, Build box'], ['Identity and design roles', 'Studio Mac, Build box']].map(([w, r]) => `<div class="row"><span>${w}</span><span class="sec" style="text-align:right">${r}</span></div>`).join('')}</div>
+      <div class="node-card"><h2>What agents may reach</h2>${[['Everyone', 'this service, model providers'], ['Builders', '+ git host, package registries'], ['Accounts', '+ accounting system only']].map(([w, r]) => `<div class="row"><span>${w}</span><span class="sec" style="text-align:right">${r}</span></div>`).join('')}<div class="note" style="margin-top:6px">Applied by the runtime on each machine. A machine with no runtime enforces nothing, so no agent is placed there.</div></div>
+      <div class="node-card"><h2>How an agent starts</h2><div class="sec" style="font-size:12.5px">This service checks and gives you a command. You run it on the machine; the agent reports in, signed with its own key. It does not run agents itself.</div><div class="note" style="margin-top:6px">Later, optional: a terminal view, or a sandbox, VM or container service. <span class="open-q">proposed</span></div></div>
+    </div></div></div>`;
+}
+
+// ---------- Starting an agent: profile, where, checks, the request, and what the runtime says.
+function startDrawer(id, nodeId) {
+  const x = byId(id), p = S.prov[id] || S.prov['A-0007'], n = S.nodes.find(z => z.id === nodeId) || S.nodes[0];
+  const review = S.reviews[id], needs = ['model providers', ...p.mcp.filter(m => !/this service/.test(m))], missing = needs.filter(nd => !n.egress.includes(nd));
+  const role = x.role, allowedHere = n.runtime !== 'none' && (n.id === 'N-4' || (/builder/.test(role) ? /N-2|N-3/.test(n.id) : /lead|verifier/.test(role) ? n.id === 'N-1' : false));
+  const checks = [
+    [x.state === 'active', `${x.name} is active`, `${x.name} is ${x.state}`],
+    [!!review, `Profile ${review} <span class="note">(sample record)</span>`, `Profile ${p.ver} has no review on record`],
+    [allowedHere, `${n.name} may run this role`, `${n.name} is not allowed for ${S.roles[role].title.toLowerCase()}s`],
+    [n.slots[0] < n.slots[1], `A slot is free (${n.slots[0]} of ${n.slots[1]} in use)`, `No slot free on ${n.name}`],
+    [S.vcreds.some(v => v.holder === id && v.state === 'active'), 'Its virtual credentials are valid', 'It holds no valid virtual credential'],
+    [!missing.length, `${n.name} may reach ${needs.join(', ')} <span class="note">(its egress list)</span>`, `${n.name} may not reach ${missing.join(', ')}`],
+  ];
+  const ok = checks.every(c => c[0]);
+  return dHead('Lifecycle', `Start ${esc(x.name)}`, 'This service checks and records; the machine\'s runtime starts it and says whether it did.')
+    + `<div class="field"><label>1. Profile</label><select class="inline-in"><option>${p.ver} · ${esc(p.model)} · ${p.tools.length} tools · ${p.mcp.length} MCP</option></select></div>
+    <div class="field"><label>2. Where</label><select id="stNode" data-act-change="startnode" data-id="${id}">${S.nodes.map(z => `<option value="${z.id}" ${z.id === n.id ? 'selected' : ''}>${esc(z.name)} · ${z.runtime}${z.rstate === 'reporting' ? '' : ' · ' + z.rstate}</option>`).join('')}</select></div>
+    <div class="section-h">3. Checks</div><div class="card">${checks.map(([good, yes, no]) => `<div class="row" style="padding:4px 0"><span>${good ? yes : no}</span><span class="${good ? 'pass' : 'fail'} mono">${good ? 'ok' : 'no'}</span></div>`).join('')}</div>
+    <div class="section-h">4. Request</div><div id="stOut" class="card sec">${ok ? `Asks ${n.runtime} on ${esc(n.name)} to start it, with the rendered profile and virtual credentials. Nothing is shown as running until the runtime confirms.` : 'Fix what is refused above first; nothing is sent.'}</div>`
+    + `<div style="margin-top:14px;display:flex;gap:8px"><button class="btn primary" data-act="startdo" data-id="${id}" data-n="${n.id}" ${ok ? '' : 'disabled style="opacity:.4"'}>Ask to start</button><button class="btn" data-act="close">Cancel</button></div>`;
+}
+
+// ---------- The dock: help or the assistant, one at a time, beside the screen.
+let dockMode = pref('dock-panel', '') || null, helpSel = null, explaining = false, shareScreen = false;
+const CONCEPTS = [
+  { id: 'grant', t: 'Grant', s: 'Who holds which relation on what, and the person it traces back to.', sel: '.chain', body: 'Every grant is five facts: who holds it, the relation, the object, who it derives from, and whether it may be passed on. Withdrawing a grant withdraws everything derived from it.' },
+  { id: 'state', t: 'State', s: 'Registered, active, suspended or retired. Authority only.', sel: '.state', body: 'State says what an identity is allowed to be doing, not whether anything is running. Sessions are counted separately, as the runtimes report them.' },
+  { id: 'kind', t: 'Person or agent', s: 'Both are identities. Every agent answers to a person.', sel: '.kind', body: 'People sign in. Agents are registered by a person who then answers for them. Anything a person can do here, an agent can do through its tools, if it holds the grant.' },
+  { id: 'check', t: 'Can this be done?', s: 'Ask any way round; every answer shows its path.', sel: '.check', body: 'Yes answers show the chain to a person. No answers say which kind of refusal it is: no grant, identity not active, authority withdrawn upstream, or a type the model does not have.' },
+  { id: 'enf', t: 'Enforcement', s: 'Whether the product holding the resource actually asks.', sel: '.enf', body: 'A product can be in the model and still not ask before acting. Until it asks, answers about its resources are not enforced there.' },
+  { id: 'svc', t: 'Where a type comes from', s: 'Built in, or added by a connected product.', sel: '.svc', body: 'This service has its own types and works with nothing else installed. Other products, ours or not, add theirs when a person approves them.' },
+  { id: 'open', t: 'Open', s: 'Not decided yet.', sel: '.open-q', body: 'Anything marked open or proposed is shown so it can be discussed. It is not settled behaviour.' },
+  { id: 'sealed', t: 'Sealed value', s: 'Never shown, to anyone.', sel: '.sealed', body: 'Secret values go into the store once. Agents use virtual credentials made from them; people use them through the same.' },
+  { id: 'stat', t: 'At a glance', s: 'Counts for this screen.', sel: '.stat-strip', body: 'Each number opens the list behind it.' },
+  { id: 'preview', t: 'Preview', s: 'The selected row, without leaving the list.', sel: '.preview', body: 'Move with j and k, or hover. Enter opens the whole file.' },
+  { id: 'graph', t: 'Graph', s: 'The same answers as Access, drawn.', sel: '#gsvg', body: 'Click a person or agent to light what it reaches; click a resource to light who reaches it.' },
+  { id: 'scope', t: 'Scope', s: 'Organisation, team, or yours alone.', sel: '[data-scope]', body: 'A personal secret is yours. An agent uses it only through a virtual credential you issue, acting for you.' },
+  { id: 'tabs', t: 'Sections', s: 'Each section has its own address.', sel: '.tabs', body: 'Keys 1 to 7 switch sections of a file. Every section can be linked to.' },
+  { id: 'rail', t: 'The rail', s: 'Every screen, one key away.', sel: '#rail', body: 'g then a letter goes to a screen. [ shows or hides labels. The rail and dock can sit on either side.' },
+];
+function renderDock() {
+  const d = $('#dock'); if (!d) return;
+  d.classList.toggle('open', !!dockMode);
+  document.querySelectorAll('[data-dockbtn]').forEach(b => b.classList.toggle('on', b.dataset.dockbtn === dockMode));
+  if (!dockMode) { d.innerHTML = ''; return; }
+  if (dockMode === 'help') {
+    const c = helpSel && CONCEPTS.find(z => z.id === helpSel);
+    d.innerHTML = `<div class="dock-in"><div class="dock-head"><span style="display:flex;gap:6px;align-items:center">${c ? '<button class="icon-btn" data-help="" title="Back">‹</button>' : ''}<b style="font-weight:600">${c ? esc(c.t) : 'Help'}</b></span><span style="display:flex;gap:4px"><button class="btn" data-act="explain" title="Number everything on this screen (?)">Explain this screen <span class="kbd">?</span></button><button class="icon-btn" data-dockbtn-close title="Close">×</button></span></div>
+      <div class="dock-body">${c ? `<div class="sheet"><p style="color:var(--text-primary)">${esc(c.s)}</p><p>${esc(c.body)}</p></div><div class="section-h">Read next</div>${CONCEPTS.filter(z => z.id !== c.id).slice(0, 3).map(z => `<div class="concept" data-help="${z.id}"><div class="t">${esc(z.t)}</div></div>`).join('')}`
+        : `<input class="search" id="helpQ" placeholder="Search help…"><div id="helpList" style="margin-top:8px">${CONCEPTS.map(z => `<div class="concept" data-help="${z.id}"><div class="t">${esc(z.t)}</div><div class="s">${esc(z.s)}</div></div>`).join('')}</div>`}</div></div>`;
+  } else {
+    const where = (location.hash || '#/people').slice(2).split('/').slice(0, 2).join(' / ');
+    d.innerHTML = `<div class="dock-in"><div class="dock-head"><b style="font-weight:600">Assistant</b><span style="display:flex;gap:6px;align-items:center"><span class="chk ${shareScreen ? 'on' : ''}" data-share>${shareScreen ? 'Sees this screen' : 'Share this screen'}</span><button class="icon-btn" data-dockbtn-close title="Close">×</button></span></div>
+      <div class="dock-body">${shareScreen ? `<div style="margin-bottom:12px"><span class="ctx">looking at: ${esc(where)}</span></div>` : ''}
+        <div class="msg me">Why can Chippy read #identity?</div>
+        <div class="msg ai">Through <b>G-5</b>: Tom Whiting owns ablative, and so project:identity; Tom Whiting gave Chippy <b>viewer</b> of project:identity, and #identity is inside it. Read needs viewer or more.</div>
+        <div class="msg me">Give the accounts assistant read access to the invoice format for a day.</div>
+        <div class="msg ai">That is viewer of project:identity, which Dana Reyes can't pass on; it traces to Tom Whiting. I've drafted it as a request to Tom Whiting:</div>
+        <div class="consent"><b style="font-weight:500">Request: viewer of project:identity, 1 day</b><div class="note" style="margin:4px 0 8px">For Accounts assistant · approver Tom Whiting · adds read on #identity, view on card_build</div><div style="display:flex;gap:8px"><button class="btn primary" data-act="toast" data-t="Sent to Tom Whiting as a request">Send request</button><button class="btn" data-act="toast" data-t="Discarded">Discard</button></div></div>
+        <div class="note">The assistant is an agent too: it acts through its own grants, and anything it changes goes through the same requests and approvals as everyone else.</div></div>
+      <div class="dock-foot"><div class="composer"><textarea id="askIn" placeholder="Ask about anyone's access, or ask for a change…"></textarea><button class="btn primary" data-act="ask">Ask</button></div><div class="note" style="margin-top:6px">Not connected in this mock-up. Which runtime powers it is <span class="open-q">open</span></div></div></div>`;
+  }
+}
+function toggleDock(m) { dockMode = dockMode === m ? null : m; setPref('dock-panel', dockMode || ''); helpSel = null; renderDock(); }
+function explainOn() {
+  closeAllV3(); explaining = true;
+  const vw = innerWidth, vh = innerHeight, placed = [];
+  const marks = CONCEPTS.map(c => { const el = [...document.querySelectorAll(c.sel)].find(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.bottom > 0 && r.top < vh && r.left < vw && !e.closest('.xlayer'); }); return el ? { c, r: el.getBoundingClientRect(), el } : null; }).filter(Boolean);
+  const layer = document.createElement('section'); layer.className = 'xlayer'; layer.setAttribute('aria-label', 'Explain mode'); layer.id = 'xlayer';
+  layer.innerHTML = `<div data-xabsorb style="position:absolute;inset:0;pointer-events:auto;background:rgba(0,0,0,.18)"></div>` + marks.map((m, i) => { let x = Math.max(4, m.r.left - 8), y = Math.max(4, m.r.top - 8); while (placed.some(([a, b]) => Math.abs(a - x) < 20 && Math.abs(b - y) < 20)) x += 22; placed.push([x, y]); return `<button class="xm" style="left:${x}px;top:${y}px" data-xm="${m.c.id}" aria-label="Explain: ${esc(m.c.t)}">${i + 1}</button>`; }).join('')
+    + `<div class="xbar">${marks.length} things explained · click a number <button class="btn" data-xoff>Done <span class="kbd">Esc</span></button></div><div class="xcard" id="xcard" style="display:none"></div>`;
+  document.body.appendChild(layer);
+  const first = layer.querySelector('.xm'); first && first.focus();
+}
+function explainOff() { const l = $('#xlayer'); if (l) l.remove(); if (explaining) { explaining = false; const b = document.querySelector('[data-act="explain"]') || $('#screen'); b.focus(); } }
+const closeAllV3 = closeAll;
+closeAll = function () { explainOff(); closeAllV3(); };
+document.addEventListener('mouseover', e => { const m = e.target.closest('[data-xm]'); const card = $('#xcard'); if (!card) return; if (!m) { card.style.display = 'none'; return; } const c = CONCEPTS.find(z => z.id === m.dataset.xm), r = m.getBoundingClientRect(); card.innerHTML = `<b>${esc(c.t)}</b>${esc(c.s)}`; card.style.display = 'block'; card.style.left = Math.min(innerWidth - 280, r.right + 8) + 'px'; card.style.top = Math.min(innerHeight - 90, r.top) + 'px'; });
+document.addEventListener('click', e => {
+  // Explain mode swallows the click that dismisses it, so nothing underneath is pressed by accident.
+  if (e.target.closest('[data-xabsorb],[data-xoff]')) { e.stopImmediatePropagation(); e.preventDefault(); explainOff(); return; }
+  const xm = e.target.closest('[data-xm]'); if (xm) { e.stopImmediatePropagation(); explainOff(); helpSel = xm.dataset.xm; dockMode = 'help'; setPref('dock-panel', 'help'); renderDock(); return; }
+  const db = e.target.closest('[data-dockbtn]'); if (db) return toggleDock(db.dataset.dockbtn);
+  if (e.target.closest('[data-dockbtn-close]')) { dockMode = null; setPref('dock-panel', ''); return renderDock(); }
+  const h = e.target.closest('[data-help]'); if (h) { helpSel = h.dataset.help || null; return renderDock(); }
+  if (e.target.closest('[data-share]')) { shareScreen = !shareScreen; return renderDock(); }
+}, true);
+document.addEventListener('input', e => { if (e.target.id === 'helpQ') { const q = e.target.value.toLowerCase(); $('#helpList').innerHTML = CONCEPTS.filter(z => (z.t + ' ' + z.s + ' ' + z.body).toLowerCase().includes(q)).map(z => `<div class="concept" data-help="${z.id}"><div class="t">${esc(z.t)}</div><div class="s">${esc(z.s)}</div></div>`).join('') || '<div class="dim">Nothing matches.</div>'; } });
+document.addEventListener('keydown', e => {
+  if (explaining && e.key === 'Escape') { e.stopImmediatePropagation(); return explainOff(); }
+  if (/input|select|textarea/i.test(e.target.tagName)) return;
+  if (e.key === '?') { e.preventDefault(); return explaining ? explainOff() : explainOn(); }
+}, true);
+
+// ---------- Acts added in v4; everything else goes to the v3 acts.
+const actV3 = act;
+act = function (a, el) {
+  const id = el && el.dataset.id, x = id && byId(id);
+  if (a === 'explain') return explainOn();
+  if (a === 'ask') { const t = $('#askIn'); t.value = ''; return toast('Not connected in this mock-up'); }
+  if (a === 'node') { const n = S.nodes.find(z => z.id === el.dataset.n); return drawer(dHead('Machine', esc(n.name), `${n.kind} · ${esc(n.where)}`) + `<div class="card"><dl class="facts"><dt>Runtime</dt><dd>${n.runtime}</dd><dt>Reporting</dt><dd>${esc(n.rstate)}</dd><dt>Slots</dt><dd>${n.slots[0]} of ${n.slots[1]} in use</dd><dt>May run</dt><dd>${esc(n.allowed)}</dd><dt>May reach</dt><dd>${esc(n.egress)}</dd><dt>Running now</dt><dd>${n.sessions.map(s => pillFor(s)).join('') || '—'}</dd></dl></div>${n.rstate !== 'reporting' && n.runtime !== 'none' ? '<div class="note" style="margin-top:8px;color:var(--warn)">Its runtime has gone quiet. Sessions it last reported are shown as unconfirmed; nothing is assumed stopped.</div>' : ''}`); }
+  if (a === 'start') return drawer(startDrawer(id, x.role === 'accounts' ? 'N-4' : 'N-1'));
+  if (a === 'startnode') { $('#drawer').innerHTML = startDrawer(el.dataset.id, el.value); return; }
+  if (a === 'startdo') {
+    const n = S.nodes.find(z => z.id === el.dataset.n); el.disabled = true; el.style.opacity = .4;
+    $('#stOut').innerHTML = `<div>Asked ${n.runtime} on ${esc(n.name)} at ${hhmm()}. <span style="color:var(--accent)">starting…</span></div>`;
+    const asked = hhmm(), out = $('#stOut'), rq = 'SR-' + Date.now().toString(36); out.dataset.rq = rq;
+    setTimeout(() => {
+      // The record changes whatever is on screen; the words go only to the drawer that asked.
+      const show = out.isConnected && out.dataset.rq === rq;
+      if (n.rstate !== 'reporting') {
+        S.sessions.push({ who: id, where: n.name, runtime: n.runtime, started: asked, status: 'unconfirmed', ctx: 'start requested, no answer', forWho: nameOf(x.human) });
+        hist(id, `start requested on ${n.name} at ${asked}; ${n.runtime} has not answered`); bump();
+        if (show) out.innerHTML = `<div style="color:var(--warn)">Unconfirmed: asked ${n.runtime} on ${esc(n.name)} at ${asked}, no answer yet (${esc(n.rstate)}).</div><div class="note" style="margin-top:4px">It may or may not have started. The request stands, so asking another machine could start it twice. Wait for ${esc(n.name)} to report, or withdraw the request and confirm it was not started.</div><button class="btn" style="margin-top:8px" data-act="toast" data-t="Withdrawal asked for. It stays unconfirmed until ${esc(n.name)} reports.">Withdraw request</button>`;
+        return;
+      }
+      n.slots[0]++; n.sessions.push(id); S.sessions.push({ who: id, where: n.name, runtime: n.runtime, started: hhmm(), status: 'running', ctx: 'profile ' + (S.prov[id] || {}).ver, forWho: nameOf(x.human) });
+      hist(id, `started on ${n.name}, confirmed by ${n.runtime}`); bump();
+      if (show) out.innerHTML = `<div class="pass">Running on ${esc(n.name)}, confirmed by ${n.runtime} at ${hhmm()}.</div><div class="note" style="margin-top:4px">Its session is on the Sessions tab. What it does from here is the runtime's to show.</div>`;
+    }, 1100); return;
+  }
+  function cannotGive(g) {
+    const rels = ['owner', 'editor', 'viewer'];
+    const out = grantsOf(meId).filter(x => standing(x).ok && !/agent/.test(x.pass)).map(x => [`${x.rel} of ${x.obj}`, `You may use it; ${x.id} does not let you pass it on.`]);
+    rels.filter(r => rels.indexOf(r) < rels.indexOf(g.rel)).forEach(r => out.push([`${r} of ${g.obj}`, 'More than you hold.']));
+    if (meId === 'P-0001') out.push(['Accounting system · finance-readonly', 'A service account lent to you for use only.']);
+    else out.push(['Bank portal · accounts team login', 'Team rule: people only, never agents.']);
+    out.push(['Your sign-in identities', 'They prove who you are. No agent can hold them.']);
+    return out.map(([w, why]) => `<div class="why-not"><b>${esc(w)}</b><div class="note">${why}</div></div>`).join('');
+  }
+  if (a === 'delegate') {
+    const g = grantById(el.dataset.g), agents = S.ids.filter(b => b.human === meId && b.state !== 'retired');
+    const rels = ['owner', 'editor', 'viewer'], rank = r => rels.indexOf(r);
+    return drawer(dHead('Your access', `Give part of ${g.rel} of ${g.obj} to an agent`, 'Only what you hold and may pass on. It traces back to you, and ends when yours does.')
+      + `<div class="field"><label>To</label><select id="dTo">${agents.map(b => `<option value="${b.id}">${esc(b.name)}${b.state !== 'active' ? ' (' + b.state + ')' : ''}</option>`).join('')}</select></div>
+      <div class="field"><label>Relation</label><div>${rels.map(r => rank(r) < rank(g.rel) ? `<span class="chk" style="opacity:.4" title="More than you hold">${r}</span>` : `<span class="chk ${r === 'viewer' ? 'on' : ''}" data-pickrel="${r}">${r}</span>`).join('')}</div><div class="note">Greyed: more than you hold.</div></div>
+      <div class="field"><label>Lasts</label><select id="dLease"><option>7 days</option><option>ends with assignment</option><option>no end</option></select></div>
+      <div class="field"><label>May the agent pass it on</label><select id="dPass"><option>no</option><option disabled>to agents (you may not allow this for ${g.rel})</option></select></div>
+      <div class="card" style="margin-top:4px"><h2>Where it comes from</h2>
+        <div class="row"><span class="sec">Source grant</span><span class="mono">${g.id} · ${g.rel} of ${g.obj}</span></div>
+        <div class="row"><span class="sec">Actions it allows</span><span class="mono">${g.rel === 'owner' ? 'view, edit, grant' : g.rel === 'editor' ? 'view, edit' : 'view'}</span></div>
+        <div class="row"><span class="sec">You may pass it on</span><span class="pass">${g.pass}</span></div>
+        <div class="row"><span class="sec">Ends no later than <span class="open-q" title="The rule is shown, not exercised: nothing here expires">illustrative</span></span><span>${g.lease && g.lease !== 'no end' ? g.lease + ', when yours does' : 'when yours ends or is revoked'}</span></div></div>
+      <div class="card"><h2>What you can't give</h2>${cannotGive(g)}</div>` + dButtons('Give', 'delegatedo', `data-g="${g.id}"`));
+  }
+  if (a === 'delegatedo') { const g = grantById(el.dataset.g), to = $('#dTo').value, rel = (document.querySelector('[data-pickrel].on') || {}).dataset?.pickrel || 'viewer'; S.grants.push({ id: 'G-' + (S.grants.length + 1), holder: to, rel, obj: g.obj, from: g.id, pass: 'not passable', live: true, lease: $('#dLease').value, used: 'not yet' }); hist(to, `given ${rel} of ${g.obj} by ${nameOf(meId)}`); bump(); closeAll(); route(); return toast(`Given. ${nameOf(to)} can now ${rel === 'viewer' ? 'view' : 'edit'} ${g.obj}, through you.`); }
+  if (a === 'addsecret') return drawer(dHead('Secrets', 'Add a secret', 'The value goes straight into the store. After this, no one sees it again, including you.')
+    + `<div class="field"><label>Name</label><input id="sPath" class="mono" value="team/identity/"></div><div class="field"><label>Kind</label><select><option>API key</option><option>OAuth client</option><option>password</option><option>certificate</option><option>SSH key</option></select></div>
+      <div class="field"><label>Scope</label><select id="sScope"><option value="team">Team: Identity</option><option value="org">Organisation</option><option value="user">Only me</option></select></div>
+      <div class="field"><label>Value</label><input type="password" value="············" autocomplete="off"></div><div class="field"><label>Rotation</label><select><option>every 30 days</option><option>every 90 days</option><option>I will rotate it</option></select></div>` + dButtons('Store it', 'addsecretdo'));
+  if (a === 'addsecretdo') { S.store.push({ path: $('#sPath').value || 'team/identity/new', kind: 'API key', scope: $('#sScope').value, team: 'Identity', owner: meId, ver: 1, age: 'just now', rot: 'not yet due', policy: 'every 30 days' }); closeAll(); route(); return toast('Stored. The value is sealed.'); }
+  if (a === 'issue') {
+    const lendable = s => s.owner === meId && !s.lend, mayLend = S.store.filter(lendable), cannot = S.store.filter(s => !lendable(s)), mine = S.ids.filter(b => b.kind === 'agent' && b.state === 'active' && b.human === meId);
+    const whyNot = s => s.lend ? s.lend : s.scope === 'user' ? `personal to ${nameOf(s.owner)}; only its owner lends it` : `owned by ${nameOf(s.owner)}; ask them to lend it`;
+    return drawer(dHead('Secrets', 'Issue a virtual credential', 'Stands in for a secret: one holder, acting for one person, with its own limits and lease.')
+    + `<div class="field"><label>Made from</label><select id="iFrom">${mayLend.map(s => `<option>${esc(s.path)}</option>`).join('')}</select><div class="note">Secrets you own. Others below.</div></div>
+      <div class="field"><label>Held by</label><select id="iTo">${mine.map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select><div class="note">Your own active agents.</div></div>
+      <div class="field"><label>How</label><select id="iMode"><option>proxied: calls go through this service</option><option>short-lived token, minted per session</option><option>token exchanged per call</option></select></div>
+      <div class="field"><label>Limits</label><input id="iLim" value="read only; $20 a month"></div><div class="field"><label>Lease</label><select id="iLease"><option>7 days</option><option>30 days</option><option>ends with assignment</option></select></div>
+      <div class="note" style="margin-top:8px">It acts for you, ${esc(nameOf(meId))}.</div>
+      <div class="card" style="margin-top:10px"><h2>What you can't lend</h2>${cannot.map(s => `<div class="why-not"><b>${esc(s.path)}</b><div class="note">${whyNot(s)}</div></div>`).join('') || '<div class="dim">Nothing.</div>'}</div>` + dButtons('Issue', 'issuedo'));
+  }
+  if (a === 'issuedo') { S.vcreds.push({ id: 'VC-' + (S.vcreds.length + 1), from: $('#iFrom').value, holder: $('#iTo').value, forWho: meId, mode: $('#iMode').value, limits: $('#iLim').value, lease: $('#iLease').value, uses: 0, state: 'active' }); bump(); closeAll(); location.hash = '#/secrets/virtual'; route(); return toast('Issued. The holder never sees the secret.'); }
+  if (a === 'revlease') { const v = S.vcreds.find(z => z.id === el.dataset.v); v.state = 'revoked here; upstream pending'; v.revoked = `stopped issuing ${hhmm()}; upstream: pending`; route(); setTimeout(() => { v.revoked = `stopped issuing; upstream confirmed ${hhmm()}`; v.state = 'revoked'; if (/secrets/.test(location.hash)) route(); }, 1600); return toast('Stopped issuing. Waiting for the system behind it to confirm.'); }
+  return actV3(a, el);
+};
+document.addEventListener('click', e => { const r = e.target.closest('[data-pickrel]'); if (r) { document.querySelectorAll('[data-pickrel]').forEach(z => z.classList.toggle('on', z === r)); } });
+
+// ---------- The file gains a Start button; routes gain the new screens.
+const viewFileV3 = viewFile;
+viewFile = function (id, tab) { const x = byId(id); let h = viewFileV3(id, tab); if (x && x.kind === 'agent' && x.state === 'active') h = h.replace('<button class="btn danger" data-act="stop"', `<button class="btn primary" data-act="start" data-id="${id}">Start…</button><button class="btn danger" data-act="stop"`); return h; };
+route = function () {
+  let [, view, a, b] = (location.hash || '#/people').split('/');
+  if (view === 'vault') view = 'secrets';
+  document.querySelectorAll('.rail a').forEach(el => el.classList.toggle('on', el.dataset.nav === (view === 'file' ? 'people' : view)));
+  const Vw = { file: () => viewFile(a, b), roles: () => viewRoles(a, b), resources: () => viewResources(a), access: () => viewAccess(a, b), requests: () => viewRequests(a), reviews: viewReviews, secrets: () => viewSecrets(a), connections: viewConnections, sessions: viewSessions, model: () => viewModel(a), settings: () => viewSettings(a), graph: () => viewGraph(a), network: viewNetwork, me: viewMe };
+  $('#screen').innerHTML = (Vw[view] || viewPeople)();
+  const nReq = S.requests.filter(r => r.state === 'waiting').length + S.acts.filter(q => q.state === 'waiting').length;
+  const nRev = S.grants.filter(g => byId(g.holder).kind === 'agent' && g.live && byId(g.holder).state !== 'retired' && !S.review.done[g.id]).length;
+  $('#cntReq').textContent = nReq || ''; $('#cntReq').style.display = nReq ? '' : 'none';
+  $('#cntRev').textContent = nRev || ''; $('#cntRev').style.display = nRev ? '' : 'none';
+  if (dockMode === 'assistant') renderDock();
+};
+// Keyboard: everything clickable that isn't a link or button is focusable and answers Enter and Space.
+const KEYABLE = '[data-gnode], .concept, .chk, [data-share], [data-pickrel], [data-help], tr[data-href], tr[data-act]';
+function keyable() { document.querySelectorAll(KEYABLE).forEach(e => { if (e.tabIndex < 0) e.tabIndex = 0; if (!e.getAttribute('role')) e.setAttribute('role', 'button'); }); }
+new MutationObserver(keyable).observe(document.body, { childList: true, subtree: true });
+document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches(KEYABLE)) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent('click', { bubbles: true })); } });
+let xTimer; const remeasure = () => { if (!explaining) return; clearTimeout(xTimer); xTimer = setTimeout(() => { const l = $('#xlayer'); if (l) l.remove(); explaining = false; explainOn(); }, 120); };
+addEventListener('scroll', remeasure, true); addEventListener('resize', remeasure);
+applyShell(); route(); renderDock();
+</script>
+<script>
+// ---------- v5: role versions, the agent's certificate, and starting by a command you run.
+
+// Which version of its role each holder is on, and provisional holdings. Sample records.
+S.onVer = { 'A-0003': 4, 'A-0009': 1 };
+S.provisional = { 'A-0009': 'until 30 Sep' };
+S.rolePolicy = {};
+S.roleLog = {
+  'identity-lead': [[7, '22 Sep', 'Tom Whiting', 'Adds the secrets and network duties'], [6, '16 Sep', 'Tom Whiting', 'Refusals say the reason and the fix'], [5, '9 Sep', 'Tom Whiting', 'Model access through the pool']],
+  builder: [[5, '20 Sep', 'Tom Whiting', 'Worktree-only Bash; package registries allowed'], [4, '4 Sep', 'Tom Whiting', 'Adds code review skill']],
+};
+const verOf = x => S.onVer[x.id] || S.roleVer[x.role];
+
+function roleVersions(roleId) {
+  const r = S.roles[roleId], cur = S.roleVer[roleId], holders = S.ids.filter(x => x.role === roleId && x.state !== 'retired');
+  const log = S.roleLog[roleId] || [[cur, '—', 'Tom Whiting', 'Current version']];
+  const pol = S.rolePolicy[roleId] || 'stay';
+  const P = [['stay', 'Holders stay on their version until someone moves them', 'Nothing changes for a holder by itself. Each move is its own act, in the record.'],
+    ['renewal', 'Holders move at their next renewal', 'Explicit, not silent: each holder shows the date it will move, and who can stop it.']];
+  return `<div class="grid2"><div>
+    <div class="card"><h2>When this role changes</h2>${P.map(([k, t, n]) => `<label class="row" style="align-items:flex-start;cursor:pointer;padding:8px 0"><span style="display:flex;gap:10px"><input type="radio" name="rpol" data-rpol="${k}" ${pol === k ? 'checked' : ''}><span>${t}<div class="note">${n}</div></span></span></label>`).join('')}
+      <div class="note" style="margin-top:6px">Either way, deliberate, or at least explicit. <span class="open-q">which is the default: open</span></div></div>
+    <div class="card"><h2>Versions</h2><table><thead><tr><th>Version</th><th>Made</th><th>By</th><th>What changed</th><th>Holders</th></tr></thead><tbody>
+      ${log.map(([v, d, by, what]) => { const on = holders.filter(h => verOf(h) === v); return `<tr><td class="mono">v${v}${v === cur ? ' <span class="pass">current</span>' : ''}</td><td class="sec">${d}</td><td class="sec">${esc(by)}</td><td style="white-space:normal">${esc(what)}</td><td>${on.map(h => pillFor(h.id)).join('') || '<span class="dim">—</span>'}</td></tr>`; }).join('')}</tbody></table></div>
+  </div><div>
+    <div class="card"><h2>Holders</h2>${holders.map(h => { const v = verOf(h), behind = v < cur, pr = S.provisional[h.id]; return `<div class="row" style="align-items:flex-start;padding:8px 0"><span>${pillFor(h.id)}<div class="note" style="margin-top:3px">on v${v}${behind ? ` · v${cur} is current` : ''}${pr ? ` · <span style="color:var(--warn)">provisional ${pr}</span>, then it lapses; nobody renews it by default, and moving versions does not change this date` : ''}${behind && pol === 'renewal' ? ' · moves at its next renewal' : ''}</div></span>${behind ? `<button class="btn" data-act="movever" data-id="${h.id}" data-to="${cur}">Move to v${cur}…</button>` : pr ? `<button class="btn" data-act="toast" data-t="Confirming makes the holding permanent. It is a decision, with your name on it">Confirm</button>` : '<span class="dim" style="font-size:12px">up to date</span>'}</div>`; }).join('') || '<div class="dim">Nobody holds it.</div>'}
+      <div class="note" style="margin-top:6px">A move is shown before it happens: what the new version adds and removes. A running session keeps the version it started with. A holder's end date belongs to its grant, not to the role: editing the role never extends it.</div></div>
+  </div></div>`;
+}
+document.addEventListener('change', e => { const r = e.target.closest('[data-rpol]'); if (r) { S.rolePolicy[roleSel] = r.dataset.rpol; route(); } });
+
+// The agent's certificate: who it is and what it may do, as one object a stranger can check.
+function tabCert(x) {
+  if (x.kind !== 'agent') return `<div class="card"><div class="sec">People sign in; they are not issued certificates here.</div></div>`;
+  const g = grantsOf(x.id).filter(z => standing(z).ok), p = S.prov[x.id], live = x.state === 'active';
+  const claims = { agent: x.id, name: x.name, role: `${x.role} v${verOf(x)}`, answers_to: x.human, grants: g.map(z => `${z.rel} of ${z.obj}`), profile: p ? p.ver : null };
+  return `<div class="grid2"><div>
+    <div class="card"><div class="row" style="padding:0 0 6px"><h2>Capability certificate</h2><span class="${live ? 'state active' : 'state suspended'}">${live ? 'valid' : 'withdrawn'}</span></div>
+      <dl class="facts"><dt>Who</dt><dd>${esc(x.name)} · ${x.id}</dd>
+      <dt>Its key</dt><dd class="mono">ed25519 · 3f9a…c21e <span class="note">sample</span></dd>
+      <dt>Proved it holds the key</dt><dd>yes: it signed the request with that key <span class="note">(PKCS#10)</span></dd>
+      <dt>Issued by</dt><dd>this service, for ${pillFor(x.human)}</dd>
+      <dt>Valid</dt><dd>22 Sep 09:14 to 29 Sep 09:14 <span class="note">· renewed only when someone renews it</span></dd>
+      <dt>What it says</dt><dd><div class="code" style="font-size:11px;white-space:pre-wrap">${esc(JSON.stringify(claims, null, 1))}</div></dd></dl>
+      <div class="note" style="margin-top:8px">A change to its grants or its role version issues a new certificate. The old one is withdrawn in the log, never edited.</div></div>
+  </div><div>
+    <div class="card"><h2>In the public log</h2><dl class="facts"><dt>Entry</dt><dd class="mono">#4127</dd><dt>Checkpoint</dt><dd class="mono">size 4131 · signed 18:40</dd></dl>
+      <div class="note" style="margin:8px 0 4px">Anyone can check it offline, without this service:</div>
+      <div class="code" style="font-size:11px">openssl verify -CAfile issuer.pem ${x.name.toLowerCase().replace(/ /g, '-')}.crt
+lys log verify inclusion --artifact entry-4127.proof</div></div>
+    <div class="card"><h2>Signed statements</h2>
+      ${[['started on Studio Mac', '18:02', 'its own key'], ['given: profile ' + (p ? p.ver : '—') + ', ' + ((S.memory[x.id] || []).length + (S.sealed[x.id] || 0)) + ' memories, ' + S.vcreds.filter(v => v.holder === x.id).length + ' credentials', '18:02', 'this service'], ['role moved to v' + verOf(x), '16 Sep', 'Tom Whiting']].map(([w, t, by]) => `<div class="row" style="padding:5px 0"><span>${esc(w)}<div class="note">signed by ${esc(by)}</div></span><span class="mono dim">${t}</span></div>`).join('')}
+      <div class="note" style="margin-top:6px">Each one is a small signed record checked with <span class="mono">lys verify --attestation</span>.</div></div>
+    <div class="note">Sample only: no real key, certificate or receipt is made by this mock-up.</div>
+  </div></div>`;
+}
+TABS.splice(TABS.length - 1, 0, ['certificate', 'Certificate']);
+
+// Starting: this service checks and hands you a command; you run it where you choose; the agent reports in.
+startDrawer = function (id, nodeId) {
+  const x = byId(id), p = S.prov[id], n = S.nodes.find(z => z.id === nodeId) || S.nodes[0];
+  if (!p) return dHead('Lifecycle', `Start ${esc(x.name)}`, '') + `<div class="card sec">${esc(x.name)} has no profile yet. Give it one on its Provisioning tab first.</div>`;
+  const review = S.reviews[id], needs = ['model providers', ...p.mcp.filter(m => !/this service/.test(m))], missing = needs.filter(nd => !n.egress.includes(nd));
+  const role = x.role, allowedHere = n.runtime !== 'none' && (n.id === 'N-4' || (/builder/.test(role) ? /N-2|N-3/.test(n.id) : /lead|verifier/.test(role) ? n.id === 'N-1' : false));
+  const checks = [
+    [x.state === 'active', `${x.name} is active`, `${x.name} is ${x.state}`],
+    [!!review, `Profile ${review} <span class="note">(sample record)</span>`, `Profile ${p.ver} has no review on record`],
+    [allowedHere, `${n.name} may run this role`, `${n.name} is not allowed for ${S.roles[role].title.toLowerCase()}s`],
+    [S.vcreds.some(v => v.holder === id && v.state === 'active'), 'Its virtual credentials are valid', 'It holds no valid virtual credential'],
+    [!missing.length, `${n.name} may reach ${needs.join(', ')} <span class="note">(its egress list)</span>`, `${n.name} may not reach ${missing.join(', ')}`],
+  ];
+  const ok = checks.every(c => c[0]), slug = x.name.toLowerCase().replace(/ /g, '-'), code = 'K7QD-' + (4000 + (id.charCodeAt(5) || 0) * 7).toString(36).toUpperCase();
+  return dHead('Lifecycle', `Start ${esc(x.name)}`, 'This service checks and gives you the command. You run it where you choose; the agent reports in when it starts.')
+    + `<div class="field"><label>1. Profile</label><select class="inline-in"><option>${p.ver} · ${esc(p.model)} · ${p.tools.length} tools · ${p.mcp.length} MCP</option></select></div>
+    <div class="field"><label>2. Where</label><select id="stNode" data-act-change="startnode" data-id="${id}">${S.nodes.filter(z => z.runtime !== 'none').map(z => `<option value="${z.id}" ${z.id === n.id ? 'selected' : ''}>${esc(z.name)}</option>`).join('')}</select></div>
+    <div class="section-h">3. Checks</div><div class="card">${checks.map(([good, yes, no]) => `<div class="row" style="padding:4px 0"><span>${good ? yes : no}</span><span class="${good ? 'pass' : 'fail'} mono">${good ? 'ok' : 'no'}</span></div>`).join('')}</div>
+    <div class="section-h">4. Run this on ${esc(n.name)}</div>
+    ${ok ? `<div class="card"><div class="row" style="padding:0 0 8px"><div class="code" style="flex:1;margin:0">identity start ${slug} --code ${code}</div><button class="btn" data-act="toast" data-t="Copied">Copy</button></div>
+      <div class="note">The code works once, on ${esc(n.name)} only, for 10 minutes. <span class="open-q" title="The command name and flags are illustrative">illustrative</span></div>
+      <div class="section-h" style="margin-top:12px">Launch record ${'LR-' + code.slice(5)}</div>
+      <dl class="facts"><dt>Machine</dt><dd>${esc(n.name)}</dd><dt>Runs</dt><dd>Claude Code, in ${esc(p.cwd)}</dd><dt>Configuration</dt><dd class="mono">profile ${p.ver} · ${S.vcreds.filter(v => v.holder === id && v.state === 'active').map(v => v.id).join(', ')}</dd><dt>State</dt><dd id="lrState">command prepared</dd></dl>
+      <div class="note">Kept, so the same start can be given again later without looking inside a running process.</div>
+      <div class="section-h" style="margin-top:12px">What it does</div>
+      <ol class="note" style="margin:0;padding-left:18px;line-height:1.7"><li>Fetches profile ${p.ver}: instructions, tools, MCP servers, working directory ${esc(p.cwd)}.</li><li>Gets its virtual credentials for this session. No secret is on the command line.</li><li>Runs Claude Code with them, in your terminal.</li><li>Reports in, signed with its own key and naming this launch record. Only then is it shown as running; copying the command is not a start.</li></ol></div>
+      <div id="stOut" class="card sec">Waiting for ${esc(x.name)} to report in. Nothing is shown as running until it does.</div>
+      <div style="margin-top:12px;display:flex;gap:8px"><button class="btn primary" data-act="startrun" data-id="${id}" data-n="${n.id}">Simulate: it reported in</button><button class="btn" data-act="close">Close</button></div>`
+    : `<div class="card sec">Fix what is refused above first; no command is given.</div><div style="margin-top:12px"><button class="btn" data-act="close">Close</button></div>`}
+    <p class="note" style="margin-top:14px">Later, and optional: a terminal view here, or a sandbox, VM or container service asked to run it. Those would be separate products; this one does not run agents. <span class="open-q">proposed</span></p>`;
+};
+
+const actV4 = act;
+act = function (a, el) {
+  if (a === 'startrun') {
+    const id = el.dataset.id, x = byId(id), n = S.nodes.find(z => z.id === el.dataset.n), out = $('#stOut');
+    el.disabled = true; el.style.opacity = .4;
+    n.slots[0]++; n.sessions.push(id); S.sessions.push({ who: id, where: n.name, runtime: 'your terminal', started: hhmm(), status: 'running', ctx: 'profile ' + S.prov[id].ver, forWho: nameOf(x.human) });
+    hist(id, `reported in from ${n.name}, signed with its own key`); bump();
+    const lr = $('#lrState'); if (lr) lr.innerHTML = '<span class="pass">running: its report matched this launch record</span>';
+    out.innerHTML = `<div class="pass">Running on ${esc(n.name)}: it reported in at ${hhmm()}, signed with its own key, naming this launch record.</div><div class="note" style="margin-top:4px">Its session is on the Sessions tab. Stopping it is the terminal's; revoking what it holds is here.</div>`;
+    return;
+  }
+  if (a === 'movever') {
+    const x = byId(el.dataset.id), to = +el.dataset.to, from = verOf(x);
+    return drawer(dHead('Roles', `Move ${esc(x.name)} to v${to}`, `From v${from}. A deliberate act, recorded with your name.`)
+      + `<div class="card"><h2>What changes</h2>${(S.roleLog[x.role] || []).filter(([v]) => v > from && v <= to).map(([v, , , what]) => `<div class="row" style="padding:5px 0"><span class="mono">v${v}</span><span>${esc(what)}</span></div>`).join('')}</div>
+      <div class="field"><label>When</label><select><option>At its next start</option><option>Now: ends its running session first</option></select></div>` + dButtons('Move', 'moveverdo', `data-id="${x.id}" data-to="${to}"`));
+  }
+  if (a === 'moveverdo') { const x = byId(el.dataset.id); S.onVer[x.id] = +el.dataset.to; hist(x.id, `moved to ${x.role} v${el.dataset.to} by ${nameOf(meId)}`); bump(); closeAll(); route(); return toast(`${x.name} moves to v${el.dataset.to} at its next start.`); }
+  return actV4(a, el);
+};
+route();
+</script>
+</body>
+</html>
