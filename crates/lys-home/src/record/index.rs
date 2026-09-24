@@ -89,17 +89,9 @@ impl Index {
         if index_file.is_file() {
             match Self::read_rows(&index_file) {
                 Ok(rows) => {
-                    let end = rows.last().map_or(header_len, |r| r.offset + r.len);
-                    if end == file_len {
-                        let mut index = Self {
-                            file: index_file,
-                            rows: Vec::new(),
-                            by_id: HashMap::new(),
-                            end: header_len,
-                        };
-                        for row in rows {
-                            index.push_row(row);
-                        }
+                    if let Some(index) =
+                        Self::from_cached(session_file, index_file, rows, header_len, file_len)
+                    {
                         return Ok((header, index, false));
                     }
                 }
@@ -109,6 +101,50 @@ impl Index {
         }
         let index = Self::rebuild(session_file, header_len)?;
         Ok((header, index, true))
+    }
+
+    /// The cached rows as an index, when they are one: each row starts where
+    /// the one before ended, has a length, an id not yet seen and a parent
+    /// already indexed (never itself), ends on a newline in the session file
+    /// (every record is one line), and the last ends where the file does.
+    /// Anything else is a cache that is not this file's, whatever its final
+    /// offset says, and the caller rebuilds from the session file, which is
+    /// the record; a self-parent row taken on trust would make `ancestry`
+    /// walk forever, and rows whose boundaries sit inside the lines would
+    /// hand out cut records.
+    fn from_cached(
+        session_file: &Path,
+        file: PathBuf,
+        rows: Vec<IndexRow>,
+        header_len: u64,
+        file_len: u64,
+    ) -> Option<Self> {
+        let mut index = Self {
+            file,
+            rows: Vec::new(),
+            by_id: HashMap::new(),
+            end: header_len,
+        };
+        let mut session = fs::File::open(session_file).ok()?;
+        for row in rows {
+            if row.offset != index.end || row.len == 0 || index.by_id.contains_key(&row.id) {
+                return None;
+            }
+            let last = row.offset.checked_add(row.len)? - 1;
+            session.seek(SeekFrom::Start(last)).ok()?;
+            let mut byte = [0u8; 1];
+            session.read_exact(&mut byte).ok()?;
+            if &byte != b"\n" {
+                return None;
+            }
+            if let Some(parent) = &row.parent
+                && !index.by_id.contains_key(parent)
+            {
+                return None;
+            }
+            index.push_row(row);
+        }
+        (index.end == file_len).then_some(index)
     }
 
     fn read_rows(index_file: &Path) -> Result<Vec<IndexRow>, HomeError> {
