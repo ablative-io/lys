@@ -101,7 +101,7 @@
       "items": [
         {
           "id": "C14",
-          "text": "A lantern is a lys.lantern custom entry whose data carries exactly point, note and lit_by, and an epilogue is a lys.lantern_epilogue custom entry whose data carries exactly lantern, note and written_in; the entry's own timestamp is when, and no field is added outside Pi's custom data.",
+          "text": "A lantern is a lys.lantern custom entry whose data carries exactly point, note and lit_by, and an epilogue is a lys.lantern_epilogue custom entry whose data carries lantern, note and written_by, and written_in only when its writer names a session the home holds; the entry's own timestamp is when, and no field is added outside Pi's custom data.",
           "done": false
         },
         {
@@ -116,7 +116,7 @@
         },
         {
           "id": "C17",
-          "text": "Adding an epilogue appends one lys.lantern_epilogue entry to the lantern's own session naming the lantern's entry id, and an empty epilogue and a name that is not a lys.lantern entry of that session are each refused by name and append nothing.",
+          "text": "Adding an epilogue appends one lys.lantern_epilogue entry to the lantern's own session naming the lantern's entry id, and an empty epilogue, a name that is not a lys.lantern entry of that session, and a writer's session the home does not hold are each refused by name and append nothing.",
           "done": false
         },
         {
