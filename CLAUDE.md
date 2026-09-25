@@ -79,6 +79,14 @@ review. Run the gates anyway.
 
 Once a signature is produced or a leaf is logged under a format, that format is frozen — changing it breaks every historical verification. Domain-separation tags (`lys/attestation/v2`, `lys/sealed-envelope/v1`) and leaf encodings are versioned wire contracts. Evolving one means a new version alongside, never a mutation of the shipped one. This is why the extraction renames the tags *before* anything durable is signed under them.
 
+## How a carded row is built
+
+Tom's rules, in his words, with the date and time each was given.
+
+1. (2026-09-25 22:26, Tom on Dot) "All the cards on Cambium should all be connected up to the Aion workflow, should all be going like that. So he shouldn't be building them directly. There's a whole setup that we did... and you shouldn't be reviewing them." Every carded row goes through its board's chain: brief_card, sign-off, card_build_v3, src_pr, src_land. Nobody hand-builds a carded row, and no lead reviews in place of the chain. If a card will not start, that is a defect in the chain: name what refused and fix the chain.
+2. (2026-09-25 22:29, Tom on Dot) No rush and no corners cut: the full chain on every card. Jev, fmt, clippy pedantic, tests, ast-grep, gate.
+3. (2026-09-25 21:54 and 21:56, Tom on Dot) Heavy builds and full gates go to Dean's laptop. Only small, warm, single-crate checks (a lint, one crate's clippy or tests) run on the Mac, straight away, no queue.
+
 ## Gates before any commit
 
 ```
