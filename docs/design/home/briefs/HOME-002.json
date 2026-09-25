@@ -1,0 +1,305 @@
+{
+  "id": "HOME-002",
+  "cluster": "home",
+  "title": "Light a lantern in the home and recall it by note and by point",
+  "depends_on": [],
+  "blocked_by": [],
+  "checklist": [
+    "C14",
+    "C15",
+    "C16",
+    "C17",
+    "C18",
+    "C19",
+    "C20",
+    "C21",
+    "C22"
+  ],
+  "stories": [
+    "S9",
+    "S10",
+    "S11",
+    "S12",
+    "S13"
+  ],
+  "design_anchor": [
+    "ADR-003",
+    "ADR-004",
+    "ADR-012",
+    "ADR-013"
+  ],
+  "purpose": "Stage 5 of the home (design solution, ADR-012): a lantern is a note plus a point in a session, lit on purpose, that a later session or a fork walks back to. This brief lets a caller light one at any entry of a session, grow its note by epilogue, and recall it across the home by a phrase of its note or epilogues and by its point, printing the declared notes and never the transcript around the point (ADR-013, P7, CN3).",
+  "task": "The fixture home used below holds one session `lantern-fixture` built through `Session::append_entry` with four message entries `e1`, `e2`, `e3`, `e4` in one chain, head at `e4`; the text of `e2`'s message is `the heron crossed the weir at dusk`, and no note or epilogue in any test contains that text. Build lanterns in lys-home on the record code already on main from HOME-001 (`Session::append`, `Session::contains`, the index's custom rows). In: the two lys custom types; lighting, which appends a `lys.lantern` entry at the head of the session holding the point; epilogues, appended to the lantern's own session; a listing of the home's sessions and a lock-free, write-free view read through the index; recall by note and by point; three subcommands under `lys-home lantern`; the end-to-end acceptance test; RECORD.md; and the cluster's rendered markdown, which must be regenerated because this brief's authoring amended design.json (P7, CN3, non-goals, structure, gate). `lit_by` is the name the caller gives with `--by`, recorded and shown as declared, as `canon add --by` is; lys-home takes no identity dependency, and binding the home's acts to a verified identity is the directory step's own card. An epilogue always goes into the lantern's own session and records the writer's session only as a pointer. Out: the fork through a lantern (stage 5b); resonance, whispers, vectors and any ranking; dimming by code churn; Norn's tables; Cambium's screen; any read-authority check on recall. Split note: none; every checklist row here is delivered whole by this brief. Run the heavy gates where the project's rules send heavy builds; only single-crate checks of lys-home run locally.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Name the two lantern custom types and the lantern refusals",
+      "spec": "Structural. `record/entries.rs` declares `CUSTOM_LANTERN` = `lys.lantern` and `CUSTOM_LANTERN_EPILOGUE` = `lys.lantern_epilogue` beside the four lys custom types already there. `error.rs` gains two named refusals: `HomeError::EmptyNote { session, what }`, where `what` is `note` for a lantern and `epilogue` for an epilogue, and `HomeError::NotALantern { session, id }`. A point that is not an entry of the session is refused with the existing `HomeError::UnknownEntry { session, id }`. THE SYSTEM SHALL NOT carry a note's or an epilogue's text, or any transcript content, in any refusal's fields or its displayed message; refusals carry the session id, the entry id and the word naming what was empty only. THE SYSTEM SHALL NOT add a Pi entry type, a header field, or any field outside a custom entry's `data`.",
+      "acceptance": [
+        "`CUSTOM_LANTERN == \"lys.lantern\"` and `CUSTOM_LANTERN_EPILOGUE == \"lys.lantern_epilogue\"`.",
+        "`HomeError::EmptyNote { session: \"s1\".into(), what: \"note\" }.to_string()` contains `s1` and `note`, and `HomeError::EmptyNote { session: \"s1\".into(), what: \"epilogue\" }.to_string()` contains `s1` and `epilogue`.",
+        "`HomeError::NotALantern { session: \"s1\".into(), id: \"e2\".into() }.to_string()` contains `s1` and `e2`.",
+        "`HomeError` has exactly two more variants than it has on the commit the brief starts from: `EmptyNote` and `NotALantern`."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-home/src/record/entries.rs",
+          "crates/lys-home/src/error.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C14",
+        "C16",
+        "C17"
+      ],
+      "stories": []
+    },
+    {
+      "id": "R2",
+      "title": "List a home's sessions and read one's custom entries without its lock",
+      "spec": "WHEN the home's sessions are listed, THE SYSTEM SHALL return the id of every `sessions/<id>.jsonl` file whose name does not end in `.index.jsonl`, in ascending byte order of the id; a session's `<id>.index.jsonl`, `<id>.head` and `<id>..lock` siblings are not sessions by rule. IF a `.jsonl` file's id is not one safe path component, THEN THE SYSTEM SHALL refuse the listing with `HomeError::BadName`. WHEN a session is opened as a view, THE SYSTEM SHALL read its header line and its cached index and SHALL read entries only by seeking to index rows, taking no lock and writing no file, so a view opens while another owner holds the session. THE SYSTEM SHALL accept the cached rows under the same checks `Index::load` applies to a cached index, except that the session file may extend past the last row, which is an append in flight by the owner; entries past the last row are not read. IF the index file is absent, THEN THE SYSTEM SHALL read zero rows when the session file holds only its header line, and SHALL refuse with `HomeError::StaleIndex` naming the session file otherwise. IF the cached rows fail those checks, THEN THE SYSTEM SHALL refuse with `HomeError::StaleIndex`. THE SYSTEM SHALL NOT rebuild, write, truncate or create an index, head, lock or session file from a view, SHALL NOT skip a session it cannot read, and SHALL NOT load a whole session file to answer a view. A view reports how many bytes of the session file it read.",
+      "acceptance": [
+        "A home holding sessions `b` and `a`, each with its index, head and lock siblings, lists exactly `[\"a\", \"b\"]`.",
+        "A home holding session `a` and a file `sessions/bad name.jsonl` refuses the listing with `HomeError::BadName`.",
+        "With `Home::open_session(\"lantern-fixture\")` held open, a view of `lantern-fixture` opens and returns the same entries for `lys.lantern` as the owner's `customs_everywhere(\"lys.lantern\")`.",
+        "After a view reads `lantern-fixture`, the bytes of `lantern-fixture.jsonl`, `lantern-fixture.index.jsonl` and `lantern-fixture.head` are identical to before, and the listing of `sessions/` names the same files as before.",
+        "A session file holding its header and two entries, with its index file deleted, is refused by a view with `HomeError::StaleIndex`, and no index file exists after the refusal.",
+        "A session file holding only its header line, with no index file, opens as a view with zero rows.",
+        "A session file with one more complete entry line appended after the last indexed row opens as a view and returns only the indexed entries.",
+        "A view of the fixture after two lanterns and one epilogue reports bytes read equal to the header line's length plus the `len` of the three `lys.lantern` and `lys.lantern_epilogue` rows."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/record/view.rs",
+          "crates/lys-home/src/record/view_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/record/mod.rs",
+          "crates/lys-home/src/record/index.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C18"
+      ],
+      "stories": [
+        "S11"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Light a lantern at any entry of a session",
+      "spec": "Structural: `record/lantern.rs` defines the lantern's data, exactly three keys: `point` (the id of the entry it marks), `note` (the note as given, byte for byte) and `lit_by` (the name given by the caller, recorded as declared and never verified). When it was lit is the entry's own `timestamp`; the data carries no time. WHEN a lantern is lit with a home, a session, a point and a note and a name, THE SYSTEM SHALL open the session as its owner, check the point and the note before writing anything, append one `custom` entry with `customType` `lys.lantern` as a child of the session's head, and return the lantern's entry id, the session, the point and the entry's timestamp. The point may be any entry on the session's tree: the head, an entry the head has moved past, or an entry on another branch. IF the point is not an entry of that session, THEN THE SYSTEM SHALL refuse with `HomeError::UnknownEntry` and append nothing. IF the note is empty or holds only whitespace, THEN THE SYSTEM SHALL refuse with `HomeError::EmptyNote` (`what` = `note`) and append nothing. IF another owner holds the session, THEN THE SYSTEM SHALL refuse with `HomeError::SessionHeld` and append nothing. THE SYSTEM SHALL NOT move the head to the point, SHALL NOT trim, truncate or rewrite the note, SHALL NOT cap the note's size, SHALL NOT rewrite any earlier byte of the session file, and SHALL NOT light a lantern except when asked.",
+      "acceptance": [
+        "Lighting on `lantern-fixture` at point `e2` with note `Migration Checksum proved green` and name `agent-a` returns a lantern id `L1`; afterwards the session's persisted head is `L1`, entry `L1`'s `parentId` is `e4`, and its data is exactly `{\"point\":\"e2\",\"note\":\"Migration Checksum proved green\",\"lit_by\":\"agent-a\"}`.",
+        "The first N bytes of `lantern-fixture.jsonl` after that lighting equal all N bytes before it, and the file grew by exactly one line.",
+        "With the head moved to `e2` and an entry `e5` appended there, then the head moved back to `e4`, lighting at `e5` succeeds and its data's `point` is `e5`.",
+        "Lighting at point `nope` returns `HomeError::UnknownEntry { session: \"lantern-fixture\", id: \"nope\" }`, and the session file's length and persisted head are unchanged.",
+        "Lighting with note `` and, separately, with note `   ` each return `HomeError::EmptyNote` with `what` = `note`, and the session file's length and persisted head are unchanged after each.",
+        "The returned time equals the lantern entry's `timestamp` field."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/record/lantern.rs",
+          "crates/lys-home/src/record/lantern_tests.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C14",
+        "C15",
+        "C16"
+      ],
+      "stories": [
+        "S9"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Add an epilogue to a lantern in the lantern's own session",
+      "spec": "Structural: `record/epilogue.rs` defines the epilogue's data, exactly three keys: `lantern` (the lantern's entry id), `note` (the further words as given, byte for byte) and `written_in` (the id of the session its writer was in when writing it, a pointer only). WHEN an epilogue is added with a home, the lantern's session, the lantern's entry id, the words and the writer's session id, THE SYSTEM SHALL open the lantern's session as its owner, check the lantern and the words before writing anything, and append one `custom` entry with `customType` `lys.lantern_epilogue` as a child of that session's head, moving the head to it, exactly as lighting does. IF the named id is not a `lys.lantern` entry of that session (no such entry, or an entry of another kind), THEN THE SYSTEM SHALL refuse with `HomeError::NotALantern` and append nothing. IF the words are empty or hold only whitespace, THEN THE SYSTEM SHALL refuse with `HomeError::EmptyNote` (`what` = `epilogue`) and append nothing. IF the writer's session id is not one safe path component, THEN THE SYSTEM SHALL refuse with `HomeError::BadName` and append nothing. THE SYSTEM SHALL NOT write anything into the writer's session, SHALL NOT rewrite the lantern entry or an earlier epilogue, and SHALL NOT append an epilogue to any session but the lantern's own.",
+      "acceptance": [
+        "After lighting `L1` on the fixture, adding the epilogue `later the rollback held` to `L1` in `lantern-fixture` with writer's session `later-session` appends one entry whose data is exactly `{\"lantern\":\"L1\",\"note\":\"later the rollback held\",\"written_in\":\"later-session\"}`, whose `parentId` is `L1`, and which is the session's persisted head.",
+        "No file named `later-session.jsonl` exists in the home's `sessions/` after that epilogue.",
+        "Adding an epilogue naming `e2` (a message entry) and, separately, naming `nope` each return `HomeError::NotALantern`, and the session file's length is unchanged after each.",
+        "Adding the epilogue `` to `L1` returns `HomeError::EmptyNote` with `what` = `epilogue`, and the session file's length is unchanged.",
+        "The session file's bytes before the epilogue's line are identical to the whole file before the epilogue was added."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/record/epilogue.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/record/lantern_tests.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C14",
+        "C17"
+      ],
+      "stories": [
+        "S10"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Recall lanterns across the home by note and by point",
+      "spec": "WHEN lanterns are recalled by note with a query, THE SYSTEM SHALL read every session the home lists through a view, and SHALL return every `lys.lantern` entry whose note, or the note of any `lys.lantern_epilogue` naming it in the same session, contains the query as one contiguous substring after both are lowercased with `str::to_lowercase`. WHEN lanterns are recalled by point with a session and an entry id, THE SYSTEM SHALL read that session only, through a view, and SHALL return every `lys.lantern` entry whose `point` equals the entry id. Each returned row is exactly: `id` (the lantern's entry id), `session`, `point`, `lit_by`, `lit_at` (the lantern entry's `timestamp`), `note`, and `epilogues`, the lantern's epilogues in the session file's order, each exactly `note` and `written_in`. Rows come in ascending byte order of session id, then in file order within a session. IF a `lys.lantern` or `lys.lantern_epilogue` entry's data does not have its keys, THEN THE SYSTEM SHALL refuse with `HomeError::Malformed` naming the session file and the entry id, never the data. IF a session cannot be read as a view, THEN THE SYSTEM SHALL refuse the recall by that view's refusal. THE SYSTEM SHALL NOT match by stem, fuzz, vector, embedding, words out of order or any looser rule; SHALL NOT rank, score or reorder rows; SHALL NOT skip a session; SHALL NOT read an entry that is not a `lys.lantern` or `lys.lantern_epilogue` row; and SHALL NOT put in a row any line of the transcript, the point's entry or any entry around it.",
+      "acceptance": [
+        "On the fixture with `L1` at `e2` (note `Migration Checksum proved green`), `L2` lit after it at `e2` (note `second look at the checksum`) and the epilogue `later the rollback held` on `L1`: recall by note `CHECKSUM` returns exactly 2 rows, `L1` then `L2`.",
+        "On that fixture, recall by note `migration checksum` returns exactly 1 row, `L1`, and recall by note `checksum migration` returns 0 rows.",
+        "On that fixture, recall by note `rollback` returns exactly 1 row, `L1`, whose `epilogues` is exactly `[{\"note\":\"later the rollback held\",\"written_in\":\"later-session\"}]`.",
+        "On that fixture, recall by point `lantern-fixture` / `e2` returns exactly 2 rows, `L1` then `L2`, and recall by point `lantern-fixture` / `e3` returns 0 rows.",
+        "Row `L1` has exactly the keys `id`, `session`, `point`, `lit_by`, `lit_at`, `note`, `epilogues`, with `point` = `e2`, `lit_by` = `agent-a` and `lit_at` equal to `L1`'s entry `timestamp`.",
+        "A lantern with note `Über den Berg` is returned by recall by note `ÜBER` and by recall by note `über`.",
+        "A home holding session `a-first` with one lantern whose note contains `checksum`, beside the fixture, returns for `checksum` the `a-first` row before the `lantern-fixture` rows.",
+        "A `lys.lantern` entry written by hand with data `{\"note\":\"x\"}` makes recall by note `x` return `HomeError::Malformed`.",
+        "No row returned in any of these recalls contains the text `the heron crossed the weir at dusk`."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/record/lantern_recall.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/record/lantern_tests.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C19",
+        "C20"
+      ],
+      "stories": [
+        "S11",
+        "S12",
+        "S13"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Give lys-home the lantern light, epilogue and recall subcommands",
+      "spec": "Structural: `lys-home lantern light --home <dir> --session <id> --point <entry id> --note <text> --by <name>`, `lys-home lantern epilogue --home <dir> --session <id> --lantern <entry id> --note <text> --written-in <session id>`, and `lys-home lantern recall --home <dir>` with either `--note <text>` or both `--session <id>` and `--point <entry id>`; clap refuses both forms together and neither form with exit code 2. The subcommands live in `src/cli_lantern.rs`; `cli.rs` gains only the `lantern` variant and its dispatch, and its module doc gains one sentence: transcript contents are message entries, blocks and anything a model or a tool produced and never appear in a report; a lantern's note and epilogues are declared notes and are the one thing a listing prints. WHEN `lantern light` succeeds, THE SYSTEM SHALL print one JSON object with exactly the keys `id`, `session`, `point`, `lit_at`. WHEN `lantern epilogue` succeeds, THE SYSTEM SHALL print one JSON object with exactly the keys `id` (the epilogue's entry id), `session` and `lantern`. WHEN `lantern recall` succeeds, THE SYSTEM SHALL print one JSON object with exactly the keys `lanterns` (the R5 rows, in R5's order) and `count`; no match prints `{\"lanterns\":[],\"count\":0}` and exits 0. IF a lantern act is refused, THEN THE SYSTEM SHALL exit 1 with the refusal on stderr and print nothing on stdout. THE SYSTEM SHALL NOT print a note or an epilogue in the light or epilogue report, SHALL NOT print transcript contents in any report or refusal, and SHALL NOT take `lit_by` from anywhere but `--by`.",
+      "acceptance": [
+        "`lys-home lantern light` on the fixture prints one line that parses as a JSON object with exactly the keys `id`, `session`, `point`, `lit_at`, and exits 0.",
+        "`lys-home lantern epilogue` on that lantern prints one JSON object with exactly the keys `id`, `session`, `lantern`, and exits 0.",
+        "`lys-home lantern recall --home <dir> --note zzz-no-match` prints `{\"lanterns\":[],\"count\":0}` and exits 0.",
+        "`lys-home lantern recall --home <dir> --note x --session lantern-fixture --point e2` exits 2.",
+        "`lys-home lantern recall --home <dir>` with neither `--note` nor `--session` and `--point` exits 2.",
+        "`lys-home lantern light` with `--point nope` exits 1, prints nothing on stdout, and its stderr contains `nope`.",
+        "`cli.rs` and `cli_lantern.rs` each hold at most 500 lines of code excluding tests, comments and blank lines."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/cli_lantern.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/cli.rs",
+          "crates/lys-home/src/lib.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C15",
+        "C17",
+        "C19",
+        "C20",
+        "C22"
+      ],
+      "stories": [
+        "S9",
+        "S10",
+        "S11",
+        "S12"
+      ]
+    },
+    {
+      "id": "R7",
+      "title": "Prove the words' acceptance end to end through the binary",
+      "spec": "Structural: `tests/lantern.rs` builds the fixture home in a temporary directory and runs the `lys-home` binary (`env!(\"CARGO_BIN_EXE_lys-home\")`) for every act, asserting the count of rows and of refusals, not only successes. WHEN a session holding lanterns and an epilogue is rendered to a Claude Code file, THE SYSTEM SHALL write no line from a `lys.lantern` or `lys.lantern_epilogue` entry, and SHALL write the same number of records it writes for that session before any lantern was lit. THE SYSTEM SHALL NOT change `src/harness/claude_code/render.rs` to meet this, and no test name SHALL contain a fixture message's text or a note.",
+      "acceptance": [
+        "Through the binary on the fixture: `L1` lit at the past entry `e2` is returned by `recall --note checksum` and by `recall --session lantern-fixture --point e2`.",
+        "Through the binary: after `L2` is lit at `e2`, `recall --session lantern-fixture --point e2` prints `count` 2.",
+        "Through the binary: after the epilogue `later the rollback held` on `L1`, `recall --note rollback` prints `count` 1 with row `L1` whose `epilogues` holds that epilogue, and in the stdout of `recall --note checksum` the first byte offset of `later the rollback held` is greater than the first byte offset of `Migration Checksum proved green`.",
+        "Through the binary: `light --point nope` and `light --note \"\"` each exit 1; the test counts exactly 2 refusals, and the session file's length is unchanged by both.",
+        "Through the binary: after `light`, the session file's bytes before the new line equal the whole file before it, and `<session>.head` holds the lantern's id.",
+        "`lys-home render` of `lantern-fixture` after both lanterns and the epilogue writes a file in which no line contains `lys.lantern` and no line contains `Migration Checksum`, no line contains `second look`, no line contains `rollback`, and whose record count equals the count `lys-home render` reports for a copy of the fixture rendered before any lantern was lit.",
+        "The stdout of every `recall`, `light` and `epilogue` run in the test, concatenated, contains `the heron crossed the weir at dusk` 0 times, and the test asserts it ran at least 5 recalls."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/tests/lantern.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C15",
+        "C16",
+        "C19",
+        "C20",
+        "C21"
+      ],
+      "stories": [
+        "S9",
+        "S11",
+        "S12",
+        "S13"
+      ]
+    },
+    {
+      "id": "R8",
+      "title": "Write the lantern entries into the record document and render the cluster",
+      "spec": "Structural: `docs/design/home/RECORD.md` gains a section for `lys.lantern` (data `point`, `note`, `lit_by`; when is the entry's timestamp; appended at the head of the session holding the point; `lit_by` declared, not verified) and one for `lys.lantern_epilogue` (data `lantern`, `note`, `written_in`; appended to the lantern's own session; `written_in` a pointer only), each stating that recall prints the note and nothing else from the file. The cluster's rendered markdown (`DESIGN.md`, `CHECKLIST.md`, `USER-STORIES.md`, `briefs/HOME-002.md`) is regenerated with `scripts/design/render-cluster.py` from the JSON as it stands, so `DESIGN.md` carries the amended P7 and CN3 and no longer lists stage 5 as a non-goal while still excluding stage 5b. THE SYSTEM SHALL NOT edit a rendered markdown file by hand, SHALL NOT change the JSON documents of the cluster in this requirement, and SHALL NOT describe either entry as a signed or frozen wire format.",
+      "acceptance": [
+        "`grep -c 'lys.lantern_epilogue' docs/design/home/RECORD.md` prints a number of at least 1, and the `lys.lantern` section names `point`, `note` and `lit_by`.",
+        "`sh scripts/design/gate.sh` run from the repository root exits 0.",
+        "`grep -c 'Lanterns and forks at a coordinate' docs/design/home/DESIGN.md` prints 0 and `grep -c 'stage 5b' docs/design/home/DESIGN.md` prints a number of at least 1.",
+        "`docs/design/home/briefs/HOME-002.md` exists and `cmp` against a fresh render of `HOME-002.json` reports no difference."
+      ],
+      "files": {
+        "create": [
+          "docs/design/home/briefs/HOME-002.md"
+        ],
+        "modify": [
+          "docs/design/home/RECORD.md",
+          "docs/design/home/DESIGN.md",
+          "docs/design/home/CHECKLIST.md",
+          "docs/design/home/USER-STORIES.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C22"
+      ],
+      "stories": [
+        "S13"
+      ]
+    }
+  ],
+  "boundaries": [
+    "No fork, cut or seeded session through a lantern (stage 5b).",
+    "No vectors, embeddings, resonance, whispers, fuzzy or stemmed matching, ranking or scoring.",
+    "No dimming by code churn and no repository commit carried on a lantern.",
+    "No Norn crate or type, and no Cambium, aion or manifold dependency, enters lys-home; no new dependency enters crates/lys-home/Cargo.toml.",
+    "No identity dependency and no verification of `lit_by`; it is the declared string given with `--by`.",
+    "No earlier byte of a session file is rewritten or deleted; lighting and adding an epilogue append one line each and move the head to it; recall writes no file of any kind.",
+    "Nothing is written into the session an epilogue's `written_in` names.",
+    "No transcript contents (message entries, blocks, anything a model or a tool produced) in any report, error, log line or test name; a lantern's note and epilogues are printed by the recall listing only; refusals carry ids only.",
+    "No change to src/harness/claude_code/render.rs; a lantern is never rendered into a harness file.",
+    "No read-authority or grant check on recall; that is its own later unit.",
+    "The design's structure array is the whole file list; a path outside it is not created."
+  ],
+  "verification": [
+    "From the repository root: python3 scripts/design/validate.py docs/design/home exits 0.",
+    "From the repository root: python3 scripts/design/check-coverage.py docs/design/home exits 0.",
+    "From the repository root: sh scripts/design/gate.sh exits 0.",
+    "From the repository root: cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, cargo clippy --all-targets -- -D warnings, cargo test --workspace --all-features, cargo doc --no-deps --all-features and cargo doc --no-deps each exit 0.",
+    "git diff main -- crates/lys-home/Cargo.toml crates/lys-home/src/harness/claude_code/render.rs prints nothing.",
+    "cargo test -p lys-home --test lantern reports every test passed and at least 1 test run.",
+    "grep -rnE 'unwrap\\(\\)|expect\\(|panic!' crates/lys-home/src/record/lantern.rs crates/lys-home/src/record/epilogue.rs crates/lys-home/src/record/view.rs crates/lys-home/src/record/lantern_recall.rs crates/lys-home/src/cli_lantern.rs returns nothing."
+  ]
+}

@@ -50,6 +50,44 @@
           "text": "As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught."
         }
       ]
+    },
+    {
+      "name": "Agent",
+      "role": "Marks a moment it will want to walk back to",
+      "stories": [
+        {
+          "id": "S9",
+          "text": "As an agent at a moment of completion, success or learning, I want to light a lantern at a point in my session, including one I have already moved past, so that a later session or a fork can walk back to that place."
+        },
+        {
+          "id": "S10",
+          "text": "As an agent that learned how a lantern's story turned out, I want to add an epilogue to that lantern, so that the note grows without anything already written being changed."
+        }
+      ]
+    },
+    {
+      "name": "Agent",
+      "role": "Looks for a place an earlier session marked",
+      "stories": [
+        {
+          "id": "S11",
+          "text": "As an agent starting later, I want to find every lantern whose note or epilogues contain the words I remember, so that I can walk back to where it was learned."
+        },
+        {
+          "id": "S12",
+          "text": "As an agent standing at a point in a session, I want every lantern lit at that point, so that I see all that was said about it."
+        }
+      ]
+    },
+    {
+      "name": "Owner",
+      "role": "Reads what the home prints",
+      "stories": [
+        {
+          "id": "S13",
+          "text": "As the owner of the platform, I want a lantern listing to print the declared notes and never the conversation around the point, so that recall does not become a way to read a transcript."
+        }
+      ]
     }
   ]
 }

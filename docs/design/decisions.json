@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-24",
+  "updated": "2026-09-26",
   "decisions": [
     {
       "id": "ADR-001",
@@ -191,6 +191,43 @@
       "consequences": [
         "DIRECTORY-003 records the state beside each identity; no check reads it until the permission work of road step 2.",
         "The room's own questions stay with the proposal: whether a reason is mandatory on suspend and retire, and whether activation needs a credential handle (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:101-103)."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-012",
+      "title": "The home takes lanterns in as two lys custom entries, local home state",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-26",
+      "decided_by": "Tom (the lantern definition of 8 August 2026 and roadmap stage 5 of 22 September 2026), filed by Archie on 26 September 2026",
+      "context": "The home design listed lanterns and forks at a coordinate (stages 5 and 5b) as a non-goal of HOME-001, because they stand on a proved resume. Stage 5 is now asked for: a note plus a point in a transcript, lit on purpose, growing only by appended epilogues. The home's grammar is Pi's session tree and lys adds nothing to it (home P2, CN4), so the lantern had to be carried either as lys custom entries in the session it marks or in a store of the home's own beside the sessions.",
+      "decision": "A lantern is a lys.lantern custom entry and an epilogue a lys.lantern_epilogue custom entry, appended to the session that holds the lantern's point, over a separate lantern table or store beside the sessions, because Pi's grammar already carries custom entries, the session's index already finds them by custom type, and the lantern then moves with its session. Both entries are local home state documented in RECORD.md like the other lys custom entries, not a signed wire contract. Stage 5 leaves the non-goals; stage 5b, the fork through a lantern, stays out.",
+      "quote": "",
+      "consequences": [
+        "HOME-002 adds the two custom types and the light, epilogue and recall subcommands to lys-home.",
+        "RECORD.md writes down both entries' data; nothing is added outside Pi's custom data.",
+        "Lighting and adding an epilogue move the session's head to the new entry; every reader of the head must meet a custom entry there.",
+        "The fork through a lantern, resonance, vectors, ranking, dimming by churn, Norn's tables and a Cambium screen are later units."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-013",
+      "title": "A lantern's note and epilogues are declared notes, the one thing a listing prints",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-26",
+      "decided_by": "The lead who owns the lantern card, on Tom's standing ruling of 8 August 2026 that a memory is a note stored against a thing so it can be retrieved against that thing; amended into home P7 and CN3 through the card's own pull request with Waffles' sign-off",
+      "context": "Home P7 and CN3 say transcript contents never appear in output: hashes, counts, offsets and ids only, and the lys-home command line promises no transcript content in any report. A lantern's note is stored as a line of the session file, and recall must print it, so as written the rule forbade the one thing recall is for.",
+      "decision": "A lantern's note and its epilogues are declared notes, words a person or an agent wrote to be read back, and a lantern listing prints them, over keeping every line of a session file out of output, which would make recall print nothing a person could use. Transcript contents are message entries, blocks and anything a model or a tool produced, and they stay under the rule: never in output, logs, errors, test names or pages.",
+      "quote": "",
+      "consequences": [
+        "Home P7 and CN3 and the lys-home command line's module doc each gain one sentence saying what transcript contents are and that declared notes are the one thing a listing prints.",
+        "No lantern listing, report or error prints a line of the transcript around a point; refusals carry ids only, never note text.",
+        "The acceptance check that no listing prints transcript content is a search of the output for a fixture message's text that appears in no note."
       ],
       "supersedes": [],
       "superseded_by": ""

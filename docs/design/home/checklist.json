@@ -95,6 +95,56 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Lanterns",
+      "items": [
+        {
+          "id": "C14",
+          "text": "A lantern is a lys.lantern custom entry whose data carries exactly point, note and lit_by, and an epilogue is a lys.lantern_epilogue custom entry whose data carries exactly lantern, note and written_in; the entry's own timestamp is when, and no field is added outside Pi's custom data.",
+          "done": false
+        },
+        {
+          "id": "C15",
+          "text": "Lighting appends one lys.lantern entry at the session's head marking any entry of that session, the head included and a past entry included, leaves the file's earlier bytes unchanged, moves the head to the lantern, and prints a JSON report of the lantern's id, session, point and time.",
+          "done": false
+        },
+        {
+          "id": "C16",
+          "text": "Lighting at an entry id the session does not hold, and lighting with an empty note, are each refused by name and append nothing.",
+          "done": false
+        },
+        {
+          "id": "C17",
+          "text": "Adding an epilogue appends one lys.lantern_epilogue entry to the lantern's own session naming the lantern's entry id, and an empty epilogue and a name that is not a lys.lantern entry of that session are each refused by name and append nothing.",
+          "done": false
+        },
+        {
+          "id": "C18",
+          "text": "The home lists its sessions by rule, and a session is read for recall through its index's custom rows without taking its lock and without writing any file.",
+          "done": false
+        },
+        {
+          "id": "C19",
+          "text": "Recall by note lists every lantern in the home whose note or any epilogue contains the given text after both are case-folded, and recall by point lists every lantern marking a given session and entry id.",
+          "done": false
+        },
+        {
+          "id": "C20",
+          "text": "Each recall row is exactly the lantern's id, session, point, lit_by, lit_at, note and its epilogues in file order, and no listing prints a line of the transcript.",
+          "done": false
+        },
+        {
+          "id": "C21",
+          "text": "A session holding lanterns and epilogues renders to a Claude Code file carrying no line from either entry.",
+          "done": false
+        },
+        {
+          "id": "C22",
+          "text": "The home's design, the record document and the command line's module doc state that a lantern's note and epilogues are declared notes, the one thing a listing prints, and the record document writes down both lantern entries.",
+          "done": false
+        }
+      ]
     }
   ]
 }
