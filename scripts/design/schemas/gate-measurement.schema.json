@@ -1,0 +1,75 @@
+{
+  "type": "object",
+  "properties": {
+    "legs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "tree": {
+            "type": "string"
+          },
+          "venue": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "failed",
+              "unmeasured",
+              "not_requested"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "exits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "code"
+              ]
+            }
+          },
+          "diagnostics": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "tree",
+          "venue",
+          "command",
+          "status",
+          "reason",
+          "exits",
+          "diagnostics"
+        ]
+      }
+    },
+    "complete": {
+      "type": "boolean"
+    },
+    "passed": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "legs",
+    "complete",
+    "passed"
+  ]
+}

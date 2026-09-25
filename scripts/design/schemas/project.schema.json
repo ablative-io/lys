@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Project Setup",
+  "description": "The per-project setup a design directory carries beside its two ledgers: the working trees of this project with the exact command lines each is measured by, and the named directories of the other projects in the estate. An author copies the trees array verbatim into a new cluster design's gate array, so a cluster is measured by the project's own command lines and never by a guess. Absent or malformed, it is refused by name — there is no default.",
+  "type": "object",
+  "required": ["trees", "roots"],
+  "additionalProperties": false,
+  "properties": {
+    "trees": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "title": "the three-line shorthand",
+            "type": "object",
+            "required": ["tree", "fmt", "lint", "tests"],
+            "additionalProperties": false,
+            "properties": {
+              "tree": {
+                "type": "string",
+                "description": "A working tree of this project: an absolute path, or a path relative to the repository root. Copied into a cluster design's gate array unchanged."
+              },
+              "fmt": {
+                "type": "string",
+                "description": "The formatting command line, run in the tree with no shell. The formatting command, never its check form: a formatting change the gate makes is part of the tree the developer commits."
+              },
+              "lint": {
+                "type": "string",
+                "description": "The lint command line, run in the tree with no shell, with warnings denied."
+              },
+              "tests": {
+                "type": "string",
+                "description": "The test command line, run in the tree with no shell."
+              }
+            },
+            "description": "Three named legs written short: fmt, lint and tests, each at the place the ledger itself runs, each every round."
+          },
+          {
+            "title": "the legs the repository declares",
+            "type": "object",
+            "required": ["tree", "legs"],
+            "additionalProperties": false,
+            "properties": {
+              "tree": {
+                "type": "string",
+                "description": "The working tree these legs measure, spelled the same way as in the three-line shorthand."
+              },
+              "shorthand": {
+                "type": "object",
+                "description": "Names this entry gives to requirement sets that recur across its legs, as name to an array of requirements. A shorthand names a set and is never a kind of its own."
+              },
+              "legs": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": ["name", "command", "requires", "cadence"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": { "type": "string", "description": "What this leg is called. An outcome names one leg, so a name is used once in an entry." },
+                    "command": { "type": "string", "description": "The command line this leg is, run in the tree with no shell." },
+                    "requires": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": { "type": "string" },
+                      "description": "What this leg requires of a place, each spelled kind:value — tool, toolchain, target, lockfile, quiet, place — or the name of a shorthand this entry declares. A leg that declares nothing is refused. A leg no configured venue satisfies is unmeasured by name and stops the round."
+                    },
+                    "cadence": { "type": "string", "enum": ["round", "demand"], "description": "Whether this leg runs every round, or only on demand." }
+                  }
+                },
+                "description": "Every leg of this tree's gate, named. A round that did not run one of them cannot report green."
+              }
+            }
+          }
+        ],
+        "description": "One working tree and the gate it is measured by, written either as the three-line shorthand or as the legs the repository declares."
+      },
+      "description": "Every working tree this project's work is measured in. At least one: a project whose trees are unnamed cannot have a cluster gated."
+    },
+    "roots": {
+      "type": "object",
+      "description": "The other projects in the estate, as name to absolute directory. A survey reads them to answer what a change here means for them. The keys are project names chosen by the people who own them, so the map cannot be written as named properties here; each value is an absolute directory, checked by the ledger when it reads this document."
+    }
+  }
+}

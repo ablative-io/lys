@@ -19,3 +19,10 @@
 - [ ] **C12** — Everything handed out is a lease counted by uses, a time window and a spend cap: the window in the signed delegation, uses and spend counted by the door, a one-use grant never spent twice.
 - [ ] **C13** — Every point the statement leaves open is recorded open in the row it touches and is not decided there.
 - [ ] **C14** — No broker row depends on any one engine: an engine without the broker reads its own pool file as it does today.
+
+## Authority and screen conformance, 23 September amendment
+
+- [ ] **C15** — Real secret ownership or a valid human-rooted delegation permitting re-lending establishes affirmative may-lend; mere use and display labels do not. Applicable recipient policy is checked separately, including people-only refusal.
+- [ ] **C16** — Personal, team and organisation secret boundaries are enforced in listing, metadata, read, use and lending; knowing another identity's record ID grants nothing.
+- [ ] **C17** — Every derived handle stays inside its live ancestry, including shared use/spend budgets and expiry; revoking its source does not revoke an independently authorised sibling.
+- [ ] **C18** — Issuance, account selection, retry and revocation preserve exact provenance and current authority; the screen distinguishes local refusal from unconfirmed provider action.

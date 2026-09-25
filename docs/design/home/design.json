@@ -39,6 +39,10 @@
     },
     {
       "id": "P9",
+      "text": "The canon is one curated, versioned series of examples every new session starts from: each entry is one rule stated short plus one real exchange that shows it lived (verify before claiming, a correction taken well, a refusal named, careful work), drawn from every agent's sessions, distilling the collective experience so far: 'our learnings in one another' (Tom, Dot 13:44 to 13:46; Waffles 0169c353). It is not a letter from one session to its successor. It lives in the lys repository at canon/canon.jsonl in Pi's grammar and changes only through src_commit and review, like code. Genuine thinking is kept whole where a real turn produced it and replays only to the same provider, api and model; thinking is never authored."
+    },
+    {
+      "id": "P10",
       "text": "A handover is a letter the outgoing session writes to its successor in its own real thinking and answer; it enters the successor as a lys.inherited entry marked as a predecessor's memory, never as the successor's own experience, and replays only to the same provider, api and model. No thinking is ever authored; only thinking a model produced is kept (Tom, Dot 13:38 to 13:40: 'you are waking up ... I am another one, I'm helping you have part of my memory ... like a parent imparting a wish to a child'; Waffles 52d53451)."
     }
   ],
@@ -52,6 +56,7 @@
     "One real Claude Code session imported into the common record, rendered back, and resumed under a new id on 2.1.281 without repeating a completed tool action, with the original file's hash unchanged.",
     "One seat with a subscription login making calls through a pass-through proxy, so the tee has somewhere to live.",
     "A written loss account for every derived record: what a render or translation preserved, transformed and could not carry.",
+    "The canon, one curated versioned series of short examples each showing a rule lived, seeds every new session, and its effect is measured on a card against a plain start.",
     "A handover letter from an outgoing session seeds its successor as inherited memory, with the model's own thinking intact, and the effect is measured on a card against a plain start."
   ],
   "non_goals": [
@@ -189,7 +194,7 @@
     },
     {
       "path": "crates/lys-home/src/proxy/mod.rs",
-      "note": "the little proxy: pass the stream through unchanged, record each call as a lys.call entry under the session it belongs to",
+      "note": "the proxy module: declarations only",
       "brief": "HOME-001"
     },
     {
@@ -208,6 +213,26 @@
       "brief": "HOME-001"
     },
     {
+      "path": "crates/lys-home/src/record/canon.rs",
+      "note": "the canon: copy chosen real exchanges (or a clearly authored example) into canon.jsonl with a lys.inherited entry naming each source; seed a new session from it",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/record/canon_tests.rs",
+      "note": "gates on the canon: copied whole, never twice, no authored thinking, rendered first",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "docs/design/home/PROOF-CANON.md",
+      "note": "measured: a session started from the canon against a plain start, on one card",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "canon/canon.jsonl",
+      "note": "the canon itself, versioned by the repository, changed only through src_commit and review",
+      "brief": "HOME-001"
+    },
+    {
       "path": "crates/lys-home/src/record/handover.rs",
       "note": "the handover: take the outgoing session's letter turn (thinking intact) and seed the successor with it as lys.inherited",
       "brief": "HOME-001"
@@ -215,6 +240,71 @@
     {
       "path": "docs/design/home/PROOF-HANDOVER.md",
       "note": "measured: a successor seeded with an inherited letter, whether 2.1.281 replays the signed thinking, and seeded against plain on one card",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/forward.rs",
+      "note": "forward a request to the provider and stream the response back unchanged",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/capture.rs",
+      "note": "bounded spooling of request and response bodies to files while forwarding, handed to the R6 sink",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/journal.rs",
+      "note": "the open-call journal: a call id written before forwarding, retired after ingest, so a restart records lost calls once",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/stream.rs",
+      "note": "the coordinator of the stream readers: picks the grammar by api and hands each frame on as it passes",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/stream_sse.rs",
+      "note": "SSE framing: events and data lines out of a byte stream, retaining byte order, encoding and trailers",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/stream_messages.rs",
+      "note": "the Messages event grammar assembled into response parts",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/stream_chat.rs",
+      "note": "the Chat Completions chunk grammar assembled into response parts",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/stream_responses.rs",
+      "note": "the Responses event grammar assembled into response parts",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/error.rs",
+      "note": "the proxy's errors and outcomes, named",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/forward_tests.rs",
+      "note": "forwarding against a loopback fake",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/stream_tests.rs",
+      "note": "the three grammars, partial streams",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/link_tests.rs",
+      "note": "linking by the measured key; unlinked; never inferred",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/proxy/journal_tests.rs",
+      "note": "recovery after a kill: one lost record per open call",
       "brief": "HOME-001"
     }
   ],
@@ -237,7 +327,7 @@
     },
     {
       "path": "$PI/packages/coding-agent/src/core/session-manager.ts",
-      "note": "Pi's session tree at 3d5cbe98 (checkout /Users/tom/Developer/tools/harness/pi, earendil-works/pi): header, entries, leaf (branch at :1125 moves an in-memory cursor; _buildIndex:754 restores the last physical entry on reopen; loadEntriesFromFile:438 reads the whole file)"
+      "note": "Pi's session tree at 3d5cbe98 (github.com/earendil-works/pi): header, entries, leaf (branch at :1125 moves an in-memory cursor; _buildIndex:754 restores the last physical entry on reopen; loadEntriesFromFile:438 reads the whole file)"
     },
     {
       "path": "$PI/packages/ai/src/api/transform-messages.ts",
@@ -249,7 +339,7 @@
     },
     {
       "path": "$CCFLARE/README.md",
-      "note": "ccflare at 95c4c6a (/Users/tom/Developer/tools/proxy/ccflare): the concept of a native pass-through that keeps request history; reference only, not used (Tom, Dot 13:34)"
+      "note": "ccflare at 95c4c6a (github.com/snipeship/ccflare): the concept of a native pass-through that keeps request history; reference only, not used (Tom, Dot 13:34)"
     }
   ],
   "constraints": [

@@ -8,7 +8,7 @@ title: Build the secrets broker: handles, the proxy, rotation, sealed records, r
 # SECRETS-002: Build the secrets broker: handles, the proxy, rotation, sealed records, revocation and leases
 
 > **Cluster:** secrets
-> **Blocked by:** Waffles' review of each row before it is dispatched (CN2), The live permission decision, SpiceDB beside the door, which the statement records as not started (docs/design/identity/STATEMENT-2026-09-22.md:127) and places in step 2 of the road (docs/design/identity/STATEMENT-2026-09-22.md:143); every proxy check asks it (docs/design/identity/STATEMENT-2026-09-22.md:17), A root naming the door repository, which is not set for this round; every door-owned file moves into files when it is, The delegation schema, which the statement leaves unsettled (docs/design/identity/STATEMENT-2026-09-22.md:21); the handle (R1) and the lease's time window (R9) wait on it, The lys-core release that freezes lys/delegation/v1, which waits until the fold that enforces its ordering rule exists (CLAUDE.md:23); until then no delegation is signed outside tests (crates/lys-core/src/delegation/mod.rs:237-242)
+> **Blocked by:** Waffles' review of each row before it is dispatched (CN2), The live permission decision, SpiceDB beside the door, which the statement records as not started (docs/design/identity/STATEMENT-2026-09-22.md:127) and places in step 2 of the road (docs/design/identity/STATEMENT-2026-09-22.md:143); every proxy check asks it (docs/design/identity/STATEMENT-2026-09-22.md:17), A root naming the door repository, which is not set for this round; every door-owned file moves into files when it is, The delegation schema, which the statement leaves unsettled (docs/design/identity/STATEMENT-2026-09-22.md:21); the handle (R1) and the lease's time window (R9) wait on it, The lys-core release that freezes lys/delegation/v1, which waits until the fold that enforces its ordering rule exists (CLAUDE.md:23); until then no delegation is signed outside tests (crates/lys-core/src/delegation/mod.rs:237-242), Standalone broker-host ownership and complete per-row implementation/test file walls: the prior draft maps the door to Cambium, while ADR-004 and IDENTITY-001 rows 04/05 require standalone identity operation. This discrepancy must be resolved by a reviewed ownership decision, not by making Cambium a mandatory server. No empty-wall row is ready for dispatch., Review of the proposed R7 freshness/refusal mechanism and the pending lifecycle-state policy in CONFORMANCE rows 3.2 and 3.4; accepted suspension/reinstatement behaviour in row 3.3 remains binding.
 > **Design anchor:**
 > - ADR-001 — Secrets are held behind a handle the door swaps for the credential — A seat holds a short-lived handle bound to its identity. The real credential sits in the door's encrypted store and never leaves the server. The door's proxy checks SpiceDB, swaps the handle for the credential, forwards the call and writes one audit line. Built in Rust inside the door; no OpenBao unless credentials minted on demand are later needed.
 > - ADR-002 — The token revolver is the first consumer of the handle — The worker asks the broker for its next account instead of walking its own list; the store keeps the set of real accounts behind one handle and the proxy takes the next in turn and logs which one served each call. This replaces the account pool file.
@@ -26,6 +26,10 @@ title: Build the secrets broker: handles, the proxy, rotation, sealed records, r
 > - C12 — Everything handed out is a lease counted by uses, a time window and a spend cap: the window in the signed delegation, uses and spend counted by the door, a one-use grant never spent twice.
 > - C13 — Every point the statement leaves open is recorded open in the row it touches and is not decided there.
 > - C14 — No broker row depends on any one engine: an engine without the broker reads its own pool file as it does today.
+> - C15 — Real secret ownership or a valid human-rooted delegation permitting re-lending establishes affirmative may-lend; mere use and display labels do not. Applicable recipient policy is checked separately, including people-only refusal.
+> - C16 — Personal, team and organisation secret boundaries are enforced in listing, metadata, read, use and lending; knowing another identity's record ID grants nothing.
+> - C17 — Every derived handle stays inside its live ancestry, including shared use/spend budgets and expiry; revoking its source does not revoke an independently authorised sibling.
+> - C18 — Issuance, account selection, retry and revocation preserve exact provenance and current authority; the screen distinguishes local refusal from unconfirmed provider action.
 > **Stories:**
 > - S2 (Person, Grants an agent provisioned under them access to an account) — As a person granting an agent access, I want to give it a handle under my own grant, limited by uses, time and spend, so that it can use the account without ever holding the credential and the grant traces back to me.
 > - S3 (Person, Grants an agent provisioned under them access to an account) — As a person, I want to drop an agent's handle and have every new call on it refused at once, so that taking access back does not wait on rotating the real key.
@@ -37,14 +41,17 @@ title: Build the secrets broker: handles, the proxy, rotation, sealed records, r
 > - S9 (Operator, Keeps the accounts and revokes access) — As an operator revoking access, I want each case to say what it reaches: a handle refuses new calls, a call already admitted follows the stated cancellation rule, a login token's seat is ended by its engine, and read knowledge stays read, so that I am never told revocation took back what it cannot.
 > - S10 (Reviewer, Reads the audit of what the broker did) — As a reviewer reading the audit, I want one line per use naming the seat, the handle, the real account and the time, and one per sealed read, so that every use is attributed to an identity in one place.
 > - S11 (Reviewer, Reads the audit of what the broker did) — As a reviewer reading the audit, I want each call that was in flight when its handle was dropped to show the outcome the cancellation rule gave it, so that no call's end is unaccounted for.
+> - S12 (Account holder, Uses and deliberately delegates scoped access without exposing credentials) — As a person allowed to use an account, I want the screen and server to distinguish that from permission to lend it, so I cannot accidentally grant my agent authority I do not hold.
+> - S13 (Account holder, Uses and deliberately delegates scoped access without exposing credentials) — As Dana, I want my private secrets and their metadata isolated from Tom and his agents unless I grant access, so knowing an identifier or signing in to the same installation does not disclose them.
+> - S14 (Account holder, Uses and deliberately delegates scoped access without exposing credentials) — As a person reviewing a grant or revocation, I want its source, selected service account and confirmed or unconfirmed outcome shown, so I know exactly what authority changed.
 
 ## Purpose
 
-Agents get a short-lived, limited handle to a credential, never the credential itself (ADR-001), and the token revolver is the first user (ADR-002). This brief is the temporary key model of the statement, one requirement per part, so each row can be reviewed by Waffles and built on its own; it is step 3 of the road: 'Store, handle, proxy, rotation under 1 handle' (docs/design/identity/STATEMENT-2026-09-22.md:144).
+Agents get a short-lived, limited handle to a credential, never the credential itself (ADR-001), and the token revolver is the first user (ADR-002). This brief is the temporary key model of the statement, one requirement per part, so each row can be reviewed by Waffles and built on its own; it is step 3 of the road: 'Store, handle, proxy, rotation under 1 handle' (docs/design/identity/STATEMENT-2026-09-22.md:144). Amendment of 23 September 2026: the You and Secrets screens must distinguish permission to use an account from affirmative permission to lend it, with the responsible person and the source grant visible. This amendment is awaiting Waffles review; the implementation is not dispatched or claimed complete.
 
 ## Task
 
-Build the broker the statement's 'Secrets: the temporary key model' describes, in Rust, inside the door (docs/design/identity/STATEMENT-2026-09-22.md:23-57), applying the lys formats 'Where it lives: lys' names (docs/design/identity/STATEMENT-2026-09-22.md:82). The store and the proxy are the door's; the handle's and the sealed record's formats are lys's. In: the handle and the proxy swap with its audit line (R1); rotation under one handle (R2); the token revolver as the first consumer (R3); OAuth refresh at the proxy (R4); the seat's own login at spawn (R5); sealed knowledge tagged in SpiceDB (R6); the three revocation cases (R7); the cancellation rule for calls in flight (R8); leases counted by uses, time window and spend (R9). Out: OpenBao or any external secrets engine; the proxy-handle login path; the delegation schema; anything the statement leaves open, each recorded open in the row it touches. Door-owned files are named in each spec with owner and citation and are not in files until a root naming the door repository is set. Every path is relative to its own repository's root.
+Build the broker the statement's 'Secrets: the temporary key model' describes, in Rust, inside the door (docs/design/identity/STATEMENT-2026-09-22.md:23-57), applying the lys formats 'Where it lives: lys' names (docs/design/identity/STATEMENT-2026-09-22.md:82). The store and the proxy are the door's; the handle's and the sealed record's formats are lys's. In: the handle and the proxy swap with its audit line (R1); rotation under one handle (R2); the token revolver as the first consumer (R3); OAuth refresh at the proxy (R4); the seat's own login at spawn (R5); sealed knowledge tagged in SpiceDB (R6); the three revocation cases (R7); the cancellation rule for calls in flight (R8); leases counted by uses, time window and spend (R9). Out: OpenBao or any external secrets engine; the proxy-handle login path; the delegation schema; anything the statement leaves open, each recorded open in the row it touches. Door-owned files are named in each spec with owner and citation and are not in files until a root naming the door repository is set. Every path is relative to its own repository's root. Conformance amendment source: docs/design/identity/CONFORMANCE.md at commit 1353c22, especially rows 3.3 and 7.1–7.8. Trace each executable acceptance identifier below to that committed behaviour map. Tom's 23 September 2026, 19:04:22 Melbourne request is context, not the checkable source. Existing SECRETS-001 execution records describe the earlier authoring task and are not evidence for this amendment. The broker-host ownership must be settled against the standalone identity product before the proposed Cambium paths below become executable walls.
 
 ## Requirements
 
@@ -60,6 +67,8 @@ Door-owned, named here only (the door repository (the cambium checkout the desig
 
 OPEN, not decided here: (a) the delegation schema, which the statement leaves unsettled (docs/design/identity/STATEMENT-2026-09-22.md:21; ADR-003). (b) Which lys/delegation/v1 pair a handle would use: the only pair v1 defines for a seat is seat with speaks-for, and that role 'has defined semantics, no implementation and no consumer ... Do not invent a consumer for it' (crates/lys-core/src/delegation/artifact.rs:242-254), so whether the handle is that consumer or a new version alongside is Tom's to settle. (c) Delegation is behind unstable-anchor and 'No delegation may be signed outside tests until it is' ratified (crates/lys-core/src/delegation/mod.rs:237-242), and the lys-core release that freezes it waits for the fold (CLAUDE.md:23). (d) Whose key signs a proxy audit line: the statement says each proxy call is 'signed with the agent's key' (docs/design/identity/STATEMENT-2026-09-22.md:80), while the door holds only the seat's public key and never persists the private half (crates/cambium-door/src/http/agent_seat.rs:13-15). (e) The leaf schema of an audit line, which the statement leaves open as 'the event schema shared with the audit lines' (docs/design/identity/STATEMENT-2026-09-22.md:187).
 
+Conformance amendment (ADR-003; STATEMENT-2026-09-22.md, Everything is pegged to a human authority; docs/design/identity/CONFORMANCE.md at commit 1353c22 row 7.3): WHEN a person or agent requests a derived handle, THE SYSTEM SHALL independently authorise both exercise and delegation against the current source grant. Permission to use a secret, possession of a handle, a display-only owner label or the absence of a prohibition SHALL NOT establish permission to lend. A person verified by the server as the actual owner has the affirmative may-lend route stated in docs/design/identity/CONFORMANCE.md at commit 1353c22, row 7.3; no separate borrowed pass-on grant is required for that owner route. A non-owner requires a valid human-rooted delegation explicitly permitting re-lending. Both routes enforce the requested recipient policy and bounds, identify their responsible person, and retain the actual ownership or source-grant evidence in the decision. A people-only account SHALL refuse every agent recipient, including the owner's own agent. The same check SHALL apply to direct API and agent-tool calls as to the screen; hiding a button is not enforcement. The refusal SHALL identify the blocking grant or policy without exposing another person's secret metadata or value. Stable operation identity SHALL survive a lost acknowledgement so retry cannot mint a second handle. The public record SHALL show holder, responsible person, source grant, permitted operations/resource, pass-on rights, expiry and current state; it SHALL contain no credential material.
+
 **Acceptance:**
 - A test sends one call through the proxy with a live handle to an upstream test double: the double receives exactly 1 request carrying the stored credential, and the seat-visible request and response contain no byte of that credential.
 - A test sends one call each with an unknown handle, a dropped handle, and a handle bound to another seat's identity: each is refused, and the upstream test double's request count stays 0 across all 3.
@@ -68,6 +77,11 @@ OPEN, not decided here: (a) the delegation schema, which the statement leaves un
 - A redaction test formats the store's credential type, the proxy's error type and the audit line with Debug and Display: none of the outputs contains a byte of the credential.
 - A test asks the door to issue a handle for an agent whose grant does not trace to a person: no handle is issued.
 - docs/design/WIRE-FORMATS.md and crates/lys-core/src/delegation/mod.rs name the handle's format before any handle is signed outside tests, and the points recorded open above are still recorded open, not decided, when the row is reviewed.
+- SEC_USE_NOT_LEND: permit Tom to use Dana's finance-readonly account but give Tom no delegation right; Tom's proxied use succeeds, and both browser issuance and a direct API request for Tom's own agent are refused. Exactly zero derived handles, success-audit events or upstream calls result from the refused issuances.
+- SEC_AFFIRMATIVE_LEND: verify both routes from CONFORMANCE row 7.3: the actual secret owner can issue a bounded handle without a separate borrowed pass-on grant; a non-owner can issue only with a valid human-rooted delegation permitting re-lending. Remove that delegation while retaining use-only permission and refuse the non-owner. A display-only owner label or ownership of a different secret cannot substitute for the real ownership record. Record which route authorised each success.
+- SEC_PEOPLE_ONLY: Dana is the server-verified owner of the accounts-team credential, so ownership establishes her may-lend authority. An explicit applicable recipient policy permits people only. Issuance to her agent is refused by that recipient policy, not by denying Dana's ownership route. With an agent-permitting policy the owner route succeeds. Direct tool/API requests enforce the same decision.
+- SEC_ISSUE_RETRY: lose the response after a committed issuance, repeat the exact operation ID and payload, then change the payload under that ID. The repeat returns the original handle identity with one logical issuance event; the changed payload is refused by name.
+- SEC_AUTHORITY_TRACE: the visible handle record and audit carry the same holder, responsible person and source-grant IDs returned by the issuer. Altering a supplied parent, recipient kind, action set or resource cannot increase effective authority. Count the refused cases explicitly.
 
 **Files:**
 - modify: crates/lys-core/src/delegation/mod.rs
@@ -76,11 +90,15 @@ OPEN, not decided here: (a) the delegation schema, which the statement leaves un
 **Checklist:**
 - C4 — A seat's call with its handle goes through the door's proxy, which checks SpiceDB, swaps the handle for the real credential, forwards the call and writes one audit line naming the seat, the handle, the real account and the time; the credential never leaves the server.
 - C13 — Every point the statement leaves open is recorded open in the row it touches and is not decided there.
+- C15 — Real secret ownership or a valid human-rooted delegation permitting re-lending establishes affirmative may-lend; mere use and display labels do not. Applicable recipient policy is checked separately, including people-only refusal.
+- C18 — Issuance, account selection, retry and revocation preserve exact provenance and current authority; the screen distinguishes local refusal from unconfirmed provider action.
 
 **Stories:**
 - S2 (Person, Grants an agent provisioned under them access to an account) — As a person granting an agent access, I want to give it a handle under my own grant, limited by uses, time and spend, so that it can use the account without ever holding the credential and the grant traces back to me.
 - S4 (AI Agent, Uses a handle for its outbound calls and reads its sealed records) — As an agent, I want to make my call with my handle and have the proxy swap in the credential, refreshing an expired OAuth token itself, so that I can do my work without ever seeing a credential.
 - S10 (Reviewer, Reads the audit of what the broker did) — As a reviewer reading the audit, I want one line per use naming the seat, the handle, the real account and the time, and one per sealed read, so that every use is attributed to an identity in one place.
+- S12 (Account holder, Uses and deliberately delegates scoped access without exposing credentials) — As a person allowed to use an account, I want the screen and server to distinguish that from permission to lend it, so I cannot accidentally grant my agent authority I do not hold.
+- S14 (Account holder, Uses and deliberately delegates scoped access without exposing credentials) — As a person reviewing a grant or revocation, I want its source, selected service account and confirmed or unconfirmed outcome shown, so I know exactly what authority changed.
 
 ### R2: Rotate across a set of real accounts under one handle
 
@@ -92,18 +110,23 @@ Door-owned, named here only (the door repository (the cambium checkout the desig
 
 Retiring the pool file waits until its consumers have migrated (docs/design/identity/STATEMENT-2026-09-22.md:167), and an engine without the broker reads its own pool file as it does today (docs/design/identity/STATEMENT-2026-09-22.md:62; ADR-004).
 
+Every account selected by rotation SHALL be eligible under the handle's same resource/action and owner boundaries. Rotation SHALL NOT turn a read-only handle into a write capability or select an account belonging to another person merely because it is in an available pool.
+
 **Acceptance:**
 - A test with 3 accounts behind one handle sends 6 calls: each account serves exactly 2, in turn, and each of the 6 audit lines names the account that served it.
 - A test rests 1 of the 3 accounts in the store and sends 4 calls: the rested account serves 0 of them and the other 2 serve 2 each.
 - Resting an account is a single store change: the test performs no file write outside the store and touches no pool file.
 - A test with every account behind a handle rested sends 1 call: it is refused and the upstream test double's request count is 0.
+- SEC_ROTATION_SCOPE: place one eligible account and one account outside the source grant in a test pool. Calls under that handle use only the eligible account; after it is rested the next call refuses instead of selecting the out-of-scope account. The audit identifies the selected account without disclosing its credential.
 
 **Checklist:**
 - C5 — The store keeps a set of real accounts behind one handle, the proxy takes the next in turn and logs which one served, and resting an account is a store change with no file copied to any machine.
+- C17 — Every derived handle stays inside its live ancestry, including shared use/spend budgets and expiry; revoking its source does not revoke an independently authorised sibling.
 
 **Stories:**
 - S8 (Operator, Keeps the accounts and revokes access) — As an operator, I want to rest an account by one change in the store, so that no worker gives it another call and no file is copied to any machine.
 - S10 (Reviewer, Reads the audit of what the broker did) — As a reviewer reading the audit, I want one line per use naming the seat, the handle, the real account and the time, and one per sealed read, so that every use is attributed to an identity in one place.
+- S12 (Account holder, Uses and deliberately delegates scoped access without exposing credentials) — As a person allowed to use an account, I want the screen and server to distinguish that from permission to lend it, so I cannot accidentally grant my agent authority I do not hold.
 
 ### R3: Serve the token revolver its next account from the broker
 
@@ -137,17 +160,22 @@ Owner: the door (docs/design/identity/STATEMENT-2026-09-22.md:25-27, docs/design
 
 Door-owned, named here only (the door repository (the cambium checkout the design inventory names, read at cbcd2cc9d; paths below are relative to that repository's root)): crates/cambium-store/src/traits/secrets.rs, holding the refresh token (docs/design/identity/STATEMENT-2026-09-22.md:39); crates/cambium-door/src/http/secrets_oauth.rs, the refresh at the proxy (docs/design/identity/STATEMENT-2026-09-22.md:39). Door-owned files are named here with their owner and citation and are not listed in files, because no root naming the door repository is set; each moves into files when that root is set. Door paths are proposed new files: the door has no secrets module today (the statement's table, docs/design/identity/STATEMENT-2026-09-22.md:128, records the broker as not started in the cambium door), and they sit where the door keeps its kinds of file today: store traits in crates/cambium-store/src/traits/ (crates/cambium-store/src/traits/mod.rs), HTTP handlers in crates/cambium-door/src/http/ registered in crates/cambium-door/src/http/router.rs.
 
+A provider sign-in identity and an OAuth service-access grant SHALL remain distinct records. The account selected during service consent, its provider subject, client registration and consented scopes SHALL be recorded as that service grant's provenance; a sign-in email or the currently displayed person SHALL NOT substitute for the selected provider subject. Lending service access still requires R1's affirmative delegation decision.
+
 **Acceptance:**
 - A test with an expired access token sends 1 call: the proxy makes exactly 1 refresh request to the provider test double, forwards the call with the new access token, and the seat-visible response contains neither the refresh token nor either access token.
 - A test with a live access token sends 2 calls: the provider test double's refresh request count is 0.
 - A test drops an OAuth handle: the next call is refused, and when upstream revocation is asked for, the provider test double receives exactly 1 revocation request.
 - A redaction test formats the store's OAuth grant type with Debug: the output contains neither token.
+- SEC_OAUTH_ACCOUNT: use separate sign-in and service-consent provider fixtures, select a different account during service consent, and refresh after reopen. The recorded service grant and upstream call use the selected service account and original client; neither a matching email nor sign-in credentials are used to rebind or refresh it. A new client requires a named reconnect rather than an assumed refresh.
 
 **Checklist:**
 - C7 — The proxy refreshes an OAuth access token itself from the refresh token in the store, and the seat never sees the refresh token.
+- C18 — Issuance, account selection, retry and revocation preserve exact provenance and current authority; the screen distinguishes local refusal from unconfirmed provider action.
 
 **Stories:**
 - S4 (AI Agent, Uses a handle for its outbound calls and reads its sealed records) — As an agent, I want to make my call with my handle and have the proxy swap in the credential, refreshing an expired OAuth token itself, so that I can do my work without ever seeing a credential.
+- S14 (Account holder, Uses and deliberately delegates scoped access without exposing credentials) — As a person reviewing a grant or revocation, I want its source, selected service account and confirmed or unconfirmed outcome shown, so I know exactly what authority changed.
 
 ### R5: Put the seat's own login into its environment at spawn
 
@@ -185,12 +213,15 @@ Door-owned, named here only (the door repository (the cambium checkout the desig
 
 OPEN, not decided here: lys/sealed-envelope/v1 seals with an empty AAD (docs/design/WIRE-FORMATS.md:18; crates/lys-core/src/seal/sealed_envelope.rs:180-183), so an envelope carries nothing that binds it to its name or its owning identity. Whether 'each identity's sealed records are its own' is held by a construction alongside v1 or by the door is not settled by the statement; any construction is a new version alongside, never a change to the shipped one, and takes an adversarial review (CLAUDE.md, coding standards).
 
+Personal, team and organisation scopes SHALL be enforced at list, metadata, read, use and lending seams. A personal record belongs to its recorded person; another person's sign-in or agent ownership creates no access to it. Knowing a record ID or path SHALL NOT bypass its policy. Public denials SHALL avoid leaking the existence, title or owner of a record the caller cannot discover.
+
 **Acceptance:**
 - A test in which SpiceDB permits the asking identity reads one memory record by name: the text is returned and exactly 1 audit line is appended naming the seat, the record and the time.
 - A test in which SpiceDB does not permit the asking identity: the read is refused, no text is returned, and the record is not decrypted.
 - A test asks to read a record marked as a key: the read is refused, and the key is usable only through the proxy of R1.
 - A test moves one identity's sealed record to another identity's name in the store and reads it as the second identity: the read returns no text.
 - A test searches every memory file the door writes for a record's plaintext after sealing it: 0 matches.
+- SEC_PRIVATE_SCOPE: create distinct personal memories and credentials for Tom and Dana. For each person, enumerate, read by known ID and request a derived handle as the other person and as that person's agent. Every unauthorised leg returns no protected metadata/plaintext, performs no decryption or credential forwarding and creates no handle; same-owner authorised controls prove each route actually ran.
 
 **Files:**
 - modify: crates/lys-core/src/seal/mod.rs
@@ -199,10 +230,12 @@ OPEN, not decided here: lys/sealed-envelope/v1 seals with an empty AAD (docs/des
 **Checklist:**
 - C9 — Sealed records are kept encrypted in the store, tagged in SpiceDB with which identities may read them, read by name with a relation check and one audit line, and a key is used through the proxy, never read.
 - C13 — Every point the statement leaves open is recorded open in the row it touches and is not decided there.
+- C16 — Personal, team and organisation secret boundaries are enforced in listing, metadata, read, use and lending; knowing another identity's record ID grants nothing.
 
 **Stories:**
 - S5 (AI Agent, Uses a handle for its outbound calls and reads its sealed records) — As an agent, I want to ask for one of my sealed memories by name and get back only the piece I am permitted, so that a secret never sits in plain text in my memory files.
 - S10 (Reviewer, Reads the audit of what the broker did) — As a reviewer reading the audit, I want one line per use naming the seat, the handle, the real account and the time, and one per sealed read, so that every use is attributed to an identity in one place.
+- S13 (Account holder, Uses and deliberately delegates scoped access without exposing credentials) — As Dana, I want my private secrets and their metadata isolated from Tom and his agents unless I grant access, so knowing an identifier or signing in to the same installation does not disclose them.
 
 ### R7: Revoke in the three cases the statement names
 
@@ -214,19 +247,30 @@ Door-owned, named here only (the door repository (the cambium checkout the desig
 
 OPEN, not decided here: (a) whether revoking the login token at the provider makes the seat's next call fail, proved with the provider before it is promised (docs/design/identity/STATEMENT-2026-09-22.md:56). (b) The file that carries the lys revocation fold: its owner is lys (docs/design/identity/STATEMENT-2026-09-22.md:126), and the key-history artifact that would carry a fold 'is its own future format' (crates/lys-core/src/delegation/mod.rs:208-210); no file is named until that format is designed.
 
+Withdrawing a source grant SHALL stop fresh issuance and fresh use through every grant and handle derived from that source. A separate valid grant to the same holder or resource SHALL remain independent and SHALL NOT be revoked merely because it shares an identity or account. Proposal under review, not a settled source rule: if the broker cannot establish a permission decision at least as fresh as the revocation, refuse the affected admission by name rather than use a cached permit. The freshness mechanism and whether admission can await a fresh decision must be settled before dispatch. Local refusal of new proxy calls and upstream revocation confirmation SHALL be represented separately; a timeout SHALL remain unconfirmed, never displayed as completed. Unknown mutation outcomes retain their operation IDs for reconciliation.
+
+The general identity-state policy is pending in docs/design/identity/CONFORMANCE.md at commit 1353c22, rows 3.2 and 3.4, and must be reviewed before this row is dispatched. The specific virtual-credential hold on suspension follows accepted row 3.3. Reinstatement SHALL re-evaluate current grants and leases; it SHALL NOT resurrect a separately revoked handle, an expired provisional grant, a retired identity or authority withdrawn by an ancestor. A suspension being lifted is not an issuance or renewal event.
+
 **Acceptance:**
 - A test drops a handle and then sends 3 new calls on it: all 3 are refused and the upstream test double's request count stays at its value before the drop.
 - A test revokes a seat's login: the door's answer names the seat the token went to, and the door itself ends no process.
 - A test revokes a sealed record's relation after one read: the next read is refused, the earlier audit line is still in the log, and the door's answer does not claim the earlier read is undone.
 - The provider-revocation question and the fold's file are recorded open in this requirement when the row is reviewed.
+- SEC_REVOKE_CHAIN: create a person-to-agent-to-agent chain with explicit pass-on grants and an independent sibling source. Revoke the chain root, then exercise every descendant. All chain-derived calls refuse and forward zero new upstream requests; the independently authorised control still works.
+- SEC_REVOKE_FRESHNESS (proposed consistency acceptance; review required before dispatch): hold a permission replica behind the revocation revision. Fresh use must either await a sufficiently fresh decision or refuse by name; it never reaches upstream on the stale permit. Assert the selected behaviour and the exact zero-forward count.
+- SEC_REVOKE_STATES: acknowledge local handle revocation while withholding provider acknowledgement. API and screen show local use stopped and upstream unconfirmed; no timer changes it to confirmed. Deliver the exact matching provider outcome and verify the state transitions once without a second revoke operation.
+- SEC_REINSTATE_CURRENT: suspend a holder with three handles, independently revoke one and expire another while suspended, then reinstate the holder. Only the third still-authorised handle can resume; the revoked and expired handles stay refused and no new issuance/renewal is recorded.
 
 **Checklist:**
 - C10 — Each of the three revocation cases has its own behaviour: a dropped handle refuses every new call, the login token's seat is ended by its engine, and read sealed knowledge is disclosed and recorded, never claimed back.
 - C13 — Every point the statement leaves open is recorded open in the row it touches and is not decided there.
+- C17 — Every derived handle stays inside its live ancestry, including shared use/spend budgets and expiry; revoking its source does not revoke an independently authorised sibling.
+- C18 — Issuance, account selection, retry and revocation preserve exact provenance and current authority; the screen distinguishes local refusal from unconfirmed provider action.
 
 **Stories:**
 - S3 (Person, Grants an agent provisioned under them access to an account) — As a person, I want to drop an agent's handle and have every new call on it refused at once, so that taking access back does not wait on rotating the real key.
 - S9 (Operator, Keeps the accounts and revokes access) — As an operator revoking access, I want each case to say what it reaches: a handle refuses new calls, a call already admitted follows the stated cancellation rule, a login token's seat is ended by its engine, and read knowledge stays read, so that I am never told revocation took back what it cannot.
+- S14 (Account holder, Uses and deliberately delegates scoped access without exposing credentials) — As a person reviewing a grant or revocation, I want its source, selected service account and confirmed or unconfirmed outcome shown, so I know exactly what authority changed.
 
 ### R8: State and enforce the cancellation rule for calls already admitted
 
@@ -262,6 +306,8 @@ Door-owned, named here only (the door repository (the cambium checkout the desig
 
 OPEN, not decided here: the delegation schema (docs/design/identity/STATEMENT-2026-09-22.md:21), and with it how a time window is carried: lys/delegation/v1 has no expiry by design (crates/lys-core/src/delegation/mod.rs:218-221), so a window in the signed delegation is a new version alongside v1, never a change to it; its shape waits on the schema.
 
+Derived leases SHALL be bounded by every live ancestor's resource, action, recipient-kind, time, use and spend restrictions. Splitting authority across two children SHALL NOT duplicate the parent's remaining use or spend budget. Delegation SHALL NOT renew a provisional grant or move its end date. A role-definition version change is distinct from the holder's grant and SHALL NOT silently extend that grant's lease. Expiry is checked against the named clock at admission, not merely displayed by the browser.
+
 **Acceptance:**
 - A test with a lease of 2 uses sends 3 calls: the first 2 are forwarded and the 3rd is refused, and the upstream test double's request count is 2.
 - A test sends 2 simultaneous requests on a one-use grant: with both held at the use check until both have arrived, so the race is forced rather than hoped for, exactly 1 is forwarded and the other is refused.
@@ -270,6 +316,9 @@ OPEN, not decided here: the delegation schema (docs/design/identity/STATEMENT-20
 - A test sends a call after its lease's time window has ended: it is refused.
 - The door's spend report labels its total as the spending that passed through the proxy.
 - The delegation schema and the carriage of the time window are recorded open in this requirement when the row is reviewed.
+- SEC_LEASE_ATTENUATION: request a child lease ending after its parent, with broader actions/resource or an unpermitted recipient kind. Each request is refused naming the exceeded boundary; a strictly narrower control succeeds. An expired ancestor refuses even when the child's own displayed end date is later.
+- SEC_SHARED_ALLOWANCE: derive two handles under a source with one use remaining; hold two calls at their shared reservation boundary and release them together. Exactly one upstream call occurs and the other refuses. Reopen and retry the accepted operation; the source allowance remains consumed once.
+- SEC_PROVISIONAL_EXPIRY: advance a controlled clock to the holder's grant end and try both use and child issuance. Both refuse, including after editing the role definition or moving the holder to another role version; no action renews the expired grant without a separately authorised grant operation.
 
 **Files:**
 - modify: crates/lys-core/src/delegation/mod.rs
@@ -278,9 +327,11 @@ OPEN, not decided here: the delegation schema (docs/design/identity/STATEMENT-20
 **Checklist:**
 - C12 — Everything handed out is a lease counted by uses, a time window and a spend cap: the window in the signed delegation, uses and spend counted by the door, a one-use grant never spent twice.
 - C13 — Every point the statement leaves open is recorded open in the row it touches and is not decided there.
+- C17 — Every derived handle stays inside its live ancestry, including shared use/spend budgets and expiry; revoking its source does not revoke an independently authorised sibling.
 
 **Stories:**
 - S2 (Person, Grants an agent provisioned under them access to an account) — As a person granting an agent access, I want to give it a handle under my own grant, limited by uses, time and spend, so that it can use the account without ever holding the credential and the grant traces back to me.
+- S12 (Account holder, Uses and deliberately delegates scoped access without exposing credentials) — As a person allowed to use an account, I want the screen and server to distinguish that from permission to lend it, so I cannot accidentally grant my agent authority I do not hold.
 
 ## Boundaries
 
@@ -293,6 +344,7 @@ OPEN, not decided here: the delegation schema (docs/design/identity/STATEMENT-20
 - A shipped wire format is never mutated: lys/sealed-envelope/v1 and lys/delegation/v1 evolve only by a new version alongside, and any cryptographic change takes an adversarial review before it lands.
 - No door file is edited in a round without a root naming the door repository.
 - No row is dispatched until Waffles has reviewed it.
+- A mock-up owner label, an absent deny flag or a role name is never ownership evidence. Server-verified ownership of the secret is an affirmative may-lend route under docs/design/identity/CONFORMANCE.md at commit 1353c22, row 7.3; a non-owner needs a valid human-rooted delegation permitting re-lending. Policy and authority checks are performed at the server for every UI/API/MCP route; the UI renders that answer.
 
 ## Verification
 
@@ -300,3 +352,4 @@ OPEN, not decided here: the delegation schema (docs/design/identity/STATEMENT-20
 - From the door repository root: the door's own gates, all clean, once its root is set.
 - From docs/ of the lys repository: python3 $DS2_METHOD/scripts/validate.py design/secrets and python3 $DS2_METHOD/scripts/check-coverage.py design/secrets exit 0.
 - A search of every file a row touches finds no credential, token or key value.
+- Map SEC_USE_NOT_LEND through SEC_PROVISIONAL_EXPIRY to the accepted mock-up conformance IDs before dispatch; the code evidence must include independent negative cases and exact exercised counts. A rendered mock-up is a specification artifact, never proof that broker enforcement exists.

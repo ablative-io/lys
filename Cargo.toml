@@ -4,6 +4,7 @@ members = [
     "crates/lys-anchor",
     "crates/lys-anchor-cli",
     "crates/lys-core",
+    "crates/lys-home",
     "crates/lys-log-store",
 ]
 resolver = "3"
@@ -19,6 +20,7 @@ rust-version = "1.85"
 [workspace.dependencies]
 # Internal
 lys-core = { version = "0.2.0", path = "crates/lys-core" }
+lys-home = { version = "0.2.0", path = "crates/lys-home" }
 lys-log-store = { version = "0.2.0", path = "crates/lys-log-store" }
 
 # Cryptographic primitives — pinned at the versions hardened in meridian-trust.

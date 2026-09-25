@@ -1,0 +1,30 @@
+[package]
+name = "lys-home"
+description = "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version = "1.89" # std::fs::File::try_lock, the one-owner lock on a session file
+keywords = ["session", "transcript", "tree", "home", "agent"]
+categories = ["database-implementations"]
+
+[dependencies]
+clap.workspace = true
+rand.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+time = { workspace = true, features = ["formatting", "parsing"] }
+
+[[bin]]
+name = "lys-home"
+path = "src/main.rs"
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
