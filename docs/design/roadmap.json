@@ -125,25 +125,33 @@
     {
       "id": "RM-005",
       "title": "Give a session a home: its context record, kept byte for byte",
-      "status": "idea",
+      "status": "briefed",
       "kind": "feature",
       "summary": "The home (identity platform steps 4 and 5): a running session's transcript captured into a home byte for byte, indexed for reading back, with the record of what the agent was given as well as what it did. Lanterns, translation and forks stand on it.",
       "provenance": {
         "requested_by": "tom",
         "date": "2026-09-25",
         "quote": "",
-        "context": "CONTEXT-001 (docs/design/identity/briefs) and the home cluster on lys PR 8 (card/home-001-on-main), which moves this item to designed when it lands."
+        "context": "CONTEXT-001 (docs/design/identity/briefs) and the home cluster, landed on main with lys PR 8 (HOME-001, design.json, stories, checklist)."
       },
       "links": {
         "cluster": "home",
-        "decisions": [],
-        "briefs": [],
-        "commits": []
+        "decisions": [
+          "ADR-001",
+          "ADR-003",
+          "ADR-004"
+        ],
+        "briefs": [
+          "HOME-001"
+        ],
+        "commits": [
+          "7b47115cb08b02c246ff19e3330e5f825ed68163"
+        ]
       },
       "depends_on": [
         "RM-001"
       ],
-      "notes": "Owned by Archie. The cached-index rule (lys-home Index::from_cached) landed with the cluster on PR 8's branch."
+      "notes": "Owned by Archie. The home cluster and HOME-001 landed on main with PR 8; the cached-index rule (lys-home Index::from_cached) is in that brief. Next: HOME-001 dispatched through the board."
     }
   ]
 }
