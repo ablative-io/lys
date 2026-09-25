@@ -101,12 +101,12 @@
       "items": [
         {
           "id": "C14",
-          "text": "When a compaction entry enters a session on import, a lys.loss custom entry follows it, points at it by entry id and names what fell outside the kept range: the span's first and last entry ids, its counts of entries, messages, tool calls, tool results and blocks with their bytes, and the tokensBefore the harness reported, as ids, counts and hashes and never content.",
+          "text": "When a compaction entry enters a session on import (a compact_boundary whose summary record never arrives included, as a compaction with an empty summary), a lys.loss custom entry follows it, points at it by entry id and names what fell outside the kept range: the span's first and last entry ids, its counts of entries, messages, tool calls, tool results and blocks with their bytes, and the tokensBefore the harness reported, as ids, counts and hashes and never content.",
           "done": false
         },
         {
           "id": "C15",
-          "text": "A lys-home subcommand lists a session's compactions, each with its loss entry and a check that every entry in the summarised span is readable by id and every block it references is held, as a JSON report of ids, counts and hashes.",
+          "text": "A lys-home subcommand lists a session's compactions, each with its loss entry and a check that every entry in the summarised span is readable by id and every block it references is held, as a JSON report of ids, counts and hashes, and exits non-zero after the report when an entry cannot be read or a block is missing, naming each by entry id or block hash.",
           "done": false
         },
         {
