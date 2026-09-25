@@ -88,6 +88,7 @@ Tom's rules, in his words, with the date and time each was given.
 3. (2026-09-25 21:54 and 21:56, Tom on Dot) Heavy builds and full gates go to Dean's laptop. Only small, warm, single-crate checks (a lint, one crate's clippy or tests) run on the Mac, straight away, no queue.
 4. (2026-09-25 22:37, Tom on Dot) Lys identity comes first. "Lys is very important... the whole identity" work. The order for a night: the chain's blocking fault, then the Lys identity cards, then haematite and Dot.
 5. (2026-09-23 19:23, Tom) Workflow inputs name a repository, a commit, a card and a brief, never a folder.
+6. (2026-09-26 02:40 to 02:43, Tom on Dot) Nobody stops working and nobody waits on Tom, every night. Before any blocker is called Tom's, the seat searches the estate for it itself (files, keys, earlier words, running tools); the Jev key sat on this Mac all night while the whole room waited on him for it. If it truly needs him, everything up to it keeps moving and other work fills the time.
 
 ## Gates before any commit
 
