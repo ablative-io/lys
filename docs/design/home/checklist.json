@@ -21,7 +21,7 @@
       "items": [
         {
           "id": "C3",
-          "text": "A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original.",
+          "text": "A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original. A compaction is read as Claude Code 2.1.281 measurably writes it, a compact_boundary system record and its isCompactSummary user record becoming one compaction entry (first kept entry from preservedSegment.headUuid, tokensBefore from compactMetadata.preTokens); this corrects R3's summary record by measurement, and the summary record is still read where a file carries one (the compaction half is HOME-002's).",
           "done": false
         },
         {
@@ -92,6 +92,36 @@
         {
           "id": "C13",
           "text": "At compaction or retirement the outgoing session's letter to its successor, with its real thinking, becomes the successor's first entry as lys.inherited; it is never authored and replays only to the same provider, api and model; seeded against plain is measured on a card.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "The compaction",
+      "items": [
+        {
+          "id": "C14",
+          "text": "When a compaction entry enters a session on import, a lys.loss custom entry follows it, points at it by entry id and names what fell outside the kept range: the span's first and last entry ids, its counts of entries, messages, tool calls, tool results and blocks with their bytes, and the tokensBefore the harness reported, as ids, counts and hashes and never content.",
+          "done": false
+        },
+        {
+          "id": "C15",
+          "text": "A lys-home subcommand lists a session's compactions, each with its loss entry and a check that every entry in the summarised span is readable by id and every block it references is held, as a JSON report of ids, counts and hashes.",
+          "done": false
+        },
+        {
+          "id": "C16",
+          "text": "The hash of every content part stored at import is kept beside the session in <id>.blocks.jsonl, one row per part naming its entry, so the blocks an entry references can be checked as held; a session without the file is reported as unverified.",
+          "done": false
+        },
+        {
+          "id": "C17",
+          "text": "A compaction renders for Claude Code as the target version writes it (a compact_boundary record, then the isCompactSummary record, then the kept records, the parent chain advancing through all three) and the lys.loss entry never renders.",
+          "done": false
+        },
+        {
+          "id": "C18",
+          "text": "One real compacted Claude Code session is imported on the machine that holds it and its listing recorded in a proof document as counts, ids and hashes only; the compaction render is measured resuming on a named Claude Code version.",
           "done": false
         }
       ]

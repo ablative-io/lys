@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-24",
+  "updated": "2026-09-26",
   "decisions": [
     {
       "id": "ADR-001",
@@ -191,6 +191,44 @@
       "consequences": [
         "DIRECTORY-003 records the state beside each identity; no check reads it until the permission work of road step 2.",
         "The room's own questions stay with the proposal: whether a reason is mandatory on suspend and retire, and whether activation needs a credential handle (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:101-103)."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-012",
+      "title": "A compaction's loss is a lys.loss custom entry beside it, and a session's block hashes are a lys file beside the session",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-26",
+      "decided_by": "The lead who owns the home compaction card (RM-006), answering its survey",
+      "context": "A compaction stored beside its original must say what it could not keep, and a listing must be able to check that every summarised entry and block is still held. Pi's grammar has no place for either (home DESIGN P2), and no home entry records which blocks it came from: the importer's store_part discards the hash BlockStore::put returns, and message entries keep their parts inline in Pi's shape, so re-hashing a part does not give the stored block's hash.",
+      "decision": "Each compaction entry is followed in the file by a lys.loss custom entry, a side leaf under the compaction, whose data names the summarised span's first and last entry ids, its counts of entries, messages, tool calls, tool results and blocks, their bytes, a digest of the span's block hashes and the harness's tokensBefore, deterministic so two imports agree apart from ids and timestamps. Block hashes are kept in <id>.blocks.jsonl beside the session, one {entry, part, hash} row per stored part, as the index and head are kept. Rejected: a new field on a Pi message or a custom entry per message for block references, which adds to Pi's grammar or doubles every import's entries; re-hashing parts or following only harness-event record hashes, which cannot find the stored blocks; and placing the loss entry on the chain, which would re-parent the record after the compaction and break the importer's parent equality.",
+      "quote": "",
+      "consequences": [
+        "RECORD.md names lys.loss, its fields, its place and its span rule, and tells it apart from a render's .loss.json.",
+        "A session imported before the block rows existed is reported by the listing as unverified, never guessed at.",
+        "The span is walked by seeking through the index, never by reading the whole session file (CN7).",
+        "HOME-002 delivers it."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-013",
+      "title": "Claude Code's compaction is read and rendered in the shape the measured version writes",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-26",
+      "decided_by": "The lead who owns the home compaction card (RM-006), answering its survey",
+      "context": "HOME-001 R3 maps Claude Code's summary record to a compaction entry and R4 renders a compaction as that summary line. Measured across the compacted Claude Code files on one machine, there are 3,415 compact_boundary system records, each followed by an isCompactSummary user record, and one summary record; a boundary becomes a harness event and its summary a plain user message today, and the rendered summary line leaves the summary in no record the model reads. Home DESIGN P6 makes a resume path a per-harness, per-version measurement, never an assumption.",
+      "decision": "The importer reads a compact_boundary record and its isCompactSummary record as one Pi compaction entry: the summary is the isCompactSummary message's text, the first kept entry is the entry of preservedSegment.headUuid (the compaction itself when there is no preservedSegment, so it keeps nothing), tokensBefore is compactMetadata.preTokens, and Pi's details field names both source records by uuid; a named first kept entry not on record is refused by uuid. The summary record path stays for the file that carries one. The render writes a compact_boundary record, then the isCompactSummary record, then the kept records, with the parent chain advancing through all three, measured on the installed Claude Code version. Rejected: attaching the loss entry only to the summary record path, which almost no file uses, and keeping R4's summary line, which a resumed session would not read.",
+      "quote": "",
+      "consequences": [
+        "HOME-001's checklist row C3 says the compact_boundary pair is R3 corrected by measurement.",
+        "HOME-001's R4 text is amended to name the measured render shape, and its render fixture is updated.",
+        "Older compacted sessions without a preservedSegment import as compactions that keep nothing.",
+        "HOME-002 delivers it; a later Claude Code version that changes the shape needs its own measurement."
       ],
       "supersedes": [],
       "superseded_by": ""

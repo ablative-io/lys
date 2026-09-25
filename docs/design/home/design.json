@@ -49,7 +49,9 @@
   "decisions": [
     "ADR-001",
     "ADR-003",
-    "ADR-004"
+    "ADR-004",
+    "ADR-012",
+    "ADR-013"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -306,6 +308,81 @@
       "path": "crates/lys-home/src/proxy/journal_tests.rs",
       "note": "recovery after a kill: one lost record per open call",
       "brief": "HOME-001"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-002.json",
+      "note": "the second brief: a compaction's loss entry, the block rows beside a session, the compaction listing, the compaction render, and the proof",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-002.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "docs/design/home/PROOF-COMPACTION.md",
+      "note": "measured: one real compacted Claude Code session imported and listed as counts, ids and hashes, and the compaction render resumed on a named Claude Code version",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/record/block_rows.rs",
+      "note": "the block rows beside a session, <id>.blocks.jsonl: one {entry, part, hash} row per content part stored at import",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/record/block_rows_tests.rs",
+      "note": "gates on the block rows: one row per stored part, the hash put returned, no content",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/record/loss.rs",
+      "note": "the lys.loss entry: a compaction's summarised span walked by seeking, counted, and written as ids, counts and hashes",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/record/loss_tests.rs",
+      "note": "gates on the loss entry: span bounds, counts, bytes and digest against the fixture",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/record/compactions.rs",
+      "note": "the compaction listing: each compaction, its loss entry, and the span's entries read by id and blocks checked as held",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/record/compactions_tests.rs",
+      "note": "gates on the listing: every entry read, a removed block named by hash, an absent rows file reported unverified",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/compaction.rs",
+      "note": "Claude Code's compaction records (the compact_boundary and isCompactSummary pair, and the summary record) into one Pi compaction entry",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/compaction_tests.rs",
+      "note": "gates on the compaction mapping: first kept, tokensBefore, keep-nothing, the unknown first kept refused by uuid",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_tests.rs",
+      "note": "gates on the render, including the compaction's compact_boundary shape",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/error.rs",
+      "note": "the crate's errors, including an unknown first kept entry refused by uuid",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/tests/claude_code_compaction.rs",
+      "note": "end to end on the compacted fixture: import, two homes, context path, listing, render",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/tests/fixtures/claude_code_compacted.jsonl",
+      "note": "a hand-built Claude Code 2.1.281 file with two compactions and no real content",
+      "brief": "HOME-002"
     }
   ],
   "inventory": [
@@ -375,9 +452,72 @@
   "gate": [
     {
       "tree": ".",
-      "fmt": "cargo fmt --all -- --check",
-      "lint": "cargo clippy --all-targets -- -D warnings",
-      "tests": "cargo test --workspace"
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
+      "legs": [
+        {
+          "name": "fmt",
+          "command": "cargo fmt --all",
+          "requires": [
+            "tool:cargo",
+            "tool:rustfmt"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy-all-features",
+          "command": "cargo clippy --all-targets --all-features -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy",
+          "command": "cargo clippy --all-targets -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "tests",
+          "command": "cargo test --workspace --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc-all-features",
+          "command": "cargo doc --no-deps --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc",
+          "command": "cargo doc --no-deps",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
+          "requires": [
+            "tool:sh",
+            "tool:python3"
+          ],
+          "cadence": "round"
+        }
+      ]
     }
   ]
 }
