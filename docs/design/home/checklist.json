@@ -106,7 +106,7 @@
         },
         {
           "id": "C15",
-          "text": "`lys-home fork` refuses a lantern id the home does not hold as a `lys.lantern` entry, naming the id, and creates no session and changes no byte of any session.",
+          "text": "`lys-home fork` cuts from the session a lantern was lit in, never from a child holding a copy of its line, and refuses by name, creating no session and changing no byte of any session: a lantern id the home does not hold as a `lys.lantern` entry, a `--session` that is not the lantern's lit-in session (`lantern_not_lit_here`), an older-record lantern held by more than one session with no `--session` (`lantern_ambiguous`), and a lantern with no assistant message at or before its point (`nothing_to_fork`).",
           "done": false
         },
         {
@@ -131,7 +131,7 @@
         },
         {
           "id": "C20",
-          "text": "When the lantern's point is a user message, that message is not copied into the child's path but is carried as the child's first prompt in a seed file beside the rendered file, and lys.forked_from records it with coordinate_carried true.",
+          "text": "When the lantern's point is a user message, that message is not copied into the child's path but its text parts, in order, are carried as the child's first prompt in a seed file beside the rendered file, and lys.forked_from records it with coordinate_carried true and counts by kind the parts the seed left out.",
           "done": false
         },
         {
