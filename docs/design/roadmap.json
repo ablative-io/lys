@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-25",
+  "updated": "2026-09-26",
   "items": [
     {
       "id": "RM-001",
@@ -152,6 +152,37 @@
         "RM-001"
       ],
       "notes": "Owned by Archie. The home cluster and HOME-001 landed on main with PR 8; the cached-index rule (lys-home Index::from_cached) is in that brief. Next: HOME-001 dispatched through the board."
+    },
+    {
+      "id": "RM-006",
+      "title": "Translate one home session to Codex: Claude Code to Codex 0.156.0, with a kept, changed and lost account",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "The home's first cross-harness translation, one named pair and one session: a home session imported from Claude Code rendered as a Codex rollout that Codex 0.156.0 resumes, every text part, tool call and result carried whole, readable thinking as text, an in-band translation marker, and a JSON account beside it of what was kept, changed and lost. Codex's own importer is the baseline improved on, never adopted.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-26T06:38:28+10:00",
+        "quote": "Translation is designed and not proved: the lantern work measured three session formats and left the converter out, so the first translation is one named pair, one session, and an account of what was kept, changed and lost, and nothing above it assumes it. The pair is Claude Code to Codex, the pair the lantern work measured: Codex's own importer of Claude Code files is the recorded baseline, a compaction and not a copy, dropping thinking, sidechains and meta records and clipping tool calls and results, and Tom ruled on 5 September 2026 that we improve on it and do not adopt it. This card renders a home session that was imported from Claude Code as a Codex rollout that Codex 0.156.0 on this Mac resumes, with a loss account beside it. A lys-home subcommand takes the home, the session, a target directory and the Codex version it renders for, walks the context path as the Claude Code render does, and writes a rollout file in the shape that version of Codex writes and reads for its own threads, measured from the files Codex writes here and never assumed from the June checkout; every text part is carried whole, every tool call and result is carried whole as Codex's own items for a call and its output and never as a truncated note, and readable thinking is carried as text while opaque blocks are dropped and named by hash in the loss account, as P3 rules for another provider. The rendered thread announces itself in band as a translated context with the source session id and the render's template hash, following the marker precedent, so the fork can never mistake itself for the original. The loss account is written beside the rollout as JSON and lists, by entry id and block hash, what was kept, what changed shape and how, and what was lost and why: sidechains, harness events, lanterns and other lys entries, and any block kind Codex has no item for. The report is JSON with the rollout path, entry and block counts, the loss counts and the account's path, never content. Acceptance is that a fixture session imported from a fixture Claude Code file renders to a rollout whose items match a recorded fixture rollout for Codex 0.156.0 apart from ids and timestamps; that the loss account names every dropped block by hash with a reason and every changed block with its before and after kinds; that a session with a thinking block from another provider renders it as text and the account says so; that a tool result longer than Codex's importer clips is carried whole; that rendering to an existing path is refused by path and writes nothing; that the rendered rollout is resumed by Codex 0.156.0 on this Mac and answers from its content, recorded in a proof document with hashes, counts and paths only; and that the Claude Code render of the same session is unchanged, checked by hash. Not in scope: Codex to Claude Code, which does not exist in any tree here; adopting or calling Codex's importer; Pi or any third harness; launching Codex through the launch template, which is that template's next version. Filed by Archie on Tom's roadmap stage 4b of 22 September 2026 at 14:45, his 5 September 2026 ruling on the Codex converter, the lantern design's session-formats measurement, and home DESIGN P1, P3 and P7 at lys main 0073b966, on 26 September 2026.",
+        "context": "The card's words, filed on the identity roadmap's stage 4b (docs/design/identity/CONTEXT-ROADMAP-2026-09-22.md), the 5 September 2026 ruling on Codex's converter recorded in the lantern session-formats measurement (ADR-012), and home DESIGN P1, P3 and P7 at lys 0073b966. The card's lead answered five survey questions: no live Codex home (ADR-013), no template hash, a recorded base hash for the Claude Code render, sidechains carried as spawned threads where measured, authored and inherited turns carried with markers."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-001",
+          "ADR-004",
+          "ADR-007",
+          "ADR-012",
+          "ADR-013"
+        ],
+        "briefs": [
+          "HOME-002"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-005"
+      ],
+      "notes": "Further units, not written: Codex to Claude Code: import a Codex rollout into the home; Swap and swap back: a Claude Code session through Codex and home again, with provider-native reasoning restored; Launch template next version: start Codex on a rendered rollout; Sidechains carried into Codex as spawned threads (its own card if HOME-002's R1 measures no 0.156.0 spawned-thread shape here); A deterministic Claude Code render. Open with the lead: how the 0.156.0 index rows are written in the scratch home if R1 measures they are needed, given lys-home's pure-Rust dependency rule."
     }
   ]
 }

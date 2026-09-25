@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-24",
+  "updated": "2026-09-26",
   "decisions": [
     {
       "id": "ADR-001",
@@ -191,6 +191,42 @@
       "consequences": [
         "DIRECTORY-003 records the state beside each identity; no check reads it until the permission work of road step 2.",
         "The room's own questions stay with the proposal: whether a reason is mandatory on suspend and retire, and whether activation needs a credential handle (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:101-103)."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-012",
+      "title": "A translation to another harness is rendered by lys, never that harness's own importer",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-05",
+      "decided_by": "Tom",
+      "context": "Codex ships an importer of Claude Code session files. The lantern work measured it at the June checkout d667082322 ($LANTERN/docs/02-SESSION-FORMATS.md section 3): it drops thinking, sidechain and meta records, clips each tool call note to 2,000 characters and each tool result to 4,000, and ends the thread with an in-band imported marker. A converted thread is a compaction, not a copy. The home's first translation (HOME-002, Claude Code to Codex) had to choose between adopting that importer and rendering its own. The ruling lived only in the lantern repository.",
+      "decision": "A session carried to another harness is a derived record rendered by lys from the home: tool traffic carried whole as the target harness's own items, readable thinking carried, the translation announcing itself in band with its source, and an account of what was kept, changed and lost beside it. Rejected: adopting, wrapping or calling the target harness's own importer, whose output is a compaction that loses what the file held.",
+      "quote": "we improve on this, we do not adopt it. Ours is on-demand from the last compaction boundary and keeps everything the file holds.",
+      "consequences": [
+        "lys-home neither depends on nor calls Codex code or Codex's importer (home CN9); Codex's importer is the baseline a translation's account is measured against.",
+        "A translation carries every tool call and result whole and never as a clipped note; what it cannot carry is named in its account by entry id and hash with a reason.",
+        "Every later harness pair follows the same rule and is its own profile and its own measurement."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-013",
+      "title": "A render never writes into a harness's live home; its proof runs under a scratch home",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-26",
+      "decided_by": "the lead of the HOME-002 card, answering survey question f3a16b3214ae",
+      "context": "Codex 0.156.0 resumes a thread by id, not by path, and indexes threads in its home's state_5.sqlite and thread_history_1.sqlite. Rendering a translated rollout into the live Codex home would put it in the operator's own Codex thread list and in anything watching that home. A scratch Codex home instead needs a credential, and credentials are never carried (ADR-001). home CN1 already forbade rewriting under ~/.claude/projects.",
+      "decision": "A render writes only under the target directory it is given, and a proof runs the harness with its home set to a scratch directory; the credential is supplied at launch as an environment variable read from the existing key file by path, never printed, and no auth.json or other credential file is copied. Rejected: writing the rollout and its index rows into the live Codex home, which changes the operator's own thread list.",
+      "quote": "Never into the live ~/.codex: the analogue of CN1 holds and Tom's own thread list is not touched.",
+      "consequences": [
+        "home CN8: no file under a live Codex home is written by this cluster.",
+        "Whatever index a harness version needs to find a rendered thread is written, if at all, in the scratch home only, and is measured for that version.",
+        "If a harness refuses to run in a scratch home without a copied login, the proof records the refusal by name as the measured limit."
       ],
       "supersedes": [],
       "superseded_by": ""

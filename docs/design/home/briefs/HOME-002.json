@@ -1,0 +1,324 @@
+{
+  "id": "HOME-002",
+  "cluster": "home",
+  "title": "Render a Claude Code-imported home session as a Codex 0.156.0 rollout with a kept, changed and lost account",
+  "depends_on": [
+    "HOME-001"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C14",
+    "C15",
+    "C16",
+    "C17",
+    "C18",
+    "C19",
+    "C20",
+    "C21",
+    "C22",
+    "C23"
+  ],
+  "stories": [
+    "S9",
+    "S10",
+    "S11",
+    "S12"
+  ],
+  "design_anchor": [
+    "ADR-001",
+    "ADR-004",
+    "ADR-007",
+    "ADR-012",
+    "ADR-013"
+  ],
+  "purpose": "The home's first cross-harness translation, one named pair and one session: a home session imported from Claude Code is rendered as a Codex rollout that Codex 0.156.0 resumes, in the shape that version writes for its own threads, with every text part, tool call and tool result carried whole, readable thinking carried as text, the thread announcing in band that it is a translation, and an account beside it naming what was kept, what changed shape and what was lost. Codex's own importer of Claude Code files is the recorded baseline: a compaction, not a copy. This brief improves on it and does not adopt it. Nothing above this translation assumes it until its proof holds.",
+  "task": "Measure first (R1): record what Codex 0.156.0 writes and what it needs to resume, under a scratch Codex home, and take every shape from that recording, never from a source checkout. Then build the Codex profile in crates/lys-home/src/harness/codex (R2 to R6), the codex-render subcommand (R7), the comparison against the recorded rollout (R8), the account written down in RECORD.md (R9) and the resume proof (R10). In scope: one direction (Claude Code-imported home session to Codex), one version (0.156.0), one session per render. Out of scope: Codex to Claude Code; adopting or calling Codex's importer; Pi or any third harness; launching Codex through the launch template; making the Claude Code render deterministic (its random ids for multi-result tool records are a separate defect, and this brief's fixture holds none so its hash is stable). The render writes the rollout under the target's sessions tree and writes no SQLite index row: if R1 measures that 0.156.0 does not replay a rollout that has no state_5.sqlite and thread_history_1.sqlite rows, stop at R1 and report it, because how those rows are written without a non-Rust dependency is open with the card's lead. Sidechains are carried as spawned threads only where R1 measured the 0.156.0 spawned-thread shape; otherwise each is named lost with that reason and carrying them is its own card.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Record the second party: what Codex 0.156.0 writes and what it needs to resume",
+      "spec": "Before any render code is written, and at the base commit, the builder runs the Codex binary that answers `codex-cli 0.156.0` with CODEX_HOME set to an empty scratch directory and its working directory an empty scratch directory, the API key supplied as an environment variable read at launch from the operator's existing key file by path, never printed and never written into the scratch home, and no auth.json copied. In that home it has 0.156.0 write one thread holding at least two user turns, two assistant replies, one function_call and its function_call_output, and asks it to spawn one sub-agent thread. The thread's rollout, as Codex wrote it, is copied to the fixture directory as `recorded.jsonl`; a spawned child rollout, when 0.156.0 wrote one, is copied as `recorded-child.jsonl`. The builder then writes `source.claude-code.jsonl`, a Claude Code 2.1.281 file transcribing the same conversation (the same user texts, assistant texts, tool name, tool arguments and tool output), with no user record holding more than one tool result, and records in `claude-code-render.sha256` the SHA-256 of the Claude Code render of that file (imported with lys-home import, rendered with lys-home render for model claude-opus-5-5 and a fixed session uuid) made by the base commit's lys-home. The builder measures, in a second scratch home holding only that rollout under sessions/ and no state_5.sqlite or thread_history_1.sqlite, whether `codex resume <thread id>` finds and replays it, and records the result in PROOF-CODEX.md under 'Measured before rendering' with every record kind and key set the rollout holds, by count. THE SYSTEM SHALL NOT write, copy or read anything under the operator's live Codex home, SHALL NOT take any shape from any source checkout of Codex, and the fixtures SHALL NOT hold a credential.",
+      "acceptance": [
+        "`recorded.jsonl` exists in the fixture directory, its session_meta payload has cli_version equal to \"0.156.0\", and it holds at least 1 response_item of payload type function_call and at least 1 of payload type function_call_output with the same call_id.",
+        "`grep -c 'sk-'` over each file in the fixture directory prints 0, and the fixture directory holds no file named auth.json.",
+        "Importing `source.claude-code.jsonl` with lys-home import reports 0 user records holding more than one tool result (every tool result entry id equals its record's uuid).",
+        "`claude-code-render.sha256` holds one 64-character lowercase hex SHA-256, and PROOF-CODEX.md names the base commit it was taken at.",
+        "PROOF-CODEX.md's 'Measured before rendering' section records the measured result of `codex resume <thread id>` in the index-free scratch home as one of the two words `replayed` and `refused`, lists each record kind of `recorded.jsonl` with its count, and records the presence of `recorded-child.jsonl` as one of the two words `present` and `absent`."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/tests/fixtures/codex-0.156.0",
+          "docs/design/home/PROOF-CODEX.md"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C14",
+        "C20",
+        "C22",
+        "C23"
+      ],
+      "stories": [
+        "S12"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "The Codex 0.156.0 profile: measured constants, marker texts and the rollout's place",
+      "spec": "Create the Codex profile module. mod.rs carries only `pub mod` declarations and module docs that name the Codex version measured (0.156.0), the fixture it was measured from, and the rule that a shape is valid for that version only. profile.rs holds: the one supported version string \"0.156.0\"; the mapping name \"codex-0.156.0 render v1\"; the three marker texts (translation: `[lys translated context] This thread is a translation, not the original session. Source session: <session id>. Rendered by lys-home <crate version> (<git commit>) with mapping codex-0.156.0 render v1.`; authored: `[lys authored turn] A person wrote this reply; no model produced it.`; inherited: `[lys inherited] Carried from session <from_session>: a predecessor's memory, not this session's own experience.`); the thread id, a UUID version 7 whose 48-bit time field is the home session header's timestamp in milliseconds and whose remaining random bits are the leading bits of SHA-256 over the session id, a NUL byte and the id of the last entry on the context path; and the rollout path `<target>/sessions/YYYY/MM/DD/rollout-YYYY-MM-DDThh-mm-ss-<thread id>.jsonl` from that header timestamp in UTC, with the account at the same path with `.jsonl` replaced by `.loss.json`. shape-0.156.0.json holds the session_meta and turn_context values measured from `recorded.jsonl` that are not content and not ids or timestamps. build.rs records the git commit the crate is built from as a compile-time value; IF no commit can be read, THEN the build SHALL fail naming why. WHEN a version other than \"0.156.0\" is asked for, THE SYSTEM SHALL refuse it by name. THE SYSTEM SHALL NOT mint a random thread id, SHALL NOT read the clock for any value in the rollout, and SHALL NOT take a shape value from anywhere but the recorded fixture.",
+      "acceptance": [
+        "For a fixed session id, header timestamp and last context entry id, the thread id is the same string on two calls, parses as a UUID with version 7, and its first 12 hex digits, hyphens removed, are the header timestamp's Unix milliseconds written as 12 lowercase hex digits.",
+        "The rollout path under target `/t` is `/t/sessions/<YYYY>/<MM>/<DD>/rollout-<YYYY>-<MM>-<DD>T<hh>-<mm>-<ss>-<thread id>.jsonl` with every field taken from the header timestamp in UTC, and the account path is the same path ending `.loss.json` in place of `.jsonl`.",
+        "Asking the profile for version `0.155.0` returns an error whose message contains `0.155.0` and `0.156.0`.",
+        "harness/codex/mod.rs holds no `fn`, `struct`, `enum`, `const` and `impl` item: every non-comment line is a `pub mod` or `pub use` declaration.",
+        "Every key in shape-0.156.0.json's session_meta object is a key of `recorded.jsonl`'s session_meta payload with the same value."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/harness/codex/mod.rs",
+          "crates/lys-home/src/harness/codex/profile.rs",
+          "crates/lys-home/src/harness/codex/shape-0.156.0.json",
+          "crates/lys-home/build.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/harness/mod.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C14",
+        "C17"
+      ],
+      "stories": [
+        "S10"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "The account: kept, changed and lost, by entry id and block hash",
+      "spec": "Define the loss account written beside a rollout as one JSON object: `source_session` (the home session id), `thread_id`, `mapping` (\"codex-0.156.0 render v1\"), `rollout` (its path), and three arrays. `kept`: one object per part carried as the Codex item native to its kind with its content unchanged, with `entry_id`, `part` (its index in the entry's content, or null for a whole entry), `hash`, `kind` (the home part kind) and `item` (the Codex item or part kind it became). `changed`: one object per part or entry carried in another kind or with something removed or added, with `entry_id`, `part`, `hash`, `before`, `after` and `how` (a fixed phrase naming the change, never content). `lost`: one object per part or entry not carried, with `entry_id`, `part`, `hash`, `kind` and `reason` (a fixed phrase, never content). A part's `hash` is the lowercase hex SHA-256 of the part's JSON as the home entry holds it, serialised by serde_json; a whole entry's `hash` is the SHA-256 of the entry's JSON as serialised by serde_json. THE SYSTEM SHALL NOT write any transcript text, argument, output or thinking into the account, SHALL NOT list one part in two arrays, and SHALL NOT omit a part or entry of the context path from all three.",
+      "acceptance": [
+        "An account built for an entry `e1` with parts [text, thinking with signature, redacted thinking] lists part 0 in `kept` with kind `text` and item `output_text`, part 1 in `changed` with before `thinking` and after `output_text`, and part 2 in `lost` with kind `thinking` and reason `redacted thinking: opaque to another provider`.",
+        "The `hash` for part 0 equals the SHA-256 of `serde_json::to_vec` of that part as the entry holds it.",
+        "The sum of the lengths of `kept`, `changed` and `lost` for that entry equals 3.",
+        "The serialised account for a fixture whose texts each contain the string `CANARY-7f3a` contains 0 occurrences of `CANARY-7f3a`."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/harness/codex/loss.rs",
+          "crates/lys-home/src/harness/codex/loss_tests.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C18"
+      ],
+      "stories": [
+        "S11"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Home entries into Codex items, carried whole",
+      "spec": "Map each context-path entry to Codex 0.156.0 response items in the shapes of `recorded.jsonl`, each payload carrying the keys the recorded payload of the same type carries. A user message becomes a `message` with role user and one `input_text` per text part, the text byte-identical. An assistant message becomes, in part order: consecutive text and readable-thinking parts gathered into one `message` with role assistant and one `output_text` per part, and each toolCall part a `function_call` with `name` the tool name, `call_id` the tool call id and `arguments` the serde_json string of the arguments object. A toolResult message becomes a `function_call_output` with `call_id` the tool call id and `output` a list of `input_text` parts, one per text part, byte-identical, and one `input_image` per image part with `image_url` the data URL `data:<media type>;base64,<data>`. An image part in a user message becomes an `input_image` in the same way. WHEN a thinking part carries readable text, THE SYSTEM SHALL carry that text as an `output_text` and list it as changed (thinking to output_text, and signature dropped when it had one); IF a thinking part is redacted or its text is empty, THEN THE SYSTEM SHALL drop it and list it as lost by hash. WHEN a message follows a lys.authored entry, THE SYSTEM SHALL carry it as an assistant message whose first `output_text` is the authored marker and list it as changed. WHEN a message is one of a lys.inherited entry's `from_entries`, THE SYSTEM SHALL carry it in its own role with the inherited marker, naming `from_session`, as its first text part, and list it as changed. WHEN a toolResult has isError true, THE SYSTEM SHALL carry it and list it as changed with how `is_error flag not carried`. A compaction entry becomes a user `message` whose one `input_text` is the summary, listed as changed. A lys.harness_event, lys.call or any other lys custom entry, a label, and every other entry type are lost with a reason naming the entry type or customType; a part kind with no Codex item is lost with a reason naming the kind. THE SYSTEM SHALL NOT truncate, clip, summarise or re-encode any text, argument or output, SHALL NOT write a `reasoning` item, and SHALL NOT write any signature or redacted data into an item.",
+      "acceptance": [
+        "A toolResult whose one text part is 10,000 characters becomes a `function_call_output` whose one `input_text` has 10,000 characters and the same SHA-256 as the source text.",
+        "A toolCall with arguments `{\"command\":\"ls -la\",\"timeout\":5}` becomes a `function_call` whose `arguments` parses to the same JSON value and whose `call_id` equals the toolCall id.",
+        "An assistant entry [signed thinking `look first`, text `done`] becomes one assistant `message` with two `output_text` parts, `look first` then `done`, and no item in the output contains the signature string.",
+        "An assistant entry following a lys.authored entry becomes an assistant `message` whose first `output_text` equals `[lys authored turn] A person wrote this reply; no model produced it.`.",
+        "A message listed in a lys.inherited entry with from_session `s0` keeps its role and its first text part equals the inherited marker with `<from_session>` replaced by `s0`.",
+        "A lys.harness_event entry, a label entry and a `document` part each appear once in the account's `lost` with a reason naming `lys.harness_event`, `label` and `document` respectively, and produce no item."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/harness/codex/items.rs",
+          "crates/lys-home/src/harness/codex/items_tests.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C15",
+        "C16",
+        "C19"
+      ],
+      "stories": [
+        "S9"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Render the context path to a rollout beside its account",
+      "spec": "WHEN codex-render is asked for a session and a target directory, THE SYSTEM SHALL walk the session's context path as the Claude Code render does (Session::context_path), and write the rollout at the R2 path: a session_meta record (id and session_id the thread id, cwd the home session header's cwd, originator `lys-home`, cli_version `0.156.0`, model_provider `openai`, and every other key from shape-0.156.0.json), then a turn_context record with model and the other keys from shape-0.156.0.json, then as the first response_item a developer `message` whose one `input_text` is the translation marker with the source session id, the crate version and the build commit filled in, then the R4 items in path order, each wrapped in the top-level keys `timestamp` (the entry's timestamp), `ordinal` (0-based line index), `type` and `payload`, with an event_msg task_started before and task_complete after each user turn where the recorded fixture writes them; then write the R3 account at the R2 account path. IF the rollout path or the account path exists, THEN THE SYSTEM SHALL return HomeError::Exists naming that path and SHALL create no file and no directory. THE SYSTEM SHALL NOT write under any directory but the target, SHALL NOT write any SQLite file, SHALL NOT write a token_count, token_usage_record, realtime_item or world_state record, and SHALL NOT append to, open for writing or rewrite any file of the home.",
+      "acceptance": [
+        "Rendering the same session twice to one target: the second call returns HomeError::Exists whose path equals the first call's rollout path, and a listing of every file under the target with its size and SHA-256 is identical before and after the second call.",
+        "With only the account path pre-created as an empty file, the call returns HomeError::Exists naming the account path and no rollout file exists afterwards.",
+        "The rollout's first line has type `session_meta`, its second `turn_context`, and its first response_item is a developer message whose text contains the source session id and `codex-0.156.0 render v1`.",
+        "The home session file, its index and its head file have the same SHA-256 before and after a render, and the home's blocks directory holds the same file count.",
+        "No file whose name ends `.sqlite` exists under the target after a render."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/harness/codex/render.rs",
+          "crates/lys-home/src/harness/codex/render_tests.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C14",
+        "C17",
+        "C21"
+      ],
+      "stories": [
+        "S9",
+        "S10"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Sidechains as spawned threads, in the measured shape",
+      "spec": "WHILE R1 recorded a spawned child rollout (`recorded-child.jsonl` exists), WHEN the session holds a sidechain (entries hanging under a label naming an agent, off the context path), THE SYSTEM SHALL render each sidechain as its own child rollout under the target in the shape of `recorded-child.jsonl`, carrying its parent link in the records the recorded child carries it in, and list the sidechain's parts in the account as kept or changed as R4 rules. IF R1 recorded no spawned child rollout, THEN THE SYSTEM SHALL write no child rollout and list each sidechain entry in `lost` with reason `sidechain: 0.156.0 spawned-thread shape not measured here`. THE SYSTEM SHALL NOT write a thread_spawn_edges row or any SQLite file, and SHALL NOT place a sidechain's items in the parent rollout.",
+      "acceptance": [
+        "With `recorded-child.jsonl` present, a fixture session with one sidechain of 2 entries renders to 2 rollout files under the target, and the child's parent-link fields equal the parent rollout's thread id in the record kinds `recorded-child.jsonl` uses.",
+        "With `recorded-child.jsonl` absent, the same fixture renders to 1 rollout file and the account's `lost` holds 2 entries with reason `sidechain: 0.156.0 spawned-thread shape not measured here`.",
+        "The parent rollout holds 0 items whose source entry is a sidechain entry."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/harness/codex/sidechain.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C20"
+      ],
+      "stories": [
+        "S9"
+      ]
+    },
+    {
+      "id": "R7",
+      "title": "The codex-render subcommand and its report",
+      "spec": "Add the `codex-render` subcommand with `--home`, `--session`, `--target` (the directory the rollout is written under, used as the Codex home) and `--codex-version`, all required. Its argument struct and run function live in harness/codex/command.rs; cli.rs gains only the enum variant and one dispatch arm. WHEN it succeeds, THE SYSTEM SHALL print one JSON object: `command` (`codex-render`), `rollout` (path), `account` (path), `entries` (context-path entries walked), `blocks` (parts walked), `kept`, `changed` and `lost` (the account's array lengths), and `child_rollouts` (paths). THE SYSTEM SHALL NOT print, log or put in an error any transcript text, argument, output, thinking or marker text, and SHALL NOT launch Codex or any other program.",
+      "acceptance": [
+        "`lys-home codex-render --home H --session S --target T --codex-version 0.156.0` on the R8 fixture prints one JSON object whose keys are exactly command, rollout, account, entries, blocks, kept, changed, lost and child_rollouts, and whose kept, changed and lost equal the lengths of the account file's `kept`, `changed` and `lost` arrays.",
+        "Omitting `--codex-version` exits with code 2 and the message names `--codex-version`.",
+        "The report's JSON for a fixture whose texts contain `CANARY-7f3a` holds 0 occurrences of `CANARY-7f3a`.",
+        "cli.rs and command.rs each hold at most 500 lines of code excluding comments, blank lines and tests."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/harness/codex/command.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/cli.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C21"
+      ],
+      "stories": [
+        "S9"
+      ]
+    },
+    {
+      "id": "R8",
+      "title": "The fixture comparison against the rollout Codex wrote",
+      "spec": "An integration test imports `source.claude-code.jsonl` into a temporary home, renders it with codex-render to a temporary target, and compares the rendered rollout with `recorded.jsonl`. The compared set on the recorded side is every response_item whose payload type is message with role user or assistant, function_call or function_call_output, excluding a user message whose one input_text begins `<environment_context>`; on the rendered side it is the same types after the first response_item (the marker). Two payloads are equal when they are equal as JSON after `id`, `call_id` and the metadata passthrough's `turn_id` and `create_time` are removed from both. A second test renders a session holding one signed readable thinking block and one redacted thinking block. A third renders the fixture's Claude Code render with lys-home render for model claude-opus-5-5 and the fixed session uuid of R1 and compares its SHA-256 with `claude-code-render.sha256`. Test names carry no transcript text. THE SYSTEM SHALL NOT compare a set that could be empty without asserting its length, and SHALL NOT build the expected side from lys-home's own output.",
+      "acceptance": [
+        "The comparison test asserts the compared sets have the same length, that length is at least 5, and every pair is equal.",
+        "The thinking test asserts the signed block's text appears as an `output_text`, the account's `changed` names it with before `thinking` and after `output_text`, the account's `lost` names the redacted block by the SHA-256 of its part with reason `redacted thinking: opaque to another provider`, and the rollout contains neither signature string.",
+        "The Claude Code render test's SHA-256 equals the value in `claude-code-render.sha256`.",
+        "Setting any one output_text in `recorded.jsonl` to a different string makes exactly the comparison test fail."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/tests/codex_render.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C14",
+        "C15",
+        "C16",
+        "C23"
+      ],
+      "stories": [
+        "S9",
+        "S12"
+      ]
+    },
+    {
+      "id": "R9",
+      "title": "The loss account written down in the record",
+      "spec": "Replace the stub under 'The loss account' in docs/design/home/RECORD.md with the account's fields as R3 defines them, the fixed `how` and `reason` phrases R4, R5 and R6 use, which hash names a part and a whole entry and how a reader recomputes it from the home file by entry id and part index, and the Codex importer baseline it is measured against (thinking, sidechains and meta records dropped; tool notes clipped at 2,000 and results at 4,000 characters). THE SYSTEM SHALL NOT quote any transcript text and SHALL NOT change what the section says of the Claude Code render's own account.",
+      "acceptance": [
+        "RECORD.md's 'The loss account' section names each of source_session, thread_id, mapping, rollout, kept, changed and lost, and every `how` and `reason` phrase that appears in harness/codex/items.rs, render.rs and sidechain.rs appears in it verbatim.",
+        "The section no longer contains the words `Written with R4`."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/home/RECORD.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C18"
+      ],
+      "stories": [
+        "S11"
+      ]
+    },
+    {
+      "id": "R10",
+      "title": "The resume proof on Codex 0.156.0 under a scratch home",
+      "spec": "The builder renders the fixture session with codex-render into an empty scratch directory, then runs the Codex binary that answers `codex-cli 0.156.0` with CODEX_HOME set to that directory, the API key supplied as the R1 environment variable, and `resume <thread id>`, and asks two questions: the source session id named in the thread, and one fact that appears only in the fixture conversation. PROOF-CODEX.md records under 'Resume': the binary's path and version answer, the command with the key's variable named and its value never shown, the SHA-256 of the rollout before and after the resume, the SHA-256 of the home session file before and after, record and item counts, and for each question the SHA-256 of the expected answer and of the answer given and whether they are equal. IF 0.156.0 refuses to resume without an auth.json, THEN the proof records that refusal by its message's hash and exit code as the measured limit. PROOF-CODEX.md SHALL NOT hold any transcript text, question text, answer text or credential, and SHALL NOT name a path under the operator's live Codex home.",
+      "acceptance": [
+        "PROOF-CODEX.md's 'Resume' section names version `0.156.0`, holds a rollout SHA-256 before and after, and states the home session file's SHA-256 before and after as equal.",
+        "For each of the two questions it records expected and given answer hashes and a result of `equal`.",
+        "`grep -c 'sk-'` over PROOF-CODEX.md prints 0, and `grep -c '/.codex/'` over it prints 0."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/home/PROOF-CODEX.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C22"
+      ],
+      "stories": [
+        "S12"
+      ]
+    }
+  ],
+  "boundaries": [
+    "No file under a live Codex home or a live Claude Code home is written, copied, read for writing or rewritten; everything Codex runs with has CODEX_HOME set to a scratch directory.",
+    "No credential and no auth.json is copied into the target or any fixture; the API key is supplied at launch as an environment variable and never printed.",
+    "No Codex code is adopted, vendored, depended on or called by lys-home, and Codex's importer of Claude Code files is not run; lys-home builds and tests with no Codex installed.",
+    "The codex-render subcommand never launches Codex or any other program.",
+    "No change to harness/claude_code/render.rs or harness/claude_code/import.rs, and the Claude Code render's output is not changed.",
+    "No home session file, index, head or block is written by the Codex render, and Pi's grammar gains no field or entry kind.",
+    "No SQLite file is written by lys-home and no dependency that is not pure Rust is added.",
+    "No Codex to Claude Code path, no Pi or third harness, no launch-template change.",
+    "No transcript text, argument, output, thinking or marker text in the report, an error, a log line, a test name, the account or PROOF-CODEX.md.",
+    "No shape is taken from any source checkout of Codex; every shape comes from the files 0.156.0 wrote in R1."
+  ],
+  "verification": [
+    "From the repository root: python3 scripts/design/validate.py docs/design/home and python3 scripts/design/check-coverage.py docs/design/home exit 0.",
+    "From the repository root: cargo fmt --all, cargo clippy --all-targets --all-features -- -D warnings, cargo clippy --all-targets -- -D warnings, cargo test --workspace --all-features, cargo doc --no-deps --all-features and cargo doc --no-deps exit 0, and git diff is empty after cargo fmt --all.",
+    "sh scripts/design/gate.sh exits 0.",
+    "git diff of the base commit against the branch shows no change to crates/lys-home/src/harness/claude_code/.",
+    "crates/lys-home/Cargo.toml lists no dependency on a crate whose name contains sqlite, codex or norn.",
+    "cargo test -p lys-home --test codex_render runs and passes 3 or more tests, and the test output contains no fixture text.",
+    "docs/design/home/PROOF-CODEX.md has sections 'Measured before rendering' and 'Resume', names 0.156.0, and holds no line containing `sk-`."
+  ]
+}

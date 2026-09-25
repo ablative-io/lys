@@ -3,7 +3,7 @@
   "title": "The home: a session held under its identity, resumable by any harness that can be measured",
   "intention": "A session's history lives under the agent's identity, not under a harness. The record is what the model was given and what came back, in order, with each provider's native blocks kept whole. A harness's own resume file is rendered from that record on demand, so an agent moves machines, harnesses or providers and continues; the original bytes are never rewritten.",
   "problem": "Today a session exists only as its harness's file. Archie's Claude Code file measured 141,931,097 bytes on 24 September 2026: the conversation itself is under 3% of it, tool results 14%, thinking 6%, and about 60% is harness bookkeeping the model never sees; Waffles' file is 3.37 GB and Claude Code loads it whole. Nothing central holds a session, so nothing can render a smaller working session, move one to another device, swap provider and come back, or say what a session was given. Norn already has the canonical event model (SessionEvent, conversion to provider messages, compaction as a derived event, provider epoch boundaries) proved by its own tests; Claude Code has no importer to it and no renderer from it.",
-  "solution": "Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree, not Norn): one append-only JSONL per session, a header line, then entries each carrying id, parentId and timestamp, a leaf pointer for the current position, forks by moving the pointer, compaction and branch summaries as entries that keep their originals. lys adds nothing to that grammar: harness events (approvals, tool completion) and proxy call records ride Pi's custom entry type under lys customType names, so a home file stays readable by Pi's own parser. Two captures feed it: the model traffic through the door's proxy (the same process that swaps the credential, SECRETS-002 R1), and the harness's own events from its transcript. Content blocks are stored once by hash; entries reference them. A harness resume file is a rendered projection of the root-to-leaf path: for Claude Code, a JSONL written under a chosen uuid at the harness's own path, then resumed by that id with --fork-session. Provider-native reasoning stays on the message with its provider, api and model and is rendered whole only to the same three; another model gets readable thinking as text and opaque blocks dropped, each named in a loss account. lys grants say who may read and resume. Every resume path is measured on a named harness version before anything relies on it.",
+  "solution": "Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree, not Norn): one append-only JSONL per session, a header line, then entries each carrying id, parentId and timestamp, a leaf pointer for the current position, forks by moving the pointer, compaction and branch summaries as entries that keep their originals. lys adds nothing to that grammar: harness events (approvals, tool completion) and proxy call records ride Pi's custom entry type under lys customType names, so a home file stays readable by Pi's own parser. Two captures feed it: the model traffic through the door's proxy (the same process that swaps the credential, SECRETS-002 R1), and the harness's own events from its transcript. Content blocks are stored once by hash; entries reference them. A harness resume file is a rendered projection of the root-to-leaf path: for Claude Code, a JSONL written under a chosen uuid at the harness's own path, then resumed by that id with --fork-session. Provider-native reasoning stays on the message with its provider, api and model and is rendered whole only to the same three; another model gets readable thinking as text and opaque blocks dropped, each named in a loss account. lys grants say who may read and resume. Every resume path is measured on a named harness version before anything relies on it. The first translation is one named pair, Claude Code to Codex 0.156.0 (brief HOME-002): a home session imported from Claude Code is rendered by lys-home as a Codex rollout under a target directory that serves as a scratch Codex home, in the record shapes Codex 0.156.0 wrote on this machine, with every text part, tool call and tool result carried whole as Codex's own items, readable thinking carried as text, an in-band translation marker naming the source session, the lys-home version and commit and the mapping (codex-0.156.0 render v1), and a JSON account beside it listing by entry id and block hash what was kept, what changed shape and how, and what was lost and why. Codex's own importer is the baseline improved on and is never adopted or called (ADR-012); nothing is written into a live Codex home (ADR-013, CN8). Nothing above this translation assumes it until its proof, PROOF-CODEX, holds.",
   "principles": [
     {
       "id": "P1",
@@ -49,7 +49,10 @@
   "decisions": [
     "ADR-001",
     "ADR-003",
-    "ADR-004"
+    "ADR-004",
+    "ADR-007",
+    "ADR-012",
+    "ADR-013"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -57,7 +60,8 @@
     "One seat with a subscription login making calls through a pass-through proxy, so the tee has somewhere to live.",
     "A written loss account for every derived record: what a render or translation preserved, transformed and could not carry.",
     "The canon, one curated versioned series of short examples each showing a rule lived, seeds every new session, and its effect is measured on a card against a plain start.",
-    "A handover letter from an outgoing session seeds its successor as inherited memory, with the model's own thinking intact, and the effect is measured on a card against a plain start."
+    "A handover letter from an outgoing session seeds its successor as inherited memory, with the model's own thinking intact, and the effect is measured on a card against a plain start.",
+    "One Claude Code-imported home session rendered as a Codex 0.156.0 rollout that Codex 0.156.0 resumes under a scratch Codex home and answers from, with an account beside it naming every kept, changed and lost block by entry id and hash, and the Claude Code render of the same session unchanged by hash."
   ],
   "non_goals": [
     {
@@ -69,8 +73,8 @@
       "reason": "Stage 3's three preconditions (identity and read authority, encryption before bytes leave, the resume evidence) are their own brief."
     },
     {
-      "text": "Harnesses other than Claude Code, and Chat Completions or Responses translation beyond keeping the raw call bytes.",
-      "reason": "One harness proved first; each other harness is its own profile and its own measurement."
+      "text": "Harnesses other than Claude Code and Codex (Pi or any third harness), Codex to Claude Code, and Chat Completions or Responses translation beyond keeping the raw call bytes and the one Claude Code to Codex rendering of HOME-002.",
+      "reason": "One harness proved first, then one named pair; each other harness and each other direction is its own profile and its own measurement. Codex to Claude Code exists in no tree here."
     },
     {
       "text": "Lanterns and forks at a coordinate (stages 5 and 5b).",
@@ -79,6 +83,14 @@
     {
       "text": "Adopting, wrapping or calling Norn's session code; Pi's code is read as the reference and not vendored.",
       "reason": "Tom, Dot 13:28: not Norn. Pi's tree is the reference."
+    },
+    {
+      "text": "Adopting, wrapping or calling Codex's own importer of Claude Code files.",
+      "reason": "It is the recorded baseline, a compaction and not a copy; the ruling is to improve on it and not adopt it (ADR-012)."
+    },
+    {
+      "text": "Launching Codex on a rendered rollout through the launch template.",
+      "reason": "That is the launch template's next version; the render writes a file and never runs the agent (ADR-007)."
     }
   ],
   "structure": [
@@ -306,6 +318,81 @@
       "path": "crates/lys-home/src/proxy/journal_tests.rs",
       "note": "recovery after a kill: one lost record per open call",
       "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/mod.rs",
+      "note": "the Codex profile: module declarations and docs naming the version measured, 0.156.0",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/profile.rs",
+      "note": "the measured 0.156.0 constants: version, mapping name, marker texts, thread id and rollout path naming",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/shape-0.156.0.json",
+      "note": "the non-content session_meta and turn_context values measured from the rollout Codex 0.156.0 wrote",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/loss.rs",
+      "note": "the kept, changed and lost account: its entries, its hashes, its serialisation",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/items.rs",
+      "note": "home entries and parts into Codex response items: message, function_call, function_call_output",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/render.rs",
+      "note": "the context path walked into a rollout beside its account, refusing an existing path",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/sidechain.rs",
+      "note": "sidechains carried as spawned threads in the measured shape, or named lost",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/command.rs",
+      "note": "the codex-render subcommand's arguments, run and JSON report",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/loss_tests.rs",
+      "note": "the account's gates",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/items_tests.rs",
+      "note": "the item mapping's gates: whole calls and results, thinking as text, markers",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/render_tests.rs",
+      "note": "the render's gates: refusal writes nothing, deterministic path",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/build.rs",
+      "note": "records the git commit lys-home is built from, for the translation marker",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/tests/codex_render.rs",
+      "note": "a fixture Claude Code file imported and rendered for Codex, compared to the rollout Codex 0.156.0 wrote",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/tests/fixtures/codex-0.156.0",
+      "note": "the second party: a rollout Codex 0.156.0 wrote, the Claude Code file transcribing it, and the base Claude Code render hash",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "docs/design/home/PROOF-CODEX.md",
+      "note": "measured: the 0.156.0 shapes and index needs, and the rendered rollout resumed by 0.156.0 under a scratch Codex home",
+      "brief": "HOME-002"
     }
   ],
   "inventory": [
@@ -340,6 +427,14 @@
     {
       "path": "$CCFLARE/README.md",
       "note": "ccflare at 95c4c6a (github.com/snipeship/ccflare): the concept of a native pass-through that keeps request history; reference only, not used (Tom, Dot 13:34)"
+    },
+    {
+      "path": "$LANTERN/docs/02-SESSION-FORMATS.md",
+      "note": "the lantern measurement of session formats: section 3 records Codex's importer of Claude Code files at the June checkout d667082322 (drops thinking, sidechains and meta records; clips tool_use notes at 2,000 and tool_result at 4,000 characters; ends with an in-band imported marker) and the ruling to improve on it"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render.rs",
+      "note": "the Claude Code render the Codex render walks the same way; mints a random uuid for any entry id that is not uuid-shaped, so its output is byte-stable only for sessions without multi-result tool records"
     }
   ],
   "constraints": [
@@ -370,14 +465,85 @@
     {
       "id": "CN7",
       "text": "Reading the root-to-leaf path of a home file reads only the entries on that path plus the index, never the whole file (Pi loads the whole journal; Chippy 13:33); the head is persisted beside the file, never inferred from the last physical entry on reopen."
+    },
+    {
+      "id": "CN8",
+      "text": "No file under a live Codex home is written, rewritten or truncated by this cluster: a Codex render writes only under the target directory it is given, and the proof runs Codex only with CODEX_HOME set to a scratch directory; no credential or auth.json is copied into that directory."
+    },
+    {
+      "id": "CN9",
+      "text": "lys-home neither depends on nor calls Codex code or Codex's importer, and builds and tests with no Codex installed; only the proof runs a Codex binary."
     }
   ],
   "gate": [
     {
       "tree": ".",
-      "fmt": "cargo fmt --all -- --check",
-      "lint": "cargo clippy --all-targets -- -D warnings",
-      "tests": "cargo test --workspace"
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
+      "legs": [
+        {
+          "name": "fmt",
+          "command": "cargo fmt --all",
+          "requires": [
+            "tool:cargo",
+            "tool:rustfmt"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy-all-features",
+          "command": "cargo clippy --all-targets --all-features -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy",
+          "command": "cargo clippy --all-targets -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "tests",
+          "command": "cargo test --workspace --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc-all-features",
+          "command": "cargo doc --no-deps --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc",
+          "command": "cargo doc --no-deps",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
+          "requires": [
+            "tool:sh",
+            "tool:python3"
+          ],
+          "cadence": "round"
+        }
+      ]
     }
   ]
 }
