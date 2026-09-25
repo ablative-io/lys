@@ -8,6 +8,8 @@
 
 **S7.** As a new session, I want to start from the canon, the series of examples that carry what every session before me learned, each a rule stated short with a real exchange that shows it lived and naming where it came from, so that our learning is in one another and I know which of it is mine.
 
+**S8.** As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+
 ## Tom — Owns the platform and reads what a session was given
 
 **S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
