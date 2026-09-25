@@ -10,6 +10,7 @@ pub mod duration;
 pub mod error;
 pub mod files;
 pub mod hex;
+pub mod identity;
 pub mod inspect;
 pub mod key;
 pub mod log;

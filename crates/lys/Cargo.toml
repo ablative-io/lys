@@ -27,6 +27,12 @@ thiserror.workspace = true
 # Read-only X.509 field extraction for `lys inspect cert`; verification stays
 # in lys-core, which speaks DER and owns every trust decision.
 x509-parser.workspace = true
+# The identity deployment: its TOML configuration, generated credentials
+# and the typed Rauthy API calls of `lys identity configure` and `health`.
+toml.workspace = true
+ureq.workspace = true
+rand.workspace = true
+zeroize.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

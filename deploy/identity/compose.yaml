@@ -1,0 +1,63 @@
+# The standalone identity product's three dependency processes for development:
+# the maintained Rauthy at the pinned vendor/rauthy commit, SpiceDB, and one
+# PostgreSQL service holding the one durable database both of them use.
+#
+# Every image is pinned by tag and digest; the digests are the ones recorded in
+# versions.json. Every secret and every address comes from the venue directory
+# that `lys identity prepare` writes (LYS_IDENTITY_VENUE, default ./venue), which
+# is never committed. The database address is configuration: when the database
+# lives on another host, start without the `local-db` profile and point the
+# venue's configuration at that host.
+name: lys-identity
+
+services:
+  postgres:
+    image: postgres:17@sha256:d74eeac9a635390a49bc21bd49fccd973de707e2a53a76ac49b552b8712ec46f
+    profiles: ["local-db"]
+    env_file:
+      - ${LYS_IDENTITY_VENUE:-./venue}/postgres.env
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/10-identity.sql:ro
+    ports:
+      - "${LYS_IDENTITY_PG_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  rauthy:
+    image: ghcr.io/sebadob/rauthy:0.36.2@sha256:f7d3c501402165e023edbd958b032b41c9cfdac5ea7f8ca7d62217327145577e
+    volumes:
+      - ${LYS_IDENTITY_VENUE:-./venue}/rauthy/config.toml:/app/config.toml:ro
+      - ${LYS_IDENTITY_VENUE:-./venue}/rauthy/secrets.toml:/app/secrets.toml:ro
+      - rauthy-data:/app/data
+    ports:
+      - "${LYS_IDENTITY_RAUTHY_PORT:-8080}:8080"
+    restart: unless-stopped
+
+  spicedb-migrate:
+    image: authzed/spicedb:v1.56.2@sha256:aa96009a0477f8a759149823407d47ad16d1a74390bae3102b3b0b7143502764
+    command: ["datastore", "migrate", "head"]
+    env_file:
+      - ${LYS_IDENTITY_VENUE:-./venue}/spicedb.env
+    restart: on-failure
+
+  spicedb:
+    image: authzed/spicedb:v1.56.2@sha256:aa96009a0477f8a759149823407d47ad16d1a74390bae3102b3b0b7143502764
+    command: ["serve", "--http-enabled", "--telemetry-endpoint="]
+    env_file:
+      - ${LYS_IDENTITY_VENUE:-./venue}/spicedb.env
+    depends_on:
+      spicedb-migrate:
+        condition: service_completed_successfully
+    ports:
+      - "${LYS_IDENTITY_SPICEDB_GRPC_PORT:-50051}:50051"
+      - "${LYS_IDENTITY_SPICEDB_HTTP_PORT:-8443}:8443"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  rauthy-data:

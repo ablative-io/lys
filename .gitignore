@@ -2,3 +2,6 @@ target/
 
 .DS_Store
 __pycache__/
+
+# The identity venue: generated secrets and resolved configuration, never committed.
+deploy/identity/venue/

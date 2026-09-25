@@ -46,6 +46,11 @@ pub enum Command {
     #[command(subcommand)]
     Ca(CaCommand),
 
+    /// The standalone identity deployment: prepare its private files,
+    /// configure its clients on Rauthy, and check its readiness.
+    #[command(subcommand)]
+    Identity(crate::identity::IdentityCommand),
+
     /// Transparency-log operations: append-only logs with C2SP signed-note
     /// checkpoints and self-contained RFC 6962 proof artifacts.
     ///

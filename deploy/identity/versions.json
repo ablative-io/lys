@@ -1,0 +1,26 @@
+{
+  "note": "The pinned dependency releases of the standalone identity product's development install. compose.yaml pins each image by this tag and digest; a change here is a change there, in one gated row.",
+  "rauthy": {
+    "image": "ghcr.io/sebadob/rauthy:0.36.2",
+    "digest": "sha256:f7d3c501402165e023edbd958b032b41c9cfdac5ea7f8ca7d62217327145577e",
+    "release": "0.36.2",
+    "fork": {
+      "repository": "https://github.com/ablative-io/rauthy.git",
+      "branch": "ablative",
+      "submodule": "vendor/rauthy",
+      "commit": "dd61ac3c84d6b238108dc8438b53043b5177a662",
+      "note": "The ablative branch is upstream v0.36.2 unchanged until the provider-link row moves the pin, so the upstream release image is the pinned commit's build. Once the pin moves, the image is built from vendor/rauthy and this entry names that build."
+    },
+    "advisory_exception": "v0.36.2 accepted with the exception IDENTITY-001 records (CN10); each development install re-checks upstream releases and advisories and records the result in docs/design/identity/reports/IDENTITY-001-deployment.md."
+  },
+  "spicedb": {
+    "image": "authzed/spicedb:v1.56.2",
+    "digest": "sha256:aa96009a0477f8a759149823407d47ad16d1a74390bae3102b3b0b7143502764",
+    "release": "v1.56.2"
+  },
+  "postgres": {
+    "image": "postgres:17",
+    "digest": "sha256:d74eeac9a635390a49bc21bd49fccd973de707e2a53a76ac49b552b8712ec46f",
+    "release": "17.11"
+  }
+}

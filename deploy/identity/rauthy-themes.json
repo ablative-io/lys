@@ -1,0 +1,190 @@
+{
+  "note": "Rauthy client themes from Aion's neutral, text and radius vocabulary (apps/aion-ops-console/src/index.css) and each product's accent from the estate colour tokens (docs/design-system-v2/palette/estate-colour-tokens.json, ablative docs, read and never changed). HSL triples are [hue 0-360, saturation 0-100, lightness 0-100] as Rauthy's ThemeCss takes them; the sources and conversions are listed in theme-map.md. No purple token is used.",
+  "border_radius": "0.625rem",
+  "themes": {
+    "identity": {
+      "light": {
+        "text": [
+          240,
+          5,
+          34
+        ],
+        "text_high": [
+          240,
+          6,
+          10
+        ],
+        "bg": [
+          240,
+          5,
+          96
+        ],
+        "bg_high": [
+          0,
+          0,
+          100
+        ],
+        "action": [
+          30,
+          57,
+          42
+        ],
+        "accent": [
+          30,
+          59,
+          59
+        ],
+        "error": [
+          0,
+          53,
+          55
+        ],
+        "btn_text": "#ffffff",
+        "theme_sun": "#18181b",
+        "theme_moon": "#18181b",
+        "_contrast": {
+          "text/bg": 7.03,
+          "text_high/bg_high": 17.72,
+          "action/bg": 3.97
+        }
+      },
+      "dark": {
+        "text": [
+          240,
+          5,
+          65
+        ],
+        "text_high": [
+          240,
+          5,
+          96
+        ],
+        "bg": [
+          240,
+          14,
+          7
+        ],
+        "bg_high": [
+          240,
+          13,
+          12
+        ],
+        "action": [
+          30,
+          59,
+          59
+        ],
+        "accent": [
+          30,
+          57,
+          42
+        ],
+        "error": [
+          0,
+          53,
+          55
+        ],
+        "btn_text": "#0c0e10",
+        "theme_sun": "#f4f4f5",
+        "theme_moon": "#f4f4f5",
+        "_contrast": {
+          "text/bg": 7.46,
+          "text_high/bg_high": 15.73,
+          "action/bg": 7.62
+        }
+      }
+    },
+    "cambium": {
+      "light": {
+        "text": [
+          240,
+          5,
+          34
+        ],
+        "text_high": [
+          240,
+          6,
+          10
+        ],
+        "bg": [
+          240,
+          5,
+          96
+        ],
+        "bg_high": [
+          0,
+          0,
+          100
+        ],
+        "action": [
+          138,
+          21,
+          33
+        ],
+        "accent": [
+          136,
+          20,
+          46
+        ],
+        "error": [
+          0,
+          53,
+          55
+        ],
+        "btn_text": "#ffffff",
+        "theme_sun": "#18181b",
+        "theme_moon": "#18181b",
+        "_contrast": {
+          "text/bg": 7.03,
+          "text_high/bg_high": 17.72,
+          "action/bg": 5.9
+        }
+      },
+      "dark": {
+        "text": [
+          240,
+          5,
+          65
+        ],
+        "text_high": [
+          240,
+          5,
+          96
+        ],
+        "bg": [
+          240,
+          14,
+          7
+        ],
+        "bg_high": [
+          240,
+          13,
+          12
+        ],
+        "action": [
+          136,
+          20,
+          46
+        ],
+        "accent": [
+          138,
+          21,
+          33
+        ],
+        "error": [
+          0,
+          53,
+          55
+        ],
+        "btn_text": "#0c0e10",
+        "theme_sun": "#f4f4f5",
+        "theme_moon": "#f4f4f5",
+        "_contrast": {
+          "text/bg": 7.46,
+          "text_high/bg_high": 15.73,
+          "action/bg": 4.95
+        }
+      }
+    }
+  }
+}

@@ -11,6 +11,7 @@
 
 mod cli;
 mod commands;
+mod identity;
 
 use std::process::ExitCode;
 
@@ -20,6 +21,7 @@ use crate::cli::{
     CaCommand, Cli, Command, InspectCommand, KeyCommand, LogCommand, LogProveCommand,
     LogVerifyCommand,
 };
+use crate::identity::IdentityCommand;
 
 /// Entry point: parse arguments, dispatch, and translate the outcome into an
 /// exit code. Every failure path prints a diagnostic to stderr.
@@ -41,6 +43,11 @@ fn main() -> ExitCode {
                 allowed_signers.as_deref(),
                 json,
             ),
+        },
+        Command::Identity(identity_command) => match identity_command {
+            IdentityCommand::Prepare { config } => commands::identity::prepare(&config, json),
+            IdentityCommand::Configure { config } => commands::identity::configure(&config, json),
+            IdentityCommand::Health { config } => commands::identity::health(&config, json),
         },
         Command::Log(log_command) => match log_command {
             LogCommand::Init { dir, origin } => commands::log::init::run(&dir, &origin, json),
