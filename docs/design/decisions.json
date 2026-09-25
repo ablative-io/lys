@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-24",
+  "updated": "2026-09-26",
   "decisions": [
     {
       "id": "ADR-001",
@@ -191,6 +191,26 @@
       "consequences": [
         "DIRECTORY-003 records the state beside each identity; no check reads it until the permission work of road step 2.",
         "The room's own questions stay with the proposal: whether a reason is mandatory on suspend and retire, and whether activation needs a credential handle (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:101-103)."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-012",
+      "title": "The home reaches a harness through a preset launch template per harness, never a transcript converter",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-22",
+      "decided_by": "Tom, ruling of 16:00 on 22 September 2026, filed by Archie at 06:15 on 26 September 2026; the ruling was not held in the tree before this entry",
+      "context": "A home holds the pieces a new session is made from (the record, the canon and the handover) but nothing turned them into a running session on a harness. The closest written form of the rule was stage 2 of docs/design/identity/CONTEXT-ROADMAP-2026-09-22.md (command templates map a home onto a harness, substitutions are data, a missing required input fails); the 16:00 ruling itself was recorded nowhere in docs/ until HOME-002 was filed on it.",
+      "decision": "The home keeps one preset template per harness that maps the pieces onto that harness: the MCP configuration, the environment variables, which secrets the session may read and which it may only use through a handle, what is appended to the system prompt, and where the prior conversation goes, delivered as files and runtime variables with command mappings in text. The rejected road is a transcript converter that translates one harness's conversation into another's: the prior conversation reaches a harness only as that harness's own file, rendered from the record and resumed by the harness's own means.",
+      "quote": "",
+      "consequences": [
+        "Each harness gets its own template and its own measurement; there is no generic launch core, and a template names how its harness fills the transcript slot.",
+        "A template names its slots; a slot it does not know is refused by name, so a new slot (the canon, the handover) is a new template version.",
+        "A secret appears in a template and in every rendered file only as its handle; filling a readable secret's value belongs to the secrets rows (ADR-001).",
+        "Every render of a template is recorded on the session with the template hash and the session head hash, so a stranger can tell which template a session was launched with.",
+        "The launch line is given, never run (ADR-007)."
       ],
       "supersedes": [],
       "superseded_by": ""

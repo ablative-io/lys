@@ -1,0 +1,259 @@
+{
+  "id": "HOME-002",
+  "cluster": "home",
+  "title": "Render a session into a Claude Code launch from a launch template kept in the home",
+  "depends_on": [],
+  "blocked_by": [],
+  "checklist": [
+    "C14",
+    "C15",
+    "C16",
+    "C17",
+    "C18",
+    "C19",
+    "C20",
+    "C21",
+    "C22"
+  ],
+  "stories": [
+    "S9",
+    "S10",
+    "S11",
+    "S12"
+  ],
+  "design_anchor": [
+    "ADR-001",
+    "ADR-004",
+    "ADR-007",
+    "ADR-012"
+  ],
+  "purpose": "A home holds the record a new session is made from, but nothing turns it into a running session on a harness. This brief adds the Claude Code launch template (ADR-012): a versioned object kept in the home by its hash, with named slots for the MCP configuration, the environment, the secrets by handle, the appended instructions and the transcript, and a lys-home subcommand that reads a template and a session and writes the files a Claude Code launch needs, byte-identical on every render, with each render recorded on the session so a stranger can tell which template a session was launched with (design P11, CN8).",
+  "task": "Make R4's renderer byte-deterministic for entry ids that are not uuid-shaped; define the Claude Code launch template (schema in docs/design/home/LAUNCH-TEMPLATE.md, parsed and checked by slot name, kept under the home's templates/ by SHA-256); define the launch_render kind of lys.harness_event; write the environment file with every secret as its handle; add `lys-home render-launch`, which renders the session record (HOME-001 R4, no canon, no handover) and the template's slots into one new directory, prints a JSON report of hashes and paths with the launch line, never runs it, and appends one launch_render event on the session; and record the proof on the re-imported PROOF-RESUME session. In scope: Claude Code only, this machine only, handles only. Out of scope: any other harness, launching the line, launching on another machine, the broker's read of a secret (the secrets rows own it; a readable secret stays a handle until the door fills the environment at spawn), canon and handover slots (a later template version adds them; today a template naming either is refused like any unknown slot), and --fork-session (the line resumes in place, so the continuation is written beside the rendered file inside the output directory). The launch_render event advances the session head like every other entry; 'identical hashes' is about the written files, so two renders' reports differ by the head hash they read, and the second report's head is the first render's event. The committed tests run on a synthetic session the tests build; the real PROOF-RESUME session is re-imported on the proving machine and only its report enters the tree.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Render non-uuid entry ids to deterministic uuids",
+      "spec": "WHEN HOME-001 R4's renderer renders a message entry whose id is not uuid-shaped (36 characters, hyphens at 8, 13, 18 and 23, hex elsewhere), THE SYSTEM SHALL give its record the uuid formed from h, the lowercase hex SHA-256 of the id's UTF-8 bytes, as h[0..8] '-' h[8..12] '-' '4' h[13..16] '-' '8' h[17..20] '-' h[20..32], and SHALL derive the assistant message id from that uuid exactly as today. THE SYSTEM SHALL NOT draw a random value anywhere in a render, SHALL NOT change the record uuid of a uuid-shaped entry id, and SHALL NOT change any other byte that renderer writes.",
+      "acceptance": [
+        "An entry with id `entry-0001` renders to a record whose uuid is `c0d1f623-175c-4871-833e-04fb4700f57d`.",
+        "Rendering one session holding non-uuid ids with the same uuid, cwd and model to two paths yields two files with equal SHA-256.",
+        "The existing claude_code_round_trip test passes unchanged, and an entry with id `478d9617-9050-453d-bb94-b84385905aed` renders to a record with that same uuid.",
+        "`grep -n fresh_id crates/lys-home/src/harness/claude_code/render.rs` prints nothing."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-home/src/harness/claude_code/render.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C19"
+      ],
+      "stories": [
+        "S12"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Define the Claude Code launch template and keep it in the home by its hash",
+      "spec": "Write docs/design/home/LAUNCH-TEMPLATE.md as the template's schema: a JSON object with exactly the keys `harness` (the string `claude-code`), `version` (the integer 1), `flags` (an array of strings, appended to the launch line in order) and `slots`, an object with exactly the five keys `mcp` (a JSON object written as the MCP configuration file), `env` (an object of variable name to string value), `secrets` (an array of objects with exactly `variable`, `handle` and `permission`, where permission is `read` or `use`), `instructions` (a string written as the appended instructions file) and `transcript` (an object with exactly `fill`, whose one accepted value is `resume-by-path`). A variable name matches `[A-Za-z_][A-Za-z0-9_]*`. WHEN a template is parsed, THE SYSTEM SHALL refuse, naming the offending key or value, a slot other than the five, a missing slot, a top-level key other than the four, a harness other than `claude-code`, a version other than 1, a transcript fill other than `resume-by-path`, a permission other than `read` or `use`, a variable name outside the pattern, and one variable named in both `env` and `secrets`. WHEN a parsed template is kept, THE SYSTEM SHALL store its exact bytes in the home's `templates/` block store by SHA-256 with the same put-once rule as `blocks/`, and the template hash SHALL be that SHA-256. THE SYSTEM SHALL NOT rewrite a kept template, SHALL NOT accept `canon` or `handover` as slots in version 1, and SHALL NOT read any secret's value when parsing or keeping a template.",
+      "acceptance": [
+        "Parsing crates/lys-home/tests/fixtures/launch-template.json succeeds with 5 slots, 2 secrets (one `read`, one `use`) and flags `[\"--permission-mode\", \"default\"]`.",
+        "A template equal to the fixture plus the slot `canon` is refused with an error whose message contains `canon`; the same with `handover` is refused naming `handover`; the same with `widgets` is refused naming `widgets`; 3 refusals counted, 0 accepted.",
+        "A template equal to the fixture without `instructions` is refused naming `instructions`.",
+        "A template with `\"harness\": \"codex\"` is refused naming `codex`, and one with `\"fill\": \"convert\"` is refused naming `convert`.",
+        "A template naming `FIXTURE_READ_TOKEN` in both `env` and `secrets` is refused naming `FIXTURE_READ_TOKEN`.",
+        "Keeping the fixture twice leaves exactly 1 file under the home's `templates/`, whose bytes equal the fixture's and whose name is the fixture file's SHA-256.",
+        "docs/design/home/LAUNCH-TEMPLATE.md names the four top-level keys, the five slots, the file each slot writes and the launch line's form."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/harness/claude_code/template.rs",
+          "crates/lys-home/src/harness/claude_code/template_tests.rs",
+          "crates/lys-home/tests/fixtures/launch-template.json",
+          "docs/design/home/LAUNCH-TEMPLATE.md"
+        ],
+        "modify": [
+          "crates/lys-home/src/harness/claude_code/mod.rs",
+          "crates/lys-home/src/error.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C14",
+        "C15",
+        "C16"
+      ],
+      "stories": [
+        "S9"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Define the launch_render kind of lys.harness_event",
+      "spec": "Add the kind `launch_render` to lys.harness_event. Its data is `{kind: \"launch_render\", harness: \"claude-code\", source_uuid: null, record, detail}`, where `record` is the SHA-256 of a block in the home's `blocks/` holding the render's written paths and their hashes, and `detail` is exactly `{template, head, files}`: the template hash, the session head hash (both 64 lowercase hex) and the count of files written. The session head hash is the SHA-256 of the head entry's line as stored in the session file, from its first byte up to, not including, its newline. THE SYSTEM SHALL refuse the event with the existing size error when its serialised data exceeds 512 bytes, SHALL NOT produce the kind from an import, and SHALL NOT put a path, a flag, a variable, a handle or any template or transcript text in `detail`. docs/design/home/RECORD.md SHALL name the kind, its data and the home's `templates/` directory.",
+      "acceptance": [
+        "A launch_render event built from two 64-hex hashes, a block hash and 6 files serialises to at most 512 bytes and its `detail` has exactly the keys `template`, `head` and `files`.",
+        "Importing the HOME-001 R3 fixture produces 0 events of kind `launch_render`.",
+        "docs/design/home/RECORD.md contains `launch_render` and `templates/`."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-home/src/harness/claude_code/events.rs",
+          "docs/design/home/RECORD.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C20"
+      ],
+      "stories": [
+        "S11"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Write the environment file with every secret as its handle",
+      "spec": "WHEN the environment file is written, THE SYSTEM SHALL write `env.sh` holding, first, one line `export NAME='value'` per `env` entry in ascending byte order of NAME, then one line `export NAME='lys-handle:HANDLE'` per `secrets` entry in template order, each value single-quoted with every `'` written as `'\\''`, each line ending in one newline. THE SYSTEM SHALL NOT read a secret's value from the process environment, a file, the home or a broker, SHALL NOT write a secret's value, and SHALL NOT call a broker. THE SYSTEM SHALL report each secret as `{variable, handle, permission, filled: false}`.",
+      "acceptance": [
+        "For the fixture template, env.sh is exactly `export LYS_FIXTURE_MODE='launch'\\nexport FIXTURE_READ_TOKEN='lys-handle:fixture-read'\\nexport FIXTURE_USE_TOKEN='lys-handle:fixture-use'\\n`.",
+        "An env value `it's` is written as `'it'\\''s'`.",
+        "With the process environment holding FIXTURE_READ_TOKEN=fixture-secret-value-7c1e and FIXTURE_USE_TOKEN=fixture-secret-value-7c1e, a byte search of every file under the output directory and under the home for `fixture-secret-value-7c1e` finds 0 matches.",
+        "The report's `secrets` array has 2 members, each with `filled` false, one with permission `read` and one with `use`."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/harness/claude_code/launch_env.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C18"
+      ],
+      "stories": [
+        "S10"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Render a session and a template into one launch directory and record the render",
+      "spec": "WHEN asked to render a launch with a home, a session, a template file, a uuid, a cwd, a model and an output directory, THE SYSTEM SHALL parse and keep the template (R2), read the session's head and its head hash (R3), create the output directory and write into it: `<uuid>.jsonl` and its loss account `<uuid>.loss.json` by HOME-001 R4's renderer with that uuid, cwd and model and no canon; `mcp.json`, the `mcp` slot with keys sorted at every level, two-space indent and one trailing newline; `env.sh` (this brief's R4); `instructions.txt`, the `instructions` slot's exact UTF-8 bytes; and `launch.sh`, the launch line and one newline. The launch line SHALL be exactly `( . '<out>/env.sh' && claude --resume '<out>/<uuid>.jsonl' --mcp-config '<out>/mcp.json' --append-system-prompt \"$(cat '<out>/instructions.txt')\" <flags> )`, where <out> is the output directory's absolute path and <flags> is each template flag single-quoted, joined by one space. THE SYSTEM SHALL then store a block holding the written paths and their SHA-256 values and append one launch_render event through the session's ordinary append, advancing the head. IF the session has no head, the template is refused, or the output directory exists, THEN THE SYSTEM SHALL refuse naming it, write no file, keep no template and append nothing. THE SYSTEM SHALL NOT spawn a process, SHALL NOT add --fork-session, SHALL NOT write outside the output directory and the home, and SHALL NOT write the launch_render event into the rendered JSONL.",
+      "acceptance": [
+        "Rendering the test-built session (entries with ids `entry-0001` onward) with the fixture template writes exactly 6 files: `<uuid>.jsonl`, `<uuid>.loss.json`, `mcp.json`, `env.sh`, `instructions.txt` and `launch.sh`.",
+        "`<uuid>.jsonl` has the same SHA-256 as HOME-001 R4's render of the same session with the same uuid, cwd and model to a separate path.",
+        "mcp.json for the fixture is exactly `{\\n  \"mcpServers\": {\\n    \"fixture\": {\\n      \"args\": [\\n        \"--stdio\"\\n      ],\\n      \"command\": \"fixture-mcp\"\\n    }\\n  }\\n}\\n`.",
+        "launch.sh for the fixture rendered to the absolute output directory D with uuid U is exactly `( . 'D/env.sh' && claude --resume 'D/U.jsonl' --mcp-config 'D/mcp.json' --append-system-prompt \"$(cat 'D/instructions.txt')\" '--permission-mode' 'default' )` followed by one newline, contains no `--fork-session`, and the report's `launch` equals it without the newline.",
+        "Rendering twice to the same output path, the first output directory moved aside between the renders, yields 6 files whose SHA-256 values are equal pair by pair.",
+        "After one render the session head is a lys.harness_event of kind `launch_render` whose `detail.template` equals the fixture's SHA-256 and whose `detail.head` equals the SHA-256 of the pre-render head entry's line bytes computed by the test from the session file; its `record` block lists the 6 written paths with SHA-256 values equal to the files'.",
+        "After two renders the session holds exactly 2 launch_render events, and the second event's `detail.head` equals the SHA-256 of the first event's line bytes.",
+        "Rendering to an existing output directory is refused with an error naming that directory; its contents, the session head and the home's `templates/` are unchanged.",
+        "A template naming the slot `canon` is refused naming `canon`; the output directory does not exist afterwards and the session head is unchanged."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/harness/claude_code/launch.rs",
+          "crates/lys-home/src/harness/claude_code/launch_tests.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C15",
+        "C16",
+        "C17",
+        "C19",
+        "C20"
+      ],
+      "stories": [
+        "S9",
+        "S11",
+        "S12"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Add the render-launch subcommand",
+      "spec": "Add `lys-home render-launch --home <dir> --session <id> --template <file> --uuid <uuid> --cwd <dir> --model <id> --out <dir>` with `--version` defaulting as `render` does, its arguments and handler held in launch.rs so cli.rs gains only the variant and its dispatch. WHEN it succeeds, THE SYSTEM SHALL print one JSON object with exactly `command` (`render-launch`), `session`, `template` (hash), `head` (the head hash the render read), `out`, `files` (each `{path, sha256}`), `launch` (the launch line), `secrets` (this brief's R4), `event` (the appended entry's id) and `render` (HOME-001 R4's render report). IF a required argument is missing, THEN THE SYSTEM SHALL exit 2 naming it. THE SYSTEM SHALL NOT print transcript, block, body, instructions or MCP configuration content, SHALL NOT print a secret's value, and SHALL NOT run the launch line. crates/lys-home/README.md SHALL describe the subcommand.",
+      "acceptance": [
+        "Each of the 7 invocations omitting one of `--home`, `--session`, `--template`, `--uuid`, `--cwd`, `--model` and `--out` exits 2 with stderr naming the omitted argument; 7 cases counted.",
+        "stdout parses as one JSON object with the 10 keys named in the spec and no key named `text`, `content` or `body` at any depth.",
+        "stdout contains none of the test session's message texts, not the fixture's instructions text, and not `fixture-secret-value-7c1e`.",
+        "With a `claude` executable on PATH that creates a marker file when run, render-launch exits 0 and the marker file does not exist.",
+        "crates/lys-home/src/cli.rs has fewer than 500 lines that are neither blank nor `//` comments."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/tests/render_launch.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/cli.rs",
+          "crates/lys-home/README.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C17",
+        "C18",
+        "C21"
+      ],
+      "stories": [
+        "S9",
+        "S10"
+      ]
+    },
+    {
+      "id": "R7",
+      "title": "Prove the launch render on the re-imported PROOF-RESUME session",
+      "spec": "Re-import the PROOF-RESUME source into a scratch home, render it with the fixture template twice to the same output path (the first directory moved aside between), and write docs/design/home/PROOF-LAUNCH.md holding only: the commands with machine paths written as placeholders, the lys-home commit, the Claude Code version, the source's SHA-256 and byte count, the import's entry counts, the template hash, the head hash each render read, each written file's name relative to the output directory with its SHA-256 for both renders, the launch line with the output directory as a placeholder, and the secret search count. THE SYSTEM SHALL NOT put any line, block or excerpt of the transcript in the tree, and SHALL NOT commit the source file or the scratch home.",
+      "acceptance": [
+        "PROOF-LAUNCH.md names the source SHA-256 `793f4e87ea4608b2ddfb9d5dcbf1197d4245bde7ed1612630339a1cc1f6d15df` and 562,932 bytes.",
+        "PROOF-LAUNCH.md lists 6 written files with a SHA-256 for each of the two renders, and each pair is equal.",
+        "PROOF-LAUNCH.md records the two head hashes and states the second equals the SHA-256 of the first render's launch_render event line.",
+        "PROOF-LAUNCH.md records a secret value search count of 0 across the output directory and the scratch home.",
+        "`git ls-files | grep -c e1c27f5d` prints 0."
+      ],
+      "files": {
+        "create": [
+          "docs/design/home/PROOF-LAUNCH.md"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C22"
+      ],
+      "stories": [
+        "S12"
+      ]
+    }
+  ],
+  "boundaries": [
+    "No harness other than Claude Code: no template, slot or profile for any other harness.",
+    "No process is spawned: the launch line is printed and written to launch.sh, never run.",
+    "No broker read and no call to a broker: a secret is written only as `lys-handle:` and its handle, and no secret value is read from any source.",
+    "No launch on another machine and no target profile.",
+    "No canon or handover slot and no --canon on the render; version 1 renders the session record only.",
+    "No transcript converter: the prior conversation reaches Claude Code only as R4's rendered JSONL resumed by path.",
+    "No --fork-session added by the renderer.",
+    "Nothing is written outside the output directory and the home; no file in Claude Code's own projects directory is written.",
+    "No transcript, block, body, instructions or MCP configuration content in the report, a log line, an error or a test name; hashes, counts, ids and paths only.",
+    "No new field in Pi's grammar: the render is recorded only as a lys.harness_event custom entry.",
+    "R4's output for uuid-shaped entry ids is unchanged.",
+    "No Norn crate or code, no door code change, and no dependency on manifold, aion or argus.",
+    "No real transcript is committed: the PROOF-RESUME source and its scratch home stay off the tree.",
+    "The design's structure array is the whole file list; a path outside it is not created."
+  ],
+  "verification": [
+    "python3 $DS2_METHOD/scripts/validate.py docs/design/home exits 0.",
+    "python3 $DS2_METHOD/scripts/check-coverage.py docs/design/home exits 0.",
+    "From the repository root: cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, cargo clippy --all-targets -- -D warnings, cargo test --workspace --all-features, cargo doc --no-deps --all-features and cargo doc --no-deps exit 0.",
+    "sh scripts/design/gate.sh exits 0 after the cluster's markdown is rendered.",
+    "grep -rn 'fork-session' crates/lys-home/src/harness/claude_code/launch.rs prints nothing.",
+    "grep -rn 'process::Command' crates/lys-home/src/harness/claude_code/launch.rs crates/lys-home/src/harness/claude_code/launch_env.rs crates/lys-home/src/harness/claude_code/template.rs prints nothing.",
+    "No file under crates/lys-home/src has more than 500 lines that are not blank and not `//` comments.",
+    "grep -rln 'fixture-secret-value-7c1e' crates/lys-home/tests/fixtures prints nothing."
+  ]
+}

@@ -95,6 +95,56 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The launch template",
+      "items": [
+        {
+          "id": "C14",
+          "text": "A Claude Code launch template is kept in the home under templates/ by its SHA-256 and never rewritten, and its schema is written in docs/design/home/LAUNCH-TEMPLATE.md.",
+          "done": false
+        },
+        {
+          "id": "C15",
+          "text": "A launch template names exactly the five slots mcp, env, secrets, instructions and transcript; a template naming any other slot is refused by that slot's name and nothing is written.",
+          "done": false
+        },
+        {
+          "id": "C16",
+          "text": "The transcript slot names resume-by-path as Claude Code's fill, and the rendered JSONL is R4's render of the session under the chosen uuid and cwd, inside the output directory.",
+          "done": false
+        },
+        {
+          "id": "C17",
+          "text": "lys-home render-launch writes into one new output directory the rendered JSONL with its loss account, mcp.json, env.sh, instructions.txt and launch.sh, and the launch line is claude --resume on the rendered path with the template's flags, never run.",
+          "done": false
+        },
+        {
+          "id": "C18",
+          "text": "A secret named in a launch template is written as its handle and never as its value: a byte search of the written files, the home and the report for the fixture secret value finds 0 matches.",
+          "done": false
+        },
+        {
+          "id": "C19",
+          "text": "Rendering the same template and session twice to the same output path yields byte-identical files, including for a session whose entry ids are not uuid-shaped.",
+          "done": false
+        },
+        {
+          "id": "C20",
+          "text": "Every render-launch appends one lys.harness_event of kind launch_render on the session's context path carrying the template hash, the session head hash and the written paths.",
+          "done": false
+        },
+        {
+          "id": "C21",
+          "text": "The render-launch report is one JSON object of hashes and paths with no transcript, block or body content, and a missing required argument exits 2 naming it.",
+          "done": false
+        },
+        {
+          "id": "C22",
+          "text": "PROOF-LAUNCH.md records the fixture template and the re-imported PROOF-RESUME session rendered twice to identical hashes, with hashes, counts and paths only.",
+          "done": false
+        }
+      ]
     }
   ]
 }

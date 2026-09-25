@@ -20,6 +20,10 @@
         {
           "id": "S8",
           "text": "As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs."
+        },
+        {
+          "id": "S9",
+          "text": "As an agent, I want my home rendered into the files Claude Code starts from, so that I continue on that harness from my own record rather than from the harness's file."
         }
       ]
     },
@@ -48,6 +52,30 @@
         {
           "id": "S5",
           "text": "As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught."
+        },
+        {
+          "id": "S12",
+          "text": "As the reviewer, I want the same template and session to render to the same bytes every time, so that anyone rerunning a render can check its recorded hashes."
+        }
+      ]
+    },
+    {
+      "name": "Tom",
+      "role": "Keeps what a launched session may read and use",
+      "stories": [
+        {
+          "id": "S10",
+          "text": "As Tom, I want a secret in a launch to appear only as its handle, so that no rendered file ever holds a credential's value."
+        }
+      ]
+    },
+    {
+      "name": "Stranger",
+      "role": "Reads a session to learn what it was launched with",
+      "stories": [
+        {
+          "id": "S11",
+          "text": "As a stranger reading a session, I want each launch recorded with the template hash and the head it started from, so that I can tell which template the session was launched with."
         }
       ]
     }

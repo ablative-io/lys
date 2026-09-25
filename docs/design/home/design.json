@@ -2,8 +2,8 @@
   "cluster": "home",
   "title": "The home: a session held under its identity, resumable by any harness that can be measured",
   "intention": "A session's history lives under the agent's identity, not under a harness. The record is what the model was given and what came back, in order, with each provider's native blocks kept whole. A harness's own resume file is rendered from that record on demand, so an agent moves machines, harnesses or providers and continues; the original bytes are never rewritten.",
-  "problem": "Today a session exists only as its harness's file. Archie's Claude Code file measured 141,931,097 bytes on 24 September 2026: the conversation itself is under 3% of it, tool results 14%, thinking 6%, and about 60% is harness bookkeeping the model never sees; Waffles' file is 3.37 GB and Claude Code loads it whole. Nothing central holds a session, so nothing can render a smaller working session, move one to another device, swap provider and come back, or say what a session was given. Norn already has the canonical event model (SessionEvent, conversion to provider messages, compaction as a derived event, provider epoch boundaries) proved by its own tests; Claude Code has no importer to it and no renderer from it.",
-  "solution": "Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree, not Norn): one append-only JSONL per session, a header line, then entries each carrying id, parentId and timestamp, a leaf pointer for the current position, forks by moving the pointer, compaction and branch summaries as entries that keep their originals. lys adds nothing to that grammar: harness events (approvals, tool completion) and proxy call records ride Pi's custom entry type under lys customType names, so a home file stays readable by Pi's own parser. Two captures feed it: the model traffic through the door's proxy (the same process that swaps the credential, SECRETS-002 R1), and the harness's own events from its transcript. Content blocks are stored once by hash; entries reference them. A harness resume file is a rendered projection of the root-to-leaf path: for Claude Code, a JSONL written under a chosen uuid at the harness's own path, then resumed by that id with --fork-session. Provider-native reasoning stays on the message with its provider, api and model and is rendered whole only to the same three; another model gets readable thinking as text and opaque blocks dropped, each named in a loss account. lys grants say who may read and resume. Every resume path is measured on a named harness version before anything relies on it.",
+  "problem": "Today a session exists only as its harness's file. Archie's Claude Code file measured 141,931,097 bytes on 24 September 2026: the conversation itself is under 3% of it, tool results 14%, thinking 6%, and about 60% is harness bookkeeping the model never sees; Waffles' file is 3.37 GB and Claude Code loads it whole. Nothing central holds a session, so nothing can render a smaller working session, move one to another device, swap provider and come back, or say what a session was given. Norn already has the canonical event model (SessionEvent, conversion to provider messages, compaction as a derived event, provider epoch boundaries) proved by its own tests; Claude Code has no importer to it and no renderer from it. A home now holds the pieces a new session is made from (the record, the canon and the handover), but nothing turns them into a running session on a given harness: there is no kept statement of which MCP configuration, environment, secrets and appended instructions a launch used, and no record on the session of what it was launched with.",
+  "solution": "Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree, not Norn): one append-only JSONL per session, a header line, then entries each carrying id, parentId and timestamp, a leaf pointer for the current position, forks by moving the pointer, compaction and branch summaries as entries that keep their originals. lys adds nothing to that grammar: harness events (approvals, tool completion) and proxy call records ride Pi's custom entry type under lys customType names, so a home file stays readable by Pi's own parser. Two captures feed it: the model traffic through the door's proxy (the same process that swaps the credential, SECRETS-002 R1), and the harness's own events from its transcript. Content blocks are stored once by hash; entries reference them. A harness resume file is a rendered projection of the root-to-leaf path: for Claude Code, a JSONL written under a chosen uuid at the harness's own path, then resumed by that id with --fork-session. Provider-native reasoning stays on the message with its provider, api and model and is rendered whole only to the same three; another model gets readable thinking as text and opaque blocks dropped, each named in a loss account. lys grants say who may read and resume. Every resume path is measured on a named harness version before anything relies on it. A launch template per harness maps the home onto that harness (ADR-012): for Claude Code it is a JSON object with five named slots (the MCP configuration, the environment, the secrets by handle with their read or use permission, the appended instructions, and the transcript), written down in LAUNCH-TEMPLATE.md and kept in the home by its SHA-256 under templates/, beside sessions/ and blocks/. The transcript slot is the one slot no template maps generically, so the template names how the harness fills it; Claude Code fills it by resuming R4's rendered file by path, in place, with no --fork-session. `lys-home render-launch` reads a template and a session and writes into one new directory the rendered JSONL with its loss account, mcp.json, env.sh (a secret only as its handle), instructions.txt and launch.sh, prints a report of hashes and paths with the launch line, and never runs it (ADR-007). Each render appends one lys.harness_event of kind launch_render on the session's context path, naming the template hash, the head hash it read and the written paths by a block, so a stranger reading the session can tell which template it was launched with. A readable secret stays a handle until the door fills the environment at spawn, which the secrets rows own (ADR-001).",
   "principles": [
     {
       "id": "P1",
@@ -44,12 +44,18 @@
     {
       "id": "P10",
       "text": "A handover is a letter the outgoing session writes to its successor in its own real thinking and answer; it enters the successor as a lys.inherited entry marked as a predecessor's memory, never as the successor's own experience, and replays only to the same provider, api and model. No thinking is ever authored; only thinking a model produced is kept (Tom, Dot 13:38 to 13:40: 'you are waking up ... I am another one, I'm helping you have part of my memory ... like a parent imparting a wish to a child'; Waffles 52d53451)."
+    },
+    {
+      "id": "P11",
+      "text": "A harness is reached through its own preset launch template, never a transcript converter: the template maps the home onto the harness as files, runtime variables and command mappings in text, and the prior conversation reaches the harness only as the harness's own file, rendered and resumed by path (ADR-012). A template names its slots; one it does not know is refused by name, so a new slot is a new template version, never a guess."
     }
   ],
   "decisions": [
     "ADR-001",
     "ADR-003",
-    "ADR-004"
+    "ADR-004",
+    "ADR-007",
+    "ADR-012"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -57,7 +63,8 @@
     "One seat with a subscription login making calls through a pass-through proxy, so the tee has somewhere to live.",
     "A written loss account for every derived record: what a render or translation preserved, transformed and could not carry.",
     "The canon, one curated versioned series of short examples each showing a rule lived, seeds every new session, and its effect is measured on a card against a plain start.",
-    "A handover letter from an outgoing session seeds its successor as inherited memory, with the model's own thinking intact, and the effect is measured on a card against a plain start."
+    "A handover letter from an outgoing session seeds its successor as inherited memory, with the model's own thinking intact, and the effect is measured on a card against a plain start.",
+    "A Claude Code launch template and a session render to one directory whose files hash the same on every render, whose launch line resumes the rendered file by path, whose written files hold no secret value, and whose render is recorded on the session with the template hash and the head hash."
   ],
   "non_goals": [
     {
@@ -79,6 +86,22 @@
     {
       "text": "Adopting, wrapping or calling Norn's session code; Pi's code is read as the reference and not vendored.",
       "reason": "Tom, Dot 13:28: not Norn. Pi's tree is the reference."
+    },
+    {
+      "text": "Launching Claude Code from the template and capturing the new session back into the home.",
+      "reason": "The acceptance stops at rendering the launch; running it and recapturing is a measured harness step of its own."
+    },
+    {
+      "text": "Filling a readable secret's value at launch through the broker's read.",
+      "reason": "The broker's read belongs to the secrets rows (SECRETS-002 R1 and R5); the launch template writes handles only."
+    },
+    {
+      "text": "Canon and handover slots in the Claude Code launch template.",
+      "reason": "The first template version renders the record only; the canon (HOME-001 R11) and the handover (HOME-001 R12) become named slots in a later template version once the handover exists."
+    },
+    {
+      "text": "Launching on another machine, and target profiles (a sandbox or a VM) the template renders into.",
+      "reason": "Launching elsewhere stands on stage 3's preconditions; P8 names target profiles as later work."
     }
   ],
   "structure": [
@@ -306,6 +329,66 @@
       "path": "crates/lys-home/src/proxy/journal_tests.rs",
       "note": "recovery after a kill: one lost record per open call",
       "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/error.rs",
+      "note": "HomeError: every refusal named, no content in any message",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-002.json",
+      "note": "the second brief: the Claude Code launch template and render-launch",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-002.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "docs/design/home/LAUNCH-TEMPLATE.md",
+      "note": "the Claude Code launch template's schema: fields, the five slots, the files each slot writes, the launch line",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "docs/design/home/PROOF-LAUNCH.md",
+      "note": "measured: the fixture template and the re-imported PROOF-RESUME session rendered twice, hashes, counts and paths only",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/template.rs",
+      "note": "the Claude Code launch template: parsed, its slots checked by name, kept in the home under templates/ by its hash",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/template_tests.rs",
+      "note": "gates on the template: the five slots, unknown and missing slots refused by name, kept once by hash",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/launch_env.rs",
+      "note": "the environment file: variables by value, secrets by handle only, shell-quoted",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/launch.rs",
+      "note": "render-launch: the five launch artifacts into one new directory, the launch line, the head hash, the launch_render event and the report",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/launch_tests.rs",
+      "note": "gates on render-launch: byte-identical twice, the event on the session, the head hash, refusals writing nothing",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/tests/render_launch.rs",
+      "note": "the binary: missing arguments exit 2, no secret value anywhere, no content keys, no process spawned",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/tests/fixtures/launch-template.json",
+      "note": "the fixture Claude Code launch template the tests and PROOF-LAUNCH use; handles only",
+      "brief": "HOME-002"
     }
   ],
   "inventory": [
@@ -340,6 +423,30 @@
     {
       "path": "$CCFLARE/README.md",
       "note": "ccflare at 95c4c6a (github.com/snipeship/ccflare): the concept of a native pass-through that keeps request history; reference only, not used (Tom, Dot 13:34)"
+    },
+    {
+      "path": "crates/lys-home/src/cli.rs",
+      "note": "the lys-home subcommands (import, render, canon, fewshot, ingest-call, resume-check); 485 lines, 398 of them code, against the 500-line rule"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render.rs",
+      "note": "R4's renderer; keeps uuid-shaped entry ids and gives every other id a fresh random uuid per render, so such a session renders to different bytes each time"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/events.rs",
+      "note": "lys.harness_event with five kinds (hook, permission_mode, tool_completed, attachment, system), data capped at 512 serialised bytes"
+    },
+    {
+      "path": "crates/lys-home/src/record/index.rs",
+      "note": "the offset index (id, parent, offset, len per entry line) and the persisted head, an entry id; no head hash exists"
+    },
+    {
+      "path": "crates/lys-home/src/error.rs",
+      "note": "HomeError, the crate's one error type"
+    },
+    {
+      "path": "docs/design/home/PROOF-RESUME.md",
+      "note": "the recorded real session (sha256 793f4e87ea4608b2ddfb9d5dcbf1197d4245bde7ed1612630339a1cc1f6d15df, 562,932 bytes) imported and resumed; its scratch home is not kept"
     }
   ],
   "constraints": [
@@ -370,14 +477,81 @@
     {
       "id": "CN7",
       "text": "Reading the root-to-leaf path of a home file reads only the entries on that path plus the index, never the whole file (Pi loads the whole journal; Chippy 13:33); the head is persisted beside the file, never inferred from the last physical entry on reopen."
+    },
+    {
+      "id": "CN8",
+      "text": "No secret value appears in the home, a template, a rendered launch file, a report, a log line, an error or a test name; a secret is written only as its handle, and nothing in lys-home reads a secret's value."
     }
   ],
   "gate": [
     {
       "tree": ".",
-      "fmt": "cargo fmt --all -- --check",
-      "lint": "cargo clippy --all-targets -- -D warnings",
-      "tests": "cargo test --workspace"
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
+      "legs": [
+        {
+          "name": "fmt",
+          "command": "cargo fmt --all",
+          "requires": [
+            "tool:cargo",
+            "tool:rustfmt"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy-all-features",
+          "command": "cargo clippy --all-targets --all-features -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy",
+          "command": "cargo clippy --all-targets -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "tests",
+          "command": "cargo test --workspace --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc-all-features",
+          "command": "cargo doc --no-deps --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc",
+          "command": "cargo doc --no-deps",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
+          "requires": [
+            "tool:sh",
+            "tool:python3"
+          ],
+          "cadence": "round"
+        }
+      ]
     }
   ]
 }
