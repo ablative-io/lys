@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-24",
+  "updated": "2026-09-26",
   "decisions": [
     {
       "id": "ADR-001",
@@ -191,6 +191,25 @@
       "consequences": [
         "DIRECTORY-003 records the state beside each identity; no check reads it until the permission work of road step 2.",
         "The room's own questions stay with the proposal: whether a reason is mandatory on suspend and retire, and whether activation needs a credential handle (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:101-103)."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-012",
+      "title": "A home moves as a pushed git ref that the target fetches, and the target records its own execution id and ancestry",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-22",
+      "decided_by": "tom",
+      "context": "A home lives only on the machine that captured it. Stage 3 of the context roadmap (docs/design/identity/CONTEXT-ROADMAP-2026-09-22.md:60-74) records the rule for moving one as Tom's 08:30 rule, in the roadmap's prose only; HOME-002 is its first implementation, and every later block (the named second machine) fetches what it ships, so the rule needs to be a ledger entry every later brief honours rather than a sentence in a roadmap.",
+      "decision": "A home moves by the same route as a build tree: its tracked files are committed in the home's own git repository and pushed as one ref to a remote named on the command line, and the target fetches that ref into a new home. This over a hand copy (cp, rsync or an archive carried between directories), which leaves no commit to name, no tree hash to check the arrival against and no ancestry. The target mints its own execution id and records its arrival (source commit, remote, ref and execution id) in each session; source artifacts are never rewritten, and credentials are supplied at launch on the target, never tracked in the home.",
+      "quote": "",
+      "consequences": [
+        "HOME-002 ships and fetches by git ref only; any other transport is out of scope for the home cluster.",
+        "Every fetched session ends with a lys.harness_event of kind arrival naming the source commit, remote, ref and execution id, so ancestry is read from the record, never inferred.",
+        "The second-machine block of stage 3 fetches HOME-002's shipped ref, and adds read authority and encryption before bytes leave the machine rather than a different route.",
+        "Nothing credential-shaped is a tracked file or a recorded remote: userinfo is removed from a recorded remote and files outside the tracked set are left behind and named."
       ],
       "supersedes": [],
       "superseded_by": ""

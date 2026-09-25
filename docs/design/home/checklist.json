@@ -95,6 +95,41 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Moving a home",
+      "items": [
+        {
+          "id": "C14",
+          "text": "Ship commits exactly a home's session files, their index and head files and its blocks store in the home's own git repository, pushes the commit as one ref to the remote named on the command line, and reports the commit, the ref and every other file it found and left behind.",
+          "done": false
+        },
+        {
+          "id": "C15",
+          "text": "Ship refuses by name a home in which any session's index is stale and says so in its report, writing nothing; the source home's files are byte-identical before and after every ship.",
+          "done": false
+        },
+        {
+          "id": "C16",
+          "text": "Fetch brings the shipped ref into a new directory, refusing by name one that already holds a home; the fetched commit's tree equals the shipped commit's tree, and every index is verified against its file and every head against its index.",
+          "done": false
+        },
+        {
+          "id": "C17",
+          "text": "After the tree check, each fetched session gains exactly one appended lys.harness_event of kind arrival naming the source commit, the remote, the ref and this home's fresh execution id; the session file is the source's bytes followed by that one line.",
+          "done": false
+        },
+        {
+          "id": "C18",
+          "text": "No credential, token, key or launch environment is tracked in a home: a fixture secret in an untracked launch environment file is absent from the shipped ref and the file is named as left behind.",
+          "done": false
+        },
+        {
+          "id": "C19",
+          "text": "The fetched home is rendered as a Claude Code file and resumed by path on the installed Claude Code version, written up in PROOF-SHIP.md in hashes, counts and paths only.",
+          "done": false
+        }
+      ]
     }
   ]
 }

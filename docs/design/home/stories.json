@@ -20,6 +20,10 @@
         {
           "id": "S8",
           "text": "As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs."
+        },
+        {
+          "id": "S9",
+          "text": "As an agent, I want my home shipped as a ref and fetched into a second home where my session is rendered and resumed, so that I move by the same route as a build tree and never by a hand copy."
         }
       ]
     },
@@ -48,6 +52,14 @@
         {
           "id": "S5",
           "text": "As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught."
+        },
+        {
+          "id": "S10",
+          "text": "As the reviewer, I want the fetched tree checked equal to the shipped one before anything is appended, and each fetched session to end with one arrival event naming its source commit and a fresh execution id, so that a moved home's ancestry is on the record and nothing was rewritten."
+        },
+        {
+          "id": "S11",
+          "text": "As the reviewer, I want a home with a stale index refused by name rather than repaired and shipped, and no credential file ever tracked, so that what leaves a home is exactly its record."
         }
       ]
     }
