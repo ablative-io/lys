@@ -1,9 +1,9 @@
 {
   "cluster": "home",
   "title": "The home: a session held under its identity, resumable by any harness that can be measured",
-  "intention": "A session's history lives under the agent's identity, not under a harness. The record is what the model was given and what came back, in order, with each provider's native blocks kept whole. A harness's own resume file is rendered from that record on demand, so an agent moves machines, harnesses or providers and continues; the original bytes are never rewritten.",
-  "problem": "Today a session exists only as its harness's file. Archie's Claude Code file measured 141,931,097 bytes on 24 September 2026: the conversation itself is under 3% of it, tool results 14%, thinking 6%, and about 60% is harness bookkeeping the model never sees; Waffles' file is 3.37 GB and Claude Code loads it whole. Nothing central holds a session, so nothing can render a smaller working session, move one to another device, swap provider and come back, or say what a session was given. Norn already has the canonical event model (SessionEvent, conversion to provider messages, compaction as a derived event, provider epoch boundaries) proved by its own tests; Claude Code has no importer to it and no renderer from it.",
-  "solution": "Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree, not Norn): one append-only JSONL per session, a header line, then entries each carrying id, parentId and timestamp, a leaf pointer for the current position, forks by moving the pointer, compaction and branch summaries as entries that keep their originals. lys adds nothing to that grammar: harness events (approvals, tool completion) and proxy call records ride Pi's custom entry type under lys customType names, so a home file stays readable by Pi's own parser. Two captures feed it: the model traffic through the door's proxy (the same process that swaps the credential, SECRETS-002 R1), and the harness's own events from its transcript. Content blocks are stored once by hash; entries reference them. A harness resume file is a rendered projection of the root-to-leaf path: for Claude Code, a JSONL written under a chosen uuid at the harness's own path, then resumed by that id with --fork-session. Provider-native reasoning stays on the message with its provider, api and model and is rendered whole only to the same three; another model gets readable thinking as text and opaque blocks dropped, each named in a loss account. lys grants say who may read and resume. Every resume path is measured on a named harness version before anything relies on it.",
+  "intention": "A session's history lives under the agent's identity, not under a harness. The record is what the model was given and what came back, in order, with each provider's native blocks kept whole. A harness's own resume file is rendered from that record on demand, so an agent moves machines, harnesses or providers and continues; the original bytes are never rewritten. Code this cluster built before the chain existed is judged by the chain as it stands, and a card is done only when that judgement holds on the rows it carries: done means judged, never merely merged.",
+  "problem": "Today a session exists only as its harness's file. Archie's Claude Code file measured 141,931,097 bytes on 24 September 2026: the conversation itself is under 3% of it, tool results 14%, thinking 6%, and about 60% is harness bookkeeping the model never sees; Waffles' file is 3.37 GB and Claude Code loads it whole. Nothing central holds a session, so nothing can render a smaller working session, move one to another device, swap provider and come back, or say what a session was given. Norn already has the canonical event model (SessionEvent, conversion to provider messages, compaction as a derived event, provider epoch boundaries) proved by its own tests; Claude Code has no importer to it and no renderer from it. HOME-001's rows R1 to R11 were built by hand and reached main before every carded row had to pass through its board's chain, so nothing on main records the chain's judgement of crates/lys-home, lys has no ast-grep rule set to judge it with, and two of those rows (R7, R10) have no code on main at all.",
+  "solution": "Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree, not Norn): one append-only JSONL per session, a header line, then entries each carrying id, parentId and timestamp, a leaf pointer for the current position, forks by moving the pointer, compaction and branch summaries as entries that keep their originals. lys adds nothing to that grammar: harness events (approvals, tool completion) and proxy call records ride Pi's custom entry type under lys customType names, so a home file stays readable by Pi's own parser. Two captures feed it: the model traffic through the door's proxy (the same process that swaps the credential, SECRETS-002 R1), and the harness's own events from its transcript. Content blocks are stored once by hash; entries reference them. A harness resume file is a rendered projection of the root-to-leaf path: for Claude Code, a JSONL written under a chosen uuid at the harness's own path, then resumed by that id with --fork-session. Provider-native reasoning stays on the message with its provider, api and model and is rendered whole only to the same three; another model gets readable thinking as text and opaque blocks dropped, each named in a loss account. lys grants say who may read and resume. Every resume path is measured on a named harness version before anything relies on it.\n\nHOME-002 brings the hand-built rows under the chain without touching them. It measures crates/lys-home exactly as it stands at 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff and writes docs/design/home/PROOF-CHAIN.md: the commit measured and the tools measured with; one Jev verdict per file (jev_ask, the whole file as a diff against the empty tree, the path as the part); fmt in its checking form; the two clippy legs, which are clippy pedantic because the workspace lints set pedantic to warn under -D warnings; the workspace test run with lys-home's executed tests counted; an ast-grep scan under the estate's four sweep rules (ADR-013), which this card adds as configuration; and .land/gates.sh. Every finding a named check reports is its own line, naming the HOME-001 rows whose files it touches, and becomes its own card; what the author observes and no check reports sits under its own heading and is carded only on the lead's word. A table reads HOME-001 at that commit and records, row by row, which named files exist, so no card is set done over code that does not exist. src_land's Jev judges this card's landing diff, which is the proof and design rows; the per-file verdicts are the crate's, and the proof says so. The seven step 5 cards are set done only on a green landing that records no finding (ADR-012).",
   "principles": [
     {
       "id": "P1",
@@ -44,12 +44,18 @@
     {
       "id": "P10",
       "text": "A handover is a letter the outgoing session writes to its successor in its own real thinking and answer; it enters the successor as a lys.inherited entry marked as a predecessor's memory, never as the successor's own experience, and replays only to the same provider, api and model. No thinking is ever authored; only thinking a model produced is kept (Tom, Dot 13:38 to 13:40: 'you are waking up ... I am another one, I'm helping you have part of my memory ... like a parent imparting a wish to a child'; Waffles 52d53451)."
+    },
+    {
+      "id": "P11",
+      "text": "A proof of code already on main measures and never mends: it names the commit it measured, runs each check in its non-rewriting form, records every finding as its own line, and leaves every fix to a card of its own."
     }
   ],
   "decisions": [
     "ADR-001",
     "ADR-003",
-    "ADR-004"
+    "ADR-004",
+    "ADR-012",
+    "ADR-013"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -57,7 +63,8 @@
     "One seat with a subscription login making calls through a pass-through proxy, so the tee has somewhere to live.",
     "A written loss account for every derived record: what a render or translation preserved, transformed and could not carry.",
     "The canon, one curated versioned series of short examples each showing a rule lived, seeds every new session, and its effect is measured on a card against a plain start.",
-    "A handover letter from an outgoing session seeds its successor as inherited memory, with the model's own thinking intact, and the effect is measured on a card against a plain start."
+    "A handover letter from an outgoing session seeds its successor as inherited memory, with the model's own thinking intact, and the effect is measured on a card against a plain start.",
+    "PROOF-CHAIN.md records the chain's whole judgement of crates/lys-home at 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff: every check by name, command and outcome, one Jev verdict per file, every finding as its own line, with no byte of the crate changed."
   ],
   "non_goals": [
     {
@@ -79,6 +86,22 @@
     {
       "text": "Adopting, wrapping or calling Norn's session code; Pi's code is read as the reference and not vendored.",
       "reason": "Tom, Dot 13:28: not Norn. Pi's tree is the reference."
+    },
+    {
+      "text": "Fixing any finding the proof records, or any new capability in lys-home.",
+      "reason": "The card proves what is there; each finding becomes its own card on the step 5 board."
+    },
+    {
+      "text": "Adding ast-grep to .land/gates.sh or docs/design/project.json.",
+      "reason": "Changing the gate changes it for every later card; it is its own unit."
+    },
+    {
+      "text": "Building HOME-001 R7 and R10 (the pass-through proxy proof and lys-proxy).",
+      "reason": "They have no code on main, so there is nothing to judge; they are built through the chain as their own cards."
+    },
+    {
+      "text": "A chain step that runs Jev per file over code already on main.",
+      "reason": "It recurs for every row built before the chain; it belongs in the chain as its own unit, not in this card."
     }
   ],
   "structure": [
@@ -306,6 +329,61 @@
       "path": "crates/lys-home/src/proxy/journal_tests.rs",
       "note": "recovery after a kill: one lost record per open call",
       "brief": "HOME-001"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-002.json",
+      "note": "the proof card: the chain's whole judgement over crates/lys-home as found",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-002.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "docs/design/home/PROOF-CHAIN.md",
+      "note": "the commit measured, each check's command and outcome, one Jev verdict per file, the findings one per line, the row table",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "sgconfig.yml",
+      "note": "the ast-grep project root: ruleDirs rules/ast-grep",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "rules/ast-grep/mod-rs-declarations-only.yml",
+      "note": "the estate sweep rule mod-rs-declarations-only, byte-identical to cambium's",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "rules/ast-grep/no-let-underscore-on-results.yml",
+      "note": "the estate sweep rule no-let-underscore-on-results, byte-identical to cambium's",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "rules/ast-grep/no-lint-bypass-attributes.yml",
+      "note": "the estate sweep rule no-lint-bypass-attributes, byte-identical to cambium's",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "rules/ast-grep/no-std-mutex-in-async.yml",
+      "note": "the estate sweep rule no-std-mutex-in-async, byte-identical to cambium's",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "docs/design/home/DESIGN.md",
+      "note": "design.json rendered",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/home/CHECKLIST.md",
+      "note": "checklist.json rendered",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/home/USER-STORIES.md",
+      "note": "stories.json rendered",
+      "brief": ""
     }
   ],
   "inventory": [
@@ -340,6 +418,30 @@
     {
       "path": "$CCFLARE/README.md",
       "note": "ccflare at 95c4c6a (github.com/snipeship/ccflare): the concept of a native pass-through that keeps request history; reference only, not used (Tom, Dot 13:34)"
+    },
+    {
+      "path": "crates/lys-home",
+      "note": "at 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff: 25 files (23 .rs, Cargo.toml, README.md), 36 #[test] functions, all entered in one commit (217e81b); the thing judged, as found"
+    },
+    {
+      "path": ".land/gates.sh",
+      "note": "the gate: scripts/design/gate.sh, cargo fmt --check, clippy in both feature shapes, cargo test --workspace --all-features, cargo doc in both shapes; every leg runs, red if any leg is"
+    },
+    {
+      "path": "scripts/design/gate.sh",
+      "note": "the design leg: validate, coverage and rendered markdown equal to what the JSON renders"
+    },
+    {
+      "path": "Cargo.toml",
+      "note": "[workspace.lints.clippy] sets pedantic = warn with unwrap_used, expect_used, panic and others; lys-home inherits them"
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "note": "pins the toolchain at 1.97.1 with clippy and rustfmt"
+    },
+    {
+      "path": "$CAMBIUM/rules/ast-grep",
+      "note": "the estate sweep rules at df4dca5de6899df89b06b94cdeeec3619877fc1d: mod-rs-declarations-only, no-let-underscore-on-results, no-lint-bypass-attributes, no-std-mutex-in-async (haematite carries the same four byte for byte)"
     }
   ],
   "constraints": [
@@ -370,14 +472,81 @@
     {
       "id": "CN7",
       "text": "Reading the root-to-leaf path of a home file reads only the entries on that path plus the index, never the whole file (Pi loads the whole journal; Chippy 13:33); the head is persisted beside the file, never inferred from the last physical entry on reopen."
+    },
+    {
+      "id": "CN8",
+      "text": "HOME-002 changes no byte under crates/lys-home: no fmt rewrite, no clippy fix, no test added; git diff 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff <card head> -- crates/lys-home is empty."
     }
   ],
   "gate": [
     {
       "tree": ".",
-      "fmt": "cargo fmt --all -- --check",
-      "lint": "cargo clippy --all-targets -- -D warnings",
-      "tests": "cargo test --workspace"
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
+      "legs": [
+        {
+          "name": "fmt",
+          "command": "cargo fmt --all",
+          "requires": [
+            "tool:cargo",
+            "tool:rustfmt"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy-all-features",
+          "command": "cargo clippy --all-targets --all-features -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy",
+          "command": "cargo clippy --all-targets -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "tests",
+          "command": "cargo test --workspace --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc-all-features",
+          "command": "cargo doc --no-deps --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc",
+          "command": "cargo doc --no-deps",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
+          "requires": [
+            "tool:sh",
+            "tool:python3"
+          ],
+          "cadence": "round"
+        }
+      ]
     }
   ]
 }

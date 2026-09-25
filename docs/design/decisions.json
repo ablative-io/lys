@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-24",
+  "updated": "2026-09-26",
   "decisions": [
     {
       "id": "ADR-001",
@@ -191,6 +191,41 @@
       "consequences": [
         "DIRECTORY-003 records the state beside each identity; no check reads it until the permission work of road step 2.",
         "The room's own questions stay with the proposal: whether a reason is mandatory on suspend and retire, and whether activation needs a credential handle (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:101-103)."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-012",
+      "title": "Done on a carded row means judged by the chain, never merely merged",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-26",
+      "decided_by": "Waffles, ruling of 07:08 on 26 September 2026 in the Cambium channel; applied to HOME-002 by the lead who owns the card",
+      "context": "HOME-001's rows R1 to R11 were built by hand and reached lys main before the rule that every carded row goes through its board's chain. The seven step 5 cards carrying them sat in review with no chain fields, and two of the rows (R7, R10) have no code on main. Setting those cards done because the code is merged would say the chain judged code it never saw, and in two cases code that does not exist.",
+      "decision": "A carded row built before the chain is brought under it by a proof card that runs the chain's whole judgement over the code as found and changes none of it; its card is set done only on a green landing of that proof with no finding on the rows it carries, and only when its rows have code at the commit measured. Rejected: setting the cards done because their code is on main, and counting a landing that records a finding as green.",
+      "quote": "",
+      "consequences": [
+        "HOME-002 lands the proof with findings recorded one per line, each carded, and leaves the seven cards in review while any finding stands on their rows.",
+        "A card carrying a row with no code at the commit measured (HOME-001 R7, R10) stays in review marked not built until that row is built through the chain.",
+        "Every other row built before the chain needs its own proof card before its card can be done."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-013",
+      "title": "lys is measured by ast-grep under the estate's four sweep rules",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-26",
+      "decided_by": "the lead who owns the HOME-002 card, answering its survey",
+      "context": "The chain's judgement includes ast-grep, and lys had no sgconfig.yml; with no rules a scan passes on anything, a control that never fires read as a pass.",
+      "decision": "lys's ast-grep rule set is the estate's sweep rules (mod-rs-declarations-only, no-let-underscore-on-results, no-lint-bypass-attributes, no-std-mutex-in-async), added as sgconfig.yml and rules/ast-grep byte-identical to cambium's, as configuration and not crate code. Rejected: a copy of one repository's whole sgconfig.yml with its repository-specific rules, and a new rule set written for lys.",
+      "quote": "",
+      "consequences": [
+        "What the four rules report on lys code is a finding, recorded as its own line and carded; mod.rs files carrying logic are reported by a check, not by an author's eye.",
+        "The rule set is not yet a leg of .land/gates.sh; wiring it into the gate is its own unit."
       ],
       "supersedes": [],
       "superseded_by": ""

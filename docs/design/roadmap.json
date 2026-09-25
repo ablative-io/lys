@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-25",
+  "updated": "2026-09-26",
   "items": [
     {
       "id": "RM-001",
@@ -152,6 +152,35 @@
         "RM-001"
       ],
       "notes": "Owned by Archie. The home cluster and HOME-001 landed on main with PR 8; the cached-index rule (lys-home Index::from_cached) is in that brief. Next: HOME-001 dispatched through the board."
+    },
+    {
+      "id": "RM-006",
+      "title": "Judge lys-home as found with the chain's whole judgement, so its cards are done only when judged",
+      "status": "idea",
+      "kind": "process",
+      "summary": "HOME-001's rows R1 to R11 were built by hand and reached main before every carded row had to pass through its board's chain. HOME-002 runs the chain's whole judgement (Jev per file, fmt, clippy pedantic, tests, ast-grep, the gate) over crates/lys-home as it stands at 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff, records each check's command and outcome in a proof document, changes nothing in the crate, and lets the seven step 5 cards be set done only on a green landing with no finding.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-26T07:21:07+10:00",
+        "quote": "The HOME-001 rows R1 to R11 were built by hand on 24 September 2026 and reached lys main through the merge 7b47115, before Tom's rule of 25 September that every carded row goes through its board's chain. The seven cards that carry those rows on the step 5 board sit in review with no chain fields, and nothing on main says the chain has judged that code. This card adds no new code and only proves what is already there. It runs the chain's whole judgement over crates/lys-home as it stands on main at 0073b966: Jev per file, fmt, clippy pedantic, tests, ast-grep and the gate. The brief names each check and the command it runs, and the build's proof document records each check's outcome on the crate as found, with the commit it was measured on. If every check passes the build lands with only the proof document and the design rows this card needs. If Jev or the gate finds something, the build records each finding as its own line in the proof document and lands without changing the crate; each finding then becomes a card of its own on the step 5 board, worded from that line. When this card lands green the seven cards are set to done and each points at this card's landing, so that done means judged by the chain and never just merged before the rule. Acceptance is that the proof document names the commit, every check by name and its outcome, and holds no code changes to crates/lys-home; that a reader can rerun each named command at that commit and see the same outcome; and that the landing is green through src_pr and src_land with Jev and the gate. Not in scope: any new capability in lys-home, any change to the eleven rows, or any card other than the seven named. This card builds behind the six Lys briefs in the one-build queue on this Mac under the load guard. Filed by Archie on Waffles' ruling of 07:08 on 26 September 2026 in the Cambium channel, on Tom's rule of 22:26 on 25 September 2026 that every carded row goes through the chain, and on lys main 0073b966.",
+        "context": "The proof card filed on the step 5 board for the hand-built HOME-001 rows, surveyed against lys main 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff, with the lead's answers to the survey's five questions (which rows have code, the ast-grep rule set, where the gate runs, when a landing is green, which findings are carded)."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-004",
+          "ADR-012",
+          "ADR-013"
+        ],
+        "briefs": [
+          "HOME-002"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-005"
+      ],
+      "notes": "Further units, not written: One card per finding the proof records, on the step 5 board; An ast-grep rule set for lys (sgconfig.yml and rules) in the gate (HOME-002 adds the rule set as configuration; wiring it into .land/gates.sh is the unit left); Build R7 and R10 of HOME-001 (the pass-through proxy proof and lys-proxy); A chain step that runs Jev per file over existing code. Open for the lead: which cards hold R4, whose docs/design/home/LOSS-ACCOUNT.md is absent while its code exists; and which cards a finding on a file no HOME-001 row names holds in review once finding cards close."
     }
   ]
 }

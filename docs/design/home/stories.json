@@ -48,6 +48,28 @@
         {
           "id": "S5",
           "text": "As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught."
+        },
+        {
+          "id": "S9",
+          "text": "As the reviewer, I want every file of lys-home judged by Jev on its own, with the verdict recorded beside its path, so that a verdict on the landing diff is never read as a verdict on the crate."
+        },
+        {
+          "id": "S10",
+          "text": "As the reviewer, I want each check's command and outcome recorded against the commit it measured, so that I can rerun any of them at that commit and see the same outcome."
+        }
+      ]
+    },
+    {
+      "name": "Board reader",
+      "role": "Reads the step 5 board to know what the chain has judged",
+      "stories": [
+        {
+          "id": "S11",
+          "text": "As a reader of the step 5 board, I want a card set done only when the chain judged its rows' code and found nothing, so that done never means merely merged."
+        },
+        {
+          "id": "S12",
+          "text": "As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone."
         }
       ]
     }

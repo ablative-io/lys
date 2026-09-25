@@ -95,6 +95,51 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The chain's judgement of lys-home as found",
+      "items": [
+        {
+          "id": "C14",
+          "text": "sgconfig.yml and the four estate sweep rules (mod-rs-declarations-only, no-let-underscore-on-results, no-lint-bypass-attributes, no-std-mutex-in-async) exist in lys, each rule byte-identical to cambium's at df4dca5d.",
+          "done": false
+        },
+        {
+          "id": "C15",
+          "text": "PROOF-CHAIN.md names 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff as the commit measured, with the toolchain, the ast-grep version and the Jev model the outcomes were measured with.",
+          "done": false
+        },
+        {
+          "id": "C16",
+          "text": "PROOF-CHAIN.md carries one Jev verdict line for each of the 25 files of crates/lys-home at 0073b966.",
+          "done": false
+        },
+        {
+          "id": "C17",
+          "text": "PROOF-CHAIN.md records fmt, both clippy pedantic legs, the tests with lys-home's executed count, ast-grep with a match count per rule, and the gate with its seven legs, each with its exact command and outcome.",
+          "done": false
+        },
+        {
+          "id": "C18",
+          "text": "Each finding a named check reports is its own line in PROOF-CHAIN.md naming the check, the file and the HOME-001 rows whose files name it; observations no check reports sit under their own heading.",
+          "done": false
+        },
+        {
+          "id": "C19",
+          "text": "PROOF-CHAIN.md's table records, for HOME-001 R1 to R11, every named file present or absent at 0073b966 and the row's state, and for each of the seven step 5 cards the rows it carries.",
+          "done": false
+        },
+        {
+          "id": "C20",
+          "text": "No byte under crates/lys-home differs between 0073b966 and the card's head, and scripts/design/gate.sh passes on the card's head.",
+          "done": false
+        },
+        {
+          "id": "C21",
+          "text": "The card lands through src_pr and src_land with Jev and the gate; the seven cards are set done only on a green landing with no finding, and one card is filed per finding line.",
+          "done": false
+        }
+      ]
     }
   ]
 }
