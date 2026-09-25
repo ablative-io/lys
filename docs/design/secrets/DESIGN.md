@@ -27,6 +27,8 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 - **P3** — Every use writes one audit line naming the seat, the handle, the real account and the time.
 - **P4** — A key is used through the proxy, never read; only memories are read, in the smallest piece asked for.
 - **P5** — Every grant traces back to the person who authorised it.
+- **P6** — Permission to use never implies permission to lend. Pass-on rights are affirmative and recipient-specific; a missing prohibition is not a grant. Server-verified ownership is the affirmative may-lend route in docs/design/identity/CONFORMANCE.md at commit 1353c22 row 7.3; a display label is not proof of ownership.
+- **P7** — Secret visibility, usage, delegation and revocation follow the same current human-rooted authority at every server seam, independent of how the caller reaches it.
 
 ## Decisions
 
@@ -68,9 +70,11 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 - `docs/design/identity/STATEMENT-2026-09-22.md` — the authority: 'Secrets: the temporary key model' through 'What revoking reaches', 'Two rules from Tom, 13:55', 'Lifecycle, budgets and leases' and 'Where it lives: lys'
 - `docs/design/decisions.json` — the project decision ledger this cluster anchors to
 - `crates/` — the five lys crates (lys, lys-core, lys-anchor, lys-anchor-cli, lys-log-store): sealed envelopes, the delegation format, the log. The door repository, where the statement places the store and the proxy, is the cambium checkout, apps/cambium in the ablative estate on this Mac; it is read, never written, by this brief
+- `docs/design/identity/CONFORMANCE.md` — Committed behaviour source: docs/design/identity/CONFORMANCE.md at commit 1353c22. Bind the SEC_* acceptance IDs to its rows before dispatch; mock-up sample data is not enforcement evidence.
 
 ## Constraints
 
 - **CN1** — No credential, token or key value is ever written, read or quoted in any document of this cluster.
 - **CN2** — No row of SECRETS-002 is dispatched before Waffles has reviewed it.
 - **CN3** — Every path written in a document of this cluster is relative to the repository root, whatever directory a session starts in; a command runs from its own tree and spells its paths from there.
+- **CN4** — Resolve standalone broker-host ownership before dispatch. Earlier SECRETS-002 Cambium path proposals and empty door-owned file walls are not authority to make Cambium a required runtime service; ADR-004 remains binding.

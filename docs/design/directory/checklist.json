@@ -125,6 +125,61 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Human-rooted grant implementation",
+      "items": [
+        {
+          "id": "C21",
+          "text": "The proposed application grant schema separates exercise and pass-on authority; its additional fields require independent review before dispatch and do not change published crypto formats.",
+          "done": false
+        },
+        {
+          "id": "C22",
+          "text": "Delegation requires an explicit permission to delegate to the requested subject kind; use-only, absent policy and owner labels cannot create it.",
+          "done": false
+        },
+        {
+          "id": "C23",
+          "text": "Every grant is bounded by a live, acyclic ancestry to a responsible person; scope is evaluated by model actions/resources, never display-name rank.",
+          "done": false
+        },
+        {
+          "id": "C24",
+          "text": "Grant changes and their audit share one durable authoritative event; retries and uncertain outcomes preserve operation identity and replay-equivalent projections.",
+          "done": false
+        },
+        {
+          "id": "C25",
+          "text": "Revocation stops derived authority while independent authority remains usable; the proposed revision-freshness mechanism is reviewed before dispatch.",
+          "done": false
+        },
+        {
+          "id": "C26",
+          "text": "Inherited expiry and provisional end dates are enforced at admission; role changes and reinstatement cannot resurrect expired or revoked authority.",
+          "done": false
+        },
+        {
+          "id": "C27",
+          "text": "Typed browser/API/agent seams use one authenticated evaluator; forward and reverse explanations name the same authority path and revision without private-record leakage.",
+          "done": false
+        },
+        {
+          "id": "C28",
+          "text": "Observed grant usage names its source and time; not seen is not reported as never used.",
+          "done": false
+        },
+        {
+          "id": "C29",
+          "text": "The You and delegation screens show real server authority, separate service accounts from sign-in identities, and preserve personal versus administrator visibility.",
+          "done": false
+        },
+        {
+          "id": "C30",
+          "text": "The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success.",
+          "done": false
+        }
+      ]
     }
   ]
 }

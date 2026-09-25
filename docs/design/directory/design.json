@@ -56,7 +56,8 @@
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
     "The grant path (create an agent under a person, grant it a project, the action is allowed, revoke or suspend, the same action is refused) is a requirement of the row that owns it, with acceptance criteria; where the sources do not settle the row, it is recorded open for Tom in DIRECTORY-003 with its criteria drafted.",
     "Every decision still open for Tom is recorded as open and decided nowhere in this cluster.",
-    "The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6)."
+    "The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6).",
+    "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record."
   ],
   "non_goals": [
     {
@@ -402,13 +403,178 @@
     },
     {
       "path": "crates/lys-identity-server/src/routes.rs",
-      "note": "the screens' routes",
+      "note": "the screens' routes; DIRECTORY-006 later extends the same route seam after reconciling the dependency-owned manifest",
       "brief": "DIRECTORY-005"
     },
     {
       "path": "docs/design/identity/reports/IDENTITY-001-standalone.md",
       "note": "row 05's report: screenshots, observed actions, artifact hashes",
       "brief": "DIRECTORY-005"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-006.json",
+      "note": "The human-rooted grants and delegation implementation brief, awaiting reviewed foundation manifests and contract decisions",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-006.md",
+      "note": "Rendered grants and delegation brief",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/mod.rs",
+      "note": "Define the reviewed grant contract without changing published cryptography; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/types.rs",
+      "note": "Define the reviewed grant contract without changing published cryptography; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/error.rs",
+      "note": "Define the reviewed grant contract without changing published cryptography; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/tests/grant_contract.rs",
+      "note": "Define the reviewed grant contract without changing published cryptography; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "docs/design/identity/GRANT-CONTRACT.md",
+      "note": "Define the reviewed grant contract without changing published cryptography; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/src/lib.rs",
+      "note": "Define the reviewed grant contract without changing published cryptography; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/admission.rs",
+      "note": "Enforce affirmative delegation and bounded ancestry; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/lineage.rs",
+      "note": "Enforce affirmative delegation and bounded ancestry; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/authority.rs",
+      "note": "Enforce affirmative delegation and bounded ancestry; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/tests/grant_delegation.rs",
+      "note": "Enforce affirmative delegation and bounded ancestry; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/events.rs",
+      "note": "Commit grants and their audit as one replayable operation; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/projection.rs",
+      "note": "Commit grants and their audit as one replayable operation; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/recovery.rs",
+      "note": "Commit grants and their audit as one replayable operation; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/tests/grant_faults.rs",
+      "note": "Commit grants and their audit as one replayable operation; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/tests/grant_receipts.rs",
+      "note": "Commit grants and their audit as one replayable operation; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/revocation.rs",
+      "note": "Enforce revocation, inherited expiry and current permission decisions; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/expiry.rs",
+      "note": "Enforce revocation, inherited expiry and current permission decisions; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/permission.rs",
+      "note": "Enforce revocation, inherited expiry and current permission decisions; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/tests/grant_revocation.rs",
+      "note": "Enforce revocation, inherited expiry and current permission decisions; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity/tests/grant_expiry.rs",
+      "note": "Enforce revocation, inherited expiry and current permission decisions; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grants.rs",
+      "note": "Expose one authenticated grant and explanation seam; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grant_contract.rs",
+      "note": "Expose one authenticated grant and explanation seam; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/grants.rs",
+      "note": "Expose one authenticated grant and explanation seam; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/grant_explanations.rs",
+      "note": "Expose one authenticated grant and explanation seam; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "surface/identity/src/features/grants/YouGrants.tsx",
+      "note": "Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "surface/identity/src/features/grants/DelegateGrant.tsx",
+      "note": "Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "surface/identity/src/features/grants/GrantExplanation.tsx",
+      "note": "Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "surface/identity/tests/grants.test.tsx",
+      "note": "Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "surface/identity/tests/acceptance/grants.spec.ts",
+      "note": "Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "surface/identity/src/routes.tsx",
+      "note": "Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "surface/identity/src/generated/index.ts",
+      "note": "Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch",
+      "brief": "DIRECTORY-006"
     }
   ],
   "inventory": [
@@ -439,6 +605,10 @@
     {
       "path": "docs/design/identity/RAUTHY-BASELINE.md",
       "note": "the fork baseline: pin, maintenance owner, the IDENTITY-001-UPSTREAM-AUTH-STATE blocker; read, never changed"
+    },
+    {
+      "path": "docs/design/identity/CONFORMANCE.md",
+      "note": "Accepted mock-up behaviour map; DIRECTORY-006 maps You/delegation/access requirements and does not claim mock-up sample policy is authoritative."
     }
   ],
   "constraints": [
@@ -485,6 +655,10 @@
     {
       "id": "CN11",
       "text": "Step 1 is directory records, sign-in and the minimum signed identity audit. SpiceDB is installed and checked in row 02 and enforces nothing in step 1; live capability policy and its enforcement are step 2's, and running SpiceDB is not permission enforcement (docs/design/identity/briefs/IDENTITY-001.json:29-30)."
+    },
+    {
+      "id": "CN12",
+      "text": "DIRECTORY-006 is implementation work after the frozen planning task: its source paths are only executable after the DIRECTORY-002/003 foundations are implemented and their integration manifests are reconciled. R6 also waits for the standalone surface foundation. Do not dispatch from a schema-valid but dependency-blocked brief."
     }
   ],
   "gate": [

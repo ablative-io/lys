@@ -35,3 +35,11 @@
 **S10.** As a reviewer reading the audit, I want one line per use naming the seat, the handle, the real account and the time, and one per sealed read, so that every use is attributed to an identity in one place.
 
 **S11.** As a reviewer reading the audit, I want each call that was in flight when its handle was dropped to show the outcome the cancellation rule gave it, so that no call's end is unaccounted for.
+
+## Account holder — Uses and deliberately delegates scoped access without exposing credentials
+
+**S12.** As a person allowed to use an account, I want the screen and server to distinguish that from permission to lend it, so I cannot accidentally grant my agent authority I do not hold.
+
+**S13.** As Dana, I want my private secrets and their metadata isolated from Tom and his agents unless I grant access, so knowing an identifier or signing in to the same installation does not disclose them.
+
+**S14.** As a person reviewing a grant or revocation, I want its source, selected service account and confirmed or unconfirmed outcome shown, so I know exactly what authority changed.
