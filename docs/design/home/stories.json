@@ -20,6 +20,14 @@
         {
           "id": "S8",
           "text": "As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs."
+        },
+        {
+          "id": "S9",
+          "text": "As an agent, I want to fork a new session from a lantern I lit, so that a later session can hold a conversation with the self that lit it."
+        },
+        {
+          "id": "S10",
+          "text": "As the self in a fork cut back from a question, I want the question the lantern was lit on carried to me as my first prompt, so that I answer from the moment I was asked about."
         }
       ]
     },
@@ -48,6 +56,14 @@
         {
           "id": "S5",
           "text": "As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught."
+        },
+        {
+          "id": "S11",
+          "text": "As the reviewer, I want every fork's ancestry written in both the parent and the child, so that a fork's actions are never indistinguishable from its parent's."
+        },
+        {
+          "id": "S12",
+          "text": "As the reviewer, I want a fork to leave the parent's earlier bytes and the block store unchanged, so that forking costs no history and duplicates no block."
         }
       ]
     }

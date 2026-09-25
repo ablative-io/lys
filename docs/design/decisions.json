@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-24",
+  "updated": "2026-09-26",
   "decisions": [
     {
       "id": "ADR-001",
@@ -191,6 +191,24 @@
       "consequences": [
         "DIRECTORY-003 records the state beside each identity; no check reads it until the permission work of road step 2.",
         "The room's own questions stay with the proposal: whether a reason is mandatory on suspend and retire, and whether activation needs a credential handle (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:101-103)."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-012",
+      "title": "A fork's ancestry is written on both sides as two lys custom entries",
+      "status": "proposed",
+      "scope": "home",
+      "date": "",
+      "decided_by": "",
+      "context": "A fork is a new session cut from a parent at a lantern's point. Pi's header field parentSession names the parent from the child's side only, and it is a file path, so the parent never learns it was forked, and nothing on either side says which lantern and which point the cut was made from. The lifecycle screen will later show a session's forks and ancestry, so both directions must be readable from the record without transcript content. Home P2 allows lys to add entry kinds only as Pi custom entries, never a field.",
+      "decision": "The child carries a lys.forked_from custom entry (parent session id, lantern, point, the entry the cut ended at, whether the point's user message was carried and which entry it was), appended directly after the copied path, and the parent carries a lys.fork custom entry naming the child, appended at its head; both are home-local state in durable session files, not signed wire formats. Rejected: recording the ancestry in the child's header parentSession alone, which is one-sided, names no lantern or point, and would have needed a field outside Pi's grammar to say more; and a sidecar file beside the sessions, which Pi's parser never reads and which could drift from the files it describes.",
+      "quote": "",
+      "consequences": [
+        "RECORD.md documents both entries with their data keys; a change to either is a new custom type alongside, never a mutation of the shipped one.",
+        "Appending lys.fork to a parent takes the parent's one-owner lock and rewrites no earlier byte (home P1).",
+        "The render skips both entries, as it skips every custom entry, so neither reaches a Claude Code file."
       ],
       "supersedes": [],
       "superseded_by": ""

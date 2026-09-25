@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-25",
+  "updated": "2026-09-26",
   "items": [
     {
       "id": "RM-001",
@@ -152,6 +152,37 @@
         "RM-001"
       ],
       "notes": "Owned by Archie. The home cluster and HOME-001 landed on main with PR 8; the cached-index rule (lys-home Index::from_cached) is in that brief. Next: HOME-001 dispatched through the board."
+    },
+    {
+      "id": "RM-006",
+      "title": "Fork a session from a lantern's point, with its ancestry written on both sides",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "Stage 5b of the home: `lys-home fork` takes a home and a lantern id, cuts the parent's chain from its root to the lantern's point (back to the last assistant message when the point is not one), writes a new session from the parent's own lines under Pi's parentSession, adds nothing to the block store, and writes lys.forked_from in the child and lys.fork at the parent's head. A user message at the point is carried as the child's first prompt. The child renders and launches like any session by its printed resume-by-path line, and a proof records a conversation with the lantern's self through the fork.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-26T06:30:25+10:00",
+        "quote": "A fork is a launch from a lantern's point with its own session identity and its ancestry recorded, so a later session can hold a conversation with the self that lit the lantern. Claude Code resumes a session from its end, never from a point inside it, so a fork at a point is the lantern design's cut and seed: a new session in the home whose entries are the parent's context path from its root to the lantern's point, and nothing after. A lys-home subcommand forks: it takes the home and a lantern id, refuses by name a lantern it does not hold, creates a new session with its own id whose header names the parent session as Pi's parentSession, copies the context path up to the point as entries that reference the same blocks by hash, with no block bytes duplicated, and appends first to the child a lys.forked_from custom entry naming the parent session, the lantern and the point, and then to the parent, at its head, a lys.fork custom entry naming the child, so the ancestry is written on both sides. Claude Code's resume walks the chain from an assistant-anchored leaf, so when the lantern's point is not an assistant message the cut ends at the last assistant message at or before the point and the report names the entry it stopped at. The child is then rendered and launched through the Claude Code launch template like any session, with its own handles supplied at launch by the template and never copied from the parent; its lease is the seat's lifecycle and is not this card's. The report is JSON: the child session id, the parent, the lantern, the point, the entry the cut ended at, entry and block counts, never content. Acceptance is that on a fixture session with a lit lantern at a past assistant entry, the fork's entries hash-match the parent's context path up to that entry and stop there, the child header's parentSession is the parent's id, the child's first lys entry is forked_from and the parent's head is a fork entry naming the child, the parent's earlier bytes are unchanged; that a lantern at a user entry forks to the preceding assistant entry and the report says so; that an unknown lantern id is refused by name; that the launch template renders the child and its launch line resumes it, and a proof document records that a conversation was held with the lantern's self through the fork, as hashes, counts and paths only; and that two forks from one lantern are two sessions with distinct ids that share every block. Not in scope: cutting at a point that has no lantern; forks with tools or a lens; leases, budgets and kill rules; harnesses other than Claude Code. Filed by Archie on Tom's definition of 8 August 2026 that a lantern is a pathway back to a conversation with the previous self through a fork, his roadmap stage 5b of 22 September 2026, the lantern design's cut-and-seed measurement, and home DESIGN P1, P2, P4 and P8 at lys main 0073b966, on 26 September 2026.",
+        "context": "The words of the card filed on the Lys board for the context roadmap's stage 5b (docs/design/identity/CONTEXT-ROADMAP-2026-09-22.md), surveyed against lys main 0073b966, with the lead's answers on the lantern prerequisite, the launch line, handles, inline content, the first entry the fork writes, parentSession as a path, and carrying a user message at the point."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-001",
+          "ADR-003",
+          "ADR-004",
+          "ADR-007",
+          "ADR-012"
+        ],
+        "briefs": [
+          "HOME-002"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-005"
+      ],
+      "notes": "Stands on the lantern card, 'Light a lantern and recall it' (board card YUTHf4z0, brief 7657952c), which delivers lys.lantern and the lantern light subcommand; that card is ahead of this one and not yet on main, so HOME-002 is built on main after it lands and is refreshed onto that main (its brief id, checklist, story, decision and roadmap numbers collide with the lantern card's and are renumbered then). Further units, not written: Lantern recall: light a lantern at a point with a note, and recall it by note and by point (roadmap stage 5); The Claude Code launch template: render a launch line for a home session to a target profile, with handles supplied at launch; Handles for a forked session through the broker; The lantern briefed on what changed since; The lifecycle screen shows a session's forks and ancestry."
     }
   ]
 }

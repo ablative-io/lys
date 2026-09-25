@@ -95,6 +95,56 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Forks",
+      "items": [
+        {
+          "id": "C14",
+          "text": "`lys.fork` and `lys.forked_from` are named custom types in record/entries.rs and are written down in RECORD.md with their data keys.",
+          "done": false
+        },
+        {
+          "id": "C15",
+          "text": "`lys-home fork` refuses a lantern id the home does not hold as a `lys.lantern` entry, naming the id, and creates no session and changes no byte of any session.",
+          "done": false
+        },
+        {
+          "id": "C16",
+          "text": "A fork's cut is the parent's raw root-to-point chain read through the index, ending at the last assistant message at or before the lantern's point, with nothing after it and no side leaf.",
+          "done": false
+        },
+        {
+          "id": "C17",
+          "text": "The child is a new session with its own id whose header parentSession is the parent session file's path relative to the home, and whose copied entry lines are byte-identical to the parent's lines for the same entries.",
+          "done": false
+        },
+        {
+          "id": "C18",
+          "text": "The fork appends lys.forked_from to the child as the child of the cut entry, then lys.fork at the parent's head naming the child, and every byte of the parent before the fork is unchanged.",
+          "done": false
+        },
+        {
+          "id": "C19",
+          "text": "A fork adds no file and no byte to the block store, and two forks from one lantern are two sessions with distinct ids whose block hash sets are equal.",
+          "done": false
+        },
+        {
+          "id": "C20",
+          "text": "When the lantern's point is a user message, that message is not copied into the child's path but is carried as the child's first prompt in a seed file beside the rendered file, and lys.forked_from records it with coordinate_carried true.",
+          "done": false
+        },
+        {
+          "id": "C21",
+          "text": "`lys-home fork` prints one JSON report of the child id, parent, lantern, point, cut entry, entry and block counts, coordinate_carried and the carried entry id, and never transcript content.",
+          "done": false
+        },
+        {
+          "id": "C22",
+          "text": "Rendering the child prints a `claude --resume` launch line that resumes it, and PROOF-FORK.md records a conversation held with the lantern's self through the fork on a named Claude Code version, as hashes, counts and paths only.",
+          "done": false
+        }
+      ]
     }
   ]
 }
