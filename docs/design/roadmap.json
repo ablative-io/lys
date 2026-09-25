@@ -1,0 +1,149 @@
+{
+  "project": "lys",
+  "updated": "2026-09-25",
+  "items": [
+    {
+      "id": "RM-001",
+      "title": "Stand up the identity directory with every grant rooted in a person",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "The standalone identity directory: sign-in through the platform's own Rauthy fork, two upstream providers linked to one person, a signed authoritative identity, and the standalone screen journey, all installed against one PostgreSQL database. It is the root every later grant in the platform hangs from.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-25",
+        "quote": "",
+        "context": "The identity platform statement (docs/design/identity/STATEMENT-2026-09-22.md) and IDENTITY-001; the cluster and its five briefs reached main in 55933549."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-003",
+          "ADR-004",
+          "ADR-005",
+          "ADR-007",
+          "ADR-008",
+          "ADR-009",
+          "ADR-010",
+          "ADR-011"
+        ],
+        "briefs": [
+          "DIRECTORY-001",
+          "DIRECTORY-002",
+          "DIRECTORY-003",
+          "DIRECTORY-004",
+          "DIRECTORY-005"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "The briefs build in order: DIRECTORY-002 before 003, 003 before 004 and 005. Each card runs through the board (brief_card, then card_build_v3)."
+    },
+    {
+      "id": "RM-002",
+      "title": "Build the secrets broker so agents hold handles, never credentials",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "A broker that keeps credentials behind handles: the door swaps a handle for the credential at use, the token revolver is the first consumer, and rotation and sealing happen without any agent ever seeing a secret.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-25",
+        "quote": "",
+        "context": "The secrets cluster (docs/design/secrets) and its two briefs, written to ADR-001 and ADR-002."
+      },
+      "links": {
+        "cluster": "secrets",
+        "decisions": [
+          "ADR-001",
+          "ADR-002",
+          "ADR-003",
+          "ADR-004"
+        ],
+        "briefs": [
+          "SECRETS-001",
+          "SECRETS-002"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": ""
+    },
+    {
+      "id": "RM-003",
+      "title": "Move the Rauthy fork onto the next hardened upstream release",
+      "status": "idea",
+      "kind": "fix",
+      "summary": "Rebase the platform's own Rauthy fork (ADR-009) onto the next upstream release that upstream tags as a release and whose changelog carries security or hardening fixes. Our commits stay on top of the upstream tag, unsquashed and unaltered; the pin moves to the rebased head; the fork builds and passes its own suite; the standalone install comes up from the rebased build against the existing database with no migration by hand; the provider-link behaviour of DIRECTORY-004 still holds.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-25",
+        "quote": "",
+        "context": "Written ahead of its trigger from the Lys board card of the same name. Upstream was still v0.36.2 on 2026-09-23 and the fork is pinned to that exact version. The trigger is a fact recorded in the pull request (the upstream tag, its commit, its changelog entry), never a judgement."
+      },
+      "links": {
+        "cluster": "rauthy-rebase",
+        "decisions": [
+          "ADR-009"
+        ],
+        "briefs": [],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-001"
+      ],
+      "notes": "The card is built only when the trigger is met. It needs DIRECTORY-004 (the provider link commit the rebase must carry) and DIRECTORY-002 (the standalone install it must prove) landed first. If the rebase cannot carry a fork commit cleanly the card stops and reports the conflicting upstream commit rather than rewriting ours. Nothing in Cambium or Aion changes; no production node is touched; Tom's three acts stay Tom's."
+    },
+    {
+      "id": "RM-004",
+      "title": "Rewrite the decision quotes as plain statements in the team's words",
+      "status": "idea",
+      "kind": "design",
+      "summary": "docs/design/decisions.json holds eight decisions (ADR-001 to ADR-008) whose quote field carries a person's words. Each quote becomes a plain statement of the decision in the team's words, with the decision, context, consequences and sources kept exactly as they are. ADR-009 and ADR-010 already read that way and are the pattern.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-25",
+        "quote": "",
+        "context": "The canon rule of 24 September: repository canon holds no person's words and nothing personal. ADR-009 and ADR-010 (lys 586ef5f4) were written to it."
+      },
+      "links": {
+        "cluster": "decisions-words",
+        "decisions": [
+          "ADR-001",
+          "ADR-002",
+          "ADR-003",
+          "ADR-004",
+          "ADR-005",
+          "ADR-006",
+          "ADR-007",
+          "ADR-008"
+        ],
+        "briefs": [],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Documents only. scripts/design/gate.sh must stay green: decisions.json validates against decisions.schema.json, which keeps the quote field required."
+    },
+    {
+      "id": "RM-005",
+      "title": "Give a session a home: its context record, kept byte for byte",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "The home (identity platform steps 4 and 5): a running session's transcript captured into a home byte for byte, indexed for reading back, with the record of what the agent was given as well as what it did. Lanterns, translation and forks stand on it.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-25",
+        "quote": "",
+        "context": "CONTEXT-001 (docs/design/identity/briefs) and the home cluster on lys PR 8 (card/home-001-on-main), which moves this item to designed when it lands."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [],
+        "briefs": [],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-001"
+      ],
+      "notes": "Owned by Archie. The cached-index rule (lys-home Index::from_cached) landed with the cluster on PR 8's branch."
+    }
+  ]
+}
