@@ -325,6 +325,60 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-024",
+      "title": "Audit receipts are for changes only; answered permission checks go to step 2's separate access record",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-26",
+      "decided_by": "Waffles, the lead, at 22:56 on 26 September 2026 (W1); recorded with DIRECTORY-007",
+      "context": "The audit receipt card asked whether a permission check that is merely answered, not changed, leaves a receipt. Every signed receipt is a leaf in the lys log in operation order (docs/design/identity/briefs/IDENTITY-001.md:49); a check is answered many times a minute once step 2 enforces anything, so putting answered checks into the signed receipt log would make it a high-volume access log that drowns the changes it exists to prove.",
+      "decision": "Receipts are for changes only. A check that is answered and changes nothing is not a receipt. When step 2 brings enforcement, allows and refusals go into a separate access record that step 2 defines: refusals are always recorded there, and whether allows are too is decided with step 2. Rejected: every answered check as a signed receipt in the lys log, and deferring the question to the build.",
+      "quote": "Receipts are for changes only. A check that is answered and changes nothing is not a receipt.",
+      "consequences": [
+        "DIRECTORY-007 writes this as a boundary and as constraint CN15 of the directory design, so nobody later puts high-volume checks into the signed receipt log.",
+        "Step 2's access record is a non-goal of DIRECTORY-007; the brief that brings enforcement defines it and decides whether allows are recorded.",
+        "In step 1 nothing answers a permission check (CN11), so the only receipts are the listed changes and the directory service's sign-ins and sign-in refusals."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-025",
+      "title": "The receipt verifier lives in the lys CLI, offline, needing only the log and the service's public key",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-26",
+      "decided_by": "Waffles, the lead, at 22:56 on 26 September 2026 (W2); recorded with DIRECTORY-007",
+      "context": "The audit receipt card asked where the verifier lives: the lys CLI or the directory service. A verifier is what a party holding only the log and the key uses to check the directory's history without the operator's cooperation (story S7, DIRECTORY-003 R2's read-only verification path).",
+      "decision": "The verifier lives in the lys CLI, as lys log verify receipt, offline, needing only the log directory and the service's public key. Changing the published lys binary for this is accepted; the release that carries it is a separate, deliberate act after docs/design/identity/IDENTITY-EVENTS.md's envelope version is ratified and recorded, never before, because publishing a crate that exposes a format freezes it (CLAUDE.md:78-80). Rejected: a verifier inside the directory service, which would be checking the service with the service and defeats the point of an independent audit.",
+      "quote": "A verifier that needs the running directory service would be checking the service with the service, which defeats the point of an independent audit.",
+      "consequences": [
+        "DIRECTORY-007 R3 adds the subcommand under the published discipline of lys log verify: one refusal class for every cryptographic or structural failure, pre-crypto refusals named on their own.",
+        "The verifier's row lands on main behind a check that the ratified envelope version is on main; landing on main publishes nothing.",
+        "The receipt's signed encoding stays with IDENTITY-EVENTS.md under DIRECTORY-003's joint review; the verifier is written against that document's version field and freezes no wire format."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-026",
+      "title": "A development install emits test receipts under a test key and a test tag, and a real key never verifies one",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-26",
+      "decided_by": "Waffles, the lead, at 22:56 on 26 September 2026 (W3); recorded with DIRECTORY-007",
+      "context": "Emitting any receipt outside a test is one of the three acts reserved for Tom (docs/design/lys-anchor/DECISIONS.md:333-335). A development install signs outside a cargo test harness, so its receipts had to be read either as that reserved act or as test receipts; read as the act, the whole path could never be proved end to end before Tom's release.",
+      "decision": "A development install emits test receipts, signed with a test key and carrying a test tag, inside IDENTITY-001's development isolation, and never performs the reserved act. The verifier refuses a test-tagged receipt by name unless it is given the test key explicitly, and a real key never verifies a test receipt, so a test receipt never passes as real. Harness tests stay as well. Rejected: a development install that emits no receipts, and reading its receipts as the reserved act.",
+      "quote": "A development install emits test receipts, signed with a test key and carrying a test tag, inside IDENTITY-001's development isolation, and never performs the act DECISIONS.md:335 reserves for Tom.",
+      "consequences": [
+        "The test tag is the one field added to IDENTITY-001's receipt contract, under this ruling; IDENTITY-EVENTS.md carries it in the envelope.",
+        "lys log verify receipt takes --test-key beside --verifier-key: a test-tagged receipt is verified only against the test key and refused pre-crypto without it, saying to supply the test key; an untagged receipt is verified only against the verifier key.",
+        "DIRECTORY-007 R5 proves the whole path on the development install with test receipts and records the three outcomes: verified as a test receipt, refused for want of the test key, refused under another key."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

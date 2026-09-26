@@ -1,0 +1,208 @@
+{
+  "id": "DIRECTORY-007",
+  "cluster": "directory",
+  "title": "An audit receipt for every sign-in and permission change",
+  "depends_on": [
+    "DIRECTORY-003"
+  ],
+  "blocked_by": [
+    "Waffles' sign-off of this brief before any row is dispatched (DIRECTORY-001 boundary: no row brief is dispatched until Waffles has reviewed it). The exact file manifest of the wholly new module crates/lys-receipt/ is R2's files list, and this sign-off is its manifest review (CN9).",
+    "R2, R3, R4 and R5 wait on docs/design/identity/IDENTITY-EVENTS.md being on main with the envelope version, the typed payloads, the named commitment hash and the recorded joint review (DIRECTORY-003 R2, A3). Check: git ls-tree --name-only origin/main docs/design/identity/IDENTITY-EVENTS.md prints the path, and rg -n 'version|commitment|review' docs/design/identity/IDENTITY-EVENTS.md finds all three words. Until then the code rows do not start; the act that answers is DIRECTORY-003's joint review landing that file, never an edit by this brief.",
+    "R4 and R5 wait on IDENTITY-EVENTS.md carrying the test tag (W3, CN16) and the sign-in and sign-in-refusal operations in its vocabulary (A11, A12), which R1's document lists as inputs to that review. Check: rg -n 'test' docs/design/identity/IDENTITY-EVENTS.md and rg -n 'sign_in' docs/design/identity/IDENTITY-EVENTS.md each print a line. If the file lands on main without them, the act that answers is a revision of DIRECTORY-003 through the lead under CN9; this brief edits nothing under crates/lys-identity/ or in that file.",
+    "R4 and R5 wait on DIRECTORY-003 landed on main: crates/lys-identity/ and crates/lys-identity-server/ exist there and DIRECTORY-003.json carries an execution record with status landed. Check: git ls-tree -r --name-only origin/main crates/lys-identity crates/lys-identity-server prints paths, and python3 -c \"import json; print(json.load(open('docs/design/directory/briefs/DIRECTORY-003.json'))['execution']['status'])\" prints landed.",
+    "R4's one-line hook sits in the file of crates/lys-identity-server/ where DIRECTORY-003's OIDC session handling resolves a Rauthy-authenticated issuer-subject to a registered identity or fails to. That file is named by DIRECTORY-003's reviewed manifest, not known at 1756688, so this brief is revised to name it exactly before R4 is dispatched (CN9). Check: rg -n 'issuer' crates/lys-identity-server/src prints the resolution point, and the revised R4 files.modify lists that path.",
+    "R4 waits on the landed crates/lys-identity exposing a commit path that accepts a typed payload of IDENTITY-EVENTS.md's vocabulary and returns the receipt beside the appended leaf (DIRECTORY-003 R2). Check: cargo doc -p lys-identity --no-deps lists that function in the crate's public API. If it accepts only directory changes, R4 stops and names it, and the act that answers is a DIRECTORY-003 revision through the lead."
+  ],
+  "checklist": [
+    "C31",
+    "C32",
+    "C33",
+    "C34",
+    "C35"
+  ],
+  "stories": [
+    "S13",
+    "S14",
+    "S15"
+  ],
+  "design_anchor": [
+    "ADR-009",
+    "ADR-011",
+    "ADR-024",
+    "ADR-025",
+    "ADR-026"
+  ],
+  "purpose": "Every sign-in and every permission change on the platform leaves an audit receipt, and this brief writes that receipt and the code that emits and verifies it. The receipt's shape is IDENTITY-001's shared contract carried as written (docs/design/identity/briefs/IDENTITY-001.md:57): a version, a stable operation ID, the actor, the affected identity, the operation, a payload commitment and the log coordinate where the record sits, with one addition under a lead's ruling, the test tag of W3. It is signed by the service that performed the operation, never by the party it is about, because a claim must not be settable by the party being judged (P8, CN13). The signed event is the appended leaf, in the order the operations happened, and the receipt is returned beside it (IDENTITY-001.md:49, DIRECTORY-003 R2, CN14). The verifier lives in the lys CLI, offline, given only the log and the service's public key (W2, ADR-025), and refuses a receipt whose payload commitment does not match the leaf at its coordinate under the published CLI's one refusal class (A9, CN17). Receipts are for changes only; an answered permission check is never one (W1, ADR-024, CN15). A development install emits test receipts under a test key and a test tag that a real key never verifies (W3, ADR-026, CN16). This brief defines the common receipt and its verifier and replaces nothing: DIRECTORY-003 R2 (identity changes, docs/design/directory/briefs/DIRECTORY-003.md:64-70), DIRECTORY-004 ID001_LINK_AUDIT (provider links and unlinks, docs/design/directory/briefs/DIRECTORY-004.md:41) and DIRECTORY-006 GRANT_AUDIT (grants, docs/design/directory/briefs/DIRECTORY-006.md:100) keep emitting their receipts inside their own walls, unedited (A1).",
+  "task": "Five rows, in order: R1 the contract document (2 hours), R2 the receipt crate and verifier core (4 hours), R3 the lys CLI verifier (3 hours), R4 the sign-in receipts the directory service emits (4 hours), R5 the development-install proof (2 hours): 15 focused implementer hours, a new increment beside IDENTITY-001's ceiling (CN7), not inside it. R1 is documents only and lands first; R2 and R3 start only when IDENTITY-EVENTS.md is on main with its version, typed payloads, named commitment hash and recorded review (blocked_by); R4 and R5 start only when DIRECTORY-003 has landed. What stands on main and is not reopened: the shared contract (IDENTITY-001.md:57), the audit-record wording of docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:40-44, and the three acts that stay Tom's, publishing lys-anchor, generating a production key and emitting a receipt outside a test (docs/design/lys-anchor/DECISIONS.md:333-335). The rulings realised: W1 (receipts for changes only; the access record is step 2's), W2 (the verifier in the lys CLI, offline), W3 (test receipts under a test key and a test tag), and the settled answers A1 to A12, with A8 standing where it corrects A7. Development record, kept here because the pipeline appends the dev block later: main corrected A7. DIRECTORY-003 R1 says that in step 1 the only caller that may register a person is the configured administrator and a first sign-in registers nobody (DIRECTORY-003.md:39), so in step 1 a first sign-in leaves a sign-in receipt, or a refusal receipt when the issuer-subject is bound to no registered identity, and the administrator's register act leaves the register receipt; A7's one register event on first sign-in is ADR-011's proposal for step 2's self-registration (LIFECYCLE-STATES-2026-09-22.md:34) and applies only when a brief brings that. Where a count could be argued (how many leaves a scenario leaves, how many cases a tamper matrix holds, how many refusals a leg asserts) it is decided by rule in this brief, as the lead decided the E10 counts for the sibling briefs tonight, and the legs assert those numbers. Every code row is red first: its first commit adds its test file alone and the named tests fail; its second commit makes them pass. No wall clock anywhere in the new code: every time value a test needs is injected by the harness. No name of a person and no date inside code. Every path is relative to the repository root. The shared, pre-existing files of the published CLI this brief touches (crates/lys/src/cli.rs, crates/lys/src/main.rs, crates/lys/src/commands/error.rs, crates/lys/src/commands/log/mod.rs, crates/lys/Cargo.toml, Cargo.toml, Cargo.lock) are owned by no brief; DIRECTORY-002 also edits the first three, and whichever row lands second rebases onto the first's additions. Anything under crates/lys-identity/ is DIRECTORY-003's wall and is not edited.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Write the audit receipt contract as it stands, the emitter of every operation, and what the envelope review must carry",
+      "spec": "Documents only. THE SYSTEM SHALL add docs/design/identity/AUDIT-RECEIPT.md holding, in this order: (1) the contract sentence of docs/design/identity/briefs/IDENTITY-001.md:57 word for word, 'Audit receipts carry a version, stable operation ID, actor, affected identity, operation, payload commitment and resulting log coordinate/checkpoint. Secrets and whole context objects are excluded. Exact signed encoding is reviewed before use, not frozen by this draft.', and the one field added under a lead's ruling, the test tag (W3), with the rule that no other field is added without a lead's ruling; (2) the signer rule: the service that performed the operation signs, never the party the receipt is about, and a verifier is given the service's public key and never takes a key carried in the receipt as its authority (CN13); (3) the leaf rule: the signed event is the appended leaf, appended in the order the operations happened, and the receipt is returned beside it carrying the coordinate the append yielded and the payload commitment, and is never itself appended (IDENTITY-001.md:49, DIRECTORY-003.md:64-66, CN14); (4) the emitter table, one row per operation, each naming exactly one emitting brief or row: an identity moving between lifecycle states, DIRECTORY-003 R5; a person or agent being registered and a display-profile change, DIRECTORY-003 R1 (A12); a provider being linked to a person and unlinked from one, DIRECTORY-004 ID001_LINK_AUDIT through its outbox and DIRECTORY-003 R4's receiver (A12); a grant being given or taken away, DIRECTORY-006 GRANT_AUDIT, whose payload waits on the grant representation that is OPEN for Tom (docs/design/directory/DESIGN.md:58, A6), so the common receipt commits only to the seven fields and treats the payload commitment as a commitment over whatever representation is settled; a sign-in the directory service records and a sign-in it refuses after Rauthy authenticated the person, this brief's R4 (A4, A11); an agent being provisioned, no row and no receipt of its own, because provisioned is a view over grants and a handle and not a transition (LIFECYCLE-STATES-2026-09-22.md:26-28), so it shows as the agent's register transition and then each grant given to it (A5); the table states that the words' list names operations that must emit one and not the only ones, since IDENTITY-001's rule makes one signed event both the change and its audit record (IDENTITY-001.md:44, A12); (5) the step-1 sign-in boundary: the directory service refuses exactly one kind of authenticated sign-in, an issuer-subject Rauthy authenticated that is bound to no identity the administrator registered, and that refusal leaves the refusal receipt; a suspended or retired identity produces no state-based refusal receipt because state is recorded and not enforced in step 1 (CN11, DIRECTORY-003.md:122), and suspension semantics stay OPEN for Tom; the step-2 refusals arrive with enforcement (A11); a first sign-in in step 1 registers nobody, so it leaves a sign-in receipt or the refusal receipt and the administrator's register act leaves the register receipt, and the document records that main corrected A7 this way (A8); Rauthy's own refusals, a bad password or a failed provider callback, are out of scope because Rauthy's native events are asynchronous and severity-filtered (IDENTITY-001.md:44) and a signing key inside Rauthy is a fork change under ADR-009 that no brief of this repository makes (A4); (6) the changes-only rule: a permission check that is answered and changes nothing is not a receipt; when step 2 brings enforcement, allows and refusals go to a separate access record that step 2 defines, refusals always, allows decided with step 2, so nobody later puts high-volume checks into the signed receipt log (W1, CN15); (7) the test-receipt rule: a development install emits test receipts, signed with a test key and carrying the test tag, inside IDENTITY-001's development isolation, and never performs the act docs/design/lys-anchor/DECISIONS.md:335 reserves; the verifier refuses a test-tagged receipt by name unless given the test key explicitly, and a real key never verifies a test receipt (W3, CN16); (8) the verifier's order and refusal classes, as R2 and R3 build them (A9, CN17); (9) the list of what docs/design/identity/IDENTITY-EVENTS.md must carry before R2 to R5 start, as inputs to DIRECTORY-003's joint review and not as edits: the envelope version field the verifier is written against, the typed payloads, the named commitment hash (SHA-256 named explicitly, never confused with a BLAKE3 content address, IDENTITY-001.md:49), the test tag, the sign-in and sign-in-refusal operations in the vocabulary with the affected identity empty and the issuer and subject in the typed payload for a refusal of an unbound subject, and the recorded review (A3, ADR-025); and (10) the release rule: a lys release carrying the verifier is a separate, deliberate act after IDENTITY-EVENTS.md's version is ratified and recorded, never before, under CLAUDE.md:78-80; landing on main publishes nothing (A10, CN18). The document SHALL NOT restate any of these as a new decision, SHALL NOT fix an encoding, tag or content type, SHALL NOT edit any IDENTITY-001 file, the lifecycle states document or IDENTITY-EVENTS.md, and SHALL NOT decide anything the design records as OPEN for Tom.",
+      "acceptance": [
+        "Leg 1 of 5: grep -c 'Audit receipts carry a version, stable operation ID, actor, affected identity, operation, payload commitment and resulting log coordinate/checkpoint. Secrets and whole context objects are excluded. Exact signed encoding is reviewed before use, not frozen by this draft.' docs/design/identity/AUDIT-RECEIPT.md prints 1.",
+        "Leg 2 of 5: the emitter table in docs/design/identity/AUDIT-RECEIPT.md has exactly 7 rows (lifecycle transition, register and display-profile change, provider link and unlink, grant given or taken away, sign-in recorded, sign-in refused, agent provisioned), and grep -c 'DIRECTORY-003 R5\\|DIRECTORY-003 R1\\|ID001_LINK_AUDIT\\|GRANT_AUDIT\\|DIRECTORY-007 R4' docs/design/identity/AUDIT-RECEIPT.md prints at least 5; the provisioning row names no emitter and cites docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:26-28.",
+        "Leg 3 of 5: grep -c 'main corrected A7' docs/design/identity/AUDIT-RECEIPT.md prints 1, and grep -c 'supply the test key' docs/design/identity/AUDIT-RECEIPT.md prints at least 1.",
+        "Leg 4 of 5: git diff --stat 1756688cc08169bef4a9ac37b9b079efb9e38b18 -- docs/design/identity/briefs docs/design/identity/LIFECYCLE-STATES-2026-09-22.md docs/design/identity/IDENTITY-EVENTS.md crates deploy surface vendor prints nothing on the R1 commit.",
+        "Leg 5 of 5: from the repository root, sh scripts/design/gate.sh exits 0 on the R1 commit."
+      ],
+      "files": {
+        "create": [
+          "docs/design/identity/AUDIT-RECEIPT.md"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C31"
+      ],
+      "stories": [
+        "S13"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Build the receipt crate: the typed receipt of the shared shape and the verifier core, with one refusal class",
+      "spec": "THE SYSTEM SHALL add the wholly new crate crates/lys-receipt (its exact file manifest is this row's files list, reviewed at sign-off, CN9) as a library that reads a receipt of the shared shape and verifies it against a log and a key, and that signs nothing outside its own test harness. It depends on lys-core for Ed25519 verification and SHA-256 and on lys-log-store for the LeafStore trait (crates/lys-log-store/src/store.rs:120-141); it SHALL NOT change lys-core, lys-log-store or any published wire format, and lys-core gains no identity concept. crates/lys-receipt/src/receipt.rs SHALL define the typed receipt exactly as docs/design/identity/IDENTITY-EVENTS.md writes it at its ratified version: version, operation ID, actor, affected identity, operation, payload commitment, log coordinate, the test tag and the signature, parsed from JSON by a function that refuses by name, ReceiptError::MalformedReceipt naming what was malformed, any input that is not JSON, lacks a field, or carries a version other than the one the crate is written against; the operation is read as a string of IDENTITY-EVENTS.md's vocabulary and SHALL NOT be enumerated by the crate (A12). crates/lys-receipt/src/verify.rs SHALL verify in this order: (a) WHERE the receipt carries the test tag, THE SYSTEM SHALL consult only the test key, and IF no test key was given THEN it SHALL refuse with ReceiptError::NeedsTestKey, whose message is 'test-tagged receipt: supply the test key', before any cryptography; WHERE the receipt carries no test tag, it SHALL consult only the verifier key and never the test key, so a real key never verifies a test receipt and a test key never verifies a receipt as real (W3, CN16); (b) the signature over the receipt's signed bytes against the consulted key's Ed25519 public key; (c) the coordinate lies within the store's extent; (d) the named commitment hash of the leaf bytes at that coordinate equals the receipt's payload commitment. Every failure of (b), (c) or (d) SHALL collapse to the one refusal ReceiptError::VerificationFailed, whose message is 'receipt verification failed: invalid receipt, signature, coordinate or leaf', so tamper classes are indistinguishable from the output (crates/lys/src/commands/log/verify.rs:7-14, A9, CN17). On success it SHALL return the log's origin, the leaf index, the operation, the operation ID, the affected identity and whether the receipt is a test receipt, and nothing else. THE SYSTEM SHALL read the log through LeafStore::leaf and LeafStore::extent only, SHALL NOT call Log::open (crates/lys-log-store/src/log.rs:99, which may write a repaired pin) or append, and SHALL NOT write to the log directory. Debug and Display of the receipt and of every error SHALL NOT contain the leaf bytes or the signature bytes. The crate SHALL NOT read a wall clock: every time value in its tests is injected by the harness in crates/lys-receipt/tests/support/mod.rs, which also holds the harness signer over generated test keys, the fixture log builder and the tamper table, and is never compiled into the library.",
+      "acceptance": [
+        "Leg 1 of 7, rcpt_accept: five operations committed in order into a fixture log occupy leaves 0 to 4 in that order and yield exactly 5 receipts, all 5 accepted, each report naming the fixture's origin, its leaf index and its operation; cargo test -p lys-receipt --test receipt_verify rcpt_accept prints 'test result: ok. 1 passed; 0 failed'.",
+        "Leg 2 of 7, rcpt_tamper: a table of exactly 9 cases, one each for a changed version, operation ID, actor, affected identity, operation, payload commitment and coordinate, one flipped signature byte, and one receipt signed by the affected identity's own test key instead of the service's, yields 9 ReceiptError::VerificationFailed and 0 acceptances, and the 9 Display strings are equal to each other and to 'receipt verification failed: invalid receipt, signature, coordinate or leaf'; cargo test -p lys-receipt --test receipt_verify rcpt_tamper prints 'test result: ok. 1 passed; 0 failed'.",
+        "Leg 3 of 7, rcpt_leaf: a receipt correctly signed by the service key whose coordinate names a leaf holding different bytes, and a correctly signed receipt whose coordinate is the store's extent, yield exactly 2 ReceiptError::VerificationFailed with the same Display string as leg 2, and the test counts 2 refusals from 2 cases; cargo test -p lys-receipt --test receipt_verify rcpt_leaf prints 'test result: ok. 1 passed; 0 failed'.",
+        "Leg 4 of 7, rcpt_testtag: four cases: a test-tagged receipt with no test key returns ReceiptError::NeedsTestKey whose Display contains 'supply the test key'; the same receipt with the test key is accepted with the test flag true; a test-tagged receipt signed with the verifier key, given both keys, returns VerificationFailed; an untagged receipt signed with the test key, given both keys, returns VerificationFailed; the test asserts 1 NeedsTestKey, 1 acceptance and 2 VerificationFailed; cargo test -p lys-receipt --test receipt_verify rcpt_testtag prints 'test result: ok. 1 passed; 0 failed'.",
+        "Leg 5 of 7, rcpt_shape: three inputs, bytes that are not JSON, a JSON object lacking the operation field, and a receipt whose version is not the crate's, each return ReceiptError::MalformedReceipt whose Display begins 'malformed receipt' and names the missing field or the version; the test asserts 3 refusals from 3 cases and that none of the three Display strings equals leg 2's; cargo test -p lys-receipt --test receipt_verify rcpt_shape prints 'test result: ok. 1 passed; 0 failed'.",
+        "Leg 6 of 7, rcpt_redact: with a leaf whose bytes hold the marker 'fixture-marker-0' and a receipt whose signature bytes are known, the Debug and Display renderings of the receipt and of each of the three error variants contain the marker 0 times and the signature's hex 0 times; cargo test -p lys-receipt --test receipt_verify rcpt_redact prints 'test result: ok. 1 passed; 0 failed'.",
+        "Leg 7 of 7, rcpt_clock and the mapping: rg -n 'SystemTime::now|Utc::now|Local::now|Instant::now' crates/lys-receipt prints nothing; rg -c 'fn \\w*rcpt_(accept|tamper|leaf|testtag|shape|redact)(_|\\b)' crates/lys-receipt/tests/receipt_verify.rs prints 6; and on the row's first commit cargo test -p lys-receipt --test receipt_verify fails to compile or prints '0 passed' with the six names listed as failed."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-receipt/Cargo.toml",
+          "crates/lys-receipt/src/lib.rs",
+          "crates/lys-receipt/src/receipt.rs",
+          "crates/lys-receipt/src/verify.rs",
+          "crates/lys-receipt/src/error.rs",
+          "crates/lys-receipt/tests/receipt_verify.rs",
+          "crates/lys-receipt/tests/support/mod.rs"
+        ],
+        "modify": [
+          "Cargo.toml",
+          "Cargo.lock"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C32"
+      ],
+      "stories": [
+        "S13"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Add lys log verify receipt to the CLI, offline, from the log and the key alone",
+      "spec": "THE SYSTEM SHALL add the subcommand lys log verify receipt --receipt <file> --dir <log directory> --verifier-key <string> [--test-key <string>] [--json] to the published CLI (W2, ADR-025), implemented in the new file crates/lys/src/commands/log/receipt.rs and declared as the Receipt variant of LogVerifyCommand in crates/lys/src/cli.rs (beside Inclusion and Consistency, crates/lys/src/cli.rs:438-480), dispatched from crates/lys/src/main.rs beside the two existing verify arms (crates/lys/src/main.rs:66-75), with the module line added to crates/lys/src/commands/log/mod.rs and the lys-receipt dependency added to crates/lys/Cargo.toml. It SHALL need no running service: it reads the receipt file (capped at 16 MiB as the other artifacts are, crates/lys/src/commands/log/verify.rs:29-32), opens the log directory through lys-log-store's FileLeafStore::open (crates/lys-log-store/src/file.rs:165) as a LeafStore and never as a Log, parses each key string with NoteVerifierKey::from_spec (crates/lys-core/src/checkpoint/verifier_key.rs:92), the same ORIGIN+KEYID_HEX+KEY_BASE64 form the other verify commands take, and calls crates/lys-receipt's verifier. Refusals keep the published discipline: pre-crypto and actionable, each named on its own, CliError::JsonParse with what 'receipt' for a malformed receipt file, CliError::Trust for a malformed --verifier-key or --test-key string, and the new CliError::ReceiptNeedsTestKey, whose message is 'test-tagged receipt: supply the test key with --test-key', for a test-tagged receipt presented without --test-key; every cryptographic or structural failure collapses to the new CliError::ReceiptVerificationFailed, whose message is 'receipt verification failed: invalid receipt, signature, coordinate or leaf', one message per artifact class as CliError::LogInclusionVerificationFailed is (crates/lys/src/commands/error.rs:189-196, A9, CN17). Both variants are appended to crates/lys/src/commands/error.rs; no existing variant or message changes. On success it SHALL print, through the Emitter, 'receipt verified', the origin, the leaf index, the operation, the operation ID, the affected identity and 'test receipt: true' or 'test receipt: false', and exit 0; every refusal exits 1 with its message on stderr. It SHALL NOT write to the log directory, SHALL NOT change the behaviour or output of lys log verify inclusion or consistency, and SHALL NOT publish any crate: the lys release carrying this subcommand is a separate act after IDENTITY-EVENTS.md's version is ratified (A10, CN18).",
+      "acceptance": [
+        "Leg 1 of 6, rcli_accept: a fixture log directory, a receipt from crates/lys-receipt's harness and the service's key string: the binary exits 0 and its stdout contains 'receipt verified', the fixture origin, 'leaf index' with the receipt's index, the operation and 'test receipt: false'; with --json the same fields appear as JSON keys; cargo test -p lys --test receipt_tests rcli_accept prints 'test result: ok. 1 passed; 0 failed'.",
+        "Leg 2 of 6, rcli_tamper: the 9 tamper cases of R2 leg 2 and the 2 leaf cases of R2 leg 3, 11 in all, each exit 1 with stderr identical across all 11 and equal to 'receipt verification failed: invalid receipt, signature, coordinate or leaf' plus the CLI's error prefix; the test counts 11 refusals from 11 cases; cargo test -p lys --test receipt_tests rcli_tamper prints 'test result: ok. 1 passed; 0 failed'.",
+        "Leg 3 of 6, rcli_precrypto: five cases: a receipt file that is not JSON and one lacking a field each exit 1 with stderr naming 'receipt' and the file path; a malformed --verifier-key and a malformed --test-key each exit 1 with stderr naming the key string as malformed; a test-tagged receipt without --test-key exits 1 with stderr containing 'supply the test key with --test-key'; none of the five stderr strings equals leg 2's; the test counts 5 refusals from 5 cases; cargo test -p lys --test receipt_tests rcli_precrypto prints 'test result: ok. 1 passed; 0 failed'.",
+        "Leg 4 of 6, rcli_test: a test-tagged receipt with --test-key exits 0 and stdout contains 'test receipt: true'; the same receipt with --verifier-key set to the key that signed it and --test-key set to another key exits 1 with leg 2's stderr, so a real key never verifies a test receipt; the test counts 1 acceptance and 1 refusal; cargo test -p lys --test receipt_tests rcli_test prints 'test result: ok. 1 passed; 0 failed'.",
+        "Leg 5 of 6, rcli_readonly: after legs 1 to 4 have run against the same fixture log directory, the count of files under it and the SHA-256 of each are equal to those recorded before the first run; cargo test -p lys --test receipt_tests rcli_readonly prints 'test result: ok. 1 passed; 0 failed'.",
+        "Leg 6 of 6, the published surface and the mapping: cargo test -p lys --test log_tests prints '0 failed' with the same number of tests as at 1756688cc08169bef4a9ac37b9b079efb9e38b18 (rg -c '#\\[test\\]' crates/lys/tests/log_tests.rs is unchanged), and git diff 1756688cc08169bef4a9ac37b9b079efb9e38b18 -- crates/lys/src/commands/log/verify.rs crates/lys-core crates/lys-log-store prints nothing; rg -c 'fn \\w*rcli_(accept|tamper|precrypto|test|readonly)(_|\\b)' crates/lys/tests/receipt_tests.rs prints 5; on the row's first commit cargo test -p lys --test receipt_tests fails to compile or lists the five names as failed."
+      ],
+      "files": {
+        "create": [
+          "crates/lys/src/commands/log/receipt.rs",
+          "crates/lys/tests/receipt_tests.rs"
+        ],
+        "modify": [
+          "crates/lys/src/cli.rs",
+          "crates/lys/src/main.rs",
+          "crates/lys/src/commands/error.rs",
+          "crates/lys/src/commands/log/mod.rs",
+          "crates/lys/Cargo.toml",
+          "Cargo.lock"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C33"
+      ],
+      "stories": [
+        "S13"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Emit the sign-in and sign-in-refusal receipts from the directory service, for changes only",
+      "spec": "WHEN Rauthy has authenticated a person and the directory service resolves the issuer-subject to an identity the administrator registered, THE SYSTEM SHALL commit one signed event of operation sign-in through the landed lys-identity commit path (DIRECTORY-003 R2), attesting the authenticated person and their provenance as the actor and naming that identity as the affected identity, and return the receipt beside the appended leaf. WHEN the issuer-subject is bound to no registered identity, THE SYSTEM SHALL refuse the sign-in by name, SignInRefusal::UnboundSubject with message prefix sign_in_unbound_subject, register nobody, and commit one signed event of operation sign-in-refused whose affected identity is empty and whose typed payload carries the issuer and subject, returning its receipt (A8, A11). In step 1 this is the only kind of authenticated sign-in the service refuses: WHILE an identity is suspended or retired, THE SYSTEM SHALL NOT refuse its sign-in on state and SHALL leave the sign-in receipt, since state is recorded and not enforced (CN11, DIRECTORY-003.md:122); the step-2 refusals arrive with enforcement and suspension semantics stay OPEN for Tom. A read of a record and any permission question that is answered SHALL NOT commit an event or leave a receipt (W1, CN15). The receipts are signed by the service's key as the landed emitter signs them, carrying the test tag when that key is a test key (CN16); this row SHALL NOT sign with a key of the person, SHALL NOT append the receipt itself, and SHALL NOT change what lys-identity signs or how. The new code is the module crates/lys-identity-server/src/sign_in_receipt.rs, declared by one line in crates/lys-identity-server/src/lib.rs, and called by one line at the resolution point of DIRECTORY-003's OIDC session handling, whose file this brief names by revision before dispatch (blocked_by); it SHALL NOT read a wall clock, taking its time from the clock the landed server injects. Rauthy's own refusals leave nothing here, and no fork file and no signing key inside Rauthy is touched (A4, ADR-009).",
+      "acceptance": [
+        "Leg 1 of 5, signin_ok: the administrator registers person P (DIRECTORY-003's act, leaf 0, its register receipt), then P signs in through the test issuer with an issuer-subject bound to P: exactly 1 new leaf, operation sign-in, affected identity P, actor the service's attestation of P's provenance; the receipt is accepted by crates/lys-receipt's verifier with the test key and the test flag is true; then 3 reads of P's record and 3 answered permission questions leave the leaf count unchanged; the test asserts 2 leaves and 2 receipts after the sign-in and 2 after the reads; cargo test -p lys-identity-server --test sign_in_receipts signin_ok prints 'test result: ok. 1 passed; 0 failed'.",
+        "Leg 2 of 5, signin_refused: a sign-in whose issuer-subject is bound to no registered identity is refused by name, the refusal's message begins sign_in_unbound_subject, the directory's record count is unchanged, and exactly 1 new leaf of operation sign-in-refused is left whose receipt verifies with the test key and whose affected identity is empty; the test asserts 1 refusal, 1 leaf and 0 new records; cargo test -p lys-identity-server --test sign_in_receipts signin_refused prints 'test result: ok. 1 passed; 0 failed'.",
+        "Leg 3 of 5, signin_first: an unregistered person's first sign-in, then the administrator's register of that person, then the person's sign-in leave exactly 3 leaves in the order sign-in-refused, register, sign-in, and no register event is left by the first sign-in; the test asserts the 3 operations at indices 0, 1 and 2 (decided by rule: A8 corrects A7 for step 1); cargo test -p lys-identity-server --test sign_in_receipts signin_first prints 'test result: ok. 1 passed; 0 failed'.",
+        "Leg 4 of 5, signin_state: with P registered and then suspended by the administrator (DIRECTORY-003 R5), P's sign-in leaves exactly 1 new leaf of operation sign-in and 0 refusals, and P's recorded state is still suspended; the test asserts 1 sign-in receipt and 0 refusal receipts; cargo test -p lys-identity-server --test sign_in_receipts signin_state prints 'test result: ok. 1 passed; 0 failed'.",
+        "Leg 5 of 5, the wall and the mapping: git diff <landed DIRECTORY-003 commit> -- crates/lys-identity vendor/rauthy prints nothing on the row's commits; rg -n 'SystemTime::now|Utc::now|Local::now|Instant::now' crates/lys-identity-server/src/sign_in_receipt.rs prints nothing; rg -c 'fn \\w*signin_(ok|refused|first|state)(_|\\b)' crates/lys-identity-server/tests/sign_in_receipts.rs prints 4; on the row's first commit cargo test -p lys-identity-server --test sign_in_receipts fails to compile or lists the four names as failed."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/sign_in_receipt.rs",
+          "crates/lys-identity-server/tests/sign_in_receipts.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/lib.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C34"
+      ],
+      "stories": [
+        "S15"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Prove the whole path on a development install with test receipts that never pass as real",
+      "spec": "THE SYSTEM SHALL prove, on the development install DIRECTORY-002 and DIRECTORY-003 stand up (deploy/identity), that a test receipt travels the whole path end to end: a test key is generated with lys key generate into a file outside the repository, the directory service is configured with it as its signing key so every receipt it emits carries the test tag (W3, CN16), the administrator registers a test person, that person signs in, an unbound issuer-subject is refused, and each of the three receipts is verified with lys log verify receipt against the install's log directory. The proof SHALL show all three outcomes of the test-tag rule: with --test-key, each receipt verifies and prints 'test receipt: true'; without --test-key, each is refused with 'supply the test key with --test-key'; with --verifier-key set to the signing key and --test-key set to a second generated key, each is refused with the one generic message. deploy/identity/README.md SHALL gain a section 'Test receipts' stating that a development install emits test receipts only, how the test key is named in configuration, and the three commands above; docs/design/identity/reports/DIRECTORY-007-receipts.md SHALL record the run as commands, exit codes, leaf indices, operation IDs, key fingerprints and counts, never a private key, seed or token. This row SHALL NOT generate a production key, SHALL NOT publish lys-anchor or any crate, SHALL NOT emit a receipt outside the test harness or the development install's test path, SHALL NOT use a real business sign-in or a live Cambium participant (CN2), and SHALL NOT change any product that calls the service. The three acts of docs/design/lys-anchor/DECISIONS.md:333-335 stay Tom's.",
+      "acceptance": [
+        "Leg 1 of 4: docs/design/identity/reports/DIRECTORY-007-receipts.md records 3 receipts (register, sign-in, sign-in-refused) with their leaf indices 0, 1 and 2 and operation IDs, and 9 verify runs: 3 exit 0 with 'test receipt: true', 3 exit 1 with 'supply the test key with --test-key', 3 exit 1 with 'receipt verification failed: invalid receipt, signature, coordinate or leaf'; grep -c 'exit 0' docs/design/identity/reports/DIRECTORY-007-receipts.md prints 3 and grep -c 'exit 1' prints 6.",
+        "Leg 2 of 4: rg -n 'BEGIN|PRIVATE|seed|token' docs/design/identity/reports/DIRECTORY-007-receipts.md deploy/identity/README.md prints nothing, and every key in the report appears only as the ORIGIN+KEYID_HEX+KEY_BASE64 verifier string or a fingerprint.",
+        "Leg 3 of 4: grep -c '^## Test receipts' deploy/identity/README.md prints 1, and git diff --stat <landed DIRECTORY-003 commit> -- deploy/identity prints only deploy/identity/README.md.",
+        "Leg 4 of 4: rg -n 'lys log verify receipt' deploy/identity/README.md docs/design/identity/reports/DIRECTORY-007-receipts.md prints at least 4 lines, and the report's 'Rauthy user count before and after' line shows equal counts, proving the run created no Rauthy user beyond the test person the administrator registered."
+      ],
+      "files": {
+        "create": [
+          "docs/design/identity/reports/DIRECTORY-007-receipts.md"
+        ],
+        "modify": [
+          "deploy/identity/README.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C35"
+      ],
+      "stories": [
+        "S14"
+      ]
+    }
+  ],
+  "boundaries": [
+    "Only the files listed in this brief's requirements change; a row that needs a file outside its wall stops and names it, and Waffles approves a brief revision before that file is edited (CN9). Nothing under crates/lys-identity/ is edited: it is DIRECTORY-003's wall. DIRECTORY-003, DIRECTORY-004 and DIRECTORY-006 are not edited and keep emitting their receipts.",
+    "Receipts are for changes only. A permission check that is answered and changes nothing is not a receipt and never enters the signed receipt log; step 2's access record, where refusals are always recorded and allows are decided with step 2, is a non-goal of this brief (W1, CN15).",
+    "No production key, no production anchor, test identities only, and no change to the products that call the service; development isolation throughout (CN2). The three acts of docs/design/lys-anchor/DECISIONS.md:333-335, publishing lys-anchor, generating a production key and emitting a receipt outside a test, stay Tom's; a development install's test receipts are inside the test path, not that act (W3).",
+    "No fork change and no signing key inside Rauthy; Rauthy's own refusals are out of scope with the reason recorded (A4, ADR-009).",
+    "No wire format is frozen by this brief: the receipt's signed encoding, tag and content type stay with docs/design/identity/IDENTITY-EVENTS.md under DIRECTORY-003's joint review (A3); lys-core, lys-log-store, lys/anchor-receipt/v1, lys/attestation/v2 and every other shipped tag are unchanged.",
+    "Landing on main publishes nothing. The lys release carrying the verifier is a separate, deliberate act after IDENTITY-EVENTS.md's version is ratified and recorded, never before (A10, CLAUDE.md:78-80); W2's acceptance of changing the published lys binary is acceptance of that later release.",
+    "Grant receipts wait with DIRECTORY-006 GRANT_AUDIT and the grant representation that is OPEN for Tom; this brief commits to the seven common fields only (A6). No provisioning receipt exists (A5). No state-based sign-in refusal exists in step 1, and suspension semantics stay OPEN for Tom (A11).",
+    "The verifier keeps the published discipline of lys log verify: one refusal class for every cryptographic or structural failure, pre-crypto refusals named on their own; the verifier takes no key carried in a receipt as its authority and enumerates no operation vocabulary (A9, A12, CN13, CN17).",
+    "No wall clock in any new code; no name of a person and no date inside code; no credential, token or key value in code, tests, fixtures, logs or documents.",
+    "A live demonstration to Tom is a verification step a person performs after a row lands, never an acceptance criterion (CN5). No row is dispatched until Waffles has reviewed it."
+  ],
+  "verification": [
+    "From the repository root: sh scripts/design/gate.sh exits 0, and python3 scripts/design/validate.py docs/design/decisions.json and python3 scripts/design/validate.py docs/design/roadmap.json each exit 0.",
+    "From the repository root, after each code row: cargo fmt --all; cargo clippy --all-targets --all-features -- -D warnings; cargo clippy --all-targets -- -D warnings; cargo test --workspace --all-features; cargo doc --no-deps --all-features; cargo doc --no-deps, all clean, with git status showing no change from cargo fmt (CLAUDE.md, gates before any commit; heavy runs at the gate venue, CN8).",
+    "From the repository root: rg -c 'fn \\w*rcpt_(accept|tamper|leaf|testtag|shape|redact)(_|\\b)' crates/lys-receipt/tests/receipt_verify.rs prints 6; rg -c 'fn \\w*rcli_(accept|tamper|precrypto|test|readonly)(_|\\b)' crates/lys/tests/receipt_tests.rs prints 5; rg -c 'fn \\w*signin_(ok|refused|first|state)(_|\\b)' crates/lys-identity-server/tests/sign_in_receipts.rs prints 4.",
+    "For each code row, the row's first commit adds only its test file and fails by name, and its second commit passes; the review reads both commits.",
+    "The row diffs touch no path under crates/lys-identity/, vendor/rauthy or docs/design/identity/briefs/, and no file of DIRECTORY-003, DIRECTORY-004 or DIRECTORY-006: git diff --stat <base> -- crates/lys-identity vendor/rauthy docs/design/identity/briefs prints nothing.",
+    "rg -n 'SystemTime::now|Utc::now|Local::now|Instant::now' crates/lys-receipt crates/lys/src/commands/log/receipt.rs crates/lys-identity-server/src/sign_in_receipt.rs prints nothing, and a search of every file this brief touches finds no credential, token or key value."
+  ]
+}

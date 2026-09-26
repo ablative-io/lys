@@ -3,7 +3,7 @@
   "title": "The standalone identity directory, with every grant rooted in a person",
   "intention": "An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change.",
   "problem": "IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands.",
-  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.",
+  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5. DIRECTORY-007 writes the audit receipt every sign-in and every permission change leaves: IDENTITY-001's shared contract carried as written, signed by the service that performed the operation, returned beside the signed event the log holds, verified offline by lys log verify receipt (ADR-025), for changes only (ADR-024), with a development install emitting test receipts under a test key and a test tag (ADR-026); its receipt crate crates/lys-receipt and its CLI subcommand are wholly new modules with exact manifests, its sign-in receipts live in the directory service, and DIRECTORY-003, DIRECTORY-004 and DIRECTORY-006 keep emitting their own receipts.",
   "principles": [
     {
       "id": "P1",
@@ -50,14 +50,18 @@
     "ADR-008",
     "ADR-009",
     "ADR-010",
-    "ADR-011"
+    "ADR-011",
+    "ADR-024",
+    "ADR-025",
+    "ADR-026"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
     "The grant path (create an agent under a person, grant it a project, the action is allowed, revoke or suspend, the same action is refused) is a requirement of the row that owns it, with acceptance criteria; where the sources do not settle the row, it is recorded open for Tom in DIRECTORY-003 with its criteria drafted.",
     "Every decision still open for Tom is recorded as open and decided nowhere in this cluster.",
     "The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6).",
-    "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record."
+    "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record.",
+    "DIRECTORY-007 leaves one verifiable receipt for every sign-in and permission change, verified offline from the log and the service's key alone, with receipts for changes only and test receipts that never pass as real."
   ],
   "non_goals": [
     {
@@ -103,6 +107,34 @@
     {
       "text": "A shared design-system package extracted for every product",
       "reason": "Tom left it as a thing to look at, not a row (ADR-010)."
+    },
+    {
+      "text": "Step 2's access record, where answered permission checks are recorded.",
+      "reason": "W1 (ADR-024): receipts are for changes only; when step 2 brings enforcement, allows and refusals go into a separate access record that step 2 defines, refusals always, allows decided with step 2. Nothing in DIRECTORY-007 records an answered check."
+    },
+    {
+      "text": "Receipts for refusals Rauthy makes itself: a bad password, a failed provider callback.",
+      "reason": "They never reach the directory service, Rauthy's native events are asynchronous and severity-filtered (docs/design/identity/briefs/IDENTITY-001.md:44), and a signing key inside Rauthy is a fork change under ADR-009 that no brief of this repository makes (A4); sign-in receipts cover what the directory service records and refuses."
+    },
+    {
+      "text": "A receipt verifier inside the directory service.",
+      "reason": "W2 (ADR-025): a verifier that needs the running service would be checking the service with the service; the verifier lives in the lys CLI, offline."
+    },
+    {
+      "text": "The lys release that carries the receipt verifier.",
+      "reason": "A separate, deliberate act after IDENTITY-EVENTS.md's envelope version is ratified and recorded, never before, because publishing a crate that exposes a format freezes it (CLAUDE.md:78-80, A10); landing DIRECTORY-007 R3 on main publishes nothing."
+    },
+    {
+      "text": "A separate agent-provisioning receipt.",
+      "reason": "Provisioned is a view over grants and a handle, not a transition (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:26-28); an agent's provisioning shows as its register transition and then its grants (A5)."
+    },
+    {
+      "text": "The grant receipt's payload and its test legs.",
+      "reason": "They cover exactly the grant representation, which is OPEN for Tom above, and stay with DIRECTORY-006 GRANT_AUDIT; DIRECTORY-007 commits only to the contract's seven fields (A6)."
+    },
+    {
+      "text": "A state-based sign-in refusal, and a receipt for one, in step 1.",
+      "reason": "Lifecycle state is recorded and not enforced in step 1 (CN11, DIRECTORY-003 R5); the step-2 refusals arrive with enforcement and suspension semantics stay OPEN for Tom (A11)."
     }
   ],
   "structure": [
@@ -575,6 +607,86 @@
       "path": "surface/identity/src/generated/index.ts",
       "note": "Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch",
       "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-007.json",
+      "note": "the audit receipt brief: the contract document, the receipt crate, the CLI verifier, the sign-in receipts and the development-install proof",
+      "brief": "DIRECTORY-007"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-007.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-007"
+    },
+    {
+      "path": "docs/design/identity/AUDIT-RECEIPT.md",
+      "note": "the audit receipt contract as it stands, the emitter of every operation, the step-1 sign-in boundary, the changes-only and test-receipt rules, and what IDENTITY-EVENTS.md must carry",
+      "brief": "DIRECTORY-007"
+    },
+    {
+      "path": "crates/lys-receipt/Cargo.toml",
+      "note": "the receipt crate's manifest; depends on lys-core and lys-log-store only",
+      "brief": "DIRECTORY-007"
+    },
+    {
+      "path": "crates/lys-receipt/src/lib.rs",
+      "note": "declarations and re-exports only",
+      "brief": "DIRECTORY-007"
+    },
+    {
+      "path": "crates/lys-receipt/src/receipt.rs",
+      "note": "the typed receipt of the shared shape at IDENTITY-EVENTS.md's version, parsed from JSON, refusing a malformed input by name",
+      "brief": "DIRECTORY-007"
+    },
+    {
+      "path": "crates/lys-receipt/src/verify.rs",
+      "note": "verification in order: test tag and key selection, signature, coordinate within extent, commitment against the leaf; one refusal class for every cryptographic or structural failure",
+      "brief": "DIRECTORY-007"
+    },
+    {
+      "path": "crates/lys-receipt/src/error.rs",
+      "note": "ReceiptError: MalformedReceipt, NeedsTestKey, VerificationFailed; never carries leaf or signature bytes",
+      "brief": "DIRECTORY-007"
+    },
+    {
+      "path": "crates/lys-receipt/tests/receipt_verify.rs",
+      "note": "rcpt_accept, rcpt_tamper, rcpt_leaf, rcpt_testtag, rcpt_shape, rcpt_redact",
+      "brief": "DIRECTORY-007"
+    },
+    {
+      "path": "crates/lys-receipt/tests/support/mod.rs",
+      "note": "harness signer over generated test keys, fixture log builder with an injected clock, tamper table; never compiled into the library",
+      "brief": "DIRECTORY-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/receipt.rs",
+      "note": "lys log verify receipt: offline, from the receipt, the log directory and the key strings",
+      "brief": "DIRECTORY-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/mod.rs",
+      "note": "the log command family's module list; pre-existing, gains the receipt module line (DIRECTORY-007)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/tests/receipt_tests.rs",
+      "note": "rcli_accept, rcli_tamper, rcli_precrypto, rcli_test, rcli_readonly, driving the binary",
+      "brief": "DIRECTORY-007"
+    },
+    {
+      "path": "crates/lys-identity-server/src/sign_in_receipt.rs",
+      "note": "the sign-in and sign-in-refusal receipts the directory service emits, through lys-identity's commit path (DIRECTORY-007, after DIRECTORY-003 lands)",
+      "brief": "DIRECTORY-007"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/sign_in_receipts.rs",
+      "note": "signin_ok, signin_refused, signin_first, signin_state",
+      "brief": "DIRECTORY-007"
+    },
+    {
+      "path": "docs/design/identity/reports/DIRECTORY-007-receipts.md",
+      "note": "the development-install proof: commands, exit codes, leaf indices, operation IDs, key fingerprints and counts; never a private key",
+      "brief": "DIRECTORY-007"
     }
   ],
   "inventory": [
@@ -609,6 +721,30 @@
     {
       "path": "docs/design/identity/CONFORMANCE.md",
       "note": "Accepted mock-up behaviour map; DIRECTORY-006 maps You/delegation/access requirements and does not claim mock-up sample policy is authoritative."
+    },
+    {
+      "path": "crates/lys/src/commands/log/verify.rs",
+      "note": "lys log verify inclusion and consistency: the published discipline the receipt verifier keeps, pre-crypto refusals named, every cryptographic or structural failure one generic message per artifact class (lines 7-14). Unchanged by DIRECTORY-007."
+    },
+    {
+      "path": "crates/lys/src/commands/error.rs",
+      "note": "CliError, with LogInclusionVerificationFailed and LogConsistencyVerificationFailed at lines 189-196 as the pattern; DIRECTORY-007 R3 appends ReceiptNeedsTestKey and ReceiptVerificationFailed and changes no existing variant."
+    },
+    {
+      "path": "crates/lys-log-store/src/store.rs",
+      "note": "the LeafStore trait (lines 120-141): origin, extent and leaf, which the receipt verifier reads through; it never opens a Log, whose open may write a repaired pin (crates/lys-log-store/src/log.rs:99)."
+    },
+    {
+      "path": "crates/lys-core/src/checkpoint/verifier_key.rs",
+      "note": "NoteVerifierKey::from_spec (line 92): the ORIGIN+KEYID_HEX+KEY_BASE64 key string the CLI's verify commands take; the receipt verifier parses --verifier-key and --test-key with it."
+    },
+    {
+      "path": "docs/design/lys-anchor/DECISIONS.md",
+      "note": "lines 333-335: the three acts reserved for Tom, publishing lys-anchor, generating a production anchor key, emitting any receipt outside a test. Read, never changed."
+    },
+    {
+      "path": "CLAUDE.md",
+      "note": "lines 78-80: a format is frozen once a signature is produced or a leaf is logged under it; a new version alongside, never a mutation. Governs the lys release that carries the verifier."
     }
   ],
   "constraints": [
@@ -659,6 +795,30 @@
     {
       "id": "CN12",
       "text": "DIRECTORY-006 is implementation work after the frozen planning task: its source paths are only executable after the DIRECTORY-002/003 foundations are implemented and their integration manifests are reconciled. R6 also waits for the standalone surface foundation. Do not dispatch from a schema-valid but dependency-blocked brief."
+    },
+    {
+      "id": "CN13",
+      "text": "An audit receipt is signed by the service that performed the operation, never by the identity it is about; a verifier is given that service's public key and never takes a key the receipt carries as its authority (P8)."
+    },
+    {
+      "id": "CN14",
+      "text": "The appended leaf is the signed event, appended in the order the operations happened; the receipt is returned beside it carrying the log coordinate the append yielded and the payload commitment, and is never itself appended (docs/design/identity/briefs/IDENTITY-001.md:49)."
+    },
+    {
+      "id": "CN15",
+      "text": "Receipts are for changes only: a permission check that is answered and changes nothing leaves no receipt and never enters the signed receipt log; when step 2 brings enforcement, allows and refusals go to a separate access record step 2 defines, refusals always, allows decided with step 2 (ADR-024)."
+    },
+    {
+      "id": "CN16",
+      "text": "A development install emits test receipts, signed with a test key and carrying a test tag, inside development isolation, and never performs the act docs/design/lys-anchor/DECISIONS.md:335 reserves; a verifier refuses a test-tagged receipt by name unless given the test key explicitly, saying to supply it, and a real key never verifies a test receipt, so a test receipt never passes as real; harness tests stay as well (ADR-026)."
+    },
+    {
+      "id": "CN17",
+      "text": "The receipt verifier keeps the published discipline of crates/lys/src/commands/log/verify.rs: every cryptographic or structural verification failure collapses to one named refusal class for the receipt artifact, so tamper classes are indistinguishable in the output; the pre-crypto, actionable refusals stay named on their own: malformed JSON, a malformed key string, and a test-tagged receipt presented without the test key."
+    },
+    {
+      "id": "CN18",
+      "text": "The receipt's signed encoding, tag and content type are written in docs/design/identity/IDENTITY-EVENTS.md under its recorded joint review, never in a brief; a code row of the receipt starts only when that file is on main with its version, typed payloads, named commitment hash and recorded review; a lys release carrying the verifier is a separate act after that version is ratified, never before (CLAUDE.md:78-80), and landing on main publishes nothing."
     }
   ],
   "gate": [
