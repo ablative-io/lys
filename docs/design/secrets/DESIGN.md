@@ -18,7 +18,7 @@ Credentials live in files on each machine and in each worker's environment. An a
 
 ## Solution
 
-A broker in Rust inside the door: an encrypted store of real credentials, handles bound to identities, a proxy that checks SpiceDB, swaps the handle, forwards the call and writes one audit line, rotation across several accounts under one handle, OAuth refresh at the proxy, sealed records tagged in SpiceDB, and leases counted by uses, time window and spend. The token revolver is its first consumer.
+A broker in Rust in the lys repository, as the crate crates/lys-secrets of the standalone identity platform (ADR-019, proposed as an amendment to ADR-001 and waiting on Tom's word), which Cambium consumes through the door and never hosts: an encrypted store of real credentials, handles bound to identities, a proxy that checks SpiceDB, swaps the handle, forwards the call and writes one audit line, rotation across several accounts under one handle, OAuth refresh at the proxy, the seat's own login at spawn, sealed records tagged in SpiceDB, and leases counted by uses, time window and spend. A lease is a broker record under the audit log, read only by the broker; its not_after never extends past the window of the lys-identity grant it counts against (ADR-020). The token revolver is its first consumer. SECRETS-002 states what the broker does, requirement by requirement. SECRETS-003 builds it: a documents-only baseline recorded from source, a contract with its adversarial review before any code, and code rows that each deliver named SECRETS-002 requirements with counted acceptance legs, an estimate in hours, and the directory briefs they wait on.
 
 ## Principles
 
@@ -36,18 +36,23 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 - ADR-002 — The token revolver is the first consumer of the handle — The worker asks the broker for its next account instead of walking its own list; the store keeps the set of real accounts behind one handle and the proxy takes the next in turn and logs which one served each call. This replaces the account pool file.
 - ADR-003 — Everything is pegged to a human authority — A person signs in first; an agent is provisioned under that person with its own identity; the person's permissions are the ceiling and the agent holds an explicit subset; every grant says who may exercise it and who may pass it on; withdrawing the authority stops every grant derived from it. The exact delegation schema is not settled by this decision.
 - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
+- ADR-019 — The secrets broker lives in lys, as crates/lys-secrets; Cambium consumes it and is never its home (amends ADR-001) — The broker lives in the lys repository as the crate crates/lys-secrets, part of the standalone identity platform, built in Rust. A person installs Lys to hold secrets; Cambium reaches the broker through the door as a consumer and is never its home. Rejected: the broker inside the cambium door that ADR-001 and SECRETS-002 name, which would make Cambium a runtime a person must install to keep a credential.
+- ADR-020 — A lease is a broker record under the audit log, not a signed format — The lease is a broker record under the audit log: it counts uses, time and spend against a grant and is read only by the broker, so nothing a stranger verifies changes. The limit on a lease's time is the window of the lys-identity grant it counts against (DIRECTORY-006 R1): the lease's own not_after never extends past it. Rejected: a signed lease format, a new version beside lys/delegation/v1 with its own adversarial review; and reading the window as one the signed delegation keeps, which v1 cannot carry.
 
 ## Goals
 
 - An implementation brief, SECRETS-002, covers every part of the temporary key model in the statement with numbered requirements and acceptance criteria.
-- Every checklist item and user story of the broker is covered by a SECRETS-002 requirement.
+- Every checklist item and user story of the broker is covered by a SECRETS-002 or SECRETS-003 requirement.
 - The token revolver can take its next account from the broker instead of its own list.
+- An implementation brief, SECRETS-003, carries a baseline row, a contract row with its adversarial review, and code rows that deliver SECRETS-002's R1 to R9 in crates/lys-secrets, each code row with counted acceptance legs, an estimate in hours, and DIRECTORY-002, DIRECTORY-003 and DIRECTORY-006 R1 to R4 as blockers, each with a check a stranger can run.
 
 ## Non-Goals
 
-- OpenBao or another external secrets engine — Tom's model is built in Rust inside the door; an external engine is only reconsidered if credentials minted on demand are needed.
+- OpenBao or another external secrets engine — Tom's model is a broker built in Rust (ADR-001); ADR-019, proposed and waiting on his word, amends where it is built, from inside the door to lys as crates/lys-secrets. An external engine is only reconsidered if credentials minted on demand are needed.
 - The seat login through a proxy handle and base URL — Not tested with a subscription login; the statement keeps it open to prove later and nothing depends on it.
 - The delegation schema — The statement says it is not settled.
+- A signed lease format, a new version beside lys/delegation/v1 — ADR-020: the lease is a broker record read only by the broker; a lease a stranger verifies offline is a new brief with its own adversarial review.
+- A release and demonstration row for the broker — SECRETS-003's words list its rows, and a release row is not among them; it would come from a later roadmap decision.
 
 ## Structure
 
@@ -64,6 +69,38 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 | `crates/lys-core/src/delegation/mod.rs` | lys/delegation/v1; its docs record the handle and the lease's time window as applications of the delegation format (SECRETS-002 R1, R9) | SECRETS-002 |
 | `docs/design/WIRE-FORMATS.md` | the lys wire-format register; records the handle, sealed-record and lease formats before any is signed (SECRETS-002 R1, R6, R9) | SECRETS-002 |
 | `crates/lys-core/src/seal/mod.rs` | sealed envelopes; its docs record the sealed record as an application of lys/sealed-envelope/v1 (SECRETS-002 R6) | SECRETS-002 |
+| `docs/design/secrets/briefs/SECRETS-003.json` | the broker build brief: baseline, contract and counted code rows in crates/lys-secrets | SECRETS-003 |
+| `docs/design/secrets/briefs/SECRETS-003.md` | its rendered markdown | SECRETS-003 |
+| `docs/design/secrets/BASELINE.md` | SECRETS-003 R1: the revolver call site, the pool file's consumers, every credential path into a seat classed, and what lys/delegation/v1 and lys/sealed-envelope/v1 can carry, by file and line | SECRETS-003 |
+| `docs/design/secrets/CONTRACT.md` | SECRETS-003 R2: the invariant, the key custody, the handle, the lease, the cancellation rule, the SpiceDB relations, the sealed-record binding and the audit line | SECRETS-003 |
+| `docs/design/secrets/reports/SECRETS-003-adversarial-review.md` | SECRETS-003 R2: every attack tried against the contract and the clause defeating each | SECRETS-003 |
+| `Cargo.toml` | the workspace manifest; gains crates/lys-secrets as a member (SECRETS-003 R3) | SECRETS-003 |
+| `Cargo.lock` | the workspace lockfile (SECRETS-003 R3, R4 and R5) | SECRETS-003 |
+| `crates/lys-secrets/Cargo.toml` | the broker crate's manifest (SECRETS-003 R3, R4 and R5) | SECRETS-003 |
+| `crates/lys-secrets/src/lib.rs` | module declarations and the crate's invariant docs | SECRETS-003 |
+| `crates/lys-secrets/src/error.rs` | the broker's error type; no credential byte in any variant | SECRETS-003 |
+| `crates/lys-secrets/src/secret.rs` | the one redacting type that holds every credential byte and every raw handle byte | SECRETS-003 |
+| `crates/lys-secrets/src/store.rs` | the encrypted store of real credentials | SECRETS-003 |
+| `crates/lys-secrets/src/key_rotation.rs` | store-key rotation: every entry resealed to the new key, the old key refused by name, one audit line naming both key ids | SECRETS-003 |
+| `crates/lys-secrets/src/handle.rs` | handles bound to one identity, issued, resolved and dropped | SECRETS-003 |
+| `crates/lys-secrets/src/lease.rs` | the lease record: uses, time window, spend, the atomic use step and the retry outcome | SECRETS-003 |
+| `crates/lys-secrets/src/audit.rs` | audit lines appended through lys-log-store | SECRETS-003 |
+| `crates/lys-secrets/schema/secrets.zed` | the SpiceDB relations for handle use and sealed-record reads | SECRETS-003 |
+| `crates/lys-secrets/src/proxy.rs` | the check, swap, forward and audit line | SECRETS-003 |
+| `crates/lys-secrets/src/rotation.rs` | the next real account in turn under one handle | SECRETS-003 |
+| `crates/lys-secrets/src/in_flight.rs` | the register of admitted calls and the cancellation rule applied at a drop | SECRETS-003 |
+| `crates/lys-secrets/src/oauth.rs` | OAuth refresh at the proxy | SECRETS-003 |
+| `crates/lys-secrets/src/spawn_login.rs` | the seat's own login answered at spawn and the record of which went to which seat | SECRETS-003 |
+| `crates/lys-secrets/src/sealed.rs` | sealed records read by name under a relation check; keys refused for reading | SECRETS-003 |
+| `crates/lys-secrets/src/next_account.rs` | the revolver's ask for its next account | SECRETS-003 |
+| `crates/lys-secrets/tests/store_leases.rs` | R3's counted legs | SECRETS-003 |
+| `crates/lys-secrets/tests/secret_scope.rs` | SEC3_SECRET_SCOPE: the counting test that keeps every secret byte in the redacting type | SECRETS-003 |
+| `crates/lys-secrets/tests/proxy.rs` | R4's counted legs | SECRETS-003 |
+| `crates/lys-secrets/tests/oauth.rs` | R5's counted legs | SECRETS-003 |
+| `crates/lys-secrets/tests/spawn_login.rs` | R6's counted legs | SECRETS-003 |
+| `crates/lys-secrets/tests/sealed.rs` | R7's counted legs | SECRETS-003 |
+| `crates/lys-secrets/tests/next_account.rs` | R8's counted legs | SECRETS-003 |
+| `crates/lys-secrets/tests/support/mod.rs` | shared test doubles (the upstream, the provider, SpiceDB, the canary and the kill points) and the tracing subscriber that captures every log line | SECRETS-003 |
 
 ## Inventory
 
@@ -77,4 +114,5 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 - **CN1** — No credential, token or key value is ever written, read or quoted in any document of this cluster.
 - **CN2** — No row of SECRETS-002 is dispatched before Waffles has reviewed it.
 - **CN3** — Every path written in a document of this cluster is relative to the repository root, whatever directory a session starts in; a command runs from its own tree and spells its paths from there.
-- **CN4** — Resolve standalone broker-host ownership before dispatch. Earlier SECRETS-002 Cambium path proposals and empty door-owned file walls are not authority to make Cambium a required runtime service; ADR-004 remains binding.
+- **CN4** — Resolve standalone broker-host ownership before dispatch. Earlier SECRETS-002 Cambium path proposals and empty door-owned file walls are not authority to make Cambium a required runtime service; ADR-004 remains binding. Answered by ADR-019, proposed: the broker lives in lys as crates/lys-secrets and Cambium consumes it and is never its home; it amends ADR-001 and is settled when Tom gives his word, which every SECRETS-003 code row waits on.
+- **CN5** — No row of SECRETS-003 is dispatched before the lead has reviewed it; no code row starts before the baseline row and the contract row are accepted.
