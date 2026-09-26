@@ -57,6 +57,22 @@ THE SYSTEM SHALL append to the verification array of docs/design/directory/brief
 **Stories:**
 - S2 (Reviewer, Reviews a brief before any of its rows is dispatched) — As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1 (count is 5, first four unchanged): met. Before appending, the script asserted len(verification)==4 and that the round trip was byte-identical, so the first four strings are untouched. The new entry comes after the ID001_DIRECTORY_LIVE entry in DIRECTORY-005.json's verification array. Row 2 (the phrase is present once in each file): met. The phrase is in DIRECTORY-005.json once and at DIRECTORY-005.md:109. Row 3 (numstat is 2 added, 1 deleted): met. git diff --numstat printed '2 1 docs/design/directory/briefs/DIRECTORY-005.json'. Row 4 (task and depends_on unchanged): met. Only the verification array was touched, so the task text with its 6-hour estimate and depends_on ['DIRECTORY-004'] are as main holds them.
+- Deviation: (none)
+- Files changed:
+  - modified: `docs/design/directory/briefs/DIRECTORY-005.json` — verification array now holds five entries; the fifth and last is 'Frontend checks pass with strict types and the generated API schema, with negative and crash-boundary tests.'; the first four and every other member are unchanged
+  - modified: `docs/design/directory/briefs/DIRECTORY-005.md` — re-rendered; the Verification section lists the five entries, with the new one at line 109
+- Checklist delivery:
+  - [x] C3 — Each open row (02, 04, 03, 05) is a design-system brief, DIRECTORY-002 to DIRECTORY-005, in dependency order, with its wall as files, its ID001 acceptance identifiers kept, and its estimate in its task. — DIRECTORY-005 keeps its id, wall, ID001 identifiers and 6-hour estimate, and gains only the frontend verification line
+  - [x] C6 — The rendered markdown of this cluster matches its JSON and coverage is clean. — the rendered DIRECTORY-005.md comes from render-cluster.py over the edited JSON
+- Story delivery:
+  - [x] S2 (Reviewer, Reviews a brief before any of its rows is dispatched) — As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria. — DIRECTORY-005 now carries the frontend verification criterion its reviewer checks against
+
 ### R2: Add the three inventory rows beside what main lists
 
 THE SYSTEM SHALL append three rows to the inventory array of docs/design/directory/design.json (docs/design/directory/design.json:580-613, eight rows at 1756688cc08169bef4a9ac37b9b079efb9e38b18, ending with docs/design/identity/RAUTHY-BASELINE.md at docs/design/directory/design.json:606 and docs/design/identity/CONFORMANCE.md at docs/design/directory/design.json:610), after the eight and in this order, each with its path and a note of what exists there at 1756688cc08169bef4a9ac37b9b079efb9e38b18: (1) path 'vendor/rauthy', note 'the maintained Rauthy fork (ADR-009), the git submodule pinned at dd61ac3c84d6b238108dc8438b53043b5177a662, the upstream v0.36.2 commit the ablative branch was created from; DIRECTORY-004 moves the pin (structure row); read here, never changed by a document row'; (2) path 'crates/lys', note 'the lys CLI crate: Cargo.toml, src/main.rs, src/cli.rs and src/commands/ (attest, ca, key, log, inspect, files); DIRECTORY-002 adds src/identity/ and the identity subcommand to it (structure rows)'; (3) path 'docs/design/decisions.json', note 'the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row'. The eight rows main lists SHALL stay byte for byte and in their order. No structure row, principle, goal, non-goal, constraint or gate leg changes. THE SYSTEM SHALL re-render docs/design/directory/DESIGN.md with python3 scripts/design/render-cluster.py docs/design/directory so its Inventory section (docs/design/directory/DESIGN.md:167-176 at 1756688cc08169bef4a9ac37b9b079efb9e38b18) lists the eleven rows.
@@ -78,6 +94,22 @@ THE SYSTEM SHALL append three rows to the inventory array of docs/design/directo
 **Stories:**
 - S2 (Reviewer, Reviews a brief before any of its rows is dispatched) — As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria.
 
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1 (count is 11, first eight unchanged): met. Before appending, the script asserted len(inventory)==8 and a byte-identical round trip. Row 2 (path counts): met. The three rows appended to design.json's inventory add one '"path": "vendor/rauthy"' (two in total with the structure row), one crates/lys (one in total) and one docs/design/decisions.json (two in total with the structure row). Row 3 (one bullet each in DESIGN.md): met, at DESIGN.md:179, :180 and :181. Row 4 (paths of rows 8 onward, and RAUTHY-BASELINE/CONFORMANCE count of 2): met. inventory[8:] are the three paths in the specified order, and the existing RAUTHY-BASELINE.md and CONFORMANCE.md rows are unchanged. No structure row, principle, goal, non-goal, constraint or gate leg was touched.
+- Deviation: (none)
+- Files changed:
+  - modified: `docs/design/directory/design.json` — inventory now holds eleven rows: the eight main lists, byte for byte and in order, then vendor/rauthy, crates/lys and docs/design/decisions.json, each with its note exactly as specified
+  - modified: `docs/design/directory/DESIGN.md` — re-rendered; the Inventory section lists eleven rows, with the three new ones at lines 179-181
+- Checklist delivery:
+  - [x] C1 — The directory design records the outcome, the shared contract as principles, the constraints and the non-goals of IDENTITY-001, revised for the grant ruling. — the design's inventory now names the fork, the CLI crate and the decision ledger it reads
+  - [x] C6 — The rendered markdown of this cluster matches its JSON and coverage is clean. — DESIGN.md was re-rendered from design.json
+- Story delivery:
+  - [x] S2 (Reviewer, Reviews a brief before any of its rows is dispatched) — As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria. — a reviewer sees every file the open rows read or change listed in the inventory
+
 ### R3: Record the Cambium direction in the intention while the non-goal stands
 
 THE SYSTEM SHALL append one sentence to the intention of docs/design/directory/design.json (docs/design/directory/design.json:4 at 1756688cc08169bef4a9ac37b9b079efb9e38b18, one sentence ending 'every identity change.'), after one space, exactly: 'Cambium later uses this issuer, keeping its participant ids (rows 06 and 07); that direction is recorded here while rows 06 and 07 stay the non-goal recorded below, and this sentence promises neither row.' The non-goal for rows 06 and 07 (docs/design/directory/design.json:63-66, text 'Rows 06 (connect Cambium) and 07 (gate, install and demonstrate the release)' with its reason) SHALL stay byte for byte; no other member of the intention, and no goal, principle, non-goal, structure row, constraint or gate leg, changes. THE SYSTEM SHALL re-render docs/design/directory/DESIGN.md with python3 scripts/design/render-cluster.py docs/design/directory so its Intention section (docs/design/directory/DESIGN.md:11-13 at 1756688cc08169bef4a9ac37b9b079efb9e38b18) carries the sentence.
@@ -98,6 +130,22 @@ THE SYSTEM SHALL append one sentence to the intention of docs/design/directory/d
 
 **Stories:**
 - S2 (Reviewer, Reviews a brief before any of its rows is dispatched) — As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria.
+
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1 (the phrase is present once in each file): met. 'keeping its participant ids' is in the intention at design.json:4 and in DESIGN.md's Intention section. Row 2 (the intention's start and end): met. The existing intention text was kept, and the script asserted it ended with 'every identity change.' before the sentence was appended after one space, so it still starts 'An operator installs the identity product without Cambium or Manifold, signs in,' and now ends 'and this sentence promises neither row.' Row 3 (the rows 06/07 non-goal present once, and 11 non-goals): met. non_goals was not touched. Row 4 (5 goals, 9 principles, 12 constraints): met. goals, principles and constraints were not touched. The only other design.json change is R2's inventory append.
+- Deviation: (none)
+- Files changed:
+  - modified: `docs/design/directory/design.json` — intention ends with the specified Cambium sentence, appended after one space
+  - modified: `docs/design/directory/DESIGN.md` — re-rendered; the Intention section, at line 13, carries the sentence
+- Checklist delivery:
+  - [x] C1 — The directory design records the outcome, the shared contract as principles, the constraints and the non-goals of IDENTITY-001, revised for the grant ruling. — the intention records the Cambium direction, and the non-goal for rows 06 and 07 stands unchanged
+  - [x] C6 — The rendered markdown of this cluster matches its JSON and coverage is clean. — DESIGN.md was re-rendered from design.json
+- Story delivery:
+  - [x] S2 (Reviewer, Reviews a brief before any of its rows is dispatched) — As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria. — the direction is recorded without promising row 06 or 07
 
 ## Boundaries
 
