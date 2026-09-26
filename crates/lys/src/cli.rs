@@ -12,6 +12,8 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
+use crate::identity::cli::IdentityCommand;
+
 /// Cryptographic trust infrastructure for AI agents — identity, attestation,
 /// and verification.
 #[derive(Debug, Parser)]
@@ -120,6 +122,12 @@ pub enum Command {
     /// network service, where a decode-success signal is a parsing oracle.
     #[command(subcommand)]
     Inspect(InspectCommand),
+
+    /// Prepare, configure and check the development deployment of the
+    /// standalone identity product: the maintained Rauthy, `SpiceDB` and one
+    /// `PostgreSQL` database (deploy/identity/). Never prints a secret.
+    #[command(subcommand)]
+    Identity(IdentityCommand),
 
     /// Seal a payload for a recipient and sign the envelope with the
     /// sender's identity (X25519 + HKDF-SHA256 + AES-256-GCM, Ed25519

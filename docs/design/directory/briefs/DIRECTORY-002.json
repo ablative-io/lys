@@ -74,7 +74,188 @@
       ],
       "stories": [
         "S3"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "deploy/identity/compose.yaml",
+            "change": "created",
+            "note": "The three dependency processes: postgres (profile `database`, runs postgres-init.sql from its init directory, track_commit_timestamp on); spicedb-migrate (migrate head, then exits); spicedb (serve, HTTP on); rauthy (HIQLITE=false, PostgreSQL datastore, data volume for the Hiqlite cache). Every image is pinned by digest. Every value is `${NAME:?missing_secret|missing_config NAME}`, so nothing is defaulted, and the database host is configuration."
+          },
+          {
+            "path": "deploy/identity/versions.json",
+            "change": "created",
+            "note": "Releases, index and per-platform digests for all three images, the pinned fork commit, the 2026-09-27 release and advisory read, and the accepted IDENTITY-001-UPSTREAM-AUTH-STATE exception."
+          },
+          {
+            "path": "deploy/identity/config.example.toml",
+            "change": "created",
+            "note": "The secret-free deployment config: the node the operator names, compose project, private directory, database address as configuration, local and TLS origins documented, and the two clients."
+          },
+          {
+            "path": "deploy/identity/postgres-init.sql",
+            "change": "created",
+            "note": "Creates the least-privilege roles rauthy and spicedb and a schema each, sets each role's search_path to its own schema, and grants PUBLIC nothing. Passwords come in via psql \\getenv, and an absent one stops the file by name."
+          },
+          {
+            "path": "deploy/identity/README.md",
+            "change": "created",
+            "note": "Install steps; the database address as configuration; local and TLS origins; migration order; readiness and named failures; stop/start; the four-part backup and restore procedure (SQL dump, the Rauthy/Hiqlite data volume, the private key files, the config); SpiceDB's step-1 role; the identity leg."
+          },
+          {
+            "path": "docs/design/identity/reports/IDENTITY-001-deployment.md",
+            "change": "created",
+            "note": "Records the release/advisory check, artifact digests, the resolved configuration with every secret shown as <generated>, and the hand-observed install including the backup/restore result. The gate-measured section is marked as not yet run; the row makes no claim that the directory exists."
+          },
+          {
+            "path": "crates/lys/tests/identity_deploy.rs",
+            "change": "created",
+            "note": "ID001_DEPLOY readiness with only the three services declared and running, plus the three R2 container lines; ID001_PIN_CLONE."
+          },
+          {
+            "path": "crates/lys/tests/identity_refusals.rs",
+            "change": "created",
+            "note": "ID001_DEPLOY_REFUSAL: invalid issuer and redirect refused with nothing written; 192.0.2.10 resolved into compose and refused by health as database_unreachable; a missing secret refused by compose and by the CLI; a stopped database named, with no substitute identity after it returns."
+          },
+          {
+            "path": "crates/lys/tests/identity_shared_db.rs",
+            "change": "created",
+            "note": "ID001_SHARED_DB: both services write and reopen; migration histories and search paths each in their own schema; four cross-schema and public-schema refusals counted; backup, loss and restore, then readiness repeated with the same issuer and signing keys."
+          },
+          {
+            "path": "crates/lys/tests/identity_restart.rs",
+            "change": "created",
+            "note": "ID001_DEPLOY restart: down/up keeping volumes preserves the issuer, the signing keys and the database contents, and configure then reports every operation unchanged."
+          },
+          {
+            "path": "crates/lys/tests/identity_support/mod.rs",
+            "change": "created",
+            "note": "Declares the container-test support modules."
+          },
+          {
+            "path": "crates/lys/tests/identity_support/fixtures.rs",
+            "change": "created",
+            "note": "Venue: a temp dir holding a copy of config.example.toml with free ports, a unique project and a configurable database host. Runs the lys binary and refuses as secret_leaked any run whose output carries a generated secret."
+          },
+          {
+            "path": "crates/lys/tests/identity_support/server.rs",
+            "change": "created",
+            "note": "Stack: requires `docker info` (container_runtime_missing), renders, checks PG_HOST reached compose unchanged, and brings the stack up. Also health/configure/wait_ready, and psql with the password passed through the environment. Drop runs `down -v`."
+          },
+          {
+            "path": "crates/lys/tests/identity_support/compose.rs",
+            "change": "created",
+            "note": "docker compose from the repository root: renders the config through `lys identity prepare`, and reads the resolved `compose config --format json` environment."
+          },
+          {
+            "path": "crates/lys/Cargo.toml",
+            "change": "modified",
+            "note": "Five [[test]] entries with test = false (identity_deploy, identity_refusals, identity_shared_db, identity_restart, identity_theme); the rand, sha2, toml and zeroize dependencies are R2's."
+          },
+          {
+            "path": ".land/gates.sh",
+            "change": "modified",
+            "note": "Adds identity_leg. With no `docker info` answer it prints container_runtime_missing and returns 1. Otherwise it runs `cargo clippy -p lys --all-features --test 'identity_*' -- -D warnings` (no -A/-W/--cap-lints), and on failure prints identity_lint_failed and runs no test; only then `cargo test -p lys --all-features --test 'identity_*'`."
+          },
+          {
+            "path": "CLAUDE.md",
+            "change": "modified",
+            "note": "Exactly one added line in the gate block, naming both identity-leg commands."
+          }
+        ],
+        "how": "Each acceptance row, with its evidence:\n\n1. ID001_DEPLOY is implemented in crates/lys/tests/identity_deploy.rs:34 and crates/lys/tests/identity_restart.rs:21. The deploy test waits for readiness, asserts compose declares exactly {postgres, rauthy, spicedb, spicedb-migrate} and that only postgres, rauthy and spicedb are running. The restart test runs down/up keeping volumes and requires the same issuer and signing-key ids and the same rauthy.clients, jwks and alembic rows. The hand-run install saw exactly this: all three ready from empty volumes, nothing else running (report, 'Observed by hand'). The test itself has not run; it runs on the identity leg.\n\n2. ID001_DEPLOY_REFUSAL is in crates/lys/tests/identity_refusals.rs:34 and :111. Four named config refusals (invalid_issuer, invalid_redirect_uri) leave no private directory. Compose itself refuses a removed secret as `missing_secret LYS_IDENTITY_RAUTHY_API_KEY_SECRET`; I confirmed that wording against the real compose file. prepare and configure refuse a deleted credential as secret_missing and never regenerate it (crates/lys/src/identity/credentials.rs load_or_generate). A stopped database is named database_unreachable, and after it returns the issuer and keys are unchanged.\n\n3. The report is written at docs/design/identity/reports/IDENTITY-001-deployment.md: versions, digests, the resolved config without secrets, and the backup/restore result from the hand-run install. It states that the directory is not claimed.\n\n4. ID001_SHARED_DB is crates/lys/tests/identity_shared_db.rs:36. The hand-run install observed the same things: 48 tables in the rauthy schema, 9 in spicedb, 0 in public; each role refused the other's schema; pg_dump --create, then down -v, create, untar of the data volume, and pg_restore --clean --create --if-exists --exit-on-error exited 0; the same four signing-key ids came back and both services were ready.\n\n5. ID001_PIN_CLONE is crates/lys/tests/identity_deploy.rs:106. It checks the gitlink and the vendor/rauthy HEAD against versions.json source_commit, checks .gitmodules names the ablative-io fork on branch ablative, fetches the fork's ablative tip and runs merge-base --is-ancestor, and refuses objects borrowed through alternates. It is due at the venue gate, whose path the brief's blocked_by places with Heimdall.\n\n6. The 192.0.2.10 row is implemented as described: identity_refusals.rs:66-89 renders through identity_support/compose.rs (Compose::render runs `lys identity prepare`) and reads `docker compose config --format json`. Rauthy's PG_HOST and the host in SpiceDB's datastore URI are both 192.0.2.10, and no postgres service is declared. Health then fails with `database_unreachable ... [database at 192.0.2.10:5432]` and never dials 127.0.0.1 or localhost. The health probe dials only config.database.host (crates/lys/src/identity/health.rs:116), and config.rs:320 refuses a loopback host. I checked the interpolation by hand against the real compose file.\n\n7. The identity-leg clippy row is implemented at .land/gates.sh:32, which runs exactly that command with no allow argument. With the five targets temporarily set test = true, the crusher hook's `cargo clippy --all-targets -- -D warnings` under the workspace pedantic set reported nothing; lys has no features of its own, so --all-features compiles the same code. The manifest was restored to test = false. `cargo test ... 'identity_*'` has not been run.\n\n8. The row that the workspace test run names no identity target holds by construction: test = false at crates/lys/Cargo.toml:50-70, and the tests' own clippy targets exclude them.\n\n9. The docker-absent and unused-variable row is implemented: .land/gates.sh:28-30 returns 1 with container_runtime_missing when `docker info` fails, and :32-34 stops at the clippy step, whose output names the file. Not exercised here.\n\n10. The CLAUDE.md row is met: `git diff CLAUDE.md` shows exactly one added line (CLAUDE.md:102) naming both commands.\n\nStatus is 'implemented' on the strength of this code evidence, the lint evidence and the hand-observed install. The container rows' actual pass is measured only on the identity leg.",
+        "deviation": "Three, all stated in the files. (1) The Rauthy image is upstream's published ghcr.io/sebadob/rauthy:0.36.2, pinned by digest, rather than a fork-built image. The pinned ablative commit dd61ac3 is the v0.36.2 tag commit itself, so the image is built from the pinned source (versions.json image_source_note). Building from source is a release build, which stays on the gate. (2) PostgreSQL is pulled from public.ecr.aws/docker/library/postgres, whose index digest is identical to Docker Hub's, because Docker Hub pulls on this seat failed on a locked credential helper. (3) The report's hand-observed install used an environment rendered by hand with prepare's exact variable names, because the row's CLI could not be built outside the gate. The report says so.",
+        "checklist": [
+          {
+            "id": "C7",
+            "done": true,
+            "note": "Packaged and installed for development, with separate roles and schemas and the database address as configuration. Readiness, restart, named refusals, the shared database and restore are implemented as container tests and observed by hand; the tests' measured pass belongs to the identity leg."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S3",
+            "satisfied": true,
+            "note": "The operator chooses database.host (a network device or this node under the `database` profile). Restart and the documented four-part restore preserve the issuer, the signing keys and the data. Nothing from Cambium or Manifold is involved."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "fixed",
+        "acceptance": [
+          {
+            "criterion": "ID001_DEPLOY: from a fresh venue directory, dependencies become ready with no other Ablative service running; restart preserves issuer identity and database contents.",
+            "met": true,
+            "evidence": "identity_deploy::id001_deploy_ready_configured_and_named and identity_restart::id001_deploy_restart_preserves_issuer_and_contents both ok in /tmp/gates2.log (sh .land/gates.sh, identity leg status 0); the test asserts that compose declares exactly {postgres, rauthy, spicedb, spicedb-migrate} and runs exactly {postgres, rauthy, spicedb}"
+          },
+          {
+            "criterion": "ID001_DEPLOY_REFUSAL: missing secret, invalid issuer/redirect and unavailable database produce named failures, never a substitute identity or development database.",
+            "met": true,
+            "evidence": "identity_refusals::id001_deploy_refusal_config_and_database_address and ::id001_deploy_refusal_running_deployment ok; compose.yaml uses ${NAME:?missing_secret|missing_config NAME} throughout with no defaults; config.rs refuses a loopback database host"
+          },
+          {
+            "criterion": "Dependency artifact digests, versions, resolved configuration without secrets and backup/restore result are recorded in docs/design/identity/reports/IDENTITY-001-deployment.md. This row does not claim the product directory exists yet.",
+            "met": true,
+            "evidence": "the report holds the digests, versions, the configuration with secrets shown as <generated>, and the backup/restore section; line 4 disclaims the directory; 'Measured by the gate' now records the measured run"
+          },
+          {
+            "criterion": "ID001_SHARED_DB: prove Rauthy and SpiceDB both write/reopen against the same PostgreSQL database, migrations do not collide and the service roles cannot read the other schema. Restore the database plus documented key/config/cache dependencies and repeat readiness.",
+            "met": true,
+            "evidence": "identity_shared_db::id001_shared_db_coexist_isolate_and_restore ok in /tmp/gates2.log"
+          },
+          {
+            "criterion": "ID001_PIN_CLONE: the venue fetches the exact pushed Lys ref with recursive submodules and verifies the expected Rauthy commit on ablative without using the Mac reading copy.",
+            "met": true,
+            "evidence": "identity_deploy::id001_pin_clone ok: gitlink and vendor/rauthy HEAD equal dd61ac3c, fetched from github ablative-io/rauthy refs/heads/ablative, merge-base --is-ancestor, no alternates; run on this node; the venue gate's own run is recorded in the report as still owed"
+          },
+          {
+            "criterion": "A test copies deploy/identity/config.example.toml with its database host set to 192.0.2.10, renders it through the identity test support (crates/lys/tests/identity_support/compose.rs) into the environment deploy/identity/compose.yaml interpolates, and reads docker compose -f deploy/identity/compose.yaml config: Rauthy's PG_HOST is 192.0.2.10 and SpiceDB's datastore URI names the host 192.0.2.10; with that address unreachable, readiness fails with a named database failure and no default local address is substituted (ADR-005).",
+            "met": true,
+            "evidence": "identity_refusals.rs UNREACHABLE_HOST=192.0.2.10; id001_deploy_refusal_config_and_database_address ok; health.rs dials only config.database.host"
+          },
+          {
+            "criterion": "From the repository root with the container runtime answering: cargo clippy -p lys --all-features --test 'identity_*' -- -D warnings exits 0 with no warning, the identity leg in .land/gates.sh runs that command exactly with no -A, -W or --cap-lints argument, and cargo test -p lys --all-features --test 'identity_*' runs identity_deploy, identity_refusals, identity_shared_db and identity_restart and exits 0.",
+            "met": true,
+            "evidence": ".land/gates.sh identity_leg runs the exact command with no allow arguments; clippy exit 0; the test run passed all 5 targets (7 tests); identity_leg status 0"
+          },
+          {
+            "criterion": "cargo test --workspace --all-features runs none of identity_deploy, identity_refusals, identity_shared_db and identity_restart: its output names no such target.",
+            "met": true,
+            "evidence": "grep over the cargo test --workspace section of /tmp/gates2.log counts 0 identity_* names; crates/lys/Cargo.toml declares test = false"
+          },
+          {
+            "criterion": "With docker absent from PATH, sh .land/gates.sh prints container_runtime_missing in the identity leg and exits 1; with one unused variable added to crates/lys/tests/identity_restart.rs, the identity leg fails at its clippy step, names identity_restart and runs no identity test.",
+            "met": true,
+            "evidence": "/tmp/gates3.log (PATH without docker): 'container_runtime_missing: ...', '--- status 1: identity_leg ---', EXIT 1. With `let injected = 1;` injected: 'error: unused variable --> crates/lys/tests/identity_restart.rs:28:9', identity_lint_failed, no Running line; the file was restored byte-identical (cmp)"
+          },
+          {
+            "criterion": "CLAUDE.md's gates before any commit carries exactly one added line, and that line names both cargo clippy -p lys --all-features --test 'identity_*' -- -D warnings and cargo test -p lys --all-features --test 'identity_*'.",
+            "met": true,
+            "evidence": "git diff -U0 CLAUDE.md shows a single + line holding both commands"
+          }
+        ],
+        "checklist": [
+          "C7"
+        ],
+        "stories": [
+          "S3"
+        ],
+        "issues": [
+          "Bounds nobody asked for: READY_TIMEOUT (240 s) and `down --timeout 5` in crates/lys/tests/identity_support/server.rs; the 90 s deadline in wait_for_database in crates/lys/tests/identity_shared_db.rs; healthcheck interval 2s, timeout 5s and retries 30 in deploy/identity/compose.yaml.",
+          "wait_ready treated one failed admin `select 1` as final, so a database still in recovery failed identity_deploy (seen in the first gate re-run: 'the database system is not yet accepting connections').",
+          "docs/design/identity/reports/IDENTITY-001-deployment.md claimed the identity leg appends its receipt; nothing writes it, and the section was empty.",
+          "deploy/identity/config.example.toml described a hand-written TOML subset parser that no longer exists (the toml crate reads it).",
+          "Removing the backup path's use of Venue::dir left dead code in the shared support, which the identity clippy caught."
+        ],
+        "fixes": [
+          "Removed READY_TIMEOUT, the down --timeout, the 90 s deadline and the three healthcheck bounds; the gate and Docker's defaults bound them now.",
+          "wait_ready keeps polling until health passes and, for a local database, the admin select 1 answers.",
+          "The report's 'Measured by the gate' section records this review's run: the seven tests, the twelve contrast ratios, and that it is not the venue gate.",
+          "The config.example.toml comment now describes the TOML reading as it is: unknown, missing or mistyped keys are config_invalid.",
+          "identity_shared_db takes its backup directory from tempfile, and Venue::dir and the unused Path import are removed."
+        ]
+      }
     },
     {
       "id": "R2",
@@ -121,7 +302,184 @@
       ],
       "stories": [
         "S3"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys/src/identity/mod.rs",
+            "change": "created",
+            "note": "Declarations only, with the module manifest and invariants in the module docs."
+          },
+          {
+            "path": "crates/lys/src/identity/cli.rs",
+            "change": "created",
+            "note": "The IdentityCommand arguments: prepare --config, configure --config --themes, health --config."
+          },
+          {
+            "path": "crates/lys/src/identity/config.rs",
+            "change": "created",
+            "note": "The typed DeploymentConfig, read with the toml crate (deny_unknown_fields, no defaults), and validation that names each failure (invalid_issuer, invalid_redirect_uri, invalid_database_host including loopback, invalid_sslmode, invalid_client_id, ...). It also derives the issuer and origins. 486 counted lines of code."
+          },
+          {
+            "path": "crates/lys/src/identity/credentials.rs",
+            "change": "created",
+            "note": "The nine declared credentials. Secret is Zeroizing and formats as its name with [redacted]. Values are generated from the thread CSPRNG, reused when present, and a missing one after prepare is secret_missing."
+          },
+          {
+            "path": "crates/lys/src/identity/private_files.rs",
+            "change": "created",
+            "note": "0700 directories and 0600 files: temp write, fsync, rename, directory fsync, then read-back to confirm the outcome (private_write_unconfirmed). Refuses group or other permission bits; fails as io_failed/Unsupported off Unix."
+          },
+          {
+            "path": "crates/lys/src/identity/prepare.rs",
+            "change": "created",
+            "note": "Validates first, then generates or reuses credentials, renders identity.env, and checks every declared file's mode against declared_files(). It prints file names and whether each was generated or reused, never a value."
+          },
+          {
+            "path": "crates/lys/src/identity/configure.rs",
+            "change": "created",
+            "note": "Idempotent reconciliation of exactly the platform and cambium clients and their themes. Operation ids are lys-identity/<kind>/<id>/<sha256 of the desired state>; every write is confirmed by read-back; the built-in rauthy client is never touched and nothing is deleted."
+          },
+          {
+            "path": "crates/lys/src/identity/rauthy.rs",
+            "change": "created",
+            "note": "Plain HTTP/1.1 over std::net that separates 'never sent' from 'sent, answer lost'. Typed NewClient, Theme/ThemeCss and RauthyHealth; named status errors; create_client resolves a lost answer by reading the client back and never sends a second create. The API key lives only in a Zeroizing header, and Debug redacts it."
+          },
+          {
+            "path": "crates/lys/src/identity/health.rs",
+            "change": "created",
+            "note": "Three declared services: a PostgreSQL SSLRequest probe to the configured host, Rauthy /auth/v1/health, SpiceDB /healthz. Each failure is named. When all are ready it prints the issuer and signing-key ids; it reads no credential."
+          },
+          {
+            "path": "crates/lys/src/identity/error.rs",
+            "change": "created",
+            "note": "IdentityError: 19 variants, each message beginning with a stable failure name and carrying the operation, resource and path, never secret bytes."
+          },
+          {
+            "path": "crates/lys/src/identity/config_tests.rs",
+            "change": "created",
+            "note": "The example validates; 192.0.2.10 is accepted as configuration; 20 named refusals, each counted; unknown or missing keys are config_invalid; an https origin needs its proxy CIDR."
+          },
+          {
+            "path": "crates/lys/src/identity/credentials_tests.rs",
+            "change": "created",
+            "note": "Generate once, then reuse; a missing credential is refused and not regenerated; a malformed one is refused without echoing its value. Redaction: Debug and Display of Credentials, every Secret, CredentialSpec and Provenance, and RauthyApi's Debug carry no secret (12 renderings × 9 secrets, counted)."
+          },
+          {
+            "path": "crates/lys/src/identity/error_tests.rs",
+            "change": "created",
+            "note": "Every IdentityError variant, matched with no wildcard so a new variant cannot skip it, formatted with Display, Debug and pretty Debug alongside nine generated secrets: each begins with its name and carries no secret. Plus the status-name mapping."
+          },
+          {
+            "path": "crates/lys/src/identity/prepare_tests.rs",
+            "change": "created",
+            "note": "Walks the private tree and requires it to equal the declared set (9 secrets + identity.env), counting each file at 0600 and the directories at 0700. Also: identity.env carries every LYS_IDENTITY_* variable compose reads; a rerun reuses everything; a missing secret or an opened file mode is refused."
+          },
+          {
+            "path": "Cargo.toml",
+            "change": "modified",
+            "note": "Adds workspace dependency toml = \"1\"."
+          },
+          {
+            "path": "Cargo.lock",
+            "change": "modified",
+            "note": "lys now depends on rand, sha2, toml and zeroize; adds the toml 1.1.6 family (toml_parser, toml_writer, toml_datetime, serde_spanned, winnow, indexmap, hashbrown, equivalent), all MIT or Apache-2.0."
+          },
+          {
+            "path": "crates/lys/Cargo.toml",
+            "change": "modified",
+            "note": "lys dependencies rand, sha2, toml, zeroize (workspace)."
+          },
+          {
+            "path": "crates/lys/src/main.rs",
+            "change": "modified",
+            "note": "Declares mod identity and dispatches Command::Identity to prepare/configure/health."
+          },
+          {
+            "path": "crates/lys/src/cli.rs",
+            "change": "modified",
+            "note": "Adds the Identity(IdentityCommand) subcommand."
+          },
+          {
+            "path": "crates/lys/src/commands/error.rs",
+            "change": "modified",
+            "note": "CliError::Identity(#[from] IdentityError), transparent."
+          },
+          {
+            "path": "crates/lys/tests/identity_deploy.rs",
+            "change": "created",
+            "note": "R2's three container lines (the same file listed under R1)."
+          }
+        ],
+        "how": "Each acceptance row, with its evidence:\n\n1. The redaction test is credentials_tests.rs:79 plus error_tests.rs:134. Both are ordinary unit tests in `cargo test --workspace --all-features`. They cover Secret, Credentials, CredentialSpec, Provenance, RauthyApi and all 19 IdentityError variants, counted and exhaustively matched.\n\n2. Health output without secrets is implemented at identity_deploy.rs:78-85. Every `lys` run in the container tests also goes through Venue::lys, which refuses output containing any generated secret. health.rs reads no credential.\n\n3. File modes are covered by prepare_tests.rs:38: it walks the tree, requires set equality with declared_files(), and counts every mode. prepare.rs:120 also re-checks the declared set at runtime.\n\n4. Configure twice is implemented at identity_deploy.rs:52-71 and check_clients. A CuttingProxy forwards the first POST /auth/v1/clients and drops its answer; configure reports created_resolved_by_read_back, and rauthy.rs:195 reads the client back rather than creating it again. The second run reports all four operations unchanged with identical operation ids. Exactly rauthy, platform and cambium exist, rauthy is equal to its pre-configure JSON, and the configured values (redirects, RS256, S256 or absent) hold. Rauthy's API behaviour was confirmed by hand: a duplicate create is 400 'ID exists already'.\n\n5. Health per service is implemented at identity_deploy.rs:87-99: it stops postgres, rauthy and spicedb in turn, requires database_unreachable, rauthy_unreachable and spicedb_unreachable respectively, and counts 3, equal to health's declared checks.\n\n6. The manifest row is met. The 11 manifest modules exist (themes.rs is R3's), plus only config_tests.rs, credentials_tests.rs, error_tests.rs and prepare_tests.rs (themes_tests.rs is R3's). Counted by the crusher's own counter, the largest is config.rs at 486 lines of code.\n\nclippy -D warnings over all lys targets is clean via the crusher hook. The unit tests have not been run here. Rows 2, 4 and 5 run on the identity leg.",
+        "deviation": "Two. (1) R2 adds the `toml` crate (workspace Cargo.toml and Cargo.lock, both in R2's wall) to read config.example.toml, rather than hand-parsing TOML. The first draft's hand-written subset parser pushed config.rs past the 500-line limit, and the boring, interoperable parser is the same one Rauthy uses. (2) Removed the error variant `UnsupportedPlatform` from my own draft: in a binary crate on Unix it would never be constructed, which is dead code under -D warnings. Off Unix, private files now fail as io_failed with ErrorKind::Unsupported.",
+        "checklist": [
+          {
+            "id": "C8",
+            "done": true,
+            "note": "prepare, configure and health exist with exactly the manifest's modules plus the named sibling test files. The two clients are registered idempotently with stable operation ids. Secrets stay out of Git, output, errors and health."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S3",
+            "satisfied": true,
+            "note": "The operator prepares, configures and checks the standalone deployment from the lys CLI alone. No Python or shell provisioning engine is involved."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "fixed",
+        "acceptance": [
+          {
+            "criterion": "A redaction test in cargo test --workspace --all-features formats every credential and error type under crates/lys/src/identity/ with Debug and Display: none contains a byte of a generated secret.",
+            "met": true,
+            "evidence": "credentials_tests::debug_and_display_of_every_credential_type_carry_no_secret and error_tests::every_error_names_its_failure_and_carries_no_generated_secret (which now also covers rauthy::Transport) both ok in the workspace run"
+          },
+          {
+            "criterion": "In identity_deploy, the health output of a configured deployment is captured: it contains no byte of a generated secret.",
+            "met": true,
+            "evidence": "identity_deploy.rs checks health stdout and stderr against 9 counted secrets; Venue::lys refuses secret_leaked; test ok"
+          },
+          {
+            "criterion": "prepare creates every declared private file with a restricted mode; a test reads each file's mode and counts the files against the declared set.",
+            "met": true,
+            "evidence": "prepare_tests::prepare_creates_exactly_the_declared_private_files_owner_only ok in the workspace run"
+          },
+          {
+            "criterion": "In identity_deploy, after two configure runs against the same Rauthy, the platform client and the Cambium client each exist exactly once with the configured values, the built-in rauthy client is unchanged, and no other client exists; their themes keep unchanged operation identifiers, and a transport failure after a request is resolved by read-back and never creates a second client.",
+            "met": true,
+            "evidence": "id001_deploy_ready_configured_and_named ok: CuttingProxy cut==1, created_resolved_by_read_back, 4 unchanged operations with identical ids, and check_clients passes"
+          },
+          {
+            "criterion": "In identity_deploy, health names each unready service or database: a test makes each one unavailable in turn and counts one named failure per case, equal to the number of declared services.",
+            "met": true,
+            "evidence": "The SERVICES loop in identity_deploy.rs counts named==3==ready.checks length; the test is ok"
+          },
+          {
+            "criterion": "Every module of the manifest exists under crates/lys/src/identity/, the only other files this requirement adds there are the sibling unit-test files config_tests.rs, credentials_tests.rs, error_tests.rs and prepare_tests.rs, and none exceeds 500 lines of code.",
+            "met": true,
+            "evidence": "ls crates/lys/src/identity shows the 10 R2 modules, themes.rs and themes_tests.rs (R3's) and the 4 named test files; the largest is config.rs at 497 non-comment, non-blank lines; health.rs is 174 after the fix"
+          }
+        ],
+        "checklist": [
+          "C8"
+        ],
+        "stories": [
+          "S3"
+        ],
+        "issues": [
+          "Bounds nobody asked for: PROBE_TIMEOUT (3 s) and .take(120) in crates/lys/src/identity/health.rs; TIMEOUT (10 s) and .take(200) on Rauthy's message in crates/lys/src/identity/rauthy.rs.",
+          "health reported the database ready while PostgreSQL was starting or recovering, because such a server still answers an SSLRequest. That is a wrong readiness answer.",
+          "The redaction test did not cover rauthy::Transport, the other error type under identity/."
+        ],
+        "fixes": [
+          "Removed PROBE_TIMEOUT, TIMEOUT and both truncations; connections use TcpStream::connect, and Rauthy's message is carried whole.",
+          "health.rs now sends a password-less startup message after the SSLRequest and names a 57P-class refusal database_not_accepting; the module docs and the README readiness table list it.",
+          "error_tests renders both Transport variants with Debug against the nine secrets, counted."
+        ]
+      }
     },
     {
       "id": "R3",
@@ -153,7 +511,106 @@
       ],
       "stories": [
         "S3"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "deploy/identity/rauthy-themes.json",
+            "change": "created",
+            "note": "Dark only. Per client, only text←foundation.text, bg←foundation.ink, bg_high←foundation.raised and accent←the product accent (platform: products.identity.accent #D4975A [30,59,59]; cambium: products.cambium.accent #5E8C6A [136,20,46]). Records the source ref and the copy actually read."
+          },
+          {
+            "path": "deploy/identity/theme-map.md",
+            "change": "created",
+            "note": "Every source token and its hex-to-HSL conversion; exactly eight gaps (light mode, error, radius, text_high, action, btn_text, theme_sun, theme_moon), each keeping Rauthy's default; ADR-021 cited; the twelve contrast figures."
+          },
+          {
+            "path": "crates/lys/src/identity/themes.rs",
+            "change": "created",
+            "note": "Loads and validates the mapping: dark only, exact token roles, HSL recomputed from each hex, no Aion accent, no banned purple. DarkMapping::apply changes only the four fields. check_contrast applies WCAG 2.1 AA to six pairs, resolving hsl()/hsla() values against the theme, and a pair below its tier is contrast_below_tier naming it."
+          },
+          {
+            "path": "crates/lys/src/identity/themes_tests.rs",
+            "change": "created",
+            "note": "The shipped mapping sets only the four fields; hex→HSL is checked on 7 colours; the WCAG formula; 12 pairs counted at their tiers; a low pair refused by name; 6 mapping refusals counted (light mode, purple, text←muted, a wrong HSL, a wrong product, missing source)."
+          },
+          {
+            "path": "crates/lys/tests/identity_theme.rs",
+            "change": "created",
+            "note": "The identity-leg theme test. It reads Rauthy's pinned defaults from vendor/rauthy's source, checks both exported themes (four mapped fields, eight gaps, light mode, radius), and runs the counted contrast leg with an independent HSL implementation: 12 lines plus the summary. It then restarts Rauthy and checks the themes persist."
+          },
+          {
+            "path": "crates/lys/Cargo.toml",
+            "change": "modified",
+            "note": "[[test]] identity_theme, test = false."
+          }
+        ],
+        "how": "Each acceptance row, with its evidence:\n\n1. ID001_THEME is implemented at crates/lys/tests/identity_theme.rs:35. It checks the mapped fields against rauthy-themes.json, and the gaps, light mode and radius against defaults parsed from vendor/rauthy/src/data/src/entity/theme.rs (default_dark 459, default_light 474, radius 88). It checks the six pairs per client from what the running Rauthy exports (configure's read-back), and persistence across `compose restart rauthy`. The source ref and theme export are recorded in theme-map.md and in configure's JSON output.\n\n2. The counted contrast leg is implemented: identity_theme.rs:116 prints 'contrast <client> <pair>: <ratio .2> (tier ...)' twelve times, then :78 prints 'contrast: 12 pairs measured, 12 at or above their tier'. A low pair returns contrast_below_tier naming the pair and its ratio. Computed on the stored HSL values: the lowest is Cambium theme_moon over ink at 3.97 against 3:1, so no gap stops the row. themes_tests.rs asserts all 12 pass.\n\n3. The accent row is met. Validation requires platform→products.identity.accent and cambium→products.cambium.accent and refuses #A78BFA (themes.rs validate:141). identity_theme.rs:39 refuses #6B96D1 or #A78BFA anywhere in the mapping. Neither appears.\n\n4. The theme-map row is met: it names exactly eight gaps, each 'keeps Rauthy's own default', and cites ADR-021.\n\n5. The identity_theme target is test = false (crates/lys/Cargo.toml:70) and runs on the leg via --test 'identity_*'. Not run here.\n\n6. The ledger carry-check is met. Against origin/main 1756688cc08169bef4a9ac37b9b079efb9e38b18 (fetched; it is HEAD~1 and an ancestor): every decision and roadmap row main holds is present by id and byte-identical when serialised with sorted keys. The branch holds exactly one more in each: ADR-021 in decisions.json and RM-014 in roadmap.json. validate.py exited 0 on both files. Those ledgers were not changed by this work.",
+        "deviation": "The estate token values were read from ablative-io/design-system palette/estate-colour-tokens.json at 3c3bac715fb60348017f0d5cf40b412cf168da77. The brief's ablative-docs 385916e could not be reached from this seat (ablative-io/ablative-docs does not resolve, and no local clone holds 385916e). That copy's identity entry matches ADR-010's recorded 385916e values exactly. rauthy-themes.json cites 385916e in source.ref and records the copy read in source.read_copy; theme-map.md explains it. Someone who can reach 385916e should confirm it.",
+        "checklist": [
+          {
+            "id": "C9",
+            "done": true,
+            "note": "Both themes carry the estate neutrals, with Cambium green on the Cambium client and identity orange on the platform client. ID001_THEME is implemented and its contrast is computed; the running-Rauthy check runs on the identity leg."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S3",
+            "satisfied": true,
+            "note": "The standalone product's sign-in pages wear the estate vocabulary with no Cambium or Aion build dependency."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "fixed",
+        "acceptance": [
+          {
+            "criterion": "ID001_THEME: inspect both client login pages in dark mode; text is the estate text, bg is ink, bg_high is raised and accent is the client's product accent, each as the declared mapping gives it in HSL; the eight gap fields and every light field equal the pinned Rauthy's defaults; all persist after restart. Readable contrast is WCAG 2.1 AA over six pairs per client, each ratio computed with the WCAG relative-luminance formula from the values the running Rauthy exports: text over bg (ink), text over bg_high (raised), text_high over ink and btn_text over action at 4.5 to 1 or more, the body-text tier; theme_sun over ink and theme_moon over ink at 3 to 1 or more, the tier for large text, icons and interface components. Record the source-token ref and Rauthy theme export without credentials.",
+            "met": true,
+            "evidence": "identity_theme::id001_theme_contrast ok (mapped fields, gaps and light defaults read from vendor/rauthy, persistence across a restart); the token values match design-system palette/estate-colour-tokens.json; the source ref is in rauthy-themes.json and theme-map.md"
+          },
+          {
+            "criterion": "The contrast check is a counted leg of identity_theme: cargo test -p lys --all-features --test identity_theme contrast -- --nocapture prints one line per pair per client naming the pair, its measured ratio to two decimal places and its tier, twelve lines in all, then the line contrast: 12 pairs measured, 12 at or above their tier, and exits 0; when any pair is below its tier the leg fails naming that pair and its ratio. A gap field whose Rauthy default fails over ink stays a gap and takes no value the estate does not name: the row stops and names the failing pair as a CN9 stop for the lead.",
+            "met": true,
+            "evidence": "The command printed 12 'contrast <client> <pair>: N.NN (tier ...)' lines, then 'contrast: 12 pairs measured, 12 at or above their tier', and exited 0; the lowest is cambium theme_moon at 3.97; an independent Python WCAG calculation gives the same 16.25 and 13.48; themes_tests covers the refusal of a low pair"
+          },
+          {
+            "criterion": "The Cambium client's accent is Cambium green and the identity client's is the identity orange of the estate tokens; neither is Aion blue, and no purple token appears in deploy/identity/rauthy-themes.json.",
+            "met": true,
+            "evidence": "rauthy-themes.json: platform accent products.identity.accent #D4975A, cambium accent products.cambium.accent #5E8C6A; neither #6B96D1 nor #A78BFA appears"
+          },
+          {
+            "criterion": "deploy/identity/theme-map.md names exactly eight gaps, light mode, the error colour, the radius, text_high, action, btn_text, theme_sun and theme_moon, each marked as keeping Rauthy's own default, and cites ADR-021.",
+            "met": true,
+            "evidence": "theme-map.md '## The eight gaps' table rows 1-8 under 'Keeps Rauthy's own default'; ADR-021 cited"
+          },
+          {
+            "criterion": "cargo test --workspace --all-features runs no target named identity_theme, and cargo test -p lys --all-features --test identity_theme runs it on the identity leg and exits 0.",
+            "met": true,
+            "evidence": "0 identity_* names in the workspace test section of /tmp/gates2.log; identity_theme ok on the identity leg"
+          },
+          {
+            "criterion": "Ledger carry-check against main at the brief's src commit, the commit the build's src input names: for docs/design/decisions.json and for docs/design/roadmap.json, the file at that commit (git show, then json.load) is compared with the branch's file entry by entry, and every decision and every row main holds there is present by id and byte-identical when both are serialised with sorted keys; the branch holds exactly one entry more in each ledger, ADR-021 in decisions.json and RM-014 in roadmap.json, each appearing exactly once; and python3 scripts/design/validate.py docs/design/decisions.json and python3 scripts/design/validate.py docs/design/roadmap.json exit 0.",
+            "met": true,
+            "evidence": "Against 1756688cc081: decisions main 18 / branch 19, all identical, extra [ADR-021] once; roadmap main 10 / branch 11, all identical, extra [RM-014] once; both validate.py runs exit 0"
+          }
+        ],
+        "checklist": [
+          "C9"
+        ],
+        "stories": [
+          "S3"
+        ],
+        "issues": [
+          "theme-map.md said nothing in the repository reads the gap values, but the contrast check and ID001_THEME read Rauthy's defaults to measure them.",
+          "The token values were read from ablative-io/design-system at 3c3bac7, not ablative-docs 385916e, which is unreachable (stated deviation). The identity values match ADR-010's record of 385916e; confirming the Cambium accent at 385916e is owed to someone who can reach it."
+        ],
+        "fixes": [
+          "theme-map.md now says nothing sets a gap value and that the contrast check and ID001_THEME only read the defaults to measure them."
+        ]
+      }
     },
     {
       "id": "R4",
@@ -175,7 +632,56 @@
       ],
       "stories": [
         "S3"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "deploy/identity/README.md",
+            "change": "created",
+            "note": "'SpiceDB in step 1' section: R4's sentence word for word, and what SpiceDB does not do in step 1."
+          }
+        ],
+        "how": "1. The README row is met: deploy/identity/README.md:148 carries R4's sentence ('in step 1 SpiceDB is installed, migrated, backed up and health-checked against the shared PostgreSQL database, and it enforces nothing, because no component asks it for a permission decision or writes a grant to it, and live capability policy and its enforcement stay with road step 2'). A substring check against the brief JSON returned True.\n\n2. The source-search row is met. `grep -i spicedb crates/lys/src/identity/*.rs` finds it only in configuration (config.rs; the credentials and env names in credentials.rs and prepare.rs), the health readiness check (health.rs /healthz, cli.rs help) and module docs. A search for relationships/write, schema/write, CheckPermission, WriteRelationships or WriteSchema under crates/lys/src finds nothing. The fixture schema and relationship live only in the test crates/lys/tests/identity_shared_db.rs and are documented there as fixtures, not grants.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C10",
+            "done": true,
+            "note": "The role is written word for word and held: health reads readiness only, and no permission, relationship or schema call exists in the CLI."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S3",
+            "satisfied": true,
+            "note": "The operator can see from the README exactly what SpiceDB does and does not do in step 1."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "deploy/identity/README.md carries the step-1 sentence of this requirement word for word.",
+            "met": true,
+            "evidence": "deploy/identity/README.md:148 carries the sentence from the brief's R4 spec verbatim"
+          },
+          {
+            "criterion": "A search of crates/lys/src/identity/ finds SpiceDB named only by the health readiness check and its configuration: no permission check, relationship write or schema write call.",
+            "met": true,
+            "evidence": "grep -i spicedb in crates/lys/src/identity finds only config, credential/env names, health /healthz and docs; no CheckPermission, WriteRelationships, WriteSchema, relationships/write or schema/write"
+          }
+        ],
+        "checklist": [
+          "C10"
+        ],
+        "stories": [
+          "S3"
+        ],
+        "issues": [],
+        "fixes": []
+      }
     }
   ],
   "boundaries": [

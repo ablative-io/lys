@@ -1,0 +1,45 @@
+{
+  "checked_at": "2026-09-27",
+  "checked_how": "GitHub releases and security-advisories APIs for sebadob/rauthy and authzed/spicedb; registry manifests read by digest from ghcr.io, registry-1.docker.io and public.ecr.aws",
+  "rauthy": {
+    "release": "v0.36.2",
+    "source_repository": "https://github.com/ablative-io/rauthy.git",
+    "source_branch": "ablative",
+    "source_commit": "dd61ac3c84d6b238108dc8438b53043b5177a662",
+    "image": "ghcr.io/sebadob/rauthy:0.36.2",
+    "image_index_digest": "sha256:f7d3c501402165e023edbd958b032b41c9cfdac5ea7f8ca7d62217327145577e",
+    "platform_digests": {
+      "linux/amd64": "sha256:2f227cdc1cb8b5377c34deecf4472218e7b33d7c3d891344bf0b3911312744a6",
+      "linux/arm64": "sha256:979c51e5fcc4215602618ebaff557bd0f9157b7e0c70636a8e657afd95f6f945"
+    },
+    "image_source_note": "The pinned ablative commit is the upstream v0.36.2 tag commit itself (docs/design/identity/RAUTHY-BASELINE.md), so upstream's published v0.36.2 image is built from the pinned source. When ablative diverges from the tag (row 03), a fork-built image pinned by digest replaces it.",
+    "latest_upstream_release": "v0.36.2, published 2026-08-08",
+    "advisories": [
+      "GHSA-wx92-7mmw-5x82: affected <= 0.36.1, patched 0.36.2",
+      "GHSA-7qh2-3hc5-2vqp: affected >= 0.30.0, < 0.36.1, patched 0.36.1",
+      "GHSA-x8jp-v2j6-6vjf: affected < 0.36.0, patched 0.36.0"
+    ],
+    "accepted_exception": "IDENTITY-001-UPSTREAM-AUTH-STATE: v0.36.2 lacks upstream hardening #1696 and #1728. Accepted for isolated development installs with test identities in rows 02 to 05 only (Waffles, door time 15:36:25); it binds real sign-in and install in rows 06 and 07 through IDENTITY-002."
+  },
+  "spicedb": {
+    "release": "v1.56.2",
+    "image": "ghcr.io/authzed/spicedb:v1.56.2",
+    "image_index_digest": "sha256:aa96009a0477f8a759149823407d47ad16d1a74390bae3102b3b0b7143502764",
+    "platform_digests": {
+      "linux/amd64": "sha256:71714826647e660f22aab619abe2b7ee659bdfd40d2f66c141f0c5fbfa997a06",
+      "linux/arm64": "sha256:dd98bfca12f111a0e698bf348723fe4e443d2189a6bd40481adb31ee9789a6ad"
+    },
+    "latest_upstream_release": "v1.56.2, published 2026-09-11",
+    "advisories": "Every published advisory is patched at or before v1.56.2; the latest, GHSA-jf7w-wx43-32gc (affected >= v1.54.0, < v1.56.2), is patched in this release."
+  },
+  "postgres": {
+    "release": "17.11",
+    "image": "public.ecr.aws/docker/library/postgres:17.11-bookworm",
+    "image_index_digest": "sha256:639ab7ceb90e13123085b741fb31ef493fba25463002f6da665352e7b534b652",
+    "platform_digests": {
+      "linux/amd64": "sha256:91eb910c44c7ed13f7f1a4ccadaa9ca72ef14cddc04cacb6e070e48eb44731a3",
+      "linux/arm64": "sha256:75731e2765e7d0c8bb7dea960ef3bdcde68d16314991ab2057a2a74ea0fff257"
+    },
+    "image_source_note": "The Docker Official Image, pulled through its ECR Public mirror, whose index digest is identical to docker.io/library/postgres:17.11-bookworm. PostgreSQL 17 is a supported major release; 17.11 is its latest minor at the check."
+  }
+}

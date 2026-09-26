@@ -21,15 +21,53 @@ lys-log-store.workspace = true
 base64.workspace = true
 chrono.workspace = true
 clap.workspace = true
+# `lys identity`: generated deployment credentials (rand), stable operation
+# identifiers over the desired Rauthy state (sha2), the deployment config
+# (toml), and credential buffers wiped on drop (zeroize).
+rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 thiserror.workspace = true
+toml.workspace = true
 # Read-only X.509 field extraction for `lys inspect cert`; verification stays
 # in lys-core, which speaks DER and owns every trust decision.
 x509-parser.workspace = true
+zeroize.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+# The container-backed identity targets (DIRECTORY-002 R1, R2, R3). `test = false`
+# keeps them out of `cargo test --workspace --all-features`, which stays hermetic:
+# none of them runs without a container runtime answering `docker info`. They run
+# only on the identity leg of .land/gates.sh, linted first:
+#   cargo clippy -p lys --all-features --test 'identity_*' -- -D warnings
+#   cargo test -p lys --all-features --test 'identity_*'
+[[test]]
+name = "identity_deploy"
+path = "tests/identity_deploy.rs"
+test = false
+
+[[test]]
+name = "identity_refusals"
+path = "tests/identity_refusals.rs"
+test = false
+
+[[test]]
+name = "identity_shared_db"
+path = "tests/identity_shared_db.rs"
+test = false
+
+[[test]]
+name = "identity_restart"
+path = "tests/identity_restart.rs"
+test = false
+
+[[test]]
+name = "identity_theme"
+path = "tests/identity_theme.rs"
+test = false
 
 [lints]
 workspace = true

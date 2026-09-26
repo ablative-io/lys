@@ -1,0 +1,124 @@
+# deploy/identity/compose.yaml
+#
+# The three dependency processes of the standalone identity product (DIRECTORY-002
+# R1): the maintained Rauthy (ADR-009), SpiceDB, and one PostgreSQL service holding
+# one durable database for both (ADR-005). Cambium, Manifold, Argus and Aion are not
+# runtime dependencies of anything here (ADR-004).
+#
+# Every value below that varies by deployment is interpolated from the environment
+# file `lys identity prepare` renders (identity.env in the deployment's private
+# directory); run from the repository root:
+#
+#   docker compose -f deploy/identity/compose.yaml -p <project> \
+#     --env-file <private_dir>/identity.env --profile database up -d
+#
+# Every interpolation is `${NAME:?...}`: a value that is absent refuses by name and
+# nothing is defaulted, so no database address, secret or origin is ever
+# substituted. The database host in particular is configuration and is never
+# assumed to be this machine (ADR-005).
+#
+# The `database` profile runs the PostgreSQL service on this node. Leave it off when
+# the database lives on another device: Rauthy and SpiceDB then dial the configured
+# host, and nothing starts a local stand-in.
+#
+# Migration order: PostgreSQL ready (its init directory runs postgres-init.sql once,
+# on first initialisation) -> spicedb-migrate runs SpiceDB's migrations to head in
+# the spicedb schema and exits -> SpiceDB serves, and Rauthy starts and runs its own
+# embedded migrations in the rauthy schema. Image references pin the digests
+# recorded in deploy/identity/versions.json.
+
+name: lys-identity
+
+services:
+  postgres:
+    image: public.ecr.aws/docker/library/postgres:17.11-bookworm@sha256:639ab7ceb90e13123085b741fb31ef493fba25463002f6da665352e7b534b652
+    profiles: ["database"]
+    # SpiceDB's PostgreSQL datastore reads commit timestamps for its revisions.
+    command: ["postgres", "-c", "track_commit_timestamp=on"]
+    environment:
+      POSTGRES_USER: ${LYS_IDENTITY_PG_ADMIN_USER:?missing_config LYS_IDENTITY_PG_ADMIN_USER}
+      POSTGRES_PASSWORD: ${LYS_IDENTITY_PG_ADMIN_PASSWORD:?missing_secret LYS_IDENTITY_PG_ADMIN_PASSWORD}
+      POSTGRES_DB: ${LYS_IDENTITY_PG_DATABASE:?missing_config LYS_IDENTITY_PG_DATABASE}
+      LYS_IDENTITY_RAUTHY_DB_PASSWORD: ${LYS_IDENTITY_RAUTHY_DB_PASSWORD:?missing_secret LYS_IDENTITY_RAUTHY_DB_PASSWORD}
+      LYS_IDENTITY_SPICEDB_DB_PASSWORD: ${LYS_IDENTITY_SPICEDB_DB_PASSWORD:?missing_secret LYS_IDENTITY_SPICEDB_DB_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/10-identity.sql:ro
+    ports:
+      - "${LYS_IDENTITY_PG_PUBLISH:?missing_config LYS_IDENTITY_PG_PUBLISH}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+
+  spicedb-migrate:
+    image: ghcr.io/authzed/spicedb:v1.56.2@sha256:aa96009a0477f8a759149823407d47ad16d1a74390bae3102b3b0b7143502764
+    command: ["datastore", "migrate", "head"]
+    environment:
+      SPICEDB_DATASTORE_ENGINE: postgres
+      SPICEDB_DATASTORE_CONN_URI: postgres://${LYS_IDENTITY_SPICEDB_DB_USER:?missing_config LYS_IDENTITY_SPICEDB_DB_USER}:${LYS_IDENTITY_SPICEDB_DB_PASSWORD:?missing_secret LYS_IDENTITY_SPICEDB_DB_PASSWORD}@${LYS_IDENTITY_PG_HOST:?missing_config LYS_IDENTITY_PG_HOST}:${LYS_IDENTITY_PG_PORT:?missing_config LYS_IDENTITY_PG_PORT}/${LYS_IDENTITY_PG_DATABASE:?missing_config LYS_IDENTITY_PG_DATABASE}?sslmode=${LYS_IDENTITY_PG_SSLMODE:?missing_config LYS_IDENTITY_PG_SSLMODE}
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    restart: "no"
+
+  spicedb:
+    image: ghcr.io/authzed/spicedb:v1.56.2@sha256:aa96009a0477f8a759149823407d47ad16d1a74390bae3102b3b0b7143502764
+    command: ["serve"]
+    environment:
+      SPICEDB_DATASTORE_ENGINE: postgres
+      SPICEDB_DATASTORE_CONN_URI: postgres://${LYS_IDENTITY_SPICEDB_DB_USER:?missing_config LYS_IDENTITY_SPICEDB_DB_USER}:${LYS_IDENTITY_SPICEDB_DB_PASSWORD:?missing_secret LYS_IDENTITY_SPICEDB_DB_PASSWORD}@${LYS_IDENTITY_PG_HOST:?missing_config LYS_IDENTITY_PG_HOST}:${LYS_IDENTITY_PG_PORT:?missing_config LYS_IDENTITY_PG_PORT}/${LYS_IDENTITY_PG_DATABASE:?missing_config LYS_IDENTITY_PG_DATABASE}?sslmode=${LYS_IDENTITY_PG_SSLMODE:?missing_config LYS_IDENTITY_PG_SSLMODE}
+      SPICEDB_GRPC_PRESHARED_KEY: ${LYS_IDENTITY_SPICEDB_PRESHARED_KEY:?missing_secret LYS_IDENTITY_SPICEDB_PRESHARED_KEY}
+      SPICEDB_HTTP_ENABLED: "true"
+      SPICEDB_HTTP_ADDR: ":8443"
+    ports:
+      - "${LYS_IDENTITY_SPICEDB_GRPC_PUBLISH:?missing_config LYS_IDENTITY_SPICEDB_GRPC_PUBLISH}:50051"
+      - "${LYS_IDENTITY_SPICEDB_HTTP_PUBLISH:?missing_config LYS_IDENTITY_SPICEDB_HTTP_PUBLISH}:8443"
+    depends_on:
+      spicedb-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  rauthy:
+    image: ghcr.io/sebadob/rauthy:0.36.2@sha256:f7d3c501402165e023edbd958b032b41c9cfdac5ea7f8ca7d62217327145577e
+    environment:
+      # PostgreSQL is the identity datastore; Hiqlite runs only as Rauthy's cache.
+      HIQLITE: "false"
+      PG_HOST: ${LYS_IDENTITY_PG_HOST:?missing_config LYS_IDENTITY_PG_HOST}
+      PG_PORT: ${LYS_IDENTITY_PG_PORT:?missing_config LYS_IDENTITY_PG_PORT}
+      PG_USER: ${LYS_IDENTITY_RAUTHY_DB_USER:?missing_config LYS_IDENTITY_RAUTHY_DB_USER}
+      PG_PASSWORD: ${LYS_IDENTITY_RAUTHY_DB_PASSWORD:?missing_secret LYS_IDENTITY_RAUTHY_DB_PASSWORD}
+      PG_DB_NAME: ${LYS_IDENTITY_PG_DATABASE:?missing_config LYS_IDENTITY_PG_DATABASE}
+      PG_TLS: ${LYS_IDENTITY_PG_SSLMODE:?missing_config LYS_IDENTITY_PG_SSLMODE}
+      ENC_KEYS: ${LYS_IDENTITY_RAUTHY_ENC_KEY:?missing_secret LYS_IDENTITY_RAUTHY_ENC_KEY}
+      ENC_KEY_ACTIVE: ${LYS_IDENTITY_RAUTHY_ENC_KEY_ID:?missing_secret LYS_IDENTITY_RAUTHY_ENC_KEY_ID}
+      HQL_NODE_ID: "1"
+      HQL_NODES: "1 localhost:8100 localhost:8200"
+      HQL_SECRET_RAFT: ${LYS_IDENTITY_RAUTHY_HQL_SECRET_RAFT:?missing_secret LYS_IDENTITY_RAUTHY_HQL_SECRET_RAFT}
+      HQL_SECRET_API: ${LYS_IDENTITY_RAUTHY_HQL_SECRET_API:?missing_secret LYS_IDENTITY_RAUTHY_HQL_SECRET_API}
+      LISTEN_SCHEME: http
+      PUB_URL: ${LYS_IDENTITY_RAUTHY_PUB_URL:?missing_config LYS_IDENTITY_RAUTHY_PUB_URL}
+      PROXY_MODE: ${LYS_IDENTITY_RAUTHY_PROXY_MODE:?missing_config LYS_IDENTITY_RAUTHY_PROXY_MODE}
+      # Empty for a loopback http origin; the TLS proxy's CIDR for an https one.
+      TRUSTED_PROXIES: ${LYS_IDENTITY_RAUTHY_TRUSTED_PROXIES?missing_config LYS_IDENTITY_RAUTHY_TRUSTED_PROXIES}
+      RP_ID: ${LYS_IDENTITY_RAUTHY_RP_ID:?missing_config LYS_IDENTITY_RAUTHY_RP_ID}
+      RP_ORIGIN: ${LYS_IDENTITY_RAUTHY_RP_ORIGIN:?missing_config LYS_IDENTITY_RAUTHY_RP_ORIGIN}
+      BOOTSTRAP_ADMIN_EMAIL: ${LYS_IDENTITY_RAUTHY_ADMIN_EMAIL:?missing_config LYS_IDENTITY_RAUTHY_ADMIN_EMAIL}
+      BOOTSTRAP_ADMIN_PASSWORD_PLAIN: ${LYS_IDENTITY_RAUTHY_ADMIN_PASSWORD:?missing_secret LYS_IDENTITY_RAUTHY_ADMIN_PASSWORD}
+      BOOTSTRAP_API_KEY: ${LYS_IDENTITY_RAUTHY_API_KEY:?missing_config LYS_IDENTITY_RAUTHY_API_KEY}
+      BOOTSTRAP_API_KEY_SECRET: ${LYS_IDENTITY_RAUTHY_API_KEY_SECRET:?missing_secret LYS_IDENTITY_RAUTHY_API_KEY_SECRET}
+      EVENT_EMAIL: ${LYS_IDENTITY_RAUTHY_ADMIN_EMAIL:?missing_config LYS_IDENTITY_RAUTHY_ADMIN_EMAIL}
+    volumes:
+      # Hiqlite's cache node state (raft log, cache state machine) and the
+      # bootstrap generated-secrets container: backed up beside the SQL dump,
+      # see deploy/identity/README.md.
+      - rauthy-data:/app/data
+    ports:
+      - "${LYS_IDENTITY_RAUTHY_PUBLISH:?missing_config LYS_IDENTITY_RAUTHY_PUBLISH}:8080"
+    depends_on:
+      spicedb-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  rauthy-data:

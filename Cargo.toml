@@ -43,6 +43,9 @@ sha1 = "0.10"
 sha2 = "0.10"
 thiserror = "2"
 time = "0.3"
+# `lys identity` reads the operator's deployment config (deploy/identity/
+# config.example.toml) with the same TOML crate Rauthy reads its own with.
+toml = "1"
 tracing = "0.1"
 x25519-dalek = { version = "2", features = ["serde", "static_secrets"] }
 x509-parser = "0.16"

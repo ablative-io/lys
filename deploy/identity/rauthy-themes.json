@@ -1,0 +1,32 @@
+{
+  "source": {
+    "repository": "ablative-docs",
+    "path": "docs/design-system-v2/palette/estate-colour-tokens.json",
+    "ref": "385916e",
+    "owner": "Waffles",
+    "read_copy": "ablative-io/design-system palette/estate-colour-tokens.json at 3c3bac715fb60348017f0d5cf40b412cf168da77 (see deploy/identity/theme-map.md)"
+  },
+  "mode": "dark",
+  "clients": [
+    {
+      "client": "platform",
+      "product": "identity",
+      "dark": {
+        "text": { "token": "foundation.text", "hex": "#E8EAEC", "hsl": [210, 10, 92] },
+        "bg": { "token": "foundation.ink", "hex": "#0C0E10", "hsl": [210, 14, 5] },
+        "bg_high": { "token": "foundation.raised", "hex": "#1E2226", "hsl": [210, 12, 13] },
+        "accent": { "token": "products.identity.accent", "hex": "#D4975A", "hsl": [30, 59, 59] }
+      }
+    },
+    {
+      "client": "cambium",
+      "product": "cambium",
+      "dark": {
+        "text": { "token": "foundation.text", "hex": "#E8EAEC", "hsl": [210, 10, 92] },
+        "bg": { "token": "foundation.ink", "hex": "#0C0E10", "hsl": [210, 14, 5] },
+        "bg_high": { "token": "foundation.raised", "hex": "#1E2226", "hsl": [210, 12, 13] },
+        "accent": { "token": "products.cambium.accent", "hex": "#5E8C6A", "hsl": [136, 20, 46] }
+      }
+    }
+  ]
+}

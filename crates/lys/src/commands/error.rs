@@ -215,6 +215,12 @@ pub enum CliError {
         #[source]
         source: chrono::ParseError,
     },
+
+    /// A `lys identity` subcommand failed. Its message already begins with
+    /// the failure's stable name and never carries a secret, so it is
+    /// forwarded verbatim.
+    #[error(transparent)]
+    Identity(#[from] crate::identity::error::IdentityError),
 }
 
 /// Convenience alias for `Result<T, CliError>`.
