@@ -57,14 +57,26 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   `raw_blocks` separately.
 - `lys.harness_event` (R8): `{kind, harness: "claude-code", source_uuid,
   record, detail}`. `kind` is `hook`, `attachment`, `system`,
-  `permission_mode` or `tool_completed`; `record` is the whole source record
-  as a block, by hash; `detail` holds names, ids, exit codes and counts only,
-  never output or a body, and the serialised data is at most 512 bytes. A
-  record that carries a uuid (`attachment`, `system`) sits at its exact place
-  on the file's chain under that uuid, since a message's parentUuid may name
-  it; a `permission-mode` record (no uuid) and each `tool_completed` (one per
-  tool result) hang under the entry they followed as side leaves, off the
-  context path.
+  `permission_mode`, `tool_completed` or `template_render`; `record` is the
+  whole source record as a block, by hash; `detail` holds names, ids, exit
+  codes and counts only, never output or a body, and the serialised data is
+  at most 512 bytes. A record that carries a uuid (`attachment`, `system`)
+  sits at its exact place on the file's chain under that uuid, since a
+  message's parentUuid may name it; a `permission-mode` record (no uuid) and
+  each `tool_completed` (one per tool result) hang under the entry they
+  followed as side leaves, off the context path.
+- `template_render` (HOME-002 R5), the sixth kind: written by `render-launch`,
+  not imported. Its `source_uuid` is null, its `record` is the SHA-256 of a
+  manifest block, and its `detail` is `{template, session_head, files}`: the
+  template hash, the session head hash (the SHA-256 of the head entry's line,
+  newline included) and the count of files written. The manifest block, in
+  the block store, is `{template, session_head, head, uuid, files}` with
+  `head` the head entry id (or null), `uuid` the rendered session id and
+  `files` a list of `{path, sha256}` in write order, so the paths never sit
+  in the event and it stays under the cap. The event hangs beside the context
+  path as a side leaf under the head (`append_beside`): the head does not
+  move, the render walker never sees it, and a second render of the same
+  session records the same session head hash in a second event.
 - `lys.authored` (R3, R4): no data. Precedes the first authored message entry
   of a session; every authored assistant message carries provider, api and
   model `authored`, so a demonstration is never mistaken for history.

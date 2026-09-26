@@ -14,12 +14,23 @@
 //! original is lost; `detail` carries only names, ids, exit codes and counts,
 //! never hook output or a tool result's body, and the serialised data is
 //! refused when it would exceed [`MAX_DATA_BYTES`].
+//!
+//! The sixth kind, `template_render` (HOME-002 R5), is not imported from a
+//! transcript: `render-launch` appends it beside the context path as a side
+//! leaf, so the head does not move. Its `record` names a [`RenderManifest`]
+//! block by hash, which carries the written paths; its `detail` holds the
+//! template hash, the session head hash and the count of files, never a path,
+//! a flag, an environment value, a handle or the instructions text, so the
+//! event stays under the cap whatever the paths are.
 
+use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::error::HomeError;
 use crate::harness::claude_code::HARNESS;
-use crate::record::blocks::BlockStore;
+use crate::record::blocks::{BlockStore, Hash, Put};
 
 /// A hook outcome (`attachment` of type `hook_success` or `hook_failure`).
 pub const KIND_HOOK: &str = "hook";
@@ -31,8 +42,68 @@ pub const KIND_TOOL_COMPLETED: &str = "tool_completed";
 pub const KIND_ATTACHMENT: &str = "attachment";
 /// A `system` record.
 pub const KIND_SYSTEM: &str = "system";
+/// A render of the session through a launch template (HOME-002 R5).
+pub const KIND_TEMPLATE_RENDER: &str = "template_render";
 /// The most an event's serialised data may be.
 pub const MAX_DATA_BYTES: usize = 512;
+
+/// One file a render wrote: its path and the SHA-256 of its bytes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ManifestFile {
+    /// The file.
+    pub path: PathBuf,
+    /// Its SHA-256, 64 lowercase hex characters.
+    pub sha256: String,
+}
+
+/// The manifest block a `template_render` event names by hash: which
+/// template, which session head, which rendered uuid, and the files in the
+/// order they were written.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RenderManifest {
+    /// The template hash.
+    pub template: String,
+    /// The session head hash at the render.
+    pub session_head: String,
+    /// The head entry id, or `None` for a session with no head.
+    pub head: Option<String>,
+    /// The rendered session id.
+    pub uuid: String,
+    /// The files written, in write order.
+    pub files: Vec<ManifestFile>,
+}
+
+impl RenderManifest {
+    /// Store the manifest as a block of the home.
+    pub fn store(&self, blocks: &BlockStore) -> Result<Put, HomeError> {
+        let bytes = serde_json::to_vec(self).map_err(|source| HomeError::Json {
+            context: "the render manifest could not be serialised",
+            source,
+        })?;
+        blocks.put(&bytes)
+    }
+}
+
+/// The event for one render: the manifest by hash as its record, and in its
+/// detail the template hash, the session head hash and the file count only.
+#[must_use]
+pub fn template_render(
+    template: &Hash,
+    session_head: &Hash,
+    manifest: &Hash,
+    files: u64,
+) -> HarnessEvent {
+    let mut detail = Map::new();
+    detail.insert("template".to_owned(), json!(template.as_str()));
+    detail.insert("session_head".to_owned(), json!(session_head.as_str()));
+    detail.insert("files".to_owned(), json!(files));
+    HarnessEvent {
+        kind: KIND_TEMPLATE_RENDER.to_owned(),
+        source_uuid: None,
+        record: Some(manifest.as_str().to_owned()),
+        detail,
+    }
+}
 
 /// One harness event, before it becomes an entry.
 #[derive(Clone, Debug, PartialEq, Eq)]
