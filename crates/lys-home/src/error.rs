@@ -240,6 +240,15 @@ pub enum HomeError {
     )]
     NoConfigDir,
 
+    /// An entry named as one of a lys custom type is not one.
+    #[error("entry `{id}` is not a `{custom_type}` entry")]
+    NotOfCustomType {
+        /// The entry named.
+        id: String,
+        /// The custom type it was taken for.
+        custom_type: &'static str,
+    },
+
     /// A path that must be absolute is not.
     #[error("{what} `{}` is not an absolute path; give it from the root", path.display())]
     NotAbsolute {

@@ -31,6 +31,9 @@ pub mod canon;
 #[cfg(test)]
 mod canon_tests;
 pub mod entries;
+pub mod given;
+#[cfg(test)]
+mod given_tests;
 pub mod index;
 #[cfg(test)]
 mod record_tests;

@@ -21,6 +21,9 @@ pub const CUSTOM_CALL: &str = "lys.call";
 pub const CUSTOM_AUTHORED: &str = "lys.authored";
 /// The custom type marking an entry inherited from another session.
 pub const CUSTOM_INHERITED: &str = "lys.inherited";
+/// The custom type of the context record: what a session was given at
+/// render, as paths, lengths and hashes (see [`crate::record::given`]).
+pub const CUSTOM_GIVEN: &str = "lys.given";
 
 /// The first line of a session file.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

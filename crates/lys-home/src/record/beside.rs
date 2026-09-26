@@ -5,7 +5,10 @@
 //! moving the head: the entry is durable in the same order as any append (the
 //! line, then its index row) through the one write path `append_entry` uses,
 //! and the head file is not touched. The render walker never sees such a
-//! leaf; `customs_everywhere` does.
+//! leaf; `customs_everywhere` does. [`Session::append_under`] does the same
+//! under a named entry instead of the head, so a record that follows a side
+//! leaf (the given entry after a render event, HOME-003 R4) hangs under it
+//! and the head still does not move.
 //!
 //! [`Session::head_hash`] names the session's position by content: the
 //! SHA-256 of the head entry's line bytes, trailing newline included, exactly
@@ -31,6 +34,24 @@ impl Session {
             base: EntryBase {
                 id: id.clone(),
                 parent_id: self.head.clone(),
+                timestamp: now(),
+            },
+            body,
+        };
+        self.append_line(&entry)?;
+        Ok(id)
+    }
+
+    /// Append an entry as a child of a named entry on record, with a fresh
+    /// id and the current time, and leave the head where it stands. Returns
+    /// the id; a parent not on record is refused by name.
+    pub fn append_under(&mut self, parent: &str, body: EntryBody) -> Result<String, HomeError> {
+        self.reconcile()?;
+        let id = fresh_id();
+        let entry = Entry {
+            base: EntryBase {
+                id: id.clone(),
+                parent_id: Some(parent.to_owned()),
                 timestamp: now(),
             },
             body,
