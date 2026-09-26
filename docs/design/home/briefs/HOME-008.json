@@ -1,0 +1,175 @@
+{
+  "id": "HOME-008",
+  "cluster": "home",
+  "title": "State the rendered-uuid rule with its test vector in RECORD.md, pin it by a test, amend the launch card and decide ADR-016",
+  "depends_on": [
+    "HOME-007"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C45",
+    "C46",
+    "C47",
+    "C48",
+    "C49"
+  ],
+  "stories": [
+    "S24",
+    "S25"
+  ],
+  "design_anchor": [
+    "ADR-016",
+    "ADR-012"
+  ],
+  "purpose": "A rendered Claude Code record's uuid for an entry id that is not uuid-shaped is derived from the home session's id and the entry id together, so the same id in two sessions rendered into one Claude Code directory never collides. HOME-007 R1 already derives it that way in render.rs; what is missing is the contract: RECORD.md states the rule but gives no test vector, no test ties the document to the code, the launch card HOME-002 still specifies the SHA-256 of the entry id alone, and ADR-016 is still proposed. This brief states the one rule with its vector in RECORD.md, pins that vector with a named test so the document and the render cannot drift, amends HOME-002 to name the rule, and moves ADR-016 to decided. A person sees no behaviour change: render.rs and every byte a render writes stay as they are.",
+  "task": "No change to crates/lys-home/src/harness/claude_code/render.rs: record_uuid already returns, for an entry id that is not uuid-shaped, UUIDv5 under session_namespace(session id) over `<entry id>#record`, and its one call site passes session.header().id, the home session's own id. The work is the contract around it. (1) Rewrite the salt sentence of RECORD.md's `## The rendered uuid` section so it names the salt as the home session's own id (the id in the home session's header) and never the render target's session id that the rendered file's `sessionId` carries, and add a test vector table: session `one`, entry `e1`, uuid `83871c7a-20b7-5baa-8f66-8d8f4201d90d`; session `two`, entry `e1`, uuid `96533416-b648-5185-ac85-c3b7c51203c9`. (2) Add the test record_md_states_the_rendered_uuid_rule_with_the_vector_the_render_derives to render_tests.rs, reading RECORD.md at run time and keyed only on the values the document supplies, and prove it with the drift command below on a scratch copy. (3) Append an amendment to HOME-002.json naming the rule in place of R2's SHA-256-alone derivation and re-render HOME-002.md. (4) Move ADR-016 from proposed to decided in docs/design/decisions.json, touching only its status and the ledger's updated date, and show that diff in the dev record. (5) Re-render the cluster's markdown, run the design gate, and prove HOME-008 exists on no other branch. Out of scope: ids that are already uuid-shaped, which pass through unchanged; the importer; any harness but Claude Code.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "State the one rendered-uuid rule and its test vector in RECORD.md",
+      "spec": "The `## The rendered uuid` section of docs/design/home/RECORD.md states one rule: a record's `uuid` is the entry's own id when that id is uuid-shaped (36 characters, hex with `-` at 8, 13, 18 and 23), which passes through unchanged; any other entry id derives as UUID version 5 (RFC 9562) over the name `<entry id>#record` under the session's namespace, which is UUIDv5 of the lys render namespace `32c05904-d1f1-550c-9eee-2f6c8f98b665` over the home session's own id, the id in the home session's header that the render is called with. The section names that salt as the home session's own id and says the render target's session id, the one the rendered file's `sessionId` carries, never enters the derivation. The section gives a test vector as a markdown table with the columns session id, entry id and uuid and exactly two rows, each cell in backticks: `one`, `e1`, `83871c7a-20b7-5baa-8f66-8d8f4201d90d`; and `two`, `e1`, `96533416-b648-5185-ac85-c3b7c51203c9`. The section SHALL NOT state a second derivation as in force, SHALL NOT name the SHA-256 of the entry id alone as the rule, and SHALL NOT change the namespace, the name form or the role set it already states.",
+      "acceptance": [
+        "The section contains the strings `32c05904-d1f1-550c-9eee-2f6c8f98b665`, `<entry id>#record`, `home session's own id` and `sessionId`.",
+        "The section holds exactly two table rows of three backticked cells: `one` | `e1` | `83871c7a-20b7-5baa-8f66-8d8f4201d90d` and `two` | `e1` | `96533416-b648-5185-ac85-c3b7c51203c9`.",
+        "`python3 -c \"import uuid;ns=uuid.uuid5(uuid.UUID('32c05904-d1f1-550c-9eee-2f6c8f98b665'),'one');print(uuid.uuid5(ns,'e1#record'))\"` prints `83871c7a-20b7-5baa-8f66-8d8f4201d90d`, and with `two` in place of `one` prints `96533416-b648-5185-ac85-c3b7c51203c9`.",
+        "The section states that a uuid-shaped entry id passes through unchanged."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/home/RECORD.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C45"
+      ],
+      "stories": [
+        "S24"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Pin the RECORD.md vector with a named render test and prove it with a drift command",
+      "spec": "Add to crates/lys-home/src/harness/claude_code/render_tests.rs a test named record_md_states_the_rendered_uuid_rule_with_the_vector_the_render_derives. WHEN the test runs, THE SYSTEM SHALL read docs/design/home/RECORD.md from the crate's manifest directory, take the vector rows from the `## The rendered uuid` section, assert that it found exactly two rows, and for each row render a one-entry session of a fresh home whose session id and entry id are the row's and assert the rendered record's `uuid` equals the row's uuid, and assert the two rows share one entry id and give two different uuids. The test SHALL take every session id, entry id and expected uuid from the document, SHALL NOT hold a copy of the vector in the test source, and SHALL NOT compute an expected value from the render it checks. No other test SHALL read the vector from RECORD.md. THE SYSTEM SHALL NOT change render.rs, any existing test in render_tests.rs, or tests/claude_code_round_trip.rs and its pinned fixture hash.",
+      "acceptance": [
+        "`cargo test -p lys-home --all-features record_md_states_the_rendered_uuid_rule_with_the_vector_the_render_derives` reports 1 passed and 0 failed.",
+        "The source of record_md_states_the_rendered_uuid_rule_with_the_vector_the_render_derives contains neither `83871c7a-20b7-5baa-8f66-8d8f4201d90d` nor `96533416-b648-5185-ac85-c3b7c51203c9`.",
+        "On a scratch copy of the landed head, `scratch=$(mktemp -d) && git archive HEAD | tar -x -C \"$scratch\" && sed -i.orig 's/83871c7a-20b7-5baa-8f66-8d8f4201d90d/83871c7a-20b7-5baa-8f66-8d8f4201d90e/' \"$scratch/docs/design/home/RECORD.md\" && grep -c '83871c7a-20b7-5baa-8f66-8d8f4201d90e' \"$scratch/docs/design/home/RECORD.md\" && (cd \"$scratch\" && cargo test -p lys-home --all-features --no-fail-fast 2>&1) | grep -E '^test .* \\.\\.\\. FAILED$'` prints `1` and then exactly one line, `test harness::claude_code::render_tests::record_md_states_the_rendered_uuid_rule_with_the_vector_the_render_derives ... FAILED`.",
+        "The same command without the sed step prints no FAILED line.",
+        "`git diff 1756688 -- crates/lys-home/src/harness/claude_code/render.rs crates/lys-home/tests/claude_code_round_trip.rs` prints nothing.",
+        "`git diff 1756688 -- crates/lys-home/src/harness/claude_code/render_tests.rs` removes no line.",
+        "`cargo test --workspace --all-features` reports every test that passed at 1756688 as passing, the_same_entry_id_in_two_sessions_derives_two_uuids_salted_by_the_session_id among them."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-home/src/harness/claude_code/render_tests.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C46"
+      ],
+      "stories": [
+        "S24"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Amend the launch card to name the rendered-uuid rule",
+      "spec": "Append one entry to the `amendments` array of docs/design/home/briefs/HOME-002.json whose subject names the rendered uuid and whose ruling states that R2's derivation from the SHA-256 of the entry id's bytes is replaced by the rule docs/design/home/RECORD.md states: UUIDv5 over `<entry id>#record` under UUIDv5 of `32c05904-d1f1-550c-9eee-2f6c8f98b665` over the home session's own id, never the render target's session id, with a uuid-shaped entry id passing through unchanged (ADR-016). Then regenerate docs/design/home/briefs/HOME-002.md with scripts/design/render-brief.py. THE SYSTEM SHALL NOT rewrite HOME-002's requirements, acceptance, boundaries, verification or its existing amendment.",
+      "acceptance": [
+        "HOME-002.json's `amendments` array holds 2 entries, and the first is equal field for field to the one at 1756688.",
+        "The second amendment's ruling contains `32c05904-d1f1-550c-9eee-2f6c8f98b665`, `<entry id>#record`, `home session's own id` and `RECORD.md`.",
+        "HOME-002.json's `requirements` array is equal field for field to the one at 1756688.",
+        "`sh scripts/design/gate.sh` prints no line naming docs/design/home/briefs/HOME-002.md."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/home/briefs/HOME-002.json",
+          "docs/design/home/briefs/HOME-002.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C47"
+      ],
+      "stories": [
+        "S25"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Move ADR-016 from proposed to decided with a two-line ledger diff",
+      "spec": "In docs/design/decisions.json set ADR-016's `status` from `proposed` to `decided` and the ledger's top-level `updated` to the day the change is made. THE SYSTEM SHALL NOT change ADR-016's title, scope, date, decided_by, context, decision, quote, consequences, supersedes or superseded_by, and SHALL NOT change any other decision. The dev record shows the output of `git diff 1756688 -- docs/design/decisions.json`.",
+      "acceptance": [
+        "In docs/design/decisions.json, ADR-016's `status` is `decided`.",
+        "`git diff -U0 1756688 -- docs/design/decisions.json | grep -E '^[-+][^-+]'` prints only ADR-016's `\"status\"` line removed as `proposed` and added as `decided`, and the ledger's top-level `\"updated\"` line; it prints no other line.",
+        "`python3 scripts/design/validate.py docs/design/decisions.json` prints `All 1 document(s) valid.`",
+        "The dev record holds the output of `git diff 1756688 -- docs/design/decisions.json`."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/decisions.json"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C48"
+      ],
+      "stories": [
+        "S25"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Render the cluster's markdown and prove HOME-008 exists once",
+      "spec": "Regenerate the cluster's markdown with scripts/design/render-cluster.py so docs/design/home/DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/HOME-008.md are what their JSON renders to. WHEN every ref of the repository's remote has been fetched, THE SYSTEM SHALL show that every commit touching docs/design/home/briefs/HOME-008.json on any branch is an ancestor of the landed head, so a HOME-008.json on any other branch fails this check. THE SYSTEM SHALL NOT write a second brief under HOME-008, SHALL NOT write any other brief file, and SHALL NOT delete another branch's commits to pass the check.",
+      "acceptance": [
+        "`sh scripts/design/gate.sh` exits 0.",
+        "After `git fetch origin '+refs/heads/*:refs/remotes/origin/*'`, `for c in $(git log --all --format=%H -- docs/design/home/briefs/HOME-008.json); do git merge-base --is-ancestor \"$c\" HEAD || echo \"$c\"; done` prints nothing, and `git log --all --format=%H -- docs/design/home/briefs/HOME-008.json | wc -l` prints at least 1.",
+        "`ls docs/design/home/briefs/ | grep -c '^HOME-008\\.'` prints `2` (HOME-008.json and HOME-008.md)."
+      ],
+      "files": {
+        "create": [
+          "docs/design/home/briefs/HOME-008.md"
+        ],
+        "modify": [
+          "docs/design/home/DESIGN.md",
+          "docs/design/home/CHECKLIST.md",
+          "docs/design/home/USER-STORIES.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C49"
+      ],
+      "stories": [
+        "S25"
+      ]
+    }
+  ],
+  "boundaries": [
+    "No change to crates/lys-home/src/harness/claude_code/render.rs: its derivation, RENDER_NAMESPACE, the name form `<entry id>#<role>`, the role set and the call site passing the home session's own id stay as they are.",
+    "The render target's session id never enters a derived uuid, in the code or in any rule this brief writes.",
+    "Uuid-shaped entry ids pass through unchanged; this brief does not touch them.",
+    "No change to tests/claude_code_round_trip.rs, the fixture hash it pins, PROOF-RESUME.md, import.rs or the ids it writes.",
+    "decisions.json changes by ADR-016's status and the ledger's updated date only.",
+    "HOME-002's requirements and its existing amendment are not rewritten, only added to.",
+    "No person sees a behaviour change: no rendered byte, report field or CLI output changes.",
+    "The design's structure array is the whole file list; a path outside it is not created."
+  ],
+  "verification": [
+    "From the repository root: cargo fmt --all leaves the tree unchanged.",
+    "cargo clippy --all-targets --all-features -- -D warnings and cargo clippy --all-targets -- -D warnings exit 0.",
+    "cargo test --workspace --all-features exits 0 and lists record_md_states_the_rendered_uuid_rule_with_the_vector_the_render_derives as passed.",
+    "cargo doc --no-deps --all-features and cargo doc --no-deps exit 0 with no warnings.",
+    "sh scripts/design/gate.sh exits 0.",
+    "Run R2's drift command on a scratch copy of the landed head and read exactly one FAILED line, naming the test R2 adds.",
+    "git diff 1756688 -- crates/lys-home/src/harness/claude_code/render.rs prints nothing."
+  ],
+  "amendments": []
+}

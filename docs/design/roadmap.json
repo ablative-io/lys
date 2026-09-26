@@ -303,6 +303,34 @@
         "RM-008"
       ],
       "notes": "Renumbered from the HOME-002 it was written as; HOME-006 follows the lantern card (HOME-004, RM-008) and the launch template (HOME-002, RM-006), both on main, and after the render card (HOME-007), which took RM-009, ADR-016, C31 to C35, S18, S19 and CN9. Further units, not written: lit_in written by the light act (the lantern card's next round); a fork given tools, a lens or a briefing on what changed since the point; leases, budgets and kill rules; harnesses other than Claude Code."
+    },
+    {
+      "id": "RM-011",
+      "title": "State the rendered-uuid rule with its test vector in RECORD.md, pin it by a test, amend the launch card and decide ADR-016",
+      "status": "idea",
+      "kind": "fix",
+      "summary": "A rendered Claude Code record's uuid for an entry id that is not uuid-shaped is derived from the home session's own id and the entry id together, so two sessions with the same id rendered into one Claude Code directory never collide. HOME-007 landed that derivation in the code; this item writes the contract: the one rule and a test vector in RECORD.md, a named test that reads the vector so the document and the render cannot drift, the launch card amended to name the rule in place of its SHA-256-of-the-entry-id-alone derivation, and ADR-016 moved to decided. No rendered byte changes.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-26T19:33:51+10:00",
+        "quote": "The render's record uuid for an entry whose id is not uuid-shaped is the SHA-256 of the entry id alone, so an id like e1 renders to the same uuid in every session, and two sessions rendered into one Claude Code directory can collide. The uuid is derived from the session id and the entry id together, one rule stated in RECORD.md with its test vector, and the launch card's derivation is amended to name it. Every existing render test keeps passing with the new vector; a fixture with the same entry id in two sessions renders two different uuids. Found by Waffles reviewing lys PR 14. Not in scope: ids that are already uuid-shaped, which pass through unchanged.\n\nCorrections from Waffles' cross-review of the brief HOME-008 at 50135be on 26 September 2026 at 19:32, carried into the words for the re-fire. C1: R1 and RECORD.md name the salt as the home session's own id, the one render.rs passes at its one call site, and never the render target's session id that the rendered file's sessionId carries, matching ADR-016. C2: an acceptance line fails when HOME-008 is duplicated on any branch, for example git log --all on docs/design/home/briefs/HOME-008.json naming only this brief's commits. C3: R2's drift check is a command run on a scratch copy with its expected result stated, exactly one test fails and it is named record_md_states_the_rendered_uuid_rule_with_the_vector_the_render_derives, not a hand edit written up in the dev record. C4, from the lead's own check: git diff 1756688 50135be on docs/design/decisions.json is empty, so the brief left ADR-016 proposed; the brief moves ADR-016 to decided as its round one answered, and the dev record shows that diff, whose only lines are ADR-016's status and the ledger's updated date.",
+        "context": "Found reviewing lys PR 14, before HOME-007 salted the derivation; re-fired with the corrections of a cross-review of the earlier HOME-008 brief. The lead answered that the card ships the contract only, with no change to render.rs."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-016",
+          "ADR-012"
+        ],
+        "briefs": [
+          "HOME-008"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-009"
+      ],
+      "notes": "Stands on HOME-007 R1, which landed the salted derivation, so render.rs does not change. Further units, not written: none."
     }
   ]
 }

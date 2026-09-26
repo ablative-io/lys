@@ -275,6 +275,36 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The rendered uuid contract",
+      "items": [
+        {
+          "id": "C45",
+          "text": "RECORD.md's rendered-uuid section states the one rule: an entry id that is not uuid-shaped derives as UUIDv5 under a namespace that is UUIDv5 of 32c05904-d1f1-550c-9eee-2f6c8f98b665 over the home session's own id, never the render target's session id that the rendered file's sessionId carries, with the name `<entry id>#record`; a uuid-shaped id passes through unchanged; and it gives a test vector of a session id, an entry id and the uuid they produce, the same entry id `e1` in two sessions giving two uuids.",
+          "done": false
+        },
+        {
+          "id": "C46",
+          "text": "A render test named record_md_states_the_rendered_uuid_rule_with_the_vector_the_render_derives reads the vector from RECORD.md and asserts the render derives it for each session, the two uuids differ, every existing render test passes unchanged, and a drift command run on a scratch copy that alters the vector in RECORD.md fails exactly that one test.",
+          "done": false
+        },
+        {
+          "id": "C47",
+          "text": "The launch card HOME-002 carries an amendment naming the rendered-uuid rule RECORD.md states in place of its R2 derivation from the SHA-256 of the entry id alone, its existing requirements and amendment unchanged, and HOME-002.md is re-rendered from it.",
+          "done": false
+        },
+        {
+          "id": "C48",
+          "text": "ADR-016 moves from proposed to decided, and the decision ledger's diff from the commit this card starts from changes no line but ADR-016's status and the ledger's updated date.",
+          "done": false
+        },
+        {
+          "id": "C49",
+          "text": "HOME-008 exists once: every commit that touches docs/design/home/briefs/HOME-008.json on any branch is one of this brief's commits.",
+          "done": false
+        }
+      ]
     }
   ]
 }

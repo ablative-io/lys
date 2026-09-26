@@ -650,6 +650,21 @@
       "path": "docs/design/home/PROOF-FORK.md",
       "note": "the measured fork: Pi's parentSession read, a real session forked, rendered and launched, as hashes, counts and exit codes",
       "brief": "HOME-006"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.json",
+      "note": "the rendered-uuid contract: the rule and its vector in RECORD.md pinned by a test, the launch card amended, ADR-016 decided",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/decisions.json",
+      "note": "the decision ledger; HOME-008 moves ADR-016 to decided",
+      "brief": "HOME-008"
     }
   ],
   "inventory": [

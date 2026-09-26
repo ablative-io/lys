@@ -108,6 +108,14 @@
         {
           "id": "S22",
           "text": "As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone."
+        },
+        {
+          "id": "S24",
+          "text": "As the reviewer, I want the rendered-uuid rule and a test vector written in RECORD.md and read by a named test, so that the document and the render cannot drift apart without that test failing."
+        },
+        {
+          "id": "S25",
+          "text": "As the reviewer, I want the launch card, the decision ledger and the brief list to agree on one rendered-uuid rule and one HOME-008, so that no record still states the SHA-256-of-the-entry-id-alone derivation and no second card claims this work."
         }
       ]
     }
