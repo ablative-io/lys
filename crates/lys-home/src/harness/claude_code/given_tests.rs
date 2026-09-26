@@ -265,6 +265,56 @@ fn neither_a_template_variable_nor_home_is_refused_by_name() {
 }
 
 #[test]
+fn an_empty_home_is_no_home() {
+    let refused = ConfigDir::resolve(None, Some(Path::new("")));
+    assert!(matches!(refused, Err(HomeError::NoConfigDir)));
+}
+
+#[test]
+fn a_config_dir_that_is_not_absolute_is_refused_naming_the_variable_and_its_shape() -> Outcome {
+    for (value, shape) in [
+        ("", "empty"),
+        (".claude", "relative"),
+        ("~/.claude", "beginning with `~`"),
+    ] {
+        let refused = ConfigDir::resolve(Some(value), Some(Path::new("/h")));
+        let Err(error) = refused else {
+            return Err(format!("a config dir of `{value}` must be refused").into());
+        };
+        let text = error.to_string();
+        assert!(
+            matches!(&error, HomeError::NotAbsolute { what: "CLAUDE_CONFIG_DIR", path, .. } if path == Path::new(value)),
+            "{text}"
+        );
+        assert!(text.contains("CLAUDE_CONFIG_DIR"), "{text}");
+        assert!(text.contains(shape), "{text}");
+        assert!(text.contains("from the root"), "{text}");
+    }
+    let refused = ConfigDir::resolve(None, Some(Path::new("~")));
+    let text = refused
+        .as_ref()
+        .map_or_else(ToString::to_string, |_| String::new());
+    assert!(
+        matches!(&refused, Err(HomeError::NotAbsolute { what: "HOME", .. })),
+        "{text}"
+    );
+    assert!(
+        text.contains("HOME") && text.contains("beginning with `~`"),
+        "{text}"
+    );
+    let refused = ConfigDir::resolve(None, Some(Path::new("home/u")));
+    assert!(matches!(
+        &refused,
+        Err(HomeError::NotAbsolute {
+            what: "HOME",
+            shape: "relative",
+            ..
+        })
+    ));
+    Ok(())
+}
+
+#[test]
 fn home_dot_claude_claude_md_is_listed_once_first_as_the_user_file_when_home_is_the_config()
 -> Outcome {
     let dir = tempfile::tempdir()?;

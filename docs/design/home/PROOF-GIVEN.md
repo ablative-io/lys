@@ -112,9 +112,9 @@ person's documents):
 ## One real render
 
 The session is the one PROOF-RESUME.md and PROOF-LAUNCH.md measured, the
-Archie session of 11 September 2026 at
+session PROOF-RESUME.md names, at
 `~/.claude/projects/<slug dir of the session cwd>/e1c27f5d-b418-472d-8ea8-b69bea49882f.jsonl`,
-the file PROOF-RESUME.md names, not running at the time; read, hashed and never written
+not running at the time; read, hashed and never written
 (`793f4e87ea4608b2ddfb9d5dcbf1197d4245bde7ed1612630339a1cc1f6d15df` before
 and after), not committed.
 

@@ -260,11 +260,16 @@ pub enum HomeError {
         path: PathBuf,
     },
 
-    /// A path that must be absolute is not.
-    #[error("{what} `{}` is not an absolute path; give it from the root", path.display())]
+    /// A path that must be absolute is not: it would resolve against
+    /// lys-home's own working directory, which is never the session's.
+    #[error(
+        "{what} `{}` is {shape}, not an absolute path; set {what} to a path from the root", path.display()
+    )]
     NotAbsolute {
-        /// What the path names.
+        /// What the path names: the variable it came from, or what it is for.
         what: &'static str,
+        /// The value's shape: empty, relative, or beginning with `~`.
+        shape: &'static str,
         /// The path given.
         path: PathBuf,
     },

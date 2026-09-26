@@ -150,7 +150,7 @@ fn kinds_are_the_six_resolved_and_two_unlisted_and_no_document_is_of_an_unlisted
 }
 
 #[test]
-fn the_environment_holds_the_names_in_order_and_never_a_value() -> Outcome {
+fn the_environment_holds_the_names_sorted_and_never_a_value() -> Outcome {
     let dir = tempfile::tempdir()?;
     let (mut session, event) = session_with_a_render_event(dir.path())?;
     let template_env = [("FOO_A", "secret-value-1"), ("BAR_B", "secret-value-2")];
@@ -159,7 +159,7 @@ fn the_environment_holds_the_names_in_order_and_never_a_value() -> Outcome {
         .map(|(name, _)| (*name).to_owned())
         .collect();
     let record = GivenRecord::claude_code(resolution(ConfigSource::Template), names);
-    assert_eq!(record.data()?["environment"], json!(["FOO_A", "BAR_B"]));
+    assert_eq!(record.data()?["environment"], json!(["BAR_B", "FOO_A"]));
     record.append_under(&mut session, &event)?;
     let file = std::fs::read_to_string(session.file())?;
     let lines: Vec<&str> = file.lines().collect();

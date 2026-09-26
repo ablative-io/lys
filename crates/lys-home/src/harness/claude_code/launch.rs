@@ -8,17 +8,17 @@
 //! if it exists; the template is stored (R3); the session head hash is taken
 //! (R4); the session is rendered with its loss account (R2); the MCP file, the
 //! environment file (R6) and the instructions file are written; the five files
-//! are hashed; the manifest block is stored and the event appended (R5); the
-//! documents the session is given are resolved and recorded as one
-//! `lys.given` entry under that event (HOME-003 R4); the report is returned.
+//! are hashed; the manifest block is stored; the documents the session is
+//! given are resolved (HOME-003 R4); the event is appended (R5) and the
+//! `lys.given` entry under it; the report is returned.
 //! Nothing runs: the launch line is text in the report (ADR-007). `--out` is
 //! made absolute first, so the manifest, the launch line and the given entry
 //! never carry a relative path; the render is given the rendered file's path
 //! and never looks for the user's home directory, which is read only to name
 //! the session's config directory when the template sets none. Nothing is
 //! written outside `--out` and the home, and nothing after a refusal; a
-//! resolution that fails leaves the render's files and its event and no
-//! given entry, and the command fails by the document's path.
+//! resolution that fails leaves the render's files and no entry of either
+//! kind on the session, and the command fails by the document's path.
 
 use std::path::{Path, PathBuf};
 
@@ -140,16 +140,16 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
         &manifest_put.hash,
         manifest.files.len() as u64,
     );
-    let event_id = session.append_beside(EntryBody::Custom {
-        custom_type: CUSTOM_HARNESS_EVENT.to_owned(),
-        data: Some(event.data()?),
-    })?;
     let config_dir = ConfigDir::resolve(
         template.env.get(CONFIG_DIR_VARIABLE).map(String::as_str),
         process_home.as_deref(),
     )?;
     let resolution = resolve_given(&args.cwd, config_dir, &out)?;
     let given = GivenRecord::claude_code(resolution, environment_names(&template));
+    let event_id = session.append_beside(EntryBody::Custom {
+        custom_type: CUSTOM_HARNESS_EVENT.to_owned(),
+        data: Some(event.data()?),
+    })?;
     let given_id = given.append_under(&mut session, &event_id)?;
     let launch = launch_line(&template, &rendered, &mcp_file, &env, &instructions);
     Ok(json!({
@@ -167,13 +167,12 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
     }))
 }
 
-/// The names of the variables the environment file sets for the session,
-/// in the file's order: the template's variables and each use-only secret's
-/// variable, sorted as the file writes them. Never a value or a handle.
+/// The names of the variables the environment file sets for the session:
+/// the template's variables and each use-only secret's variable, which the
+/// record sorts. Never a value or a handle.
 fn environment_names(template: &Template) -> Vec<String> {
     let mut names: Vec<String> = template.env.keys().cloned().collect();
     names.extend(template.use_only.iter().map(|secret| secret.env.clone()));
-    names.sort_unstable();
     names
 }
 

@@ -10,7 +10,7 @@
 //! request records from the request as the harness resolved it); the config
 //! directory with its source; the documents in the measured order, each as
 //! kind, path, byte length and SHA-256; and the names of the environment
-//! variables the template set. No document content and no variable value is
+//! variables the template set, sorted. No document content and no variable value is
 //! carried, nothing is signed or encrypted, and no field is added outside
 //! `custom.data`, so the shape can be signed over and encrypted at rest
 //! later without changing what is recorded.
@@ -83,9 +83,10 @@ pub struct GivenRecord {
 
 impl GivenRecord {
     /// The record of a Claude Code render: the resolution's config directory
-    /// and documents, and the variable names the template set.
+    /// and documents, and the variable names the template set, sorted.
     #[must_use]
-    pub fn claude_code(resolution: Resolution, environment: Vec<String>) -> Self {
+    pub fn claude_code(resolution: Resolution, mut environment: Vec<String>) -> Self {
+        environment.sort_unstable();
         Self {
             harness: HARNESS.to_owned(),
             harness_version: MEASURED_VERSION.to_owned(),

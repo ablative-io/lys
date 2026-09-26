@@ -55,6 +55,8 @@ pub const MEASURED_VERSION: &str = "2.1.283";
 pub const CONFIG_DIR_NAME: &str = ".claude";
 /// The variable a template sets to name the session's config directory.
 pub const CONFIG_DIR_VARIABLE: &str = "CLAUDE_CONFIG_DIR";
+/// The rendering process's variable the config directory falls back to.
+pub const HOME_VARIABLE: &str = "HOME";
 /// The three instruction files of one directory on the chain, in the order
 /// the request gives them.
 pub const CHAIN_FILES: [&str; 3] = ["CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md"];
@@ -112,18 +114,52 @@ pub struct ConfigDir {
 impl ConfigDir {
     /// The config directory from what the template sets, or from the
     /// rendering process's `HOME` when the template sets none. Refused by
-    /// name when neither names one.
+    /// name when neither names one (an empty `HOME` is none), and refused
+    /// naming the variable and the value's shape when the value is not an
+    /// absolute path: a relative one, an empty one or one beginning with
+    /// `~` would resolve against lys-home's own working directory, which is
+    /// never the session's.
     pub fn resolve(template: Option<&str>, process_home: Option<&Path>) -> Result<Self, HomeError> {
         if let Some(dir) = template {
+            let path = absolute_or_refused(CONFIG_DIR_VARIABLE, Path::new(dir))?;
             return Ok(Self {
-                path: PathBuf::from(dir),
+                path,
                 source: ConfigSource::Template,
             });
         }
-        let home = process_home.ok_or(HomeError::NoConfigDir)?;
+        let home = process_home
+            .filter(|home| !home.as_os_str().is_empty())
+            .ok_or(HomeError::NoConfigDir)?;
+        let home = absolute_or_refused(HOME_VARIABLE, home)?;
         Ok(Self {
             path: home.join(CONFIG_DIR_NAME),
             source: ConfigSource::Home,
+        })
+    }
+}
+
+/// The shape of a path that is not absolute, for a refusal to name.
+#[must_use]
+pub fn path_shape(path: &Path) -> &'static str {
+    if path.as_os_str().is_empty() {
+        "empty"
+    } else if path.starts_with("~") {
+        "beginning with `~`, a shell expansion the harness does not perform"
+    } else {
+        "relative"
+    }
+}
+
+/// The path when it is absolute; otherwise a refusal naming the variable it
+/// came from and its shape.
+fn absolute_or_refused(variable: &'static str, path: &Path) -> Result<PathBuf, HomeError> {
+    if path.is_absolute() {
+        Ok(path.to_path_buf())
+    } else {
+        Err(HomeError::NotAbsolute {
+            what: variable,
+            shape: path_shape(path),
+            path: path.to_path_buf(),
         })
     }
 }
@@ -165,6 +201,7 @@ pub fn resolve_given(
     if !working.is_absolute() {
         return Err(HomeError::NotAbsolute {
             what: "working directory",
+            shape: path_shape(working),
             path: working.to_path_buf(),
         });
     }

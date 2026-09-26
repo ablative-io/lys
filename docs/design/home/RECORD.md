@@ -113,7 +113,7 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   omitted; when the config directory is `D/.claude` for a `D` on the chain,
   `D/.claude/CLAUDE.md` is listed once, first, as `user_claude_md`.
   `environment` is the names of the variables the template set for the
-  session, in the environment file's order, never a value or a handle. The
+  session, sorted, never a value or a handle. The
   entry hangs under the `template_render` event it follows, beside the
   context path, so the head does not move. It is unsigned and unencrypted
   and carries no document content: signing (stage 6) and encryption at rest

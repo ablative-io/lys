@@ -534,7 +534,7 @@ fn an_unreadable_claude_md_fails_the_render_by_path_with_no_given_entry() -> Out
     let records = fixture.records()?;
     assert_eq!(records.len(), 1);
     let session = fixture.session()?;
-    assert_eq!(session.customs_everywhere("lys.harness_event")?.len(), 2);
+    assert_eq!(session.customs_everywhere("lys.harness_event")?.len(), 1);
     assert_eq!(session.head()?, Some("e4"));
     drop(session);
     Ok(())
