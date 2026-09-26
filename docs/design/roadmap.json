@@ -352,12 +352,12 @@
           "ADR-029"
         ],
         "briefs": [
-          "HOME-008"
+          "HOME-010"
         ],
         "commits": []
       },
       "depends_on": [],
-      "notes": "Further units, not written: The slug rule under a canonical working directory; Canonical paths in the other home records (fork parentSession, the render manifest's files, render-launch --out). The chain walks the canonical working directory while the slug takes it as given, so the two may see different forms of one directory; that is a question for the slug rule's own requirement. Ids are the next after main's and every open brief branch's highest, checked against origin's brief branches on 2026-09-27: RM-018, ADR-029, C71 to C77, S32 and S33, CN12; the brief id HOME-008 was given with the card, and brief/home/5898fcb0 also holds a HOME-008 (the rendered-uuid rule)."
+      "notes": "Further units, not written: The slug rule under a canonical working directory; Canonical paths in the other home records (fork parentSession, the render manifest's files, render-launch --out). The chain walks the canonical working directory while the slug takes it as given, so the two may see different forms of one directory; that is a question for the slug rule's own requirement. Ids are the next free after main's highest and every open brief branch's, checked against origin's branch list (git ls-remote) when the brief was written: main holds HOME-007, RM-016, ADR-018, C44, S23, CN10; brief/home/5898fcb0 holds HOME-008 and RM-011 (the rendered-uuid rule, C45 to C49, S24 and S25), which keep them; brief/home/9e701467 holds HOME-009, RM-012, ADR-023, C70, S31, CN11; the highest RM on a brief branch is RM-017 and the highest ADR is ADR-028 (brief/directory/lifecycle-hand). So this card is HOME-010, with RM-018, ADR-029, C71 to C77, S32 and S33, and CN12; it was first drafted as HOME-008 and renumbered."
     }
   ]
 }

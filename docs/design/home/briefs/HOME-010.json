@@ -1,5 +1,5 @@
 {
-  "id": "HOME-008",
+  "id": "HOME-010",
   "cluster": "home",
   "title": "Canonicalise every lys.given path before it is recorded or compared",
   "depends_on": [],
@@ -23,12 +23,12 @@
     "ADR-029"
   ],
   "purpose": "The lys.given context record (HOME-003) stores each document's path as the resolver built it from the render's --cwd and config directory, and given-check finds the listed document by comparing those paths as written. One file reached through a symlinked directory, through a path with `..` in it, or through a config directory written with a trailing slash therefore records as a different path, and given-check reports a difference that is not one. This brief canonicalises every absolute path before it is recorded or compared, keeps a path that does not exist as given and names it unresolved in the `given` and `given-check` reports, states the rule in RECORD.md, and proves the three shapes record and compare as one path with a fixture test (CN12, ADR-029).",
-  "task": "Today crates/lys-home/src/harness/claude_code/given.rs builds every recorded path with Path::join from the config directory and from Path::new(cwd).ancestors(), and nothing in crates/lys-home/src canonicalises a path; crates/lys-home/src/cli/given.rs finds the listed document with `document.path == args.path`, its one comparison site. Rust's Path equality already ignores a trailing slash, but a PathBuf serialises with it, and `..` and symlinks are not normalised by it; with a `..` in --cwd the chain walk also visits directories the harness never reads. Add one helper module beside given.rs that canonicalises a given path by the rule ADR-029 fixes, use it in resolve_given (the working directory before the chain walk, the config directory, every absolute document) and in given-check (the listed path and the --path argument, and --file before it is read), and add an `unresolved` list to the `given` and `given-check` reports. The lys.given entry's data keeps exactly its six fields (ADR-013); nothing is added to it. The two written files (instructions.md and mcp.json) stay relative to the render's out directory and are exempt, for the reason RECORD.md already gives. A document path is built by join and cannot carry a trailing slash; only the config directory can, so the trailing-slash shape is proven on the config directory and nowhere else. The memory index's slug keeps taking the working directory as given (projects_slug is unchanged); the chain then walks the canonical working directory while the slug is computed from the one given, so the two may see different forms of one directory, and which form the slug should take is left to the slug rule's own requirement. Existing tests whose expectations are built from a temporary directory (a symlinked /var path on macOS) build them from that directory canonicalised, so the suite asserts the same paths on every platform. Out of scope: the slug rule, canonical paths in any other home record (fork's parentSession, the render manifest's files, render-launch --out), PROOF-GIVEN.md's measured paths, and any harness but Claude Code.",
+  "task": "Today crates/lys-home/src/harness/claude_code/given.rs builds every recorded path with Path::join from the config directory and from Path::new(cwd).ancestors(), and nothing in crates/lys-home/src canonicalises a path; crates/lys-home/src/cli/given.rs finds the listed document with `document.path == args.path`, its one comparison site. Rust's Path equality already ignores a trailing slash, but a PathBuf serialises with it, and `..` and symlinks are not normalised by it; with a `..` in --cwd the chain walk also visits directories the harness never reads. Add one helper module beside given.rs that canonicalises a given path by the rule ADR-029 fixes, use it in resolve_given (the working directory before the chain walk, the config directory, every absolute document) and in given-check (the listed path and the --path argument, and --file before it is read), and add an `unresolved` list to the `given` and `given-check` reports. The lys.given entry's data keeps exactly its six fields (ADR-013); nothing is added to it. The two written files (instructions.md and mcp.json) stay relative to the render's out directory and are exempt, for the reason RECORD.md already gives. A document path is built by join and cannot carry a trailing slash; only the config directory can, so the trailing-slash shape is proven on the config directory and nowhere else. The memory index's slug keeps taking the working directory as given (projects_slug is unchanged); the chain then walks the canonical working directory while the slug is computed from the one given, so the two may see different forms of one directory, and which form the slug should take is left to the slug rule's own requirement. Existing tests whose expectations are built from a temporary directory (a symlinked /var path on macOS) build them from that directory canonicalised, so the suite asserts the same paths on every platform. Out of scope: the slug rule, canonical paths in any other home record (fork's parentSession, the render manifest's files, render-launch --out), PROOF-GIVEN.md's measured paths, and any harness but Claude Code. Its ids are the next free after main's highest and every open brief branch's, checked against the remote's branch list: main holds up to HOME-007, RM-016, ADR-018, C44, S23 and CN10; brief/home/5898fcb0 holds HOME-008 and RM-011, and brief/home/9e701467 holds HOME-009, RM-012, C70, S31 and CN11; the highest brief-branch RM is RM-017 and ADR is ADR-028. So this brief is HOME-010, with RM-018, ADR-029, C71 to C77, S32, S33 and CN12.",
   "requirements": [
     {
       "id": "R1",
       "title": "Canonicalise one given path by the record's rule",
-      "spec": "Add a module given_path beside given.rs with one enum naming what became of a path: canonical, unresolved, or relative. WHEN it canonicalises a directory path, THE SYSTEM SHALL resolve the whole path, every symlink, `..` and trailing slash included, with std::fs::canonicalize. WHEN it canonicalises a document path, THE SYSTEM SHALL canonicalise the path's parent directory whole and join the path's own final component unchanged, so a document that is itself a symlink is named at its link position; a path whose final component is not a normal name (`..`, or the root) SHALL be canonicalised whole. WHEN the path is relative, THE SYSTEM SHALL return it unchanged, marked relative, and SHALL NOT resolve it against the process's working directory. IF canonicalisation fails because the path does not exist (NotFound, or NotADirectory for a component that is a file), THEN THE SYSTEM SHALL return the path byte for byte as given, marked unresolved, and SHALL NOT drop it or return an error. IF canonicalisation fails for any other reason (permission denied, a loop of symlinks), THEN THE SYSTEM SHALL refuse with HomeError::Io whose context is `canonicalising a given path` and whose path is the path given. THE SYSTEM SHALL NOT open or read any file's bytes, and SHALL NOT put anything but the path in an error.",
+      "spec": "Add a module given_path beside given.rs with one enum naming what became of a path: canonical, unresolved, or relative. WHEN it canonicalises a directory path, THE SYSTEM SHALL resolve the whole path, every symlink, `..` and trailing slash included, with std::fs::canonicalize. WHEN it canonicalises a document path, THE SYSTEM SHALL canonicalise the path's parent directory whole, join the path's own final component unchanged, and then read the joined path's own entry with std::fs::symlink_metadata, so a document that is itself a symlink is named at its link position and a dangling symlink counts as existing there; a path whose final component is not a normal name (`..`, or the root) SHALL be canonicalised whole as a directory path. WHEN the path is relative, THE SYSTEM SHALL return it unchanged, marked relative, and SHALL NOT resolve it against the process's working directory. IF a directory path cannot be canonicalised because it does not exist, or a document path's parent cannot be canonicalised because it does not exist, or a document path's own entry does not exist (canonicalize or symlink_metadata answering NotFound, or NotADirectory for a component that is a file), THEN THE SYSTEM SHALL return the path byte for byte as given, marked unresolved, and SHALL NOT drop it, SHALL NOT return an error, and SHALL NOT mark it canonical. IF canonicalize or symlink_metadata fails for any other reason (permission denied, a loop of symlinks), THEN THE SYSTEM SHALL refuse with HomeError::Io whose context is `canonicalising a given path` and whose path is the path given. THE SYSTEM SHALL NOT open or read any file's bytes, and SHALL NOT put anything but the path in an error.",
       "acceptance": [
         "Under a temporary directory canonicalised as `B`, with `B/real/w/CLAUDE.md` a file and `B/link` a symlink to `B/real`, canonicalising the document path `B/link/w/CLAUDE.md` gives canonical `B/real/w/CLAUDE.md`.",
         "Canonicalising the document path `B/real/w/../w/CLAUDE.md` gives canonical `B/real/w/CLAUDE.md`.",
@@ -36,9 +36,11 @@
         "With `B/real/w/CLAUDE.md` a symlink to `B/real/t/target.md`, canonicalising the document path `B/real/w/CLAUDE.md` gives canonical `B/real/w/CLAUDE.md`, not `B/real/t/target.md`.",
         "Canonicalising the directory path written as `B/gone/c/`, where `B/gone` does not exist, gives unresolved with the string `B/gone/c/` byte for byte.",
         "Canonicalising the document path `B/real/w/CLAUDE.md/x`, where `B/real/w/CLAUDE.md` is a file, gives unresolved `B/real/w/CLAUDE.md/x`.",
+        "Canonicalising the document path `B/real/w/absent.md`, where `B/real/w` is a directory and `absent.md` does not exist in it, gives unresolved `B/real/w/absent.md`.",
+        "With `B/real/w/dangling.md` a symlink to `B/real/t/none.md`, which does not exist, canonicalising the document path `B/real/w/dangling.md` gives canonical `B/real/w/dangling.md`.",
         "Canonicalising `instructions.md` gives relative `instructions.md`.",
         "With `B/locked` a directory of mode 0o000 holding `w/CLAUDE.md`, canonicalising the document path `B/locked/w/CLAUDE.md` returns HomeError::Io whose Display contains `canonicalising a given path` and `B/locked/w/CLAUDE.md`.",
-        "Every case above is built under the temporary directory by the test itself, and the test asserts the count of cases it ran, 8."
+        "Every case above is built under the temporary directory by the test itself, and the test asserts the count of cases it ran, 10."
       ],
       "files": {
         "create": [
@@ -51,8 +53,7 @@
         "delete": []
       },
       "checklist": [
-        "C71",
-        "C73"
+        "C71"
       ],
       "stories": [
         "S32",
@@ -62,23 +63,26 @@
     {
       "id": "R2",
       "title": "Resolve and record the given documents at canonical paths",
-      "spec": "WHEN resolve_given resolves a session's documents, THE SYSTEM SHALL canonicalise the working directory as a directory path before walking the CLAUDE.md chain and walk the ancestors of the result; SHALL canonicalise the config directory as a directory path and record the result as config_dir.path; SHALL build the user CLAUDE.md and the memory index under the canonical config directory; SHALL record every absolute document's path as the R1 document canonicalisation of the path it was read at; and SHALL compare a chain position with the user CLAUDE.md on their canonical paths, so `D/.claude/CLAUDE.md` is still listed once, first, as user_claude_md. WHEN the working directory or the config directory is unresolved, THE SYSTEM SHALL use it as given and continue. THE SYSTEM SHALL compute the memory index's slug with projects_slug from the working directory exactly as given. THE SYSTEM SHALL NOT canonicalise the paths of the two written files, SHALL NOT resolve a document's final component, SHALL NOT change the measured order, SHALL NOT list an absent position, and SHALL NOT change projects_slug. IF canonicalising any path fails for a reason other than not existing, THEN THE SYSTEM SHALL fail the resolution with R1's refusal, and render-launch SHALL exit 2 with no lys.given entry written.",
+      "spec": "WHEN resolve_given resolves a session's documents, THE SYSTEM SHALL canonicalise the working directory as a directory path before walking the CLAUDE.md chain and walk the ancestors of the result; SHALL canonicalise the config directory as a directory path and record the result as config_dir.path; SHALL build the user CLAUDE.md and the memory index under the canonical config directory; SHALL record every absolute document's path as the R1 document canonicalisation of the path it was read at; and SHALL compare a chain position with the user CLAUDE.md on their canonical paths, so `D/.claude/CLAUDE.md` is still listed once, first, as user_claude_md. WHEN the working directory or the config directory is unresolved, THE SYSTEM SHALL use it as given and continue. THE SYSTEM SHALL compute the memory index's slug with projects_slug from the working directory exactly as given. THE SYSTEM SHALL NOT canonicalise the paths of the two written files, SHALL NOT resolve a document's final component, SHALL NOT change the measured order, SHALL NOT list an absent position, and SHALL NOT change projects_slug. IF canonicalising any path fails for a reason other than not existing, THEN THE SYSTEM SHALL fail the resolution with R1's refusal, and render-launch SHALL refuse with its existing refusal status 1, with no lys.given entry written.",
       "acceptance": [
         "Under a canonical temporary directory `B` with `B/link` a symlink to `B/real`, `B/real/w/CLAUDE.md` present and config `B/real/c`, resolving cwd `B/link/w` lists the chain document at `B/real/w/CLAUDE.md`.",
         "With `B/real/CLAUDE.md` and `B/real/w/CLAUDE.md` present, resolving cwd `B/real/w/../w` lists exactly 2 claude_md_chain documents under `B`, at `B/real/CLAUDE.md` then `B/real/w/CLAUDE.md`.",
         "Resolving with the config directory `B/real/c/` gives config_dir.path serialised as `B/real/c`, and `B/real/c/CLAUDE.md` listed as user_claude_md at `B/real/c/CLAUDE.md`.",
+        "With config `B/link/.claude`, `B/link` a symlink to `B/real`, cwd `B/real/w`, and `B/real/.claude/CLAUDE.md` and `B/real/w/CLAUDE.md` present, the resolution's absolute documents are exactly 2: `B/real/.claude/CLAUDE.md` as user_claude_md first, then `B/real/w/CLAUDE.md` as claude_md_chain, and no claude_md_chain document has the path `B/real/.claude/CLAUDE.md`.",
         "Resolving with the config directory `B/gone/c/`, which does not exist, succeeds with config_dir.path serialised as `B/gone/c/` byte for byte and no user_claude_md or memory_index document.",
         "With cwd `B/link/w` and config `B/real/c`, a MEMORY.md at `B/real/c/projects/<projects_slug(\"B/link/w\")>/memory/MEMORY.md` is listed at that path, and a MEMORY.md placed only under `projects_slug(\"B/real/w\")` gives no memory_index document.",
         "With `B/real/w/CLAUDE.md` a symlink to `B/real/t/target.md`, the chain document is listed at `B/real/w/CLAUDE.md`.",
         "The appended_instructions and mcp_config documents are listed at `instructions.md` and `mcp.json`.",
         "With cwd `B/locked/w` and `B/locked` of mode 0o000, resolution returns HomeError::Io whose Display contains `canonicalising a given path` and `B/locked/w`.",
+        "render-launch with --cwd `B/locked/w`, `B/locked` of mode 0o000, exits 1, stderr contains `canonicalising a given path` and `B/locked/w`, and the session holds 0 lys.given entries afterwards.",
         "`git diff` against the base of this brief shows no change to crates/lys-home/src/harness/claude_code/paths.rs."
       ],
       "files": {
         "create": [],
         "modify": [
           "crates/lys-home/src/harness/claude_code/given.rs",
-          "crates/lys-home/src/harness/claude_code/given_tests.rs"
+          "crates/lys-home/src/harness/claude_code/given_tests.rs",
+          "crates/lys-home/tests/given_record.rs"
         ],
         "delete": []
       },
@@ -101,6 +105,7 @@
         "A lys.given entry listing `B/gone/CLAUDE.md`, which does not exist, checked with --path `B/gone/CLAUDE.md` and a --file of equal bytes and length exits 0 with `answer` `matches` and `unresolved` [\"B/gone/CLAUDE.md\"].",
         "The same entry checked with --path `B/gone/../gone/CLAUDE.md` exits 2, stdout is empty and stderr contains `B/gone/../gone/CLAUDE.md`.",
         "`given` on a session holding a record whose config_dir.path is `B/gone/c/` and a record whose paths all exist reports `unresolved` [\"B/gone/c/\"] on the first and [] on the second.",
+        "`given` on a session holding a record that lists the document `B/real/w/absent.md`, which does not exist at listing time while `B/real/w` does, reports `unresolved` [\"B/real/w/absent.md\"] on that record.",
         "given-check with --path `B/locked/w/CLAUDE.md`, `B/locked` of mode 0o000, exits 2, stdout is empty and stderr contains `canonicalising a given path` and `B/locked/w/CLAUDE.md`.",
         "given-check with --path `instructions.md` against a render's record exits 0 with `answer` `matches` for the render's instructions.md.",
         "The keys of a lys.given entry's data after a render are exactly harness, harness_version, kinds, config_dir, documents and environment."
@@ -156,11 +161,11 @@
         "RECORD.md's lys.given paragraph contains the words `canonicalised`, `link position`, `unresolved` and `trailing slash`, and names instructions.md and mcp.json as the exemption.",
         "RECORD.md's lys.given paragraph states that the slug is computed from the working directory as given.",
         "RECORD.md still states `Data is exactly {harness, harness_version, kinds, config_dir, documents, environment}`.",
-        "`sh scripts/design/gate.sh` exits 0, so DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/HOME-008.md are what their JSON renders to."
+        "`sh scripts/design/gate.sh` exits 0, so DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/HOME-010.md are what their JSON renders to."
       ],
       "files": {
         "create": [
-          "docs/design/home/briefs/HOME-008.md"
+          "docs/design/home/briefs/HOME-010.md"
         ],
         "modify": [
           "docs/design/home/RECORD.md",

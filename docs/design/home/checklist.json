@@ -281,7 +281,7 @@
       "items": [
         {
           "id": "C71",
-          "text": "One helper canonicalises a given path: a directory whole, a document by its parent directory with its own final name kept, a relative path left as written, and a path that does not exist kept byte for byte and marked unresolved.",
+          "text": "One helper canonicalises a given path: a directory whole, a document by its parent directory with its own final name kept and its own entry required to exist (a dangling symlink exists at its link position), a relative path left as written, and a path whose parent or own entry does not exist kept byte for byte and marked unresolved.",
           "done": false
         },
         {
@@ -291,7 +291,7 @@
         },
         {
           "id": "C73",
-          "text": "A canonicalisation failure other than a path not existing is refused by path and operation: render-launch exits 2 with no lys.given entry written, and given-check exits 2 with nothing on stdout.",
+          "text": "A canonicalisation failure other than a path not existing is refused by path and operation: render-launch refuses with its existing status 1 with no lys.given entry written, and given-check exits 2 with nothing on stdout.",
           "done": false
         },
         {
