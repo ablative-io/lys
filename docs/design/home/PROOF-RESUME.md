@@ -81,3 +81,41 @@ From PROOF-FEWSHOT.md's continuation (`<scratch>/proof5/fewshot/60d9c850-….jso
 ## Pi's reader on the record (R1 acceptance)
 
 Recorded in PROOF-CANON.md with the canon file, since both are the same check: `parseSessionEntries` from the checkout at `3d5cbe98`, run under node against `home/sessions/real1.jsonl` and the canon.
+
+## The deterministic render (HOME-007)
+
+The render is one function of the session head, the target and the lys-home
+version: the same inputs give the same bytes, so a rendered file is told by
+its hash. This section pins that on a synthetic fixture and re-measures the
+session above.
+
+### The fixture's hash (R3)
+
+`crates/lys-home/tests/fixtures/multi_result.jsonl`, six synthetic records
+(SHA-256 `5e9c37f955dee54b215c30adeec521ae4f5827fb80d1b9bb0d395f3daee497fc`):
+a question, an assistant record with two tool_use parts, a user record of
+exactly two tool_result parts, an assistant record with one tool_use, a user
+record of one tool_result beside its own text, and the answer. Built from
+lys-home at `396f2b6` (the derivation landed at `8bc7f04`) and run from the
+repository root, `<scratch>` a fresh directory:
+
+```
+lys-home import --home <scratch>/home --claude-code crates/lys-home/tests/fixtures/multi_result.jsonl --session multi
+lys-home render --home <scratch>/home --session multi --uuid aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa --cwd /elsewhere --model claude-opus-5-5 --version 2.1.281 --out <scratch>/a.jsonl
+lys-home render --home <scratch>/home --session multi --uuid aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa --cwd /elsewhere --model claude-opus-5-5 --version 2.1.281 --out <scratch>/b.jsonl
+shasum -a 256 <scratch>/a.jsonl <scratch>/b.jsonl
+```
+
+| field | value |
+| --- | --- |
+| import | 6 records, 11 entries, 9 blocks new |
+| each render | 8 records, `dropped` 0 |
+| `a.jsonl` | `798a64be2164b48c30e4e64fa80c4a307687f7808c256e7606be52b2c9f03074` |
+| `b.jsonl` | equal to `a.jsonl` |
+| `a.loss.json`, `b.loss.json` | `4d9fd3712492331879273558a96c18eecbeb77aa42215100e7d14faff1542f2e`, equal |
+
+`tests/claude_code_round_trip.rs` runs the same import and render through
+`lys_home::cli::run` and asserts the rendered file's SHA-256 equals that
+constant, written in the test and never computed from the render it checks,
+and that this document contains it once. Drift injection: one hex digit of
+the value above changed makes exactly that test fail.

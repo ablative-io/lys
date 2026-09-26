@@ -4,10 +4,13 @@
 //! every message part by hash; a rendered file resumed by Claude Code must not
 //! repeat the tool actions it already holds, and `resume-check` refuses a fork
 //! that does; an authored file's boundary to the real turn survives the trip.
+//! The multi-result fixture rendered through `run` hashes to the constant
+//! pinned here and recorded in PROOF-RESUME.md (HOME-007 R3).
 
 use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 
 use lys_home::cli::{Cli, Command, run};
 use lys_home::harness::claude_code::import::import_claude_code;
@@ -337,5 +340,74 @@ fn the_authored_boundary_survives_fewshot_import_and_render() {
         ["authored", "authored", "authored", "claude-opus-5-5"]
     );
     drop(s);
+    dir.close().unwrap();
+}
+
+/// The determinism fixture and the proof document that records its hash.
+const MULTI_RESULT: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/multi_result.jsonl"
+);
+const PROOF_RESUME: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/design/home/PROOF-RESUME.md"
+);
+
+/// SHA-256 of the fixture rendered with session id aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa,
+/// cwd /elsewhere, model claude-opus-5-5 and version 2.1.281 from a session named
+/// `multi`, measured with `shasum -a 256` on the CLI's own render and recorded in
+/// PROOF-RESUME.md. It is written here, never computed from the render it checks.
+const PINNED_FIXTURE_SHA256: &str =
+    "798a64be2164b48c30e4e64fa80c4a307687f7808c256e7606be52b2c9f03074";
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    Sha256::digest(bytes)
+        .iter()
+        .fold(String::new(), |mut s, b| {
+            write!(s, "{b:02x}").unwrap();
+            s
+        })
+}
+
+#[test]
+fn the_fixture_rendered_through_run_hashes_to_the_constant_pinned_here_and_in_proof_resume() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = dir.path().join("home");
+    let imported = run(Cli {
+        command: Command::Import {
+            home: home.clone(),
+            claude_code: PathBuf::from(MULTI_RESULT),
+            session: "multi".into(),
+        },
+    })
+    .unwrap();
+    assert_eq!(imported["report"]["records"], 6);
+    let out = dir.path().join("rendered.jsonl");
+    let rendered = run(Cli {
+        command: Command::Render {
+            home,
+            session: "multi".into(),
+            uuid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa".into(),
+            cwd: "/elsewhere".into(),
+            model: "claude-opus-5-5".into(),
+            out: Some(out.clone()),
+            version: "2.1.281".into(),
+            canon: None,
+        },
+    })
+    .unwrap();
+    assert_eq!(rendered["report"]["records"], 8);
+    assert_eq!(
+        sha256_hex(&std::fs::read(&out).unwrap()),
+        PINNED_FIXTURE_SHA256,
+        "the rendered fixture's SHA-256"
+    );
+    let proof = std::fs::read_to_string(PROOF_RESUME).unwrap();
+    assert_eq!(
+        proof.matches(PINNED_FIXTURE_SHA256).count(),
+        1,
+        "PROOF-RESUME.md records the pinned constant once"
+    );
     dir.close().unwrap();
 }
