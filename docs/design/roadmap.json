@@ -35,7 +35,7 @@
         "commits": []
       },
       "depends_on": [],
-      "notes": "The briefs build in order: DIRECTORY-002 before 003, 003 before 004 and 005. Each card runs through the board (brief_card, then card_build_v3). DIRECTORY-002 is owned by RM-009, the card that builds it."
+      "notes": "The briefs build in order: DIRECTORY-002 before 003, 003 before 004 and 005. Each card runs through the board (brief_card, then card_build_v3). DIRECTORY-002 is owned by RM-011, the card that builds it."
     },
     {
       "id": "RM-002",
@@ -246,10 +246,69 @@
     },
     {
       "id": "RM-009",
+      "title": "Make the Claude Code render byte-deterministic for the same session head and version",
+      "status": "idea",
+      "kind": "fix",
+      "summary": "Two renders of the same session head give different bytes whenever the context path holds an entry whose id is not uuid-shaped, which the importer writes for every tool record with more than one result: the render draws a fresh random uuid for each. The render derives those uuids from the record instead (UUIDv5 over a fixed lys namespace, the session id and the entry id with its role), a fixture carrying the defect is pinned by hash in a test and in PROOF-RESUME.md, and the resume is re-measured on the Claude Code installed on this Mac. A rendered file can then be told by its hash, a receipted render event can name what was written, and the launch template's identical-hash acceptance has ground to stand on.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-26T08:03:37+10:00",
+        "quote": "The Claude Code render in crates/lys-home walks a session's context path and writes the JSONL file that Claude Code 2.1.282 on this Mac resumes by path, as HOME-001 R4 and R9 landed it on lys main 0073b966. Rendering the same session twice does not give the same bytes today when a tool record on the path holds more than one result, which the translation card's survey found on 26 September 2026 while reading the render for the Codex rollout, and the launch template card's acceptance that rendering the same template and session twice yields identical hashes stands on the render being deterministic. A render of the same session head with the same lys-home version is one function of the record and must give the same bytes every time, so a reader can tell a rendered file by its hash and a receipted render event can name what was written. The change finds why two renders of a multi-result tool record differ, names that cause in the proof document, and makes the render byte-deterministic for the same session head and the same version without changing what the rendered file holds or how Claude Code resumes it. Where the cause is an order that the record does not fix, the render takes the order the record gives, entry order then part order, and never a map's or a set's order; where the cause is a fresh id or a clock, the value is derived from the record's own ids and stamps as the fork and launch cards derive theirs. Acceptance is that a fixture session holding a tool record with more than one result renders twice to files of equal SHA-256; that the fixture from PROOF-RESUME renders twice to equal hashes; that a recorded fixture hash in the proof document matches the render at the landed commit; that the rendered file still resumes in Claude Code 2.1.282 on this Mac, recorded in the proof document as before; and that the proof document names the cause found. Not in scope: any change to the importer, the record's shape, or the rendered file's content beyond the determinism, and any harness other than Claude Code. Filed by Archie on the translation card's survey of 26 September 2026, on Tom's rule of 16 September 2026 to find the underlying cause, and on lys main 0073b966.",
+        "context": "Filed on the translation card's survey, which found the nondeterminism while reading the render for the Codex rollout; surveyed on lys main 0073b966. The lead's answers settled the Claude Code version the resume is measured on (the one installed when the proof runs, as `claude --version` prints it, with the rendered records' version field left at 2.1.281) and that this card defines the id derivation the fork and launch cards follow; a follow-up card ruled that the derived uuid is salted with the session id."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-004",
+          "ADR-007",
+          "ADR-016"
+        ],
+        "briefs": [
+          "HOME-007"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Renumbered from the HOME-002 and RM-006 it was written as, since the launch template took HOME-002 and RM-006, the context record HOME-003 and RM-007, and the lanterns HOME-004 and RM-008 first. Stands on HOME-001's render (R4) and CLI (R9), already on main at 0073b966, so no roadmap dependency is written. Further units, not written: Make the Claude Code import deterministic for the same transcript; Render tool parts from the stored block so a round trip adds only the new turn; Move the render's default Claude Code version off 2.1.281. ADR-016 is proposed and binds the fork and launch cards' id derivation."
+    },
+    {
+      "id": "RM-010",
+      "title": "Fork a session from a lantern's point and launch the child",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "Stage 5b of the home: lys-home fork takes a lantern id, resolves it to the session it was lit in, cuts that session's chain at the last assistant message at or before the lantern's point, and writes a child session holding the parent's own lines with its ancestry on both sides (the header's parentSession, a lys.forked_from entry in the child, a lys.fork entry at the parent's head), adding nothing to the block store and rewriting nothing in the parent. A user-message point is carried as a seed prompt the child's render writes beside the rendered file and the launch line passes as the first prompt. The child renders and launches through the launch template, measured on the installed Claude Code version.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-26T13:16:00+10:00",
+        "quote": "A lantern is a pathway back to a conversation with the self that lit it, and Claude Code resumes a session only from its end. This brief delivers the fork that makes the pathway: a new session in the home cut from the parent's chain at a lantern's point, carrying its ancestry on both sides, adding nothing to the block store and rewriting nothing in the parent, then rendered and launched like any session. It is stage 5b of the home and stands on the lantern card's lys.lantern entry (the design's solution and ADR-012).",
+        "context": "The stage 5b fork card on the Lys board, surveyed against lys main after the lantern card; the lead's answers settled that the fork stands on the lantern card and is built on the main it lands on, that the child launches through the launch template's line, that the copied lines are the parent's own bytes with the same hashes and the block store unchanged, that lys.forked_from is the first entry the fork writes, that parentSession carries the parent file's path as Pi reads it, that a user-message point is carried as a seed and never dropped, that a lantern resolves to its lit-in session (lit_in) with the older-record rule until the lantern card records it, that a lantern before any assistant message is refused nothing_to_fork, and that non-text parts of a carried message are counted, never refused. HOME-006 carries those answers."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-007",
+          "ADR-012",
+          "ADR-014",
+          "ADR-017",
+          "ADR-018"
+        ],
+        "briefs": [
+          "HOME-006"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-006",
+        "RM-008"
+      ],
+      "notes": "Renumbered from the HOME-002 it was written as; HOME-006 follows the lantern card (HOME-004, RM-008) and the launch template (HOME-002, RM-006), both on main, and after the render card (HOME-007), which took RM-009, ADR-016, C31 to C35, S18, S19 and CN9. Further units, not written: lit_in written by the light act (the lantern card's next round); a fork given tools, a lens or a briefing on what changed since the point; leases, budgets and kill rules; harnesses other than Claude Code."
+    },
+    {
+      "id": "RM-011",
       "title": "Install the standalone service dependencies on one PostgreSQL database",
       "status": "idea",
       "kind": "feature",
-      "summary": "The card that builds DIRECTORY-002, Row 02 of IDENTITY-001 revision 5, adopted as it stands: the maintained Rauthy fork at its pin, SpiceDB and one PostgreSQL database packaged in deploy/identity/ and installed for development on a node the operator names, with the database host confirmed with the operator and possibly on a network device; lys identity prepare, configure and health in the lys CLI; both Rauthy client themes in dark from the estate tokens with each product's own accent; and SpiceDB's step-1 role written down and held. The lead's survey rulings are written in: sibling unit tests under crates/lys/src/identity/, dark-only themes mapping a field only where an estate token names its role, with light, error, radius and the dark emphasised text, action and button text as design-system gaps (ADR-016), idempotence counted over the two managed clients beside Rauthy's built-in one, and the container-backed tests as their own leg of .land/gates.sh.",
+      "summary": "The card that builds DIRECTORY-002, Row 02 of IDENTITY-001 revision 5, adopted as it stands: the maintained Rauthy fork at its pin, SpiceDB and one PostgreSQL database packaged in deploy/identity/ and installed for development on a node the operator names, with the database host confirmed with the operator and possibly on a network device; lys identity prepare, configure and health in the lys CLI; both Rauthy client themes in dark from the estate tokens with each product's own accent; and SpiceDB's step-1 role written down and held. The lead's survey rulings are written in: sibling unit tests under crates/lys/src/identity/, dark-only themes mapping a field only where an estate token names its role, with light, error, radius and the dark emphasised text, action and button text as design-system gaps (ADR-019), idempotence counted over the two managed clients beside Rauthy's built-in one, and the container-backed tests as their own leg of .land/gates.sh.",
       "provenance": {
         "requested_by": "tom",
         "date": "2026-09-26T15:34:38+10:00",
@@ -265,7 +324,7 @@
           "ADR-009",
           "ADR-010",
           "ADR-011",
-          "ADR-016"
+          "ADR-019"
         ],
         "briefs": [
           "DIRECTORY-002"
@@ -273,7 +332,7 @@
         "commits": []
       },
       "depends_on": [],
-      "notes": "DIRECTORY-002 is the one unit and is built whole through the card chain; its three blocked_by entries are each discharged only by the blocker having landed, checked live when the build starts. Further units, not yet written: Fill the Rauthy client theme gaps from the design system: light mode, error colour, border radius, and dark emphasised text, action and button text (a design-system card the lead places, ADR-016). RM-001 carries the rest of the directory rows."
+      "notes": "DIRECTORY-002 is the one unit and is built whole through the card chain; its three blocked_by entries are each discharged only by the blocker having landed, checked live when the build starts. Further units, not yet written: Fill the Rauthy client theme gaps from the design system: light mode, error colour, border radius, and dark emphasised text, action and button text (a design-system card the lead places, ADR-019). RM-001 carries the rest of the directory rows."
     }
   ]
 }

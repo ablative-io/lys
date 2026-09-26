@@ -273,17 +273,72 @@
     },
     {
       "id": "ADR-016",
+      "title": "A rendered file's derived uuids are a fixed, versioned contract",
+      "status": "proposed",
+      "scope": "home",
+      "date": "2026-09-26",
+      "decided_by": "",
+      "context": "The Claude Code render gave every entry id that is not uuid-shaped a fresh random uuid, so two renders of one session head differed and no hash could name a rendered file; the launch template then shaped one from the SHA-256 of the entry id alone, deterministic but outside any namespace, without a role, and equal for the same entry id in any two sessions. Deriving those uuids from the record under a fixed scheme makes a render deterministic, and from the first receipted render event onward a hash names a rendered file, so the derivation fixes those hashes the way a wire format fixes signatures. The fork and launch cards need the same kind of derived id.",
+      "decision": "Derive every uuid a render needs and the record does not hold as UUIDv5 under the session's namespace and the name `<entry id>#<role>`, with a closed set of roles (`record` first); the session's namespace is UUIDv5 over one fixed lys namespace (32c05904-d1f1-550c-9eee-2f6c8f98b665, itself UUIDv5 of the RFC 9562 URL namespace over `lys/home/claude-code/render-uuid/v1`) and the id of the session being rendered, so the same entry id in two sessions never derives one uuid. Treat the namespace, the session namespace rule, the name form and the roles as frozen: a change is a new version alongside, never a mutation. The fork and launch cards derive by this scheme. Rejected: drawing fresh ids (nondeterministic), keying on a hash of the entry id alone without a namespace, a role and a session (two roles on one entry collide, two sessions with one hand-authored id collide, and it is not reproducible with standard UUID tooling), mixing in the target session id (the record does not hold it), and leaving the scheme mutable until a later card (every recorded hash would move with it).",
+      "quote": "",
+      "consequences": [
+        "HOME-007 implements the derivation for the role `record` and pins a fixture hash in PROOF-RESUME.md.",
+        "A fork or launch card that needs a derived id adds a role to the closed set, never changes the namespace, the session namespace rule or the name form.",
+        "Changing the derivation breaks every recorded render hash and is written as a new version with its own namespace, alongside the old."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-017",
+      "title": "A fork is a child session cut from the parent's own lines at a lantern's point, with its ancestry on both sides",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-26",
+      "decided_by": "The stage 5b fork request and the lead's answers to its survey; recorded with HOME-006",
+      "context": "A lantern is a pathway back to a conversation with the self that lit it, and Claude Code resumes a session only from its end. The home record is Pi's session tree (P2); Pi's own fork writes a new session whose header's parentSession is the source file's path and copies the source entries. The fork has to say which session a lantern was lit in, since a copied line keeps its id and a child holds a copy of every lantern on the copied chain.",
+      "decision": "A fork resolves a lantern to the session it was lit in, read from the lys.lantern data's lit_in when the record carries it and otherwise by the older-record rule (one holder cuts, several refuse lantern_ambiguous until a session is named), and cuts that session's root-to-point chain at the last assistant message at or before the point, through the index. The child is a new session under the parent's cwd whose header's parentSession is the parent file's path relative to the home, holding each cut entry as the parent file's own line bytes, then one lys.forked_from custom entry as its head naming the parent session, the lantern, the point, the cut entry, whether the coordinate was carried and the carried entry; the parent gains one lys.fork custom entry at its head naming the child. Nothing else is copied and no block is written. Rejected: re-serialising the copied entries (the copy would stop hash-matching the parent's lines), a fork store beside the sessions outside Pi's grammar, cutting at a point no lantern names, and a header field beyond Pi's parentSession.",
+      "quote": "",
+      "consequences": [
+        "HOME-006 defines both custom types and documents their data in docs/design/home/RECORD.md; a copy of a lantern's line in a child is a copy, never a second lantern.",
+        "A lantern that sits before any assistant message is refused nothing_to_fork: a point before the first reply would carry only a seed, which is a new session and not a fork.",
+        "The fork report carries ids and counts only: entries copied, distinct block hashes the copied entries name that the store holds, and those it does not.",
+        "The lantern card records lit_in in a later round; until it does, every lantern the light act writes resolves by the older-record rule."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-018",
+      "title": "A user-message point is carried as a seed prompt beside the rendered file, never copied into the child",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-26",
+      "decided_by": "The lead's answers to the fork survey; recorded with HOME-006",
+      "context": "A lantern may mark a user message. Copying it into the child would leave the child ending on a question no reply answers, and dropping it would lose the coordinate the lantern marks. The measured cut of the lantern design carries the message as the first prompt instead.",
+      "decision": "When the point is a user message the cut stops at the assistant message before it and the message is carried, not copied: lys.forked_from records its id with coordinate_carried true and counts, by kind, the parts of it that are not text. The Claude Code render of such a child writes the message's text parts, in order, as a seed prompt beside the rendered file under an in-band marker line naming the parent session, the point and the lantern, and names it in the render report; the template's launch line, printed by render-launch only, passes that file as the resumed session's first prompt. A part that is not text never refuses a fork or a render and never enters the seed. Rejected: copying the user message into the child's chain, refusing a fork for a non-text part, and putting the seed's text in the report or the loss account.",
+      "quote": "",
+      "consequences": [
+        "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
+        "A seed path that already exists is refused by name and the render writes nothing.",
+        "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-019",
       "title": "The identity install themes Rauthy in dark only, from the estate tokens as they stand",
       "status": "decided",
       "scope": "directory",
       "date": "2026-09-26",
       "decided_by": "The lead of the directory card, answering the DIRECTORY-002 survey",
       "context": "DIRECTORY-002 R3 reads its colours from the estate colour tokens (ablative-docs 385916e), which hold a dark foundation and the product accents only: no light neutrals, no error colour and no radius. Rauthy's theme needs light and dark values for seven fields plus button text and radius. The only light palette in the estate is Aion's console stylesheet, and its dark background (#121218) differs from the estate ink (#0C0E10).",
-      "decision": "The install card uses the design-system tokens as they stand, in dark only. Light mode, the error colour and the radius are out of scope for DIRECTORY-002 and are each named as a gap for a design-system card the lead places. Where two dark backgrounds compete, the one the design system names as the page surface wins: foundation ink, whose use is page background. Rejected: reading light mode, error and radius from Aion's console stylesheet at a pinned commit, which would make Aion a colour source outside the design system.",
+      "decision": "The install card uses the design-system tokens as they stand, in dark only, and a Rauthy field takes an estate token only where the token names the same role: text takes text, bg takes ink, bg_high takes raised, accent takes the product accent. Light mode, the error colour and the radius are out of scope for DIRECTORY-002, and so are the dark text_high, action and button text, for which the estate names no emphasised text tier, no accent role for actions and no text-on-accent; each is named as a gap for a design-system card the lead places. Where two dark backgrounds compete, the one the design system names as the page surface wins: foundation ink, whose use is page background. Rejected: mapping text to muted, which would set the body of every page in the secondary colour; reading light mode, error and radius from Aion's console stylesheet at a pinned commit, which would make Aion a colour source outside the design system.",
       "quote": "",
       "consequences": [
-        "DIRECTORY-002 R3 sets the dark text, text_high, bg, bg_high, action, accent and button text of both clients, and leaves the light fields, the dark error and the radius as Rauthy holds them.",
-        "deploy/identity/theme-map.md names the three gaps; nothing reads colours from apps/aion-ops-console/src/index.css.",
+        "DIRECTORY-002 R3 sets the dark text and bg_high of both clients from the estate tokens text and raised, with bg from ink and each client's own product accent, and leaves the light fields, the dark error and the radius as Rauthy holds them.",
+        "deploy/identity/theme-map.md names six gaps: light mode, the error colour, the border radius, and the dark text_high, action and button text; each keeps Rauthy's own default until the estate names a token for it, and nothing reads a gap. Nothing reads colours from apps/aion-ops-console/src/index.css.",
         "ADR-010's accessible light values and corner radius wait for the design-system card that fills the gaps."
       ],
       "supersedes": [],

@@ -51,7 +51,7 @@
     "ADR-009",
     "ADR-010",
     "ADR-011",
-    "ADR-016"
+    "ADR-019"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -107,7 +107,7 @@
     },
     {
       "text": "Light mode, the error colour, the border radius, and the dark text_high, action and button text of the Rauthy client themes",
-      "reason": "The estate colour tokens hold a dark foundation only and name no emphasised text tier, no action role and no text-on-accent; each is a gap for a design-system card the lead places, and DIRECTORY-002 leaves each as Rauthy holds it (ADR-016)."
+      "reason": "The estate colour tokens hold a dark foundation only and name no emphasised text tier, no action role and no text-on-accent; each is a gap for a design-system card the lead places, and DIRECTORY-002 leaves each as Rauthy holds it (ADR-019)."
     }
   ],
   "structure": [
