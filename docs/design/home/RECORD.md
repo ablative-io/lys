@@ -164,7 +164,7 @@ id follow from it. A derived uuid carries version nibble 5 where Claude
 Code's own carry 4. Nothing random and no clock enters a render, every
 timestamp is the entry's own, and the walk takes entry order then part
 order, so the same session head with the same target writes the same bytes
-(CN9, ADR-014); the namespace, the name form and the roles are fixed, and a
+(CN9, ADR-016); the namespace, the name form and the roles are fixed, and a
 change is a new version alongside.
 
 ## The loss account

@@ -96,8 +96,9 @@ session above.
 a question, an assistant record with two tool_use parts, a user record of
 exactly two tool_result parts, an assistant record with one tool_use, a user
 record of one tool_result beside its own text, and the answer. Built from
-lys-home at `396f2b6` (the derivation landed at `8bc7f04`) and run from the
-repository root, `<scratch>` a fresh directory:
+lys-home at `287207d` (the derivation landed at `a2d6d2c`; first measured on the
+same tree before the branch was rebased, and equal again after) and run from
+the repository root, `<scratch>` a fresh directory:
 
 ```
 lys-home import --home <scratch>/home --claude-code crates/lys-home/tests/fixtures/multi_result.jsonl --session multi
@@ -117,8 +118,22 @@ shasum -a 256 <scratch>/a.jsonl <scratch>/b.jsonl
 `tests/claude_code_round_trip.rs` runs the same import and render through
 `lys_home::cli::run` and asserts the rendered file's SHA-256 equals that
 constant, written in the test and never computed from the render it checks,
-and that this document contains it once. Drift injection: one hex digit of
-the value above changed makes exactly that test fail.
+and that this document contains it once. Drift injections, both run in the card's
+worktree on the tree of `b19c3df` with `cargo test -p lys-home`, the code put
+back afterwards:
+
+- R2, `record::fresh_id` put back in place of the derivation in
+  `record_uuid` (`--lib the_multi_result_fixture`): the fixture test fails at
+  `render_tests.rs:452` with `assertion \`left == right\` failed: two renders,
+  one SHA-256`, left `a672a1e45f9f5e6118becf4870ca0cd154c07c72088e44f6de2220ad5688279d`,
+  right `f012d1af8cf106e2258fc1fd0f4ebf367d9856ce457e626306f81576e0adc766`
+  (two random renders; the values differ on every run), `0 passed; 1 failed`.
+  Run over the whole render test module the same injection also fails the
+  UUIDv5 vector tests, the salt test, the kept-id test, the source-scan test
+  and the earlier determinism test, six in all, each on its own rule.
+- R3, one hex digit of the value above changed in this document
+  (`--test claude_code_round_trip`): exactly the pinned-hash test fails, on
+  `PROOF-RESUME.md records the pinned constant once`, `3 passed; 1 failed`.
 
 ### The cause (R4)
 
@@ -155,7 +170,7 @@ before), imported once with `lys-home import --home <scratch>/resume/home
 --claude-code <source> --session real1` (242 records, 205 entries, 81 blocks,
 as in the first import above) and rendered twice with one command to two out
 paths, `<scratch>/resume/rendered/a.jsonl` then `b.jsonl`, built from
-lys-home at `02f7519`:
+lys-home at `e7adda5`:
 
 ```
 lys-home render --home <scratch>/resume/home --session real1 --uuid 478d9617-9050-453d-bb94-b84385905aed --cwd "<session cwd>" --model claude-opus-5 --out <scratch>/resume/rendered/<a or b>.jsonl
