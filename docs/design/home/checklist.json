@@ -155,6 +155,51 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Moving a home",
+      "items": [
+        {
+          "id": "C24",
+          "text": "lys-home ship commits the home's tracked set (session files, their index and head files, blocks and templates) and pushes it as one ref, refs/lys-home/<commit>, to the remote named on the command line, and its report names the commit and the ref.",
+          "done": false
+        },
+        {
+          "id": "C25",
+          "text": "Ship refuses by name a home whose index is stale or whose head file is missing, exits 1, and writes nothing to the home or the remote; no index is rebuilt and no head persisted.",
+          "done": false
+        },
+        {
+          "id": "C26",
+          "text": "Ship refuses by name any remote that is not a path on this machine or a file:/// URL, naming its scheme and the encryption-at-rest precondition, and writes nothing.",
+          "done": false
+        },
+        {
+          "id": "C27",
+          "text": "No lock, temporary, environment or render file is in a shipped tree, and ship refuses by file and offset a tracked file holding any value of the --secret-values file, printing no value.",
+          "done": false
+        },
+        {
+          "id": "C28",
+          "text": "lys-home fetch fetches the named ref into a new directory, refuses by name a directory that already holds any entry, and checks every index against its file and every head against its index without rebuilding either, leaving nothing behind on a refusal.",
+          "done": false
+        },
+        {
+          "id": "C29",
+          "text": "Fetch appends to each session, beside the head, one lys.harness_event of kind arrival naming the source commit, the remote without userinfo, the ref and the target home's execution id, within the 512-byte cap.",
+          "done": false
+        },
+        {
+          "id": "C30",
+          "text": "On the fixture home, every tracked file at the fetched commit equals its source byte for byte, the source session file and index are byte prefixes of the target's after the arrival, the source home's files are unchanged by ship and fetch, and a search of every object in the remote finds no fixture secret value while a planted one is found.",
+          "done": false
+        },
+        {
+          "id": "C31",
+          "text": "PROOF-MOVE.md records the fetched home rendered by render-launch and resumed by the printed launch line on Claude Code 2.1.283, as hashes, counts and paths only.",
+          "done": false
+        }
+      ]
     }
   ]
 }

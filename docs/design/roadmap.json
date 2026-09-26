@@ -214,6 +214,41 @@
         "RM-006"
       ],
       "notes": "Renumbered from the HOME-002 it was written as, since the launch template took HOME-002 and RM-006 first; built on the launch template branch (RM-006, lys PR 14) and lands after it. Built on lys main after ct98Wv-2 lands. Further units, not written: Record settings.json in the given entry; Record SessionStart hook output in the given entry; Record plugin skill and agent listings in the given entry; Record output styles in the given entry; Record what reached the model, @-imports and .claude/rules included, in a second lys.given entry at the first request from the HOME-001 proxy's capture."
+    },
+    {
+      "id": "RM-008",
+      "title": "Move a home as a pushed ref: ship, fetch and the same-machine resume proof (stage 3, first block)",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "A home lives only on the machine that captured it. This item takes stage 3's first block: the home directory becomes a git repository with an allowlisted tracked set, `lys-home ship` commits it and pushes it as one ref to a remote named on the command line, refusing a stale index, a remote off this machine and a named secret value, and `lys-home fetch` fetches the ref into a new home, checks every index and head without rebuilding, and records an arrival event on each session naming the source commit, the remote, the ref and the new home's execution id. The fetched home is rendered through the Claude Code launch template and resumed by the printed line, measured on the installed Claude Code and written up as hashes, counts and paths.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-26T06:27:00+10:00",
+        "quote": "A home is a directory of session files, their indexes and heads, and the blocks store, and today it lives on the machine that captured it and nowhere else. Roadmap stage 3 says a home moves by the same route as a build tree, a pushed ref that the target fetches, never a hand copy, and that the target gets a distinct execution id with its ancestry recorded. This card takes the first block of stage 3, the same-machine proof: a home shipped as a ref to a named remote and fetched into an isolated second home on this Mac, then rendered and resumed there through the Claude Code launch template. The home directory is a git repository whose tracked files are the session files, their index and head files and the blocks store; a lys-home subcommand commits the home's current state and pushes it as one ref to a remote named on the command line, refusing by name a home whose index is stale rather than shipping it, and reporting the commit and the ref it pushed. A second lys-home subcommand fetches that ref from the named remote into a new home directory that must not already hold a home, verifies every index against its file and every head against its index, and appends to each session a lys.harness_event recording the arrival: the source home's commit, the remote and ref it came from, and this home's own execution id, so the ancestry is on the record. Source files are never rewritten by either side, and no credential, token or secret value is ever tracked in the home. With the target home in place the launch template renders it and the printed launch line resumes it, which is the resume evidence stage 3 asks for, measured on this Mac on Claude Code 2.1.281 and written up as a proof document holding hashes, counts and paths only. Acceptance is that a fixture home with a synthetic session ships to a bare remote in a temporary directory and is fetched into a second directory whose session file, index and blocks hash-match the source; that the source home's files are byte-identical before and after; that the target session's last entry is an arrival event naming the source commit and a fresh execution id; that a fetch into a directory already holding a home is refused by name; that a home with a stale index is refused by name on ship and the report says so; that the launch template renders the target home and the launch line resumes it, recorded in the proof document; and that a search of the shipped ref for a fixture secret value finds nothing. Not in scope: the named second machine, which is stage 3's second block and waits on its two preconditions, read authority over the home from the directory step and encryption before bytes leave the machine from the secrets step, each a card on its own board, with this card's shipped ref as what that block fetches; harnesses other than Claude Code; encryption of the home; any transport other than a git ref to a named remote. Filed by Archie on Tom's roadmap stage 3 of 22 September 2026 and his 08:30 rule that a home moves as a pushed ref, on home DESIGN P1, P7 and P8 at lys main 0073b966, at 06:27 on 26 September 2026.",
+        "context": "A Cambium card on the home cluster for roadmap stage 3's first block, the same-machine proof. The lead's answers settled that the hash match is taken at the fetched commit before the arrival and as byte prefixes after it, that the proof is measured on the installed Claude Code 2.1.283 rather than the 2.1.281 the words name, that ship refuses a remote off this machine until encryption at rest lands, that no secret is tracked by an allowlisted tracked set plus a scan for the named values file's values and five standard patterns, and that templates/ is shipped."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-001",
+          "ADR-004",
+          "ADR-007",
+          "ADR-012",
+          "ADR-013",
+          "ADR-014",
+          "ADR-015"
+        ],
+        "briefs": [
+          "HOME-004"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-005",
+        "RM-006",
+        "RM-007"
+      ],
+      "notes": "Further units, not written: Stage 3 block two: a home fetched and resumed on a named second machine. Open with the lead: which five standard patterns ship scans for beside the named values; HOME-004 scans for the named values only."
     }
   ]
 }

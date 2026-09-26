@@ -24,6 +24,10 @@
         {
           "id": "S9",
           "text": "As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness."
+        },
+        {
+          "id": "S14",
+          "text": "As an agent, I want my home carried to a new home as a pushed ref that the new home fetches, so that I continue from my own record rather than from a hand copy."
         }
       ]
     },
@@ -68,6 +72,18 @@
         {
           "id": "S13",
           "text": "As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed."
+        },
+        {
+          "id": "S15",
+          "text": "As the reviewer, I want every fetched session to record the commit, remote and ref it came from and the new home's execution id, so that a moved home's ancestry is on the record."
+        },
+        {
+          "id": "S16",
+          "text": "As the reviewer, I want a ship to refuse a home holding a named secret value, so that no credential leaves in a shipped ref."
+        },
+        {
+          "id": "S17",
+          "text": "As the reviewer, I want the moved home's resume measured on a named Claude Code version and written in a proof document, so that the move is shown to continue a session rather than assumed to."
         }
       ]
     }
