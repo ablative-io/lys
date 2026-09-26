@@ -166,7 +166,7 @@
         },
         {
           "id": "C25",
-          "text": "Every text part, tool call and tool result on the context path is carried whole as Codex's own message, function_call and function_call_output items, paired by call id, never clipped or noted; readable thinking is carried as text; opaque thinking is dropped and named by hash; a compaction becomes the item Codex 0.156.0 writes for one, measured.",
+          "text": "Every text part, tool call and tool result on the context path is carried whole as Codex's own message, function_call and function_call_output items, paired by call id, never clipped or noted; readable thinking is carried as text; an image part whose source is base64 is carried as Codex's input_image item, and any other image source is named lost, never fetched; opaque thinking is dropped and named by hash; a compaction becomes the item Codex 0.156.0 writes for one, measured.",
           "done": false
         },
         {
@@ -186,7 +186,7 @@
         },
         {
           "id": "C29",
-          "text": "A fixture session imported from a fixture Claude Code file renders to a rollout whose items match a fixture rollout recorded from Codex 0.156.0, apart from ids and timestamps; a tool result longer than Codex's importer clips is carried whole.",
+          "text": "A fixture session imported from a fixture Claude Code file renders to a rollout whose items match a fixture rollout recorded from Codex 0.156.0, apart from ids and timestamps, over the item kinds the render can produce, with the kinds Codex writes that no source record stands behind named and counted; a tool result longer than Codex's importer clips is carried whole.",
           "done": false
         },
         {

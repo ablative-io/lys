@@ -510,7 +510,7 @@
     },
     {
       "path": "crates/lys-home/src/harness/codex/rollout_tests.rs",
-      "note": "gates on the item mapping: whole, ordered, deterministic, opaque dropped, images refused",
+      "note": "gates on the item mapping: whole, ordered, deterministic, opaque dropped, base64 images carried and other images lost",
       "brief": "HOME-004"
     },
     {
