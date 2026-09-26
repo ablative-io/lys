@@ -106,7 +106,7 @@
         },
         {
           "id": "C15",
-          "text": "A lys-home subcommand lists a session's compactions, each with its loss entry and a check that every entry in the summarised span is readable by id and every block it references is held, as a JSON report of ids, counts and hashes, and exits non-zero after the report when an entry cannot be read or a block is missing, naming each by entry id or block hash.",
+          "text": "A lys-home subcommand lists a session's compactions, each with its loss entry and a check that every entry in the summarised span is readable by id and every block it references is held, as a JSON report of ids, counts and hashes; it prints the whole report, then exits non-zero when an entry cannot be read, a block is missing, the session's blocks are unverified or a compaction has no loss entry (its reason given as unknown), naming each by entry id, block hash, session id or compaction id, and exits 0 only when every compaction's loss entry and every block in every span was read.",
           "done": false
         },
         {

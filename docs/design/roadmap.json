@@ -179,7 +179,7 @@
       "depends_on": [
         "RM-005"
       ],
-      "notes": "Further units, not written: LOSS-ACCOUNT.md: the written loss account across render and compaction. Open for the lead: the compaction listing's exit status for a compaction that has no lys.loss entry (a session imported before HOME-002)."
+      "notes": "Further units, not written: LOSS-ACCOUNT.md: the written loss account across render and compaction."
     }
   ]
 }
