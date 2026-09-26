@@ -346,7 +346,7 @@
     },
     {
       "path": "crates/lys-home/src/record/given.rs",
-      "note": "the lys.given entry data: harness, version, kinds, documents, environment names; appended and read back",
+      "note": "the lys.given entry data: harness, version, kinds, config directory and its source, documents, environment names; appended and read back",
       "brief": "HOME-002"
     },
     {
