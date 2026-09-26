@@ -341,7 +341,7 @@
     },
     {
       "path": "crates/lys-home/src/harness/codex/items.rs",
-      "note": "home entries and parts into Codex response items: message, function_call, function_call_output",
+      "note": "home entries and parts into Codex records: message, function_call, function_call_output and the compacted record",
       "brief": "HOME-002"
     },
     {
@@ -381,7 +381,7 @@
     },
     {
       "path": "crates/lys-home/build.rs",
-      "note": "records the git commit lys-home is built from, for the translation marker",
+      "note": "records the git commit lys-home is built from, from git or else LYS_HOME_COMMIT, for the translation marker",
       "brief": "HOME-002"
     },
     {
@@ -391,7 +391,7 @@
     },
     {
       "path": "crates/lys-home/tests/fixtures/codex-0.156.0",
-      "note": "the second party: a rollout Codex 0.156.0 wrote, the Claude Code file transcribing it, and the base Claude Code render hash",
+      "note": "the second party: the rollouts Codex 0.156.0 wrote (a thread with a tool call and an image, its spawned child when written, and a compacted thread), the Claude Code file transcribing it, and the base Claude Code render hash",
       "brief": "HOME-002"
     },
     {

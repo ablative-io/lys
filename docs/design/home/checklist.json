@@ -106,7 +106,7 @@
         },
         {
           "id": "C15",
-          "text": "Every text part, tool call and tool result on the context path is carried whole as a Codex message, function_call and function_call_output item; a tool result longer than 4,000 characters is carried whole.",
+          "text": "Every text part, tool call and tool result on the context path is carried whole as a Codex message, function_call and function_call_output item; a tool result longer than 4,000 characters is carried whole; a compaction is carried as Codex 0.156.0's own compaction record with its summary whole.",
           "done": false
         },
         {
@@ -116,7 +116,7 @@
         },
         {
           "id": "C17",
-          "text": "The rollout's first response item is a developer message announcing a translated context with the source session id, the lys-home version and commit, and the mapping codex-0.156.0 render v1.",
+          "text": "The rollout's first response item is a developer message announcing a translated context with the source session id, the lys-home version and commit, the mapping codex-0.156.0 render v1, and whether its working directory came from --cwd or the source session header.",
           "done": false
         },
         {
