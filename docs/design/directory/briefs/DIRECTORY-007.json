@@ -58,7 +58,33 @@
       ],
       "stories": [
         "S13"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/identity/AUDIT-RECEIPT.md",
+            "change": "created",
+            "note": "The audit receipt contract in the ten sections R1 asks for, in order. It restates no decision as new, fixes no encoding, tag or content type, and decides nothing that is OPEN for Tom."
+          }
+        ],
+        "how": "Leg 1 is met. Section 1 (docs/design/identity/AUDIT-RECEIPT.md:13) quotes docs/design/identity/briefs/IDENTITY-001.md:57 word for word on one line, and the leg-1 grep printed 1. Leg 2 is met. The emitter table at AUDIT-RECEIPT.md:40-48 has exactly 7 data rows: lifecycle transition, register/display-profile, provider link/unlink, grant, sign-in recorded, sign-in refused, agent provisioned. The provisioning row names no emitter ('none: no row and no receipt of its own') and cites docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:26-28. The emitter-name grep printed 6. Leg 3 is met: 'main corrected A7' prints 1 (section 5) and 'supply the test key' prints 2 (sections 7 and 8). Leg 4 is met: the only change is the new file, so nothing changes under the briefs, the lifecycle document, IDENTITY-EVENTS.md, crates, deploy, surface or vendor (git status shows only the new file). Leg 5: scripts/design/gate.sh only measures clusters that have a design.json, and docs/design/identity has none (gate.sh header), so this file is outside what the gate measures. I did not run the gate myself, as instructed; the workflow measures it.",
+        "deviation": "CN1 says nothing outside docs/design/directory/ and docs/design/decisions.json is created, but R1's own file list creates docs/design/identity/AUDIT-RECEIPT.md. I followed R1's file list and treat CN1 as the cluster's documents-only rule, which R1 respects because it creates no code. The file cites CLAUDE.md:78-80 for the release rule because the brief does. In this clone those lines sit in the 'Wire formats are forever' area, not the unstable-anchor paragraph, so the reviewer may want that line reference revised.",
+        "checklist": [
+          {
+            "id": "C31",
+            "done": true,
+            "note": "The contract is word for word with the test tag as the one ruled addition, the table names exactly one emitter for each operation, and the sign-in boundary, changes-only rule, test-receipt rule and IDENTITY-EVENTS.md inputs are all present."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S13",
+            "satisfied": false,
+            "note": "R1 writes down the verifier's contract (section 8). The story is satisfied only when R2 and R3 build the verifier, and both are blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -94,7 +120,27 @@
       ],
       "stories": [
         "S13"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. The brief makes R2 wait on docs/design/identity/IDENTITY-EVENTS.md being on main with its envelope version, typed payloads, named commitment hash and recorded joint review. That file does not exist in this tree (ls docs/design/identity shows no IDENTITY-EVENTS.md). receipt.rs has to define the typed receipt exactly as that file writes it at its ratified version, so building it now would invent the signed encoding that A3 and CN18 reserve for DIRECTORY-003's joint review. The act that unblocks R2 is DIRECTORY-003's review landing that file. None of legs 1 to 7 is met.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C32",
+            "done": false,
+            "note": "Blocked on IDENTITY-EVENTS.md (A3, CN18)."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S13",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -128,7 +174,27 @@
       ],
       "stories": [
         "S13"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. R3 calls crates/lys-receipt's verifier (R2), and R2 is blocked. R3 also carries the same IDENTITY-EVENTS.md blocker. None of legs 1 to 6 is met, and no CLI file was touched.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C33",
+            "done": false,
+            "note": "Blocked on R2 and IDENTITY-EVENTS.md."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S13",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -156,7 +222,27 @@
       ],
       "stories": [
         "S15"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. crates/lys-identity and crates/lys-identity-server do not exist in this tree (ls crates shows lys, lys-anchor, lys-anchor-cli, lys-core, lys-home and lys-log-store), so DIRECTORY-003 has not landed. The file where OIDC resolution happens still has to be named by a brief revision (CN9). IDENTITY-EVENTS.md, with the sign-in and sign-in-refusal operations and the test tag, is also absent. None of legs 1 to 5 is met.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C34",
+            "done": false,
+            "note": "Blocked on DIRECTORY-003 landing and on IDENTITY-EVENTS.md."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S15",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -182,7 +268,27 @@
       ],
       "stories": [
         "S14"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. R5 proves the whole path on the development install that DIRECTORY-002/003 stand up, using R3's CLI and R4's receipts. All of those are blocked or absent. No key was generated and no receipt was emitted. None of legs 1 to 4 is met.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C35",
+            "done": false,
+            "note": "Blocked on R3, R4 and DIRECTORY-003."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S14",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
