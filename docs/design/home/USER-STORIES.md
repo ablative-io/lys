@@ -21,3 +21,17 @@
 ## Reviewer — Checks the proofs before anything relies on them
 
 **S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+## Agent — Continues a session in another harness
+
+**S9.** As an agent, I want my Claude Code session rendered as a Codex thread that Codex resumes with every message, tool call and result whole, so that I continue in another harness without being cut down to a summary.
+
+**S10.** As a translated session, I want to be told in my own context that I am a translation and of which session, so that I never mistake myself for the original.
+
+## Tom — Judges a translation against the importer it improves on
+
+**S11.** As Tom, I want each Codex translation to carry an account of what was kept, what changed shape and what was lost, block by block, so that the translation is measured against Codex's own importer rather than claimed.
+
+## Reviewer — Checks the translation proof before anything relies on it
+
+**S12.** As the reviewer, I want the Codex resume measured on a named Codex version under a scratch home with hashes and counts recorded, so that a later version changing the shape is caught and the live Codex home is never touched.

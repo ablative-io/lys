@@ -398,6 +398,16 @@
       "path": "docs/design/home/PROOF-CODEX.md",
       "note": "measured: the 0.156.0 shapes and index needs, and the rendered rollout resumed by 0.156.0 under a scratch Codex home",
       "brief": "HOME-002"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-002.json",
+      "note": "the Codex translation brief: Claude Code-imported home session to a Codex 0.156.0 rollout with its account",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-002.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-002"
     }
   ],
   "inventory": [
