@@ -27,6 +27,7 @@ use serde_json::{Value, json};
 use crate::error::HomeError;
 use crate::record::entries::{CUSTOM_FORK, CUSTOM_FORKED_FROM, Entry, EntryBody};
 use crate::record::fork_cut::resolve_and_cut;
+use crate::record::fork_report::{ForkReport, candidate_hashes, count_held};
 use crate::record::index::{IndexRow, write_head};
 use crate::record::lantern::own;
 use crate::record::{Home, Session, custom_type_of, fresh_id, write_durable};
@@ -51,28 +52,6 @@ pub struct ForkedFrom {
     pub carried: Option<String>,
     /// The parts of the carried message that are not text, counted by type.
     pub seed_left_out: BTreeMap<String, u64>,
-}
-
-/// What a fork wrote, as ids and counts: never a part's text, a note or
-/// any entry's data.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-pub struct ForkReport {
-    /// The child's session id.
-    pub child: String,
-    /// The parent's session id.
-    pub parent: String,
-    /// The lantern the fork was taken through.
-    pub lantern: String,
-    /// The lantern's point.
-    pub point: String,
-    /// The cut entry.
-    pub cut_at: String,
-    /// Entries copied into the child.
-    pub entries: u64,
-    /// Whether the point was carried rather than copied.
-    pub coordinate_carried: bool,
-    /// The carried entry's id, when one was carried.
-    pub carried: Option<String>,
 }
 
 /// The parts of a carried message that are not text, counted by type; empty
@@ -182,9 +161,12 @@ impl Session {
 }
 
 /// Fork a child session from `lantern`'s point, cutting from `session` when
-/// one is named, and return what was written.
+/// one is named, and return the report. The candidate hashes are taken
+/// from the cut before anything is written, and counted against the store
+/// after the child stands.
 pub fn fork(home: &Home, lantern: &str, session: Option<&str>) -> Result<ForkReport, HomeError> {
     let cut = resolve_and_cut(home, lantern, session)?;
+    let candidates = candidate_hashes(&cut.entries)?;
     let mut parent = own(home, &cut.session)?;
     let child_id = fresh_id();
     let parent_path = format!("sessions/{}.jsonl", cut.session);
@@ -215,6 +197,7 @@ pub fn fork(home: &Home, lantern: &str, session: Option<&str>) -> Result<ForkRep
         custom_type: CUSTOM_FORK.to_owned(),
         data: Some(json!({"child": child_id})),
     })?;
+    let (blocks, unstored) = count_held(&home.blocks()?, &candidates);
     Ok(ForkReport {
         child: child_id,
         parent: cut.session,
@@ -222,6 +205,8 @@ pub fn fork(home: &Home, lantern: &str, session: Option<&str>) -> Result<ForkRep
         point: cut.point,
         cut_at: cut.cut_at,
         entries: cut.entries.len() as u64,
+        blocks,
+        unstored,
         coordinate_carried: forked_from.coordinate_carried,
         carried,
     })

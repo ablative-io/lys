@@ -38,6 +38,7 @@ pub mod fork;
 pub mod fork_cut;
 #[cfg(test)]
 pub(crate) mod fork_cut_tests;
+pub mod fork_report;
 #[cfg(test)]
 pub(crate) mod fork_tests;
 pub mod given;

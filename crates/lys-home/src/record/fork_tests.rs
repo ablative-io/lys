@@ -3,8 +3,11 @@
 //! data, the header names the parent file relative to the home, a carried
 //! user message is counted and never copied, the parent gains exactly one
 //! `lys.fork` line at its head with no earlier byte changed, no block is
-//! written, and a held parent is refused with nothing written.
+//! written, and a held parent is refused with nothing written. The report
+//! gates (R4) count entries and blocks, find an inline part's block by path
+//! themselves, and search the report for every content sentinel.
 
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::path::Path;
 
@@ -13,9 +16,12 @@ use serde_json::{Value, json};
 use crate::error::HomeError;
 use crate::record::Home;
 use crate::record::blocks::Hash;
-use crate::record::entries::{CUSTOM_FORK, CUSTOM_FORKED_FROM, EntryBody};
+use crate::record::entries::{CUSTOM_FORK, CUSTOM_FORKED_FROM, CUSTOM_HARNESS_EVENT, EntryBody};
 use crate::record::fork::fork;
-use crate::record::fork_cut_tests::{PARENT, fixture_home, session_files};
+use crate::record::fork_cut_tests::{
+    PARENT, SENTINELS, assistant, fixture_home, lantern_entry, put_parts, session_files, text_part,
+    user,
+};
 use crate::record::index::Index;
 
 type Gate = Result<(), Box<dyn Error>>;
@@ -175,5 +181,138 @@ fn a_parent_another_owner_holds_is_refused_and_nothing_is_written() -> Gate {
     let after = session_files(&home)?;
     assert_eq!(after.len(), before.len());
     assert_eq!(after.get("parent.jsonl"), before.get("parent.jsonl"));
+    Ok(())
+}
+
+/// The candidate hashes of a child's copied entries, computed here and not
+/// by the crate: each message part's own SHA-256, and the record hash a
+/// harness event names.
+fn child_hashes(
+    home: &Home,
+    child: &str,
+    copied: usize,
+) -> Result<BTreeSet<String>, Box<dyn Error>> {
+    let reader = home.read_session(child)?;
+    let ids: Vec<String> = reader.ids().take(copied).map(str::to_owned).collect();
+    assert_eq!(ids.len(), copied);
+    let mut hashes = BTreeSet::new();
+    for id in ids {
+        match reader.entry(&id)?.body {
+            EntryBody::Message { message } => {
+                for part in message["content"].as_array().ok_or("parts")? {
+                    hashes.insert(Hash::of(&serde_json::to_vec(part)?).to_string());
+                }
+            }
+            EntryBody::Custom {
+                custom_type,
+                data: Some(data),
+            } if custom_type == CUSTOM_HARNESS_EVENT => {
+                hashes.insert(data["record"].as_str().ok_or("a record hash")?.to_owned());
+            }
+            _ => {}
+        }
+    }
+    Ok(hashes)
+}
+
+fn block_file(home: &Home, hash: &str) -> bool {
+    home.root()
+        .join("blocks")
+        .join(&hash[..2])
+        .join(hash)
+        .is_file()
+}
+
+#[test]
+fn the_report_counts_the_entries_copied_and_the_blocks_the_store_holds() -> Gate {
+    let (_dir, home, lanterns) = fixture_home()?;
+    let report = fork(&home, &lanterns.l5, None)?;
+    assert_eq!((report.entries, report.blocks, report.unstored), (7, 5, 0));
+    let l6 = fork(&home, &lanterns.l6, None)?;
+    assert_eq!(l6.cut_at, "e5");
+    assert_eq!(l6.point, "e6");
+    assert!(l6.coordinate_carried);
+    assert_eq!(l6.carried.as_deref(), Some("e6"));
+    Ok(())
+}
+
+#[test]
+fn an_inline_part_whose_source_form_is_the_stored_block_counts_as_unstored() -> Gate {
+    let (_dir, home, _) = fixture_home()?;
+    let blocks = home.blocks()?;
+    let m1_part = text_part("fixture-text-1");
+    put_parts(&blocks, std::slice::from_ref(&m1_part))?;
+    let thinking =
+        json!({"type": "thinking", "thinking": "fixture-text-2", "thinkingSignature": "sig-m2"});
+    let call =
+        json!({"type": "toolCall", "id": "call-m2", "name": "fixture-tool", "arguments": {}});
+    put_parts(
+        &blocks,
+        &[
+            json!({"type": "thinking", "thinking": "fixture-text-2", "signature": "sig-m2"}),
+            json!({"type": "tool_use", "id": "call-m2", "name": "fixture-tool", "input": {}}),
+        ],
+    )?;
+    {
+        let mut session = home.create_session("mixed", "/fixture", None)?;
+        session.append_entry(&user("m1", None, &[m1_part]))?;
+        session.append_entry(&assistant("m2", Some("m1"), &[thinking, call]))?;
+        session.append_entry(&lantern_entry("M2", "m2", "m2", None))?;
+    }
+    let report = fork(&home, "M2", None)?;
+    assert_eq!((report.entries, report.blocks, report.unstored), (2, 1, 2));
+    let hashes = child_hashes(&home, &report.child, 2)?;
+    assert_eq!(hashes.len(), 3);
+    let held: Vec<&String> = hashes.iter().filter(|h| block_file(&home, h)).collect();
+    assert_eq!(held.len(), 1);
+    assert_eq!(hashes.len() - held.len(), 2);
+    Ok(())
+}
+
+#[test]
+fn two_forks_of_one_lantern_name_two_children_with_the_same_hashes() -> Gate {
+    let (_dir, home, lanterns) = fixture_home()?;
+    let first = fork(&home, &lanterns.l5, None)?;
+    let second = fork(&home, &lanterns.l5, None)?;
+    assert_ne!(first.child, second.child);
+    let a = child_hashes(&home, &first.child, 7)?;
+    let b = child_hashes(&home, &second.child, 7)?;
+    assert_eq!(a, b);
+    assert_eq!(a.len(), 5);
+    let text = serde_json::to_string(&first)?;
+    let report: Value = serde_json::from_str(&text)?;
+    let mut keys: Vec<&String> = report.as_object().ok_or("an object")?.keys().collect();
+    keys.sort();
+    assert_eq!(
+        keys,
+        [
+            "blocks",
+            "carried",
+            "child",
+            "coordinate_carried",
+            "cut_at",
+            "entries",
+            "lantern",
+            "parent",
+            "point",
+            "unstored"
+        ]
+    );
+    for hash in &a {
+        assert!(!text.contains(hash.as_str()));
+    }
+    Ok(())
+}
+
+#[test]
+fn the_report_carries_no_content_sentinel() -> Gate {
+    let (_dir, home, lanterns) = fixture_home()?;
+    let report = serde_json::to_string(&fork(&home, &lanterns.l6, None)?)?;
+    let mut checked = 0;
+    for sentinel in SENTINELS {
+        assert!(!report.contains(sentinel));
+        checked += 1;
+    }
+    assert_eq!(checked, 8);
     Ok(())
 }
