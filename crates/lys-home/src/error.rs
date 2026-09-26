@@ -289,10 +289,10 @@ pub enum HomeError {
     },
 
     /// A file name under `sessions/` is not Unicode text, so it cannot be a session id.
-    #[error("a file name under {} is not Unicode text and cannot be a session id; rename it", dir.display())]
+    #[error("the file name of {} is not Unicode text and cannot be a session id; rename the file", path.display())]
     NameNotUnicode {
-        /// The directory listed.
-        dir: PathBuf,
+        /// The file whose name is not Unicode.
+        path: PathBuf,
     },
 
     /// A file render-launch would write already exists.

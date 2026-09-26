@@ -137,9 +137,7 @@ pub fn session_ids(sessions: &Path) -> Result<Vec<String>, HomeError> {
         if !kind.is_file() {
             continue;
         }
-        let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
-            continue;
-        };
+        let name = unicode_name(&path)?;
         let Some(id) = name.strip_suffix(SESSION_SUFFIX) else {
             continue;
         };
@@ -154,4 +152,39 @@ pub fn session_ids(sessions: &Path) -> Result<Vec<String>, HomeError> {
     }
     ids.sort_unstable();
     Ok(ids)
+}
+
+/// The file name of a listed path as text; a name that is not Unicode cannot be a session id.
+fn unicode_name(path: &Path) -> Result<String, HomeError> {
+    match path.file_name().and_then(std::ffi::OsStr::to_str) {
+        Some(name) => Ok(name.to_owned()),
+        None => Err(HomeError::NameNotUnicode {
+            path: path.to_path_buf(),
+        }),
+    }
+}
+
+#[cfg(all(test, unix))]
+mod name_tests {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+    use std::path::Path;
+
+    use super::unicode_name;
+    use crate::error::HomeError;
+
+    #[test]
+    fn a_file_name_that_is_not_unicode_is_refused_by_path() -> Result<(), HomeError> {
+        let path = Path::new("/home/sessions").join(OsStr::from_bytes(b"\xff\xfe.jsonl"));
+        let refused = unicode_name(&path);
+        assert!(
+            matches!(&refused, Err(HomeError::NameNotUnicode { path: named }) if *named == path),
+            "expected the name refused by path, got {refused:?}"
+        );
+        assert_eq!(
+            unicode_name(Path::new("/home/sessions/abc.jsonl"))?,
+            "abc.jsonl"
+        );
+        Ok(())
+    }
 }
