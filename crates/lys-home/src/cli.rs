@@ -1,8 +1,12 @@
 //! The `lys-home` command line: import, render, fewshot, ingest-call,
-//! resume-check, render-launch. Every command prints one JSON report of
-//! paths, hashes and counts, never transcript, block or body content. A
-//! missing required argument is refused by clap with exit code 2, naming the
-//! argument.
+//! resume-check, render-launch, given, given-check. Every command prints one
+//! JSON report of paths, hashes and counts, never transcript, block or body
+//! content. A missing required argument is refused by clap with exit code 2,
+//! naming the argument. A command that refuses exits 1, except `given-check`,
+//! which answers as `diff` does: 0 on matches, 1 on differs, 2 on a refusal
+//! ([`given`]).
+
+pub mod given;
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -10,6 +14,7 @@ use std::path::{Path, PathBuf};
 use clap::{Parser, Subcommand};
 use serde_json::{Value, json};
 
+use crate::cli::given::{GivenArgs, GivenCheckArgs, Outcome, STATUS_REFUSED};
 use crate::error::HomeError;
 use crate::harness::claude_code::AUTHORED;
 use crate::harness::claude_code::import::import_claude_code;
@@ -168,12 +173,41 @@ pub enum Command {
     },
     /// Write the files a Claude Code launch needs from a kept template and a session.
     RenderLaunch(LaunchArgs),
+    /// List a session's given records: what each rendered session was given, as paths, lengths and hashes.
+    Given(GivenArgs),
+    /// Check a document a given record lists against a file on disk by hash: exit 0 on matches, 1 on differs, 2 on a refusal.
+    GivenCheck(GivenCheckArgs),
 }
 
-/// Run a command and return its report; a non-zero exit is the caller's to
-/// decide from the error.
+impl Command {
+    /// The status the process exits with when this command refuses: 2 for
+    /// `given-check`, as `diff` does, and 1 for every other command.
+    #[must_use]
+    pub fn refusal_status(&self) -> i32 {
+        match self {
+            Self::GivenCheck(_) => STATUS_REFUSED,
+            _ => 1,
+        }
+    }
+}
+
+/// Run a command and return its report; a refusal is the caller's to exit on
+/// with [`Command::refusal_status`].
 pub fn run(cli: Cli) -> Result<Value, HomeError> {
+    run_with_status(cli).map(|outcome| outcome.report)
+}
+
+/// Run a command and return its report with the status the process exits
+/// with: 0 for every command but a `given-check` that answers differs.
+pub fn run_with_status(cli: Cli) -> Result<Outcome, HomeError> {
     match cli.command {
+        Command::GivenCheck(args) => given::check(&args),
+        other => report(other).map(Outcome::done),
+    }
+}
+
+fn report(command: Command) -> Result<Value, HomeError> {
+    match command {
         Command::Import {
             home,
             claude_code,
@@ -312,6 +346,8 @@ pub fn run(cli: Cli) -> Result<Value, HomeError> {
             Ok(json!({"command": "resume-check", "report": check}))
         }
         Command::RenderLaunch(args) => render_launch(&args),
+        Command::Given(args) => given::list(&args),
+        Command::GivenCheck(args) => given::check(&args).map(|outcome| outcome.report),
     }
 }
 

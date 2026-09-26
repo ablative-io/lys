@@ -249,6 +249,17 @@ pub enum HomeError {
         custom_type: &'static str,
     },
 
+    /// A given entry lists no document at the path named.
+    #[error(
+        "given entry `{entry}` lists no document at `{}`; name a path exactly as `lys-home given` reports it", path.display()
+    )]
+    UnlistedDocument {
+        /// The given entry.
+        entry: String,
+        /// The path named.
+        path: PathBuf,
+    },
+
     /// A path that must be absolute is not.
     #[error("{what} `{}` is not an absolute path; give it from the root", path.display())]
     NotAbsolute {
