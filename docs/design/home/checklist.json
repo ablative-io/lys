@@ -116,7 +116,7 @@
         },
         {
           "id": "C17",
-          "text": "The rollout's first response item is a developer message announcing a translated context with the source session id, the lys-home version and commit, the mapping codex-0.156.0 render v1, and whether its working directory came from --cwd or the source session header.",
+          "text": "The rollout's first response item is a developer message announcing a translated context with the source session id, the lys-home version and commit, the mapping codex-0.156.0 render v1, and whether its working directory came from --cwd or the source session header, its metadata naming the kind lys.translation_marker unless Codex 0.156.0 was measured refusing to replay that kind.",
           "done": false
         },
         {
