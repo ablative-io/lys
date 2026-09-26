@@ -500,12 +500,12 @@
     },
     {
       "path": "crates/lys-home/src/harness/codex/mod.rs",
-      "note": "the Codex profile: the measured 0.156.0 rollout shape, version, model and provider; declarations only",
+      "note": "the Codex profile: the measured 0.156.0 rollout shape and its constants (version, model provider, originator, source, history mode, id prefixes, image detail, content item kinds); declarations only",
       "brief": "HOME-004"
     },
     {
       "path": "crates/lys-home/src/harness/codex/rollout.rs",
-      "note": "the context path mapped to Codex 0.156.0 items: text, function call and output whole, readable thinking as text, the marker last",
+      "note": "the context path mapped to Codex 0.156.0 lines: session_meta, then text, function call and output whole, readable thinking as text, a compaction as a marked user message, the marker last",
       "brief": "HOME-004"
     },
     {
@@ -515,7 +515,7 @@
     },
     {
       "path": "crates/lys-home/src/harness/codex/loss.rs",
-      "note": "the loss account: kept, changed and lost by entry id and the importer's block hash",
+      "note": "the loss account: kept, changed and lost by entry id, part index and the importer's block hash, and every entry off the context path",
       "brief": "HOME-004"
     },
     {
@@ -545,13 +545,23 @@
     },
     {
       "path": "crates/lys-home/tests/fixtures/codex/claude-code.jsonl",
-      "note": "the fixture Claude Code file, synthetic, carrying the recorded rollout's conversation",
+      "note": "the fixture Claude Code file, synthetic, in the measured part shapes, carrying the recorded rollout's conversation",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/tests/fixtures/codex/claude-code-losses.jsonl",
+      "note": "the second fixture Claude Code file, synthetic: thinking, redacted thinking, long tool input and result, images, a sidechain, harness events, meta and authored records",
       "brief": "HOME-004"
     },
     {
       "path": "crates/lys-home/tests/fixtures/codex/rollout-0.156.0.jsonl",
       "note": "the fixture rollout recorded from Codex 0.156.0 itself, synthetic",
       "brief": "HOME-004"
+    },
+    {
+      "path": "docs/design/home/design.json",
+      "note": "the cluster design, rendered to DESIGN.md, CHECKLIST.md and USER-STORIES.md by the design gate",
+      "brief": ""
     }
   ],
   "inventory": [

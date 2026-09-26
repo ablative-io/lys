@@ -243,7 +243,7 @@
       "depends_on": [
         "RM-005"
       ],
-      "notes": "Further units, not written: Launch Codex from its home through a Codex launch template; Translate from the last compaction boundary on demand; Codex to Claude Code translation; Pi as a translation target."
+      "notes": "Further units, not written: Launch Codex from its home through a Codex launch template; Codex to Claude Code translation; Pi as a translation target."
     }
   ]
 }

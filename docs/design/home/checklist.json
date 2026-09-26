@@ -161,12 +161,12 @@
       "items": [
         {
           "id": "C24",
-          "text": "lys-home render-codex takes a home, a session, a target directory and a Codex version; renders only for the measured Codex 0.156.0 and refuses any other version naming the version asked for and the one measured; walks the context path the Claude Code render walks; and writes one rollout in the shape Codex 0.156.0 writes for its own threads, measured from files that version wrote, with nothing written when it refuses.",
+          "text": "lys-home render-codex takes a home, a session, a target directory that is a Codex sessions root, and a Codex version; renders only for the measured Codex 0.156.0 and refuses any other version naming the version asked for and the one measured; walks the context path the Claude Code render walks; and writes one rollout under that root's dated directories in the shape Codex 0.156.0 writes for its own threads, measured from files that version wrote, with nothing written when it refuses.",
           "done": false
         },
         {
           "id": "C25",
-          "text": "Every text part, tool call and tool result on the context path is carried whole as Codex's own message, function_call and function_call_output items, paired by call id, never clipped or noted; readable thinking is carried as text; an image part whose source is base64 is carried as Codex's input_image item, and any other image source is named lost, never fetched; opaque thinking is dropped and named by hash; a compaction becomes the item Codex 0.156.0 writes for one, measured.",
+          "text": "Every text part, tool call and tool result on the context path is carried whole as Codex's own message, function_call and function_call_output items, paired by call id, never clipped or noted; readable thinking is carried as text; an image part whose source is base64 is carried as Codex's input_image item, and any other image source is named lost, never fetched; opaque thinking is dropped and named by hash; a compaction becomes Codex's own compaction item where 0.156.0 writes one with readable text, measured, and otherwise a user message that says it is a compaction summary.",
           "done": false
         },
         {
