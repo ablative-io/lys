@@ -35,7 +35,7 @@ const HANDLE: &str = "handle-fixture-0001";
 const RECORDED: [(&str, &str); 5] = [
     (
         "00000000-0000-4000-8000-000000000001.jsonl",
-        "510c6704870200f2a946ee56b27b1a790adc8d6f957627cead4776628f1ae238",
+        "4e58e3f419806a97814d141cec563784d5ae92037ed300ba08467cf7b3d29f4f",
     ),
     (
         "00000000-0000-4000-8000-000000000001.loss.json",

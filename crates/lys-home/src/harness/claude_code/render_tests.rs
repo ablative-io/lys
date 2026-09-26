@@ -3,11 +3,13 @@
 //! the loss account, the refusal of an existing path, and the round trip.
 
 use serde_json::Value;
-use sha2::{Digest, Sha256};
+use sha2::Digest;
 
 use crate::harness::claude_code::import::import_claude_code;
 use crate::harness::claude_code::import_tests::fixture;
-use crate::harness::claude_code::render::{RenderTarget, record_uuid, render_claude_code};
+use crate::harness::claude_code::render::{
+    RENDER_NAMESPACE, RenderTarget, record_uuid, render_claude_code, uuid_string, uuid_v5,
+};
 use crate::record::Home;
 use crate::record::blocks::Hash;
 use crate::record::entries::{Entry, EntryBase, EntryBody};
@@ -191,8 +193,8 @@ fn a_session_renders_byte_identically_twice_with_distinct_chained_uuids() {
     assert_eq!(uuids.len(), 4);
     for u in &uuids {
         assert_eq!(u.len(), 36);
-        assert_eq!(&u[14..15], "4");
-        assert_eq!(&u[19..20], "8");
+        assert_eq!(&u[14..15], "5", "a derived uuid is version 5");
+        assert!(matches!(&u[19..20], "8" | "9" | "a" | "b"), "{u}");
     }
     assert_eq!(lines[0]["parentUuid"], Value::Null);
     for pair in lines.windows(2) {
@@ -205,12 +207,14 @@ fn a_session_renders_byte_identically_twice_with_distinct_chained_uuids() {
 #[test]
 fn a_uuid_shaped_entry_id_is_kept_and_any_other_maps_to_one_fixed_uuid() {
     const KEPT: &str = "5f0c0b8e-2a1d-4c3b-9e7f-0123456789ab";
-    assert_eq!(record_uuid(KEPT), KEPT);
-    assert_eq!(record_uuid("e1"), record_uuid("e1"));
-    assert_ne!(record_uuid("e1"), record_uuid("e2"));
+    const ONES: &str = "11111111-1111-4111-8111-111111111111";
+    assert_eq!(record_uuid("kept", KEPT), KEPT);
+    assert_eq!(record_uuid("kept", ONES), ONES);
+    assert_eq!(record_uuid("kept", "e1"), record_uuid("kept", "e1"));
+    assert_ne!(record_uuid("kept", "e1"), record_uuid("kept", "e2"));
     let dir = tempfile::tempdir().unwrap();
     let home = Home::open(dir.path().join("home")).unwrap();
-    let s = session_of(&home, "kept", &["e1", KEPT]);
+    let s = session_of(&home, "kept", &["e1", ONES, KEPT]);
     let out = dir.path().join("kept.jsonl");
     let report = render_claude_code(
         &s,
@@ -218,41 +222,123 @@ fn a_uuid_shaped_entry_id_is_kept_and_any_other_maps_to_one_fixed_uuid() {
         Some(dir.path()),
     )
     .unwrap();
-    assert_eq!(report.records, 2);
+    assert_eq!(report.records, 3);
     let lines: Vec<Value> = std::fs::read_to_string(&out)
         .unwrap()
         .lines()
         .map(|l| serde_json::from_str(l).unwrap())
         .collect();
-    assert_eq!(lines[1]["uuid"], KEPT);
+    assert_eq!(lines[1]["uuid"], ONES);
+    assert_eq!(lines[2]["uuid"], KEPT);
     assert_eq!(lines[1]["parentUuid"], lines[0]["uuid"]);
+    assert_eq!(lines[2]["parentUuid"], ONES);
     assert_ne!(lines[0]["uuid"], "e1");
     drop(s);
     dir.close().unwrap();
 }
 
-#[test]
-fn record_uuid_is_the_documented_selection_of_the_sha256_of_the_entry_id() {
+/// The uuid of the first record of a one-entry session `session` whose entry
+/// id is `id`, read back from the rendered file.
+fn rendered_uuid(dir: &std::path::Path, home: &Home, session: &str, id: &str) -> String {
+    let s = session_of(home, session, &[id]);
+    let out = dir.join(format!("{session}.jsonl"));
+    let report =
+        render_claude_code(&s, &target("claude-opus-5-5", out.clone()), Some(dir)).unwrap();
+    assert_eq!(report.records, 1);
+    let line: Value = serde_json::from_str(std::fs::read_to_string(&out).unwrap().trim()).unwrap();
+    drop(s);
+    line["uuid"].as_str().unwrap().to_owned()
+}
+
+/// RFC 9562's UUID version 5, written out here with the sha1 crate directly so the
+/// render's own `uuid_v5` is checked against a second spelling of the rule.
+fn uuid5_by_hand(namespace: &[u8; 16], name: &str) -> String {
     use std::fmt::Write as _;
-    let digest = Sha256::digest(b"fixed-entry-id");
-    let hex = digest.iter().fold(String::new(), |mut s, b| {
+    let mut input = namespace.to_vec();
+    input.extend_from_slice(name.as_bytes());
+    let digest = sha1::Sha1::digest(&input);
+    let mut bytes = [0u8; 16];
+    bytes.copy_from_slice(&digest[..16]);
+    bytes[6] = (bytes[6] & 0x0f) | 0x50;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    let hex = bytes.iter().fold(String::new(), |mut s, b| {
         write!(s, "{b:02x}").unwrap();
         s
     });
-    assert_eq!(hex.len(), 64);
-    let expected = format!(
-        "{}-{}-4{}-8{}-{}",
+    format!(
+        "{}-{}-{}-{}-{}",
         &hex[..8],
         &hex[8..12],
-        &hex[13..16],
-        &hex[17..20],
-        &hex[20..32]
-    );
-    assert_eq!(record_uuid("fixed-entry-id"), expected);
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..]
+    )
+}
+
+#[test]
+fn the_render_namespace_is_the_uuid5_of_the_url_namespace_over_the_lys_name() {
+    const URL_NAMESPACE: [u8; 16] = [
+        0x6b, 0xa7, 0xb8, 0x11, 0x9d, 0xad, 0x11, 0xd1, 0x80, 0xb4, 0x00, 0xc0, 0x4f, 0xd4, 0x30,
+        0xc8,
+    ];
+    const NAME: &str = "lys/home/claude-code/render-uuid/v1";
+    const EXPECTED: &str = "32c05904-d1f1-550c-9eee-2f6c8f98b665";
+    assert_eq!(uuid_string(&RENDER_NAMESPACE), EXPECTED);
+    assert_eq!(uuid5_by_hand(&URL_NAMESPACE, NAME), EXPECTED);
     assert_eq!(
-        record_uuid("fixed-entry-id"),
-        "69392357-b162-4c19-8db0-8c73793670c5"
+        uuid_string(&uuid_v5(&URL_NAMESPACE, NAME.as_bytes())),
+        EXPECTED
     );
+}
+
+#[test]
+fn a_non_uuid_entry_id_derives_the_uuid5_under_the_session_namespace_over_the_id_and_its_role() {
+    // Python: uuid.uuid5(uuid.uuid5(UUID("32c05904-…"), "one"), "u1#record").
+    const EXPECTED: &str = "8614322e-bd70-5b0c-baa8-571010e52a8c";
+    assert_eq!(record_uuid("one", "u1"), EXPECTED);
+    let dir = tempfile::tempdir().unwrap();
+    let home = Home::open(dir.path().join("home")).unwrap();
+    assert_eq!(rendered_uuid(dir.path(), &home, "one", "u1"), EXPECTED);
+    dir.close().unwrap();
+}
+
+#[test]
+fn the_same_entry_id_in_two_sessions_derives_two_uuids_salted_by_the_session_id() {
+    // Python: uuid.uuid5(uuid.uuid5(UUID("32c05904-…"), "two"), "u1#record").
+    const ONE: &str = "8614322e-bd70-5b0c-baa8-571010e52a8c";
+    const TWO: &str = "9c843336-82b9-5a39-b7cd-2889252f8e4e";
+    let dir = tempfile::tempdir().unwrap();
+    let home = Home::open(dir.path().join("home")).unwrap();
+    let a = rendered_uuid(dir.path(), &home, "one", "u1");
+    let b = rendered_uuid(dir.path(), &home, "two", "u1");
+    assert_eq!((a.as_str(), b.as_str()), (ONE, TWO));
+    assert_ne!(a, b, "the session id is the salt");
+    assert_eq!(record_uuid("two", "u1"), TWO);
+    dir.close().unwrap();
+}
+
+#[test]
+fn the_render_reads_no_clock_and_no_random_source() {
+    const SOURCE: &str = include_str!("render.rs");
+    const FORBIDDEN: [&str; 6] = [
+        "fresh_id",
+        "rand::",
+        "now(",
+        "SystemTime",
+        "OffsetDateTime",
+        "Instant",
+    ];
+    let found: Vec<&str> = FORBIDDEN
+        .iter()
+        .copied()
+        .filter(|token| SOURCE.contains(token))
+        .collect();
+    assert_eq!(
+        found,
+        Vec::<&str>::new(),
+        "render.rs names a clock or a random source"
+    );
+    assert_eq!(FORBIDDEN.len(), 6);
 }
 
 #[test]
