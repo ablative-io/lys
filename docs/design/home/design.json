@@ -191,8 +191,13 @@
     },
     {
       "path": "crates/lys-home/Cargo.toml",
-      "note": "the crate manifest; gains the passthrough example, and regex for the five standard secret patterns",
+      "note": "the crate manifest; gains the passthrough example",
       "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/Cargo.toml",
+      "note": "the crate manifest; gains regex for the five standard secret patterns",
+      "brief": "HOME-004"
     },
     {
       "path": "crates/lys-home/README.md",
@@ -577,12 +582,12 @@
     {
       "path": "Cargo.toml",
       "note": "the workspace manifest; gains regex among the workspace dependencies",
-      "brief": "HOME-001"
+      "brief": "HOME-004"
     },
     {
       "path": "Cargo.lock",
       "note": "the lockfile; gains regex and what it resolves to",
-      "brief": "HOME-001"
+      "brief": "HOME-004"
     }
   ],
   "inventory": [

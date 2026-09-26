@@ -181,7 +181,7 @@
         },
         {
           "id": "C28",
-          "text": "lys-home fetch fetches the named ref into a new directory, refuses by name a directory that already holds any entry, and checks every index against its file and every head against its index without rebuilding either, leaving nothing behind on a refusal.",
+          "text": "lys-home fetch fetches the named ref into a new directory, refuses by name a directory that already holds a home (a sessions, blocks or templates directory, or a .git entry) and accepts one holding only other entries, and checks every index against its file and every head against its index without rebuilding either, leaving nothing behind on a refusal.",
           "done": false
         },
         {
