@@ -1,5 +1,5 @@
 //! The `lys-home` command line: import, render, fewshot, ingest-call,
-//! resume-check, render-launch, given, given-check, lantern. Every command prints one
+//! resume-check, render-launch, given, given-check, lantern, fork. Every command prints one
 //! JSON report of paths, hashes and counts, never transcript, block or body
 //! content. A missing required argument is refused by clap with exit code 2,
 //! naming the argument. A command that refuses exits 1, except `given-check`,
@@ -15,6 +15,7 @@ use clap::{Parser, Subcommand};
 use serde_json::{Value, json};
 
 use crate::cli::given::{GivenArgs, GivenCheckArgs, Outcome, STATUS_REFUSED};
+use crate::cli_fork::ForkArgs;
 use crate::cli_lantern::LanternAction;
 use crate::error::HomeError;
 use crate::harness::claude_code::AUTHORED;
@@ -184,6 +185,8 @@ pub enum Command {
         #[command(subcommand)]
         action: LanternAction,
     },
+    /// Fork a child session from a lantern's point, with its ancestry on both sides.
+    Fork(ForkArgs),
 }
 
 impl Command {
@@ -356,6 +359,7 @@ fn report(command: Command) -> Result<Value, HomeError> {
         Command::Given(args) => given::list(&args),
         Command::GivenCheck(args) => given::check(&args).map(|outcome| outcome.report),
         Command::Lantern { action } => crate::cli_lantern::run(action),
+        Command::Fork(args) => crate::cli_fork::run(&args),
     }
 }
 
