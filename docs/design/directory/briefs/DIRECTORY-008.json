@@ -47,7 +47,77 @@
       ],
       "stories": [
         "S2"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-005.json",
+            "change": "modified",
+            "note": "The verification array now holds five entries. The fifth, at line 119, is 'Frontend checks pass with strict types and the generated API schema, with negative and crash-boundary tests.' Every other member is unchanged."
+          },
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-005.md",
+            "change": "modified",
+            "note": "Re-rendered. The Verification section lists the five entries, with the new one at line 109."
+          }
+        ],
+        "how": "Accept 1: met. The verification array has 5 entries, and the first four were left untouched by the append (the dump round trip is byte-identical, checked before editing). Accept 2: met. rg -c prints 1 for docs/design/directory/briefs/DIRECTORY-005.json (line 119) and 1 for DIRECTORY-005.md (line 109). Accept 3: met. The working-tree git diff --numstat for DIRECTORY-005.json is '2 1': the new line plus the fourth entry gaining its comma. Accept 4: met. The check prints 1 ['DIRECTORY-004'].",
+        "deviation": "I ran python3 scripts/design/render-cluster.py docs/design/directory once, because R1 to R3 require the re-render and it is the only way to produce the rendered twins. I ran no other listed check, build, lint or test, and made no commit, as instructed.",
+        "checklist": [
+          {
+            "id": "C3",
+            "done": true,
+            "note": "DIRECTORY-005 keeps its id, depends_on, estimate and ID001 identifiers. Only the verification line was added."
+          },
+          {
+            "id": "C6",
+            "done": true,
+            "note": "The rendered twin was regenerated from the JSON."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": "The brief now carries the frontend verification line for review."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "From the repository root: python3 -c \"import json; print(len(json.load(open('docs/design/directory/briefs/DIRECTORY-005.json'))['verification']))\" prints 5 (it prints 4 at 1756688cc08169bef4a9ac37b9b079efb9e38b18), and the first four entries equal, string for string, the four that git show 1756688cc08169bef4a9ac37b9b079efb9e38b18:docs/design/directory/briefs/DIRECTORY-005.json holds.",
+            "met": true,
+            "evidence": "Measured: 4 at 1756688, 5 now. verification[:4] equals the base list (True). No other member differs from base (empty set)."
+          },
+          {
+            "criterion": "From the repository root: rg -c 'strict types and the generated API schema' docs/design/directory/briefs/DIRECTORY-005.json prints 1, and the same command over docs/design/directory/briefs/DIRECTORY-005.md prints 1; both print nothing at 1756688cc08169bef4a9ac37b9b079efb9e38b18.",
+            "met": true,
+            "evidence": "rg -c prints 1 for DIRECTORY-005.json (line 119) and 1 for DIRECTORY-005.md (line 109). The phrase is absent at base."
+          },
+          {
+            "criterion": "From the repository root, on the build branch: git diff --no-ext-diff --numstat <base>..HEAD -- docs/design/directory/briefs/DIRECTORY-005.json prints 2 added and 1 deleted (the new entry's line and the fourth entry's line gaining its trailing comma), where <base> is the commit the build started from.",
+            "met": true,
+            "evidence": "git diff --no-ext-diff --numstat against base 3c1a3b9 (working tree, not yet committed) prints '2\t1\tdocs/design/directory/briefs/DIRECTORY-005.json'."
+          },
+          {
+            "criterion": "From the repository root: python3 -c \"import json; d=json.load(open('docs/design/directory/briefs/DIRECTORY-005.json')); print(d['task'].count('6 focused implementer hours'), d['depends_on'])\" prints 1 ['DIRECTORY-004'], as at 1756688cc08169bef4a9ac37b9b079efb9e38b18.",
+            "met": true,
+            "evidence": "Prints 1 ['DIRECTORY-004']."
+          }
+        ],
+        "checklist": [
+          "C3",
+          "C6"
+        ],
+        "stories": [
+          "S2"
+        ],
+        "issues": [],
+        "fixes": []
+      }
     },
     {
       "id": "R2",
@@ -73,7 +143,77 @@
       ],
       "stories": [
         "S2"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/directory/design.json",
+            "change": "modified",
+            "note": "The inventory now holds eleven rows. Rows 9 to 11 (lines 624, 628 and 632) are vendor/rauthy, crates/lys and docs/design/decisions.json, each with the note exactly as specified. The intention also changed, under R3."
+          },
+          {
+            "path": "docs/design/directory/DESIGN.md",
+            "change": "modified",
+            "note": "Re-rendered. The Inventory section lists the eleven rows, with the new three at lines 179 to 181."
+          }
+        ],
+        "how": "Accept 1: met. len(inventory) is 11, and the first eight rows were left unchanged by the append. Accept 2: met. '\"path\": \"vendor/rauthy\"' counts 2 (lines 380 and 624), '\"path\": \"crates/lys\"' counts 1 (line 628), and '\"path\": \"docs/design/decisions.json\"' counts 2 (lines 140 and 632). Accept 3: met. Each of the three '^- `...`' patterns matches once in DESIGN.md, at lines 179, 180 and 181. Accept 4: met. inventory[8:] paths are ['vendor/rauthy', 'crates/lys', 'docs/design/decisions.json'], and the RAUTHY-BASELINE and CONFORMANCE rows were not touched, so that count stays 2.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C1",
+            "done": true,
+            "note": "The inventory now also records the fork, the CLI crate and the decision ledger. No other design member changed."
+          },
+          {
+            "id": "C6",
+            "done": true,
+            "note": "DESIGN.md was re-rendered from design.json."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": "Reviewers can see what the rows read and move."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "From the repository root: python3 -c \"import json; print(len(json.load(open('docs/design/directory/design.json'))['inventory']))\" prints 11 (it prints 8 at 1756688cc08169bef4a9ac37b9b079efb9e38b18), and the first eight rows equal, member for member, the eight that git show 1756688cc08169bef4a9ac37b9b079efb9e38b18:docs/design/directory/design.json holds.",
+            "met": true,
+            "evidence": "Measured: 8 at base, 11 now. inventory[:8] equals the base inventory (True)."
+          },
+          {
+            "criterion": "From the repository root: rg -c '\"path\": \"vendor/rauthy\"' docs/design/directory/design.json prints 2 (1 at 1756688cc08169bef4a9ac37b9b079efb9e38b18, the structure row at docs/design/directory/design.json:380); rg -c '\"path\": \"crates/lys\"' docs/design/directory/design.json prints 1 (nothing at 1756688cc08169bef4a9ac37b9b079efb9e38b18); rg -c '\"path\": \"docs/design/decisions.json\"' docs/design/directory/design.json prints 2 (1 at 1756688cc08169bef4a9ac37b9b079efb9e38b18, the structure row at docs/design/directory/design.json:140).",
+            "met": true,
+            "evidence": "The three rg -c commands print 2, 1 and 2."
+          },
+          {
+            "criterion": "From the repository root: rg -c '^- `vendor/rauthy`' docs/design/directory/DESIGN.md prints 1; rg -c '^- `crates/lys`' docs/design/directory/DESIGN.md prints 1; rg -c '^- `docs/design/decisions.json`' docs/design/directory/DESIGN.md prints 1; each prints nothing at 1756688cc08169bef4a9ac37b9b079efb9e38b18.",
+            "met": true,
+            "evidence": "Each prints 1, at DESIGN.md:179-181, as the rendered Inventory shows."
+          },
+          {
+            "criterion": "From the repository root: python3 -c \"import json; d=json.load(open('docs/design/directory/design.json')); print([r['path'] for r in d['inventory'][8:]])\" prints ['vendor/rauthy', 'crates/lys', 'docs/design/decisions.json'], and rg -c 'RAUTHY-BASELINE.md\"|CONFORMANCE.md\"' docs/design/directory/design.json prints 2, as at 1756688cc08169bef4a9ac37b9b079efb9e38b18.",
+            "met": true,
+            "evidence": "Prints ['vendor/rauthy', 'crates/lys', 'docs/design/decisions.json'], and the rg count is 2. Each new row's note equals the spec text exactly, and its keys are exactly {path, note}. The notes' facts hold: git ls-tree shows the submodule at dd61ac3c84d6b238108dc8438b53043b5177a662, crates/lys holds the named files, and the last ADR is ADR-018."
+          }
+        ],
+        "checklist": [
+          "C1",
+          "C6"
+        ],
+        "stories": [
+          "S2"
+        ],
+        "issues": [],
+        "fixes": []
+      }
     },
     {
       "id": "R3",
@@ -99,7 +239,77 @@
       ],
       "stories": [
         "S2"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/directory/design.json",
+            "change": "modified",
+            "note": "At line 4 the intention now ends with one space and then the exact Cambium sentence. The non-goals were not changed."
+          },
+          {
+            "path": "docs/design/directory/DESIGN.md",
+            "change": "modified",
+            "note": "Re-rendered. The Intention section (line 13) carries the sentence."
+          }
+        ],
+        "how": "Accept 1: met. 'keeping its participant ids' counts 1 in design.json (line 4) and 1 in DESIGN.md. Accept 2: met. The intention starts with the operator sentence and ends with 'and this sentence promises neither row.' Accept 3: met. The non-goals were not edited, so the Rows 06/07 text is still present and non_goals still has 11 entries (measured). Accept 4: met. goals, principles and constraints measure 5, 9 and 12.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C1",
+            "done": true,
+            "note": "The outcome now records the Cambium direction, and the non-goal is kept."
+          },
+          {
+            "id": "C6",
+            "done": true,
+            "note": "DESIGN.md was re-rendered."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": "The direction is recorded without promising any row."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "From the repository root: rg -c 'keeping its participant ids' docs/design/directory/design.json prints 1 and the same command over docs/design/directory/DESIGN.md prints 1; both print nothing at 1756688cc08169bef4a9ac37b9b079efb9e38b18.",
+            "met": true,
+            "evidence": "Prints 1 for design.json and 1 for DESIGN.md."
+          },
+          {
+            "criterion": "From the repository root: python3 -c \"import json; i=json.load(open('docs/design/directory/design.json'))['intention']; print(i.startswith('An operator installs the identity product without Cambium or Manifold, signs in,') and i.endswith('and this sentence promises neither row.'))\" prints True.",
+            "met": true,
+            "evidence": "Prints True. The intention also equals the base intention + ' ' + the exact spec sentence (True)."
+          },
+          {
+            "criterion": "From the repository root: rg -c 'Rows 06 \\(connect Cambium\\) and 07 \\(gate, install and demonstrate the release\\)' docs/design/directory/design.json prints 1, as at 1756688cc08169bef4a9ac37b9b079efb9e38b18, and python3 -c \"import json; print(len(json.load(open('docs/design/directory/design.json'))['non_goals']))\" prints 11, as at 1756688cc08169bef4a9ac37b9b079efb9e38b18.",
+            "met": true,
+            "evidence": "rg -c prints 1, and len(non_goals) is 11. non_goals equals the base value (True)."
+          },
+          {
+            "criterion": "From the repository root: python3 -c \"import json; d=json.load(open('docs/design/directory/design.json')); print(len(d['goals']), len(d['principles']), len(d['constraints']))\" prints 5 9 12, as at 1756688cc08169bef4a9ac37b9b079efb9e38b18.",
+            "met": true,
+            "evidence": "Prints 5 9 12. Against HEAD, only intention and inventory differ in design.json."
+          }
+        ],
+        "checklist": [
+          "C1",
+          "C6"
+        ],
+        "stories": [
+          "S2"
+        ],
+        "issues": [],
+        "fixes": []
+      }
     }
   ],
   "boundaries": [
