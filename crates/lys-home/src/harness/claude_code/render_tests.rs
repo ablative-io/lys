@@ -3,7 +3,7 @@
 //! the loss account, the refusal of an existing path, and the round trip.
 
 use serde_json::Value;
-use sha2::Digest;
+use sha2::{Digest, Sha256};
 
 use crate::harness::claude_code::import::import_claude_code;
 use crate::harness::claude_code::import_tests::fixture;
@@ -371,6 +371,117 @@ fn a_render_with_no_out_and_no_home_directory_is_refused_by_name_and_writes_noth
             .starts_with(dir.path().join(".claude").join("projects"))
     );
     assert_eq!(report.records, 2);
+    drop(s);
+    dir.close().unwrap();
+}
+
+/// The determinism fixture: a user record holding exactly two tool results,
+/// and one holding a tool result beside the user's own text, so the importer
+/// writes two `-r0` entries whose uuids the render derives.
+const MULTI_RESULT: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/multi_result.jsonl"
+);
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    Sha256::digest(bytes)
+        .iter()
+        .fold(String::new(), |mut s, b| {
+            write!(s, "{b:02x}").unwrap();
+            s
+        })
+}
+
+#[test]
+fn the_multi_result_fixture_renders_twice_to_equal_bytes_with_derived_distinct_chained_uuids() {
+    // The two derived values: Python's uuid.uuid5(uuid.uuid5(UUID("32c05904-…"), "multi"),
+    // "<entry id>#record") over the importer's `-r0` ids.
+    const EXPECTED: [&str; 8] = [
+        "11111111-1111-4111-8111-111111111111",
+        "22222222-2222-4222-8222-222222222222",
+        "d0426444-d38e-5376-aef6-035f7c3634e1",
+        "33333333-3333-4333-8333-333333333333",
+        "44444444-4444-4444-8444-444444444444",
+        "dcc867fa-10a3-5142-89a0-38367729ae4b",
+        "55555555-5555-4555-8555-555555555555",
+        "66666666-6666-4666-8666-666666666666",
+    ];
+    let dir = tempfile::tempdir().unwrap();
+    let home = Home::open(dir.path().join("home")).unwrap();
+    let blocks = home.blocks().unwrap();
+    let mut s = home.create_session("multi", "/w", None).unwrap();
+    import_claude_code(std::path::Path::new(MULTI_RESULT), &mut s, &blocks).unwrap();
+    // The importer's ids on the path, unchanged: the split results carry `-r0`.
+    let ids: Vec<String> = s
+        .context_path()
+        .unwrap()
+        .iter()
+        .filter(|e| matches!(e.body, EntryBody::Message { .. }))
+        .map(|e| e.id().to_owned())
+        .collect();
+    assert_eq!(
+        ids,
+        [
+            "11111111-1111-4111-8111-111111111111",
+            "22222222-2222-4222-8222-222222222222",
+            "33333333-3333-4333-8333-333333333333-r0",
+            "33333333-3333-4333-8333-333333333333",
+            "44444444-4444-4444-8444-444444444444",
+            "55555555-5555-4555-8555-555555555555-r0",
+            "55555555-5555-4555-8555-555555555555",
+            "66666666-6666-4666-8666-666666666666",
+        ]
+    );
+    let a_path = dir.path().join("a.jsonl");
+    let b_path = dir.path().join("b.jsonl");
+    let a = render_claude_code(
+        &s,
+        &target("claude-opus-5-5", a_path.clone()),
+        Some(dir.path()),
+    )
+    .unwrap();
+    let b = render_claude_code(
+        &s,
+        &target("claude-opus-5-5", b_path.clone()),
+        Some(dir.path()),
+    )
+    .unwrap();
+    assert_eq!((a.records, b.records), (8, 8));
+    let a_bytes = std::fs::read(&a_path).unwrap();
+    assert_eq!(
+        sha256_hex(&a_bytes),
+        sha256_hex(&std::fs::read(&b_path).unwrap()),
+        "two renders, one SHA-256"
+    );
+    assert_eq!(
+        std::fs::read(&a.loss_path).unwrap(),
+        std::fs::read(&b.loss_path).unwrap()
+    );
+    let lines: Vec<Value> = std::str::from_utf8(&a_bytes)
+        .unwrap()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    let uuids: Vec<&str> = lines.iter().map(|l| l["uuid"].as_str().unwrap()).collect();
+    assert_eq!(uuids, EXPECTED);
+    let distinct: std::collections::BTreeSet<&str> = uuids.iter().copied().collect();
+    assert_eq!(distinct.len(), 8);
+    for u in &uuids {
+        assert_eq!(u.len(), 36);
+        for (i, b) in u.bytes().enumerate() {
+            if matches!(i, 8 | 13 | 18 | 23) {
+                assert_eq!(b, b'-', "{u}");
+            } else {
+                assert!(b.is_ascii_hexdigit(), "{u}");
+            }
+        }
+    }
+    assert_eq!(lines[0]["parentUuid"], Value::Null);
+    for pair in lines.windows(2) {
+        assert_eq!(pair[1]["parentUuid"], pair[0]["uuid"]);
+    }
+    assert_eq!(lines.windows(2).count(), 7);
     drop(s);
     dir.close().unwrap();
 }
