@@ -291,7 +291,7 @@
         },
         {
           "id": "C73",
-          "text": "Recall rows carry lit_in beside point, note and lit_by: the lighting session for a lantern the light act lit, null for a lantern whose data has no lit_in; a lantern whose lit_in is present and not a session id is never listed as a row.",
+          "text": "Recall rows carry lit_in beside point, note and lit_by: the lighting session for a lantern the light act lit, null for a lantern whose data has no lit_in; a lantern whose lit_in is present and not a session id is never listed as a row, and is skipped by note and refused by point as lit_in_not_a_session naming which.",
           "done": false
         },
         {
