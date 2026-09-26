@@ -197,8 +197,7 @@ pub fn run(cli: Cli) -> Result<Value, HomeError> {
         } => {
             let home = Home::open(home)?;
             let s = home.open_session(&session)?;
-            let user_home =
-                std::env::var_os("HOME").map_or_else(|| PathBuf::from("."), PathBuf::from);
+            let user_home = std::env::var_os("HOME").map(PathBuf::from);
             let target = RenderTarget {
                 session_id: uuid,
                 cwd,
@@ -207,7 +206,7 @@ pub fn run(cli: Cli) -> Result<Value, HomeError> {
                 out,
                 canon,
             };
-            let report = render_claude_code(&s, &target, &user_home)?;
+            let report = render_claude_code(&s, &target, user_home.as_deref())?;
             Ok(json!({"command": "render", "report": report}))
         }
         Command::Canon { action } => match action {

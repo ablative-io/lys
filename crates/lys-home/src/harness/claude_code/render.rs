@@ -85,15 +85,19 @@ pub fn default_path(home_dir: &Path, cwd: &str, session_id: &str) -> Result<Path
         .join(format!("{session_id}.jsonl")))
 }
 
-/// Render the session's context path for Claude Code.
+/// Render the session's context path for Claude Code. `user_home` is the
+/// directory `.claude/projects` sits under, needed only when `target.out` is
+/// `None`; asked for then and absent, the render is refused by name and
+/// nothing is written.
 pub fn render_claude_code(
     session: &Session,
     target: &RenderTarget,
-    user_home: &Path,
+    user_home: Option<&Path>,
 ) -> Result<RenderReport, HomeError> {
-    let path = match &target.out {
-        Some(out) => out.clone(),
-        None => default_path(user_home, &target.cwd, &target.session_id)?,
+    let path = match (&target.out, user_home) {
+        (Some(out), _) => out.clone(),
+        (None, Some(home)) => default_path(home, &target.cwd, &target.session_id)?,
+        (None, None) => return Err(HomeError::NoRenderPlace),
     };
     if path.exists() {
         return Err(HomeError::Exists { path });

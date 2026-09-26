@@ -31,6 +31,12 @@ Read from the Pi checkout at `3d5cbe98`
 - `<id>.head`: the head entry id, written whole to a temporary file and renamed
   into place. Absent (a file Pi wrote), the last indexed entry is taken as the
   head and persisted on that open, so a later side leaf is never taken for it.
+  Opening a session may therefore write beside the file before the command
+  that opened it does anything else: a missing or stale index is rebuilt and
+  a missing head is persisted, by every command that opens a session
+  (`render`, `render-launch`, `ingest-call`, `canon add --from`), even when
+  that command then refuses. The session file itself is never written by an
+  open.
 - Durability order on append: entry line fsynced, then index row fsynced, then
   head renamed. A crash between any two leaves a file whose index is either
   complete or rebuildable, never one that claims an entry it does not hold.

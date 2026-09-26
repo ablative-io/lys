@@ -6,7 +6,7 @@ lys-home binary built from card/home-002-launch-template at 338d3ba.
 ## The session, imported
 
 The session is the one PROOF-RESUME.md measured: the Archie session of 11
-September 2026 at `~/.claude/projects/-Users-tom-Developer-archie/e1c27f5d-b418-472d-8ea8-b69bea49882f.jsonl`,
+September 2026 at `~/.claude/projects/<slug dir of the session cwd>/e1c27f5d-b418-472d-8ea8-b69bea49882f.jsonl`, the file PROOF-RESUME.md names,
 not running at the time (`pgrep` found no process on it). It is read, hashed
 and never written; it is not committed.
 
@@ -24,7 +24,7 @@ and never written; it is not committed.
 | field | value |
 | --- | --- |
 | proof template | `<scratch>/proof-real/template.json`, hash `38322da990c441add9066bf7f64f3df7633e23a0708193a01d8a0c2a0357e249`; `harness` `claude-code`; flags `--strict-mcp-config --allowedTools 'Bash(printenv:*)'`; `transcript` fill `resume-by-path`, canon null; `mcp` = `{"mcpServers": {}}`; `env` = one variable `LYS_PROOF_MODE`; `secrets.use_only` = one entry, variable `LYS_PROOF_TOKEN`, handle `handle-proof-0001`; `secrets.readable` empty; `reader` empty; `instructions` = one line asking every reply to end with a fixed token; `--system-prompt-snapshot` not set |
-| render-launch | `lys-home render-launch --home <scratch>/proof-real/home --session real1 --template <scratch>/proof-real/template.json --uuid 9c1e4a7b-3d5f-4a2c-8e6b-1f0d2c4a6e8b --cwd /Users/tom/Developer/archie --model claude-opus-5 --version 2.1.283 --out <out>`, with `LYS_PROOF_TOKEN` set in its environment to a value that appears in none of the five files and not in the report (0 matches by byte search in each of the six) |
+| render-launch | `lys-home render-launch --home <scratch>/proof-real/home --session real1 --template <scratch>/proof-real/template.json --uuid 9c1e4a7b-3d5f-4a2c-8e6b-1f0d2c4a6e8b --cwd <session cwd> --model claude-opus-5 --version 2.1.283 --out <out>`, with `LYS_PROOF_TOKEN` set in its environment to a value that appears in none of the five files and not in the report (0 matches by byte search in each of the six) |
 | report | `records` 81 (32 user, 49 assistant), `thinking_kept` 17, `thinking_as_text` 0, `dropped` 0, `authored` false, `inherited` 0; loss account `dropped: []`; manifest block `b5c540ddc6f691c767fd0360e21646fe5d827f364c2e5596e91aab03a0642479`; event `21cc155252be1c9bfe06da50d90855e6`, a `template_render` entry whose parentId is the head `e28eef93-…`; the head file still names `e28eef93-…` after the render |
 | template kept | `<scratch>/proof-real/home/templates/38/38322da9…`, the hash the report names |
 
@@ -51,12 +51,12 @@ claude --resume <out>/9c1e4a7b-3d5f-4a2c-8e6b-1f0d2c4a6e8b.jsonl --fork-session 
 Run once, by hand and never by the tool, from `<scratch>/proof-real/elsewhere`
 (neither `<out>` nor the session's cwd), in print mode so it is
 non-interactive: the line above followed by `-p --max-turns 2 --output-format json`
-and one short question asking the session to run `printenv LYS_PROOF_TOKEN`
-with the Bash tool and then reply on one line with the number of messages it
-had said were carried over (the question PROOF-RESUME.md asked) and the value
-printed. Two turns because the third question below needs the tool call and
-the answer after it; with one turn the run ends on the call. `LYS_PROOF_TOKEN`
-was set in the shell's environment to the same value as at the render.
+and one short question (redacted, as every message of the session is: it
+asks for one Bash call on the variable `LYS_PROOF_TOKEN` and for one value the
+rendered history holds, the value PROOF-RESUME.md's question drew out). Two
+turns because the third question below needs the tool call and the answer
+after it; with one turn the run ends on the call. `LYS_PROOF_TOKEN` was set in
+the shell's environment to the same value as at the render.
 
 | field | value |
 | --- | --- |
@@ -65,7 +65,7 @@ was set in the shell's environment to the same value as at the render.
 | rendered file before | `46b6b9e741f05dc089848de20562e9b6cf2a7d49fb355a707b3945e38bf97879` |
 | rendered file after | `46b6b9e741f05dc089848de20562e9b6cf2a7d49fb355a707b3945e38bf97879` (equal) |
 | `<out>` after | the same five files, no sixth: nothing was written beside the rendered file |
-| continuation | `~/.claude/projects/-private-tmp-claude-501--Users-tom-Developer-archie-34c4f280-dc08-4edc-9fe0-82f1f75bee3b-scratchpad-proof-real-elsewhere/1a83f02d-7e36-4005-98a9-b0c4daa911e9.jsonl`: the run directory's slug directory (the projects listing gained exactly that directory), under the uuid Claude Code assigned at the fork, not the rendered file's path; sha256 `5e27c5320036e25d038fd707052912f8e7cd89f4c32dab2bb1b0ed3ebc6aeb73`; read, hashed, left alone |
+| continuation | `~/.claude/projects/<slug dir>/1a83f02d-7e36-4005-98a9-b0c4daa911e9.jsonl`, where `<slug dir>` is the run directory's slug (`<scratch>/proof-real/elsewhere` with every `/` replaced by `-`) (the projects listing gained exactly that directory), under the uuid Claude Code assigned at the fork, not the rendered file's path; sha256 `5e27c5320036e25d038fd707052912f8e7cd89f4c32dab2bb1b0ed3ebc6aeb73`; read, hashed, left alone |
 | continuation lines | 98: 64 records copied from the rendered file (same uuids: every user and text record, none of the 17 thinking records, as PROOF-RESUME.md measured on 2.1.281), the new turn (2 user, 2 assistant, 1 tool_use and 1 tool_result), and Claude Code's own records (17 attachment, 3 mode, 3 atis-latch, 3 last-prompt, 2 queue-operation, 1 system, 1 cost-state) |
 | assistant models | `claude-opus-5` on every copied and every new assistant record |
 | answer | redacted: it held the same number PROOF-RESUME.md recorded as the session's last answer (yes), the handle (yes), the instruction token (yes), the secret value (no); 85 characters |

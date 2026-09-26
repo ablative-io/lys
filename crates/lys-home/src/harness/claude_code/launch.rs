@@ -10,8 +10,10 @@
 //! environment file (R6) and the instructions file are written; the five files
 //! are hashed; the manifest block is stored and the event appended (R5); the
 //! report is returned. Nothing runs: the launch line is text in the report
-//! (ADR-007). Nothing is written outside `--out` and the home, and nothing
-//! after a refusal.
+//! (ADR-007). `--out` is made absolute first, so the manifest and the launch
+//! line never carry a relative path; the render is given the rendered file's
+//! path and never looks for the user's home directory. Nothing is written
+//! outside `--out` and the home, and nothing after a refusal.
 
 use std::path::{Path, PathBuf};
 
@@ -80,7 +82,9 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
     safe_component("uuid", &args.uuid)?;
     let home = Home::open(&args.home)?;
     let mut session = home.open_session(&args.session)?;
-    let [rendered, loss, mcp_file, env, instructions] = targets(&args.out, &args.uuid);
+    let out = std::path::absolute(&args.out)
+        .map_err(|e| HomeError::io("resolving the out directory", &args.out, e))?;
+    let [rendered, loss, mcp_file, env, instructions] = targets(&out, &args.uuid);
     for path in [&rendered, &loss, &mcp_file, &env, &instructions] {
         if path.exists() {
             return Err(HomeError::LaunchTargetExists { path: path.clone() });
@@ -97,8 +101,7 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
         out: Some(rendered.clone()),
         canon: template.canon.clone(),
     };
-    let user_home = std::env::var_os("HOME").map_or_else(|| PathBuf::from("."), PathBuf::from);
-    let render = render_claude_code(&session, &target, &user_home)?;
+    let render = render_claude_code(&session, &target, None)?;
     let mcp = Value::Object(std::mem::take(&mut template.mcp));
     let mcp_bytes = serde_json::to_vec_pretty(&mcp).map_err(|source| HomeError::Json {
         context: "the MCP configuration could not be serialised",

@@ -219,6 +219,13 @@ pub enum HomeError {
         name: String,
     },
 
+    /// A render was asked for Claude Code's own place with no home directory
+    /// to find that place under.
+    #[error(
+        "no place to render to: --out was not given and the user's home directory is not known; give --out, or run where HOME names the directory that holds .claude/projects"
+    )]
+    NoRenderPlace,
+
     /// A file render-launch would write already exists.
     #[error("render-launch target already exists: {}", path.display())]
     LaunchTargetExists {

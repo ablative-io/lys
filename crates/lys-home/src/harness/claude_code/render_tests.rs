@@ -46,8 +46,12 @@ fn same_model_keeps_signed_thinking_and_the_round_trip_keeps_every_block() {
     let mut s = home.create_session("one", "/w", None).unwrap();
     import_claude_code(&src, &mut s, &blocks).unwrap();
     let out = dir.path().join("out").join("same.jsonl");
-    let report =
-        render_claude_code(&s, &target("claude-opus-5-5", out.clone()), dir.path()).unwrap();
+    let report = render_claude_code(
+        &s,
+        &target("claude-opus-5-5", out.clone()),
+        Some(dir.path()),
+    )
+    .unwrap();
     assert_eq!(
         (
             report.records,
@@ -75,9 +79,13 @@ fn same_model_keeps_signed_thinking_and_the_round_trip_keeps_every_block() {
     assert_eq!(message_hashes(&s), message_hashes(&again));
     // Existing path refused, bytes untouched.
     let before = std::fs::read(&out).unwrap();
-    let err = render_claude_code(&s, &target("claude-opus-5-5", out.clone()), dir.path())
-        .unwrap_err()
-        .to_string();
+    let err = render_claude_code(
+        &s,
+        &target("claude-opus-5-5", out.clone()),
+        Some(dir.path()),
+    )
+    .unwrap_err()
+    .to_string();
     assert!(err.contains("same.jsonl"), "{err}");
     assert_eq!(std::fs::read(&out).unwrap(), before);
     drop((s, again));
@@ -94,8 +102,12 @@ fn a_different_model_gets_thinking_as_text_and_a_loss_account_entry() {
     let mut s = home.create_session("one", "/w", None).unwrap();
     import_claude_code(&src, &mut s, &blocks).unwrap();
     let out = dir.path().join("other.jsonl");
-    let report =
-        render_claude_code(&s, &target("claude-sonnet-5", out.clone()), dir.path()).unwrap();
+    let report = render_claude_code(
+        &s,
+        &target("claude-sonnet-5", out.clone()),
+        Some(dir.path()),
+    )
+    .unwrap();
     assert_eq!(
         (
             report.thinking_kept,
@@ -147,8 +159,18 @@ fn a_session_renders_byte_identically_twice_with_distinct_chained_uuids() {
     let s = session_of(&home, "det", &["e1", "e2", "e3", "e4"]);
     let first = dir.path().join("first").join("r.jsonl");
     let second = dir.path().join("second").join("r.jsonl");
-    let a = render_claude_code(&s, &target("claude-opus-5-5", first.clone()), dir.path()).unwrap();
-    let b = render_claude_code(&s, &target("claude-opus-5-5", second.clone()), dir.path()).unwrap();
+    let a = render_claude_code(
+        &s,
+        &target("claude-opus-5-5", first.clone()),
+        Some(dir.path()),
+    )
+    .unwrap();
+    let b = render_claude_code(
+        &s,
+        &target("claude-opus-5-5", second.clone()),
+        Some(dir.path()),
+    )
+    .unwrap();
     assert_eq!((a.records, b.records), (4, 4));
     assert_eq!(
         std::fs::read(&first).unwrap(),
@@ -190,8 +212,12 @@ fn a_uuid_shaped_entry_id_is_kept_and_any_other_maps_to_one_fixed_uuid() {
     let home = Home::open(dir.path().join("home")).unwrap();
     let s = session_of(&home, "kept", &["e1", KEPT]);
     let out = dir.path().join("kept.jsonl");
-    let report =
-        render_claude_code(&s, &target("claude-opus-5-5", out.clone()), dir.path()).unwrap();
+    let report = render_claude_code(
+        &s,
+        &target("claude-opus-5-5", out.clone()),
+        Some(dir.path()),
+    )
+    .unwrap();
     assert_eq!(report.records, 2);
     let lines: Vec<Value> = std::fs::read_to_string(&out)
         .unwrap()
@@ -227,4 +253,38 @@ fn record_uuid_is_the_documented_selection_of_the_sha256_of_the_entry_id() {
         record_uuid("fixed-entry-id"),
         "69392357-b162-4c19-8db0-8c73793670c5"
     );
+}
+
+#[test]
+fn a_render_with_no_out_and_no_home_directory_is_refused_by_name_and_writes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = Home::open(dir.path().join("home")).unwrap();
+    let s = session_of(&home, "noplace", &["e1", "e2"]);
+    let mut target = target("claude-opus-5-5", dir.path().join("unused.jsonl"));
+    target.out = None;
+    let before: Vec<_> = std::fs::read_dir(dir.path())
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
+    let err = render_claude_code(&s, &target, None).unwrap_err();
+    assert!(
+        matches!(err, crate::error::HomeError::NoRenderPlace),
+        "{err}"
+    );
+    assert!(err.to_string().contains("--out"), "{err}");
+    let after: Vec<_> = std::fs::read_dir(dir.path())
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
+    assert_eq!(before, after);
+    assert_eq!(before.len(), 1, "only the home");
+    let report = render_claude_code(&s, &target, Some(dir.path())).unwrap();
+    assert!(
+        report
+            .path
+            .starts_with(dir.path().join(".claude").join("projects"))
+    );
+    assert_eq!(report.records, 2);
+    drop(s);
+    dir.close().unwrap();
 }

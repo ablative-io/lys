@@ -137,8 +137,12 @@ fn import_render_import_keeps_every_message_part_and_the_signature() {
     let a = import_claude_code(&src, &mut first, &blocks).unwrap();
     assert_eq!(a.events.get("hook"), Some(&1));
     let out = dir.path().join("rendered.jsonl");
-    let rendered =
-        render_claude_code(&first, &target("claude-opus-5-5", out.clone()), dir.path()).unwrap();
+    let rendered = render_claude_code(
+        &first,
+        &target("claude-opus-5-5", out.clone()),
+        Some(dir.path()),
+    )
+    .unwrap();
     assert_eq!(
         (rendered.records, rendered.thinking_kept, rendered.dropped),
         (4, 1, 0)
@@ -315,8 +319,12 @@ fn the_authored_boundary_survives_fewshot_import_and_render() {
     );
     assert_eq!(s.customs("lys.authored").unwrap().len(), 1);
     let out = dir.path().join("rendered.jsonl");
-    let rendered =
-        render_claude_code(&s, &target("claude-opus-5-5", out.clone()), dir.path()).unwrap();
+    let rendered = render_claude_code(
+        &s,
+        &target("claude-opus-5-5", out.clone()),
+        Some(dir.path()),
+    )
+    .unwrap();
     assert!(rendered.authored);
     let lines = read_jsonl(&out);
     let models: Vec<&str> = lines
