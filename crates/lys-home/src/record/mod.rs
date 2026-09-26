@@ -31,6 +31,9 @@ pub mod entries;
 pub mod index;
 #[cfg(test)]
 mod record_tests;
+pub mod templates;
+#[cfg(test)]
+mod templates_tests;
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -41,6 +44,7 @@ use crate::error::HomeError;
 use crate::record::blocks::BlockStore;
 use crate::record::entries::{Entry, EntryBase, EntryBody, SessionHeader};
 use crate::record::index::{Index, IndexRow, read_head, write_head};
+use crate::record::templates::TemplateStore;
 
 /// The most bytes a session or block name may have.
 pub const MAX_NAME_BYTES: usize = 200;
@@ -96,6 +100,13 @@ impl Home {
     /// The block store of this home.
     pub fn blocks(&self) -> Result<BlockStore, HomeError> {
         BlockStore::open(self.root.join("blocks"))
+    }
+
+    /// The template store of this home, `templates/` beside `sessions/` and
+    /// `blocks/`; its directory appears when the first template is stored.
+    #[must_use]
+    pub fn templates(&self) -> TemplateStore {
+        TemplateStore::at(self.root.join("templates"))
     }
 
     /// The path of a session file by id; an id that is not one safe path
