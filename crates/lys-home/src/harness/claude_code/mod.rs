@@ -10,6 +10,16 @@
 //! from a file anywhere on disk (Waffles 13:36, Archie 13:37) and writes its
 //! continuation beside that file as `<sessionId>.jsonl`, leaving the passed
 //! file unchanged.
+//!
+//! A launch therefore resumes with `--fork-session`: a bare resume writes its
+//! continuation as `<sessionId>.jsonl` beside the passed file, and under the
+//! render that is the rendered file's own name (its session id is the chosen
+//! uuid), so a bare resume would write onto the rendered file and break the
+//! hash recorded for it. With `--fork-session` the continuation lands under
+//! `~/.claude/projects/<cwd-slug>/` for the run's working directory, under
+//! the uuid Claude Code assigns at the fork (PROOF-FEWSHOT.md measured the
+//! bare case on 2.1.281, PROOF-RESUME.md the fork on 2.1.281, and
+//! PROOF-LAUNCH.md the launch line on 2.1.283).
 
 pub mod events;
 #[cfg(test)]
