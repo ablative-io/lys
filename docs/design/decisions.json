@@ -325,6 +325,42 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-019",
+      "title": "The secrets broker lives in lys, as crates/lys-secrets; Cambium consumes it and is never its home",
+      "status": "decided",
+      "scope": "secrets",
+      "date": "2026-09-26",
+      "decided_by": "The lead's answers to the secrets survey; recorded with SECRETS-003",
+      "context": "SECRETS-002 named door-owned files in the cambium checkout while its design's CN4 refused to let those proposals make Cambium a required runtime, and left the broker's host open. Every code row's files wait on which repository they sit in, and ADR-004 requires every project to stand alone.",
+      "decision": "The broker lives in the lys repository as the crate crates/lys-secrets, part of the standalone identity platform. A person installs Lys to hold secrets; Cambium reaches the broker through the door as a consumer and is never its home. Rejected: the broker inside the cambium door that SECRETS-002 names, which would make Cambium a runtime a person must install to keep a credential.",
+      "quote": "",
+      "consequences": [
+        "Every SECRETS-003 code row's files sit in the lys repository, under crates/lys-secrets.",
+        "CN4 of the secrets design is settled by this entry; SECRETS-002's open reading of the host is closed by SECRETS-003 without editing SECRETS-002.",
+        "The cambium paths SECRETS-002 names are not walls for any row; no cambium file is edited for the broker."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-020",
+      "title": "A lease is a broker record under the audit log, not a signed format",
+      "status": "decided",
+      "scope": "secrets",
+      "date": "2026-09-26",
+      "decided_by": "The lead's answers to the secrets survey; recorded with SECRETS-003",
+      "context": "SECRETS-002 R9 puts a lease's time window in the signed delegation, while the draft the survey found made the lease a broker record. lys/delegation/v1 has no not_after by design (crates/lys-core/src/delegation/mod.rs:218-221), and a signed format freezes wire bytes that strangers verify.",
+      "decision": "The lease is a broker record under the audit log: it counts uses, time and spend against a delegation and is read only by the broker, so nothing a stranger verifies changes. The signed delegation keeps the time window SECRETS-002 R9 gives it, and the lease's own not_after never widens that window. Rejected: a signed lease format, a new version beside lys/delegation/v1 with its own adversarial review.",
+      "quote": "",
+      "consequences": [
+        "No new signed format and no new version beside lys/delegation/v1 is written for the lease.",
+        "v1's lack of not_after is recorded as a fact the lease's window covers.",
+        "A lease a stranger verifies offline, if a later row needs one, is a new brief with its own adversarial review."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

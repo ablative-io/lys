@@ -303,6 +303,39 @@
         "RM-008"
       ],
       "notes": "Renumbered from the HOME-002 it was written as; HOME-006 follows the lantern card (HOME-004, RM-008) and the launch template (HOME-002, RM-006), both on main, and after the render card (HOME-007), which took RM-009, ADR-016, C31 to C35, S18, S19 and CN9. Further units, not written: lit_in written by the light act (the lantern card's next round); a fork given tools, a lens or a briefing on what changed since the point; leases, budgets and kill rules; harnesses other than Claude Code."
+    },
+    {
+      "id": "RM-011",
+      "title": "Build the secrets broker in lys from a baseline, a reviewed contract and counted code rows",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "SECRETS-003, beside SECRETS-002 and without editing it: a documents-only baseline recorded from source, a contract with an adversarial review before any code, and code rows in crates/lys-secrets that deliver SECRETS-002's R1 to R9 with counted acceptance legs, hours per row and DIRECTORY-002, DIRECTORY-003 and DIRECTORY-006 as blockers. The broker lives in lys (ADR-019) and the lease is a broker record (ADR-020).",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-26T19:03:25+10:00",
+        "quote": "The unlanded draft IDENTITY-003 under docs/design/identity/briefs does not land; that directory sits outside the gate. The broker's brief on main is the secrets cluster: docs/design/secrets/briefs/SECRETS-001.json (done) and SECRETS-002.json, R1 to R9 with SEC_ identifiers, anchored to ADR-001 (secrets sit behind a handle the door swaps for the credential), ADR-002 (the token revolver is the first consumer), ADR-003 and ADR-004.\n\nThis brief is SECRETS-003, a brief of its own beside SECRETS-002, so what has landed stays stable; SECRETS-002 is not edited. It adds, in docs/design/secrets/, what the draft carries and main lacks: a documents-only baseline row recording from source the revolver's next-account call site, every consumer of the account pool file, every credential path into a seat today classed as the login exception, a proxied credential or neither, and what lys/delegation/v1 and the sealed envelope can carry for a handle, a lease and a sealed record, by file and line; a contract row before any code stating the invariant, the handle, the lease with its atomic use step and retry outcome, the cancellation rule, the SpiceDB relations and the audit line fields, with an adversarial review recording every attack tried (a replayed or forged handle, a use spent or counted twice, an admitted call outliving the rule, a credential in a log, a sealed key read, a stale SpiceDB answer) and the clause defeating each; counted acceptance legs on every code row (each refusal leg, a forced race on a k-use lease admitting exactly k, a redaction canary with a positive control, kill and reopen at each append boundary, each in-flight outcome its own test); hours per row; dependencies on DIRECTORY-002, 003 and 006 blocking the code rows.\n\nSettled on main, not reopened: the seat's own login reaches its process at spawn as the one named exception (R5); OAuth refresh and spend caps are in scope (R4, R9); every point it records open stays open.\n\nBoundaries: documents only, no code; no credential value; lys-core and its published formats unchanged, a signed lease format only as a new version alongside with its own adversarial review; no engine structural; no row dispatched before the lead's review; the gate is scripts/design/gate.sh.\n\nAsk the lead, do not decide: whether the broker lives in lys (the draft's crates/lys-secrets) or in the cambium door SECRETS-002 names, which CN4 leaves open; whether the lease is a broker record or a signed format; whether the draft's hours stand. The brief records each as an open question with both readings.",
+        "context": "The secrets broker card on the Lys board, surveyed against lys main after SECRETS-002 landed; the lead's answers settled that the broker lives in lys as crates/lys-secrets, that the lease is a broker record under the audit log, that the draft's hours are re-costed with OAuth refresh, the spend cap and the login path in scope, and that SECRETS-003 carries its own code rows that deliver SECRETS-002's requirements."
+      },
+      "links": {
+        "cluster": "secrets",
+        "decisions": [
+          "ADR-001",
+          "ADR-002",
+          "ADR-003",
+          "ADR-004",
+          "ADR-019",
+          "ADR-020"
+        ],
+        "briefs": [
+          "SECRETS-003"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-001",
+        "RM-002"
+      ],
+      "notes": "Further units, not written: Run SECRETS-003's baseline row: record the revolver call site, pool consumers, credential paths and format capacity from source; Run SECRETS-003's contract row and its adversarial review; The broker's code rows (store, handles and leases; proxy and in-flight rule; sealed records; revolver as consumer); A signed lease format beside lys/delegation/v1, with its own brief and adversarial review (not planned: ADR-020 rules the lease a broker record); A release and demonstration row for the broker. The broker-host ruling is recorded as ADR-019 with this row and settles CN4."
     }
   ]
 }
