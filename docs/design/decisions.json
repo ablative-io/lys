@@ -270,6 +270,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-016",
+      "title": "A rendered file's derived uuids are a fixed, versioned contract",
+      "status": "proposed",
+      "scope": "home",
+      "date": "2026-09-26",
+      "decided_by": "",
+      "context": "The Claude Code render gave every entry id that is not uuid-shaped a fresh random uuid, so two renders of one session head differed and no hash could name a rendered file; the launch template then shaped one from the SHA-256 of the entry id alone, deterministic but outside any namespace, without a role, and equal for the same entry id in any two sessions. Deriving those uuids from the record under a fixed scheme makes a render deterministic, and from the first receipted render event onward a hash names a rendered file, so the derivation fixes those hashes the way a wire format fixes signatures. The fork and launch cards need the same kind of derived id.",
+      "decision": "Derive every uuid a render needs and the record does not hold as UUIDv5 under the session's namespace and the name `<entry id>#<role>`, with a closed set of roles (`record` first); the session's namespace is UUIDv5 over one fixed lys namespace (32c05904-d1f1-550c-9eee-2f6c8f98b665, itself UUIDv5 of the RFC 9562 URL namespace over `lys/home/claude-code/render-uuid/v1`) and the id of the session being rendered, so the same entry id in two sessions never derives one uuid. Treat the namespace, the session namespace rule, the name form and the roles as frozen: a change is a new version alongside, never a mutation. The fork and launch cards derive by this scheme. Rejected: drawing fresh ids (nondeterministic), keying on a hash of the entry id alone without a namespace, a role and a session (two roles on one entry collide, two sessions with one hand-authored id collide, and it is not reproducible with standard UUID tooling), mixing in the target session id (the record does not hold it), and leaving the scheme mutable until a later card (every recorded hash would move with it).",
+      "quote": "",
+      "consequences": [
+        "HOME-007 implements the derivation for the role `record` and pins a fixture hash in PROOF-RESUME.md.",
+        "A fork or launch card that needs a derived id adds a role to the closed set, never changes the namespace, the session namespace rule or the name form.",
+        "Changing the derivation breaks every recorded render hash and is written as a new version with its own namespace, alongside the old."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

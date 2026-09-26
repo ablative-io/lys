@@ -195,6 +195,36 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The deterministic render",
+      "items": [
+        {
+          "id": "C31",
+          "text": "The Claude Code render derives the uuid of a record whose entry id is not uuid-shaped as UUIDv5 over the session's namespace, itself UUIDv5 of 32c05904-d1f1-550c-9eee-2f6c8f98b665 over the id of the session being rendered, and the name `<entry id>#record`, so two sessions with the same non-uuid entry id never collide; render.rs calls no random source and no clock.",
+          "done": false
+        },
+        {
+          "id": "C32",
+          "text": "A fixture session holding a tool record with two results and a tool record with one result beside user text renders twice, to two paths with the same target, into files of equal SHA-256.",
+          "done": false
+        },
+        {
+          "id": "C33",
+          "text": "A test pins the fixture's rendered SHA-256, and PROOF-RESUME.md records the same value with the commands that produce it.",
+          "done": false
+        },
+        {
+          "id": "C34",
+          "text": "The PROOF-RESUME source renders twice from one import with one recorded command into files of equal SHA-256, and PROOF-RESUME.md records that hash and the command.",
+          "done": false
+        },
+        {
+          "id": "C35",
+          "text": "PROOF-RESUME.md names the cause found, the namespace, name form and roles the multi-result case used, and a resume of the rendered file with --fork-session on the installed Claude Code, with the version `claude --version` printed and repeated_tool_use_ids 0.",
+          "done": false
+        }
+      ]
     }
   ]
 }
