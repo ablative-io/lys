@@ -226,6 +226,31 @@ pub enum HomeError {
     )]
     NoRenderPlace,
 
+    /// A session id was named that has no session file in the home.
+    #[error("no session `{session}` in the home; name a session whose file stands under sessions/")]
+    UnknownSession {
+        /// The session id named.
+        session: String,
+    },
+
+    /// A lantern's point was a lantern or an epilogue, which cannot be marked.
+    #[error(
+        "entry `{id}` of session {session} is a lantern or an epilogue, which cannot be a lantern's point; light at the entry it marks, or add an epilogue to the lantern"
+    )]
+    PointIsLantern {
+        /// The session id.
+        session: String,
+        /// The entry id named as the point.
+        id: String,
+    },
+
+    /// A note, an epilogue or the words of a recall were empty or only whitespace.
+    #[error("the {what} is empty or only whitespace; give the {what} in words")]
+    EmptyNote {
+        /// What was empty: `note`, `epilogue` or `words`.
+        what: &'static str,
+    },
+
     /// A file render-launch would write already exists.
     #[error("render-launch target already exists: {}", path.display())]
     LaunchTargetExists {

@@ -35,6 +35,9 @@ pub mod given;
 #[cfg(test)]
 mod given_tests;
 pub mod index;
+pub mod lantern;
+#[cfg(test)]
+mod lantern_tests;
 pub mod reader;
 #[cfg(test)]
 pub(crate) mod reader_tests;
