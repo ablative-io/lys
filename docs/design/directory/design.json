@@ -248,7 +248,7 @@
     },
     {
       "path": "crates/lys/src/identity/configure.rs",
-      "note": "idempotent client and theme reconciliation with stable operation identifiers",
+      "note": "idempotent client reconciliation with stable operation identifiers (R2), and theme reconciliation (R3)",
       "brief": "DIRECTORY-002"
     },
     {

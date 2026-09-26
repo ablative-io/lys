@@ -28,6 +28,7 @@
         ],
         "briefs": [
           "DIRECTORY-001",
+          "DIRECTORY-002",
           "DIRECTORY-003",
           "DIRECTORY-004",
           "DIRECTORY-005"
@@ -35,7 +36,7 @@
         "commits": []
       },
       "depends_on": [],
-      "notes": "The briefs build in order: DIRECTORY-002 before 003, 003 before 004 and 005. Each card runs through the board (brief_card, then card_build_v3). DIRECTORY-002 is owned by RM-011, the card that builds it."
+      "notes": "The briefs build in order: DIRECTORY-002 before 003, 003 before 004 and 005. Each card runs through the board (brief_card, then card_build_v3)."
     },
     {
       "id": "RM-002",
@@ -326,13 +327,11 @@
           "ADR-011",
           "ADR-019"
         ],
-        "briefs": [
-          "DIRECTORY-002"
-        ],
+        "briefs": [],
         "commits": []
       },
       "depends_on": [],
-      "notes": "DIRECTORY-002 is the one unit and is built whole through the card chain; its three blocked_by entries are each discharged only by the blocker having landed, checked live when the build starts. Further units, not yet written: Fill the Rauthy client theme gaps from the design system: light mode, error colour, border radius, and dark emphasised text, action and button text (a design-system card the lead places, ADR-019). RM-001 carries the rest of the directory rows."
+      "notes": "DIRECTORY-002 is the one unit and is built whole through the card chain; its three blocked_by entries are each discharged only by the blocker having landed, checked live when the build starts. Further units, not yet written: Fill the Rauthy client theme gaps from the design system: light mode, error colour, border radius, and dark emphasised text, action and button text (a design-system card the lead places, ADR-019). DIRECTORY-002 is linked from RM-001, which owns it and the rest of the directory briefs, so this row names it here and does not link it again."
     }
   ]
 }
