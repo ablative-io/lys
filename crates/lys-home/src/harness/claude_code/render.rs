@@ -72,8 +72,8 @@ pub struct RenderReport {
 
 /// The default place for a session file: Claude Code's own directory for the
 /// cwd. The session id must be one safe path component, and the slug is one
-/// by construction (every `/` becomes `-`); both are checked, so no id can
-/// name a path outside that directory.
+/// by construction (every character outside ASCII letters and digits becomes
+/// `-`); both are checked, so no id can name a path outside that directory.
 pub fn default_path(home_dir: &Path, cwd: &str, session_id: &str) -> Result<PathBuf, HomeError> {
     safe_component("session id", session_id)?;
     let slug = projects_slug(cwd);

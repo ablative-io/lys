@@ -2,7 +2,8 @@
 //!
 //! Claude Code 2.1.281 writes one JSONL file per session under
 //! `~/.claude/projects/<cwd-slug>/<session id>.jsonl`, where the slug is the
-//! working directory with every `/` replaced by `-`. Every record carries
+//! working directory with every character that is not an ASCII letter or
+//! digit replaced by `-` ([`paths::projects_slug`]). Every record carries
 //! `uuid`, `parentUuid`, `type`, `timestamp`, `sessionId` and `cwd`; `user` and
 //! `assistant` records carry a `message`. The file is already a tree.
 //!
@@ -29,6 +30,9 @@ pub mod import;
 pub(crate) mod import_tests;
 pub mod launch;
 pub mod launch_env;
+pub mod paths;
+#[cfg(test)]
+mod paths_tests;
 pub mod render;
 #[cfg(test)]
 mod render_tests;
@@ -45,8 +49,4 @@ pub const API: &str = "anthropic-messages";
 /// The model value that marks a hand-authored turn.
 pub const AUTHORED: &str = "authored";
 
-/// The directory Claude Code keeps a session in for a working directory.
-#[must_use]
-pub fn projects_slug(cwd: &str) -> String {
-    cwd.replace('/', "-")
-}
+pub use paths::projects_slug;
