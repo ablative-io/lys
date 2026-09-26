@@ -10,6 +10,8 @@
 
 **S8.** As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
 
+**S9.** As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
+
 ## Tom — Owns the platform and reads what a session was given
 
 **S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
@@ -18,6 +20,10 @@
 
 **S6.** As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
 
+**S10.** As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
+
 ## Reviewer — Checks the proofs before anything relies on them
 
 **S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
