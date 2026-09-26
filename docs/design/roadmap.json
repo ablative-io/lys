@@ -220,7 +220,7 @@
       "title": "Move a home as a pushed ref: ship, fetch and the same-machine resume proof (stage 3, first block)",
       "status": "idea",
       "kind": "feature",
-      "summary": "A home lives only on the machine that captured it. This item takes stage 3's first block: the home directory becomes a git repository with an allowlisted tracked set, `lys-home ship` commits it and pushes it as one ref to a remote named on the command line, refusing a stale index, a remote off this machine and a named secret value, and `lys-home fetch` fetches the ref into a new home, checks every index and head without rebuilding, and records an arrival event on each session naming the source commit, the remote, the ref and the new home's execution id. The fetched home is rendered through the Claude Code launch template and resumed by the printed line, measured on the installed Claude Code and written up as hashes, counts and paths.",
+      "summary": "A home lives only on the machine that captured it. This item takes stage 3's first block: the home directory becomes a git repository with an allowlisted tracked set, `lys-home ship` commits it and pushes it as one ref to a remote named on the command line, refusing a stale index, a remote off this machine, a named secret value and a match of the five standard secret patterns, and `lys-home fetch` fetches the ref into a new home, checks every index and head without rebuilding, and records an arrival event on each session naming the source commit, the remote, the ref and the new home's execution id. The fetched home is rendered through the Claude Code launch template and resumed by the printed line, measured on the installed Claude Code and written up as hashes, counts and paths.",
       "provenance": {
         "requested_by": "tom",
         "date": "2026-09-26T06:27:00+10:00",
@@ -248,7 +248,7 @@
         "RM-006",
         "RM-007"
       ],
-      "notes": "Further units, not written: Stage 3 block two: a home fetched and resumed on a named second machine. Open with the lead: which five standard patterns ship scans for beside the named values; HOME-004 scans for the named values only."
+      "notes": "Further units, not written: Stage 3 block two: a home fetched and resumed on a named second machine."
     }
   ]
 }

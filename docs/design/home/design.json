@@ -191,7 +191,7 @@
     },
     {
       "path": "crates/lys-home/Cargo.toml",
-      "note": "the crate manifest; gains the passthrough example",
+      "note": "the crate manifest; gains the passthrough example, and regex for the five standard secret patterns",
       "brief": "HOME-001"
     },
     {
@@ -536,17 +536,17 @@
     },
     {
       "path": "crates/lys-home/src/moves/tracked.rs",
-      "note": "the tracked set by allowlist, and the scan for the named secret values",
+      "note": "the tracked set by allowlist, and the scan for the named secret values and the five standard patterns",
       "brief": "HOME-004"
     },
     {
       "path": "crates/lys-home/src/moves/tracked_tests.rs",
-      "note": "gates on the tracked set and the scan",
+      "note": "gates on the tracked set, the value scan and each pattern with its near miss",
       "brief": "HOME-004"
     },
     {
       "path": "crates/lys-home/src/moves/ship.rs",
-      "note": "ship: check, scan, commit the tracked set, push one ref",
+      "note": "ship: check, scan, commit the tracked set, push one ref; the table of the five standard secret patterns",
       "brief": "HOME-004"
     },
     {
@@ -573,6 +573,16 @@
       "path": "crates/lys-home/tests/home_move.rs",
       "note": "the move end to end on the fixture home: hash match at the fetched commit, prefixes after, source unchanged, secret search with its control",
       "brief": "HOME-004"
+    },
+    {
+      "path": "Cargo.toml",
+      "note": "the workspace manifest; gains regex among the workspace dependencies",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "Cargo.lock",
+      "note": "the lockfile; gains regex and what it resolves to",
+      "brief": "HOME-001"
     }
   ],
   "inventory": [

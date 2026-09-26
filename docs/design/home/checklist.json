@@ -176,7 +176,7 @@
         },
         {
           "id": "C27",
-          "text": "No lock, temporary, environment or render file is in a shipped tree, and ship refuses by file and offset a tracked file holding any value of the --secret-values file, printing no value.",
+          "text": "No lock, temporary, environment or render file is in a shipped tree, and ship refuses by file and offset a tracked file holding any value of the --secret-values file or matching one of the five standard patterns, naming the pattern and printing no value or matched byte.",
           "done": false
         },
         {
