@@ -281,7 +281,7 @@
       "items": [
         {
           "id": "C71",
-          "text": "A compact_boundary record followed by its isCompactSummary user record imports as a lys.harness_event for the boundary and one Pi compaction entry under the summary record's uuid, the child of the boundary's entry, whose firstKeptEntryId is the earliest in file order of compactMetadata.preservedMessages.uuids and whose tokensBefore is compactMetadata.preTokens; the summary record is not a message entry.",
+          "text": "A compact_boundary record followed by its isCompactSummary user record imports as a lys.harness_event for the boundary and one Pi compaction entry under the summary record's uuid, the child of the boundary's entry, whose firstKeptEntryId is the earliest in file order of compactMetadata.preservedMessages.uuids when that list is non-empty, and otherwise the first record whose parent is the summary record, and whose tokensBefore is compactMetadata.preTokens; the summary record is not a message entry.",
           "done": false
         },
         {
@@ -321,7 +321,7 @@
         },
         {
           "id": "C79",
-          "text": "lys-home compactions prints one JSON report of a session's compactions, each with its loss entry, the span's ids, counts and hashes and a check that every span entry is readable by id and every named block is held; a compaction with no loss entry or pointing at itself is reported unaccounted by entry id.",
+          "text": "lys-home compactions prints one JSON report of a session's compactions, each with its loss entry, the span's ids, counts and hashes and a check that every span entry is readable by id and every named block is held, and exits 0 only when nothing is missing and 1 when anything is, naming the first missing item; a compaction with no loss entry or pointing at itself is reported unaccounted by entry id.",
           "done": false
         },
         {
@@ -332,6 +332,11 @@
         {
           "id": "C81",
           "text": "PROOF-COMPACTION.md records one real compact_boundary session imported read-only with its listing as counts and hashes and its source SHA-256 equal before and after, and a rendered compacted fixture resumed on Claude Code 2.1.283 answering from the summary, by hashes only.",
+          "done": false
+        },
+        {
+          "id": "C82",
+          "text": "A compact_boundary with no isCompactSummary record under it imports as a lys.harness_event only, with no compaction and no lys.loss entry, and lys-home compactions reports it by entry id as a boundary without a summary.",
           "done": false
         }
       ]
