@@ -47,7 +47,43 @@
       ],
       "stories": [
         "S2"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-005.json",
+            "change": "modified",
+            "note": "verification array now holds five entries; the fifth and last is 'Frontend checks pass with strict types and the generated API schema, with negative and crash-boundary tests.'; the first four and every other member are unchanged"
+          },
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-005.md",
+            "change": "modified",
+            "note": "re-rendered; the Verification section lists the five entries, with the new one at line 109"
+          }
+        ],
+        "how": "Row 1 (count is 5, first four unchanged): met. Before appending, the script asserted len(verification)==4 and that the round trip was byte-identical, so the first four strings are untouched. The new entry comes after the ID001_DIRECTORY_LIVE entry in DIRECTORY-005.json's verification array. Row 2 (the phrase is present once in each file): met. The phrase is in DIRECTORY-005.json once and at DIRECTORY-005.md:109. Row 3 (numstat is 2 added, 1 deleted): met. git diff --numstat printed '2 1 docs/design/directory/briefs/DIRECTORY-005.json'. Row 4 (task and depends_on unchanged): met. Only the verification array was touched, so the task text with its 6-hour estimate and depends_on ['DIRECTORY-004'] are as main holds them.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C3",
+            "done": true,
+            "note": "DIRECTORY-005 keeps its id, wall, ID001 identifiers and 6-hour estimate, and gains only the frontend verification line"
+          },
+          {
+            "id": "C6",
+            "done": true,
+            "note": "the rendered DIRECTORY-005.md comes from render-cluster.py over the edited JSON"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": "DIRECTORY-005 now carries the frontend verification criterion its reviewer checks against"
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -73,7 +109,43 @@
       ],
       "stories": [
         "S2"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/directory/design.json",
+            "change": "modified",
+            "note": "inventory now holds eleven rows: the eight main lists, byte for byte and in order, then vendor/rauthy, crates/lys and docs/design/decisions.json, each with its note exactly as specified"
+          },
+          {
+            "path": "docs/design/directory/DESIGN.md",
+            "change": "modified",
+            "note": "re-rendered; the Inventory section lists eleven rows, with the three new ones at lines 179-181"
+          }
+        ],
+        "how": "Row 1 (count is 11, first eight unchanged): met. Before appending, the script asserted len(inventory)==8 and a byte-identical round trip. Row 2 (path counts): met. The three rows appended to design.json's inventory add one '\"path\": \"vendor/rauthy\"' (two in total with the structure row), one crates/lys (one in total) and one docs/design/decisions.json (two in total with the structure row). Row 3 (one bullet each in DESIGN.md): met, at DESIGN.md:179, :180 and :181. Row 4 (paths of rows 8 onward, and RAUTHY-BASELINE/CONFORMANCE count of 2): met. inventory[8:] are the three paths in the specified order, and the existing RAUTHY-BASELINE.md and CONFORMANCE.md rows are unchanged. No structure row, principle, goal, non-goal, constraint or gate leg was touched.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C1",
+            "done": true,
+            "note": "the design's inventory now names the fork, the CLI crate and the decision ledger it reads"
+          },
+          {
+            "id": "C6",
+            "done": true,
+            "note": "DESIGN.md was re-rendered from design.json"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": "a reviewer sees every file the open rows read or change listed in the inventory"
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -99,7 +171,43 @@
       ],
       "stories": [
         "S2"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/directory/design.json",
+            "change": "modified",
+            "note": "intention ends with the specified Cambium sentence, appended after one space"
+          },
+          {
+            "path": "docs/design/directory/DESIGN.md",
+            "change": "modified",
+            "note": "re-rendered; the Intention section, at line 13, carries the sentence"
+          }
+        ],
+        "how": "Row 1 (the phrase is present once in each file): met. 'keeping its participant ids' is in the intention at design.json:4 and in DESIGN.md's Intention section. Row 2 (the intention's start and end): met. The existing intention text was kept, and the script asserted it ended with 'every identity change.' before the sentence was appended after one space, so it still starts 'An operator installs the identity product without Cambium or Manifold, signs in,' and now ends 'and this sentence promises neither row.' Row 3 (the rows 06/07 non-goal present once, and 11 non-goals): met. non_goals was not touched. Row 4 (5 goals, 9 principles, 12 constraints): met. goals, principles and constraints were not touched. The only other design.json change is R2's inventory append.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C1",
+            "done": true,
+            "note": "the intention records the Cambium direction, and the non-goal for rows 06 and 07 stands unchanged"
+          },
+          {
+            "id": "C6",
+            "done": true,
+            "note": "DESIGN.md was re-rendered from design.json"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": "the direction is recorded without promising row 06 or 07"
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
