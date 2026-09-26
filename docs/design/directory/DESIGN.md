@@ -188,7 +188,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `crates/lys/src/commands/log/mod.rs` | the log command family's module list; pre-existing, gains the receipt module line (DIRECTORY-007) |  |
 | `crates/lys/tests/receipt_tests.rs` | rcli_accept, rcli_tamper, rcli_precrypto, rcli_test, rcli_readonly, driving the binary | DIRECTORY-007 |
 | `crates/lys-identity-server/src/sign_in_receipt.rs` | the sign-in and sign-in-refusal receipts the directory service emits, through lys-identity's commit path (DIRECTORY-007, after DIRECTORY-003 lands) | DIRECTORY-007 |
-| `crates/lys-identity-server/tests/sign_in_receipts.rs` | signin_ok, signin_refused, signin_first, signin_state | DIRECTORY-007 |
+| `crates/lys-identity-server/tests/sign_in_receipts.rs` | signin_ok, signin_refused, signin_first, signin_refused_reason | DIRECTORY-007 |
 | `docs/design/identity/reports/DIRECTORY-007-receipts.md` | the development-install proof: commands, exit codes, leaf indices, operation IDs, key fingerprints and counts; never a private key | DIRECTORY-007 |
 
 ## Inventory

@@ -201,7 +201,7 @@
         },
         {
           "id": "C34",
-          "text": "The directory service leaves a sign-in receipt for every sign-in it records and a refusal receipt for the one refusal step 1 makes, registers nobody on a first sign-in, refuses nothing on state, and leaves no receipt for a read or an answered check (signin_ok, signin_refused, signin_first, signin_state).",
+          "text": "The directory service leaves a sign-in receipt for every sign-in it records and a refusal receipt carrying the refusal's name as its reason for every sign-in it refuses, registers nobody on a first sign-in, decides no refusal on state itself, and leaves no receipt for a read or an answered check (signin_ok, signin_refused, signin_first, signin_refused_reason).",
           "done": false
         },
         {
