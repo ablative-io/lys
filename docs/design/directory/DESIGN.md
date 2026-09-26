@@ -42,6 +42,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
 - ADR-010 — Every product shares one design and keeps its own accent; the identity product's is orange — The identity screens follow Aion's structure, typography, spacing and interaction, and Rauthy's client themes take the same colours, with no build dependency on Cambium or Aion. Each product keeps its own accent within the estate colour family: Cambium green, Aion blue and black, Argus light blue, Haematite mustard. The identity product's accent is orange (accent #D4975A, deep #A86B2E, wash #3D2A17 in the estate colour tokens), set apart from Manifold's copper. No product is silently made Aion-blue, and purple is not used.
 - ADR-011 — An identity is registered, active, suspended or retired — An identity is in one of four states: registered (exists in the directory, no grants, no credential handle, may not act), active (may act within its grants), suspended (kept whole, grants kept but not effective) and retired (permanent, history kept, never reactivated; a new identity is made instead). Register, activate, suspend, reinstate and retire are the only transitions, each one signed audit record naming the authenticated actor and their provenance, the identity, from, to, when and reason. Having a grant or a credential is a fact beside the state, not a state. A person is registered by first sign-in; an agent is registered by a signed-in person, who carries it as its responsible person for life and may cause every transition of their own agents. Source: docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:71-95.
+- ADR-021 — The Rauthy client themes are dark only from the estate tokens, and every field the estate names no token for is a named gap — Both client themes are dark only. A Rauthy field takes an estate token only where the estate names the same role: the dark text takes text, bg takes ink, bg_high takes raised and accent takes the client's product accent. Every other field is a gap that keeps Rauthy's own default: light mode, the error colour, the radius, and the dark text_high, action, btn_text, theme_sun and theme_moon, eight in all, listed by name in deploy/identity/theme-map.md. Rejected: mapping text to muted, which would set the body of every page in the secondary colour; and choosing colours for the fields the estate names no token for.
 
 ## Goals
 
@@ -86,10 +87,12 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `docs/design/directory/briefs/DIRECTORY-005.md` | rendered markdown | DIRECTORY-001 |
 | `Cargo.toml` | workspace manifest; gains the identity dependencies (DIRECTORY-002) and the directory crates (DIRECTORY-003) | DIRECTORY-002 |
 | `Cargo.lock` | lock file; follows Cargo.toml (DIRECTORY-002, DIRECTORY-003) | DIRECTORY-002 |
-| `crates/lys/Cargo.toml` | the CLI crate's manifest; gains the identity subcommand's dependencies | DIRECTORY-002 |
+| `crates/lys/Cargo.toml` | the CLI crate's manifest; gains the identity subcommand's dependencies and the test = false [[test]] entries of the identity targets | DIRECTORY-002 |
 | `crates/lys/src/main.rs` | the CLI entry; dispatches lys identity | DIRECTORY-002 |
 | `crates/lys/src/cli.rs` | the CLI arguments; gains the identity subcommand | DIRECTORY-002 |
 | `crates/lys/src/commands/error.rs` | the CLI error type; carries the identity errors | DIRECTORY-002 |
+| `.land/gates.sh` | the landing gate; gains the identity leg: container_runtime_missing when no runtime answers, then clippy and the test = false identity targets | DIRECTORY-002 |
+| `CLAUDE.md` | gates before any commit; gains one line naming both acts of the identity leg | DIRECTORY-002 |
 | `crates/lys/src/identity/mod.rs` | declarations and re-exports only | DIRECTORY-002 |
 | `crates/lys/src/identity/cli.rs` | identity subcommand argument declarations | DIRECTORY-002 |
 | `crates/lys/src/identity/config.rs` | typed deployment configuration and validation; no secret values in diagnostics | DIRECTORY-002 |
@@ -101,6 +104,11 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `crates/lys/src/identity/themes.rs` | reads the declared estate palette mapping and validates both client themes | DIRECTORY-002 |
 | `crates/lys/src/identity/health.rs` | named readiness checks for the declared services; SpiceDB readiness only | DIRECTORY-002 |
 | `crates/lys/src/identity/error.rs` | typed errors carrying operation, resource and path, never secret bytes | DIRECTORY-002 |
+| `crates/lys/src/identity/config_tests.rs` | unit tests of config.rs | DIRECTORY-002 |
+| `crates/lys/src/identity/credentials_tests.rs` | unit tests of credentials.rs, the Debug and Display redaction included | DIRECTORY-002 |
+| `crates/lys/src/identity/error_tests.rs` | unit tests of error.rs, the Debug and Display redaction included | DIRECTORY-002 |
+| `crates/lys/src/identity/prepare_tests.rs` | unit tests of prepare.rs, the private files' modes included | DIRECTORY-002 |
+| `crates/lys/src/identity/themes_tests.rs` | unit tests of themes.rs | DIRECTORY-002 |
 | `crates/lys/tests/identity_deploy.rs` | ID001_DEPLOY | DIRECTORY-002 |
 | `crates/lys/tests/identity_refusals.rs` | ID001_DEPLOY_REFUSAL | DIRECTORY-002 |
 | `crates/lys/tests/identity_theme.rs` | ID001_THEME | DIRECTORY-002 |
@@ -177,7 +185,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 
 ## Constraints
 
-- **CN1** — Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed.
+- **CN1** — Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed. The ledger entries the method keeps for a brief, its roadmap row in docs/design/roadmap.json and its decision in docs/design/decisions.json, stand outside this wall.
 - **CN2** — Development isolation: rows 02 to 05 use only disposable test identities and test provider registrations; no production tokens, real business sign-in or live Cambium participant migration.
 - **CN3** — Every path written in a document of this cluster is relative to the repository root, whatever directory a session starts in; a command runs from its own tree and spells its paths from there.
 - **CN4** — No structure row or files entry carries a root token; a file in another repository is named in a requirement's spec with its owner.

@@ -50,7 +50,8 @@
     "ADR-008",
     "ADR-009",
     "ADR-010",
-    "ADR-011"
+    "ADR-011",
+    "ADR-021"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -193,7 +194,7 @@
     },
     {
       "path": "crates/lys/Cargo.toml",
-      "note": "the CLI crate's manifest; gains the identity subcommand's dependencies",
+      "note": "the CLI crate's manifest; gains the identity subcommand's dependencies and the test = false [[test]] entries of the identity targets",
       "brief": "DIRECTORY-002"
     },
     {
@@ -209,6 +210,16 @@
     {
       "path": "crates/lys/src/commands/error.rs",
       "note": "the CLI error type; carries the identity errors",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": ".land/gates.sh",
+      "note": "the landing gate; gains the identity leg: container_runtime_missing when no runtime answers, then clippy and the test = false identity targets",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "CLAUDE.md",
+      "note": "gates before any commit; gains one line naming both acts of the identity leg",
       "brief": "DIRECTORY-002"
     },
     {
@@ -264,6 +275,31 @@
     {
       "path": "crates/lys/src/identity/error.rs",
       "note": "typed errors carrying operation, resource and path, never secret bytes",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/config_tests.rs",
+      "note": "unit tests of config.rs",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/credentials_tests.rs",
+      "note": "unit tests of credentials.rs, the Debug and Display redaction included",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/error_tests.rs",
+      "note": "unit tests of error.rs, the Debug and Display redaction included",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/prepare_tests.rs",
+      "note": "unit tests of prepare.rs, the private files' modes included",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/themes_tests.rs",
+      "note": "unit tests of themes.rs",
       "brief": "DIRECTORY-002"
     },
     {
@@ -614,7 +650,7 @@
   "constraints": [
     {
       "id": "CN1",
-      "text": "Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed."
+      "text": "Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed. The ledger entries the method keeps for a brief, its roadmap row in docs/design/roadmap.json and its decision in docs/design/decisions.json, stand outside this wall."
     },
     {
       "id": "CN2",
