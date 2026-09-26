@@ -1,5 +1,5 @@
 {
-  "id": "HOME-008",
+  "id": "HOME-010",
   "cluster": "home",
   "title": "LanternData carries lit_in, the light act records it, recall reports it and the fork reads the typed field",
   "depends_on": [
@@ -166,17 +166,17 @@
     {
       "id": "R6",
       "title": "Document lit_in in the record, the README and the fork proof, and render the cluster",
-      "spec": "Structural. `docs/design/home/RECORD.md`'s `lys.lantern` bullet lists `{point, note, lit_by, lit_at, lit_in}` and states that `lit_in` is the id of the session the light act appended the lantern to, absent from a lantern lit before HOME-008; its Forks section states that a lantern with no `lit_in` resolves by its holders and a present `lit_in` that is not a session id is refused `lit_in_not_a_session`. The `lys.lantern` row of the lys-home README's custom-entry table lists `lit_in`. `docs/design/home/PROOF-FORK.md` keeps its measured sentence that the light act on the measured tree records no `lit_in` byte for byte, and gains a note directly after it that from HOME-008 the light act records `lit_in`, and that lanterns lit before it, as those measured, resolve by the older-record rule. `HOME-008.md`, `DESIGN.md`, `CHECKLIST.md` and `USER-STORIES.md` are rendered from their JSON with `scripts/design/render-brief.py` and `scripts/design/render-cluster.py`. THE SYSTEM SHALL NOT rewrite any measured figure, hash, command or result in PROOF-FORK.md, and SHALL NOT edit any rendered markdown by hand.",
+      "spec": "Structural. `docs/design/home/RECORD.md`'s `lys.lantern` bullet lists `{point, note, lit_by, lit_at, lit_in}` and states that `lit_in` is the id of the session the light act appended the lantern to, absent from a lantern lit before HOME-010; its Forks section states that a lantern with no `lit_in` resolves by its holders and a present `lit_in` that is not a session id is refused `lit_in_not_a_session`. The `lys.lantern` row of the lys-home README's custom-entry table lists `lit_in`. `docs/design/home/PROOF-FORK.md` keeps its measured sentence that the light act on the measured tree records no `lit_in` byte for byte, and gains a note directly after it that from HOME-010 the light act records `lit_in`, and that lanterns lit before it, as those measured, resolve by the older-record rule. `HOME-010.md`, `DESIGN.md`, `CHECKLIST.md` and `USER-STORIES.md` are rendered from their JSON with `scripts/design/render-brief.py` and `scripts/design/render-cluster.py`. THE SYSTEM SHALL NOT rewrite any measured figure, hash, command or result in PROOF-FORK.md, and SHALL NOT edit any rendered markdown by hand.",
       "acceptance": [
         "`grep -c 'point, note, lit_by, lit_at, lit_in' docs/design/home/RECORD.md` prints `1`.",
         "`grep -c 'lit_in_not_a_session' docs/design/home/RECORD.md` prints at least `1`.",
         "The README line beginning `| \\`lys.lantern\\`` contains `lit_in`.",
-        "`git diff` of `docs/design/home/PROOF-FORK.md` deletes no line, and the added lines contain `HOME-008` and `lit_in`.",
+        "`git diff` of `docs/design/home/PROOF-FORK.md` deletes no line, and the added lines contain `HOME-010` and `lit_in`.",
         "`sh scripts/design/gate.sh` exits 0."
       ],
       "files": {
         "create": [
-          "docs/design/home/briefs/HOME-008.md"
+          "docs/design/home/briefs/HOME-010.md"
         ],
         "modify": [
           "docs/design/home/RECORD.md",
@@ -205,7 +205,7 @@
     "SHALL NOT change the Claude Code render or its derived uuids (ADR-016), and SHALL NOT render a lantern into a resume file (C30).",
     "SHALL NOT put a note, epilogue words or any transcript content in a refusal, a report, a log line, a test name or a proof document; only recall prints notes and epilogues (ADR-015).",
     "SHALL NOT mark or filter in recall a lantern copied into a fork's child, and SHALL NOT re-measure PROOF-FORK on a real session.",
-    "SHALL NOT add a file beyond HOME-008.md."
+    "SHALL NOT add a file beyond HOME-010.md."
   ],
   "verification": [
     "From the repository root: `python3 scripts/design/validate.py docs/design/home` and `python3 scripts/design/check-coverage.py docs/design/home` exit 0.",

@@ -123,17 +123,17 @@ The words ask for lit_in to become a real, typed part of a lantern. LanternData 
 
 ### The smallest complete shape
 
-One card, HOME-008 on the Lys board as 0a59xZFp. LanternData gains lit_in, modelled so that null and non-string values keep their named lit_in_not_a_session refusals. light() writes the lighting session's id. Recall rows carry lit_in. fork_cut.rs reads the typed field and drops the raw-Value stopgap, with the lead's ruling on missing lit_in applied and tested. L2 in both fork fixtures is lit with the light act. The key-set tests are updated to the new shape. RECORD.md, the README and PROOF-FORK's stale line are corrected. ADR-019, C45 onward and S24 onward are added, and every gate passes, including scripts/design/gate.sh.
+One card, HOME-010 on the Lys board as 0a59xZFp. LanternData gains lit_in, modelled so that null and non-string values keep their named lit_in_not_a_session refusals. light() writes the lighting session's id. Recall rows carry lit_in. fork_cut.rs reads the typed field and drops the raw-Value stopgap, with the lead's ruling on missing lit_in applied and tested. L2 in both fork fixtures is lit with the light act. The key-set tests are updated to the new shape. RECORD.md, the README and PROOF-FORK's stale line are corrected. ADR-019, C45 onward and S24 onward are added, and every gate passes, including scripts/design/gate.sh.
 
 ## The roadmap row
 
 - **RM-018** — LanternData carries lit_in, the light act records it, recall reports it and the fork reads the typed field (feature, idea)
 - Summary: A lantern records the session it was lit in. LanternData gains an optional lit_in; the light act writes it as the id of the session it appends the lantern to and prints it in its report; recall rows carry it beside point, note and lit_by, null for a lantern lit before it; and HOME-006's fork reads the typed field in place of the raw-data stopgap, with L2 in both fork fixtures lit by the light act. A lantern with no lit_in stays an older record resolved by its holders (ADR-017), and a present lit_in that is not a session id is refused lit_in_not_a_session, never read as any session (ADR-029).
 - Asked by: tom on 2026-09-27T07:17:00+10:00
-- Context: The Lys board card 0a59xZFp that HOME-006's third amendment names as the closer of the lit_in gap, surveyed on lys main after HOME-006 landed (PR 19, amendment 3 at 1756688). The lead's answers settled that a lantern with no lit_in keeps the holder rule rather than being refused (correcting the request's 'as it is today'), that lit_in is optional and shows as null in recall for an earlier lantern, that the fork fixtures keep hand-written only the lanterns the light act cannot produce, that the two key-set pins are updated to include lit_in, that the light report prints lit_in, and that recall refuses a lantern whose lit_in is present and not a session id as lit_in_not_a_session with the fork's four reason texts. HOME-008 carries those answers.
+- Context: The Lys board card 0a59xZFp that HOME-006's third amendment names as the closer of the lit_in gap, surveyed on lys main after HOME-006 landed (PR 19, amendment 3 at 1756688). The lead's answers settled that a lantern with no lit_in keeps the holder rule rather than being refused (correcting the request's 'as it is today'), that lit_in is optional and shows as null in recall for an earlier lantern, that the fork fixtures keep hand-written only the lanterns the light act cannot produce, that the two key-set pins are updated to include lit_in, that the light report prints lit_in, and that recall refuses a lantern whose lit_in is present and not a session id as lit_in_not_a_session with the fork's four reason texts. HOME-010 carries those answers.
 - Quote: The lantern's typed data does not carry lit_in and the light act does not record it, so HOME-006's fork reads lit_in from the entry's raw data as a stopgap and the fixtures write L2 by hand. This card makes the typed field the shape. LanternData gains lit_in, the session that held the point when the lantern was lit; the light act records it at the head of the session holding the point; recall reports it beside point, note and lit_by. The fork in HOME-006 reads the typed field and its hand-written fixtures light L2 with the light act instead. A lantern record without lit_in, or with a lit_in that is not a session id, is refused by name as it is today, never read as any session. Ordered after HOME-006 lands. Acceptance: a lantern lit with the light act recalls with lit_in equal to the lighting session; the fork's fixtures contain no hand-written lantern entry; the two lit_in refusals keep their tests; the existing lantern and fork tests keep passing; ADR, checklist and user story rows renumbered past HOME-006's.
-- Cluster: home; briefs: HOME-008
-- Notes: Ordered after HOME-006 (RM-010), which is on main at 1756688, so no roadmap dependency is written and the card starts on the current main. Ids: the brief is HOME-008 as the brief method named it; RM-018, ADR-029, C71 to C76 and S32 to S34 are the next after main's highest and every open brief branch's (RM-017 and ADR-028 on brief/directory/lifecycle-hand, C70 and S31 on brief/home/9e701467), under the ruling that RM-016 records; HOME-008 is also held on brief/home/5898fcb0, so a refresh renumbers whichever lands second. Further units, not written: Re-measure PROOF-FORK on a real session whose lanterns carry lit_in; Recall tells a lantern lit here from a copy carried in by a fork; Retire the older-record holder rule once no lantern without lit_in remains.
+- Cluster: home; briefs: HOME-010
+- Notes: Ordered after HOME-006 (RM-010), which is on main at 1756688, so no roadmap dependency is written and the card starts on the current main. Ids: the brief is HOME-010 as the brief method named it; RM-018, ADR-029, C71 to C76 and S32 to S34 are the next after main's highest and every open brief branch's (RM-017 and ADR-028 on brief/directory/lifecycle-hand, C70 and S31 on brief/home/9e701467), under the ruling that RM-016 records; HOME-010 is also held on brief/home/5898fcb0, so a refresh renumbers whichever lands second. Further units, not written: Re-measure PROOF-FORK on a real session whose lanterns carry lit_in; Recall tells a lantern lit here from a copy carried in by a fork; Retire the older-record holder rule once no lantern without lit_in remains.
 
 ## The design
 
@@ -325,8 +325,8 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `crates/lys-home/src/harness/claude_code/seed.rs` | the seed prompt of a carried user message: the marker line, the text parts, the seed argument for the template's launch line | HOME-006 |
 | `crates/lys-home/tests/fork.rs` | the fork run as the binary: five forks and five refusals, blocks unchanged, both ancestry sides | HOME-006 |
 | `docs/design/home/PROOF-FORK.md` | the measured fork: Pi's parentSession read, a real session forked, rendered and launched, as hashes, counts and exit codes | HOME-006 |
-| `docs/design/home/briefs/HOME-008.json` | the lit-in brief: LanternData's lit_in, recorded by the light act, reported by recall and read by the fork | HOME-008 |
-| `docs/design/home/briefs/HOME-008.md` | its rendered markdown | HOME-008 |
+| `docs/design/home/briefs/HOME-010.json` | the lit-in brief: LanternData's lit_in, recorded by the light act, reported by recall and read by the fork | HOME-010 |
+| `docs/design/home/briefs/HOME-010.md` | its rendered markdown | HOME-010 |
 
 ## Inventory
 
@@ -1969,12 +1969,12 @@ Complete the section of docs/design/home/PROOF-RESUME.md that R3 adds with: the 
 
 ---
 type: brief
-id: HOME-008
+id: HOME-010
 cluster: home
 title: LanternData carries lit_in, the light act records it, recall reports it and the fork reads the typed field
 ---
 
-# HOME-008: LanternData carries lit_in, the light act records it, recall reports it and the fork reads the typed field
+# HOME-010: LanternData carries lit_in, the light act records it, recall reports it and the fork reads the typed field
 
 > **Cluster:** home
 > **Depends on:** HOME-004, HOME-006
@@ -2126,17 +2126,17 @@ In `fixture_home` of `record/fork_cut_tests.rs`, `L2` is lit with `light(&home, 
 
 ### R6: Document lit_in in the record, the README and the fork proof, and render the cluster
 
-Structural. `docs/design/home/RECORD.md`'s `lys.lantern` bullet lists `{point, note, lit_by, lit_at, lit_in}` and states that `lit_in` is the id of the session the light act appended the lantern to, absent from a lantern lit before HOME-008; its Forks section states that a lantern with no `lit_in` resolves by its holders and a present `lit_in` that is not a session id is refused `lit_in_not_a_session`. The `lys.lantern` row of the lys-home README's custom-entry table lists `lit_in`. `docs/design/home/PROOF-FORK.md` keeps its measured sentence that the light act on the measured tree records no `lit_in` byte for byte, and gains a note directly after it that from HOME-008 the light act records `lit_in`, and that lanterns lit before it, as those measured, resolve by the older-record rule. `HOME-008.md`, `DESIGN.md`, `CHECKLIST.md` and `USER-STORIES.md` are rendered from their JSON with `scripts/design/render-brief.py` and `scripts/design/render-cluster.py`. THE SYSTEM SHALL NOT rewrite any measured figure, hash, command or result in PROOF-FORK.md, and SHALL NOT edit any rendered markdown by hand.
+Structural. `docs/design/home/RECORD.md`'s `lys.lantern` bullet lists `{point, note, lit_by, lit_at, lit_in}` and states that `lit_in` is the id of the session the light act appended the lantern to, absent from a lantern lit before HOME-010; its Forks section states that a lantern with no `lit_in` resolves by its holders and a present `lit_in` that is not a session id is refused `lit_in_not_a_session`. The `lys.lantern` row of the lys-home README's custom-entry table lists `lit_in`. `docs/design/home/PROOF-FORK.md` keeps its measured sentence that the light act on the measured tree records no `lit_in` byte for byte, and gains a note directly after it that from HOME-010 the light act records `lit_in`, and that lanterns lit before it, as those measured, resolve by the older-record rule. `HOME-010.md`, `DESIGN.md`, `CHECKLIST.md` and `USER-STORIES.md` are rendered from their JSON with `scripts/design/render-brief.py` and `scripts/design/render-cluster.py`. THE SYSTEM SHALL NOT rewrite any measured figure, hash, command or result in PROOF-FORK.md, and SHALL NOT edit any rendered markdown by hand.
 
 **Acceptance:**
 - `grep -c 'point, note, lit_by, lit_at, lit_in' docs/design/home/RECORD.md` prints `1`.
 - `grep -c 'lit_in_not_a_session' docs/design/home/RECORD.md` prints at least `1`.
 - The README line beginning `| \`lys.lantern\`` contains `lit_in`.
-- `git diff` of `docs/design/home/PROOF-FORK.md` deletes no line, and the added lines contain `HOME-008` and `lit_in`.
+- `git diff` of `docs/design/home/PROOF-FORK.md` deletes no line, and the added lines contain `HOME-010` and `lit_in`.
 - `sh scripts/design/gate.sh` exits 0.
 
 **Files:**
-- create: docs/design/home/briefs/HOME-008.md
+- create: docs/design/home/briefs/HOME-010.md
 - modify: docs/design/home/RECORD.md
 - modify: crates/lys-home/README.md
 - modify: docs/design/home/PROOF-FORK.md
@@ -2160,7 +2160,7 @@ Structural. `docs/design/home/RECORD.md`'s `lys.lantern` bullet lists `{point, n
 - SHALL NOT change the Claude Code render or its derived uuids (ADR-016), and SHALL NOT render a lantern into a resume file (C30).
 - SHALL NOT put a note, epilogue words or any transcript content in a refusal, a report, a log line, a test name or a proof document; only recall prints notes and epilogues (ADR-015).
 - SHALL NOT mark or filter in recall a lantern copied into a fork's child, and SHALL NOT re-measure PROOF-FORK on a real session.
-- SHALL NOT add a file beyond HOME-008.md.
+- SHALL NOT add a file beyond HOME-010.md.
 
 ## Verification
 

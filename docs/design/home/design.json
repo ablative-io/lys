@@ -653,14 +653,14 @@
       "brief": "HOME-006"
     },
     {
-      "path": "docs/design/home/briefs/HOME-008.json",
+      "path": "docs/design/home/briefs/HOME-010.json",
       "note": "the lit-in brief: LanternData's lit_in, recorded by the light act, reported by recall and read by the fork",
-      "brief": "HOME-008"
+      "brief": "HOME-010"
     },
     {
-      "path": "docs/design/home/briefs/HOME-008.md",
+      "path": "docs/design/home/briefs/HOME-010.md",
       "note": "its rendered markdown",
-      "brief": "HOME-008"
+      "brief": "HOME-010"
     }
   ],
   "inventory": [
