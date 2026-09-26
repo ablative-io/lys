@@ -8,7 +8,10 @@
 //! block is dropped and named by hash in the loss account beside the file. A
 //! compaction becomes Claude Code's `summary` record. Custom entries (the lys
 //! ones included) and labels do not render. An existing target path is
-//! refused by name and nothing is written.
+//! refused by name and nothing is written. The report carries the launch
+//! line, `claude --resume '<path>'`, and for a child forked at a user
+//! message the seed file written beside the rendered file and the line that
+//! passes it as the first prompt ([`super::seed`]); the line is never run.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -18,6 +21,7 @@ use serde_json::{Value, json};
 use sha1::{Digest, Sha1};
 
 use crate::error::HomeError;
+use crate::harness::claude_code::seed::{resume_line, seed_of, seed_path, write_seed};
 use crate::harness::claude_code::{API, PROVIDER, projects_slug};
 use crate::record::blocks::{Hash, hex_of};
 use crate::record::entries::{CUSTOM_AUTHORED, EntryBody};
@@ -69,6 +73,12 @@ pub struct RenderReport {
     pub authored: bool,
     /// Canon examples placed before the session's own entries.
     pub inherited: u64,
+    /// The launch line: the rendered file resumed by path, with the seed as
+    /// the first prompt when there is one. Printed, never run.
+    pub launch: String,
+    /// The seed file written beside the rendered file, for a child forked
+    /// at a user message; `None` otherwise.
+    pub seed: Option<PathBuf>,
 }
 
 /// The default place for a session file: Claude Code's own directory for the
@@ -111,6 +121,13 @@ pub fn render_claude_code(
         entries.extend(canon.entries);
     }
     entries.extend(session.context_path()?);
+    let seed = seed_of(session, &entries)?;
+    let seed_file = seed.as_ref().map(|_| seed_path(&path));
+    if let Some(file) = &seed_file
+        && file.exists()
+    {
+        return Err(HomeError::Exists { path: file.clone() });
+    }
     let authored = entries.iter().any(|e| e.is_custom(CUSTOM_AUTHORED));
     let mut records: Vec<Value> = Vec::new();
     let mut losses: Vec<Loss> = Vec::new();
@@ -253,6 +270,10 @@ pub fn render_claude_code(
         serde_json::to_vec_pretty(&account).unwrap_or_default(),
     )
     .map_err(|e| HomeError::io("writing the loss account", &loss_path, e))?;
+    if let (Some(seed), Some(file)) = (&seed, &seed_file) {
+        write_seed(file, seed)?;
+    }
+    let launch = resume_line(&path, seed_file.as_deref());
     Ok(RenderReport {
         path,
         loss_path,
@@ -262,6 +283,8 @@ pub fn render_claude_code(
         dropped: losses.len() as u64,
         authored,
         inherited,
+        launch,
+        seed: seed_file,
     })
 }
 

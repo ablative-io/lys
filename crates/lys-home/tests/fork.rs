@@ -51,6 +51,7 @@ type Gate = Result<(), Box<dyn Error>>;
 /// The ids the fixture's lanterns were lit under.
 struct Lanterns {
     l5: String,
+    l6: String,
     l1: String,
 }
 
@@ -226,10 +227,10 @@ fn fixture_home(dir: &Path) -> Result<(PathBuf, Lanterns), Box<dyn Error>> {
     }
     let home_arg = root.to_str().ok_or("a UTF-8 path")?;
     let l5 = light(home_arg, PARENT, "e5")?;
-    light(home_arg, PARENT, "e6")?;
+    let l6 = light(home_arg, PARENT, "e6")?;
     let l1 = light(home_arg, PARENT, "e1")?;
     light(home_arg, COMPACTED, "e5")?;
-    Ok((root, Lanterns { l5, l1 }))
+    Ok((root, Lanterns { l5, l6, l1 }))
 }
 
 fn lines_of_code(file: &str) -> Result<usize, Box<dyn Error>> {
@@ -292,5 +293,107 @@ fn fork_prints_one_report_and_refuses_by_name_with_nothing_on_stdout() -> Gate {
         }
     }
     assert!(lines_of_code(concat!(env!("CARGO_MANIFEST_DIR"), "/src/cli.rs"))? <= 500);
+    Ok(())
+}
+
+const TEMPLATE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/launch/template.json"
+);
+const UUID: &str = "00000000-0000-4000-8000-000000000006";
+
+/// `render-launch` on a session of the home, with HOME a fresh directory
+/// and the process's own config directory out of the environment, so the
+/// given record depends on nothing of this machine.
+fn render_launch(
+    home: &str,
+    session: &str,
+    out: &Path,
+    user_home: &Path,
+) -> Result<Output, Box<dyn Error>> {
+    Ok(Command::new(BIN)
+        .env("HOME", user_home)
+        .env_remove("CLAUDE_CONFIG_DIR")
+        .args([
+            "render-launch",
+            "--home",
+            home,
+            "--session",
+            session,
+            "--template",
+            TEMPLATE,
+            "--uuid",
+            UUID,
+            "--cwd",
+            "/fixture",
+            "--model",
+            "claude-fixture",
+            "--version",
+            "2.1.283",
+            "--out",
+            out.to_str().ok_or("a UTF-8 path")?,
+        ])
+        .output()?)
+}
+
+fn template_line(out: &Path) -> String {
+    format!(
+        "claude --resume {o}/{UUID}.jsonl --fork-session --mcp-config {o}/mcp.json --settings {o}/env.json --append-system-prompt-file {o}/instructions.md --strict-mcp-config",
+        o = out.display()
+    )
+}
+
+#[test]
+fn render_launch_prints_the_template_line_with_the_seed_as_the_first_prompt() -> Gate {
+    let dir = tempfile::tempdir()?;
+    let (home, lanterns) = fixture_home(dir.path())?;
+    let home_arg = home.to_str().ok_or("a UTF-8 path")?;
+    let user_home = dir.path().join("h");
+    std::fs::create_dir(&user_home)?;
+    let mut launches = 0;
+    for (lantern, seeded) in [(&lanterns.l6, true), (&lanterns.l5, false)] {
+        let forked = one_object(&lys_home(&[
+            "fork",
+            "--home",
+            home_arg,
+            "--lantern",
+            lantern,
+        ])?)?;
+        let child = forked["report"]["child"]
+            .as_str()
+            .ok_or("a child")?
+            .to_owned();
+        let out = dir.path().join(format!("out-{launches}"));
+        std::fs::create_dir(&out)?;
+        let report = one_object(&render_launch(home_arg, &child, &out, &user_home)?)?;
+        let files = report["files"].as_array().ok_or("files")?;
+        let seed = out.join(format!("{UUID}.seed.txt"));
+        if seeded {
+            assert_eq!(
+                report["launch"],
+                json!(format!(
+                    "{} \"$(cat '{}')\"",
+                    template_line(&out),
+                    seed.display()
+                ))
+            );
+            assert_eq!(files.len(), 6);
+            assert_eq!(files[5]["path"], json!(seed));
+            assert_eq!(report["render"]["seed"], json!(seed));
+            assert!(seed.is_file());
+        } else {
+            assert_eq!(report["launch"], json!(template_line(&out)));
+            assert_eq!(files.len(), 5);
+            assert_eq!(report["render"]["seed"], Value::Null);
+            assert!(!seed.exists());
+        }
+        assert_eq!(report["render"]["records"], 4);
+        let text = serde_json::to_string(&report)?;
+        for sentinel in SENTINELS {
+            assert!(!text.contains(sentinel));
+        }
+        launches += 1;
+    }
+    assert_eq!(launches, 2);
     Ok(())
 }

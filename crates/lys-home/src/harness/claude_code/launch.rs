@@ -7,8 +7,9 @@
 //! under the session's lock; each of the five target files is refused by path
 //! if it exists; the template is stored (R3); the session head hash is taken
 //! (R4); the session is rendered with its loss account (R2); the MCP file, the
-//! environment file (R6) and the instructions file are written; the five files
-//! are hashed; the manifest block is stored; the documents the session is
+//! environment file (R6) and the instructions file are written; the five files,
+//! and the seed file when the render wrote one (HOME-006 R6), are hashed; the
+//! manifest block is stored; the documents the session is
 //! given are resolved (HOME-003 R4); the event is appended (R5) and the
 //! `lys.given` entry under it; the report is returned.
 //! Nothing runs: the launch line is text in the report (ADR-007). `--out` is
@@ -30,6 +31,7 @@ use crate::harness::claude_code::events::{ManifestFile, RenderManifest, template
 use crate::harness::claude_code::given::{CONFIG_DIR_VARIABLE, ConfigDir, resolve_given};
 use crate::harness::claude_code::launch_env::{write_env_file, write_new};
 use crate::harness::claude_code::render::{RenderTarget, render_claude_code};
+use crate::harness::claude_code::seed::seed_argument;
 use crate::harness::claude_code::template::{Template, read_template};
 use crate::record::blocks::Hash;
 use crate::record::entries::{CUSTOM_HARNESS_EVENT, EntryBody};
@@ -118,10 +120,14 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
     write_new(&mcp_file, &with_newline(mcp_bytes))?;
     write_env_file(&template, &env)?;
     write_new(&instructions, template.instructions.as_bytes())?;
-    let mut files = Vec::with_capacity(5);
-    for path in [&rendered, &loss, &mcp_file, &env, &instructions] {
+    let mut written: Vec<&Path> = vec![&rendered, &loss, &mcp_file, &env, &instructions];
+    if let Some(seed) = &render.seed {
+        written.push(seed);
+    }
+    let mut files = Vec::with_capacity(written.len());
+    for path in written {
         files.push(ManifestFile {
-            path: path.clone(),
+            path: path.to_path_buf(),
             sha256: hash_file(path)?.as_str().to_owned(),
         });
     }
@@ -151,7 +157,14 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
         data: Some(event.data()?),
     })?;
     let given_id = given.append_under(&mut session, &event_id)?;
-    let launch = launch_line(&template, &rendered, &mcp_file, &env, &instructions);
+    let launch = launch_line(
+        &template,
+        &rendered,
+        &mcp_file,
+        &env,
+        &instructions,
+        render.seed.as_deref(),
+    );
     Ok(json!({
         "command": "render-launch",
         "template": stored.hash.as_str(),
@@ -177,7 +190,8 @@ fn environment_names(template: &Template) -> Vec<String> {
 }
 
 /// The launch line: the rendered file resumed by path with `--fork-session`,
-/// the three files, then the template's flags in order. Never run here.
+/// the three files, then the template's flags in order, then the seed as
+/// the first prompt when the render wrote one. Never run here.
 #[must_use]
 pub fn launch_line(
     template: &Template,
@@ -185,6 +199,7 @@ pub fn launch_line(
     mcp: &Path,
     env: &Path,
     instructions: &Path,
+    seed: Option<&Path>,
 ) -> String {
     let mut words: Vec<String> = vec![
         "claude".to_owned(),
@@ -199,6 +214,9 @@ pub fn launch_line(
         shell_word(&instructions.display().to_string()),
     ];
     words.extend(template.flags.iter().map(|flag| shell_word(flag)));
+    if let Some(seed) = seed {
+        words.push(seed_argument(seed));
+    }
     words.join(" ")
 }
 

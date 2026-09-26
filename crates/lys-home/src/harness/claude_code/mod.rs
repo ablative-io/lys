@@ -39,6 +39,9 @@ mod paths_tests;
 pub mod render;
 #[cfg(test)]
 mod render_tests;
+pub mod seed;
+#[cfg(test)]
+mod seed_tests;
 pub mod template;
 #[cfg(test)]
 mod template_tests;
