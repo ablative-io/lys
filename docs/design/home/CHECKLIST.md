@@ -30,3 +30,13 @@
 ## The handover
 
 - [ ] **C13** — At compaction or retirement the outgoing session's letter to its successor, with its real thinking, becomes the successor's first entry as lys.inherited; it is never authored and replays only to the same provider, api and model; seeded against plain is measured on a card.
+
+## Moving a home
+
+- [ ] **C14** — Ship commits exactly a home's session files, their index and head files and its blocks store in the home's own git repository, pushes that commit as one ref to the remote named on the command line, and reports the commit, the ref and every lock or temporary file it left behind.
+- [ ] **C15** — Ship refuses by name a home in which any session's index is missing or stale, names the index step that fixes it and writes nothing; a session without a head file ships as it is, and the source home's files are byte-identical before and after every ship.
+- [ ] **C16** — A separate index subcommand rebuilds a session's missing or stale index, after which the same ship command runs unchanged and succeeds.
+- [ ] **C17** — Ship refuses by name every file in the home that is not a home file, and every place a tracked file holds a value from the credential values file named on the command line or matches one of five standard credential patterns, giving the file and the byte offset and never the value; nothing is redacted.
+- [ ] **C18** — Fetch brings the shipped ref into a new directory and refuses by name one that already holds a home; the fetched tree equals the shipped tree, so the session file, index, head and blocks hash-match the source, and every index is verified against its file and every head against its index.
+- [ ] **C19** — After the tree check, each fetched session gains exactly one appended lys.harness_event of kind arrival naming the source commit, the remote, the ref and a fresh execution id; the source session file is a byte prefix of the target's, the blocks still hash-match, and the index and head are the ones Session::append wrote for that entry.
+- [ ] **C20** — The fetched home is rendered through the Claude Code launch template and resumed by its printed launch line on the Claude Code installed when the proof runs, its version recorded, written up in PROOF-SHIP.md in hashes, lengths, counts and paths only.

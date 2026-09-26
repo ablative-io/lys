@@ -38,6 +38,8 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 - ADR-001 — Secrets are held behind a handle the door swaps for the credential — A seat holds a short-lived handle bound to its identity. The real credential sits in the door's encrypted store and never leaves the server. The door's proxy checks SpiceDB, swaps the handle for the credential, forwards the call and writes one audit line. Built in Rust inside the door; no OpenBao unless credentials minted on demand are later needed.
 - ADR-003 — Everything is pegged to a human authority — A person signs in first; an agent is provisioned under that person with its own identity; the person's permissions are the ceiling and the agent holds an explicit subset; every grant says who may exercise it and who may pass it on; withdrawing the authority stops every grant derived from it. The exact delegation schema is not settled by this decision.
 - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
+- ADR-007 — The product starts an agent by giving its start command, never by running it — The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.
+- ADR-012 — A home moves as a pushed git ref that the target fetches, and the target records its own execution id and ancestry — A home moves by the same route as a build tree: its tracked files are committed in the home's own git repository and pushed as one ref to a remote named on the command line, and the target fetches that ref into a new home. This over a hand copy (cp, rsync or an archive carried between directories), which leaves no commit to name, no tree hash to check the arrival against and no ancestry. The target mints its own execution id and records its arrival (source commit, remote, ref and execution id) in each session; source artifacts are never rewritten, and credentials are supplied at launch on the target, never tracked in the home.
 
 ## Goals
 
@@ -47,14 +49,16 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 - A written loss account for every derived record: what a render or translation preserved, transformed and could not carry.
 - The canon, one curated versioned series of short examples each showing a rule lived, seeds every new session, and its effect is measured on a card against a plain start.
 - A handover letter from an outgoing session seeds its successor as inherited memory, with the model's own thinking intact, and the effect is measured on a card against a plain start.
+- A home shipped as one git ref to a named remote, only when every index is fresh, every file is a home file and no named credential value or standard credential pattern is in it, and fetched into an isolated second home on the same machine; the fetched tree equals the source's, each session then carries one appended arrival event with the source commit and a fresh execution id, and the home is rendered through the Claude Code launch template and resumed on the installed Claude Code with its version and the measurement written down.
 
 ## Non-Goals
 
 - Anchoring, signing or receipts into a lys log (CONTEXT-ROADMAP stage 6; when asked for). — Signing comes when asked for (Tom, 22 September 16:27); every stage here works without it.
-- Encryption at rest and moving a home between devices (stage 3 preconditions). — Stage 3's three preconditions (identity and read authority, encryption before bytes leave, the resume evidence) are their own brief.
+- Encryption at rest, and moving a home between devices beyond the same-machine proof of HOME-004 (stage 3 second block and later). — The second block waits on its two preconditions, read authority over the home from the directory step and encryption before bytes leave the machine from the secrets step, each a card on its own board; HOME-004 takes only the same-machine block, and its shipped ref is what the second block fetches.
 - Harnesses other than Claude Code, and Chat Completions or Responses translation beyond keeping the raw call bytes. — One harness proved first; each other harness is its own profile and its own measurement.
 - Lanterns and forks at a coordinate (stages 5 and 5b). — Lanterns and forks stand on a proved resume; this brief supplies that proof.
 - Adopting, wrapping or calling Norn's session code; Pi's code is read as the reference and not vendored. — Tom, Dot 13:28: not Norn. Pi's tree is the reference.
+- Any transport for a home other than a git ref pushed to a named remote. — Stage 3 moves a home by the same route as a build tree, a pushed ref the target fetches, never a hand copy (ADR-012).
 
 ## Structure
 
@@ -105,6 +109,32 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `crates/lys-home/src/proxy/stream_tests.rs` | the three grammars, partial streams | HOME-001 |
 | `crates/lys-home/src/proxy/link_tests.rs` | linking by the measured key; unlinked; never inferred | HOME-001 |
 | `crates/lys-home/src/proxy/journal_tests.rs` | recovery after a kill: one lost record per open call | HOME-001 |
+| `docs/design/home/briefs/HOME-004.json` | the brief that ships a home as a git ref, fetch it into a second home with an arrival event, and the same-machine resume proof | HOME-004 |
+| `docs/design/home/briefs/HOME-004.md` | its rendered markdown | HOME-004 |
+| `docs/design/home/DESIGN.md` | the cluster design rendered from design.json | HOME-004 |
+| `docs/design/home/CHECKLIST.md` | the checklist rendered from checklist.json | HOME-004 |
+| `docs/design/home/USER-STORIES.md` | the stories rendered from stories.json | HOME-004 |
+| `crates/lys-home/src/record/verify.rs` | read-only check of a session's index against its file and its head against its index; a missing head is legal; never rebuilds or writes | HOME-004 |
+| `crates/lys-home/src/record/verify_tests.rs` | the read-only check's tests: stale index, missing index, missing head, head naming no entry, nothing written | HOME-004 |
+| `crates/lys-home/src/record/mod.rs` | declares the verify module | HOME-004 |
+| `crates/lys-home/src/error.rs` | named refusals for ship and fetch: stale index naming the index step, head mismatch, unshippable files, occupied target, a git step that failed | HOME-004 |
+| `crates/lys-home/src/ship/mod.rs` | module declarations only: git, scan, push, fetch, arrival, cli | HOME-004 |
+| `crates/lys-home/src/ship/git.rs` | the git binary run with system and global config, hooks, signing, line-ending conversion and prompts shut off | HOME-004 |
+| `crates/lys-home/src/ship/git_tests.rs` | the git runner's tests: the machine's git configuration ignored, a failed push refused by name without git's output | HOME-004 |
+| `crates/lys-home/src/ship/scan.rs` | sorts a home's files into tracked, left behind and foreign, and scans the tracked ones for the named credential values and the five standard credential patterns, by file and offset | HOME-004 |
+| `crates/lys-home/src/ship/scan_tests.rs` | the classification and scan tests: the three sets, one hit at its offset, a test per pattern, the excluded shapes not matched, no value in any report | HOME-004 |
+| `crates/lys-home/src/ship/push.rs` | ship: lock every session, check every index, classify and scan, commit exactly the tracked set in the home's own repository, push one ref | HOME-004 |
+| `crates/lys-home/src/ship/fetch.rs` | fetch: refuse an occupied target, fetch one ref, check the tree and every index and head | HOME-004 |
+| `crates/lys-home/src/ship/arrival.rs` | the arrival lys.harness_event: source commit, remote without userinfo, ref, execution id | HOME-004 |
+| `crates/lys-home/src/ship/arrival_tests.rs` | the arrival tests: the byte prefix, the index row and head, one execution id per fetch, userinfo removed, the 512-byte cap | HOME-004 |
+| `crates/lys-home/src/ship/cli.rs` | the ship, fetch and index subcommand arguments and their JSON reports | HOME-004 |
+| `crates/lys-home/src/cli.rs` | the ship, fetch and index subcommands joined to the command enum, delegating to ship/cli.rs | HOME-004 |
+| `crates/lys-home/src/main.rs` | a refused ship or fetch prints its JSON report and exits 1 | HOME-004 |
+| `crates/lys-home/src/lib.rs` | declares the ship module | HOME-004 |
+| `crates/lys-home/tests/ship_fetch.rs` | ship to a bare remote in a temporary directory and fetch into a second home: tree equality, the byte prefix after the arrival, source byte-identity, the refusals, the index step, the fixture secret | HOME-004 |
+| `docs/design/home/RECORD.md` | the git-backed home: its tracked set, what is left behind and refused, the ref, the index step and the arrival kind of lys.harness_event | HOME-004 |
+| `crates/lys-home/README.md` | what ship, fetch and index do and do not do | HOME-004 |
+| `docs/design/home/PROOF-SHIP.md` | the measured same-machine move: ship, fetch, render through the launch template and resume on the installed Claude Code with its version recorded, hashes, lengths, counts and paths only | HOME-004 |
 
 ## Inventory
 

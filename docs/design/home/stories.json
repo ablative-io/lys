@@ -59,7 +59,7 @@
         },
         {
           "id": "S11",
-          "text": "As the reviewer, I want a home with a stale index refused by name and pointed at the step that fixes it rather than repaired and shipped, every file that is not a home file refused, and every named credential value found in the home refused by file and offset, so that what leaves a home is exactly its record and nothing secret."
+          "text": "As the reviewer, I want a home with a stale index refused by name and pointed at the step that fixes it rather than repaired and shipped, every file that is not a home file refused, and every named credential value and standard credential pattern found in the home refused by file and offset, so that what leaves a home is exactly its record and nothing secret."
         }
       ]
     }

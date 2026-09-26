@@ -116,7 +116,7 @@
         },
         {
           "id": "C17",
-          "text": "Ship refuses by name every file in the home that is not a home file, and every place a tracked file holds a value from the credential values file named on the command line, giving the file and the byte offset and never the value; nothing is redacted.",
+          "text": "Ship refuses by name every file in the home that is not a home file, and every place a tracked file holds a value from the credential values file named on the command line or matches one of five standard credential patterns, giving the file and the byte offset and never the value; nothing is redacted.",
           "done": false
         },
         {
@@ -131,7 +131,7 @@
         },
         {
           "id": "C20",
-          "text": "The fetched home is rendered through the Claude Code launch template and resumed by its printed launch line on Claude Code 2.1.281, written up in PROOF-SHIP.md in hashes, lengths, counts and paths only.",
+          "text": "The fetched home is rendered through the Claude Code launch template and resumed by its printed launch line on the Claude Code installed when the proof runs, its version recorded, written up in PROOF-SHIP.md in hashes, lengths, counts and paths only.",
           "done": false
         }
       ]

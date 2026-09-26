@@ -10,6 +10,8 @@
 
 **S8.** As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
 
+**S9.** As an agent, I want my home shipped as a ref and fetched into a second home where my session is rendered and resumed, so that I move by the same route as a build tree and never by a hand copy.
+
 ## Tom — Owns the platform and reads what a session was given
 
 **S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
@@ -21,3 +23,7 @@
 ## Reviewer — Checks the proofs before anything relies on them
 
 **S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S10.** As the reviewer, I want the fetched tree checked equal to the shipped one before anything is appended, and each fetched session then to hold the source's bytes followed by one arrival event naming its source commit and a fresh execution id, so that a moved home's ancestry is on the record and nothing was rewritten.
+
+**S11.** As the reviewer, I want a home with a stale index refused by name and pointed at the step that fixes it rather than repaired and shipped, every file that is not a home file refused, and every named credential value and standard credential pattern found in the home refused by file and offset, so that what leaves a home is exactly its record and nothing secret.
