@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,33 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-018",
+      "title": "Canonicalise every lys.given path before it is recorded or compared",
+      "status": "idea",
+      "kind": "fix",
+      "summary": "The lys.given context record stores each document's path as the resolver built it, and given-check compares paths as written, so one file reached through a symlinked directory, a `..` path or a trailing-slash config directory records as a different path and given-check reports a difference that is not one. Every absolute path is canonicalised before it is recorded or compared (a document by its parent with its own name kept), the written files stay out-relative, a path that does not exist is kept as given and named unresolved in the given and given-check reports, the rule is stated in RECORD.md, and a fixture test proves the three shapes record and compare as one path.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T07:12:00+10:00",
+        "quote": "The lys.given entry records each document's path as the resolver found it, so /var and /private/var, a path with .. in it, and a path with a trailing slash record as different documents though they are one file, and given-check reports a difference that is not one. Every path is canonicalised before it is recorded or compared, the rule is stated in RECORD.md, and a fixture test proves the three shapes record and compare as one path; a path that cannot be canonicalised because it does not exist is recorded as given and named as unresolved, never dropped. Found by Waffles reviewing lys PR 16. Not in scope: the slug rule, which is its own requirement.",
+        "context": "A review of lys PR 16, which merged the lys.given context record (HOME-003, RM-007); the lead answered the survey's six questions."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-012",
+          "ADR-013",
+          "ADR-029"
+        ],
+        "briefs": [
+          "HOME-008"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Further units, not written: The slug rule under a canonical working directory; Canonical paths in the other home records (fork parentSession, the render manifest's files, render-launch --out). The chain walks the canonical working directory while the slug takes it as given, so the two may see different forms of one directory; that is a question for the slug rule's own requirement. Ids are the next after main's and every open brief branch's highest, checked against origin's brief branches on 2026-09-27: RM-018, ADR-029, C71 to C77, S32 and S33, CN12; the brief id HOME-008 was given with the card, and brief/home/5898fcb0 also holds a HOME-008 (the rendered-uuid rule)."
     }
   ]
 }

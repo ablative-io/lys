@@ -325,6 +325,25 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-029",
+      "title": "Every lys.given path is canonicalised before it is recorded or compared, a document at its link position",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's answers to the canonical-path survey; recorded with HOME-008",
+      "context": "lys.given records each document's path as the resolver built it and given-check compares paths as written, so /var and /private/var, a path with `..` and a config directory with a trailing slash record as different documents though they are one file, and given-check reports a difference that is not one. Homes already hold lys.given entries written before any rule, with paths in those shapes.",
+      "decision": "Every absolute path is canonicalised before it is recorded or compared: the config directory and the working directory (before the chain is walked) whole, a document by its parent directory canonicalised and its own final name kept, so a symlinked document is recorded where the harness loaded it from. The two written files stay relative to the render's out directory, the exemption. A path that cannot be canonicalised because it does not exist is recorded as given and named unresolved in the given and given-check reports; the entry's data is unchanged. given-check canonicalises both the listed path and the argument at check time. The memory index's slug keeps the working directory as given. Rejected: resolving a document's final component (the record would name a symlink's target rather than the load position); canonicalising the written files (two renders would stop giving equal lists); an unresolved field in the entry's data (it would change a shape homes already hold, ADR-013); canonicalising only new input at check time (records written before the rule would stop matching); and canonicalising the working directory for the slug (the slug rule is its own requirement).",
+      "quote": "",
+      "consequences": [
+        "RECORD.md states the rule, the exemption, the link-position rule and the unresolved marker.",
+        "Existing records are not rewritten; they compare by canonicalisation at check time.",
+        "A canonicalisation failure other than a path not existing is refused by path and operation.",
+        "The chain and the slug may see different forms of one working directory until the slug rule's own requirement settles it."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
