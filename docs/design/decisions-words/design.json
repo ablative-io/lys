@@ -1,0 +1,219 @@
+{
+  "cluster": "decisions-words",
+  "title": "Decision ledger in the team's words",
+  "intention": "The decision ledger is repository canon, and repository canon holds no person's words and nothing personal. When this is done a reader of docs/design/decisions.json finds every decision stated in the team's own plain words: the quote of each decision is one declarative sentence of what was decided, and the context, decision and consequences name roles rather than people, times of day or personal machines, while what was decided, why, and what it obliges stay exactly as they were ruled.\n\nThe ledger is cited by every brief that anchors a decision, so a restatement that shifts a decision's meaning would shift every review that checks against it. The intent is a change of voice, never a change of substance: the smallest edit that removes what is personal and leaves the ruling intact.",
+  "problem": "Nine decisions in docs/design/decisions.json carry a person's spoken words in their quote field: ADR-001 to ADR-008 and ADR-011, three of them joined with ellipses and one naming a person inside the words. ADR-005 to ADR-008 also name a person, with times of day, in their context, and ADR-005 and ADR-008 name that person in their decision or consequences, including a personal machine. That breaks the canon rule that repository canon holds no person's words and nothing personal. ADR-009 and ADR-010 have already been brought to the rule in their quotes (586ef5f4) and are the pattern. Every brief that anchors one of these decisions projects the ledger row into its stage prompts, so the personal content travels into every run that cites it.",
+  "solution": "One document change to docs/design/decisions.json, delivered by DECISIONSWORDS-001 and nothing else.\n\nThe quote of each of ADR-001 to ADR-008 and ADR-011 is replaced by one declarative sentence of that decision, written in the team's words in the form ADR-009 and ADR-010 already take: no speaker, no time of day, no first person and no ellipsis, restating only what the decision field already records (P1). The quote field stays present and non-empty, because the schema keeps it required and the words ask for a plain statement (CN1).\n\nIn ADR-005 to ADR-008 only what is personal in the context, decision and consequences changes: a named person becomes the operator, a time of day tied to that person is dropped while its date stays, what the person said or hoped becomes the need it stated, and the personal machine becomes the operator's workstation (P2). Every other sentence of those fields, and every source, stays byte for byte.\n\nBecause the gate compares every cluster's committed markdown with what its JSON renders to, and a rendered design or brief carries the decision field of each ADR it cites, the change to ADR-005's decision field alters the rendered markdown that cites ADR-005: docs/design/directory/DESIGN.md, the DIRECTORY-001, DIRECTORY-002 and DIRECTORY-006 briefs, and this cluster's own DESIGN.md and brief. Those files are re-rendered with scripts/design/render-cluster.py, never edited by hand, so the gate stays green (CN5).\n\nEvery other field of every decision, the order and number of decisions, and the file's serialisation stay as they are at 7b53625, so the diff touches only the changed lines plus the ledger's updated date (CN2, CN3). The ledger is validated by scripts/design/gate.sh against scripts/design/schemas/decisions.schema.json, which this work does not touch (CN4, CN5).\n\nThe same spoken words also sit in docs/design/identity/STATEMENT-2026-09-22.md and docs/design/identity/CONTEXT-ROADMAP-2026-09-22.md, which are dated records carried by a separate card; the personal content in ADR-009, ADR-010 and ADR-011's other fields and in every row's decided_by is left as it is.",
+  "principles": [
+    {
+      "id": "P1",
+      "text": "A restated quote says only what the row's decision field already says: no nuance added, no rejected road dropped, no new claim."
+    },
+    {
+      "id": "P2",
+      "text": "Only what is personal changes. A named person becomes the operator, a time of day tied to that person goes, a person's saying or hoping becomes the need it stated, and a personal machine becomes the operator's workstation; everything else stays byte for byte."
+    },
+    {
+      "id": "P3",
+      "text": "The diff is the review surface: the ledger keeps its exact serialisation so that every changed line is one the brief names."
+    }
+  ],
+  "decisions": [
+    "ADR-001",
+    "ADR-002",
+    "ADR-003",
+    "ADR-004",
+    "ADR-005",
+    "ADR-006",
+    "ADR-007",
+    "ADR-008",
+    "ADR-009",
+    "ADR-010",
+    "ADR-011"
+  ],
+  "goals": [
+    "Every committed markdown file under docs/design/directory and docs/design/decisions-words equals what scripts/design/render-cluster.py renders from the changed ledger.",
+    "The quote of each of ADR-001 to ADR-008 and ADR-011 in docs/design/decisions.json is one declarative sentence with no speaker, time of day, first person or ellipsis.",
+    "No context, decision or consequence of ADR-005 to ADR-008 contains its row's decided_by value or a time of day.",
+    "git diff --numstat 7b53625 -- docs/design/decisions.json on the build's commit reports 17 lines added and 17 removed.",
+    "sh scripts/design/gate.sh exits 0 with docs/design/decisions.json changed."
+  ],
+  "non_goals": [
+    {
+      "text": "Bring docs/design/identity/STATEMENT-2026-09-22.md and docs/design/identity/CONTEXT-ROADMAP-2026-09-22.md to the canon rule.",
+      "reason": "They are dated records of their own, carried by a separate card the lead files."
+    },
+    {
+      "text": "Reword the description of quote in scripts/design/schemas/decisions.schema.json.",
+      "reason": "The schema is copied from the design-system method, and the words rule out a schema change here; any rewording lands in the method first."
+    },
+    {
+      "text": "Change the context, decision or consequences of ADR-001 to ADR-004, ADR-009, ADR-010 or ADR-011.",
+      "reason": "The lead's ruling limits the personal-content change to ADR-005 to ADR-008 and leaves ADR-009 and ADR-010 untouched."
+    },
+    {
+      "text": "Change the decided_by field of any decision.",
+      "reason": "The words keep every field but the quote, and the lead's ruling names only context, decision and consequences of ADR-005 to ADR-008."
+    },
+    {
+      "text": "Add a Sources clause to ADR-001 to ADR-008.",
+      "reason": "The words keep the sources exactly as they are."
+    }
+  ],
+  "structure": [
+    {
+      "path": "docs/design/decisions.json",
+      "note": "The project decision ledger; the quotes of nine rows and the personal content of ADR-005 to ADR-008 are restated here",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/directory/DESIGN.md",
+      "note": "Rendered from docs/design/directory/design.json; its ADR-005 line carries ADR-005's decision",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-001.md",
+      "note": "Rendered brief; its design anchor carries ADR-005's decision",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-002.md",
+      "note": "Rendered brief; its design anchor carries ADR-005's decision",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-006.md",
+      "note": "Rendered brief; its design anchor carries ADR-005's decision",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/decisions-words/DESIGN.md",
+      "note": "Rendered from this cluster's design.json when the brief lands; its ADR-005 line carries ADR-005's decision",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/decisions-words/briefs/DECISIONSWORDS-001.md",
+      "note": "Rendered from this brief when it lands; its design anchor carries ADR-005's decision",
+      "brief": ""
+    }
+  ],
+  "inventory": [
+    {
+      "path": "docs/design/decisions.json",
+      "note": "18 decisions under {project, updated, decisions}, updated 2026-09-26. ADR-001 to ADR-008 and ADR-011 hold spoken words in quote; ADR-009 and ADR-010 hold plain statements; ADR-012 to ADR-018 hold empty quotes. Serialised exactly as json.dump(indent=2, ensure_ascii=False) plus a trailing newline."
+    },
+    {
+      "path": "scripts/design/schemas/decisions.schema.json",
+      "note": "Twelve required fields per decision, quote among them, additionalProperties false; copied from the design-system method. Its description of quote still speaks of verbatim words."
+    },
+    {
+      "path": "scripts/design/gate.sh",
+      "note": "The design leg: validates decisions.json and project.json, then validates, checks coverage of and compares the render of every cluster with a design.json. Exits 0 at 7b53625."
+    },
+    {
+      "path": "scripts/design/validate.py",
+      "note": "Validates a document against the schema its file name maps to and refuses an absolute path in a document."
+    },
+    {
+      "path": "docs/design/identity/STATEMENT-2026-09-22.md",
+      "note": "Dated record holding the spoken words of four of the restated quotes; outside this cluster."
+    },
+    {
+      "path": "docs/design/identity/CONTEXT-ROADMAP-2026-09-22.md",
+      "note": "Dated record holding the spoken words of one restated quote; outside this cluster."
+    }
+  ],
+  "constraints": [
+    {
+      "id": "CN1",
+      "text": "scripts/design/schemas/decisions.schema.json is unchanged; every decision keeps a quote field holding a non-empty string."
+    },
+    {
+      "id": "CN2",
+      "text": "docs/design/decisions.json holds 18 decisions, ADR-001 to ADR-018 in that order, with no decision added, removed, renumbered or superseded."
+    },
+    {
+      "id": "CN3",
+      "text": "docs/design/decisions.json is byte-identical to json.dumps(its parsed content, indent=2, ensure_ascii=False) followed by one newline."
+    },
+    {
+      "id": "CN4",
+      "text": "No code, script or crate changes in the build; the only files it changes are docs/design/decisions.json and the rendered markdown that scripts/design/render-cluster.py regenerates from it."
+    },
+    {
+      "id": "CN5",
+      "text": "sh scripts/design/gate.sh exits 0."
+    }
+  ],
+  "gate": [
+    {
+      "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
+      "legs": [
+        {
+          "name": "fmt",
+          "command": "cargo fmt --all",
+          "requires": [
+            "tool:cargo",
+            "tool:rustfmt"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy-all-features",
+          "command": "cargo clippy --all-targets --all-features -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy",
+          "command": "cargo clippy --all-targets -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "tests",
+          "command": "cargo test --workspace --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc-all-features",
+          "command": "cargo doc --no-deps --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc",
+          "command": "cargo doc --no-deps",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
+          "requires": [
+            "tool:sh",
+            "tool:python3"
+          ],
+          "cadence": "round"
+        }
+      ]
+    }
+  ]
+}

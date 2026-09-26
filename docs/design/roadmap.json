@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,39 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-017",
+      "title": "Restate the decision ledger's spoken quotes and personal content in the team's words",
+      "status": "idea",
+      "kind": "design",
+      "summary": "docs/design/decisions.json carries a person's spoken words in the quote of ADR-001 to ADR-008 and ADR-011, and names a person, times of day and a personal machine in the context, decision and consequences of ADR-005 to ADR-008. Each of the nine quotes becomes one plain statement of its decision in the team's words, in the form of ADR-009 and ADR-010, and in ADR-005 to ADR-008 only what is personal becomes a role. Every other field and every source stays as it is; documents only; scripts/design/gate.sh stays green.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T07:08:00+10:00",
+        "quote": "docs/design/decisions.json holds eight decisions (ADR-001 to ADR-008) whose quote field carries a person's words. The canon rule since 24 September: repository canon holds no person's words and nothing personal. Rewrite each quote as a plain statement of the decision in the team's words, keeping the decision, context, consequences and sources exactly as they are. ADR-009 and ADR-010 already read that way (lys PR 6, 586ef5f4) and are the pattern. Documents only; scripts/design/gate.sh must stay green (decisions.json validates against decisions.schema.json, which keeps the field required).",
+        "context": "The decisions-words card, surveyed at 7b53625. The lead's answers brought ADR-011's quote into this unit and ruled that the canon rule wins over keeping ADR-005 to ADR-008's context, decision and consequences exactly where the two meet; the identity STATEMENT and CONTEXT-ROADMAP records stay outside it."
+      },
+      "links": {
+        "cluster": "decisions-words",
+        "decisions": [
+          "ADR-001",
+          "ADR-002",
+          "ADR-003",
+          "ADR-004",
+          "ADR-005",
+          "ADR-006",
+          "ADR-007",
+          "ADR-008",
+          "ADR-011"
+        ],
+        "briefs": [
+          "DECISIONSWORDS-001"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Further units, not written: Bring docs/design/identity STATEMENT and CONTEXT-ROADMAP to the canon rule (a separate card the lead files); Reword the method's decisions.schema.json description of quote (the design-system method's own row). RM-004 is the earlier row carrying the same words; it is left unchanged. Id RM-017 is the next after RM-016, main's highest, with RM-011 to RM-015 taken on open brief branches."
     }
   ]
 }
