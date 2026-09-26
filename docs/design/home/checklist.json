@@ -281,7 +281,7 @@
       "items": [
         {
           "id": "C71",
-          "text": "A compact_boundary record followed by its isCompactSummary user record imports as a lys.harness_event for the boundary and one Pi compaction entry under the summary record's uuid, the child of the boundary's entry, whose firstKeptEntryId is the earliest in file order of compactMetadata.preservedMessages.uuids when that list is non-empty, and otherwise the first record whose parent is the summary record, and whose tokensBefore is compactMetadata.preTokens; the summary record is not a message entry.",
+          "text": "A compact_boundary record followed by its isCompactSummary user record imports as a lys.harness_event for the boundary and one Pi compaction entry under the summary record's uuid, the child of the boundary's entry, whose firstKeptEntryId is the earliest in file order of compactMetadata.preservedMessages.uuids when that list is non-empty, otherwise the first record whose parent is the summary record, and the empty string when there is none, so its context path is the compaction alone and the pair renders back, and whose tokensBefore is compactMetadata.preTokens; the summary record is not a message entry.",
           "done": false
         },
         {
@@ -296,7 +296,7 @@
         },
         {
           "id": "C74",
-          "text": "Directly after each compaction entry the importer appends one lys.loss custom entry whose parent is the compaction and whose data holds only ids, counts, byte counts and SHA-256 hashes, with the keys RECORD.md sets down.",
+          "text": "Directly after each compaction entry the importer appends one lys.loss custom entry whose parent is the compaction and whose data holds only ids, counts, byte counts and SHA-256 hashes, with the keys RECORD.md sets down, first_kept among them, null when nothing is kept.",
           "done": false
         },
         {
