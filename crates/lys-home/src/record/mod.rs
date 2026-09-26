@@ -34,6 +34,8 @@ pub mod entries;
 pub mod epilogue;
 #[cfg(test)]
 mod epilogue_tests;
+#[cfg(test)]
+mod fork_cut_tests;
 pub mod given;
 #[cfg(test)]
 mod given_tests;

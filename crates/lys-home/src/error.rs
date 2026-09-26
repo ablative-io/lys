@@ -329,6 +329,52 @@ pub enum HomeError {
         path: PathBuf,
     },
 
+    /// A lantern id was named that no session of the home holds as a
+    /// `lys.lantern` entry, an id of another kind of entry included.
+    #[error(
+        "no session of the home holds a lantern `{lantern}`; name the entry id a light report printed"
+    )]
+    NoSuchLantern {
+        /// The lantern id named.
+        lantern: String,
+    },
+
+    /// A lantern whose data carries no lit-in session is held by more than
+    /// one session, and none was named to cut from.
+    #[error(
+        "lantern_ambiguous: lantern `{lantern}` carries no lit-in session and is held by {}; name one of them with --session", sessions.join(", ")
+    )]
+    LanternAmbiguous {
+        /// The lantern id.
+        lantern: String,
+        /// Every session holding it, in ascending byte order.
+        sessions: Vec<String>,
+    },
+
+    /// A session was named to cut from that is not the one the lantern
+    /// records it was lit in.
+    #[error(
+        "lantern_not_lit_here: lantern `{lantern}` was lit in session {lit_in}, not in {session}; fork from {lit_in}, or leave --session out"
+    )]
+    LanternNotLitHere {
+        /// The lantern id.
+        lantern: String,
+        /// The session named.
+        session: String,
+        /// The session the lantern's data records it was lit in.
+        lit_in: String,
+    },
+
+    /// A lantern's point has no assistant message at or before it on its
+    /// chain, so there is nothing said yet to fork.
+    #[error(
+        "nothing_to_fork: lantern `{lantern}` sits before any assistant message; a fork carries what was said up to its point, and a point before the first reply would carry only a seed, which is a new session and not a fork"
+    )]
+    NothingToFork {
+        /// The lantern id.
+        lantern: String,
+    },
+
     /// A path that must be absolute is not: it would resolve against
     /// lys-home's own working directory, which is never the session's.
     #[error(

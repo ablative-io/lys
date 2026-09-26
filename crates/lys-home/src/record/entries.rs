@@ -30,6 +30,13 @@ pub const CUSTOM_LANTERN: &str = "lys.lantern";
 /// The custom type of an epilogue on a lantern: further words on its note,
 /// appended after it, never rewritten into it.
 pub const CUSTOM_LANTERN_EPILOGUE: &str = "lys.lantern_epilogue";
+/// The custom type of a fork's mark in the parent (HOME-006): one entry
+/// appended at the parent's head naming the child session cut from it.
+pub const CUSTOM_FORK: &str = "lys.fork";
+/// The custom type of a fork's ancestry in the child (HOME-006): the first
+/// entry the fork writes after the copied chain, naming the parent session,
+/// the lantern, the point and the cut.
+pub const CUSTOM_FORKED_FROM: &str = "lys.forked_from";
 
 /// What a `lys.lantern` entry carries in `custom.data`. `lit_by` is a
 /// self-declared name, as the canon's curator is, not a verified identity.
