@@ -325,6 +325,46 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-019",
+      "title": "The secrets broker lives in lys, as crates/lys-secrets; Cambium consumes it and is never its home (amends ADR-001)",
+      "status": "proposed",
+      "scope": "secrets",
+      "date": "2026-09-26",
+      "decided_by": "Proposed by the lead's answers to the secrets survey, recorded with SECRETS-003; it waits on Tom's word, because it amends ADR-001, which is his decision",
+      "context": "ADR-001 places the broker inside the door, built in Rust. SECRETS-002 named door-owned files in the cambium checkout while its design's CN4 refused to let those proposals make Cambium a required runtime, and left the broker's host open. Every code row's files wait on which repository they sit in, and ADR-004 requires every project to stand alone. This entry amends ADR-001 rather than superseding it: ADR-001's handle model stands, and only where the broker is built moves, so supersedes stays empty and ADR-001's text is unchanged.",
+      "decision": "The broker lives in the lys repository as the crate crates/lys-secrets, part of the standalone identity platform, built in Rust. A person installs Lys to hold secrets; Cambium reaches the broker through the door as a consumer and is never its home. Rejected: the broker inside the cambium door that ADR-001 and SECRETS-002 name, which would make Cambium a runtime a person must install to keep a credential.",
+      "quote": "",
+      "consequences": [
+        "Amends ADR-001's placement of the broker inside the door; ADR-001's handle model is unchanged and its entry is not edited.",
+        "The entry stays proposed until Tom gives his word, and then moves to decided with decided_by set to exactly ADR-001's decided_by value, `Tom`, and his word cited in its context; each code row's Blocked by check tests that equality.",
+        "Every SECRETS-003 code row's files sit in the lys repository, under crates/lys-secrets, and every code row carries Tom's word on this entry in its own Blocked by; if he keeps the broker inside the door, those rows' file lists are re-briefed as an amendment before any is dispatched.",
+        "CN4 of the secrets design is answered by this entry once it is decided; SECRETS-002's open reading of the host is closed by SECRETS-003 without editing SECRETS-002.",
+        "The cambium paths SECRETS-002 names are not walls for any row; no cambium file is edited for the broker."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-020",
+      "title": "A lease is a broker record under the audit log, not a signed format",
+      "status": "decided",
+      "scope": "secrets",
+      "date": "2026-09-26",
+      "decided_by": "The lead's answers to the secrets survey; recorded with SECRETS-003",
+      "context": "SECRETS-002 R9 puts a lease's time window in the signed delegation, but lys/delegation/v1 has no not_after by design (crates/lys-core/src/delegation/mod.rs:218-221), and DIRECTORY-006 R1 puts the time window in the lys-identity grant. A signed lease format would freeze wire bytes that strangers verify.",
+      "decision": "The lease is a broker record under the audit log: it counts uses, time and spend against a grant and is read only by the broker, so nothing a stranger verifies changes. The limit on a lease's time is the window of the lys-identity grant it counts against (DIRECTORY-006 R1): the lease's own not_after never extends past it. Rejected: a signed lease format, a new version beside lys/delegation/v1 with its own adversarial review; and reading the window as one the signed delegation keeps, which v1 cannot carry.",
+      "quote": "",
+      "consequences": [
+        "No new signed format and no new version beside lys/delegation/v1 is written for the lease.",
+        "v1's lack of not_after is recorded as a fact; the lys-identity grant's window is the limit a lease is checked against.",
+        "These criteria wait on the grant's window, defined by DIRECTORY-006 R1 and enforced at admission by DIRECTORY-006 R4: SECRETS-002 R9 acceptance criteria 5, 8 (SEC_LEASE_ATTENUATION) and 10 (SEC_PROVISIONAL_EXPIRY), SECRETS-002 R7 acceptance criterion 8 (SEC_REINSTATE_CURRENT's expired handle), and SECRETS-003 R3's lease-window refusal leg.",
+        "A window carried in a signed delegation stays open, as SECRETS-002 records it, and would be a new version alongside v1.",
+        "A lease a stranger verifies offline, if a later row needs one, is a new brief with its own adversarial review."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
