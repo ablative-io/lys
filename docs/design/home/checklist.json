@@ -286,7 +286,7 @@
         },
         {
           "id": "C46",
-          "text": "An unmeasured Codex version, an unnamed time zone, an unknown time zone and an existing rollout or account path are each refused by name before anything is written, with messages saying render for 0.156.0 or card a measurement of the new version, set TZ to an IANA name, and choose another --out.",
+          "text": "An unmeasured Codex version, an unnamed time zone, an unknown time zone, an existing rollout or account path and an entry stamp that is not RFC 3339 are each refused by name before anything is written, with messages saying render for 0.156.0 or card a measurement of the new version, set TZ to an IANA name, choose another --out and re-import the source file; the shared session-exists refusal of the other commands is unchanged.",
           "done": false
         },
         {
@@ -301,12 +301,12 @@
         },
         {
           "id": "C49",
-          "text": "The loss account lists kept, changed and lost rows by entry id and hash in walk order; a changed row names its before and after kinds and every field not carried or reshaped (a caller field, a one-item text array written as a string, an assistant turn's model, usage and stop reason); a lost row names its reason; the account carries no content.",
+          "text": "The loss account lists kept, changed and lost rows by entry id and hash in walk order; a changed row names its before and after kinds and every field not carried or reshaped (a caller field, a one-item text array written as a string, an assistant turn's model, usage and stop reason); a lost row names its reason; every entry off the context path that is not carried is a lost row, the harness events under a sidechain and the entries of a sidechain with no agent label among them; the account carries no content.",
           "done": false
         },
         {
           "id": "C50",
-          "text": "The rollout's session_meta holds only id, session_id, timestamp, cwd and cli_version, the thread id is record_uuid of the session head, and the first item is a developer message holding the in-band marker naming the source session as a fork, not that session.",
+          "text": "The rollout's session_meta holds only id, session_id, timestamp, cwd and cli_version, the thread id is record_uuid of the session head, and the first item is a developer message holding the in-band marker that names the source session id, the source head hash and the Codex version, declares the thread a fork and not that session, and carries no template hash.",
           "done": false
         },
         {
@@ -316,7 +316,7 @@
         },
         {
           "id": "C52",
-          "text": "The same session head translated into two fresh --out directories gives rollouts of equal SHA-256 and accounts of equal SHA-256.",
+          "text": "The same session head translated into two fresh --out directories gives rollouts of equal SHA-256, and the second account differs from the first only by the one lost row naming the first translation's side leaf.",
           "done": false
         },
         {
@@ -326,7 +326,7 @@
         },
         {
           "id": "C54",
-          "text": "PROOF-TRANSLATE.md records Codex 0.156.0 resuming the translated thread in a scratch Codex home and answering from its content, with the account's label, the start checks, the paths, hashes, counts and exit statuses, and no transcript text, email or credential.",
+          "text": "PROOF-TRANSLATE.md records Codex 0.156.0 resuming the translated thread in a scratch Codex home and answering from its content, and resuming a translated thread that holds an image, with the account's label, the start checks, the paths, the rollout's hash before and after the resume, the side leaf's rollout hash, counts and exit statuses, and no transcript text, email or credential.",
           "done": false
         },
         {
@@ -336,7 +336,12 @@
         },
         {
           "id": "C56",
-          "text": "A sidechain is carried as marked text under the entry it hangs from and counted changed; lanterns, harness events and other lys entries are listed lost by entry id; a child forked at a user message opens its rollout on that message as the first user prompt, counted changed.",
+          "text": "A sidechain is carried as marked text under the entry it hangs from and counted changed; lanterns, harness events and every other lys entry, render records included, are listed lost by entry id; a child forked at a user message opens its rollout on that message as the first user prompt, counted changed.",
+          "done": false
+        },
+        {
+          "id": "C57",
+          "text": "A base64 image part, in a user message or inside a tool result, is carried as Codex's input_image item with no detail key and counted changed, and Codex 0.156.0 is measured resuming a thread that holds one, with any detail value it needs taken from a rollout 0.156.0 wrote itself and named; an image of any other source is listed lost with its source type and part index and is never fetched.",
           "done": false
         }
       ]
