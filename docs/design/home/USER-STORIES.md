@@ -12,6 +12,12 @@
 
 **S9.** As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
 
+**S14.** As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+
+**S15.** As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
+
+**S16.** As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+
 ## Tom — Owns the platform and reads what a session was given
 
 **S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
@@ -31,3 +37,5 @@
 **S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
 
 **S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
