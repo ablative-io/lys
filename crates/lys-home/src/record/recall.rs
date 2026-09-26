@@ -13,7 +13,7 @@
 //! epilogues in file order. A session that cannot be read during recall by
 //! note is skipped and named with its reason, and every other session is
 //! still listed. A row carries the lantern's note and epilogues, the one
-//! text the crate prints (ADR-014), and never a line of the transcript.
+//! text the crate prints (ADR-015), and never a line of the transcript.
 
 use serde::{Deserialize, Serialize};
 

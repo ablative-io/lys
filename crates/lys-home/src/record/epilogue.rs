@@ -3,7 +3,7 @@
 //! An epilogue is a `lys.lantern_epilogue` custom entry appended as a child
 //! of the head of the lantern's own session, naming the lantern's entry id
 //! and carrying the further words byte for byte, who added them and when
-//! (ADR-013). The lantern entry and every earlier epilogue stay as they are;
+//! (ADR-014). The lantern entry and every earlier epilogue stay as they are;
 //! a lantern's story is its entry followed by its epilogues in file order.
 //! Entry ids are unique only within a session, so an epilogue is addressed
 //! by the session and the lantern's id together. Every refusal happens

@@ -2,7 +2,7 @@
 //!
 //! A lantern is a `lys.lantern` custom entry appended as a child of the
 //! session's head, carrying the point it marks, the note byte for byte as
-//! given, who lit it and when (ADR-013). The point may be any entry of the
+//! given, who lit it and when (ADR-014). The point may be any entry of the
 //! session that is not itself a lantern or an epilogue, the head or one the
 //! head has moved past. Lighting takes the session as its one owner and
 //! appends through the record's own path, so the line is durable before its

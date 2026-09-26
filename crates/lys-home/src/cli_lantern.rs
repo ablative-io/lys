@@ -3,7 +3,7 @@
 //! id, session, point and time, never the note; `epilogue` prints the
 //! epilogue's id, lantern, session, author, time and ordinal, never the
 //! words; `recall` prints the rows and the sessions skipped, and is the one
-//! command that prints a note or an epilogue (ADR-014). `--by` is a required
+//! command that prints a note or an epilogue (ADR-015). `--by` is a required
 //! argument, a self-declared name as `canon add`'s is, never read from the
 //! environment. A refusal is printed on stderr by the binary and exits 1;
 //! a missing or conflicting argument is refused by clap with exit code 2.
