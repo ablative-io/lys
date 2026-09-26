@@ -1,0 +1,392 @@
+{
+  "id": "HOME-008",
+  "cluster": "home",
+  "title": "Translate a session imported from Claude Code into a Codex 0.156.0 rollout with a loss account beside it",
+  "depends_on": [
+    "HOME-006",
+    "HOME-007"
+  ],
+  "blocked_by": [
+    "R10 and R11 only: a Codex account that can make requests, logged into a scratch Codex home by the person running the proof with Codex's own login act; every row before them lands on its own evidence without it."
+  ],
+  "checklist": [
+    "C45",
+    "C46",
+    "C47",
+    "C48",
+    "C49",
+    "C50",
+    "C51",
+    "C52",
+    "C53",
+    "C54",
+    "C55",
+    "C56"
+  ],
+  "stories": [
+    "S24",
+    "S25",
+    "S26",
+    "S27"
+  ],
+  "design_anchor": [
+    "ADR-001",
+    "ADR-007",
+    "ADR-012",
+    "ADR-014",
+    "ADR-016",
+    "ADR-018",
+    "ADR-019",
+    "ADR-020"
+  ],
+  "purpose": "The home's first translation to another harness, one named pair and one measured version: a session imported from Claude Code is rendered as a rollout in the shape Codex 0.156.0 writes and reads for its own threads, with every text part, tool call and tool result carried whole as Codex's own items, readable thinking carried as text and opaque blocks dropped (P3), and a JSON loss account beside it naming by entry id and hash what was kept, what changed and how, and what was lost and why. It improves on Codex's own importer of Claude Code files, which is a compaction and not a copy, and never adopts or calls it (ADR-019). The Codex thread is a fork of the session, never the same session: it announces itself in band, and its durable link back is the loss account and a side leaf on the session, which a Codex compaction cannot erase.",
+  "task": "Add a Codex profile beside the Claude Code one, crates/lys-home/src/harness/codex/, and a subcommand `lys-home translate-codex --home H --session S --out DIR --codex-version V --zone Z` in its own crates/lys-home/src/cli_translate.rs (cli.rs is 433 code lines against the 500-line cap, so it gains only the variant and its dispatch). `--out` is a Codex home directory: the rollout is written under it at Codex's own layout, sessions/YYYY/MM/DD/rollout-<local date and time>-<thread id>.jsonl, and the loss account beside it. The render walks the session's context path as the Claude Code render does (entry order, then part order), reads no clock and no random source, and derives the thread id as record_uuid of the session head (ADR-016, CN9), so each head makes a new Codex thread. **The Codex thread is a fork of the session and not the same session:** once Codex continues it, its turns never come home. The in-band marker says so, but a Codex compaction can erase it, so the durable link back is the loss account and the lys.translation side leaf the translation hangs beside the context path (ADR-012), which never moves the head, so the Claude Code render of the same session is unchanged by a byte. The item shape is the one measured from rollouts Codex writes on the machine the proof runs on; rollouts written by 0.155 on that machine are the starting point for the tool items, because the only 0.156.0 rollout there holds no tool item, and R10's recording is what decides: if it shows a shape R3 or R4 did not write, R10 corrects the render and every earlier test is run again. Codex's source checkout on the proving machine, older than 0.156.0, is never read as the shape. The Codex account: this brief names none of its own and never uses an account that sits at its usage limit; R10 and R11 run in a scratch Codex home, never the live one, with the login the person running the proof makes there by `codex login`; no step copies auth.json or any credential file (CN8, ADR-001). R10's recording and R11's resume are the last two rows and are the only ones that spend Codex requests; everything before them lands on its own evidence. Two things the words name are held back by open questions to the lead and are not in this brief: the render's template hash in the marker and the side leaf (no launch template exists for Codex, and the words put launching Codex through one out of scope), and the BlockNotStored refusal with the stored-block half of the caller case (the home entry holds each part as the importer mapped it, not its stored block's hash, so a render cannot reach the stored block without a change the words do not name). Until answered, the account's hash of a part is the SHA-256 of the part's bytes as the entry holds it, the rule the Claude Code render's loss account already uses, and a field the entry's part holds beyond what its Codex item carries (a caller field included) is counted as changed. Out of scope: Codex to Claude Code; adopting, wrapping or calling Codex's importer; Pi or any third harness; launching Codex through the launch template; Codex's thread index (state_5.sqlite, session_index.jsonl), which the render never writes; and any change to the Claude Code render or the importer.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Refuse an unmeasured Codex version, an unnamed or unknown time zone and an existing target, each naming the act that answers it",
+      "spec": "Add crates/lys-home/src/harness/codex/ (mod.rs holding only `pub mod` lines and `#[cfg(test)] mod` lines) and declare it in harness/mod.rs. In harness/codex/zone.rs define the measured version `0.156.0` and two checks. WHEN the Codex version given is not exactly `0.156.0`, THE SYSTEM SHALL refuse with HomeError::UnmeasuredCodexVersion, whose message is `Codex <version> has no measured rollout shape: render for 0.156.0 or card a measurement of the new version`. IF the zone given is absent, empty, or not an IANA-shaped name (one or more components of ASCII letters, digits, `_`, `+` and `-`, joined by single `/`, with no leading `/` or `:`), THEN THE SYSTEM SHALL refuse with HomeError::UnnamedTimeZone, whose message is `TZ <value> is not an IANA time zone name: set TZ to an IANA name`, with `<value>` the word `unset` when absent. IF the zone is IANA-shaped and not in the time zone database, THEN THE SYSTEM SHALL refuse with HomeError::UnknownTimeZone, whose message is `time zone <zone> is not in the time zone database: set TZ to an IANA name`. The zone resolves through the jiff crate with its bundled time zone database, added as a workspace dependency, so one zone name gives the same offsets on every machine. HomeError::Exists's message becomes `session file already exists: <path>; choose another --out`; no other variant's message changes. THE SYSTEM SHALL NOT read an environment variable in harness/codex/, SHALL NOT fall back to UTC or the machine's zone, SHALL NOT accept a version by prefix, and SHALL NOT write any file before each check has passed.",
+      "acceptance": [
+        "`cargo test -p lys-home --lib -- --exact harness::codex::zone_tests::version_other_than_measured_is_refused` prints `1 passed; 0 failed`; the test asserts the check of `0.157.0` displays exactly `Codex 0.157.0 has no measured rollout shape: render for 0.156.0 or card a measurement of the new version`, the check of `0.156` is refused with the same variant, and the check of `0.156.0` passes.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::zone_tests::unnamed_zone_is_refused` prints `1 passed; 0 failed`; the test asserts an absent zone displays exactly `TZ unset is not an IANA time zone name: set TZ to an IANA name`, and that `` (empty) and `:/etc/localtime` are each refused as UnnamedTimeZone.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::zone_tests::unknown_zone_is_refused` prints `1 passed; 0 failed`; the test asserts `Mars/Olympus` displays exactly `time zone Mars/Olympus is not in the time zone database: set TZ to an IANA name`.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::zone_tests::named_zone_resolves` prints `1 passed; 0 failed`; the test asserts the instant `2026-09-23T02:14:53.850Z` in zone `Australia/Sydney` is local `2026-09-23T12:14:53`, and that `UTC` resolves.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::zone_tests::exists_names_the_act` prints `1 passed; 0 failed`; the test asserts HomeError::Exists with path `a/b.jsonl` displays exactly `session file already exists: a/b.jsonl; choose another --out`.",
+        "`grep -rn 'std::env' crates/lys-home/src/harness/codex/` prints nothing."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/harness/codex/mod.rs",
+          "crates/lys-home/src/harness/codex/zone.rs",
+          "crates/lys-home/src/harness/codex/zone_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/error.rs",
+          "crates/lys-home/src/harness/mod.rs",
+          "crates/lys-home/Cargo.toml",
+          "Cargo.toml",
+          "Cargo.lock"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C46"
+      ],
+      "stories": [
+        "S26"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Define the loss account: kept, changed and lost rows by entry id and hash, and nothing of the content",
+      "spec": "In harness/codex/account.rs define the account written beside a rollout: a JSON object with exactly the keys `session` (the home session's id), `head` (the head entry's id), `thread` (the Codex thread id), `codex_version`, `kept`, `changed` and `lost`. A kept row has exactly `entry`, `hash`, `before` and `after`; a changed row has exactly `entry`, `hash`, `before`, `after` and `how`, where `how` names every field that was not carried or was reshaped, joined by `; `; a lost row has exactly `entry`, `hash`, `kind` and `reason`. `hash` is the SHA-256, lowercase hex, of serde_json::to_vec of the part (or of the tool-result message) as the home entry holds it, the rule the Claude Code render's loss account uses, and is null for a row about an entry rather than a part. Rows are in walk order. The account is written with create_new and synced before the translation reports. THE SYSTEM SHALL NOT write into the account any text, argument, output, summary, note, epilogue or seed, only ids, hashes, kind names, field names and the fixed reason words this brief gives, and SHALL NOT count a part as kept when any of its fields was not carried or was reshaped.",
+      "acceptance": [
+        "`cargo test -p lys-home --lib -- --exact harness::codex::account_tests::account_holds_the_three_lists` prints `1 passed; 0 failed`; the test builds an account with one row of each list and asserts its top-level keys are exactly `changed, codex_version, head, kept, lost, session, thread`, a kept row's keys exactly `after, before, entry, hash`, a changed row's exactly `after, before, entry, hash, how`, a lost row's exactly `entry, hash, kind, reason`, and a row about an entry has `hash` null.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::account_tests::part_hash_is_the_entry_bytes` prints `1 passed; 0 failed`; the test asserts the hash of the part `{\"type\":\"text\",\"text\":\"a\"}` is `a7be9c132fa673d4eb9460cf2601c67404000175f92f2a576610aec68877d516` (computed independently by `printf '%s' '{\"text\":\"a\",\"type\":\"text\"}' | shasum -a 256`)."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/harness/codex/account.rs",
+          "crates/lys-home/src/harness/codex/account_tests.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C49"
+      ],
+      "stories": [
+        "S25"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Carry each part whole as Codex's own item, thinking as text, and count what changed",
+      "spec": "In harness/codex/parts.rs map one message entry to Codex 0.156.0 response items and account rows. A user message's text parts, and string content, become one `message` item with role `user` and one `input_text` part per text, each text copied byte for byte; each is kept, before `text`, after `input_text`. An assistant message becomes items in part order: consecutive text and readable thinking parts form one `message` item with role `assistant` and one `output_text` part each; a toolCall part becomes one `function_call` item with `name`, `call_id` equal to the part's own id, and `arguments` equal to serde_json::to_string of the part's arguments, whole; a text part is kept, before `text`, after `output_text`; a toolCall is kept, before `toolCall`, after `function_call`. Every thinking part is treated as another provider's (the translation names no target model and the home's imported thinking is Anthropic's): readable thinking becomes an `output_text` part and is changed, before `thinking`, after `output_text`, with how `thinkingSignature not carried` when the part holds a signature and `thinking written as output_text` otherwise; redacted thinking is lost, reason `redacted thinking dropped: another provider`; thinking with no readable text is lost, reason `empty thinking dropped`. A toolResult entry becomes one `function_call_output` item with `call_id` equal to its toolCallId and `output` equal to its one text part's text as a string when its content is exactly one text part (how `content: one-item text array written as a string`), otherwise a list of `{\"type\":\"input_text\",\"text\":…}` for its text parts in order; it is one changed row keyed by the entry id and the hash of the toolResult message, before `toolResult`, after `function_call_output`, whose how also names `isError not carried`, `timestamp not carried` and `toolName not carried` for each of those keys the message holds. A part of any other kind (a user image, a tool-result image, an unknown assistant kind) is lost, reason `Codex has no item for kind <kind> in this render`. A part holding a field beyond those its item carries (text: type, text; toolCall: type, id, name, arguments; thinking: type, thinking, thinkingSignature, redacted), a caller field included, is changed instead of kept, how naming `<field> not carried` for each. Each user and assistant message entry whose message holds a key other than role and content gets one changed row with hash null, before `<role> message`, after `message item`, how naming `<key> not carried` for each such key in sorted order, so an assistant turn's model, usage and stop reason are named. THE SYSTEM SHALL NOT clip or summarise any text, argument or output, SHALL NOT write an `[external_agent_tool_call` or `[external_agent_tool_result` note, SHALL NOT write a `custom_tool_call`, a `reasoning` item or `encrypted_content`, SHALL NOT write a thinking signature or redacted data into an item, and SHALL NOT write an `id` key on any item.",
+      "acceptance": [
+        "`cargo test -p lys-home --lib -- --exact harness::codex::parts_tests::tool_call_becomes_function_call` prints `1 passed; 0 failed`; a toolCall `{\"type\":\"toolCall\",\"id\":\"toolu_1\",\"name\":\"Bash\",\"arguments\":{\"command\":\"ls\"}}` gives exactly `{\"type\":\"function_call\",\"name\":\"Bash\",\"arguments\":\"{\\\"command\\\":\\\"ls\\\"}\",\"call_id\":\"toolu_1\"}` and one kept row before `toolCall`, after `function_call`.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::parts_tests::caller_field_is_changed` prints `1 passed; 0 failed`; the same toolCall with `\"caller\":{\"type\":\"direct\"}` added gives the same item and one changed row with how exactly `caller not carried` and no kept row.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::parts_tests::one_item_result_is_a_string` prints `1 passed; 0 failed`; a toolResult message with toolCallId `toolu_1`, toolName `Bash`, content `[{\"type\":\"text\",\"text\":\"ok\"}]`, isError false and timestamp 1 gives exactly `{\"type\":\"function_call_output\",\"call_id\":\"toolu_1\",\"output\":\"ok\"}` and one changed row with how exactly `content: one-item text array written as a string; isError not carried; timestamp not carried; toolName not carried`.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::parts_tests::two_item_result_is_a_list` prints `1 passed; 0 failed`; content with text parts `a` then `b` gives `output` exactly `[{\"type\":\"input_text\",\"text\":\"a\"},{\"type\":\"input_text\",\"text\":\"b\"}]`.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::parts_tests::assistant_turn_fields_are_named` prints `1 passed; 0 failed`; an assistant message with keys role, content, api, provider, model, usage, stopReason and timestamp gives one row with hash null and how exactly `api not carried; model not carried; provider not carried; stopReason not carried; timestamp not carried; usage not carried`, and that row is in `changed`.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::parts_tests::thinking_is_text_and_opaque_is_lost` prints `1 passed; 0 failed`; a thinking part with thinking `t` and thinkingSignature `sig` gives an `output_text` part with text `t` and a changed row with how `thinkingSignature not carried`; a redacted thinking part gives no item and a lost row whose hash is the part's hash and whose reason is exactly `redacted thinking dropped: another provider`; the serialised items contain neither `sig` nor `encrypted_content`.",
+        "`grep -rnE 'custom_tool_call|encrypted_content|external_agent|truncat' crates/lys-home/src/harness/codex/parts.rs` prints nothing."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/harness/codex/parts.rs",
+          "crates/lys-home/src/harness/codex/parts_tests.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C47",
+        "C48",
+        "C49"
+      ],
+      "stories": [
+        "S24",
+        "S25"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Walk the context path and write the rollout at Codex's own layout, opening with the marker",
+      "spec": "In harness/codex/rollout.rs, WHEN a session is translated with an out directory, the Codex version and a zone, THE SYSTEM SHALL run R1's checks, then walk session.context_path() and write one rollout at `<out>/sessions/YYYY/MM/DD/rollout-YYYY-MM-DDTHH-MM-SS-<thread>.jsonl` and its account at the same path with `.jsonl` replaced by `.loss.json`, where `<thread>` is record_uuid(session id, head entry id) and the date and time are the head entry's own stamp in the given zone, seconds truncated. IF either path exists, THEN THE SYSTEM SHALL refuse with HomeError::Exists naming it and write nothing. IF an entry's stamp does not parse as RFC 3339, THEN THE SYSTEM SHALL refuse by name and write nothing. Every line is `{\"timestamp\",\"ordinal\",\"type\",\"payload\"}` with `ordinal` the 0-based line number. Line 0 is `session_meta` whose payload holds exactly `id` and `session_id` (both the thread id), `timestamp` (the head entry's stamp as recorded), `cwd` (the session header's cwd) and `cli_version` (the Codex version given). Line 1 is a `response_item` `message` with role `developer` and one `input_text` part holding exactly the marker `<TRANSLATED CONTEXT: THIS CODEX THREAD IS A FORK OF HOME SESSION {session id}, NOT THAT SESSION>`. Then each context-path entry in order: message entries through R3, with each line's `timestamp` the entry's own stamp; a compaction entry as one `developer` message whose text is `<COMPACTION SUMMARY <entry id>>`, a newline and the summary whole, counted changed with hash null, before `compaction`, after `marked text`; every other entry on the path (a custom entry, a label, a model change, a branch summary) as a lost row with hash null, `kind` its customType or its type, and reason `Codex has no item for it and it is not conversation`. The rollout is written with create_new and synced, then the account. THE SYSTEM SHALL NOT write model_provider, source, thread_source, history_mode, originator, base_instructions or any other key into session_meta; SHALL NOT write a turn_context, event_msg or any line kind other than session_meta and response_item; SHALL NOT read a clock or a random source; SHALL NOT write outside `<out>`; and SHALL NOT write Codex's thread index. IF R11 measures that Codex 0.156.0 cannot resume without one of those keys or line kinds, THEN R11 adds exactly that one and the account names it as a changed entry-level line with hash null, before `none` and after the key or line kind.",
+      "acceptance": [
+        "`cargo test -p lys-home --lib -- --exact harness::codex::rollout_tests::path_follows_codex_layout` prints `1 passed; 0 failed`; a session with id `s1` whose head entry `11111111-1111-4111-8111-111111111111` is stamped `2026-09-23T02:14:53.850Z`, translated with zone `Australia/Sydney` into out `o`, writes `o/sessions/2026/09/23/rollout-2026-09-23T12-14-53-11111111-1111-4111-8111-111111111111.jsonl` and `o/sessions/2026/09/23/rollout-2026-09-23T12-14-53-11111111-1111-4111-8111-111111111111.loss.json`.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::rollout_tests::session_meta_holds_five_keys` prints `1 passed; 0 failed`; line 0's payload keys are exactly `cli_version, cwd, id, session_id, timestamp`, and `grep -cE 'model_provider|thread_source|history_mode|originator'` on the rollout prints `0`.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::rollout_tests::marker_opens_the_thread` prints `1 passed; 0 failed`; line 1 is a `developer` message whose one `input_text` part is exactly `<TRANSLATED CONTEXT: THIS CODEX THREAD IS A FORK OF HOME SESSION s1, NOT THAT SESSION>`.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::rollout_tests::thread_id_is_record_uuid_of_head` prints `1 passed; 0 failed`; for a head entry id `h-r0` in session `s1` the thread id in the file name and in session_meta equals record_uuid(`s1`, `h-r0`), a string with version nibble 5.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::rollout_tests::ordinal_is_the_line_number` prints `1 passed; 0 failed`; every line's `ordinal` equals its 0-based line number, and every line's `type` is `session_meta` or `response_item`.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::rollout_tests::compaction_is_marked_text` prints `1 passed; 0 failed`; a compaction entry on the path gives one developer message whose text begins `<COMPACTION SUMMARY ` followed by the entry id, and one changed row before `compaction`, after `marked text`.",
+        "`grep -rnE 'fresh_id|rand::|now\\(|SystemTime|Instant|std::env' crates/lys-home/src/harness/codex/rollout.rs` prints nothing."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/harness/codex/rollout.rs",
+          "crates/lys-home/src/harness/codex/rollout_tests.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C50"
+      ],
+      "stories": [
+        "S24",
+        "S27"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Carry sidechains as marked text and a forked child's point as the first prompt, and list lys entries as lost",
+      "spec": "In harness/codex/beside.rs, for each label entry off the context path whose label begins `agent ` and whose parent is on the path, THE SYSTEM SHALL carry the sidechain it names (the label's target entry and the message entries descending from it, in file order) as one `developer` message placed directly after the items of the label's parent entry, whose text is the line `<SIDECHAIN <target id> UNDER ENTRY <parent id>>`, then for each of its message entries a line `[<role> <entry id>]` followed by its parts as lines: a text part and readable thinking whole, a toolCall as `[tool call <id> <name>] ` and its arguments as compact JSON, a toolResult as `[tool result <toolCallId>]` and then each of its text parts whole. Each sidechain message entry is one changed row with hash null, before `sidechain`, after `marked text`, how `carried as marked text under entry <parent id>`; an opaque thinking part or a non-text part inside it is left out and is a lost row as in R3. Each custom entry off the path whose parent is on the path is a lost row with hash null, `kind` its customType and reason `Codex has no item for it and it is not conversation`, except a lys.harness_event of kind template_render, a lys.given entry and a lys.translation entry, which record renders made from the session and are not part of it. WHEN the session is a child forked at a user message (ADR-018), THE SYSTEM SHALL write the carried message's text, read through the same seed_of the Claude Code render uses, as one `user` message directly after the marker, so it is the rollout's first user item, and count it as changed with the point's entry id, hash null, before `point`, after `first prompt`. Its tests import synthetic Claude Code files through lys_home::cli::run into a temporary home. THE SYSTEM SHALL NOT drop a sidechain, SHALL NOT list a render record as lost, SHALL NOT carry an entry of an unlabelled branch off the path, and SHALL NOT write the seed's text into the account or the report.",
+      "acceptance": [
+        "`cargo test -p lys-home --lib -- --exact harness::codex::beside_tests::sidechain_is_carried_as_marked_text` prints `1 passed; 0 failed`; a Claude Code fixture whose main chain is a user and an assistant record, followed by two sidechain records with agentId `a1`, gives one developer item whose first line is `<SIDECHAIN <first sidechain uuid> UNDER ENTRY <assistant uuid>>`, which contains each sidechain text part whole, which is the next item after the assistant's items, and exactly 2 changed rows with before `sidechain` and after `marked text`.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::beside_tests::lys_entries_are_listed_lost` prints `1 passed; 0 failed`; after `lys-home lantern light` at the fixture's head and an imported `attachment` record, the account holds a lost row whose entry is the lantern's id with kind `lys.lantern` and reason exactly `Codex has no item for it and it is not conversation`, and a lost row with kind `lys.harness_event`; after one translation, a second into another out holds no row of kind `lys.translation`.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::beside_tests::forked_child_opens_on_the_point` prints `1 passed; 0 failed`; a lantern lit at a user message and forked through `lys-home fork` gives a child whose rollout's first item with role `user` has one `input_text` part equal to that message's text, and whose account has a changed row with the point's entry id, before `point`, after `first prompt`."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/harness/codex/beside.rs",
+          "crates/lys-home/src/harness/codex/beside_tests.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C49",
+        "C56"
+      ],
+      "stories": [
+        "S24",
+        "S25"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Record each translation as a lys.translation side leaf that never moves the head",
+      "spec": "Add the custom type `lys.translation` to record/entries.rs beside the other lys custom types. In harness/codex/leaf.rs, WHEN the rollout and the account are both written and synced, THE SYSTEM SHALL append one lys.translation custom entry beside the context path through Session::append_beside, whose data holds exactly `harness` (`codex`), `codex_version`, `thread`, `head` (the head entry's id), `head_hash` (Session::head_hash before the append), `rollout` (the rollout's path relative to `--out`), `rollout_sha256` and `account_sha256`. This leaf and the account are the durable link from the Codex fork back to the session. THE SYSTEM SHALL NOT move the head, SHALL NOT change an earlier byte of the session file, SHALL NOT write an absolute path or any content into the data, and SHALL NOT append the leaf when a write before it failed.",
+      "acceptance": [
+        "`cargo test -p lys-home --lib -- --exact harness::codex::leaf_tests::side_leaf_names_the_translation` prints `1 passed; 0 failed`; after one translation the session holds exactly one lys.translation entry, its parent is the head, `head_hash` before and after the translation are equal, the session file's first N bytes (N its length before) are unchanged, `rollout_sha256` equals the SHA-256 of the written rollout, `account_sha256` equals that of the account, and `thread` equals the id in the rollout's file name.",
+        "`cargo test -p lys-home --lib -- --exact harness::codex::leaf_tests::leaf_data_holds_eight_keys` prints `1 passed; 0 failed`; the leaf's data keys are exactly `account_sha256, codex_version, harness, head, head_hash, rollout, rollout_sha256, thread`, and `rollout` does not begin with `/`."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/harness/codex/leaf.rs",
+          "crates/lys-home/src/harness/codex/leaf_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/record/entries.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C51"
+      ],
+      "stories": [
+        "S27"
+      ]
+    },
+    {
+      "id": "R7",
+      "title": "Add the translate-codex subcommand and its report of paths and counts",
+      "spec": "In crates/lys-home/src/cli_translate.rs add `lys-home translate-codex` taking `--home`, `--session`, `--out`, `--codex-version` (required, no default) and `--zone`, which clap reads from TZ when the flag is absent, so the library takes the zone as an explicit input. WHEN it succeeds, THE SYSTEM SHALL print one JSON object `{\"command\": \"translate-codex\", \"report\": …}` whose report holds exactly `rollout` (the rollout's path), `account` (the account's path), `entries` (entries walked on the context path), `blocks` (content parts walked), `kept`, `changed` and `lost` (the row counts of the account). IF any refusal fires, THEN THE SYSTEM SHALL exit 1 with the refusal's message on stderr and nothing on stdout, and write nothing. cli.rs gains only the variant and its dispatch; lib.rs declares the module and its sibling test file. THE SYSTEM SHALL NOT print any text, argument, output, summary or seed, and SHALL NOT run Codex (ADR-007).",
+      "acceptance": [
+        "`cargo test -p lys-home --lib -- --exact cli_translate_tests::report_carries_paths_and_counts` prints `1 passed; 0 failed`; the report's keys are exactly `account, blocks, changed, entries, kept, lost, rollout`, `kept + changed + lost` equals the account's row count, and neither the report's bytes nor the account's bytes contain any text, argument, output or thinking string of the fixture.",
+        "`cargo test -p lys-home --lib -- --exact cli_translate_tests::existing_rollout_is_refused_and_nothing_written` prints `1 passed; 0 failed`; a second translation of the same head into the same `--out` fails with exactly `session file already exists: <rollout path>; choose another --out`, the number of files under `--out` and their SHA-256 are unchanged, and the session file's bytes are unchanged.",
+        "`cargo test -p lys-home --lib -- --exact cli_translate_tests::unmeasured_codex_version_is_refused` prints `1 passed; 0 failed`; `--codex-version 0.157.0` fails with exactly `Codex 0.157.0 has no measured rollout shape: render for 0.156.0 or card a measurement of the new version` and `--out` holds no file.",
+        "`cargo test -p lys-home --lib -- --exact cli_translate_tests::unknown_zone_is_refused_and_nothing_written` prints `1 passed; 0 failed`; `--zone Mars/Olympus` fails with a message ending `set TZ to an IANA name` and `--out` holds no file.",
+        "`cargo run -p lys-home -- translate-codex --help` prints `--home`, `--session`, `--out`, `--codex-version` and `--zone`."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/cli_translate.rs",
+          "crates/lys-home/src/cli_translate_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/cli.rs",
+          "crates/lys-home/src/lib.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C45",
+        "C46"
+      ],
+      "stories": [
+        "S24"
+      ]
+    },
+    {
+      "id": "R8",
+      "title": "Prove through the binary that everything is carried whole, the bytes repeat and the Claude Code render is unchanged",
+      "spec": "Add crates/lys-home/tests/codex_translation.rs, which builds synthetic Claude Code files carrying no real transcript, imports each into a fresh home through lys_home::cli::run and translates it through the same entry point. WHEN a session is translated, THE SYSTEM SHALL carry every text part, tool call and tool result on the context path whole, SHALL write the same rollout and account bytes for the same head translated into two fresh `--out` directories (CN9), and SHALL leave the Claude Code render of the same session unchanged by hash. THE SYSTEM SHALL NOT call, wrap or name Codex's importer anywhere in crates/lys-home.",
+      "acceptance": [
+        "`cargo test -p lys-home --test codex_translation -- --exact text_and_tools_are_carried_whole` prints `1 passed; 0 failed`; a fixture holding a user text, an assistant text and tool_use, its tool_result and an assistant answer gives items in which each text is byte-equal to one `input_text` or `output_text` part, the function_call's `arguments` parses to the tool_use's input, and the function_call_output's `output` equals the result's text.",
+        "`cargo test -p lys-home --test codex_translation -- --exact tool_result_past_importer_clip_is_whole` prints `1 passed; 0 failed`; a tool_result whose text is 10,000 characters, more than the 4,000 Codex's importer clips to, gives a function_call_output whose `output` is that exact string of 10,000 characters.",
+        "`cargo test -p lys-home --test codex_translation -- --exact foreign_thinking_renders_as_text` prints `1 passed; 0 failed`; an assistant record with a signed thinking part and a redacted_thinking part gives an `output_text` part equal to the thinking text, no line containing the signature or the redacted data, a changed row before `thinking`, after `output_text`, and a lost row with reason `redacted thinking dropped: another provider`.",
+        "`cargo test -p lys-home --test codex_translation -- --exact every_row_names_its_kinds_and_reason` prints `1 passed; 0 failed`; for the fixtures of this file every changed row has non-empty `before`, `after` and `how`, and every lost row a non-empty `reason`, and the lost row count equals the count of opaque thinking parts plus lys entries the fixture holds.",
+        "`cargo test -p lys-home --test codex_translation -- --exact second_translation_gives_equal_bytes` prints `1 passed; 0 failed`; the same head translated into two fresh `--out` directories gives rollouts of equal SHA-256 and accounts of equal SHA-256.",
+        "`cargo test -p lys-home --test codex_translation -- --exact claude_code_render_is_unchanged_by_hash` prints `1 passed; 0 failed`; `lys-home render` of the session to `a.jsonl` before the translation and to `b.jsonl` after it gives files of equal SHA-256.",
+        "`grep -rnE 'external_agent|external-agent' crates/lys-home/src` prints nothing."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/tests/codex_translation.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C47",
+        "C48",
+        "C51",
+        "C52"
+      ],
+      "stories": [
+        "S24",
+        "S25"
+      ]
+    },
+    {
+      "id": "R9",
+      "title": "Document the subcommand and the custom type, and render the cluster's markdown",
+      "spec": "Add translate-codex to crates/lys-home/README.md, and the lys.translation custom type with its eight data keys to docs/design/home/RECORD.md. Then regenerate the cluster's rendered markdown with render-cluster.py, so DESIGN.md carries the amended non-goal that admits the one pair, and CHECKLIST.md, USER-STORIES.md and briefs/HOME-008.md are what their JSON renders to. THE SYSTEM SHALL NOT edit a rendered markdown file by hand and SHALL NOT change any other cluster's documents.",
+      "acceptance": [
+        "`sh scripts/design/gate.sh` exits 0.",
+        "`grep -c 'lys.translation' docs/design/home/RECORD.md` prints a number of at least 1.",
+        "`grep -c 'translate-codex' crates/lys-home/README.md` prints a number of at least 1.",
+        "`grep -c 'Claude Code to Codex' docs/design/home/DESIGN.md` prints a number of at least 1."
+      ],
+      "files": {
+        "create": [
+          "docs/design/home/briefs/HOME-008.md"
+        ],
+        "modify": [
+          "crates/lys-home/README.md",
+          "docs/design/home/RECORD.md",
+          "docs/design/home/DESIGN.md",
+          "docs/design/home/CHECKLIST.md",
+          "docs/design/home/USER-STORIES.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C55"
+      ],
+      "stories": [
+        "S26"
+      ]
+    },
+    {
+      "id": "R10",
+      "title": "Record a Codex 0.156.0 rollout in a scratch Codex home and match the fixture session's render to it",
+      "spec": "Prerequisite, done once by the person running the proof: a scratch Codex home directory, never the live one, into which that person has logged a Codex account with `CODEX_HOME=<scratch> codex login`; no file is copied into it. At its start the recording checks, with CODEX_HOME set to the scratch home: IF `codex login status` exits non-zero, THEN it stops, records `Refused: the scratch Codex home holds no login; run codex login with CODEX_HOME set to it`, and writes no fixture; IF one small request (`codex exec` asking for one word) fails because the account is at its usage limit, THEN it stops, records `Refused: the account cannot make requests until <the reset date Codex reports>; log an account that can make requests into the scratch home, or wait for that date`, and writes no fixture. Then, with TZ set to an IANA name, it records at most 3 times one `codex exec` exchange in which Codex runs one shell command and answers; the first recording whose rollout holds a `function_call` and its `function_call_output` is kept, and IF none of 3 does, THEN it stops and records `Refused: no function_call in 3 recordings`. From the kept recording commit crates/lys-home/tests/fixtures/codex/rollout-0.156.0.jsonl, the recording's `response_item` lines of type `function_call`, `function_call_output`, and `message` with role `assistant` or with role `user` whose text is the prompt, in recorded order and otherwise as Codex wrote them, and crates/lys-home/tests/fixtures/codex/claude_code.jsonl, a Claude Code file mirroring those items (the prompt as the user text, each tool call's name and parsed arguments as a tool_use, each output as its tool_result, each assistant text as an assistant text); an absolute path of the recording machine in either file is replaced by `/fixture` in both, and the count replaced is recorded. WHEN claude_code.jsonl is imported and translated, THE SYSTEM SHALL write response items after the marker whose payloads equal the fixture rollout's payloads in order apart from the keys `id`, `call_id` and `internal_chat_message_metadata_passthrough`. IF they differ in any other key or value, THEN R3 or R4 is corrected to write what Codex wrote, a key whose value the Claude session never held is named in the account as changed with before `none` and after the key, and every test of R1 to R8 is run again. docs/design/home/PROOF-TRANSLATE.md is created with a recording section. THE SYSTEM SHALL NOT use the live Codex home, SHALL NOT copy an auth file, SHALL NOT record more than 3 times, and SHALL NOT record any transcript content, account email or credential value in the proof.",
+      "acceptance": [
+        "`cargo test -p lys-home --test codex_translation -- --exact fixture_session_matches_recorded_rollout` prints `1 passed; 0 failed`; it imports tests/fixtures/codex/claude_code.jsonl, translates it with `--codex-version 0.156.0`, and asserts the response items after the marker equal tests/fixtures/codex/rollout-0.156.0.jsonl's payloads in order apart from `id`, `call_id` and `internal_chat_message_metadata_passthrough`, with at least 1 `function_call` and 1 `function_call_output` compared.",
+        "`cargo test -p lys-home --test codex_translation -- --exact proof_records_the_fixture_hash` prints `1 passed; 0 failed`; it asserts PROOF-TRANSLATE.md contains the line `Fixture rollout SHA-256: ` followed by the SHA-256 of tests/fixtures/codex/rollout-0.156.0.jsonl, computed by the test from the file.",
+        "`grep -c '^Codex version: codex-cli 0.156.0$' docs/design/home/PROOF-TRANSLATE.md` prints `2` (the recording and the resume).",
+        "`grep -c '^Recording attempts: [123]$' docs/design/home/PROOF-TRANSLATE.md` prints `1`.",
+        "`grep -c '^Login status exit: 0$' docs/design/home/PROOF-TRANSLATE.md` prints `2`.",
+        "`grep -c '^Start check exit: 0$' docs/design/home/PROOF-TRANSLATE.md` prints `2`.",
+        "`grep -c '^TZ: ' docs/design/home/PROOF-TRANSLATE.md` prints `2`.",
+        "`grep -c '^Paths replaced by /fixture: ' docs/design/home/PROOF-TRANSLATE.md` prints `1`.",
+        "`grep -c '^Live Codex home rollouts before and after: ' docs/design/home/PROOF-TRANSLATE.md` prints `2`, each line carrying two equal counts of `rollout-*.jsonl` under `$HOME/.codex/sessions`.",
+        "`grep -cE '@|auth\\.json' docs/design/home/PROOF-TRANSLATE.md` prints `0`."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/tests/fixtures/codex/rollout-0.156.0.jsonl",
+          "crates/lys-home/tests/fixtures/codex/claude_code.jsonl",
+          "docs/design/home/PROOF-TRANSLATE.md"
+        ],
+        "modify": [
+          "crates/lys-home/tests/codex_translation.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C53"
+      ],
+      "stories": [
+        "S26"
+      ]
+    },
+    {
+      "id": "R11",
+      "title": "Resume the rendered thread on Codex 0.156.0 in the scratch home and record it with hashes, counts and paths only",
+      "spec": "With the same scratch Codex home, the same start check as R10 and its refusal words, and TZ set to an IANA name: import tests/fixtures/codex/claude_code.jsonl into a fresh home, translate it with `lys-home translate-codex --out <scratch> --codex-version 0.156.0`, and resume the thread with `CODEX_HOME=<scratch> codex exec resume <thread id> <question>`, where the question can be answered only from a token the fixture's tool result holds. WHEN Codex 0.156.0 answers, THE SYSTEM SHALL have the proof record: the `codex --version` output; the account used, named by the label the person running the proof gives it and never by an email or credential; the login status and start check exits; the TZ; the rollout's and the account's paths relative to the scratch home and their SHA-256; the thread id; the entry, block, kept, changed and lost counts from the report; the resume's exit status; the count of the token in the answer; and the session's head hash before and after. IF the resume fails because a key or line kind R4 left out is needed, THEN R4's conditional applies once, the failure's exit status and the added key are recorded, and the translation and the resume are run again. THE SYSTEM SHALL NOT resume in the live Codex home, SHALL NOT write Codex's thread index by hand, and SHALL NOT record the question, the answer or any transcript text.",
+      "acceptance": [
+        "`grep -c '^Resume exit: 0$' docs/design/home/PROOF-TRANSLATE.md` prints `1`.",
+        "`grep -c '^Answer token matches: [1-9]' docs/design/home/PROOF-TRANSLATE.md` prints `1`.",
+        "`grep -c '^Account: ' docs/design/home/PROOF-TRANSLATE.md` prints `1`.",
+        "`grep -c '^Thread id: ' docs/design/home/PROOF-TRANSLATE.md` prints `1`.",
+        "`grep -cE '^Rollout SHA-256: [0-9a-f]{64}$' docs/design/home/PROOF-TRANSLATE.md` prints `1`.",
+        "`grep -cE '^Account SHA-256: [0-9a-f]{64}$' docs/design/home/PROOF-TRANSLATE.md` prints `1`.",
+        "`grep -cE '^Counts: entries [0-9]+ blocks [0-9]+ kept [0-9]+ changed [0-9]+ lost [0-9]+$' docs/design/home/PROOF-TRANSLATE.md` prints `1`.",
+        "`grep -cE '^Head hash before: [0-9a-f]{64}$' docs/design/home/PROOF-TRANSLATE.md` prints `1`, and the `Head hash after: ` line carries the same value.",
+        "`grep -cE '^Rollout path: sessions/[0-9]{4}/[0-9]{2}/[0-9]{2}/rollout-' docs/design/home/PROOF-TRANSLATE.md` prints `1`."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/home/PROOF-TRANSLATE.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C54"
+      ],
+      "stories": [
+        "S24",
+        "S26"
+      ]
+    }
+  ],
+  "boundaries": [
+    "No change to the Claude Code render (harness/claude_code/render.rs), the importer (import.rs), seed.rs or the bytes any of them write; the translation reuses record_uuid and seed_of as they are.",
+    "No call, wrapper or port of Codex's importer of Claude Code files, and no shape read from Codex's source checkout.",
+    "No harness other than Claude Code to Codex, no Codex to Claude Code, no Pi, and no launch of Codex through the launch template or otherwise; the subcommand never runs Codex.",
+    "No write into the live Codex home, Codex's state_5.sqlite, thread_history_1.sqlite or session_index.jsonl, and no copy of auth.json or any credential file anywhere.",
+    "No new role, namespace or name form for derived uuids (ADR-016): the thread id is record_uuid of the head and a call id is the record's own tool id.",
+    "No transcript content in the report, the account, an error, a test name, a log line or PROOF-TRANSLATE.md.",
+    "No template hash in the marker or the side leaf, no BlockNotStored refusal, and no read of a stored block by the translation, until the lead answers the open questions.",
+    "No Codex version but 0.156.0, and no more than 3 recordings."
+  ],
+  "verification": [
+    "cargo fmt --check",
+    "cargo clippy --all-targets --all-features -- -D warnings",
+    "cargo clippy --all-targets -- -D warnings",
+    "cargo test --workspace --all-features",
+    "cargo doc --no-deps --all-features",
+    "cargo doc --no-deps",
+    "sh scripts/design/gate.sh",
+    "cargo test -p lys-home --test codex_translation prints `0 failed`, and each named test of R8 and R10 run alone with `-- --exact` prints `1 passed; 0 failed`.",
+    "git diff 1756688 -- crates/lys-home/src/harness/claude_code/ prints nothing.",
+    "Every file under crates/lys-home/src/harness/codex/ and cli_translate.rs is under 500 lines of code, and harness/codex/mod.rs holds only `pub mod` and `#[cfg(test)] mod` lines.",
+    "Each grep -c line of R10 and R11 on docs/design/home/PROOF-TRANSLATE.md prints the count its acceptance names."
+  ]
+}

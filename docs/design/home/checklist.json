@@ -275,6 +275,71 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Translation to Codex",
+      "items": [
+        {
+          "id": "C45",
+          "text": "lys-home translate-codex takes --home, --session, --out, --codex-version and --zone, writes one rollout under <out>/sessions/YYYY/MM/DD/ named as Codex names its own and one loss account beside it, and prints one JSON report of the two paths and the entry, block, kept, changed and lost counts, never content.",
+          "done": false
+        },
+        {
+          "id": "C46",
+          "text": "An unmeasured Codex version, an unnamed time zone, an unknown time zone and an existing rollout or account path are each refused by name before anything is written, with messages saying render for 0.156.0 or card a measurement of the new version, set TZ to an IANA name, and choose another --out.",
+          "done": false
+        },
+        {
+          "id": "C47",
+          "text": "Every text part, tool call and tool result on the context path is carried whole as a Codex message, function_call or function_call_output item, never as a clipped note; a tool result longer than 4,000 characters is carried byte for byte.",
+          "done": false
+        },
+        {
+          "id": "C48",
+          "text": "Readable thinking is carried as output_text and counted changed; redacted and empty thinking are dropped and listed lost by hash with a reason; no signature, redacted data or reasoning item enters the rollout.",
+          "done": false
+        },
+        {
+          "id": "C49",
+          "text": "The loss account lists kept, changed and lost rows by entry id and hash in walk order; a changed row names its before and after kinds and every field not carried or reshaped (a caller field, a one-item text array written as a string, an assistant turn's model, usage and stop reason); a lost row names its reason; the account carries no content.",
+          "done": false
+        },
+        {
+          "id": "C50",
+          "text": "The rollout's session_meta holds only id, session_id, timestamp, cwd and cli_version, the thread id is record_uuid of the session head, and the first item is a developer message holding the in-band marker naming the source session as a fork, not that session.",
+          "done": false
+        },
+        {
+          "id": "C51",
+          "text": "Each translation appends one lys.translation custom entry beside the context path naming the thread, the head, the head hash, the rollout's relative path and the rollout's and account's SHA-256; the head and the session's earlier bytes do not move, and the Claude Code render of the session is unchanged by SHA-256.",
+          "done": false
+        },
+        {
+          "id": "C52",
+          "text": "The same session head translated into two fresh --out directories gives rollouts of equal SHA-256 and accounts of equal SHA-256.",
+          "done": false
+        },
+        {
+          "id": "C53",
+          "text": "A Codex 0.156.0 rollout recorded in a scratch Codex home in at most three attempts is committed as a fixture beside the Claude Code file that mirrors it, and that file imported and translated gives response items equal to the recording's apart from id, call_id and Codex's turn metadata.",
+          "done": false
+        },
+        {
+          "id": "C54",
+          "text": "PROOF-TRANSLATE.md records Codex 0.156.0 resuming the translated thread in a scratch Codex home and answering from its content, with the account's label, the start checks, the paths, hashes, counts and exit statuses, and no transcript text, email or credential.",
+          "done": false
+        },
+        {
+          "id": "C55",
+          "text": "The home design admits exactly one translated pair, Claude Code to Codex, as roadmap stage 4b, and the cluster's rendered markdown is what its JSON renders to.",
+          "done": false
+        },
+        {
+          "id": "C56",
+          "text": "A sidechain is carried as marked text under the entry it hangs from and counted changed; lanterns, harness events and other lys entries are listed lost by entry id; a child forked at a user message opens its rollout on that message as the first user prompt, counted changed.",
+          "done": false
+        }
+      ]
     }
   ]
 }
