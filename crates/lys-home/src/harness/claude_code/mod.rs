@@ -17,6 +17,7 @@ mod events_tests;
 pub mod import;
 #[cfg(test)]
 pub(crate) mod import_tests;
+pub mod launch;
 pub mod launch_env;
 pub mod render;
 #[cfg(test)]

@@ -9,7 +9,8 @@ unchanged. Beside each session file: `<id>.index.jsonl` (entry id, parent,
 byte offset, length) so the path from the head to the root is read by seeking
 to the entries on it, and `<id>.head` (the persisted head) so reopening
 restores where the session stood. `blocks/<hh>/<hash>` holds content once by
-SHA-256; entries reference blocks by hash.
+SHA-256; entries reference blocks by hash. `templates/<hh>/<hash>` holds each
+launch template the home has rendered, once by SHA-256, never rewritten.
 
 lys adds nothing to Pi's grammar. Its own data rides in Pi's `custom` entries:
 
@@ -37,6 +38,26 @@ and a loss account beside the file), `fewshot` writes a hand-authored file
 that `claude --resume <path>` takes (the command is in the JSON report, never
 run), and `resume-check` counts tool_use ids a fork repeats and the tool
 actions in the fork's own records.
+
+`render-launch --home <dir> --session <id> --template <file> --uuid <uuid>
+--cwd <dir> --model <id> --version <claude code version> --out <dir>` turns a
+session into the files a Claude Code launch needs, from a launch template
+(schema: `docs/design/home/launch-template.schema.json`; `harness`, `flags`
+and the five slots `transcript`, `mcp`, `env`, `secrets`, `instructions`; a
+slot outside the five is refused by name). It writes `<uuid>.jsonl` and
+`<uuid>.loss.json` (the render), `mcp.json`, `env.json` (a settings file
+whose `env` holds the template's variables and each use-only secret as its
+handle, never a value) and `instructions.md` into `--out`, refusing any that
+exists; keeps the template under `templates/`; and appends one
+`lys.harness_event` of kind `template_render` beside the session's context
+path, naming the template hash, the session head hash and a manifest block
+of the written paths, without moving the head. The report carries the launch
+line, `claude --resume <out>/<uuid>.jsonl --fork-session --mcp-config
+<out>/mcp.json --settings <out>/env.json --append-system-prompt-file
+<out>/instructions.md` plus the template's flags; the tool never runs it. A
+template marking a secret readable is refused naming `secret_reader_unbuilt`
+and SECRETS-002, since no broker reader exists yet. The same template and
+session write the same bytes twice.
 
 What the crate does not do: interpret, print or log transcript contents (errors
 and reports carry ids, hashes, offsets and counts only); sign, hash into a lys
