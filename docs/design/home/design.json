@@ -190,7 +190,7 @@
     },
     {
       "path": "crates/lys-home/Cargo.toml",
-      "note": "the crate manifest; gains the passthrough example",
+      "note": "the crate manifest; gains the passthrough example, and jiff for the Codex rollout path's local time",
       "brief": "HOME-001"
     },
     {
@@ -536,6 +536,16 @@
     {
       "path": "crates/lys-home/src/cli/codex.rs",
       "note": "the render-codex subcommand, split out of cli.rs",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "Cargo.toml",
+      "note": "the workspace manifest; gains jiff, the pure-Rust time-zone database the Codex rollout path is dated with",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "Cargo.lock",
+      "note": "the workspace lockfile; gains jiff",
       "brief": "HOME-004"
     },
     {

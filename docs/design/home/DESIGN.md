@@ -87,7 +87,7 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `docs/design/home/RECORD.md` | the home record written down: Pi's grammar as adopted, the two lys custom entries, the block store, the loss account | HOME-001 |
 | `crates/lys-home/src/lib.rs` | module wiring: record and harness | HOME-001 |
 | `crates/lys-home/src/harness/mod.rs` | harness profiles; Claude Code first | HOME-001 |
-| `crates/lys-home/Cargo.toml` | the crate manifest; gains the passthrough example | HOME-001 |
+| `crates/lys-home/Cargo.toml` | the crate manifest; gains the passthrough example, and jiff for the Codex rollout path's local time | HOME-001 |
 | `crates/lys-home/README.md` | what the tool does and does not do | HOME-001 |
 | `crates/lys-home/src/record/index.rs` | the offset index and the persisted head: a path is read by seeking, never by loading the file | HOME-001 |
 | `crates/lys-home/src/proxy/mod.rs` | the proxy module: declarations only | HOME-001 |
@@ -157,6 +157,8 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `crates/lys-home/src/harness/codex/translate.rs` | render-codex's work: version check, existing path refused, both files written, the codex_translation side leaf | HOME-004 |
 | `crates/lys-home/src/harness/codex/translate_tests.rs` | gates on the refusals writing nothing, and the side leaf leaving the head | HOME-004 |
 | `crates/lys-home/src/cli/codex.rs` | the render-codex subcommand, split out of cli.rs | HOME-004 |
+| `Cargo.toml` | the workspace manifest; gains jiff, the pure-Rust time-zone database the Codex rollout path is dated with | HOME-004 |
+| `Cargo.lock` | the workspace lockfile; gains jiff | HOME-004 |
 | `crates/lys-home/tests/codex_translation.rs` | end to end: fixture Claude Code file imported and translated, matched to the recorded rollout, the account, the Claude Code render unchanged | HOME-004 |
 | `crates/lys-home/tests/fixtures/codex/claude-code.jsonl` | the fixture Claude Code file, synthetic, in the measured part shapes, carrying the recorded rollout's conversation | HOME-004 |
 | `crates/lys-home/tests/fixtures/codex/claude-code-losses.jsonl` | the second fixture Claude Code file, synthetic: thinking, redacted thinking, long tool input and result, images, a sidechain, harness events, meta and authored records | HOME-004 |
