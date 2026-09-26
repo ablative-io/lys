@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-25",
+  "updated": "2026-09-26",
   "items": [
     {
       "id": "RM-001",
@@ -152,6 +152,36 @@
         "RM-001"
       ],
       "notes": "Owned by Archie. The home cluster and HOME-001 landed on main with PR 8; the cached-index rule (lys-home Index::from_cached) is in that brief. Next: HOME-001 dispatched through the board."
+    },
+    {
+      "id": "RM-006",
+      "title": "Light a lantern in the home and recall it by note and by point",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "Stage 5 of the home: a lantern is a note plus a point in a session, lit on purpose as a lys.lantern custom entry at the session's head, whose note grows only by lys.lantern_epilogue entries. Three lys-home subcommands light one, add an epilogue, and recall lanterns by an exact case-folded phrase of their note or epilogues, or by session and entry id, printing the lantern and its epilogues and never the transcript around the point. A lantern lives in the home and is never rendered into a Claude Code resume file.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-26T06:30:25+10:00",
+        "quote": "A lantern is a note plus a point in a transcript, declared on purpose at a moment of completion, success or learning, never automatically; it is what a later session, or a fork, walks back to. The home holds sessions in Pi's grammar and adds nothing to that grammar, so a lantern is a lys.lantern custom entry appended at the session's head, carrying the point it marks as the id of an existing entry in that session, the note as written, who lit it and when. The point may be any entry on the session's tree, not only the head, so a lantern can mark a place the session has already moved past. A note is append-only and grows: an epilogue is a lys.lantern_epilogue custom entry naming the lantern's own entry id and carrying the further words, so a lantern's story is its entry followed by its epilogues in order, and nothing is ever rewritten. A lys-home subcommand lights one: it takes the home, the session, the entry id of the point and the note, refuses by name a point that is not an entry of that session and an empty note, appends the entry, and prints a JSON report of the lantern's id, session, point and time. A second subcommand adds an epilogue to a named lantern. A third recalls: by note, listing every lantern in the home whose note or epilogues contain the given words, exact and case-folded, no vectors; and by point, listing every lantern that marks a given session and entry id. Each listing row is the lantern's id, session, point, lit-by, lit-at, note, and its epilogues, and never a line of the transcript around the point. A lantern is not rendered into a Claude Code resume file; it lives in the home. Acceptance is that on a fixture session a lantern lit at a past entry is recalled by a word of its note and by its point; that two lanterns on the same point are both recalled by point; that an epilogue is recalled with its lantern, after it, and recall by a word that appears only in the epilogue finds the lantern; that lighting at an unknown entry id and lighting with an empty note are each refused by name; that after lighting, the session file's earlier bytes are unchanged and the head is the lantern entry; that the rendered Claude Code file of that session contains no lantern line; and that no listing prints transcript content, checked by a search for a fixture message's text. Not in scope: the fork through a lantern, which is stage 5b and its own card; resonance, whispers, vectors and any ranking; dimming by code churn; Norn's tables; Cambium's screen. Filed by Archie on Tom's definition of 8 August 2026 that a lantern is a note plus a pathway back, declared deliberately, notes append-only, his roadmap stage 5 of 22 September 2026, and home DESIGN P2 and P7 at lys main 0073b966, on 26 September 2026.",
+        "context": "The stage 5 lantern card on the Lys board, surveyed against lys main 0073b966; the lead of the home card answered the survey's open questions (phrase matching, the P7 and CN3 exception, held sessions, blank notes and epilogues, epilogue authorship, unknown points in recall, lanterns as points) and HOME-002 carries those answers."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-003",
+          "ADR-004",
+          "ADR-012",
+          "ADR-013"
+        ],
+        "briefs": [
+          "HOME-002"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-005"
+      ],
+      "notes": "HOME-002 is the first unit. Further units, not yet written: Stage 5b: fork through a lantern (cut at its point and seed a new session); Lit-by from a directory identity rather than a declared name; Lighting from a live session under capture (the door's proxy or harness hook); Cambium's lantern screen; Recall by resonance and vectors, with ranking and churn dimming."
     }
   ]
 }

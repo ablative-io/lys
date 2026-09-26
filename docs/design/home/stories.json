@@ -20,6 +20,18 @@
         {
           "id": "S8",
           "text": "As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs."
+        },
+        {
+          "id": "S9",
+          "text": "As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it."
+        },
+        {
+          "id": "S10",
+          "text": "As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten."
+        },
+        {
+          "id": "S11",
+          "text": "As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again."
         }
       ]
     },
@@ -48,6 +60,10 @@
         {
           "id": "S5",
           "text": "As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught."
+        },
+        {
+          "id": "S12",
+          "text": "As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes."
         }
       ]
     }

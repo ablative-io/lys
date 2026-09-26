@@ -95,6 +95,46 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Lanterns",
+      "items": [
+        {
+          "id": "C14",
+          "text": "A lantern is a lys.lantern custom entry appended at the session's head, naming an existing entry of that session that is not a lantern or an epilogue as its point, with the note as written, lit-by and lit-at; an epilogue is a lys.lantern_epilogue custom entry naming the lantern's entry id with its words, author and time; both are documented beside the other lys custom entries.",
+          "done": false
+        },
+        {
+          "id": "C15",
+          "text": "Lighting only appends: the session's earlier bytes are unchanged and the head is the lantern; a point that is not an entry of the session, a lantern or epilogue as the point, an empty or whitespace-only note, and a session another owner holds are each refused by name with nothing written.",
+          "done": false
+        },
+        {
+          "id": "C16",
+          "text": "An epilogue is added to a named lantern of a session and appended at that session's head; a lantern the session does not hold and empty or whitespace-only words are each refused by name with nothing written.",
+          "done": false
+        },
+        {
+          "id": "C17",
+          "text": "Recall reads without owning: it takes no session lock and writes no file, and a session it cannot read is skipped and named with its reason while every other session is still listed.",
+          "done": false
+        },
+        {
+          "id": "C18",
+          "text": "Recall by note lists every lantern in the home whose note or one of whose epilogues contains the given words as one phrase, case-folded; recall by point lists every lantern marking a session and entry id, and refuses an unknown session or entry by name; every row is the lantern's id, session, point, lit-by, lit-at, note and its epilogues in order, and never a line of the transcript.",
+          "done": false
+        },
+        {
+          "id": "C19",
+          "text": "Three lys-home subcommands light a lantern, add an epilogue and recall, each printing one JSON report that carries no transcript line.",
+          "done": false
+        },
+        {
+          "id": "C20",
+          "text": "A lantern lives in the home: the rendered Claude Code file of a session carries no lantern or epilogue line, a home file holding them still parses with Pi's parser unchanged, and nothing lights a lantern automatically.",
+          "done": false
+        }
+      ]
     }
   ]
 }

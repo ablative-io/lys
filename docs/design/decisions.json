@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-24",
+  "updated": "2026-09-26",
   "decisions": [
     {
       "id": "ADR-001",
@@ -191,6 +191,43 @@
       "consequences": [
         "DIRECTORY-003 records the state beside each identity; no check reads it until the permission work of road step 2.",
         "The room's own questions stay with the proposal: whether a reason is mandatory on suspend and retire, and whether activation needs a credential handle (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:101-103)."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-012",
+      "title": "A lantern is a custom entry in its session, and its note grows only by epilogue entries",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-26",
+      "decided_by": "The stage 5 lantern request, which names the record shape; recorded with HOME-002",
+      "context": "Stage 5 of the home needs lanterns: a note plus a point in a transcript, declared on purpose, that a later session or a fork walks back to. The home record is Pi's session tree and lys adds entry kinds only as custom entries (home P2, CN4). The shape chosen here is the one the stage 5b fork will cut from, so it has to be fixed before anything is lit under it.",
+      "decision": "A lantern is a `lys.lantern` custom entry appended at its session's head, carrying in custom.data the entry id of its point (an existing entry of the same session that is not itself a lantern or an epilogue, the head or any entry the head has moved past), the note as written, who lit it and when. Its note grows only by `lys.lantern_epilogue` custom entries naming the lantern's entry id and carrying the further words, who added them and when; a lantern's story is its entry followed by its epilogues in order, and nothing is rewritten. Rejected: Pi's `label` entry on the target (it replaces or clears a label rather than growing one, and carries no author or time), a lantern store beside the session outside Pi's grammar (a lantern would stop travelling with its session), and editing the lantern's note in place (the record is append-only, P1).",
+      "quote": "",
+      "consequences": [
+        "HOME-002 defines both custom types and documents their data fields in docs/design/home/RECORD.md.",
+        "Lighting appends at the head, so the head moves onto the lantern; the stage 5b fork cuts at the lantern's point, never at the head.",
+        "A lantern or epilogue is never a lantern's point; adding to a lantern is an epilogue.",
+        "Entry ids are unique only within a session, so an epilogue and a recall by point always name the session with the id."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-013",
+      "title": "A lantern's note and epilogues are the person's annotations, not transcript",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-26",
+      "decided_by": "The lead of the home card, answering the stage 5 survey",
+      "context": "Home P7 and CN3 forbid transcript contents in output, logs and errors. A lantern's note is written as a line of the session file, and recall exists to print it, so the principle and the stage 5 request conflicted until it was settled whether a note is transcript.",
+      "decision": "A lantern's note and its epilogues are the person's own annotations, not transcript. Recall prints them by design; they are the one exception to P7 and CN3, and only recall prints them. Transcript lines (message, tool and compaction content) still never appear in output, logs or errors, and a recall row never carries a line of the transcript around its point. Rejected: treating notes as transcript and printing only their hashes, which makes recall useless to the person who wrote them.",
+      "quote": "",
+      "consequences": [
+        "P7 and CN3 of docs/design/home/design.json are amended with HOME-002 to state the exception.",
+        "The lys-home README and RECORD.md say that lantern notes and epilogues are the one text the crate prints, and only recall prints them.",
+        "Errors from lighting and epilogues still name no note, epilogue or transcript text: ids, paths and counts only."
       ],
       "supersedes": [],
       "superseded_by": ""
