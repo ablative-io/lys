@@ -76,12 +76,12 @@ fn targets(out: &Path, uuid: &str) -> [PathBuf; 5] {
 
 /// Run `render-launch` and return its report.
 pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
-    let (template, template_bytes) = read_template(&args.template)?;
+    let (mut template, template_bytes) = read_template(&args.template)?;
     safe_component("uuid", &args.uuid)?;
     let home = Home::open(&args.home)?;
     let mut session = home.open_session(&args.session)?;
-    let [rendered, loss, mcp, env, instructions] = targets(&args.out, &args.uuid);
-    for path in [&rendered, &loss, &mcp, &env, &instructions] {
+    let [rendered, loss, mcp_file, env, instructions] = targets(&args.out, &args.uuid);
+    for path in [&rendered, &loss, &mcp_file, &env, &instructions] {
         if path.exists() {
             return Err(HomeError::LaunchTargetExists { path: path.clone() });
         }
@@ -99,18 +99,16 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
     };
     let user_home = std::env::var_os("HOME").map_or_else(|| PathBuf::from("."), PathBuf::from);
     let render = render_claude_code(&session, &target, &user_home)?;
-    let mcp_bytes =
-        serde_json::to_vec_pretty(&Value::Object(template.mcp.clone())).map_err(|source| {
-            HomeError::Json {
-                context: "the MCP configuration could not be serialised",
-                source,
-            }
-        })?;
-    write_new(&mcp, &with_newline(mcp_bytes))?;
+    let mcp = Value::Object(std::mem::take(&mut template.mcp));
+    let mcp_bytes = serde_json::to_vec_pretty(&mcp).map_err(|source| HomeError::Json {
+        context: "the MCP configuration could not be serialised",
+        source,
+    })?;
+    write_new(&mcp_file, &with_newline(mcp_bytes))?;
     write_env_file(&template, &env)?;
     write_new(&instructions, template.instructions.as_bytes())?;
     let mut files = Vec::with_capacity(5);
-    for path in [&rendered, &loss, &mcp, &env, &instructions] {
+    for path in [&rendered, &loss, &mcp_file, &env, &instructions] {
         files.push(ManifestFile {
             path: path.clone(),
             sha256: hash_file(path)?.as_str().to_owned(),
@@ -135,7 +133,7 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
         custom_type: CUSTOM_HARNESS_EVENT.to_owned(),
         data: Some(event.data()?),
     })?;
-    let launch = launch_line(&template, &rendered, &mcp, &env, &instructions);
+    let launch = launch_line(&template, &rendered, &mcp_file, &env, &instructions);
     Ok(json!({
         "command": "render-launch",
         "template": stored.hash.as_str(),
