@@ -251,6 +251,17 @@ pub enum HomeError {
         what: &'static str,
     },
 
+    /// A lantern was named that the session does not hold as a `lys.lantern` entry.
+    #[error(
+        "session {session} holds no lantern `{id}`; name the entry id of a lys.lantern entry of that session"
+    )]
+    UnknownLantern {
+        /// The session id.
+        session: String,
+        /// The entry id named.
+        id: String,
+    },
+
     /// A file render-launch would write already exists.
     #[error("render-launch target already exists: {}", path.display())]
     LaunchTargetExists {
