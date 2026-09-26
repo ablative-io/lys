@@ -325,6 +325,43 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-022",
+      "title": "The home translates a session imported from Claude Code into a Codex rollout: one admitted pair, a fork with a loss account and a side leaf",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-26",
+      "decided_by": "The lead's answers to the translation survey; recorded with HOME-009",
+      "context": "The home design listed harnesses other than Claude Code as a non-goal, and ADR-012 rejected a transcript converter per harness for the launch template. Roadmap stage 4b asks for the first translation as one named pair with its own account. Codex's own importer of Claude Code files is a compaction and not a copy: it drops thinking, sidechains and meta records and clips tool calls to 2,000 and tool results to 4,000 characters. Without a ruling the card would contradict its own cluster, and the fork would either repeat the importer's losses or claim to be the session it came from.",
+      "decision": "Admit exactly one derived harness pair, Claude Code to Codex, as stage 4b, rendered by the home as a fork of the session, the same act the Claude Code render performs, for a second harness. Every text part, tool call and tool result is carried whole as Codex's own items; readable thinking is carried as text and opaque blocks are dropped (P3); a base64 image is carried as Codex's input_image item and an image of any other source is listed lost, never fetched; a sidechain is carried as marked text under the turn that spawned it; a branch summary or custom message on the context path, each of which feeds the model's context, is carried as marked developer text under its own marker, as a compaction is; a child forked at a user message carries that message's text after the walked history as the thread's next user prompt, the continuation's first prompt, read through seed_of from the parent session's file, the one file read beyond the session's own, each of its parts that is not text listed lost; entries a compaction leaves off the context path are listed lost naming the compaction; a message of any other role and a tool call or result with no id, name or call id are listed lost, never given an empty default; harness events, lanterns and other lys entries, render records included, are listed lost. The in-band marker names the source session id, the source head hash and the Codex version, the same three the account carries, and no template hash, since no launch template takes part. A JSON loss account beside the rollout lists kept, changed (with before and after kinds and the fields in how) and lost (with a reason) by entry id and the hash of each part as the home entry holds it; a tool_use's caller field, dropped at import, is recorded nowhere yet and is a later card's to record; and a lys.translation custom entry beside the context path records each translation. The thread id is record_uuid of the session head, so the Codex thread is a fork and never the same session, and its durable link back is the account and the side leaf, not the in-band marker. The recording and the resume run in a scratch Codex home outside the repository, logged in with the proof account, a Codex login named by its role, by the card's lead seat and never by the chain's builder, never the live one, and no credential file is copied. Rejected: adopting, wrapping or calling Codex's importer; listing sidechains as lost; writing into the live Codex home; copying an auth file into a scratch home; treating the Codex thread as the same session; recording the translation as a seventh lys.harness_event kind; a template hash in the marker; reading each part's stored block, with a refusal when it is not stored.",
+      "quote": "",
+      "consequences": [
+        "The home design's non-goal on other harnesses admits this one measured pair and no other; Chat Completions or Responses translation, Pi and every third harness stay out of scope.",
+        "ADR-012's rejected per-harness transcript converter stays confined to the launch template, which never converts a transcript; launching Codex through a template is that template's next version.",
+        "The translation never moves the head and never writes a byte of the Claude Code render, so the Claude Code render of a translated session is unchanged by hash.",
+        "The account and the report carry ids, hashes, kinds, field names and counts only (P7, CN3).",
+        "Each head translates to a new Codex thread; a Codex continuation never comes home."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-023",
+      "title": "A Codex rollout's shape is a per-version measurement, and the translation refuses any Codex version but the one measured",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-26",
+      "decided_by": "The words of the translation card; recorded with HOME-009",
+      "context": "Codex's rollout format changes between releases: rollouts written on the proving machine by 0.155 and 0.156.0 carry line-level ordinal keys and item metadata that the June source checkout does not, and a thread Codex cannot read resumes silently wrong or not at all. P6 already makes a resume path a per-harness, per-version measurement.",
+      "decision": "The translation writes the shape measured from rollouts Codex 0.156.0 wrote, confirmed by a recorded 0.156.0 fixture and a resume on 0.156.0, and refuses any other --codex-version by name, telling the caller to render for 0.156.0 or card a measurement of the new version. Rejected: assuming the shape from Codex's source checkout, accepting a version by prefix, and rendering an unmeasured version on a best-effort basis.",
+      "quote": "",
+      "consequences": [
+        "Each new Codex version is its own measurement card before the translation accepts it.",
+        "The time zone that names a rollout's directory and file is an explicit input, and an unnamed or unknown zone is refused with the words set TZ to an IANA name."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

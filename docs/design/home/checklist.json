@@ -275,6 +275,76 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Translation to Codex",
+      "items": [
+        {
+          "id": "C58",
+          "text": "lys-home translate-codex takes --home, --session, --out, --codex-version and --zone, writes one rollout under <out>/sessions/YYYY/MM/DD/ named as Codex names its own and one loss account beside it, and prints one JSON report of the two paths and the entry, block, kept, changed and lost counts, never content.",
+          "done": false
+        },
+        {
+          "id": "C59",
+          "text": "An unmeasured Codex version, an unnamed time zone, an unknown time zone, an existing rollout or account path and an entry stamp that is not RFC 3339 are each refused by name before anything is written, with messages saying render for 0.156.0 or card a measurement of the new version, set TZ to an IANA name, choose another --out and re-import the source file; the shared session-exists refusal of the other commands is unchanged.",
+          "done": false
+        },
+        {
+          "id": "C60",
+          "text": "Every text part, tool call and tool result on the context path is carried whole as a Codex message, function_call or function_call_output item, never as a clipped note; a tool result longer than 4,000 characters is carried byte for byte.",
+          "done": false
+        },
+        {
+          "id": "C61",
+          "text": "Readable thinking is carried as output_text and counted changed; redacted and empty thinking are dropped and listed lost by hash with a reason; no signature, redacted data or reasoning item enters the rollout.",
+          "done": false
+        },
+        {
+          "id": "C62",
+          "text": "The loss account lists kept, changed and lost rows by entry id and the hash of each part as the home entry holds it, in walk order; a changed row names its before and after kinds and every field not carried or reshaped (a key beyond those its item carries, a one-item text array written as a string, an assistant turn's model, usage and stop reason), while a tool_use's caller field, dropped at import, is recorded nowhere yet; a lost row names its reason; every entry of the root-to-head path that a compaction leaves off the context path, and every entry descending from one, is a lost row naming that compaction; a message of any other role, a toolCall with no id or name and a toolResult with no toolCallId are lost rows and never given an empty default; every other entry off the path that descends from the path and is not carried is a lost row whatever its type, the harness events under a sidechain, the entries of a sidechain with no agent label, and every other label, compaction, branch summary and model change off the path among them, while a sidechain's agent label is carried in its marker line and counted changed; the account carries no content.",
+          "done": false
+        },
+        {
+          "id": "C63",
+          "text": "The rollout's session_meta holds only id, session_id, timestamp, cwd and cli_version, the thread id is record_uuid of the session head, and the first item is a developer message holding the in-band marker that names the source session id, the source head hash and the Codex version, declares the thread a fork and not that session, and carries no template hash.",
+          "done": false
+        },
+        {
+          "id": "C64",
+          "text": "Each translation appends one lys.translation custom entry beside the context path naming the thread, the head, the head hash, the rollout's relative path and the rollout's and account's SHA-256; the head and the session's earlier bytes do not move, and the Claude Code render of the session is unchanged by SHA-256.",
+          "done": false
+        },
+        {
+          "id": "C65",
+          "text": "The same session head translated into two fresh --out directories gives rollouts of equal SHA-256, and the second account differs from the first only by the one lost row naming the first translation's side leaf.",
+          "done": false
+        },
+        {
+          "id": "C66",
+          "text": "A Codex 0.156.0 rollout recorded in a scratch Codex home outside the repository in at most two attempts of one fixed shell command that reads nothing of the machine, after exactly one request that checks the proof account there can make requests and ends when codex exec exits, is committed as a fixture beside the Claude Code file that mirrors it, neither holding a machine path, an email or a token, and that file imported and translated gives response items equal to the recording's apart from ids and timestamps (id, call_id, turn_id and create_time), every Codex command there run with CODEX_HOME set to the scratch home.",
+          "done": false
+        },
+        {
+          "id": "C67",
+          "text": "PROOF-TRANSLATE.md records, with the seat that ran it and the date, Codex 0.156.0 resuming the translated thread in a scratch Codex home outside the repository and answering from its content, and resuming a translated thread that holds an image, with the proof account named by its role, the start checks, the attempts, each retry in a fresh scratch home, the paths, the rollout's hash before and after the resume, the side leaf's rollout hash, counts and exit statuses, and no transcript text, email or credential.",
+          "done": false
+        },
+        {
+          "id": "C68",
+          "text": "The home design admits exactly one translated pair, Claude Code to Codex, as roadmap stage 4b, and the cluster's rendered markdown is what its JSON renders to.",
+          "done": false
+        },
+        {
+          "id": "C69",
+          "text": "A sidechain is carried as marked text under the entry it hangs from, opening with a line naming its entry id and its agent id, and counted changed, with the agent label that names it counted changed, before label and after marker line, and a part marked text cannot hold, a base64 image included, listed lost with its reason; a branch summary or custom message on the context path is carried as marked developer text under its own marker and counted changed; lanterns, harness events and every other lys entry, render records included, are listed lost by entry id; a child forked at a user message carries that message's text after the walked history as the thread's next user prompt, counted changed with its how, and each of its parts that is not text is listed lost.",
+          "done": false
+        },
+        {
+          "id": "C70",
+          "text": "A base64 image part, in a user message or inside a tool result, is carried as Codex's input_image item with no detail key and counted changed, and Codex 0.156.0 is measured resuming a thread that holds one, with any detail value it needs taken from a rollout 0.156.0 wrote itself and named; an image of any other source is listed lost with its source type and part index and is never fetched.",
+          "done": false
+        }
+      ]
     }
   ]
 }
