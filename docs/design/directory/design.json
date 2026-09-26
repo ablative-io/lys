@@ -106,8 +106,8 @@
       "reason": "Tom left it as a thing to look at, not a row (ADR-010)."
     },
     {
-      "text": "Light mode, the error colour and the border radius of the Rauthy client themes",
-      "reason": "The estate colour tokens hold a dark foundation only; each is a gap for a design-system card the lead places, and DIRECTORY-002 leaves each as Rauthy holds it (ADR-016)."
+      "text": "Light mode, the error colour, the border radius, and the dark text_high, action and button text of the Rauthy client themes",
+      "reason": "The estate colour tokens hold a dark foundation only and name no emphasised text tier, no action role and no text-on-accent; each is a gap for a design-system card the lead places, and DIRECTORY-002 leaves each as Rauthy holds it (ADR-016)."
     }
   ],
   "structure": [

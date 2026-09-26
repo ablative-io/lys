@@ -65,7 +65,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - The examples in AGENT-PARITY-2026-09-23 (abilities with an assignment or project, seat provisioning within a budget, private and shared notes) — Tom gave them as not yet decided (docs/design/identity/AGENT-PARITY-2026-09-23.md:11-15); they are never turned into requirements.
 - A production Cambium auth cutover, and any upstream Rauthy contribution as a prerequisite — Revision 5 forbids both before scratch acceptance, review and Gypsy's coordinated install (docs/design/identity/briefs/IDENTITY-001.json:31).
 - A shared design-system package extracted for every product — Tom left it as a thing to look at, not a row (ADR-010).
-- Light mode, the error colour and the border radius of the Rauthy client themes — The estate colour tokens hold a dark foundation only; each is a gap for a design-system card the lead places, and DIRECTORY-002 leaves each as Rauthy holds it (ADR-016).
+- Light mode, the error colour, the border radius, and the dark text_high, action and button text of the Rauthy client themes — The estate colour tokens hold a dark foundation only and name no emphasised text tier, no action role and no text-on-accent; each is a gap for a design-system card the lead places, and DIRECTORY-002 leaves each as Rauthy holds it (ADR-016).
 
 ## Structure
 

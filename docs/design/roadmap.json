@@ -249,7 +249,7 @@
       "title": "Install the standalone service dependencies on one PostgreSQL database",
       "status": "idea",
       "kind": "feature",
-      "summary": "The card that builds DIRECTORY-002, Row 02 of IDENTITY-001 revision 5, adopted as it stands: the maintained Rauthy fork at its pin, SpiceDB and one PostgreSQL database packaged in deploy/identity/ and installed for development on a node the operator names, with the database host confirmed with the operator and possibly on a network device; lys identity prepare, configure and health in the lys CLI; both Rauthy client themes in dark from the estate tokens with each product's own accent; and SpiceDB's step-1 role written down and held. The lead's survey rulings are written in: sibling unit tests under crates/lys/src/identity/, dark-only themes with light, error and radius as design-system gaps (ADR-016), and the container-backed tests as their own leg of .land/gates.sh.",
+      "summary": "The card that builds DIRECTORY-002, Row 02 of IDENTITY-001 revision 5, adopted as it stands: the maintained Rauthy fork at its pin, SpiceDB and one PostgreSQL database packaged in deploy/identity/ and installed for development on a node the operator names, with the database host confirmed with the operator and possibly on a network device; lys identity prepare, configure and health in the lys CLI; both Rauthy client themes in dark from the estate tokens with each product's own accent; and SpiceDB's step-1 role written down and held. The lead's survey rulings are written in: sibling unit tests under crates/lys/src/identity/, dark-only themes mapping a field only where an estate token names its role, with light, error, radius and the dark emphasised text, action and button text as design-system gaps (ADR-016), idempotence counted over the two managed clients beside Rauthy's built-in one, and the container-backed tests as their own leg of .land/gates.sh.",
       "provenance": {
         "requested_by": "tom",
         "date": "2026-09-26T15:34:38+10:00",
@@ -273,7 +273,7 @@
         "commits": []
       },
       "depends_on": [],
-      "notes": "DIRECTORY-002 is the one unit and is built whole through the card chain; its three blocked_by entries are each discharged only by the blocker having landed, checked live when the build starts. Further units, not yet written: Theme the Rauthy clients' light mode, error colour and border radius from the design system (a design-system card the lead places, ADR-016). RM-001 carries the rest of the directory rows."
+      "notes": "DIRECTORY-002 is the one unit and is built whole through the card chain; its three blocked_by entries are each discharged only by the blocker having landed, checked live when the build starts. Further units, not yet written: Fill the Rauthy client theme gaps from the design system: light mode, error colour, border radius, and dark emphasised text, action and button text (a design-system card the lead places, ADR-016). RM-001 carries the rest of the directory rows."
     }
   ]
 }
