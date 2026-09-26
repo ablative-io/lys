@@ -325,6 +325,25 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-021",
+      "title": "The Rauthy client themes are dark only from the estate tokens, and every field the estate names no token for is a named gap",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-26",
+      "decided_by": "The lead's rulings on the DIRECTORY-002 themes; recorded with DIRECTORY-002",
+      "context": "DIRECTORY-002 R3 asked for all seven HSL fields, button text and border radius of both Rauthy client themes in light and dark mode, but the estate colour tokens name only a dark foundation (ink, surface, raised, text, muted) and each product's accent. They name no light mode, no error colour, no radius, no emphasised text tier, no action colour, no text-on-accent and no per-mode icon, so filling every Rauthy field would mean inventing colours the design system never chose.",
+      "decision": "Both client themes are dark only. A Rauthy field takes an estate token only where the estate names the same role: the dark text takes text, bg takes ink, bg_high takes raised and accent takes the client's product accent. Every other field is a gap that keeps Rauthy's own default: light mode, the error colour, the radius, and the dark text_high, action, btn_text, theme_sun and theme_moon, eight in all, listed by name in deploy/identity/theme-map.md. Rejected: mapping text to muted, which would set the body of every page in the secondary colour; and choosing colours for the fields the estate names no token for.",
+      "quote": "",
+      "consequences": [
+        "deploy/identity/rauthy-themes.json sets only the dark text, bg, bg_high and accent of each client; the light fields, the dark error and the radius stay as Rauthy holds them.",
+        "deploy/identity/theme-map.md names the eight gaps, and nothing reads a gap.",
+        "A design-system card that names tokens for the gaps fills them; until then each keeps Rauthy's own default.",
+        "Readable contrast is measured, not asserted: WCAG 2.1 AA over named pairs, a gap field measured at Rauthy's own default; a gap field whose default fails over ink stays a gap and stops the row by the pair's name, and the fix is a token the design-system card names."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
