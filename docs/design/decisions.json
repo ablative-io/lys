@@ -233,6 +233,26 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-014",
+      "title": "A translation to another harness is a per-target, per-version renderer of our own with a loss account, never that harness's importer",
+      "status": "proposed",
+      "scope": "home",
+      "date": "",
+      "decided_by": "",
+      "context": "The home promises that a session can move to another harness, and translation had been designed and not proved. Codex already ships an importer of Claude Code files; measured in the lantern work (tools/lantern/docs/02-SESSION-FORMATS.md section 3), it is a compaction and not a copy: it drops thinking, sidechains and meta records, clips tool input and tool results, and records no account of what it dropped. The ruling recorded there was to improve on it and not adopt it. The first pair, Claude Code to Codex 0.156.0, is built in HOME-004, and every later pair (Codex to Claude Code, Pi) will face the same fork, so the shape is decided once.",
+      "decision": "A translation to another harness is a renderer of our own, one per target harness and per measured version, over the home's context path: it carries every text part, tool call and tool result whole as the target's own items, carries readable thinking as text and drops opaque blocks by hash (home P3), announces itself in band as a translated context naming its source session and head hash, writes a JSON loss account beside its output listing kept, changed and lost by entry id and block hash, and is recorded on the session as a side leaf. It is not the target harness's own importer, adopted, wrapped or called, because that importer is a compaction that loses what the home keeps and cannot say what it lost; and it is not one renderer for every version, because a harness's file shape is a per-version measurement (home P6).",
+      "quote": "",
+      "consequences": [
+        "Each target version is measured from files that version wrote before it is rendered for; an unmeasured version is refused by name.",
+        "Every translation writes a loss account whose block hashes key to the home's block store.",
+        "Every translated thread carries an in-band marker naming its source session and head hash.",
+        "The target harness's importer is never a dependency and its code is never copied.",
+        "Later pairs (Codex to Claude Code, Pi) are their own renderers under this rule, each proved on its own."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

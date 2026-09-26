@@ -3,7 +3,7 @@
   "title": "The home: a session held under its identity, resumable by any harness that can be measured",
   "intention": "A session's history lives under the agent's identity, not under a harness. The record is what the model was given and what came back, in order, with each provider's native blocks kept whole. A harness's own resume file is rendered from that record on demand, so an agent moves machines, harnesses or providers and continues; the original bytes are never rewritten.",
   "problem": "Today a session exists only as its harness's file. Archie's Claude Code file measured 141,931,097 bytes on 24 September 2026: the conversation itself is under 3% of it, tool results 14%, thinking 6%, and about 60% is harness bookkeeping the model never sees; Waffles' file is 3.37 GB and Claude Code loads it whole. Nothing central holds a session, so nothing can render a smaller working session, move one to another device, swap provider and come back, or say what a session was given. Norn already has the canonical event model (SessionEvent, conversion to provider messages, compaction as a derived event, provider epoch boundaries) proved by its own tests; Claude Code has no importer to it and no renderer from it.",
-  "solution": "Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree, not Norn): one append-only JSONL per session, a header line, then entries each carrying id, parentId and timestamp, a leaf pointer for the current position, forks by moving the pointer, compaction and branch summaries as entries that keep their originals. lys adds nothing to that grammar: harness events (approvals, tool completion) and proxy call records ride Pi's custom entry type under lys customType names, so a home file stays readable by Pi's own parser. Two captures feed it: the model traffic through the door's proxy (the same process that swaps the credential, SECRETS-002 R1), and the harness's own events from its transcript. Content blocks are stored once by hash; entries reference them. A harness resume file is a rendered projection of the root-to-leaf path: for Claude Code, a JSONL written under a chosen uuid at the harness's own path, then resumed by that id with --fork-session. Provider-native reasoning stays on the message with its provider, api and model and is rendered whole only to the same three; another model gets readable thinking as text and opaque blocks dropped, each named in a loss account. lys grants say who may read and resume. Every resume path is measured on a named harness version before anything relies on it. A session is launched on a harness from a launch template kept in the home (ADR-012): one JSON object per harness, schema in docs/design/home/launch-template.schema.json, stored under templates/ by its SHA-256 beside sessions/ and blocks/, so a template's version is its hash. Its named slots map the home onto the harness: the transcript (the one slot no template maps generically, so the template names how the harness fills it; Claude Code fills it by resuming the rendered file by path with --fork-session, since a bare resume writes onto the rendered file's own name), the MCP configuration, the environment, the secrets (use-only ones written as their handle; readable ones refused until the secrets rows build the broker reader, ADR-001) and the appended instructions. lys-home render-launch reads a template and a session, writes the R4 render, its loss account, an MCP file, an environment file and an instructions file into one directory, and prints the launch line in its report without running it (ADR-007). Each render is recorded on the session as a lys.harness_event of the sixth kind, template_render, hung as a side leaf beside the context path so the head and the session head hash (SHA-256 of the head entry's line) do not move; the written paths ride in a manifest block the event names by hash, under the 512-byte cap. At render, the launch template also records the context record: a lys.given custom entry after the render event naming, by path, byte length and SHA-256 only, the instruction documents Claude Code will load for the session's working directory and the files the render wrote, in the order measured on a named Claude Code version, with the environment variable names the template set and the kinds of document resolved and left unlisted (@-imports and .claude/rules, which a second lys.given entry at the first request records), so a reader sees what was measured and can check a file on disk against it without anyone reading its contents.",
+  "solution": "Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree, not Norn): one append-only JSONL per session, a header line, then entries each carrying id, parentId and timestamp, a leaf pointer for the current position, forks by moving the pointer, compaction and branch summaries as entries that keep their originals. lys adds nothing to that grammar: harness events (approvals, tool completion) and proxy call records ride Pi's custom entry type under lys customType names, so a home file stays readable by Pi's own parser. Two captures feed it: the model traffic through the door's proxy (the same process that swaps the credential, SECRETS-002 R1), and the harness's own events from its transcript. Content blocks are stored once by hash; entries reference them. A harness resume file is a rendered projection of the root-to-leaf path: for Claude Code, a JSONL written under a chosen uuid at the harness's own path, then resumed by that id with --fork-session. Provider-native reasoning stays on the message with its provider, api and model and is rendered whole only to the same three; another model gets readable thinking as text and opaque blocks dropped, each named in a loss account. lys grants say who may read and resume. Every resume path is measured on a named harness version before anything relies on it. A session is launched on a harness from a launch template kept in the home (ADR-012): one JSON object per harness, schema in docs/design/home/launch-template.schema.json, stored under templates/ by its SHA-256 beside sessions/ and blocks/, so a template's version is its hash. Its named slots map the home onto the harness: the transcript (the one slot no template maps generically, so the template names how the harness fills it; Claude Code fills it by resuming the rendered file by path with --fork-session, since a bare resume writes onto the rendered file's own name), the MCP configuration, the environment, the secrets (use-only ones written as their handle; readable ones refused until the secrets rows build the broker reader, ADR-001) and the appended instructions. lys-home render-launch reads a template and a session, writes the R4 render, its loss account, an MCP file, an environment file and an instructions file into one directory, and prints the launch line in its report without running it (ADR-007). Each render is recorded on the session as a lys.harness_event of the sixth kind, template_render, hung as a side leaf beside the context path so the head and the session head hash (SHA-256 of the head entry's line) do not move; the written paths ride in a manifest block the event names by hash, under the 512-byte cap. At render, the launch template also records the context record: a lys.given custom entry after the render event naming, by path, byte length and SHA-256 only, the instruction documents Claude Code will load for the session's working directory and the files the render wrote, in the order measured on a named Claude Code version, with the environment variable names the template set and the kinds of document resolved and left unlisted (@-imports and .claude/rules, which a second lys.given entry at the first request records), so a reader sees what was measured and can check a file on disk against it without anyone reading its contents. The first translation to another harness is one named pair, Claude Code to Codex 0.156.0 (ADR-014): lys-home render-codex walks the same context path the Claude Code render walks and writes a rollout in the shape Codex 0.156.0 writes for its own threads, measured from files that version wrote, with every text part, tool call and tool result carried whole as Codex's own items, readable thinking as text and opaque blocks dropped by hash, an in-band marker naming the source session and its head hash, a JSON loss account beside it listing kept, changed and lost by entry id and block hash, and a codex_translation event beside the context path naming both files by path and SHA-256; nothing above it assumes the translation.",
   "principles": [
     {
       "id": "P1",
@@ -52,7 +52,8 @@
     "ADR-004",
     "ADR-007",
     "ADR-012",
-    "ADR-013"
+    "ADR-013",
+    "ADR-014"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -62,7 +63,8 @@
     "The canon, one curated versioned series of short examples each showing a rule lived, seeds every new session, and its effect is measured on a card against a plain start.",
     "A handover letter from an outgoing session seeds its successor as inherited memory, with the model's own thinking intact, and the effect is measured on a card against a plain start.",
     "A session in the home renders, from a Claude Code launch template kept in the home by hash, into a directory of launch files whose hashes are identical on a second render, and the printed launch line resumes it on the installed Claude Code version, measured.",
-    "Every launch-template render records what the session was given: one lys.given entry after the render event naming each instruction document Claude Code will load, and each file the render wrote, by path, byte length and SHA-256 in the measured order, with the environment variable names the template set, and never a document's content; lys-home lists those records and checks a file on disk against one by hash."
+    "Every launch-template render records what the session was given: one lys.given entry after the render event naming each instruction document Claude Code will load, and each file the render wrote, by path, byte length and SHA-256 in the measured order, with the environment variable names the template set, and never a document's content; lys-home lists those records and checks a file on disk against one by hash.",
+    "One home session imported from Claude Code translates into a Codex 0.156.0 rollout that Codex 0.156.0 resumes and answers from, with every text part, tool call and tool result carried whole, a loss account naming what was kept, changed and lost by entry id and block hash, and the Claude Code render of the same session unchanged by hash."
   ],
   "non_goals": [
     {
@@ -74,8 +76,8 @@
       "reason": "Stage 3's three preconditions (identity and read authority, encryption before bytes leave, the resume evidence) are their own brief."
     },
     {
-      "text": "Harnesses other than Claude Code, and Chat Completions or Responses translation beyond keeping the raw call bytes.",
-      "reason": "One harness proved first; each other harness is its own profile and its own measurement."
+      "text": "Harnesses other than Claude Code and Codex 0.156.0, and Chat Completions or Responses translation beyond keeping the raw call bytes.",
+      "reason": "One harness proved first; each other harness is its own profile and its own measurement. Codex 0.156.0 is the first translation target, one named pair measured on its own (HOME-004)."
     },
     {
       "text": "Lanterns and forks at a coordinate (stages 5 and 5b).",
@@ -480,6 +482,76 @@
       "path": "crates/lys-home/tests/given_record.rs",
       "note": "end to end on the fixture template: order, two renders equal, one byte changed, matches and differs, no content",
       "brief": "HOME-003"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-004.json",
+      "note": "the fourth brief: the first translation, Claude Code to Codex 0.156.0, with its loss account",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-004.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "docs/design/home/PROOF-TRANSLATE.md",
+      "note": "the measured resume of a translated rollout by Codex 0.156.0 in an isolated Codex home: version, hashes, counts and paths only",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/mod.rs",
+      "note": "the Codex profile: the measured 0.156.0 rollout shape, version, model and provider; declarations only",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/rollout.rs",
+      "note": "the context path mapped to Codex 0.156.0 items: text, function call and output whole, readable thinking as text, the marker last",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/rollout_tests.rs",
+      "note": "gates on the item mapping: whole, ordered, deterministic, opaque dropped, images refused",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/loss.rs",
+      "note": "the loss account: kept, changed and lost by entry id and the importer's block hash",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/loss_tests.rs",
+      "note": "gates on the account: every hash found in the block store, every entry and part once",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/translate.rs",
+      "note": "render-codex's work: version check, existing path refused, both files written, the codex_translation side leaf",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/translate_tests.rs",
+      "note": "gates on the refusals writing nothing, and the side leaf leaving the head",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/cli/codex.rs",
+      "note": "the render-codex subcommand, split out of cli.rs",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/tests/codex_translation.rs",
+      "note": "end to end: fixture Claude Code file imported and translated, matched to the recorded rollout, the account, the Claude Code render unchanged",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/tests/fixtures/codex/claude-code.jsonl",
+      "note": "the fixture Claude Code file, synthetic, carrying the recorded rollout's conversation",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/tests/fixtures/codex/rollout-0.156.0.jsonl",
+      "note": "the fixture rollout recorded from Codex 0.156.0 itself, synthetic",
+      "brief": "HOME-004"
     }
   ],
   "inventory": [
