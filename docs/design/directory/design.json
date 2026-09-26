@@ -50,7 +50,8 @@
     "ADR-008",
     "ADR-009",
     "ADR-010",
-    "ADR-011"
+    "ADR-011",
+    "ADR-016"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -103,6 +104,10 @@
     {
       "text": "A shared design-system package extracted for every product",
       "reason": "Tom left it as a thing to look at, not a row (ADR-010)."
+    },
+    {
+      "text": "Light mode, the error colour and the border radius of the Rauthy client themes",
+      "reason": "The estate colour tokens hold a dark foundation only; each is a gap for a design-system card the lead places, and DIRECTORY-002 leaves each as Rauthy holds it (ADR-016)."
     }
   ],
   "structure": [
@@ -267,6 +272,56 @@
       "brief": "DIRECTORY-002"
     },
     {
+      "path": "crates/lys/src/identity/config_tests.rs",
+      "note": "unit tests of config.rs, beside it (CN9 revision)",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/credentials_tests.rs",
+      "note": "unit tests of credentials.rs, beside it (CN9 revision)",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/private_files_tests.rs",
+      "note": "unit tests of private_files.rs, beside it (CN9 revision)",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/prepare_tests.rs",
+      "note": "unit tests of prepare.rs, beside it (CN9 revision)",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/configure_tests.rs",
+      "note": "unit tests of configure.rs, beside it (CN9 revision)",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/rauthy_tests.rs",
+      "note": "unit tests of rauthy.rs, beside it (CN9 revision)",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/themes_tests.rs",
+      "note": "unit tests of themes.rs, beside it (CN9 revision)",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/health_tests.rs",
+      "note": "unit tests of health.rs, beside it (CN9 revision)",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/error_tests.rs",
+      "note": "unit tests of error.rs, beside it (CN9 revision)",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": ".land/gates.sh",
+      "note": "the land gate; gains the container-backed identity test leg",
+      "brief": "DIRECTORY-002"
+    },
+    {
       "path": "crates/lys/tests/identity_deploy.rs",
       "note": "ID001_DEPLOY",
       "brief": "DIRECTORY-002"
@@ -343,7 +398,7 @@
     },
     {
       "path": "deploy/identity/theme-map.md",
-      "note": "source tokens and colour conversions of the themes",
+      "note": "source tokens and colour conversions of the dark themes, and the light, error and radius gaps",
       "brief": "DIRECTORY-002"
     },
     {
@@ -646,7 +701,7 @@
     },
     {
       "id": "CN9",
-      "text": "A row that needs a file outside its wall stops and names it, and the reviewer approves a brief revision before that file is edited; a directory wall for a wholly new module allows only its named responsibility and needs an exact file manifest reviewed before its row starts (docs/design/identity/briefs/IDENTITY-001.json:28)."
+      "text": "A row that needs a file outside its wall stops and names it, and the reviewer approves a brief revision before that file is edited; a directory wall for a wholly new module allows only its named responsibility and needs an exact file manifest reviewed before its row starts (docs/design/identity/briefs/IDENTITY-001.json:28). Revision approved for DIRECTORY-002: the eleven manifest modules are the production files of crates/lys/src/identity/, each may have a sibling <module>_tests.rs holding its tests as crates/lys/src/cli_tests.rs does, and none of them exceeds 500 lines of code."
     },
     {
       "id": "CN10",
@@ -664,12 +719,19 @@
   "gate": [
     {
       "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
       "legs": [
         {
           "name": "fmt",
           "command": "cargo fmt --all",
           "requires": [
-            "place:here"
+            "tool:cargo",
+            "tool:rustfmt"
           ],
           "cadence": "round"
         },
@@ -677,7 +739,7 @@
           "name": "clippy-all-features",
           "command": "cargo clippy --all-targets --all-features -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -685,7 +747,7 @@
           "name": "clippy",
           "command": "cargo clippy --all-targets -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -693,7 +755,7 @@
           "name": "tests",
           "command": "cargo test --workspace --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -701,7 +763,7 @@
           "name": "doc-all-features",
           "command": "cargo doc --no-deps --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -709,36 +771,16 @@
           "name": "doc",
           "command": "cargo doc --no-deps",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        }
-      ]
-    },
-    {
-      "tree": "docs",
-      "legs": [
-        {
-          "name": "render",
-          "command": "python3 ../scripts/design/render-cluster.py design/directory",
-          "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
         {
-          "name": "validate",
-          "command": "python3 ../scripts/design/validate.py design/directory",
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        },
-        {
-          "name": "coverage",
-          "command": "python3 ../scripts/design/check-coverage.py design/directory",
-          "requires": [
-            "place:here"
+            "tool:sh",
+            "tool:python3"
           ],
           "cadence": "round"
         }

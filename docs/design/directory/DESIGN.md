@@ -42,6 +42,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
 - ADR-010 — Every product shares one design and keeps its own accent; the identity product's is orange — The identity screens follow Aion's structure, typography, spacing and interaction, and Rauthy's client themes take the same colours, with no build dependency on Cambium or Aion. Each product keeps its own accent within the estate colour family: Cambium green, Aion blue and black, Argus light blue, Haematite mustard. The identity product's accent is orange (accent #D4975A, deep #A86B2E, wash #3D2A17 in the estate colour tokens), set apart from Manifold's copper. No product is silently made Aion-blue, and purple is not used.
 - ADR-011 — An identity is registered, active, suspended or retired — An identity is in one of four states: registered (exists in the directory, no grants, no credential handle, may not act), active (may act within its grants), suspended (kept whole, grants kept but not effective) and retired (permanent, history kept, never reactivated; a new identity is made instead). Register, activate, suspend, reinstate and retire are the only transitions, each one signed audit record naming the authenticated actor and their provenance, the identity, from, to, when and reason. Having a grant or a credential is a fact beside the state, not a state. A person is registered by first sign-in; an agent is registered by a signed-in person, who carries it as its responsible person for life and may cause every transition of their own agents. Source: docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:71-95.
+- ADR-016 — The identity install themes Rauthy in dark only, from the estate tokens as they stand — The install card uses the design-system tokens as they stand, in dark only. Light mode, the error colour and the radius are out of scope for DIRECTORY-002 and are each named as a gap for a design-system card the lead places. Where two dark backgrounds compete, the one the design system names as the page surface wins: foundation ink, whose use is page background. Rejected: reading light mode, error and radius from Aion's console stylesheet at a pinned commit, which would make Aion a colour source outside the design system.
 
 ## Goals
 
@@ -64,6 +65,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - The examples in AGENT-PARITY-2026-09-23 (abilities with an assignment or project, seat provisioning within a budget, private and shared notes) — Tom gave them as not yet decided (docs/design/identity/AGENT-PARITY-2026-09-23.md:11-15); they are never turned into requirements.
 - A production Cambium auth cutover, and any upstream Rauthy contribution as a prerequisite — Revision 5 forbids both before scratch acceptance, review and Gypsy's coordinated install (docs/design/identity/briefs/IDENTITY-001.json:31).
 - A shared design-system package extracted for every product — Tom left it as a thing to look at, not a row (ADR-010).
+- Light mode, the error colour and the border radius of the Rauthy client themes — The estate colour tokens hold a dark foundation only; each is a gap for a design-system card the lead places, and DIRECTORY-002 leaves each as Rauthy holds it (ADR-016).
 
 ## Structure
 
@@ -101,6 +103,16 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `crates/lys/src/identity/themes.rs` | reads the declared estate palette mapping and validates both client themes | DIRECTORY-002 |
 | `crates/lys/src/identity/health.rs` | named readiness checks for the declared services; SpiceDB readiness only | DIRECTORY-002 |
 | `crates/lys/src/identity/error.rs` | typed errors carrying operation, resource and path, never secret bytes | DIRECTORY-002 |
+| `crates/lys/src/identity/config_tests.rs` | unit tests of config.rs, beside it (CN9 revision) | DIRECTORY-002 |
+| `crates/lys/src/identity/credentials_tests.rs` | unit tests of credentials.rs, beside it (CN9 revision) | DIRECTORY-002 |
+| `crates/lys/src/identity/private_files_tests.rs` | unit tests of private_files.rs, beside it (CN9 revision) | DIRECTORY-002 |
+| `crates/lys/src/identity/prepare_tests.rs` | unit tests of prepare.rs, beside it (CN9 revision) | DIRECTORY-002 |
+| `crates/lys/src/identity/configure_tests.rs` | unit tests of configure.rs, beside it (CN9 revision) | DIRECTORY-002 |
+| `crates/lys/src/identity/rauthy_tests.rs` | unit tests of rauthy.rs, beside it (CN9 revision) | DIRECTORY-002 |
+| `crates/lys/src/identity/themes_tests.rs` | unit tests of themes.rs, beside it (CN9 revision) | DIRECTORY-002 |
+| `crates/lys/src/identity/health_tests.rs` | unit tests of health.rs, beside it (CN9 revision) | DIRECTORY-002 |
+| `crates/lys/src/identity/error_tests.rs` | unit tests of error.rs, beside it (CN9 revision) | DIRECTORY-002 |
+| `.land/gates.sh` | the land gate; gains the container-backed identity test leg | DIRECTORY-002 |
 | `crates/lys/tests/identity_deploy.rs` | ID001_DEPLOY | DIRECTORY-002 |
 | `crates/lys/tests/identity_refusals.rs` | ID001_DEPLOY_REFUSAL | DIRECTORY-002 |
 | `crates/lys/tests/identity_theme.rs` | ID001_THEME | DIRECTORY-002 |
@@ -116,7 +128,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `deploy/identity/postgres-init.sql` | roles and schema namespaces for Rauthy and SpiceDB in one database | DIRECTORY-002 |
 | `deploy/identity/README.md` | install, readiness, backup and restore, and SpiceDB's step-1 sentence (DIRECTORY-002); the directory (DIRECTORY-003) and the screens (DIRECTORY-005) | DIRECTORY-002 |
 | `deploy/identity/rauthy-themes.json` | both Rauthy client themes | DIRECTORY-002 |
-| `deploy/identity/theme-map.md` | source tokens and colour conversions of the themes | DIRECTORY-002 |
+| `deploy/identity/theme-map.md` | source tokens and colour conversions of the dark themes, and the light, error and radius gaps | DIRECTORY-002 |
 | `docs/design/identity/reports/IDENTITY-001-deployment.md` | row 02's report: digests, versions, resolved configuration without secrets, restore result | DIRECTORY-002 |
 | `crates/lys-identity/` | directory records, typed API and event projection; exact manifest reviewed before the row starts | DIRECTORY-003 |
 | `crates/lys-identity-server/` | OIDC session handling, administrator admission and the link-audit receiver (DIRECTORY-003); routes and assets of the screens (DIRECTORY-005) | DIRECTORY-003 |
@@ -185,7 +197,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - **CN6** — The live demonstrations ID001_LINK_LIVE (after row 03) and ID001_DIRECTORY_LIVE (after row 05) are mandatory operator hold points: the brief that follows each is blocked by it until Tom's demonstration receipt is recorded; a loop completion never stands in for one.
 - **CN7** — Revision 5's ceiling stands: 48 focused implementer hours for IDENTITY-001 (row 01 1.5, closed; 02 8; 04 10; 03 10; 05 6; 06 4; 07 5; total 44.5, contingency 3.5), with IDENTITY-002's 4 hours outside it. An overrun is reported as soon as it is known, and Waffles takes any ceiling change to Tom (docs/design/identity/briefs/IDENTITY-001.json:24).
 - **CN8** — One implementer, one row in implementation and one gate invocation at a time in this lane; release builds, checks and tests run through the gate workflow at the venue, and a development exception never bypasses it (docs/design/identity/briefs/IDENTITY-001.json:25-27, docs/design/identity/briefs/IDENTITY-001.json:135).
-- **CN9** — A row that needs a file outside its wall stops and names it, and the reviewer approves a brief revision before that file is edited; a directory wall for a wholly new module allows only its named responsibility and needs an exact file manifest reviewed before its row starts (docs/design/identity/briefs/IDENTITY-001.json:28).
+- **CN9** — A row that needs a file outside its wall stops and names it, and the reviewer approves a brief revision before that file is edited; a directory wall for a wholly new module allows only its named responsibility and needs an exact file manifest reviewed before its row starts (docs/design/identity/briefs/IDENTITY-001.json:28). Revision approved for DIRECTORY-002: the eleven manifest modules are the production files of crates/lys/src/identity/, each may have a sibling <module>_tests.rs holding its tests as crates/lys/src/cli_tests.rs does, and none of them exceeds 500 lines of code.
 - **CN10** — Rows 02 to 05 run on Rauthy v0.36.2 under Waffles' ruling of 15:36:25; each development install checks current releases and advisories and records the accepted exception; IDENTITY-001-UPSTREAM-AUTH-STATE binds real sign-in and install, rows 06 and 07 (docs/design/identity/briefs/IDENTITY-001.json:18, docs/design/identity/briefs/IDENTITY-001.json:46).
 - **CN11** — Step 1 is directory records, sign-in and the minimum signed identity audit. SpiceDB is installed and checked in row 02 and enforces nothing in step 1; live capability policy and its enforcement are step 2's, and running SpiceDB is not permission enforcement (docs/design/identity/briefs/IDENTITY-001.json:29-30).
 - **CN12** — DIRECTORY-006 is implementation work after the frozen planning task: its source paths are only executable after the DIRECTORY-002/003 foundations are implemented and their integration manifests are reconciled. R6 also waits for the standalone surface foundation. Do not dispatch from a schema-valid but dependency-blocked brief.

@@ -28,7 +28,6 @@
         ],
         "briefs": [
           "DIRECTORY-001",
-          "DIRECTORY-002",
           "DIRECTORY-003",
           "DIRECTORY-004",
           "DIRECTORY-005"
@@ -36,7 +35,7 @@
         "commits": []
       },
       "depends_on": [],
-      "notes": "The briefs build in order: DIRECTORY-002 before 003, 003 before 004 and 005. Each card runs through the board (brief_card, then card_build_v3)."
+      "notes": "The briefs build in order: DIRECTORY-002 before 003, 003 before 004 and 005. Each card runs through the board (brief_card, then card_build_v3). DIRECTORY-002 is owned by RM-009, the card that builds it."
     },
     {
       "id": "RM-002",
@@ -244,6 +243,37 @@
         "RM-005"
       ],
       "notes": "HOME-004 is the first unit. Further units, not yet written: Stage 5b: fork through a lantern (cut at its point and seed a new session); Lit-by from a directory identity rather than a declared name; Lighting from a live session under capture (the door's proxy or harness hook); Cambium's lantern screen; Recall by resonance and vectors, with ranking and churn dimming."
+    },
+    {
+      "id": "RM-009",
+      "title": "Install the standalone service dependencies on one PostgreSQL database",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "The card that builds DIRECTORY-002, Row 02 of IDENTITY-001 revision 5, adopted as it stands: the maintained Rauthy fork at its pin, SpiceDB and one PostgreSQL database packaged in deploy/identity/ and installed for development on a node the operator names, with the database host confirmed with the operator and possibly on a network device; lys identity prepare, configure and health in the lys CLI; both Rauthy client themes in dark from the estate tokens with each product's own accent; and SpiceDB's step-1 role written down and held. The lead's survey rulings are written in: sibling unit tests under crates/lys/src/identity/, dark-only themes with light, error and radius as design-system gaps (ADR-016), and the container-backed tests as their own leg of .land/gates.sh.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-26T15:34:38+10:00",
+        "quote": "The brief for this card already stands in the cluster: docs/design/directory/briefs/DIRECTORY-002.json and DIRECTORY-002.md, \"Install the standalone service dependencies on one PostgreSQL database\", Row 02 of IDENTITY-001 revision 5, on main. Adopt it as this card's brief, unchanged. Keep its four requirements exactly: R1 package Rauthy, SpiceDB and one PostgreSQL database and install them for development; R2 prepare, configure and check the deployment from the lys CLI; R3 theme both Rauthy clients with Aion's vocabulary and each product's own accent (ADR-010: every product shares one design and keeps its own accent); R4 state what SpiceDB enforces in step 1 and hold to it. Keep its boundaries and verification as written, and change nothing the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh) does not require. Facts the brief already settles, which the survey must not reopen: PostgreSQL may live on one of the network devices and the host is confirmed with the operator before anything is installed; the install runs on a node the operator names (ADR-005) with test identities only; the Rauthy installed is the maintained fork (ADR-009) at its pin from Row 01; one PostgreSQL holds both Rauthy and SpiceDB. Nothing here is a production node, no production key is generated and no receipt is emitted outside a test; those three acts are Tom's. If the survey finds a sentence of DIRECTORY-002 open or contradicted by the repository as it stands, quote that sentence as a question for the lead rather than rewriting the brief around it. This card supersedes the archived board 2 twin \"Install the three services on one PostgreSQL\", whose sign-off carries over.",
+        "context": "The Row 02 install card on the Lys board, superseding the archived board 2 twin 'Install the three services on one PostgreSQL'. Surveyed against the tree as it stands; the lead answered the survey's four questions (the test-file wall, the colour source, the container-test leg, and which blockers a carried-over sign-off discharges) and DIRECTORY-002 carries those answers."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-003",
+          "ADR-004",
+          "ADR-005",
+          "ADR-009",
+          "ADR-010",
+          "ADR-011",
+          "ADR-016"
+        ],
+        "briefs": [
+          "DIRECTORY-002"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "DIRECTORY-002 is the one unit and is built whole through the card chain; its three blocked_by entries are each discharged only by the blocker having landed, checked live when the build starts. Further units, not yet written: Theme the Rauthy clients' light mode, error colour and border radius from the design system (a design-system card the lead places, ADR-016). RM-001 carries the rest of the directory rows."
     }
   ]
 }

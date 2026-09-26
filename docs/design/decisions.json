@@ -270,6 +270,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-016",
+      "title": "The identity install themes Rauthy in dark only, from the estate tokens as they stand",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-26",
+      "decided_by": "The lead of the directory card, answering the DIRECTORY-002 survey",
+      "context": "DIRECTORY-002 R3 reads its colours from the estate colour tokens (ablative-docs 385916e), which hold a dark foundation and the product accents only: no light neutrals, no error colour and no radius. Rauthy's theme needs light and dark values for seven fields plus button text and radius. The only light palette in the estate is Aion's console stylesheet, and its dark background (#121218) differs from the estate ink (#0C0E10).",
+      "decision": "The install card uses the design-system tokens as they stand, in dark only. Light mode, the error colour and the radius are out of scope for DIRECTORY-002 and are each named as a gap for a design-system card the lead places. Where two dark backgrounds compete, the one the design system names as the page surface wins: foundation ink, whose use is page background. Rejected: reading light mode, error and radius from Aion's console stylesheet at a pinned commit, which would make Aion a colour source outside the design system.",
+      "quote": "",
+      "consequences": [
+        "DIRECTORY-002 R3 sets the dark text, text_high, bg, bg_high, action, accent and button text of both clients, and leaves the light fields, the dark error and the radius as Rauthy holds them.",
+        "deploy/identity/theme-map.md names the three gaps; nothing reads colours from apps/aion-ops-console/src/index.css.",
+        "ADR-010's accessible light values and corner radius wait for the design-system card that fills the gaps."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
