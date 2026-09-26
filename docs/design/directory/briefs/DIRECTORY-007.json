@@ -1,0 +1,192 @@
+{
+  "id": "DIRECTORY-007",
+  "cluster": "directory",
+  "title": "Write the common audit receipt for sign-ins and permission changes, its owners and the lead's rulings",
+  "depends_on": [],
+  "blocked_by": [],
+  "checklist": [
+    "C31",
+    "C32",
+    "C33",
+    "C34",
+    "C35",
+    "C36",
+    "C37"
+  ],
+  "stories": [
+    "S13",
+    "S14"
+  ],
+  "design_anchor": [
+    "ADR-008",
+    "ADR-009",
+    "ADR-011",
+    "ADR-024"
+  ],
+  "purpose": "Write, as one brief, the audit receipt every sign-in and every permission change leaves: IDENTITY-001's shared contract carried as written, the one brief that emits each operation's receipt, the constraints the receipt and its verifier are built under, the counted measures their code unit is accepted by, and the lead's rulings and open questions. Documents only: the receipt code, its emitters and the verifier's surface are later units of RM-015, and nothing here reopens what stands on main.",
+  "task": "Land DIRECTORY-007 as a documents-only unit of RM-015. R1 records ADR-024 and the receipt constraints CN13 to CN17 in the directory design; R2 carries IDENTITY-001's receipt contract as written and names what stands; R3 names the one brief that emits each operation's receipt; R4 sets the requirements and counted measures the receipt code unit is built under; R5 records the questions routed to the lead; R6 adds the checklist and story rows and renders the cluster. In scope: the documents the requirements list. Out of scope, as later units of RM-015 named by title and not written here: the audit receipt record and its verifier; lifecycle-transition and agent-provisioning receipts emitted by the directory service; sign-in success and refusal receipts; provider-link receipts through DIRECTORY-004's outbox; grant given and removed receipts; the verifier surface in the lys CLI or the directory service. This brief defines the common receipt and its verifier and replaces nothing: DIRECTORY-003 R2 (identity changes), DIRECTORY-004 ID001_LINK_AUDIT (provider links) and DIRECTORY-006 GRANT_AUDIT (grants) keep emitting their receipts inside their own walls, unedited, so R3's assignment points at them and claims none of their checklist items. 'Receipts append to the lys log' is written precisely: the signed event is the appended leaf, and the receipt is returned beside it carrying the coordinate and the payload commitment (CN14). The roadmap row RM-015 is written with this brief's authoring and is not one of its files; ADR-024 lands with R1. Every path is relative to the repository root. No code is written and nothing is signed.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Record the encoding ruling and the receipt constraints in the directory design",
+      "spec": "THE SYSTEM SHALL hold in docs/design/decisions.json the ruling that the receipt's signed encoding stays with docs/design/identity/IDENTITY-EVENTS.md under its recorded joint review (ADR-024, decided, naming the rejected alternative of fixing the bytes in this brief), and SHALL hold in docs/design/directory/design.json the constraints CN13 to CN17: the performing service signs and the verifier is given its key (CN13); the appended leaf is the signed event, in operation order, and the receipt is returned beside it with the coordinate and the payload commitment (CN14); the signature is checked first, every signature failure answers with one refusal, and a commitment mismatch is refused by its own name only after the signature verifies (CN15); no receipt is emitted outside a test harness (CN16); the encoding, tag and content type live in IDENTITY-EVENTS.md, under a tag of the receipt's own alongside every shipped tag (CN17). The design SHALL gain ADR-024 in its decisions; non-goals for Rauthy-native refusals, the answered check, the verifier's home, development-install receipts, the grant receipt's payload and a separate provisioning receipt; and structure rows for docs/design/directory/briefs/DIRECTORY-007.json and its rendered markdown. It SHALL NOT edit ADR-001 to ADR-018, any existing principle, constraint, non-goal or structure row, and SHALL NOT record as decided anything a non-goal records as open.",
+      "acceptance": [
+        "python3 scripts/design/validate.py docs/design/decisions.json prints 'All 1 document(s) valid.', and the entry with id ADR-024 has status 'decided' and scope 'directory'.",
+        "The decisions ADR-001 to ADR-018 in docs/design/decisions.json compare equal, as parsed JSON, to the same entries at commit 1756688.",
+        "docs/design/directory/design.json holds exactly 17 constraints; CN1 to CN12 compare equal to commit 1756688, and CN13 to CN17 are present.",
+        "design.json's decisions array contains ADR-024, and its structure array holds docs/design/directory/briefs/DIRECTORY-007.json and docs/design/directory/briefs/DIRECTORY-007.md, each with brief 'DIRECTORY-007'."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/decisions.json",
+          "docs/design/directory/design.json",
+          "docs/design/directory/DESIGN.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C34"
+      ],
+      "stories": [
+        "S13"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Carry IDENTITY-001's receipt contract as written and state what stands",
+      "spec": "The brief SHALL carry, word for word, the shared contract sentence of docs/design/identity/briefs/IDENTITY-001.md:57: 'Audit receipts carry a version, stable operation ID, actor, affected identity, operation, payload commitment and resulting log coordinate/checkpoint. Secrets and whole context objects are excluded. Exact signed encoding is reviewed before use, not frozen by this draft.' It keeps 'resulting log coordinate/checkpoint' as written and adds no field, since a field needs a lead's ruling and none adds one. The brief SHALL name as standing on main and not reopened: that contract; the audit-record wording of the lifecycle states document listed in the design's inventory (every transition one signed, service-attested audit record naming who, which identity, from, to, when and reason, with grant and revoke records of the same shape); and the three acts reserved in docs/design/lys-anchor/DECISIONS.md:326-336, publishing lys-anchor, generating a production anchor key and emitting any receipt outside a test, under any tag. The brief SHALL NOT paraphrase the contract in place of the sentence, SHALL NOT edit any IDENTITY-001 file or the lifecycle states document, and SHALL NOT perform or schedule any of the three reserved acts.",
+      "acceptance": [
+        "DIRECTORY-007.json contains the contract sentence exactly as line 57 of docs/design/identity/briefs/IDENTITY-001.md reads after its leading '- '.",
+        "git diff 1756688 -- docs/design/identity/ prints nothing.",
+        "R2's spec names docs/design/lys-anchor/DECISIONS.md:326-336 and the three acts: publishing lys-anchor, generating a production anchor key, and emitting any receipt outside a test."
+      ],
+      "files": {
+        "create": [
+          "docs/design/directory/briefs/DIRECTORY-007.json",
+          "docs/design/directory/briefs/DIRECTORY-007.md"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C31",
+        "C32"
+      ],
+      "stories": [
+        "S13"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Name the one brief that emits each operation's receipt",
+      "spec": "THE SYSTEM SHALL assign each operation the audit receipt card lists exactly one emitting brief or unit, replacing none of the receipt requirements on main, which keep emitting inside their own walls: (1) an identity moving between lifecycle states: DIRECTORY-003 R5, each transition one signed event under R2's envelope. (2) An agent being provisioned: no act of its own, since provisioned is a view over grants and a handle and not a transition; it shows as the agent's register transition by an administrator (DIRECTORY-003 R1 and R5) and then each grant given to it (6). (3) A person's first sign-in, where it registers the person as ADR-011 proposes: one event, register, whose receipt records the sign-in as its provenance, and no second sign-in receipt; while DIRECTORY-003 R1's step-1 rule stands a first sign-in registers nobody and leaves a sign-in receipt like any later one; ADR-011 is proposed, so a different ruling is a brief revision. (4) A sign-in the directory service records, and a sign-in the directory service refuses after Rauthy has authenticated the person: the sign-in receipt unit of RM-015, signed by the directory service. (5) A provider being linked to a person: DIRECTORY-004 ID001_LINK_AUDIT, through its outbox and DIRECTORY-003 R4's receiver. (6) A grant being given or taken away: DIRECTORY-006 GRANT_AUDIT, whose payload waits on the grant representation; this brief commits only to the contract's common fields and treats the payload commitment as a commitment over whatever representation is settled. IF a refusal is made by Rauthy itself (a bad password, a failed provider callback), THEN no receipt of this card covers it, and the design's non-goal states why. The brief SHALL NOT add a receipt requirement to DIRECTORY-003, DIRECTORY-004 or DIRECTORY-006, SHALL NOT edit those briefs, and SHALL NOT make a separate provisioning receipt.",
+      "acceptance": [
+        "R3's spec lists 6 operations, numbered 1 to 6, each assigned to exactly one of DIRECTORY-003, DIRECTORY-004, DIRECTORY-006 and the sign-in receipt unit of RM-015.",
+        "git diff 1756688 -- docs/design/directory/briefs/DIRECTORY-003.json docs/design/directory/briefs/DIRECTORY-004.json docs/design/directory/briefs/DIRECTORY-006.json prints nothing.",
+        "design.json's non_goals hold the entry for refusals Rauthy makes itself, and its reason names ADR-009."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/directory/briefs/DIRECTORY-007.json"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C33"
+      ],
+      "stories": [
+        "S13"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Set the requirements and counted measures the receipt code unit is built under",
+      "spec": "The brief SHALL state the requirements the receipt code unit of RM-015 carries when it is written. That unit SHALL NOT start before docs/design/identity/IDENTITY-EVENTS.md is on main with the envelope version, the typed payloads, the named commitment hash and its recorded review (ADR-024), and crates/lys-identity/ is on main from DIRECTORY-003; its receipt type and verifier core are a wholly new module of crates/lys-identity whose exact file manifest is reviewed before it starts (CN9), and never part of lys-core. The requirements: (a) WHEN the directory service commits an operation, THE SYSTEM SHALL append the signed event as the leaf and return a receipt carrying the contract's fields, the coordinate the append returned and the payload commitment, signed with the performing service's test key, and SHALL NOT sign with a key of the identity the receipt is about, append the receipt itself, or sign under lys/anchor-receipt/v1, lys/attestation/v2 or any other shipped tag (CN13, CN14, CN17). (b) WHEN several operations are committed, THE SYSTEM SHALL append their events in the order the operations happened and SHALL NOT return a receipt for an operation whose event is not durably appended (P5). (c) WHEN given the log, a receipt and the service's public key, THE verifier SHALL check the signature against that key first, then that the coordinate lies in the log, then that the payload commitment matches the leaf at the coordinate, and SHALL refuse a mismatch by its own name; it SHALL NOT report a coordinate or commitment refusal for a receipt whose signature failed, and SHALL NOT take a key carried in the receipt as its authority (CN15). (d) IF a secret or a whole context object would enter a receipt, a Debug rendering, an error or a log line, THEN THE SYSTEM SHALL NOT write it there. (e) WHILE outside a test harness, THE SYSTEM SHALL NOT emit a receipt (CN16). The measures, each a test that counts what fired: (m1) five operations committed in order produce leaves at indices 0 to 4 in that order and exactly 5 receipts, all 5 accepted by the verifier; (m2) a table of exactly 9 cases, one each for a changed version, operation ID, actor, affected identity, operation, payload commitment and coordinate, one flipped signature byte, and one receipt signed with the affected identity's test key, yields 9 signature refusals and 0 acceptances; (m3) a receipt correctly signed with the service key whose coordinate names a leaf holding a different payload yields exactly 1 named commitment-mismatch refusal and 0 signature refusals; (m4) a correctly signed receipt whose coordinate lies past the log's end yields exactly 1 coordinate refusal; (m5) the Debug rendering of a receipt and of each refusal, built from fixtures holding a marker secret, contains the marker 0 times; (m6) disabling the commitment comparison makes exactly one test fail, m3's, and disabling the signature check makes exactly one test fail, m2's. This brief writes none of that code.",
+      "acceptance": [
+        "R4's spec states requirements (a) to (e), each carrying a SHALL NOT, and measures m1 to m6 with their counts: 5 receipts accepted, 9 signature refusals, 1 commitment-mismatch refusal, 1 coordinate refusal, 0 marker occurrences, and exactly one failing test per injection.",
+        "git ls-tree -r --name-only 1756688 lists no path under crates/lys-identity/ and does not list docs/design/identity/IDENTITY-EVENTS.md, the two things R4's spec says the code unit waits on.",
+        "git diff --stat 1756688 -- crates/ prints nothing."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/directory/briefs/DIRECTORY-007.json"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C35"
+      ],
+      "stories": [
+        "S14"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Record the questions routed to the lead with both readings",
+      "spec": "The brief SHALL record open, deciding none of them: (q1) whether a permission check that is answered but not changed leaves a receipt. In step 1 the directory answers no check (CN11), so the receipts this brief covers are the listed changes; from step 2 either every answered check lands in the log as a receipt, so a person inspecting an identity sees every allow and refusal, or only changes do. No check receipt is built until the lead rules, and the door's audit line (ADR-001) is not this receipt. (q2) Where the verifier's surface lives. In the lys CLI it runs offline with only the log and the service key and is a change to the published lys binary; in the directory service it needs the running service. Offline verification by a party holding only the log and the key is required whichever home is chosen (DIRECTORY-003 R2's read-only verification path, ID001_RECEIPT), and the surface's file wall waits on the ruling. (q3) How a development install's receipts are read: as the reserved act of emitting a receipt outside a test, or as test receipts under a test key and a test tag. Until the lead confirms, a development install emits none and every acceptance line stays in test harnesses. The brief SHALL NOT list a file for any of q1 to q3 and SHALL NOT record any of them as decided.",
+      "acceptance": [
+        "R5's spec states q1, q2 and q3, each with its two readings.",
+        "design.json's non_goals carry 'OPEN for the lead' on the answered-check entry and on the verifier-home entry.",
+        "No requirement of DIRECTORY-007 lists a path under crates/lys/ or crates/lys-identity-server/."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/directory/briefs/DIRECTORY-007.json"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C36"
+      ],
+      "stories": [
+        "S14"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Add the brief's rows and render the cluster",
+      "spec": "THE SYSTEM SHALL add to docs/design/directory/checklist.json the section holding C31 to C37 and to docs/design/directory/stories.json the stories S13 and S14, and SHALL render the cluster so that DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/DIRECTORY-007.md are what their JSON renders to. It SHALL NOT renumber or reword C1 to C30 or S1 to S12, and SHALL NOT change another brief's markdown.",
+      "acceptance": [
+        "From the repository root, sh scripts/design/gate.sh exits 0.",
+        "python3 scripts/design/check-coverage.py docs/design/directory prints 'Coverage clean: all items covered, briefs consistent.' with DIRECTORY-007 among its briefs.",
+        "checklist.json items C1 to C30 and stories.json stories S1 to S12 compare equal to commit 1756688."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/directory/checklist.json",
+          "docs/design/directory/CHECKLIST.md",
+          "docs/design/directory/stories.json",
+          "docs/design/directory/USER-STORIES.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C37"
+      ],
+      "stories": [
+        "S13"
+      ]
+    }
+  ],
+  "boundaries": [
+    "Documents only: no file under crates/, deploy/, surface/ or vendor/ is created or modified, and no code is written.",
+    "No production key, no production anchor, test identities only, and no change to the products that call the service.",
+    "The IDENTITY-001 files and the lifecycle states document are not edited; the shared receipt contract and the audit-record wording are not reopened.",
+    "lys-anchor is not published, no production anchor key is generated and no receipt is emitted outside a test: those three acts stay reserved (docs/design/lys-anchor/DECISIONS.md:326-336, ADR-008).",
+    "No signed encoding, tag or content type is fixed in this brief (ADR-024); lys/anchor-receipt/v1, lys/attestation/v2 and every other shipped tag are not mutated.",
+    "DIRECTORY-003, DIRECTORY-004 and DIRECTORY-006 are not edited and keep their receipt requirements.",
+    "lys-core gains no identity concept, and no lys-log-store trait gains fork, merge, delete or rewrite.",
+    "Nothing the design records as open is decided: the answered check, the verifier's home and development-install receipts stay with the lead, and the grant representation stays open."
+  ],
+  "verification": [
+    "From the repository root: python3 scripts/design/validate.py docs/design/directory, python3 scripts/design/validate.py docs/design/roadmap.json and python3 scripts/design/validate.py docs/design/decisions.json each exit 0.",
+    "From the repository root: sh scripts/design/gate.sh exits 0.",
+    "From the repository root: git diff --stat 1756688 -- crates deploy surface vendor docs/design/identity prints nothing.",
+    "From the repository root, though no code changes: cargo fmt --all; cargo clippy --all-targets --all-features -- -D warnings; cargo clippy --all-targets -- -D warnings; cargo test --workspace --all-features; cargo doc --no-deps --all-features; cargo doc --no-deps, all clean, with git status showing no change from cargo fmt."
+  ]
+}

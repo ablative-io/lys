@@ -325,6 +325,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-024",
+      "title": "The audit receipt's signed encoding stays with IDENTITY-EVENTS.md under its joint review; DIRECTORY-007 fixes none",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-26",
+      "decided_by": "The lead's answers to the DIRECTORY-007 survey; recorded with DIRECTORY-007",
+      "context": "The audit receipt card asks for the brief and the code of one receipt whose shape is IDENTITY-001's shared contract, carried as written with nothing added without a lead's ruling. That contract says the exact signed encoding is reviewed before use and not frozen by the draft (docs/design/identity/briefs/IDENTITY-001.md:57), and DIRECTORY-003 R2 places the versioned envelope in docs/design/identity/IDENTITY-EVENTS.md under a joint review before durable bytes are signed. Code cannot emit a receipt without an encoding, and an encoding freezes as a wire format once anything is signed under it, so a brief that wrote one would add to the contract and could freeze it before its review.",
+      "decision": "The receipt's signed encoding stays with docs/design/identity/IDENTITY-EVENTS.md under DIRECTORY-003's joint review. DIRECTORY-007 fixes no encoding: its code units wait on that file being on main with the envelope version, the typed payloads, the named commitment hash and the recorded review, and the verifier is written against that document's version field. Rejected: fixing the receipt's bytes in DIRECTORY-007, which would add to the shared contract without its review and freeze a wire format the first time an artifact were kept.",
+      "quote": "",
+      "consequences": [
+        "No wire format is frozen by DIRECTORY-007 and nothing is signed under an unreviewed encoding.",
+        "The receipt code unit's brief carries IDENTITY-EVENTS.md on main, with its recorded review, in blocked_by; anyone checks it by reading that file.",
+        "A change to the encoding after anything is signed under it is a new version alongside, never a mutation of the shipped one."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

@@ -303,6 +303,36 @@
         "RM-008"
       ],
       "notes": "Renumbered from the HOME-002 it was written as; HOME-006 follows the lantern card (HOME-004, RM-008) and the launch template (HOME-002, RM-006), both on main, and after the render card (HOME-007), which took RM-009, ADR-016, C31 to C35, S18, S19 and CN9. Further units, not written: lit_in written by the light act (the lantern card's next round); a fork given tools, a lens or a briefing on what changed since the point; leases, budgets and kill rules; harnesses other than Claude Code."
+    },
+    {
+      "id": "RM-015",
+      "title": "Leave a signed audit receipt for every sign-in and permission change",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "One audit receipt, IDENTITY-001's shared contract as written, for sign-ins and permission changes: signed by the service that performed the operation, pointing at the signed event appended to the lys log in operation order, and checked by a verifier that confirms its signature and coordinate and refuses a payload-commitment mismatch by name. DIRECTORY-007 is the documents-only first unit: the contract, the one owner of each operation's receipt, the receipt constraints CN13 to CN17, the code unit's counted measures, ADR-024, and the lead's rulings and open questions.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-26T22:35:59+10:00",
+        "quote": "Every sign-in and every permission change on the platform leaves an audit receipt, and this card writes the brief for that receipt and the code that emits and verifies it. The receipt's shape is the shared contract IDENTITY-001 already names: a version, a stable operation id, the actor, the affected identity, the operation, a commitment to the payload, and the log coordinate where the record sits; the brief carries that contract as written and adds nothing to it without a lead's ruling. The operations that must emit one are a person signing in through Rauthy (success and refusal), a provider being linked to a person, a grant being given or taken away, an agent being provisioned, and an identity moving between lifecycle states; each receipt is signed by the service that performed the operation, never by the party it is about, because a claim must not be settable by the party being judged. Receipts append to the lys log in the order the operations happened, and a verifier given the log and the service's public key confirms each receipt's signature and its coordinate, and refuses by name a receipt whose payload commitment does not match the record it points at. The brief states what already stands on main and must not be reopened: the shared contract in IDENTITY-001, the audit-record wording in LIFECYCLE-STATES-2026-09-22.md, and the rule that Tom's three acts (publishing lys-anchor, generating a production key, emitting a receipt outside a test) stay his. Boundaries: no production key, no production anchor, test identities only, and no change to the products that call the service. Questions for the lead rather than the survey: whether a permission check that is merely answered (not changed) leaves a receipt, and where the verifier lives (the lys CLI or the directory service).\n\nUnder the lead's ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's, this brief is DIRECTORY-007 at docs/design/directory/briefs/DIRECTORY-007.json, its roadmap row is RM-015, appended after RM-014, which the DIRECTORY-002 re-fire 073049e0 holds, and any decision it records is numbered from ADR-024 upward, after ADR-023 on brief/home/9e701467. Checked by Archie at 22:34 against main 1756688 and every open brief branch, brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-007, RM-015 or ADR-024.",
+        "context": "The audit receipt card on the Lys board, surveyed against main 1756688 and the nine open brief branches. The lead's answers settled that DIRECTORY-007 defines the common receipt and replaces none of DIRECTORY-003 R2, DIRECTORY-004 ID001_LINK_AUDIT and DIRECTORY-006 GRANT_AUDIT; that the appended leaf is the signed event with the receipt returned beside it; that the signed encoding stays with IDENTITY-EVENTS.md (ADR-024); that sign-in receipts cover only what the directory service records and refuses; that provisioning is the register transition and the grants; that grant receipts wait on the grant representation; and that a first sign-in which registers leaves one register receipt. The answered check, the verifier's home and development-install receipts stay with the lead."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-008",
+          "ADR-009",
+          "ADR-011",
+          "ADR-024"
+        ],
+        "briefs": [
+          "DIRECTORY-007"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-001"
+      ],
+      "notes": "Appended as RM-015 after RM-014, which the DIRECTORY-002 re-fire holds; RM-011 to RM-014 sit on other branches and are absent from this tree. Further units, not written: The audit receipt record and its verifier (signed encoding, tamper and named-refusal tests); Lifecycle-transition and agent-provisioning receipts emitted by the directory service; Sign-in success and refusal receipts; Provider-link receipts through DIRECTORY-004's outbox; Grant given and removed receipts; The verifier surface in the lys CLI or the directory service."
     }
   ]
 }

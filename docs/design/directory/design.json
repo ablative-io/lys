@@ -3,7 +3,7 @@
   "title": "The standalone identity directory, with every grant rooted in a person",
   "intention": "An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change.",
   "problem": "IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands.",
-  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.",
+  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5. DIRECTORY-007 writes the common audit receipt that every sign-in and every permission change leaves: it carries IDENTITY-001's receipt contract as written, names the one brief that emits each operation's receipt (DIRECTORY-003 for identity changes and lifecycle transitions, DIRECTORY-004 for provider links, DIRECTORY-006 for grants, and a later unit of its own roadmap item for the directory service's sign-ins), leaves the signed encoding with IDENTITY-EVENTS.md (ADR-024), and holds the receipt's signer, leaf, verification order, test-only emission and tag as CN13 to CN17. The receipt code, its emitters and the verifier's surface are later units; the receipt type and verifier core are planned as a wholly new module of crates/lys-identity whose exact manifest is reviewed before its row starts (CN9), never in lys-core.",
   "principles": [
     {
       "id": "P1",
@@ -50,14 +50,16 @@
     "ADR-008",
     "ADR-009",
     "ADR-010",
-    "ADR-011"
+    "ADR-011",
+    "ADR-024"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
     "The grant path (create an agent under a person, grant it a project, the action is allowed, revoke or suspend, the same action is refused) is a requirement of the row that owns it, with acceptance criteria; where the sources do not settle the row, it is recorded open for Tom in DIRECTORY-003 with its criteria drafted.",
     "Every decision still open for Tom is recorded as open and decided nowhere in this cluster.",
     "The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6).",
-    "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record."
+    "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record.",
+    "DIRECTORY-007 names exactly one emitting brief or unit for every operation family the audit receipt card lists, quotes IDENTITY-001's receipt contract word for word, and leaves the answered-check and verifier-home questions open for the lead."
   ],
   "non_goals": [
     {
@@ -103,6 +105,30 @@
     {
       "text": "A shared design-system package extracted for every product",
       "reason": "Tom left it as a thing to look at, not a row (ADR-010)."
+    },
+    {
+      "text": "Receipts for refusals Rauthy makes itself: a bad password, a failed provider callback.",
+      "reason": "They never reach the directory service, Rauthy's native events are asynchronous and severity-filtered (docs/design/identity/briefs/IDENTITY-001.md:44), and a signing key inside Rauthy is a fork change under ADR-009 that DIRECTORY-007 does not make; sign-in receipts cover only what the directory service records and refuses."
+    },
+    {
+      "text": "A receipt for a permission check that is answered but not changed. OPEN for the lead.",
+      "reason": "The audit receipt card routes it to the lead. SpiceDB answers no check in step 1 (CN11); from step 2 either every answered check lands in the log as a receipt, so a person sees every allow and refusal, or only changes do. No check receipt is built until the lead rules, and ADR-001's audit line is the door's own line on a secrets-proxy call, not this receipt."
+    },
+    {
+      "text": "Where the receipt verifier's surface lives: the lys CLI or the directory service. OPEN for the lead.",
+      "reason": "The audit receipt card routes it to the lead. A CLI verifier runs offline with only the log and the service key and is a change to the published lys binary; a service verifier needs the running service. Offline verification by a party holding only the log and the key is required whichever home is chosen (DIRECTORY-003 R2, ID001_RECEIPT)."
+    },
+    {
+      "text": "Receipts emitted by a development install. Awaiting the lead's confirmation.",
+      "reason": "Emitting a receipt outside a test under any tag is a reserved act (docs/design/lys-anchor/DECISIONS.md:326-336, ADR-008). A development install signs outside the test harness, so its receipts are either that act or test receipts under a test key and a test tag; until the lead confirms the reading it emits none (CN16)."
+    },
+    {
+      "text": "The grant receipt's payload and its test legs.",
+      "reason": "They cover exactly the grant representation, which is open above, and stay with DIRECTORY-006's GRANT_AUDIT; DIRECTORY-007 commits only to the contract's common fields."
+    },
+    {
+      "text": "A separate agent-provisioning receipt.",
+      "reason": "'Provisioned' is a view over grants and a handle, not a transition (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:26-28); an agent's provisioning shows as its register transition and then its grants."
     }
   ],
   "structure": [
@@ -575,6 +601,16 @@
       "path": "surface/identity/src/generated/index.ts",
       "note": "Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch",
       "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-007.json",
+      "note": "the common audit receipt: contract, owners, constraints, the code unit's measures and the lead's questions",
+      "brief": "DIRECTORY-007"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-007.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-007"
     }
   ],
   "inventory": [
@@ -609,6 +645,30 @@
     {
       "path": "docs/design/identity/CONFORMANCE.md",
       "note": "Accepted mock-up behaviour map; DIRECTORY-006 maps You/delegation/access requirements and does not claim mock-up sample policy is authoritative."
+    },
+    {
+      "path": "crates/lys-core/src/attestation/",
+      "note": "lys/attestation/v2: signs a SHA-256 hash and a timestamp only, and every verification failure collapses to TrustError::InvalidSignature. Shipped; not mutated."
+    },
+    {
+      "path": "crates/lys-core/src/receipt/",
+      "note": "lys/anchor-receipt/v1 and lys/consistency-receipt/v1 behind unstable-anchor, frozen since lys-core 0.2.0; the audit receipt neither reuses nor collides with their tags or content types."
+    },
+    {
+      "path": "crates/lys-log-store/src/log.rs",
+      "note": "Log::append returns the leaf's index and hash only after the leaf is stored, so a receipt's coordinate exists only after the append."
+    },
+    {
+      "path": "crates/lys/src/commands/log/verify.rs",
+      "note": "the CLI's log inclusion and consistency verification; one candidate home for the receipt verifier's surface, open for the lead."
+    },
+    {
+      "path": "crates/lys/src/commands/verify.rs",
+      "note": "the CLI's attestation verification."
+    },
+    {
+      "path": "docs/design/lys-anchor/DECISIONS.md",
+      "note": "lines 326-336: the three reserved acts (publishing lys-anchor, a production anchor key, a receipt outside a test, under any tag). Read, never changed."
     }
   ],
   "constraints": [
@@ -659,17 +719,44 @@
     {
       "id": "CN12",
       "text": "DIRECTORY-006 is implementation work after the frozen planning task: its source paths are only executable after the DIRECTORY-002/003 foundations are implemented and their integration manifests are reconciled. R6 also waits for the standalone surface foundation. Do not dispatch from a schema-valid but dependency-blocked brief."
+    },
+    {
+      "id": "CN13",
+      "text": "An audit receipt is signed by the service that performed the operation, never by the identity it is about; a verifier is given that service's public key and never takes a key the receipt carries as its authority (P8)."
+    },
+    {
+      "id": "CN14",
+      "text": "The appended leaf is the signed event, appended in the order the operations happened; the receipt is returned beside it carrying the log coordinate the append yielded and the payload commitment, and is never itself appended (docs/design/identity/briefs/IDENTITY-001.md:49)."
+    },
+    {
+      "id": "CN15",
+      "text": "A verifier checks a receipt's signature against the service key before anything else and answers every signature failure with one refusal; only a receipt whose signature verifies is checked for its coordinate and for its payload commitment against the leaf at that coordinate, and a mismatch is refused by its own name, so the named refusal says nothing about a signature."
+    },
+    {
+      "id": "CN16",
+      "text": "No receipt is emitted outside a test harness: acceptance runs under cargo test and the gate's test leg with test keys and test identities, and a development install emits none until the lead confirms how its receipts are read."
+    },
+    {
+      "id": "CN17",
+      "text": "The receipt's signed encoding, tag and content type are written in docs/design/identity/IDENTITY-EVENTS.md under its recorded joint review, never in a brief (ADR-024); the receipt signs under a versioned tag and content type of its own, alongside and never mutating lys/anchor-receipt/v1, lys/attestation/v2 or any other shipped tag."
     }
   ],
   "gate": [
     {
       "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
       "legs": [
         {
           "name": "fmt",
           "command": "cargo fmt --all",
           "requires": [
-            "place:here"
+            "tool:cargo",
+            "tool:rustfmt"
           ],
           "cadence": "round"
         },
@@ -677,7 +764,7 @@
           "name": "clippy-all-features",
           "command": "cargo clippy --all-targets --all-features -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -685,7 +772,7 @@
           "name": "clippy",
           "command": "cargo clippy --all-targets -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -693,7 +780,7 @@
           "name": "tests",
           "command": "cargo test --workspace --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -701,7 +788,7 @@
           "name": "doc-all-features",
           "command": "cargo doc --no-deps --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -709,36 +796,16 @@
           "name": "doc",
           "command": "cargo doc --no-deps",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        }
-      ]
-    },
-    {
-      "tree": "docs",
-      "legs": [
-        {
-          "name": "render",
-          "command": "python3 ../scripts/design/render-cluster.py design/directory",
-          "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
         {
-          "name": "validate",
-          "command": "python3 ../scripts/design/validate.py design/directory",
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        },
-        {
-          "name": "coverage",
-          "command": "python3 ../scripts/design/check-coverage.py design/directory",
-          "requires": [
-            "place:here"
+            "tool:sh",
+            "tool:python3"
           ],
           "cadence": "round"
         }

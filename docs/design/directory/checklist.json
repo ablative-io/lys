@@ -180,6 +180,46 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Audit receipts (DIRECTORY-007)",
+      "items": [
+        {
+          "id": "C31",
+          "text": "DIRECTORY-007 quotes IDENTITY-001's shared receipt contract word for word, 'resulting log coordinate/checkpoint' included, and adds no field to it.",
+          "done": false
+        },
+        {
+          "id": "C32",
+          "text": "DIRECTORY-007 names as standing and not reopened the IDENTITY-001 shared contract, the lifecycle states document's audit-record wording and the three reserved acts: publishing lys-anchor, generating a production anchor key and emitting a receipt outside a test.",
+          "done": false
+        },
+        {
+          "id": "C33",
+          "text": "DIRECTORY-007 assigns each operation the audit receipt card lists exactly one emitting brief or unit, edits none of DIRECTORY-003, DIRECTORY-004 and DIRECTORY-006, and records refusals Rauthy makes itself as out of scope with the reason.",
+          "done": false
+        },
+        {
+          "id": "C34",
+          "text": "The decision ledger holds ADR-024 (the signed encoding stays with IDENTITY-EVENTS.md) and the directory design holds CN13 to CN17 for the receipt's signer, leaf, verification order, test-only emission and tag.",
+          "done": false
+        },
+        {
+          "id": "C35",
+          "text": "DIRECTORY-007 records the receipt code unit's requirements, each with its SHALL NOT, the two files it waits on, and its six counted measures.",
+          "done": false
+        },
+        {
+          "id": "C36",
+          "text": "DIRECTORY-007 records the answered-check question, the verifier's home and the development-install reading as open for the lead with both readings, and lists no file for any of them.",
+          "done": false
+        },
+        {
+          "id": "C37",
+          "text": "The directory cluster's rendered markdown matches its JSON and coverage is clean with DIRECTORY-007 in it.",
+          "done": false
+        }
+      ]
     }
   ]
 }

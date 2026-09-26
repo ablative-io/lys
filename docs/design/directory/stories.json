@@ -26,6 +26,10 @@
         {
           "id": "S2",
           "text": "As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria."
+        },
+        {
+          "id": "S13",
+          "text": "As the reviewer, I want one brief to name the audit receipt's contract, the one brief that emits each operation's receipt and the lead's rulings, so that no two rows build the same receipt differently."
         }
       ]
     },
@@ -50,6 +54,10 @@
         {
           "id": "S7",
           "text": "As a verifier, I want to check a recorded identity change against a checkpoint and key with standard tooling, so that the directory's history does not rest on the operator's word."
+        },
+        {
+          "id": "S14",
+          "text": "As a verifier, I want a receipt whose payload commitment does not match the record it points at refused by name, so that a receipt signed over the wrong record never passes as proof of the change."
         }
       ]
     },
