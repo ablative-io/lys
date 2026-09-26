@@ -345,7 +345,7 @@
       "date": "2026-09-26",
       "by": "signed off by Waffles at 17:38 on 2026-09-26, from the cross-review of PR 19",
       "subject": "The fixture's L2 and lit_in",
-      "ruling": "The light act on main records no lit_in and LanternData refuses an unknown field, so the fixtures write L2 by hand carrying lit_in and the fork reads the key from the entry's raw data; the lantern card's lit_in round must add the field to LanternData, after which the fixtures can light L2 with the light act. Reading lit_in from raw data is a stopgap: a missing or non-session lit_in is refused by name, and the follow-up card \"LanternData carries lit_in and the light act records it; the fork reads the typed field\" is placed on the Lys home board."
+      "ruling": "The light act on main records no lit_in and LanternData refuses an unknown field, so the fixtures write L2 by hand carrying lit_in and the fork reads the key from the entry's raw data as a stopgap. A lys.lantern entry whose data has no lit_in key follows R2's signed holder rule: one holder cuts, several holders refuse lantern_ambiguous until --session names one; explicit and tested, not a silent fallback. A lit_in that is present but is null, not a string, not a safe session name, or names no session of the home refuses lit_in_not_a_session naming which; never a fallback to any session. Lys board card 0a59xZFp, \"LanternData carries lit_in and the light act records it\", closes the gap: LanternData carries the field, the light act records it, and the fork reads the typed field."
     }
   ]
 }
