@@ -232,6 +232,22 @@ pub enum HomeError {
         /// The file.
         path: PathBuf,
     },
+
+    /// The session's config directory has no name: the template's env slot
+    /// sets no `CLAUDE_CONFIG_DIR` and the rendering process has no `HOME`.
+    #[error(
+        "the session's config directory cannot be named: the template's env slot sets no CLAUDE_CONFIG_DIR and the rendering process has no HOME; set CLAUDE_CONFIG_DIR in the template's env slot"
+    )]
+    NoConfigDir,
+
+    /// A path that must be absolute is not.
+    #[error("{what} `{}` is not an absolute path; give it from the root", path.display())]
+    NotAbsolute {
+        /// What the path names.
+        what: &'static str,
+        /// The path given.
+        path: PathBuf,
+    },
 }
 
 impl HomeError {
