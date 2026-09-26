@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,33 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-019",
+      "title": "Record the lys.given documents in the request's order, re-measured, with the old order named as superseded",
+      "status": "idea",
+      "kind": "fix",
+      "summary": "The lys.given context record lists a session's documents in the order Claude Code reads the files, user CLAUDE.md first, while the request the harness sends puts the appended instructions in the system array ahead of the first user message. The record moves to the request's order (appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index), one rule stated in RECORD.md (ADR-030), with PROOF-GIVEN's measure.py committed unchanged and re-run on the installed Claude Code, the resolver, its unit test and the fixture test moved to the new order, S12 reworded, and the old order named as superseded by the commit that lands HOME-008 without rewriting any entry already written.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T07:24:00+10:00",
+        "quote": "The lys.given entry records the documents in the brief's read order: user CLAUDE.md, the appended instructions, the MCP configuration, the CLAUDE.md chain outermost first, the memory index. PROOF-GIVEN measured on Claude Code 2.1.283 that the request Claude Code sends differs in one place: the appended instructions sit in the system array, ahead of the first user message that carries every CLAUDE.md-family file and the memory index. The entry records the request's cross-kind order as measured, one rule stated in RECORD.md, with the measurement re-run on the installed Claude Code and its version named; the fixture test and PROOF-GIVEN are updated to the new order and the old order is named as superseded. Found by Waffles reviewing lys PR 16. Not in scope: the within-kind order, which is unchanged.\n\nRuling (Archie, lead, 27 September 2026 07:24, after run a5538a78 ended survey_malformed on seven questions it could not quote whole): the request's order wins wherever the read order and the request differ, and the rule in RECORD.md says so. The MCP configuration sits straight after the appended instructions, both harness-side inputs ahead of the first message, until a card measures a real server's tools position; this card's re-measurement reuses PROOF-GIVEN's measure.py fixture as it is and adds no MCP server. User story S12 is rewritten to \"in the order the request gives them\". Entries already written under the old order stand; the record is append-only, and the documents name the old order as superseded with the harness versions it was written under, which is enough; no new data member is added. The fixture test gains a user CLAUDE.md in its config directory so the appended instructions must precede it, beside the unit test in given_tests.rs. PROOF-GIVEN.md keeps its old measurement and appends the new one below it, naming the old order as superseded.",
+        "context": "A Cambium card on the home cluster, found reviewing lys PR 16 and ruled by the card's lead after an earlier survey run ended malformed. The lead's answer to the one open survey question corrects the words' sentence on the harness versions: both orders were written under harness_version 2.1.283, so the harness version does not tell them apart and the documents must not claim it does; no data member is added; the documents name the old order as superseded by the commit that lands this card and by that commit's date, and a reader tells an entry's order by comparing its recorded time with that date, an entry written before the landing commit being under the old order."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-007",
+          "ADR-013",
+          "ADR-030"
+        ],
+        "briefs": [
+          "HOME-008"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Carried on its own row rather than on RM-007, whose HOME-003 is already on main; it stands on HOME-003's resolver and fixture test there, so no roadmap dependency is written. Numbered after main's highest and every open brief branch's as checked on 27 September 2026 (RM-018, ADR-029, C76, S34 on brief/home/b9d7f174): RM-019, ADR-030, C77 to C81; S12 and S13 are reused. HOME-008 is the id this run was given; brief/home/5898fcb0 also holds a HOME-008 (the rendered-uuid rule, RM-011), so whichever lands second is renumbered. Further units, not written: Measure a real MCP server's tools position in the request and fix mcp_config's place by it."
     }
   ]
 }
