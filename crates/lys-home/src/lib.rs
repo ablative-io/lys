@@ -30,4 +30,10 @@ pub use record::blocks::{BlockStore, Hash, Put};
 pub use record::call::{Api, CallMeta, CallRecord, CallStatus, IngestReport, OutcomeMeta};
 pub use record::canon::{AddReport, Canon, Inherited};
 pub use record::entries::{Entry, EntryBase, EntryBody, SessionHeader};
+pub use record::epilogue::{Added, add_epilogue};
+pub use record::lantern::{Lit, light};
+pub use record::reader::SessionReader;
+pub use record::recall::{
+    Epilogue, LanternRow, RecallReport, Skipped, recall_by_note, recall_by_point,
+};
 pub use record::{Home, Session};

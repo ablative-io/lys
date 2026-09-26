@@ -44,6 +44,9 @@ mod lantern_tests;
 pub mod reader;
 #[cfg(test)]
 pub(crate) mod reader_tests;
+pub mod recall;
+#[cfg(test)]
+mod recall_tests;
 #[cfg(test)]
 mod record_tests;
 pub mod templates;
