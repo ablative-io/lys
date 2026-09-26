@@ -51,7 +51,7 @@
     "ADR-009",
     "ADR-010",
     "ADR-011",
-    "ADR-039"
+    "ADR-021"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -195,7 +195,7 @@
     },
     {
       "path": "crates/lys/Cargo.toml",
-      "note": "the CLI crate's manifest; gains the identity subcommand's dependencies",
+      "note": "the CLI crate's manifest; gains the identity subcommand's dependencies and the test = false [[test]] entries of the identity targets",
       "brief": "DIRECTORY-002"
     },
     {
@@ -211,6 +211,16 @@
     {
       "path": "crates/lys/src/commands/error.rs",
       "note": "the CLI error type; carries the identity errors",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": ".land/gates.sh",
+      "note": "the landing gate; gains the identity leg: container_runtime_missing when no runtime answers, then clippy and the test = false identity targets",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "CLAUDE.md",
+      "note": "gates before any commit; gains one line naming both acts of the identity leg",
       "brief": "DIRECTORY-002"
     },
     {
@@ -266,6 +276,31 @@
     {
       "path": "crates/lys/src/identity/error.rs",
       "note": "typed errors carrying operation, resource and path, never secret bytes",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/config_tests.rs",
+      "note": "unit tests of config.rs",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/credentials_tests.rs",
+      "note": "unit tests of credentials.rs, the Debug and Display redaction included",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/error_tests.rs",
+      "note": "unit tests of error.rs, the Debug and Display redaction included",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/prepare_tests.rs",
+      "note": "unit tests of prepare.rs, the private files' modes included",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/themes_tests.rs",
+      "note": "unit tests of themes.rs",
       "brief": "DIRECTORY-002"
     },
     {
@@ -587,91 +622,6 @@
       "path": "docs/design/directory/briefs/DIRECTORY-008.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-008"
-    },
-    {
-      "path": "docs/design/directory/briefs/DIRECTORY-013.json",
-      "note": "certificate revocation as an appended leaf, the live set folded from the log, and the revoked certificate's history (DP26, ADR-039)",
-      "brief": "DIRECTORY-013"
-    },
-    {
-      "path": "docs/design/directory/briefs/DIRECTORY-013.md",
-      "note": "rendered markdown",
-      "brief": "DIRECTORY-013"
-    },
-    {
-      "path": "docs/design/identity/CERTIFICATE-REVOCATION.md",
-      "note": "the certificate revocation contract: leaf layouts, unit, signer, permanence, fold, N and tolerance, history, no-log forms, refusals",
-      "brief": "DIRECTORY-013"
-    },
-    {
-      "path": "crates/lys-identity/src/revocation/mod.rs",
-      "note": "declarations, re-exports and module docs only",
-      "brief": "DIRECTORY-013"
-    },
-    {
-      "path": "crates/lys-identity/src/revocation/leaf.rs",
-      "note": "the three certificate-log leaves and the revocation's signed bytes",
-      "brief": "DIRECTORY-013"
-    },
-    {
-      "path": "crates/lys-identity/src/revocation/error.rs",
-      "note": "the named revocation refusals, never carrying key material",
-      "brief": "DIRECTORY-013"
-    },
-    {
-      "path": "crates/lys-identity/src/revocation/fold.rs",
-      "note": "the live set folded from a LeafStore to its extent; reads only",
-      "brief": "DIRECTORY-013"
-    },
-    {
-      "path": "crates/lys-identity/src/revocation/append.rs",
-      "note": "issuance, revocation and attestation-entry leaves appended through Log::append",
-      "brief": "DIRECTORY-013"
-    },
-    {
-      "path": "crates/lys-identity/src/revocation/verify.rs",
-      "note": "revocation-aware certificate verification with N and the tolerance as inputs",
-      "brief": "DIRECTORY-013"
-    },
-    {
-      "path": "crates/lys-identity/src/revocation/history.rs",
-      "note": "an attestation by a certificate's key judged against the revocation leaf's position",
-      "brief": "DIRECTORY-013"
-    },
-    {
-      "path": "crates/lys-identity/tests/revocation_leaf.rs",
-      "note": "leaf encoding, malformed refusals and the revocation signer",
-      "brief": "DIRECTORY-013"
-    },
-    {
-      "path": "crates/lys-identity/tests/revocation_fold.rs",
-      "note": "the fold's live set, refusals and read-only pass",
-      "brief": "DIRECTORY-013"
-    },
-    {
-      "path": "crates/lys-identity/tests/revocation_append.rs",
-      "note": "append at the extent, reopen and write failure",
-      "brief": "DIRECTORY-013"
-    },
-    {
-      "path": "crates/lys-identity/tests/revocation_verify.rs",
-      "note": "revoked, stale, unreadable, not-in-log, expired and no-log legs",
-      "brief": "DIRECTORY-013"
-    },
-    {
-      "path": "crates/lys-identity/tests/revocation_history.rs",
-      "note": "attestations before and after revocation, proofs and issuance record",
-      "brief": "DIRECTORY-013"
-    },
-    {
-      "path": "crates/lys-identity/tests/revocation_support/mod.rs",
-      "note": "test authorities, certificates and file-backed logs; generated keys only",
-      "brief": "DIRECTORY-013"
-    },
-    {
-      "path": "crates/lys/src/cli_tests.rs",
-      "note": "the CLI's help tests; DIRECTORY-013 adds the no-log revocation sentence test",
-      "brief": "DIRECTORY-013"
     }
   ],
   "inventory": [
@@ -723,7 +673,7 @@
   "constraints": [
     {
       "id": "CN1",
-      "text": "Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed.\nAs the lead ruled, CN1 binds DIRECTORY-001 only."
+      "text": "Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed. The ledger entries the method keeps for a brief, its roadmap row in docs/design/roadmap.json and its decision in docs/design/decisions.json, stand outside this wall."
     },
     {
       "id": "CN2",
