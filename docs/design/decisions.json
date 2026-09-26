@@ -325,6 +325,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-021",
+      "title": "The identity install themes Rauthy in dark only, from the estate tokens as they stand",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-26",
+      "decided_by": "The lead of the directory card, answering the DIRECTORY-002 survey",
+      "context": "DIRECTORY-002 R3 reads its colours from the estate colour tokens (ablative-docs 385916e), which hold a dark foundation (ink, surface, raised, line, text, muted) and one accent per product: no light palette, no error colour, no radius, no emphasised text tier, no accent for actions and no text-on-accent. Rauthy's theme carries text, text_high, bg, bg_high, action, accent, error and btn_text for light and dark, plus a border radius, so either some fields are left unset or colours are taken from outside the design system.",
+      "decision": "The install themes both Rauthy clients in dark only, from the estate tokens as they stand, and a Rauthy field takes an estate token only where the estate names the same role: bg takes ink, the page background; bg_high takes raised, the highest of the three backgrounds; text takes text, the primary text, since Rauthy's text is the body text; accent takes each client's own product accent (ADR-010). Every other field is a gap and keeps Rauthy's own default. Rejected: mapping text to muted, which would set the body of every page in the secondary colour; taking light mode, the error colour or the radius from a source outside the estate tokens, which would make that source a colour authority beside the design system.",
+      "quote": "",
+      "consequences": [
+        "DIRECTORY-002 R3 sets the dark bg, bg_high and text of both clients from the estate tokens ink, raised and text, and the accent from each client's product accent, and leaves the light fields, the dark error and the radius as Rauthy holds them.",
+        "deploy/identity/theme-map.md states the mapping as a table with the estate token beside each Rauthy field and names six gaps: light mode, the error colour, the border radius, and the dark text_high, action and btn_text; each keeps Rauthy's own default until the estate names a token for it, and nothing reads a gap.",
+        "Filling the gaps is a design-system card: the estate names the missing tokens first, and the theme follows."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
