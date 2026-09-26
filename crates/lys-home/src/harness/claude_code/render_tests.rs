@@ -3,6 +3,7 @@
 //! the loss account, the refusal of an existing path, and the round trip.
 
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
 use crate::harness::claude_code::import::import_claude_code;
 use crate::harness::claude_code::import_tests::fixture;
@@ -202,4 +203,28 @@ fn a_uuid_shaped_entry_id_is_kept_and_any_other_maps_to_one_fixed_uuid() {
     assert_ne!(lines[0]["uuid"], "e1");
     drop(s);
     dir.close().unwrap();
+}
+
+#[test]
+fn record_uuid_is_the_documented_selection_of_the_sha256_of_the_entry_id() {
+    use std::fmt::Write as _;
+    let digest = Sha256::digest(b"fixed-entry-id");
+    let hex = digest.iter().fold(String::new(), |mut s, b| {
+        write!(s, "{b:02x}").unwrap();
+        s
+    });
+    assert_eq!(hex.len(), 64);
+    let expected = format!(
+        "{}-{}-4{}-8{}-{}",
+        &hex[..8],
+        &hex[8..12],
+        &hex[13..16],
+        &hex[17..20],
+        &hex[20..32]
+    );
+    assert_eq!(record_uuid("fixed-entry-id"), expected);
+    assert_eq!(
+        record_uuid("fixed-entry-id"),
+        "69392357-b162-4c19-8db0-8c73793670c5"
+    );
 }
