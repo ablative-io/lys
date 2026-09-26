@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-25",
+  "updated": "2026-09-26",
   "items": [
     {
       "id": "RM-001",
@@ -152,6 +152,33 @@
         "RM-001"
       ],
       "notes": "Owned by Archie. The home cluster and HOME-001 landed on main with PR 8; the cached-index rule (lys-home Index::from_cached) is in that brief. Next: HOME-001 dispatched through the board."
+    },
+    {
+      "id": "RM-006",
+      "title": "Make the Claude Code render byte-deterministic for the same session head and version",
+      "status": "idea",
+      "kind": "fix",
+      "summary": "Two renders of the same session head give different bytes whenever the context path holds an entry whose id is not uuid-shaped, which the importer writes for every tool record with more than one result: the render draws a fresh random uuid for each. The render derives those uuids from the record instead (UUIDv5 over a fixed lys namespace and the entry id with its role), a fixture carrying the defect is pinned by hash in a test and in PROOF-RESUME.md, and the resume is re-measured on the Claude Code installed on this Mac. A rendered file can then be told by its hash, a receipted render event can name what was written, and the launch template's identical-hash acceptance has ground to stand on.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-26T08:03:37+10:00",
+        "quote": "The Claude Code render in crates/lys-home walks a session's context path and writes the JSONL file that Claude Code 2.1.282 on this Mac resumes by path, as HOME-001 R4 and R9 landed it on lys main 0073b966. Rendering the same session twice does not give the same bytes today when a tool record on the path holds more than one result, which the translation card's survey found on 26 September 2026 while reading the render for the Codex rollout, and the launch template card's acceptance that rendering the same template and session twice yields identical hashes stands on the render being deterministic. A render of the same session head with the same lys-home version is one function of the record and must give the same bytes every time, so a reader can tell a rendered file by its hash and a receipted render event can name what was written. The change finds why two renders of a multi-result tool record differ, names that cause in the proof document, and makes the render byte-deterministic for the same session head and the same version without changing what the rendered file holds or how Claude Code resumes it. Where the cause is an order that the record does not fix, the render takes the order the record gives, entry order then part order, and never a map's or a set's order; where the cause is a fresh id or a clock, the value is derived from the record's own ids and stamps as the fork and launch cards derive theirs. Acceptance is that a fixture session holding a tool record with more than one result renders twice to files of equal SHA-256; that the fixture from PROOF-RESUME renders twice to equal hashes; that a recorded fixture hash in the proof document matches the render at the landed commit; that the rendered file still resumes in Claude Code 2.1.282 on this Mac, recorded in the proof document as before; and that the proof document names the cause found. Not in scope: any change to the importer, the record's shape, or the rendered file's content beyond the determinism, and any harness other than Claude Code. Filed by Archie on the translation card's survey of 26 September 2026, on Tom's rule of 16 September 2026 to find the underlying cause, and on lys main 0073b966.",
+        "context": "Filed on the translation card's survey, which found the nondeterminism while reading the render for the Codex rollout; surveyed on lys main 0073b966. The lead's answers settled the Claude Code version the resume is measured on (the one installed when the proof runs, as `claude --version` prints it, with the rendered records' version field left at 2.1.281) and that this card defines the id derivation the fork and launch cards follow."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-004",
+          "ADR-007",
+          "ADR-012"
+        ],
+        "briefs": [
+          "HOME-002"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Stands on HOME-001's render (R4) and CLI (R9), already on main at 0073b966, so no roadmap dependency is written. Further units, not written: Make the Claude Code import deterministic for the same transcript; Render tool parts from the stored block so a round trip adds only the new turn; Move the render's default Claude Code version off 2.1.281. ADR-012 is proposed and binds the fork and launch cards' id derivation."
     }
   ]
 }
