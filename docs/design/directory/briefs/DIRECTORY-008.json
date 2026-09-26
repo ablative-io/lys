@@ -47,7 +47,43 @@
       ],
       "stories": [
         "S2"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-005.json",
+            "change": "modified",
+            "note": "The verification array now holds five entries. The fifth, at line 119, is 'Frontend checks pass with strict types and the generated API schema, with negative and crash-boundary tests.' Every other member is unchanged."
+          },
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-005.md",
+            "change": "modified",
+            "note": "Re-rendered. The Verification section lists the five entries, with the new one at line 109."
+          }
+        ],
+        "how": "Accept 1: met. The verification array has 5 entries, and the first four were left untouched by the append (the dump round trip is byte-identical, checked before editing). Accept 2: met. rg -c prints 1 for docs/design/directory/briefs/DIRECTORY-005.json (line 119) and 1 for DIRECTORY-005.md (line 109). Accept 3: met. The working-tree git diff --numstat for DIRECTORY-005.json is '2 1': the new line plus the fourth entry gaining its comma. Accept 4: met. The check prints 1 ['DIRECTORY-004'].",
+        "deviation": "I ran python3 scripts/design/render-cluster.py docs/design/directory once, because R1 to R3 require the re-render and it is the only way to produce the rendered twins. I ran no other listed check, build, lint or test, and made no commit, as instructed.",
+        "checklist": [
+          {
+            "id": "C3",
+            "done": true,
+            "note": "DIRECTORY-005 keeps its id, depends_on, estimate and ID001 identifiers. Only the verification line was added."
+          },
+          {
+            "id": "C6",
+            "done": true,
+            "note": "The rendered twin was regenerated from the JSON."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": "The brief now carries the frontend verification line for review."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -73,7 +109,43 @@
       ],
       "stories": [
         "S2"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/directory/design.json",
+            "change": "modified",
+            "note": "The inventory now holds eleven rows. Rows 9 to 11 (lines 624, 628 and 632) are vendor/rauthy, crates/lys and docs/design/decisions.json, each with the note exactly as specified. The intention also changed, under R3."
+          },
+          {
+            "path": "docs/design/directory/DESIGN.md",
+            "change": "modified",
+            "note": "Re-rendered. The Inventory section lists the eleven rows, with the new three at lines 179 to 181."
+          }
+        ],
+        "how": "Accept 1: met. len(inventory) is 11, and the first eight rows were left unchanged by the append. Accept 2: met. '\"path\": \"vendor/rauthy\"' counts 2 (lines 380 and 624), '\"path\": \"crates/lys\"' counts 1 (line 628), and '\"path\": \"docs/design/decisions.json\"' counts 2 (lines 140 and 632). Accept 3: met. Each of the three '^- `...`' patterns matches once in DESIGN.md, at lines 179, 180 and 181. Accept 4: met. inventory[8:] paths are ['vendor/rauthy', 'crates/lys', 'docs/design/decisions.json'], and the RAUTHY-BASELINE and CONFORMANCE rows were not touched, so that count stays 2.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C1",
+            "done": true,
+            "note": "The inventory now also records the fork, the CLI crate and the decision ledger. No other design member changed."
+          },
+          {
+            "id": "C6",
+            "done": true,
+            "note": "DESIGN.md was re-rendered from design.json."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": "Reviewers can see what the rows read and move."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -99,7 +171,43 @@
       ],
       "stories": [
         "S2"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/directory/design.json",
+            "change": "modified",
+            "note": "At line 4 the intention now ends with one space and then the exact Cambium sentence. The non-goals were not changed."
+          },
+          {
+            "path": "docs/design/directory/DESIGN.md",
+            "change": "modified",
+            "note": "Re-rendered. The Intention section (line 13) carries the sentence."
+          }
+        ],
+        "how": "Accept 1: met. 'keeping its participant ids' counts 1 in design.json (line 4) and 1 in DESIGN.md. Accept 2: met. The intention starts with the operator sentence and ends with 'and this sentence promises neither row.' Accept 3: met. The non-goals were not edited, so the Rows 06/07 text is still present and non_goals still has 11 entries (measured). Accept 4: met. goals, principles and constraints measure 5, 9 and 12.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C1",
+            "done": true,
+            "note": "The outcome now records the Cambium direction, and the non-goal is kept."
+          },
+          {
+            "id": "C6",
+            "done": true,
+            "note": "DESIGN.md was re-rendered."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": "The direction is recorded without promising any row."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
