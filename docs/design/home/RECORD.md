@@ -129,6 +129,22 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   The canon is appended only, through the repository's review, and rendered
   first (before a session's own entries) when a render is given `--canon`;
   R4's thinking rule applies to every inherited thinking block.
+- `lys.lantern` (HOME-004 R1, R3): `{point, note, lit_by, lit_at}`. `point` is
+  the entry id of an entry of the same session that is neither a lantern nor
+  an epilogue (the head or any entry the head has moved past); `note` is the
+  note byte for byte as written; `lit_by` is a self-declared name, as the
+  canon's `curated_by` is, not a verified identity; `lit_at` is when, as the
+  record's clock writes it. Lit only by `lantern light`, appended as a child
+  of the head, and the head advances to it.
+- `lys.lantern_epilogue` (HOME-004 R1, R4): `{lantern, words, added_by,
+  added_at}`. `lantern` is the entry id of a `lys.lantern` entry of the same
+  session; `words` are the further words byte for byte as written; `added_by`
+  is a self-declared name; `added_at` is when. Added only by `lantern
+  epilogue`, appended as a child of the head of the lantern's own session.
+  A lantern's story is its entry followed by its epilogues in file order;
+  nothing is rewritten. A lantern's note and its epilogues are the one text
+  the crate prints, and only `lantern recall` prints them (ADR-015); errors
+  and the light and epilogue reports carry ids, names and times only.
 
 ## The loss account
 

@@ -24,6 +24,43 @@ pub const CUSTOM_INHERITED: &str = "lys.inherited";
 /// The custom type of the context record: what a session was given at
 /// render, as paths, lengths and hashes (see [`crate::record::given`]).
 pub const CUSTOM_GIVEN: &str = "lys.given";
+/// The custom type of a lantern (HOME-004): a note plus a point in this
+/// session, lit on purpose, that a later session walks back to.
+pub const CUSTOM_LANTERN: &str = "lys.lantern";
+/// The custom type of an epilogue on a lantern: further words on its note,
+/// appended after it, never rewritten into it.
+pub const CUSTOM_LANTERN_EPILOGUE: &str = "lys.lantern_epilogue";
+
+/// What a `lys.lantern` entry carries in `custom.data`. `lit_by` is a
+/// self-declared name, as the canon's curator is, not a verified identity.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LanternData {
+    /// The entry id of the point the lantern marks: an entry of the same
+    /// session that is neither a lantern nor an epilogue.
+    pub point: String,
+    /// The note, byte for byte as written.
+    pub note: String,
+    /// Who lit it, as they named themselves.
+    pub lit_by: String,
+    /// When, RFC 3339 as the record's clock writes it.
+    pub lit_at: String,
+}
+
+/// What a `lys.lantern_epilogue` entry carries in `custom.data`. `added_by`
+/// is a self-declared name, not a verified identity.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EpilogueData {
+    /// The entry id of the lantern, in the same session, the words belong to.
+    pub lantern: String,
+    /// The further words, byte for byte as written.
+    pub words: String,
+    /// Who added them, as they named themselves.
+    pub added_by: String,
+    /// When, RFC 3339 as the record's clock writes it.
+    pub added_at: String,
+}
 
 /// The first line of a session file.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

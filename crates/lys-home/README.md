@@ -21,6 +21,8 @@ lys adds nothing to Pi's grammar. Its own data rides in Pi's `custom` entries:
 | `lys.authored`      | this session is a hand-written demonstration, not history         |
 | `lys.inherited`     | this entry came from the canon or another session, and says so    |
 | `lys.given`         | what a rendered session was given: each instruction document Claude Code loads and each file the render wrote, by kind, path, length and SHA-256 in the measured order, with the config directory and the environment names; never a document's content |
+| `lys.lantern`       | a lantern: a note on a point of this session (`point`, `note`, `lit_by`, `lit_at`), lit on purpose at the head |
+| `lys.lantern_epilogue` | further words on a lantern of this session (`lantern`, `words`, `added_by`, `added_at`), appended after it |
 
 One owner at a time: a session file is opened under an exclusive lock on
 `<id>.lock` beside it, held while the `Session` lives, so a second opener in
@@ -81,7 +83,9 @@ cannot be read, an entry id or listed path not in the session). Neither
 prints a byte of either file.
 
 What the crate does not do: interpret, print or log transcript contents (errors
-and reports carry ids, hashes, offsets and counts only); sign, hash into a lys
+and reports carry ids, hashes, offsets and counts only; a lantern's note and
+its epilogues are the one text the crate prints, and only `lantern recall`
+prints them); sign, hash into a lys
 log or anchor; encrypt; move a home between devices; run or supervise an
 agent; talk to Norn.
 
