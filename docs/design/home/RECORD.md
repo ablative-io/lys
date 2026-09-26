@@ -146,6 +146,27 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   the crate prints, and only `lantern recall` prints them (ADR-015); errors
   and the light and epilogue reports carry ids, names and times only.
 
+## The rendered uuid
+
+A Claude Code record's `uuid` is the entry's own id when that id is
+uuid-shaped (36 characters, hex with `-` at 8, 13, 18 and 23), so an imported
+session keeps its source's uuids. Any other id, the importer's `<uuid>-r<i>`
+for a tool result split from a record with more than one, a hand-authored id,
+a canon id, derives as UUID version 5 (RFC 9562) under the session's namespace
+over the name `<entry id>#<role>`; the session's namespace is UUIDv5 of the
+fixed lys render namespace `32c05904-d1f1-550c-9eee-2f6c8f98b665` (itself
+UUIDv5 of the URL namespace over `lys/home/claude-code/render-uuid/v1`) over
+the id of the session being rendered, so the same entry id in two sessions
+never derives one uuid, and the target session id, which the record does not
+hold, never enters it. The roles are closed: `record`, the record's `uuid`;
+the next record's parentUuid, a summary's leafUuid and an assistant's `msg_`
+id follow from it. A derived uuid carries version nibble 5 where Claude
+Code's own carry 4. Nothing random and no clock enters a render, every
+timestamp is the entry's own, and the walk takes entry order then part
+order, so the same session head with the same target writes the same bytes
+(CN9, ADR-014); the namespace, the name form and the roles are fixed, and a
+change is a new version alongside.
+
 ## The loss account
 
 Written with R4: what a render preserved, transformed and could not carry,

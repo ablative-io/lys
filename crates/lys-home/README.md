@@ -37,7 +37,13 @@ into a session, with `attachment` and `system` records as events at their
 exact place on the chain (a message's parentUuid may name one), `render`
 writes a session back as a transcript for a model (same model keeps thinking
 whole with its signature; a different model gets readable thinking as text
-and a loss account beside the file), `fewshot` writes a hand-authored file
+and a loss account beside the file; the same session head with the same
+target writes the same bytes, since a record whose entry id is not
+uuid-shaped, the importer's `<uuid>-r<i>` for a split tool result or a
+hand-authored id, carries a UUIDv5 derived under the session's namespace
+over `<entry id>#record`, never a fresh id, so two sessions with one such
+entry id never derive one uuid and a rendered file is told by its hash),
+`fewshot` writes a hand-authored file
 that `claude --resume <path>` takes (the command is in the JSON report, never
 run), and `resume-check` counts tool_use ids a fork repeats and the tool
 actions in the fork's own records.
