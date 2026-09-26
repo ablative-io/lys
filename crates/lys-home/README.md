@@ -23,6 +23,8 @@ lys adds nothing to Pi's grammar. Its own data rides in Pi's `custom` entries:
 | `lys.given`         | what a rendered session was given: each instruction document Claude Code loads and each file the render wrote, by kind, path, length and SHA-256 in the measured order, with the config directory and the environment names; never a document's content |
 | `lys.lantern`       | a lantern: a note on a point of this session (`point`, `note`, `lit_by`, `lit_at`), lit on purpose at the head |
 | `lys.lantern_epilogue` | further words on a lantern of this session (`lantern`, `words`, `added_by`, `added_at`), appended after it |
+| `lys.forked_from`   | the child's ancestry after a fork (`parent_session`, `lantern`, `point`, `cut_at`, `coordinate_carried`, `carried`, `seed_left_out`), the first entry the fork writes after the copied chain |
+| `lys.fork`          | one fork taken from this session (`child`), appended at the head |
 
 One owner at a time: a session file is opened under an exclusive lock on
 `<id>.lock` beside it, held while the `Session` lives, so a second opener in
@@ -88,6 +90,27 @@ on differs, 2 on a refusal (a missing argument, a session or file that
 cannot be read, an entry id or listed path not in the session). Neither
 prints a byte of either file.
 
+`fork --home <dir> --lantern <id> [--session <id>]` forks a child session
+from a lantern's point: it resolves the lantern to the session it was lit
+in (its data's `lit_in`, or the one session holding an older record; several
+holders are refused `lantern_ambiguous` until `--session` names one), cuts
+that session's root-to-point chain at the last assistant message at or
+before the point, and writes a child under the parent's `cwd` whose
+header's `parentSession` is `sessions/<parent>.jsonl`, holding the parent
+file's own line bytes for each cut entry, then `lys.forked_from` as its
+head; the parent gains one `lys.fork` entry at its head. No block is
+written and nothing else is copied. The report is ids and counts: the
+child, the parent, the lantern, the point, the cut entry, the entries
+copied, the distinct block hashes the copied entries name that the store
+holds and those it does not, and whether and which entry was carried. A
+lantern at a user message is carried, not copied: `render` and
+`render-launch` of that child write the message's text parts beside the
+rendered file as `<stem>.seed.txt` under an in-band marker line, and their
+launch lines pass it as the first prompt (`render` prints
+`claude --resume '<path>' "$(cat '<seed>')"`; `render-launch` appends the
+same argument to the template's line and lists the seed in its manifest).
+A lantern before any assistant message is refused `nothing_to_fork`.
+
 What the crate does not do: interpret, print or log transcript contents (errors
 and reports carry ids, hashes, offsets and counts only; a lantern's note and
 its epilogues are the one text the crate prints, and only `lantern recall`
@@ -95,6 +118,7 @@ prints them); sign, hash into a lys
 log or anchor; encrypt; move a home between devices; run or supervise an
 agent; talk to Norn.
 
-Design and briefs: `docs/design/home/` (HOME-001, HOME-002, HOME-003). Pi
+Design and briefs: `docs/design/home/` (HOME-001, HOME-002, HOME-003,
+HOME-004, HOME-006). Pi
 reference: the checkout
 at `3d5cbe98`, `packages/coding-agent/src/core/session-manager.ts`.

@@ -1,7 +1,8 @@
 # The home record
 
-Written for HOME-001 R1, R2 and R6, with HOME-002's render event and
-HOME-003's context record. Everything here is local state of a home, not a
+Written for HOME-001 R1, R2 and R6, with HOME-002's render event,
+HOME-003's context record, HOME-004's lanterns, HOME-007's rendered uuid
+and HOME-006's forks. Everything here is local state of a home, not a
 wire contract; nothing is signed.
 
 ## Pi's grammar, as adopted
@@ -146,6 +147,23 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   the crate prints, and only `lantern recall` prints them (ADR-015); errors
   and the light and epilogue reports carry ids, names and times only.
 
+- `lys.forked_from` (HOME-006 R3): `{parent_session, lantern, point, cut_at,
+  coordinate_carried, carried, seed_left_out}`. The first entry a fork writes
+  in the child, directly after the copied chain, as the child of the cut
+  entry; the child's head is it. `parent_session` is the parent's session
+  id, `lantern` the lantern the fork was taken through, `point` its point,
+  `cut_at` the cut entry (the last `message` entry whose role is `assistant`
+  at or before the point, on the root-to-point chain), `coordinate_carried`
+  whether the point is a user message carried as the child's first prompt
+  rather than copied, `carried` that entry's id (or null), and
+  `seed_left_out` an object counting, by each part's `type`, the parts of
+  the carried message that are not `text` (`{}` when nothing is carried,
+  when the content is a string, or when every part is text). Written only
+  by `fork`.
+- `lys.fork` (HOME-006 R3): `{child}`, the child's session id. Appended at
+  the parent's head, which advances to it, once per fork; the parent gains
+  this one line and no earlier byte of it changes.
+
 ## The rendered uuid
 
 A Claude Code record's `uuid` is the entry's own id when that id is
@@ -166,6 +184,50 @@ timestamp is the entry's own, and the walk takes entry order then part
 order, so the same session head with the same target writes the same bytes
 (CN9, ADR-016); the namespace, the name form and the roles are fixed, and a
 change is a new version alongside.
+## Forks
+
+A fork (HOME-006) cuts from the session a lantern was lit in, read from
+the `lys.lantern` data key `lit_in`; a lantern whose data carries no
+`lit_in` is an older record and resolves by the sessions holding it (one
+holder cuts, several refuse `lantern_ambiguous` until one is named with
+`--session`). A copy of a lantern's line in a child (copied lines keep
+their ids) is a copy, not a second lantern: with `lit_in` recorded it is
+never cut from. The chain is read through the index, never by loading the
+file, and the cut ends at the last assistant message at or before the
+point; a point before any assistant message is refused `nothing_to_fork`.
+
+The child is a new session under the parent's `cwd` whose header's
+`parentSession` is the parent file's path relative to the home root
+(`sessions/<parent id>.jsonl`), the field Pi reads as the parent session's
+file path. Its copied lines are the parent file's own bytes for each cut
+entry, read by the index row's offset and length and never re-serialised,
+so each copied line hashes equal to the parent's; nothing else of the
+parent enters the child, no block is written, and the child's parts name
+the same block hashes as the parent's.
+
+The fork report carries ids and counts only: `child`, `parent`,
+`lantern`, `point`, `cut_at`, `entries` (the entries copied), `blocks`,
+`unstored`, `coordinate_carried` and `carried`. The candidate hashes are
+the block hashes the copied custom entries name in their data (`record` of
+a `lys.harness_event`; `request`, `response`, `raw_request` and
+`raw_response` of a `lys.call`) and the SHA-256 of each content part of
+the copied message entries, serialised as it stands in the entry. `blocks`
+counts the distinct candidates that name a block the store holds, each
+checked by path and never read; `unstored` counts those that name none.
+The importer stores a Claude Code part in its source form and writes the
+mapped Pi part inline (a `thinking` part with `thinkingSignature`, a
+`toolCall` part), so an inline thinking, tool-call or tool-result part
+hashes to no block and counts as unstored; a text part is stored as it
+stands and counts as held.
+
+A carried user message is not copied: the Claude Code render of such a
+child writes its text parts, in order, beside the rendered file as
+`<stem>.seed.txt` under the in-band marker line `<FORKED FROM SESSION
+<parent> AT ENTRY <point> BY LANTERN <lantern>>` and a heading line, and
+the printed launch line passes that file as the resumed session's first
+prompt; `render-launch` does the same on the template's line and lists
+the seed in its manifest. Neither entry is a signed or frozen wire format:
+both are local state of a home, as every lys custom entry here is.
 
 ## The loss account
 
