@@ -326,12 +326,12 @@
     },
     {
       "path": "crates/lys-home/src/harness/codex/profile.rs",
-      "note": "the measured 0.156.0 constants: version, mapping name, marker texts, thread id and rollout path naming",
+      "note": "the measured 0.156.0 profile: version, mapping name, marker texts, the shape loaded, derived ids and rollout path naming",
       "brief": "HOME-002"
     },
     {
       "path": "crates/lys-home/src/harness/codex/shape-0.156.0.json",
-      "note": "the non-content session_meta and turn_context values measured from the rollout Codex 0.156.0 wrote",
+      "note": "the non-content values measured from the rollouts Codex 0.156.0 wrote: session_meta, turn_context, task events, item keys, file-name offset and the spawned-child shape",
       "brief": "HOME-002"
     },
     {
@@ -355,6 +355,11 @@
       "brief": "HOME-002"
     },
     {
+      "path": "crates/lys-home/src/harness/codex/sidechain_tests.rs",
+      "note": "the sidechain gates: a child rollout with its parent link when the shape is measured, named lost when it is not",
+      "brief": "HOME-002"
+    },
+    {
       "path": "crates/lys-home/src/harness/codex/command.rs",
       "note": "the codex-render subcommand's arguments, run and JSON report",
       "brief": "HOME-002"
@@ -371,7 +376,7 @@
     },
     {
       "path": "crates/lys-home/src/harness/codex/render_tests.rs",
-      "note": "the render's gates: refusal writes nothing, deterministic path",
+      "note": "the render's gates: refusal writes nothing, turn and record order, deterministic output",
       "brief": "HOME-002"
     },
     {
