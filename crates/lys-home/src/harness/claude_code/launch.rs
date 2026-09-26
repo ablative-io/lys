@@ -9,11 +9,16 @@
 //! (R4); the session is rendered with its loss account (R2); the MCP file, the
 //! environment file (R6) and the instructions file are written; the five files
 //! are hashed; the manifest block is stored and the event appended (R5); the
-//! report is returned. Nothing runs: the launch line is text in the report
-//! (ADR-007). `--out` is made absolute first, so the manifest and the launch
-//! line never carry a relative path; the render is given the rendered file's
-//! path and never looks for the user's home directory. Nothing is written
-//! outside `--out` and the home, and nothing after a refusal.
+//! documents the session is given are resolved and recorded as one
+//! `lys.given` entry under that event (HOME-003 R4); the report is returned.
+//! Nothing runs: the launch line is text in the report (ADR-007). `--out` is
+//! made absolute first, so the manifest, the launch line and the given entry
+//! never carry a relative path; the render is given the rendered file's path
+//! and never looks for the user's home directory, which is read only to name
+//! the session's config directory when the template sets none. Nothing is
+//! written outside `--out` and the home, and nothing after a refusal; a
+//! resolution that fails leaves the render's files and its event and no
+//! given entry, and the command fails by the document's path.
 
 use std::path::{Path, PathBuf};
 
@@ -22,11 +27,13 @@ use serde_json::{Value, json};
 
 use crate::error::HomeError;
 use crate::harness::claude_code::events::{ManifestFile, RenderManifest, template_render};
+use crate::harness::claude_code::given::{CONFIG_DIR_VARIABLE, ConfigDir, resolve_given};
 use crate::harness::claude_code::launch_env::{write_env_file, write_new};
 use crate::harness::claude_code::render::{RenderTarget, render_claude_code};
 use crate::harness::claude_code::template::{Template, read_template};
 use crate::record::blocks::Hash;
 use crate::record::entries::{CUSTOM_HARNESS_EVENT, EntryBody};
+use crate::record::given::GivenRecord;
 use crate::record::{Home, safe_component};
 
 /// The MCP configuration file's name under `--out`.
@@ -102,6 +109,7 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
         canon: template.canon.clone(),
     };
     let render = render_claude_code(&session, &target, None)?;
+    let process_home = std::env::var_os("HOME").map(PathBuf::from);
     let mcp = Value::Object(std::mem::take(&mut template.mcp));
     let mcp_bytes = serde_json::to_vec_pretty(&mcp).map_err(|source| HomeError::Json {
         context: "the MCP configuration could not be serialised",
@@ -136,6 +144,13 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
         custom_type: CUSTOM_HARNESS_EVENT.to_owned(),
         data: Some(event.data()?),
     })?;
+    let config_dir = ConfigDir::resolve(
+        template.env.get(CONFIG_DIR_VARIABLE).map(String::as_str),
+        process_home.as_deref(),
+    )?;
+    let resolution = resolve_given(&args.cwd, config_dir, &out)?;
+    let given = GivenRecord::claude_code(resolution, environment_names(&template));
+    let given_id = given.append_under(&mut session, &event_id)?;
     let launch = launch_line(&template, &rendered, &mcp_file, &env, &instructions);
     Ok(json!({
         "command": "render-launch",
@@ -147,7 +162,19 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
         "event": event_id,
         "manifest": manifest_put.hash.as_str(),
         "render": render,
+        "given": given_id,
+        "given_documents": given.documents.len(),
     }))
+}
+
+/// The names of the variables the environment file sets for the session,
+/// in the file's order: the template's variables and each use-only secret's
+/// variable, sorted as the file writes them. Never a value or a handle.
+fn environment_names(template: &Template) -> Vec<String> {
+    let mut names: Vec<String> = template.env.keys().cloned().collect();
+    names.extend(template.use_only.iter().map(|secret| secret.env.clone()));
+    names.sort_unstable();
+    names
 }
 
 /// The launch line: the rendered file resumed by path with `--fork-session`,
