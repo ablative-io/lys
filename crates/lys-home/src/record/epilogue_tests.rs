@@ -50,8 +50,8 @@ fn an_epilogue_hangs_under_the_head_and_names_its_lantern() -> Gate {
     let after = std::fs::read(&file)?;
     assert_eq!(&after[..before.len()], &before[..]);
     assert_eq!(
-        after.iter().filter(|b| **b == b'\n').count(),
-        before.iter().filter(|b| **b == b'\n').count() + 1
+        std::str::from_utf8(&after)?.lines().count(),
+        std::str::from_utf8(&before)?.lines().count() + 1
     );
     assert_eq!(
         added,
@@ -113,9 +113,9 @@ fn each_refusal_names_itself_and_writes_nothing() -> Gate {
     }
     {
         let other = home.open_session(FIXTURE)?;
-        let held = add_epilogue(&home, FIXTURE, &l1, WORDS_ONE, ANNOTATOR);
-        assert!(matches!(&held, Err(HomeError::SessionHeld { .. })));
-        refusals.push(held);
+        let while_held = add_epilogue(&home, FIXTURE, &l1, WORDS_ONE, ANNOTATOR);
+        assert!(matches!(&while_held, Err(HomeError::SessionHeld { .. })));
+        refusals.push(while_held);
         drop(other);
     }
     let missing = add_epilogue(&home, "no-such-session", &l1, WORDS_ONE, ANNOTATOR);

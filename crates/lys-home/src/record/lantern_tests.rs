@@ -91,7 +91,7 @@ fn lighting_appends_one_line_under_the_head_and_moves_the_head_onto_it() -> Gate
     let lit = light(&home, FIXTURE, "e2", NOTE, LIGHTER)?;
     let after = std::fs::read(&file)?;
     assert_eq!(&after[..before.len()], &before[..]);
-    assert_eq!(after.iter().filter(|b| **b == b'\n').count(), 7);
+    assert_eq!(std::str::from_utf8(&after)?.lines().count(), 7);
     assert_eq!(lit.session, FIXTURE);
     assert_eq!(lit.point, "e2");
     let owner = home.open_session(FIXTURE)?;
@@ -167,9 +167,9 @@ fn each_refusal_names_itself_and_writes_nothing() -> Gate {
 
     {
         let other = home.open_session(FIXTURE)?;
-        let held = light(&home, FIXTURE, "e2", NOTE, LIGHTER);
-        assert!(matches!(&held, Err(HomeError::SessionHeld { .. })));
-        refusals.push(held);
+        let while_held = light(&home, FIXTURE, "e2", NOTE, LIGHTER);
+        assert!(matches!(&while_held, Err(HomeError::SessionHeld { .. })));
+        refusals.push(while_held);
         drop(other);
     }
 
