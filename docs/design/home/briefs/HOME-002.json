@@ -1,0 +1,359 @@
+{
+  "id": "HOME-002",
+  "cluster": "home",
+  "title": "Ship a home as a git ref and fetch it into a second home on the same machine",
+  "depends_on": [
+    "HOME-001"
+  ],
+  "blocked_by": [
+    "Card ct98Wv-2, the Claude Code launch template (the stage 2 template subcommand, with typed substitution and refusal of a missing input). This brief is built on lys main after that card lands, and R10 uses its template subcommand to render the fetched home and print the launch line."
+  ],
+  "checklist": [
+    "C14",
+    "C15",
+    "C16",
+    "C17",
+    "C18",
+    "C19",
+    "C20"
+  ],
+  "stories": [
+    "S9",
+    "S10",
+    "S11"
+  ],
+  "design_anchor": [
+    "ADR-001",
+    "ADR-003",
+    "ADR-004",
+    "ADR-007",
+    "ADR-012"
+  ],
+  "purpose": "The first block of context-roadmap stage 3, the same-machine proof. A home leaves the directory that captured it only as one git ref pushed to a named remote, and only when every index is fresh, every file is a home file and no named credential value is in any of them. It arrives in a new home that checks the fetched tree before it touches it, then records its arrival and its own execution id in every session. That is ADR-012 implemented, and the ref it ships is what the second-machine block will fetch. The render and resume at the end go through the Claude Code launch template on Claude Code 2.1.281. They are the resume evidence stage 3 asks for.",
+  "task": "In lys-home, in dependency order: a read-only index and head check (R1); a git runner with the machine's own git configuration shut off (R2); the classification of a home's files and the scan of the tracked ones for credential values (R3); ship (R4); fetch (R5); the arrival event (R6); the ship, fetch and index subcommands (R7); an integration test file against a bare remote in a temporary directory (R8); the documentation and the re-rendered cluster markdown (R9); and PROOF-SHIP.md (R10).\n\nThe home directory is itself the git repository. Ship commits exactly the session files, their index and head files and the blocks store. It never writes a source file, so it refuses by name a session whose index is missing or stale, and it does not repair it the way Index::load would. The refusal names the separate `lys-home index` step that rebuilds the index, and ship is then run again unchanged. A session with no head file is legal (RECORD.md) and ships as it is.\n\nNo credential file is ever tracked. Ship refuses by name every file in the home that is not a home file, and it scans every file it would commit for the values in a credential values file named on the command line. A hit is refused by file and byte offset, never by value. Nothing is redacted: a home with a secret in a transcript is refused, not shipped. The scan for standard credential patterns that the lead's answer also asks for is not in this brief, because the pattern set is not settled; it is an open question on the card. Redaction is a later card.\n\nThe acceptance's hash match is two checks. First, as fetched and before anything is appended, the fetched commit's tree equals the shipped commit's tree, so the session file, index, head and blocks hash-match the source (R5). Second, after the arrival append, the source session file is a byte prefix of the target session file, the blocks still hash-match, and the target's index and head are the ones Session::append wrote for that one arrival entry (R6). The proof records both.\n\nThe launch template is card ct98Wv-2's, not this brief's. R10 runs after it lands. In scope: this machine, Claude Code only, and git ref transport only. Out of scope: the named second machine and its two preconditions (read authority over the home, and encryption before bytes leave the machine); harnesses other than Claude Code; encryption of the home; any transport other than a git ref to a named remote; redaction.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Check a session's index and head without writing anything",
+      "spec": "WHEN asked to check a session file's index, THE SYSTEM SHALL read the session header and the index file. It SHALL answer fresh, with the session id and the row count, only when the rows meet the rules Index::from_cached already applies: each row starts where the one before ended, has a non-zero length, an id not seen before and a parent already indexed; each row ends on a newline in the session file; and the last row ends where the file ends. IF the index file is missing or its rows fail any of those rules, THEN THE SYSTEM SHALL refuse with a stale-index error that names the session id and the command that rebuilds the index, `lys-home index --home <dir> --session <id>`. WHEN asked to check a session's head against its index, THE SYSTEM SHALL answer fresh when the head file is absent (legal; read_head then reads the last indexed entry as the head), when it is empty, or when it names an indexed entry id. IF the head file names an id the index does not hold, THEN THE SYSTEM SHALL refuse with a head-mismatch error naming the session id. THE SYSTEM SHALL NOT rebuild an index. It SHALL NOT call Index::load, Session::open, Session::create or Home::open. It SHALL NOT create, write, rename or truncate any file, including the session's lock file. It SHALL NOT put any entry content in an error.",
+      "acceptance": [
+        "A fixture session with a header and 3 entries, whose index and head were written by Session::create and Session::append and whose Session was dropped before the check, has an index check that answers fresh with 3 rows and a head check that answers fresh.",
+        "The same fixture with its index file truncated to its first 2 rows is refused with the stale-index error, whose message contains `s1` and `lys-home index`. The index file's SHA-256 and the list of file names in sessions/ are equal before and after the call.",
+        "The same fixture with its index file deleted is refused with the stale-index error naming `s1`, and no index file exists after the call.",
+        "The same fixture with its head file holding `not-an-entry` is refused with the head-mismatch error naming `s1`.",
+        "The same fixture with its head file deleted passes the head check, and no head file exists after the call.",
+        "The same fixture with an empty head file passes the head check."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/record/verify.rs",
+          "crates/lys-home/src/record/verify_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/record/mod.rs",
+          "crates/lys-home/src/error.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C15",
+        "C18"
+      ],
+      "stories": [
+        "S10",
+        "S11"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Run git with the machine's own git configuration shut off",
+      "spec": "Structural: one function runs the git binary for ship and fetch. Every invocation SHALL do all of the following: set GIT_CONFIG_NOSYSTEM=1; point GIT_CONFIG_GLOBAL at an empty file; remove every other GIT_* variable from the child's environment; set GIT_TERMINAL_PROMPT=0; pass -c core.hooksPath pointing at an empty directory, -c commit.gpgsign=false, -c core.autocrlf=false and -c core.fsmonitor=false; and set the author and the committer to the name `lys-home` and the email `lys-home@localhost`. IF git exits non-zero, THEN THE SYSTEM SHALL refuse with a git error naming the operation and the exit status. THE SYSTEM SHALL NOT echo git's stdout or stderr into an error or a report. It SHALL NOT run any hook, sign, convert line endings, or take a git library crate as a dependency.",
+      "acceptance": [
+        "HOME is pointed at a temporary directory whose .gitconfig sets commit.gpgsign=true, core.autocrlf=true and core.hooksPath to a directory holding a pre-commit hook that exits 1. With that set, committing through the runner a temporary repository that holds one file containing a CRLF byte pair succeeds. The SHA-256 of `git cat-file -p HEAD:<file>` equals the file's SHA-256, and `git log -1 --format=%an` prints `lys-home`.",
+        "A push through the runner to a remote path that does not exist is refused with the git error naming `push` and a non-zero exit status, and the error text contains no line of git's stderr.",
+        "crates/lys-home/Cargo.toml lists the same 7 dependencies before and after this brief."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/ship/git.rs",
+          "crates/lys-home/src/ship/git_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/error.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C14"
+      ],
+      "stories": [
+        "S9"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Sort a home's files and scan the tracked ones for credential values",
+      "spec": "WHEN asked to classify a home, THE SYSTEM SHALL walk every file under the home outside `.git` and put each one in exactly one of three sets. Tracked: sessions/<id>.jsonl for an id that passes safe_component, the <id>.index.jsonl and <id>.head beside it, and blocks/<xx>/<hash> where <hash> is 64 lowercase hex characters and <xx> is its first two. Left behind: the lock file Index::lock_path names for a tracked session file, that session's temporary head file <id>.head.tmp, and a block store temporary file (a name beginning `.` and ending `.tmp`, directly under blocks/ or under blocks/<xx>/). Foreign: every other file. WHEN asked to scan, THE SYSTEM SHALL read the credential values file named to it, one value per line with the trailing line ending removed. The value is the part after the first `=` when the line holds one, and the whole line otherwise; empty values are skipped. THE SYSTEM SHALL search every tracked file's bytes for every value, and SHALL report each hit as the file's path relative to the home plus the byte offset of the hit's first byte, together with the count of files and values scanned. THE SYSTEM SHALL NOT put a value, or any byte of a scanned file, in a hit, an error or a report. It SHALL NOT modify any file. It SHALL NOT count a foreign or left-behind file as tracked.",
+      "acceptance": [
+        "The fixture home has one session s1 (its file, index, head and the lock file Session::create left), 2 blocks, a file sessions/s1.head.tmp and a file launch.env at the home's root. Classifying it gives tracked = sessions/s1.jsonl, sessions/s1.index.jsonl, sessions/s1.head and the 2 block paths (5 files); left behind = the lock path and sessions/s1.head.tmp; foreign = launch.env.",
+        "A fixture session file holds `lys-fixture-secret-5b1c07` inside a tool result at byte offset N. With a values file whose one line is `LYS_FIXTURE_SECRET=lys-fixture-secret-5b1c07`, the scan reports exactly one hit, sessions/s1.jsonl at offset N, and the report serialised as JSON does not contain `lys-fixture-secret-5b1c07`.",
+        "The same values file scanned against the fixture home without the secret reports 0 hits, 5 files scanned and 1 value scanned.",
+        "A values file holding only the line `EMPTY=` and an empty line reports 0 values scanned.",
+        "The SHA-256 of every file in the fixture home, and the set of its file names, are equal before and after a classify and a scan."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/ship/scan.rs",
+          "crates/lys-home/src/ship/scan_tests.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C14",
+        "C17"
+      ],
+      "stories": [
+        "S11"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Ship: commit exactly the tracked set in the home's own repository and push one ref",
+      "spec": "WHEN asked to ship a home to a remote under a name, with a credential values file, THE SYSTEM SHALL do the following in order. (1) Take every session's lock (the file Index::lock_path names, created empty where none exists) without blocking, and hold them until the push returns. (2) Check every session's index with R1. (3) Classify the home and scan its tracked files with R3. (4) Only when none of those refuses, commit exactly the tracked set in a git repository whose directory is `.git` inside the home, initialised on the first ship. The commit's parent is the repository's previous HEAD when one exists. (5) Push that commit to the remote as the one ref refs/lys/home/<name>, where <name> passes safe_component. (6) Report the commit id, its tree id, the ref, the count of sessions and of files committed, and the path relative to the home of every left-behind file. The remote is a path or a URL as given on the command line. IF a session's lock is held, THEN THE SYSTEM SHALL refuse, naming the session id. IF any session's index is refused by R1, THEN THE SYSTEM SHALL refuse, naming every such session id and the `lys-home index` command, before creating `.git` or committing. IF the home holds any foreign file or the scan finds any hit, THEN THE SYSTEM SHALL refuse, naming every foreign file's path and every hit's path and offset, before creating `.git` or committing. THE SYSTEM SHALL NOT rebuild, rewrite, truncate or rename any session, index, head or block file. It SHALL NOT write any file in the home outside `.git`, except an empty lock file for a session that had none; that means no .gitignore and no settings file. It SHALL NOT stage a file outside the tracked set. It SHALL NOT force a push or push more than one ref. It SHALL NOT redact or omit any byte of a tracked file, and SHALL NOT report a hit's value.",
+      "acceptance": [
+        "The fixture home (one session s1 with a header and 3 entries, and 2 blocks) is shipped under the name `fixture` to a bare remote created by `git init --bare` in a temporary directory. The report shows 1 session and 5 files. `git ls-tree -r --name-only refs/lys/home/fixture` in the remote lists exactly sessions/s1.jsonl, sessions/s1.index.jsonl, sessions/s1.head and the 2 block paths.",
+        "The ship report's commit equals `git rev-parse refs/lys/home/fixture` in the remote, and `git for-each-ref` in the remote lists exactly one ref.",
+        "The SHA-256 of every file in the source home outside `.git`, and the set of those file names, are equal before and after a successful ship.",
+        "A fixture home whose index is truncated to 2 of its 3 rows is refused, naming `s1` and `lys-home index`. Afterwards the home holds no `.git`, the SHA-256 of every file in it is unchanged, and the remote holds no ref.",
+        "A fixture home whose head file is deleted ships. The remote's tree lists 4 files with no sessions/s1.head, and the source home still holds no head file.",
+        "A fixture home holding a launch.env file at its root, and a tool result in s1 containing the value listed in the values file, is refused in one report naming `launch.env` and `sessions/s1.jsonl` with that hit's byte offset. Afterwards the home holds no `.git` and the remote holds no ref.",
+        "A ship while a Session for s1 is held open in the same test is refused, naming `s1`.",
+        "After one more entry is appended to the fixture home, a second ship pushes a commit whose parent is the first ship's commit, and the remote's ref names the second commit."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/ship/push.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C14",
+        "C15",
+        "C17"
+      ],
+      "stories": [
+        "S9",
+        "S11"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Fetch: bring one ref into a new home and check it before touching it",
+      "spec": "WHEN asked to fetch a name from a remote into a directory, THE SYSTEM SHALL first check whether the directory already holds a home, meaning it contains a `sessions` entry, a `blocks` entry or a `.git` entry. IF it does, THEN THE SYSTEM SHALL refuse, naming the directory. Otherwise THE SYSTEM SHALL: create the directory when it is absent; initialise a git repository whose directory is `.git` inside the new home; fetch exactly refs/lys/home/<name> from the remote; and check the fetched commit out into the home with HEAD at it. It SHALL then verify three things: that `git status --porcelain --untracked-files=all` prints nothing; that every session's index passes R1's index check; and that every head passes R1's head check. IF any of them fails, THEN THE SYSTEM SHALL refuse, naming the session id or the path, append nothing, and leave the directory as fetched. Fetching and these checks SHALL be one library call that returns before R6 appends anything. THE SYSTEM SHALL report the fetched commit id and its tree id. THE SYSTEM SHALL NOT write to the source home or to the remote. It SHALL NOT fetch any ref other than the one named. It SHALL NOT merge into or overwrite an existing home. It SHALL NOT rebuild an index.",
+      "acceptance": [
+        "After R4 ships the fixture home under `fixture`, fetching `fixture` from the bare remote into a new temporary directory reports a commit equal to the ship report's commit and a tree equal to the ship report's tree.",
+        "In the fetched home, `git rev-parse HEAD^{tree}` equals the ship report's tree id.",
+        "Through the library call that stops after verification, the SHA-256 of sessions/s1.jsonl, sessions/s1.index.jsonl, sessions/s1.head and each of the 2 blocks in the fetched home equals the source file's.",
+        "Fetching into a directory that holds a `sessions` directory is refused, naming that directory, and the directory's file names and their SHA-256 are unchanged.",
+        "Fetching into a directory that holds only a `.git` directory is refused, naming that directory.",
+        "A remote whose shipped commit holds a head file naming `not-an-entry` is fetched, then refused naming `s1`. The fetched session file's SHA-256 equals the shipped blob's.",
+        "The SHA-256 of every file in the source home, and the remote's `git for-each-ref` output, are equal before and after a fetch."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/ship/fetch.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C18"
+      ],
+      "stories": [
+        "S9",
+        "S10"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Append one arrival event to every fetched session",
+      "spec": "WHEN R5's checks pass, THE SYSTEM SHALL mint one execution id for the fetch with record::fresh_id (32 lowercase hex characters). For each session, in id order, it SHALL append through Session::append exactly one custom entry of customType lys.harness_event whose data is {kind: \"arrival\", harness: \"lys\", source_uuid: null, record: null, detail: {source_commit, remote, ref, execution_id}}. Here source_commit is the fetched commit id; ref is refs/lys/home/<name>; and remote is the remote as given, with any userinfo removed (the part of a scheme URL's authority before an `@`). The entry is a child of the session's head and becomes its head. IF any session's arrival data would serialise to more than 512 bytes (MAX_DATA_BYTES), THEN THE SYSTEM SHALL refuse, naming the cap, before appending to any session. THE SYSTEM SHALL report the execution id and each session's arrival entry id. THE SYSTEM SHALL NOT change any block. It SHALL NOT change a session file or an index file except by appending that one line and that one row, and SHALL NOT change a head file except to name the arrival entry. It SHALL NOT append more than one entry to a session. It SHALL NOT commit the appended entries in the target repository. It SHALL NOT write the execution id into any other file. It SHALL NOT record userinfo, a token or a credential in the event.",
+      "acceptance": [
+        "After a fetch of the fixture home, the source sessions/s1.jsonl is a byte prefix of the fetched sessions/s1.jsonl, which is exactly one line longer. The fetched index file is the source index's bytes followed by one row, whose offset is the source session file's length, whose id is the arrival entry id and whose parent is the source head. The fetched head file holds the fetch report's arrival entry id.",
+        "The SHA-256 of each of the 2 blocks in the fetched home equals the source block's after the arrival append.",
+        "The fetched session's last line parses as a Pi custom entry. Its customType is `lys.harness_event` and its parentId is the source head. Its data.kind is `arrival` and data.harness is `lys`. Its data.detail.source_commit is the ship report's commit, data.detail.ref is `refs/lys/home/fixture`, and data.detail.execution_id is the fetch report's execution id, 32 lowercase hex characters.",
+        "Two fetches of the same ref into two new directories report two different execution ids.",
+        "A fetch of a home holding 2 sessions reports 2 arrival entries, both with the same execution id, and each session's last line is its arrival.",
+        "The remote `https://user:pw@example.invalid/home.git` is recorded as `https://example.invalid/home.git`, and a local path remote is recorded exactly as given.",
+        "A remote path long enough to push the arrival data past 512 bytes is refused naming 512, and the fetched session file's SHA-256 equals the source's.",
+        "In the fetched home, `git rev-parse HEAD` still equals the fetched commit after the arrival is appended, and `git status --porcelain` lists sessions/s1.jsonl, sessions/s1.index.jsonl and sessions/s1.head as modified."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/ship/arrival.rs",
+          "crates/lys-home/src/ship/arrival_tests.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C19"
+      ],
+      "stories": [
+        "S10"
+      ]
+    },
+    {
+      "id": "R7",
+      "title": "The ship, fetch and index subcommands",
+      "spec": "Add three subcommands to the lys-home binary: `ship --home <dir> --remote <url-or-path> --ref <name> --secret-values <file>`, `fetch --home <dir> --remote <url-or-path> --ref <name>`, and `index --home <dir> --session <id>`. Their arguments and reports go in their own file, joined to the command enum in cli.rs by one variant each. `index` opens the session through Home::open_session, so Index::load rebuilds a missing or stale index, and reports the session id, the row count and whether a rebuild happened. Each subcommand SHALL print one JSON report of ids, hashes, counts, offsets and paths. WHEN ship or fetch refuses, THE SYSTEM SHALL print a JSON report and exit 1. The report carries `refused` (one of `stale index`, `head mismatch`, `session held`, `unshippable files`, `home occupied`, `arrival too large` or `git`) and whatever the refusal names: session ids, the `lys-home index` command line, paths, and hits as {file, offset}. IF a required argument is missing, THEN THE SYSTEM SHALL exit 2 naming it. THE SYSTEM SHALL NOT print any transcript, block, body or credential value. It SHALL NOT change the arguments or reports of the six existing subcommands.",
+      "acceptance": [
+        "`lys-home ship --home h --remote r --secret-values v` exits 2, and its stderr names `--ref`.",
+        "`lys-home ship` on the fixture home with its index truncated exits 1. Its stdout parses as JSON, with `refused` equal to `stale index`, `sessions` equal to [`s1`], and a `fix` value containing `lys-home index`.",
+        "`lys-home index --home <that home> --session s1` then exits 0 and reports rows 3 and rebuilt true. The same `lys-home ship` command run again exits 0 and reports a commit.",
+        "`lys-home ship` on a home holding launch.env exits 1, and its stdout parses as JSON with `refused` equal to `unshippable files` and `foreign` equal to [`launch.env`].",
+        "`lys-home fetch` into an occupied directory exits 1. Its stdout parses as JSON with `refused` equal to `home occupied` and `path` naming the directory.",
+        "The stdout of a successful ship and of a successful fetch each parses as JSON and contains no key named text, content or body.",
+        "crates/lys-home/src/cli.rs holds fewer than 500 lines of code."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/ship/mod.rs",
+          "crates/lys-home/src/ship/cli.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/cli.rs",
+          "crates/lys-home/src/main.rs",
+          "crates/lys-home/src/lib.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C14",
+        "C15",
+        "C16",
+        "C17",
+        "C18"
+      ],
+      "stories": [
+        "S9",
+        "S11"
+      ]
+    },
+    {
+      "id": "R8",
+      "title": "Tests against a bare remote in a temporary directory",
+      "spec": "Structural: one integration test file drives the lys-home binary end to end against a bare remote made by `git init --bare` in a temporary directory. The fixture home holds one synthetic session (a header and 3 entries written through the library, one of them a tool result) and 2 blocks. A credential values file outside the home holds the line `LYS_FIXTURE_SECRET=lys-fixture-secret-5b1c07`. The secret fixture is a copy of the fixture home with that value inside the tool result and a `launch.env` file holding the same line at the home's root. The tests SHALL assert refusals as well as successes. They SHALL assert the number of sessions, files and blocks each check covered, so a loop over zero sessions fails. No test name carries fixture content.",
+      "acceptance": [
+        "A test ships and fetches the fixture home and asserts in order: the fetched tree equals the shipped tree before the arrival; the source session file is a byte prefix of the fetched one after the arrival, which is exactly one line longer; the 2 blocks hash-match; that last line is an arrival naming the ship report's commit and the fetch report's execution id; and the count of sessions checked is 1 and of blocks compared is 2.",
+        "A test asserts that the SHA-256 of every source home file outside `.git` is equal before and after the ship and the fetch.",
+        "A test ships the secret fixture and asserts exit 1 with `refused` equal to `unshippable files`, naming both `launch.env` and `sessions/s1.jsonl` with its offset. It then ships the clean fixture and asserts that `git grep -F lys-fixture-secret-5b1c07 $(git rev-list --all)` in the remote finds nothing and exits 1.",
+        "A test asserts the stale-index refusal by name, the `lys-home index` step and the ship that follows, and the occupied-target refusal by name, each through the binary's exit status and its JSON report.",
+        "`cargo test -p lys-home --all-features --test ship_fetch` runs at least 5 tests, and all of them pass."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/tests/ship_fetch.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C14",
+        "C15",
+        "C16",
+        "C17",
+        "C18",
+        "C19"
+      ],
+      "stories": [
+        "S9",
+        "S10",
+        "S11"
+      ]
+    },
+    {
+      "id": "R9",
+      "title": "Write the tracked set, ship, fetch, index and the arrival kind down",
+      "spec": "Structural: RECORD.md SHALL state that a home is a git repository with `.git` inside it. It SHALL name the tracked set (sessions/<id>.jsonl, <id>.index.jsonl, <id>.head and blocks/<xx>/<hash>). It SHALL state that lock files and temporary files are left behind and named, and that every other file is refused. It SHALL name the ref refs/lys/home/<name>, the credential values scan, and the `index` step that a stale-index refusal names. It SHALL add `arrival` to the closed list of lys.harness_event kinds, with harness `lys`, its four detail members and the 512-byte cap. The crate README SHALL say what ship, fetch and index do, and that the crate does not move a home to another machine, encrypt it, use any transport other than a git ref, or redact a transcript. The cluster markdown SHALL be re-rendered with render-cluster.py so that DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/HOME-002.md match their JSON. THE SYSTEM SHALL NOT change any existing kind's meaning or any published wire format.",
+      "acceptance": [
+        "RECORD.md lists 6 lys.harness_event kinds. The sixth is `arrival`, with harness `lys` and the detail members source_commit, remote, ref and execution_id.",
+        "RECORD.md names refs/lys/home/<name>, the four members of the tracked set, and `lys-home index`.",
+        "`sh scripts/design/gate.sh` exits 0.",
+        "`git diff --stat main` for this brief shows no change under crates/lys-core or crates/lys-log-store."
+      ],
+      "files": {
+        "create": [
+          "docs/design/home/briefs/HOME-002.md"
+        ],
+        "modify": [
+          "docs/design/home/RECORD.md",
+          "crates/lys-home/README.md",
+          "docs/design/home/DESIGN.md",
+          "docs/design/home/CHECKLIST.md",
+          "docs/design/home/USER-STORIES.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C17",
+        "C19"
+      ],
+      "stories": [
+        "S10",
+        "S11"
+      ]
+    },
+    {
+      "id": "R10",
+      "title": "Prove the move: ship, fetch, render through the launch template and resume on Claude Code 2.1.281",
+      "spec": "Structural: PROOF-SHIP.md records one run on the machine that built the card, in the pattern of PROOF-RESUME.md. A fixture home with a synthetic session is shipped to a bare remote in a temporary directory and fetched into a second directory. The fetched session is rendered through the launch template's subcommand, as landed with card ct98Wv-2, into a scratch directory outside the fetched home, and that subcommand prints the launch line. The launch line is run from a scratch working directory made for the run. It is run with the Claude Code 2.1.281 binary from its versioned install, not whatever `claude` resolves to on PATH, and with PROOF-RESUME.md's prompt-mode arguments added. The proof SHALL record the version string that binary prints. It SHALL record the two hash checks: the fetched files' SHA-256 before the arrival against the source's (equal); and, after the arrival, the source and target session file lengths, the target's first bytes equal to the source file (the prefix check) and the blocks' SHA-256 (equal). THE SYSTEM SHALL NOT install, upgrade or downgrade Claude Code for the proof. The proof SHALL NOT hold any transcript content, answer text, credential or secret value; it holds hashes, lengths, counts and paths only.",
+      "acceptance": [
+        "PROOF-SHIP.md records the ship report's commit and tree, the fetch report's commit, tree, execution id and arrival entry id, and the remote's ref name.",
+        "PROOF-SHIP.md records the SHA-256 of each source home file before and after the ship and fetch (equal), and the SHA-256 of the fetched session file, index, head and blocks before the arrival (equal to the source's).",
+        "PROOF-SHIP.md records the source and target session file lengths after the arrival, the prefix check's result, and the blocks' SHA-256 after the arrival (equal to the source's).",
+        "PROOF-SHIP.md records the version string `2.1.281 (Claude Code)`, the template subcommand exactly as run, the printed launch line, the command as run, the exit status, the continuation's path and line count, and the rendered file's SHA-256 before and after the resume.",
+        "PROOF-SHIP.md contains no string of the fixture session's entry text and no occurrence of `lys-fixture-secret-5b1c07`."
+      ],
+      "files": {
+        "create": [
+          "docs/design/home/PROOF-SHIP.md"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C20"
+      ],
+      "stories": [
+        "S9"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT rewrite, truncate, rename or rebuild any session, index, head or block file in the source home, and SHALL NOT call Index::load or Session::open on the ship path.",
+    "SHALL NOT move a home to another machine, encrypt a home, or claim read authority over a home.",
+    "SHALL NOT use any transport other than a git ref pushed to and fetched from a named remote, and SHALL NOT force-push.",
+    "SHALL NOT support a harness other than Claude Code, and SHALL NOT build a launch template or a profile; the template is card ct98Wv-2's.",
+    "SHALL NOT track, record or print a credential, token, key, credential values file or remote userinfo, and SHALL NOT redact or omit any byte of a tracked file.",
+    "SHALL NOT scan for credential patterns; only the values in the named credential values file are scanned until the pattern set is settled.",
+    "SHALL NOT print transcript, block or body content in any report, error, log, test name or proof.",
+    "SHALL NOT add a crate dependency to lys-home, and SHALL NOT touch lys-core, lys-log-store or any published wire format.",
+    "SHALL NOT add a field to Pi's grammar; the arrival rides only inside a custom entry's data.",
+    "SHALL NOT install, upgrade or downgrade Claude Code, and SHALL NOT have lys-home run Claude Code."
+  ],
+  "verification": [
+    "cargo fmt --all -- --check",
+    "cargo clippy --all-targets --all-features -- -D warnings",
+    "cargo clippy --all-targets -- -D warnings",
+    "cargo test --workspace --all-features",
+    "cargo doc --no-deps --all-features",
+    "cargo doc --no-deps",
+    "sh scripts/design/gate.sh",
+    "grep -n 'Index::load\\|Session::open\\|open_session\\|Home::open' crates/lys-home/src/ship/push.rs crates/lys-home/src/ship/scan.rs crates/lys-home/src/record/verify.rs finds nothing.",
+    "grep -rn 'unwrap()\\|expect(\\|panic!' crates/lys-home/src/ship crates/lys-home/src/record/verify.rs, excluding the *_tests.rs files, finds nothing.",
+    "git diff --stat main -- crates/lys-home/Cargo.toml crates/lys-core crates/lys-log-store shows no change."
+  ]
+}

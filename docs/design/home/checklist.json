@@ -95,6 +95,46 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Moving a home",
+      "items": [
+        {
+          "id": "C14",
+          "text": "Ship commits exactly a home's session files, their index and head files and its blocks store in the home's own git repository, pushes that commit as one ref to the remote named on the command line, and reports the commit, the ref and every lock or temporary file it left behind.",
+          "done": false
+        },
+        {
+          "id": "C15",
+          "text": "Ship refuses by name a home in which any session's index is missing or stale, names the index step that fixes it and writes nothing; a session without a head file ships as it is, and the source home's files are byte-identical before and after every ship.",
+          "done": false
+        },
+        {
+          "id": "C16",
+          "text": "A separate index subcommand rebuilds a session's missing or stale index, after which the same ship command runs unchanged and succeeds.",
+          "done": false
+        },
+        {
+          "id": "C17",
+          "text": "Ship refuses by name every file in the home that is not a home file, and every place a tracked file holds a value from the credential values file named on the command line, giving the file and the byte offset and never the value; nothing is redacted.",
+          "done": false
+        },
+        {
+          "id": "C18",
+          "text": "Fetch brings the shipped ref into a new directory and refuses by name one that already holds a home; the fetched tree equals the shipped tree, so the session file, index, head and blocks hash-match the source, and every index is verified against its file and every head against its index.",
+          "done": false
+        },
+        {
+          "id": "C19",
+          "text": "After the tree check, each fetched session gains exactly one appended lys.harness_event of kind arrival naming the source commit, the remote, the ref and a fresh execution id; the source session file is a byte prefix of the target's, the blocks still hash-match, and the index and head are the ones Session::append wrote for that entry.",
+          "done": false
+        },
+        {
+          "id": "C20",
+          "text": "The fetched home is rendered through the Claude Code launch template and resumed by its printed launch line on Claude Code 2.1.281, written up in PROOF-SHIP.md in hashes, lengths, counts and paths only.",
+          "done": false
+        }
+      ]
     }
   ]
 }

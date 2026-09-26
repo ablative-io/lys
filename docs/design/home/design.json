@@ -49,7 +49,9 @@
   "decisions": [
     "ADR-001",
     "ADR-003",
-    "ADR-004"
+    "ADR-004",
+    "ADR-007",
+    "ADR-012"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -57,7 +59,8 @@
     "One seat with a subscription login making calls through a pass-through proxy, so the tee has somewhere to live.",
     "A written loss account for every derived record: what a render or translation preserved, transformed and could not carry.",
     "The canon, one curated versioned series of short examples each showing a rule lived, seeds every new session, and its effect is measured on a card against a plain start.",
-    "A handover letter from an outgoing session seeds its successor as inherited memory, with the model's own thinking intact, and the effect is measured on a card against a plain start."
+    "A handover letter from an outgoing session seeds its successor as inherited memory, with the model's own thinking intact, and the effect is measured on a card against a plain start.",
+    "A home shipped as one git ref to a named remote, only when every index is fresh, every file is a home file and no named credential value is in it, and fetched into an isolated second home on the same machine; the fetched tree equals the source's, each session then carries one appended arrival event with the source commit and a fresh execution id, and the home is rendered through the Claude Code launch template and resumed on Claude Code 2.1.281 with the measurement written down."
   ],
   "non_goals": [
     {
@@ -65,8 +68,8 @@
       "reason": "Signing comes when asked for (Tom, 22 September 16:27); every stage here works without it."
     },
     {
-      "text": "Encryption at rest and moving a home between devices (stage 3 preconditions).",
-      "reason": "Stage 3's three preconditions (identity and read authority, encryption before bytes leave, the resume evidence) are their own brief."
+      "text": "Encryption at rest, and moving a home between devices beyond the same-machine proof of HOME-002 (stage 3 second block and later).",
+      "reason": "The second block waits on its two preconditions, read authority over the home from the directory step and encryption before bytes leave the machine from the secrets step, each a card on its own board; HOME-002 takes only the same-machine block, and its shipped ref is what the second block fetches."
     },
     {
       "text": "Harnesses other than Claude Code, and Chat Completions or Responses translation beyond keeping the raw call bytes.",
@@ -79,6 +82,10 @@
     {
       "text": "Adopting, wrapping or calling Norn's session code; Pi's code is read as the reference and not vendored.",
       "reason": "Tom, Dot 13:28: not Norn. Pi's tree is the reference."
+    },
+    {
+      "text": "Any transport for a home other than a git ref pushed to a named remote.",
+      "reason": "Stage 3 moves a home by the same route as a build tree, a pushed ref the target fetches, never a hand copy (ADR-012)."
     }
   ],
   "structure": [
@@ -306,6 +313,136 @@
       "path": "crates/lys-home/src/proxy/journal_tests.rs",
       "note": "recovery after a kill: one lost record per open call",
       "brief": "HOME-001"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-002.json",
+      "note": "the second brief: ship a home as a git ref, fetch it into a second home with an arrival event, and the same-machine resume proof",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-002.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "docs/design/home/DESIGN.md",
+      "note": "the cluster design rendered from design.json",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "docs/design/home/CHECKLIST.md",
+      "note": "the checklist rendered from checklist.json",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "docs/design/home/USER-STORIES.md",
+      "note": "the stories rendered from stories.json",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/record/verify.rs",
+      "note": "read-only check of a session's index against its file and its head against its index; a missing head is legal; never rebuilds or writes",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/record/verify_tests.rs",
+      "note": "the read-only check's tests: stale index, missing index, missing head, head naming no entry, nothing written",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/record/mod.rs",
+      "note": "declares the verify module",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/error.rs",
+      "note": "named refusals for ship and fetch: stale index naming the index step, head mismatch, unshippable files, occupied target, a git step that failed",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/ship/mod.rs",
+      "note": "module declarations only: git, scan, push, fetch, arrival, cli",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/ship/git.rs",
+      "note": "the git binary run with system and global config, hooks, signing, line-ending conversion and prompts shut off",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/ship/git_tests.rs",
+      "note": "the git runner's tests: the machine's git configuration ignored, a failed push refused by name without git's output",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/ship/scan.rs",
+      "note": "sorts a home's files into tracked, left behind and foreign, and scans the tracked ones for the named credential values by file and offset",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/ship/scan_tests.rs",
+      "note": "the classification and scan tests: the three sets, one hit at its offset, no value in any report",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/ship/push.rs",
+      "note": "ship: lock every session, check every index, classify and scan, commit exactly the tracked set in the home's own repository, push one ref",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/ship/fetch.rs",
+      "note": "fetch: refuse an occupied target, fetch one ref, check the tree and every index and head",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/ship/arrival.rs",
+      "note": "the arrival lys.harness_event: source commit, remote without userinfo, ref, execution id",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/ship/arrival_tests.rs",
+      "note": "the arrival tests: the byte prefix, the index row and head, one execution id per fetch, userinfo removed, the 512-byte cap",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/ship/cli.rs",
+      "note": "the ship, fetch and index subcommand arguments and their JSON reports",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/cli.rs",
+      "note": "the ship, fetch and index subcommands joined to the command enum, delegating to ship/cli.rs",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/main.rs",
+      "note": "a refused ship or fetch prints its JSON report and exits 1",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/lib.rs",
+      "note": "declares the ship module",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/tests/ship_fetch.rs",
+      "note": "ship to a bare remote in a temporary directory and fetch into a second home: tree equality, the byte prefix after the arrival, source byte-identity, the refusals, the index step, the fixture secret",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "docs/design/home/RECORD.md",
+      "note": "the git-backed home: its tracked set, what is left behind and refused, the ref, the index step and the arrival kind of lys.harness_event",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/README.md",
+      "note": "what ship, fetch and index do and do not do",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "docs/design/home/PROOF-SHIP.md",
+      "note": "the measured same-machine move: ship, fetch, render through the launch template and resume on Claude Code 2.1.281, hashes, lengths, counts and paths only",
+      "brief": "HOME-002"
     }
   ],
   "inventory": [
@@ -375,9 +512,72 @@
   "gate": [
     {
       "tree": ".",
-      "fmt": "cargo fmt --all -- --check",
-      "lint": "cargo clippy --all-targets -- -D warnings",
-      "tests": "cargo test --workspace"
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
+      "legs": [
+        {
+          "name": "fmt",
+          "command": "cargo fmt --all",
+          "requires": [
+            "tool:cargo",
+            "tool:rustfmt"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy-all-features",
+          "command": "cargo clippy --all-targets --all-features -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy",
+          "command": "cargo clippy --all-targets -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "tests",
+          "command": "cargo test --workspace --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc-all-features",
+          "command": "cargo doc --no-deps --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc",
+          "command": "cargo doc --no-deps",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
+          "requires": [
+            "tool:sh",
+            "tool:python3"
+          ],
+          "cadence": "round"
+        }
+      ]
     }
   ]
 }
