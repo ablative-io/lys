@@ -20,6 +20,7 @@ lys adds nothing to Pi's grammar. Its own data rides in Pi's `custom` entries:
 | `lys.harness_event` | a harness-local event: a hook, a system record, a permission mode or a tool completion, with the whole source record as a block |
 | `lys.authored`      | this session is a hand-written demonstration, not history         |
 | `lys.inherited`     | this entry came from the canon or another session, and says so    |
+| `lys.given`         | what a rendered session was given: each instruction document Claude Code loads and each file the render wrote, by kind, path, length and SHA-256 in the measured order, with the config directory and the environment names; never a document's content |
 
 One owner at a time: a session file is opened under an exclusive lock on
 `<id>.lock` beside it, held while the `Session` lives, so a second opener in
@@ -57,12 +58,33 @@ line, `claude --resume <out>/<uuid>.jsonl --fork-session --mcp-config
 <out>/instructions.md` plus the template's flags; the tool never runs it. A
 template marking a secret readable is refused naming `secret_reader_unbuilt`
 and SECRETS-002, since no broker reader exists yet. The same template and
-session write the same bytes twice.
+session write the same bytes twice. After the event, `render-launch` appends
+one `lys.given` entry under it: the documents Claude Code 2.1.283 loads for
+the rendered working directory (the user `CLAUDE.md` under the config
+directory, the `CLAUDE.md` chain, the memory index) and the two written
+files it is given (`instructions.md`, `mcp.json`, by their out-relative
+paths), each as kind, path, byte length and SHA-256 in the measured order,
+with the config directory (the template's `CLAUDE_CONFIG_DIR`, or
+`HOME/.claude` from the rendering process's `HOME`) and the names the
+environment file sets. Nothing of a document is kept, and a document the
+harness would read that cannot be read fails the render by path.
+
+`given --home <dir> --session <id>` reports every `lys.given` entry of the
+session in file order, each with its entry id, harness and version, config
+directory and source, the kinds resolved and unlisted, the environment names
+and each document's kind, path, length and sha256. `given-check --home <dir>
+--session <id> --entry <id> --path <listed path> --file <file>` hashes the
+file and answers `matches` when its SHA-256 and length equal the listed
+document's, `differs` otherwise, and exits as `diff` does: 0 on matches, 1
+on differs, 2 on a refusal (a missing argument, a session or file that
+cannot be read, an entry id or listed path not in the session). Neither
+prints a byte of either file.
 
 What the crate does not do: interpret, print or log transcript contents (errors
 and reports carry ids, hashes, offsets and counts only); sign, hash into a lys
 log or anchor; encrypt; move a home between devices; run or supervise an
 agent; talk to Norn.
 
-Design and brief: `docs/design/home/` (HOME-001). Pi reference: the checkout
+Design and briefs: `docs/design/home/` (HOME-001, HOME-002, HOME-003). Pi
+reference: the checkout
 at `3d5cbe98`, `packages/coding-agent/src/core/session-manager.ts`.

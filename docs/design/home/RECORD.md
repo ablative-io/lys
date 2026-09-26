@@ -1,7 +1,8 @@
 # The home record
 
-Written for HOME-001 R1, R2 and R6. Everything here is local state of a home,
-not a wire contract; nothing is signed.
+Written for HOME-001 R1, R2 and R6, with HOME-002's render event and
+HOME-003's context record. Everything here is local state of a home, not a
+wire contract; nothing is signed.
 
 ## Pi's grammar, as adopted
 
@@ -83,6 +84,40 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   path as a side leaf under the head (`append_beside`): the head does not
   move, the render walker never sees it, and a second render of the same
   session records the same session head hash in a second event.
+- `lys.given` (HOME-003 R3): the context record, what a rendered session was
+  given, as hashes only. Data is exactly `{harness, harness_version, kinds,
+  config_dir, documents, environment}`. `harness` is `claude-code` and
+  `harness_version` the Claude Code version the load order was measured on
+  (2.1.283, PROOF-GIVEN.md). `kinds` has two members: `resolved`, the list
+  `claude_md_chain, user_claude_md, memory_index, appended_instructions,
+  mcp_config, environment_names`, and `unlisted`, the list
+  `claude_md_imports, claude_rules`, the two kinds that reach the request
+  only by the harness reading a document, which this entry never parses;
+  a second `lys.given` entry appended at the first request by the proxy's
+  capture records those, so a reader can tell a kind this entry leaves out
+  from one absent from the session. `config_dir` is `{path, source}`, with
+  `source` `template` when the template's env slot set `CLAUDE_CONFIG_DIR`
+  and `home` when it set none and the path is `HOME/.claude` from the
+  rendering process's `HOME` (never that process's `CLAUDE_CONFIG_DIR`).
+  `documents` is the ordered list, each `{kind, path, length, sha256}`, in
+  the measured order: `user_claude_md` (`<config>/CLAUDE.md`), then
+  `appended_instructions` and `mcp_config` (the two files the render wrote,
+  named by their path relative to the render's out directory, so two renders
+  that write no per-render bytes give equal lists), then `claude_md_chain`
+  for each directory from the outermost ancestor of the working directory
+  down to it, its `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md` in
+  that order, then `memory_index`
+  (`<config>/projects/<slug>/memory/MEMORY.md`, the slug being every
+  character outside ASCII letters and digits replaced by `-`); every path
+  but the two written files is absolute. A position whose file is absent is
+  omitted; when the config directory is `D/.claude` for a `D` on the chain,
+  `D/.claude/CLAUDE.md` is listed once, first, as `user_claude_md`.
+  `environment` is the names of the variables the template set for the
+  session, in the environment file's order, never a value or a handle. The
+  entry hangs under the `template_render` event it follows, beside the
+  context path, so the head does not move. It is unsigned and unencrypted
+  and carries no document content: signing (stage 6) and encryption at rest
+  (stage 3) can be added later without changing what is recorded.
 - `lys.authored` (R3, R4): no data. Precedes the first authored message entry
   of a session; every authored assistant message carries provider, api and
   model `authored`, so a demonstration is never mistaken for history.
