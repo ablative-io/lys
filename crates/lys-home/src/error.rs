@@ -162,6 +162,69 @@ pub enum HomeError {
         /// How many `tool_use` ids appear more times in the fork than in the rendered file.
         count: u64,
     },
+
+    /// A launch template's `slots` object holds a member outside the five the
+    /// schema names.
+    #[error(
+        "launch template names a slot `{slot}` that is not one of transcript, mcp, env, secrets, instructions"
+    )]
+    UnknownSlot {
+        /// The member found.
+        slot: String,
+    },
+
+    /// A launch template's `slots` object lacks one of the five slots.
+    #[error("launch template is missing the slot `{slot}`")]
+    MissingSlot {
+        /// The slot missing.
+        slot: String,
+    },
+
+    /// A launch template field holds a value this profile does not accept.
+    #[error(
+        "launch template `{field}` is `{value}`, which the Claude Code profile does not accept"
+    )]
+    TemplateValue {
+        /// The field, dotted from the top of the template.
+        field: String,
+        /// The value given, cut to 80 characters.
+        value: String,
+    },
+
+    /// A launch template is not the shape the schema names.
+    #[error("launch template `{field}` {reason}")]
+    TemplateShape {
+        /// The field, dotted from the top of the template.
+        field: String,
+        /// What is wrong with it, naming no content.
+        reason: &'static str,
+    },
+
+    /// A launch template marks a secret readable, and no broker reader exists
+    /// yet to read it at start.
+    #[error(
+        "secret_reader_unbuilt: the template marks `{env}` readable, and no broker reader exists until SECRETS-002 lands one; only use-only secrets render"
+    )]
+    SecretReaderUnbuilt {
+        /// The environment variable the readable secret would fill.
+        env: String,
+    },
+
+    /// Two entries of a launch template name the same environment variable.
+    #[error(
+        "launch template names the environment variable `{name}` more than once across env, secrets.use_only and secrets.readable"
+    )]
+    DuplicateVariable {
+        /// The variable named twice.
+        name: String,
+    },
+
+    /// A file render-launch would write already exists.
+    #[error("render-launch target already exists: {}", path.display())]
+    LaunchTargetExists {
+        /// The file.
+        path: PathBuf,
+    },
 }
 
 impl HomeError {

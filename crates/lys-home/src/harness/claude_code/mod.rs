@@ -18,6 +18,9 @@ pub(crate) mod import_tests;
 pub mod render;
 #[cfg(test)]
 mod render_tests;
+pub mod template;
+#[cfg(test)]
+mod template_tests;
 
 /// The harness name as it appears in lys entries.
 pub const HARNESS: &str = "claude-code";
