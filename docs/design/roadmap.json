@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,39 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-017",
+      "title": "Sign each call and harness event of a home into a lys log under the agent's identity",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "lys-home's lys.call and lys.harness_event entries each append one leaf to a lys log the home keeps under its agent's identity: a typed payload of the identity event envelope carrying the session id, the entry id, the kind and the SHA-256 of the entry line, never content, signed with the agent identity's Ed25519 key through sign_attestation. The log starts with a signed checkpoint covering what the home held before it; a failed append is refused naming the entry and holds the session until its leaf is written; lys-home verify checks a session against the log. Built after DIRECTORY-003 R2's envelope and F-BV2vqP's lys-log-store 0.3.0 land.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T07:26:00+10:00",
+        "quote": "lys-home records proxy calls as lys.call entries (ingest_call and ingest_outcome in crates/lys-home/src/record/call.rs) and harness events as lys.harness_event entries in the session JSONL. Its Cargo.toml depends on neither lys-core nor lys-log-store, so no entry is signed and none reaches a lys log. The repository has no server or runtime process: crates/lys is the verifier command line, and `lys log append` appends a leaf file without signing it. Opening a sealed record (`lys open`, seal::open_and_verify) leaves no record at all. The outcome: each lys.call entry, each lys.harness_event entry and each sealed-record open appends one leaf to a lys log under the identity. The leaf carries the session id, the entry id, the kind and the SHA-256 of the entry line, never content, and it is signed with the identity's Ed25519 key through sign_attestation, in the envelope the identity audit events use. A failed append is refused by name with the entry id, and the entry is never reported as recorded. Tests: two calls and one event give three leaves that verify under the identity's public key; one byte changed in an entry line makes verification refuse and name that entry; ingesting the same call_id again adds no leaf; a search of the log for a fixture message's text finds nothing. It builds after the identity event envelope (DIRECTORY-003 R2) and after the log grows past memory (F-BV2vqP) have landed. Not in scope: the door's proxy and the runtime, which live outside this repository, and anchoring, encryption at rest, and haematite as the store.",
+        "context": "The signed entry log request for the home, surveyed against lys main; the lead of the home line answered that the agent's own identity key signs, that the payload joins DIRECTORY-003 R2's envelope under the same review and the card waits for it and for F-BV2vqP, that a failed append leaves the line, refuses by entry and holds the session pending, that a checkpoint leaf covers what the home held before the log, that lys-home gains a verify subcommand, and that a sealed-record open is recorded through a lys-home open subcommand as a lys.open entry, only when it succeeds, with lys open unchanged."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-003",
+          "ADR-012",
+          "ADR-013",
+          "ADR-019",
+          "ADR-020"
+        ],
+        "briefs": [
+          "HOME-008"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-001",
+        "RM-005",
+        "RM-006"
+      ],
+      "notes": "Further units, not written: Record each sealed-record open as a signed leaf under the identity (through a lys-home open subcommand appending a lys.open entry, per the lead's answers; waits on what entry holds a sealed record in a session). The survey's backfill unit is replaced by the checkpoint leaf, and its verify-subcommand unit is in HOME-008, both by the lead's answers."
     }
   ]
 }

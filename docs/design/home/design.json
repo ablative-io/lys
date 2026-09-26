@@ -2,8 +2,8 @@
   "cluster": "home",
   "title": "The home: a session held under its identity, resumable by any harness that can be measured",
   "intention": "A session's history lives under the agent's identity, not under a harness. The record is what the model was given and what came back, in order, with each provider's native blocks kept whole. A harness's own resume file is rendered from that record on demand, so an agent moves machines, harnesses or providers and continues; the original bytes are never rewritten.",
-  "problem": "Today a session exists only as its harness's file. Archie's Claude Code file measured 141,931,097 bytes on 24 September 2026: the conversation itself is under 3% of it, tool results 14%, thinking 6%, and about 60% is harness bookkeeping the model never sees; Waffles' file is 3.37 GB and Claude Code loads it whole. Nothing central holds a session, so nothing can render a smaller working session, move one to another device, swap provider and come back, or say what a session was given. Norn already has the canonical event model (SessionEvent, conversion to provider messages, compaction as a derived event, provider epoch boundaries) proved by its own tests; Claude Code has no importer to it and no renderer from it.",
-  "solution": "Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree, not Norn): one append-only JSONL per session, a header line, then entries each carrying id, parentId and timestamp, a leaf pointer for the current position, forks by moving the pointer, compaction and branch summaries as entries that keep their originals. lys adds nothing to that grammar: harness events (approvals, tool completion) and proxy call records ride Pi's custom entry type under lys customType names, so a home file stays readable by Pi's own parser. Two captures feed it: the model traffic through the door's proxy (the same process that swaps the credential, SECRETS-002 R1), and the harness's own events from its transcript. Content blocks are stored once by hash; entries reference them. A harness resume file is a rendered projection of the root-to-leaf path: for Claude Code, a JSONL written under a chosen uuid at the harness's own path, then resumed by that id with --fork-session. Provider-native reasoning stays on the message with its provider, api and model and is rendered whole only to the same three; another model gets readable thinking as text and opaque blocks dropped, each named in a loss account. lys grants say who may read and resume. Every resume path is measured on a named harness version before anything relies on it. A session is launched on a harness from a launch template kept in the home (ADR-012): one JSON object per harness, schema in docs/design/home/launch-template.schema.json, stored under templates/ by its SHA-256 beside sessions/ and blocks/, so a template's version is its hash. Its named slots map the home onto the harness: the transcript (the one slot no template maps generically, so the template names how the harness fills it; Claude Code fills it by resuming the rendered file by path with --fork-session, since a bare resume writes onto the rendered file's own name), the MCP configuration, the environment, the secrets (use-only ones written as their handle; readable ones refused until the secrets rows build the broker reader, ADR-001) and the appended instructions. lys-home render-launch reads a template and a session, writes the R4 render, its loss account, an MCP file, an environment file and an instructions file into one directory, and prints the launch line in its report without running it (ADR-007). Each render is recorded on the session as a lys.harness_event of the sixth kind, template_render, hung as a side leaf beside the context path so the head and the session head hash (SHA-256 of the head entry's line) do not move; the written paths ride in a manifest block the event names by hash, under the 512-byte cap. At render, the launch template also records the context record: a lys.given custom entry after the render event naming, by path, byte length and SHA-256 only, the instruction documents Claude Code will load for the session's working directory and the files the render wrote, in the order measured on a named Claude Code version, with the environment variable names the template set and the kinds of document resolved and left unlisted (@-imports and .claude/rules, which a second lys.given entry at the first request records), so a reader sees what was measured and can check a file on disk against it without anyone reading its contents. Lanterns (stage 5, HOME-004) are the first thing that stands on the record: a lantern is a lys.lantern custom entry lit on purpose and appended at a session's head, naming an existing non-lantern entry of that session as its point (ADR-014); its note grows only by lys.lantern_epilogue entries appended after it, so a lantern's story is its entry followed by its epilogues and nothing is rewritten. Recall reads every session of the home without owning any of it: a read-only reader takes no lock and writes no index, seeks to lantern and epilogue rows by the index's custom column (CN7), and names any session it could not read rather than shortening the list in silence. A lantern lives in the home only; the Claude Code renderer already leaves custom entries out. A render is one function of the session head, the target (session id, cwd, model, version, canon) and the lys-home version: the same inputs give the same bytes (CN9), so a rendered file is told by its hash and a receipted render event can name what was written. The walk takes the order the record gives, entry order along the context path then part order within a message, never a map's or a set's order. A value the render needs that the record does not hold is derived from the record, never drawn fresh: a timestamp is the entry's own stamp, and a Claude Code uuid for an entry whose id is not already uuid-shaped (the importer's `<uuid>-r<i>` ids for split tool results, hand-authored ids, canon ids) is a UUID version 5 (RFC 9562, SHA-1 name-based) under the session's namespace over the name `<entry id>#<role>`. The session's namespace is UUIDv5 of one fixed lys namespace, 32c05904-d1f1-550c-9eee-2f6c8f98b665, over the id of the session being rendered; that lys namespace is itself UUIDv5 of the RFC 9562 URL namespace (6ba7b811-9dad-11d1-80b4-00c04fd430c8) over the name `lys/home/claude-code/render-uuid/v1`. The session in the namespace is the salt: the same hand-authored or split-result id in two sessions never derives one uuid, and the target session id, which the record does not hold, is never mixed in. The name is the entry's own id, then `#`, then the role the id plays in the rendered file, as UTF-8 bytes; roles carry no `#`, so the last `#` splits a name unambiguously and two roles on one entry never share a name. The roles are closed: `record`, the rendered record's `uuid`. The parentUuid of the next record, a summary's leafUuid and an assistant's `msg_` id follow from it unchanged. A uuid-shaped entry id passes through as it is, so an imported Claude Code session keeps its source's uuids. A derived uuid carries version nibble 5 and Claude Code's own uuids carry 4, so a derived uuid cannot equal an imported one. The namespace, the session namespace rule, the name form and the roles are fixed (ADR-016); the fork and launch cards derive their ids by this scheme, and a change to it is a new version alongside, never a mutation. The fork (stage 5b, HOME-006) is the pathway a lantern makes: lys-home fork resolves a lantern to the session it was lit in, cuts that session's root-to-point chain at the last assistant message at or before the point, reading through the index, and writes a child session under the parent's cwd whose header's parentSession is the parent file's path relative to the home, holding the parent's own line bytes for each cut entry, then a lys.forked_from entry naming the parent, the lantern, the point and the cut (ADR-017); the parent gains one lys.fork entry at its head naming the child. Nothing else is copied and no block is written. A user-message point is carried, not copied: the child's Claude Code render writes its text parts as a seed prompt beside the rendered file under an in-band marker line, and the template's launch line, printed by render-launch only, passes it as the first prompt (ADR-018). The child renders and launches like any session, through the launch template.",
+  "problem": "Today a session exists only as its harness's file. Archie's Claude Code file measured 141,931,097 bytes on 24 September 2026: the conversation itself is under 3% of it, tool results 14%, thinking 6%, and about 60% is harness bookkeeping the model never sees; Waffles' file is 3.37 GB and Claude Code loads it whole. Nothing central holds a session, so nothing can render a smaller working session, move one to another device, swap provider and come back, or say what a session was given. Norn already has the canonical event model (SessionEvent, conversion to provider messages, compaction as a derived event, provider epoch boundaries) proved by its own tests; Claude Code has no importer to it and no renderer from it. Nothing a home holds is signed and none of it reaches a lys log: lys-home depends on neither lys-core nor lys-log-store, so a lys.call or lys.harness_event entry is only a line in a file anyone with the file can change, and no stranger can tell an honest history from an edited one.",
+  "solution": "Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree, not Norn): one append-only JSONL per session, a header line, then entries each carrying id, parentId and timestamp, a leaf pointer for the current position, forks by moving the pointer, compaction and branch summaries as entries that keep their originals. lys adds nothing to that grammar: harness events (approvals, tool completion) and proxy call records ride Pi's custom entry type under lys customType names, so a home file stays readable by Pi's own parser. Two captures feed it: the model traffic through the door's proxy (the same process that swaps the credential, SECRETS-002 R1), and the harness's own events from its transcript. Content blocks are stored once by hash; entries reference them. A harness resume file is a rendered projection of the root-to-leaf path: for Claude Code, a JSONL written under a chosen uuid at the harness's own path, then resumed by that id with --fork-session. Provider-native reasoning stays on the message with its provider, api and model and is rendered whole only to the same three; another model gets readable thinking as text and opaque blocks dropped, each named in a loss account. lys grants say who may read and resume. Every resume path is measured on a named harness version before anything relies on it. A session is launched on a harness from a launch template kept in the home (ADR-012): one JSON object per harness, schema in docs/design/home/launch-template.schema.json, stored under templates/ by its SHA-256 beside sessions/ and blocks/, so a template's version is its hash. Its named slots map the home onto the harness: the transcript (the one slot no template maps generically, so the template names how the harness fills it; Claude Code fills it by resuming the rendered file by path with --fork-session, since a bare resume writes onto the rendered file's own name), the MCP configuration, the environment, the secrets (use-only ones written as their handle; readable ones refused until the secrets rows build the broker reader, ADR-001) and the appended instructions. lys-home render-launch reads a template and a session, writes the R4 render, its loss account, an MCP file, an environment file and an instructions file into one directory, and prints the launch line in its report without running it (ADR-007). Each render is recorded on the session as a lys.harness_event of the sixth kind, template_render, hung as a side leaf beside the context path so the head and the session head hash (SHA-256 of the head entry's line) do not move; the written paths ride in a manifest block the event names by hash, under the 512-byte cap. At render, the launch template also records the context record: a lys.given custom entry after the render event naming, by path, byte length and SHA-256 only, the instruction documents Claude Code will load for the session's working directory and the files the render wrote, in the order measured on a named Claude Code version, with the environment variable names the template set and the kinds of document resolved and left unlisted (@-imports and .claude/rules, which a second lys.given entry at the first request records), so a reader sees what was measured and can check a file on disk against it without anyone reading its contents. Lanterns (stage 5, HOME-004) are the first thing that stands on the record: a lantern is a lys.lantern custom entry lit on purpose and appended at a session's head, naming an existing non-lantern entry of that session as its point (ADR-014); its note grows only by lys.lantern_epilogue entries appended after it, so a lantern's story is its entry followed by its epilogues and nothing is rewritten. Recall reads every session of the home without owning any of it: a read-only reader takes no lock and writes no index, seeks to lantern and epilogue rows by the index's custom column (CN7), and names any session it could not read rather than shortening the list in silence. A lantern lives in the home only; the Claude Code renderer already leaves custom entries out. A render is one function of the session head, the target (session id, cwd, model, version, canon) and the lys-home version: the same inputs give the same bytes (CN9), so a rendered file is told by its hash and a receipted render event can name what was written. The walk takes the order the record gives, entry order along the context path then part order within a message, never a map's or a set's order. A value the render needs that the record does not hold is derived from the record, never drawn fresh: a timestamp is the entry's own stamp, and a Claude Code uuid for an entry whose id is not already uuid-shaped (the importer's `<uuid>-r<i>` ids for split tool results, hand-authored ids, canon ids) is a UUID version 5 (RFC 9562, SHA-1 name-based) under the session's namespace over the name `<entry id>#<role>`. The session's namespace is UUIDv5 of one fixed lys namespace, 32c05904-d1f1-550c-9eee-2f6c8f98b665, over the id of the session being rendered; that lys namespace is itself UUIDv5 of the RFC 9562 URL namespace (6ba7b811-9dad-11d1-80b4-00c04fd430c8) over the name `lys/home/claude-code/render-uuid/v1`. The session in the namespace is the salt: the same hand-authored or split-result id in two sessions never derives one uuid, and the target session id, which the record does not hold, is never mixed in. The name is the entry's own id, then `#`, then the role the id plays in the rendered file, as UTF-8 bytes; roles carry no `#`, so the last `#` splits a name unambiguously and two roles on one entry never share a name. The roles are closed: `record`, the rendered record's `uuid`. The parentUuid of the next record, a summary's leafUuid and an assistant's `msg_` id follow from it unchanged. A uuid-shaped entry id passes through as it is, so an imported Claude Code session keeps its source's uuids. A derived uuid carries version nibble 5 and Claude Code's own uuids carry 4, so a derived uuid cannot equal an imported one. The namespace, the session namespace rule, the name form and the roles are fixed (ADR-016); the fork and launch cards derive their ids by this scheme, and a change to it is a new version alongside, never a mutation. The fork (stage 5b, HOME-006) is the pathway a lantern makes: lys-home fork resolves a lantern to the session it was lit in, cuts that session's root-to-point chain at the last assistant message at or before the point, reading through the index, and writes a child session under the parent's cwd whose header's parentSession is the parent file's path relative to the home, holding the parent's own line bytes for each cut entry, then a lys.forked_from entry naming the parent, the lantern, the point and the cut (ADR-017); the parent gains one lys.fork entry at its head naming the child. Nothing else is copied and no block is written. A user-message point is carried, not copied: the child's Claude Code render writes its text parts as a seed prompt beside the rendered file under an in-band marker line, and the template's launch line, printed by render-launch only, passes it as the first prompt (ADR-018). The child renders and launches like any session, through the launch template. The signed entry log (HOME-008, ADR-019) is where the home's history becomes verifiable by a stranger: each lys.call and each lys.harness_event entry appends one leaf to one lys log the home keeps at log/ beside sessions/, blocks/ and templates/, lys-log-store's file storage, serving every session of the home, since the home is its agent's and the log is kept under that agent's identity. A leaf is the identity event envelope's own encoding (DIRECTORY-003 R2) of a typed payload tagged lys/home-entry/v1, carrying the session id, the entry id, the kind and the SHA-256 of the entry's line, never content (CN11), with the COSE_Sign1 attestation sign_attestation makes over it under the agent identity's own Ed25519 key, read from where the identity crate holds it; there is no home key and no stand-in key. The line comes first and is never removed or rewritten (P1); the leaf is derived from the durable line alone and appended after it, so a failed append is refused naming the entry, marks the session pending in the home's own state, and refuses every further append to that session until the leaf is written, first thing at the session's next open or by lys-home verify --repair (CN12). No entry records its leaf's coordinate: the leaf is found in the log by its session and entry id. The log starts with one checkpoint leaf, tagged lys/home-checkpoint/v1, written when logging is first enabled on a home, naming each session with its entry count and the SHA-256 of its file as it stood; entries before it are covered by that hash and every entry after it by its own leaf. lys-home verify walks one session against the log and the checkpoint and prints a report of counts and hashes, or names the first entry that fails. The verifier command line, crates/lys, is unchanged by this: lys open writes nothing.",
   "principles": [
     {
       "id": "P1",
@@ -57,7 +57,9 @@
     "ADR-015",
     "ADR-016",
     "ADR-017",
-    "ADR-018"
+    "ADR-018",
+    "ADR-019",
+    "ADR-020"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -70,12 +72,13 @@
     "Every launch-template render records what the session was given: one lys.given entry after the render event naming each instruction document Claude Code will load, and each file the render wrote, by path, byte length and SHA-256 in the measured order, with the environment variable names the template set, and never a document's content; lys-home lists those records and checks a file on disk against one by hash.",
     "A lantern lit on purpose at a past entry of a session is recalled from the home by a word of its note and by its point, with its epilogues after it and never a line of the transcript around it.",
     "The same session head rendered twice with the same target and the same lys-home version gives files of equal SHA-256, a fixture holding a tool record with more than one result included, and the fixture's hash is pinned by a test and recorded in PROOF-RESUME.md.",
-    "A session forked from a lantern's point holds the parent's own lines up to the last assistant message before the point, carries its ancestry on both sides, adds nothing to the block store, and is rendered and launched on the installed Claude Code version, measured, with a user-message point carried as the child's first prompt."
+    "A session forked from a lantern's point holds the parent's own lines up to the last assistant message before the point, carries its ancestry on both sides, adds nothing to the block store, and is rendered and launched on the installed Claude Code version, measured, with a user-message point carried as the child's first prompt.",
+    "Two ingested calls and one harness event give three leaves in the home's log that lys-home verify accepts under the agent identity's public key; one byte changed in one of those entry lines makes it refuse naming that entry; ingesting the same call id again adds no leaf; and a byte scan of the log directory for a fixture message's text finds nothing."
   ],
   "non_goals": [
     {
-      "text": "Anchoring, signing or receipts into a lys log (CONTEXT-ROADMAP stage 6; when asked for).",
-      "reason": "Signing comes when asked for (Tom, 22 September 16:27); every stage here works without it."
+      "text": "Anchoring a home's log (CONTEXT-ROADMAP stage 6), receipts from an anchor, and signing any entry kind other than lys.call and lys.harness_event and a sealed-record open.",
+      "reason": "Signing into a lys log was asked for with those three sources named (ADR-020); anchoring was named out of scope with it, and lys.given (ADR-013), lanterns and forks are not among the three."
     },
     {
       "text": "Encryption at rest and moving a home between devices (stage 3 preconditions).",
@@ -108,6 +111,14 @@
     {
       "text": "Rendering tool parts from the stored block, and moving the render's default Claude Code version off 2.1.281.",
       "reason": "Both change what a rendered file holds; the deterministic render changes nothing a file holds beyond the determinism."
+    },
+    {
+      "text": "Haematite as the store of a home's log.",
+      "reason": "Named out of scope; the log is lys-log-store's file storage, as DIRECTORY-003 R2 also requires."
+    },
+    {
+      "text": "The door's proxy and the runtime that will call ingest_call.",
+      "reason": "They live outside this repository; they receive the named refusal of a failed append once it lands."
     }
   ],
   "structure": [
@@ -650,6 +661,96 @@
       "path": "docs/design/home/PROOF-FORK.md",
       "note": "the measured fork: Pi's parentSession read, a real session forked, rendered and launched, as hashes, counts and exit codes",
       "brief": "HOME-006"
+    },
+    {
+      "path": "crates/lys-identity/",
+      "note": "the identity crate and its event envelope (DIRECTORY-003 R2); gains the two home payloads when its envelope lands without them (HOME-008 R1)",
+      "brief": "DIRECTORY-003"
+    },
+    {
+      "path": "docs/design/identity/IDENTITY-EVENTS.md",
+      "note": "the identity event envelope (DIRECTORY-003 R2); records the two home payloads and their adversarial review (HOME-008 R1, R10)",
+      "brief": "DIRECTORY-003"
+    },
+    {
+      "path": "crates/lys-home/src/record/call_tests.rs",
+      "note": "call ingest tests",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.json",
+      "note": "the signed entry log",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.md",
+      "note": "rendered HOME-008",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/leaf.rs",
+      "note": "the lys/home-entry/v1 and lys/home-checkpoint/v1 payloads and their leaf encoding in the identity envelope",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/leaf_tests.rs",
+      "note": "leaf encoding and signature tests",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/entry_log.rs",
+      "note": "the home's log at log/: sign and append a leaf, find a leaf by session and entry",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/entry_log_tests.rs",
+      "note": "entry log tests",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/log_checkpoint.rs",
+      "note": "the checkpoint leaf written when logging is first enabled on a home",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/log_checkpoint_tests.rs",
+      "note": "checkpoint tests",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/pending.rs",
+      "note": "the pending marker beside a session and the retry of its leaf",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/pending_tests.rs",
+      "note": "pending marker tests",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/verify.rs",
+      "note": "verify one session against the log and the checkpoint",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/verify_tests.rs",
+      "note": "verify tests",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/cli_verify.rs",
+      "note": "the verify subcommand and its --repair",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/tests/entry_log.rs",
+      "note": "the words' four tests, the checkpoint, the failed append and the wrong key, through the command line",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/tests/fixtures/entry_log/",
+      "note": "a one-record Claude Code transcript and a home written before logging",
+      "brief": "HOME-008"
     }
   ],
   "inventory": [
@@ -692,6 +793,34 @@
     {
       "path": "crates/lys-home/src/harness/claude_code/import.rs",
       "note": "a user record's tool results each become an entry with id `<uuid>-r<i>`; only the last keeps the record's uuid, and only when the record has no parts of its own; unchanged by this cluster's determinism work"
+    },
+    {
+      "path": "crates/lys-home/src/record/mod.rs",
+      "note": "Session::append_entry and append_beside both write through append_line (line, then index row; append_entry then the head); every lys.call and lys.harness_event line is written here, and nothing is signed or logged. About 472 lines of code, near the 500-line limit."
+    },
+    {
+      "path": "crates/lys-home/src/record/call.rs",
+      "note": "ingest_call, ingest_call_files and ingest_outcome append lys.call through finish_ingest_counted; find_call returns early with already_recorded for a call id on record. About 460 lines of code."
+    },
+    {
+      "path": "crates/lys-core/src/attestation/sign.rs",
+      "note": "sign_attestation(payload, &Ed25519Identity) makes a lys/attestation/v2 COSE_Sign1 over SHA-256(payload) with a wall-clock timestamp; verify_attestation and verify_attestation_bytes_by_signer check one. The protected content type is the generic attestation, so what was signed is carried in the payload."
+    },
+    {
+      "path": "crates/lys-log-store/src/file.rs",
+      "note": "FileLeafStore: log.json, leaves/<20-digit index> holding raw leaf bytes, state.json; every append fsynced with its directory."
+    },
+    {
+      "path": "crates/lys-log-store/src/log.rs",
+      "note": "Log over a LeafStore; at 0.2.0 it holds every leaf in memory (log.rs:53-60), the limit F-BV2vqP lifts in lys-log-store 0.3.0."
+    },
+    {
+      "path": "crates/lys/src/commands/seal.rs",
+      "note": "lys open wraps seal::open_and_verify and collapses every failure to one CliError::OpenFailed; it takes no home, session or log and writes nothing but the opened payload."
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-003.json",
+      "note": "R2 defines the versioned identity event envelope outside lys-core with typed payloads, written in docs/design/identity/IDENTITY-EVENTS.md and reviewed before it signs durable bytes; neither that file nor crates/lys-identity exists yet."
     }
   ],
   "constraints": [
@@ -734,6 +863,14 @@
     {
       "id": "CN10",
       "text": "A fork copies the parent file's own line bytes and writes no block; nothing of the parent's header but cwd, and no credential, handle or launch setting, enters the child; the parent gains one lys.fork entry at its head and no earlier byte of it changes."
+    },
+    {
+      "id": "CN11",
+      "text": "A home log leaf carries the session id, the entry id, the kind and the SHA-256 of the entry line (or, for the checkpoint, session ids, entry counts and file SHA-256s) and nothing else: no byte of transcript content enters the log, its errors or its reports."
+    },
+    {
+      "id": "CN12",
+      "text": "A failed leaf append never removes or rewrites the entry's line: the session is marked pending, the entry is not reported as recorded, and no further entry is appended to that session until the pending leaf is written."
     }
   ],
   "gate": [

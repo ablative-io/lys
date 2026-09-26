@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,42 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-019",
+      "title": "A home entry's leaf is a typed payload of the identity event envelope, signed by the agent's own key after its durable line",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead of the home line, answering the signed entry log survey; recorded with HOME-008",
+      "context": "lys.call and lys.harness_event entries were lines in a session file with nothing signed and no log. Signing them freezes a wire format from its first signature, and several forks had to be settled first: which key signs, which envelope carries the payload, what happens when the leaf fails after the line is durable, how entries written before the log are told from tampering, and whether a person can run the check.",
+      "decision": "Each lys.call and lys.harness_event entry appends one leaf to one log the home keeps under its agent's identity: a typed payload of the identity event envelope (DIRECTORY-003 R2), tagged lys/home-entry/v1, carrying the session id, the entry id, the kind and the SHA-256 of the entry's line, signed through sign_attestation with the agent identity's own Ed25519 key as the identity crate holds it. The line is written first and never removed; a failed leaf append is refused naming the entry, marks the session pending and refuses further appends until the leaf is written at the next open or by verify --repair. The log starts with one checkpoint leaf, tagged lys/home-checkpoint/v1, naming each session with its entry count and file SHA-256. lys-home gains a verify subcommand. Rejected: a second envelope for home entries; a home key, a person's key or a stand-in key; writing the leaf before the line; a best-effort append that lets the session continue past an unlogged line; a per-entry backfill; verification as a library function only; and recording opens in the published lys open.",
+      "quote": "",
+      "consequences": [
+        "Both payloads are reviewed adversarially with the envelope before any durable byte is signed under them, and are frozen from their first signature; a change is a new version alongside.",
+        "The card waits for DIRECTORY-003 R2 and for lys-log-store 0.3.0.",
+        "lys open stays the verifier and writes nothing.",
+        "Entries of other kinds (lys.given, lanterns, forks, messages) are not signed by this."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-020",
+      "title": "The home's non-goal on signing narrows to anchoring",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The signed entry log request; recorded with HOME-008",
+      "context": "The home design held anchoring, signing and receipts into a lys log out of scope until asked for. Signing lys.call entries, lys.harness_event entries and sealed-record opens into a lys log under the identity has now been asked for, with anchoring, encryption at rest and Haematite named out of scope.",
+      "decision": "Signing into a lys log is in scope for lys.call entries, lys.harness_event entries and sealed-record opens, and for nothing else; anchoring stays out of scope. Rejected: keeping the whole non-goal, and widening signing to every entry kind.",
+      "quote": "",
+      "consequences": [
+        "The home design's first non-goal names anchoring and every other entry kind, not signing as such.",
+        "lys.given stays unsigned (ADR-013)."
       ],
       "supersedes": [],
       "superseded_by": ""

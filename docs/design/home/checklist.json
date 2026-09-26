@@ -275,6 +275,56 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The signed entry log",
+      "items": [
+        {
+          "id": "C45",
+          "text": "lys-home depends on lys-core and lys-log-store, and the home-entry leaf (session id, entry id, kind, SHA-256 of the entry line, tag lys/home-entry/v1) and the home checkpoint leaf (tag lys/home-checkpoint/v1) are typed payloads of the identity event envelope, written in docs/design/identity/IDENTITY-EVENTS.md.",
+          "done": false
+        },
+        {
+          "id": "C46",
+          "text": "Every lys.call and every lys.harness_event entry appended to a session appends exactly one leaf to the home's log at log/ under the home, signed with the agent identity's Ed25519 key through lys_core::attestation::sign_attestation, and no other entry kind appends a leaf.",
+          "done": false
+        },
+        {
+          "id": "C47",
+          "text": "No leaf and no file under the home's log directory carries a byte of transcript content: a byte scan of every file under it for a fixture message's text finds nothing.",
+          "done": false
+        },
+        {
+          "id": "C48",
+          "text": "The first leaf of a home's log is a checkpoint naming each session of the home with its entry count and the SHA-256 of its file as they stood when logging was first enabled.",
+          "done": false
+        },
+        {
+          "id": "C49",
+          "text": "A failed leaf append is refused naming the entry id, the entry is never reported as recorded, the session is marked pending, every further append to it is refused until the pending leaf is written, and the leaf is written first at the session's next open or by lys-home verify --repair.",
+          "done": false
+        },
+        {
+          "id": "C50",
+          "text": "Ingesting a call_id already recorded adds no leaf, and writes the entry's one leaf when the log holds none for it.",
+          "done": false
+        },
+        {
+          "id": "C51",
+          "text": "lys-home verify --home --session checks every logged entry line against its one leaf under the agent identity's public key and the pre-log history against the checkpoint, prints one JSON report of counts and hashes, and otherwise exits 1 naming the first entry, or the session for the checkpoint, that fails.",
+          "done": false
+        },
+        {
+          "id": "C52",
+          "text": "docs/design/home/RECORD.md records both leaf formats, their tags, the log's place in the home, the pending marker and the order of line against leaf.",
+          "done": false
+        },
+        {
+          "id": "C53",
+          "text": "The adversarial review of both leaf formats (forgery, cross-protocol confusion, replay, a leaf under another key, guessing a short line from its hash) is recorded in docs/design/identity/IDENTITY-EVENTS.md before any durable byte is signed under them.",
+          "done": false
+        }
+      ]
     }
   ]
 }
