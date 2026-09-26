@@ -30,10 +30,10 @@ use std::path::PathBuf;
 use serde_json::Value;
 
 use crate::error::HomeError;
-use crate::record::Home;
 use crate::record::entries::{CUSTOM_LANTERN, Entry, EntryBody};
 use crate::record::index::{Index, IndexRow};
 use crate::record::lantern::session_file;
+use crate::record::{Home, safe_component};
 
 /// A session whose index holds a `lys.lantern` row under the lantern id.
 struct Holder {
@@ -101,8 +101,12 @@ fn holders(home: &Home, lantern: &str) -> Result<Vec<Holder>, HomeError> {
 }
 
 /// The lantern's point and lit-in session, read from its row in `holder`,
-/// with the bytes read; data that is not a lantern's shape refuses by name.
+/// with the bytes read; data that is not a lantern's shape refuses by name,
+/// and a `lit_in` that is present but not a session id (null, not a
+/// string, not a safe name, or no session file of the home) refuses
+/// `lit_in_not_a_session` rather than falling back to the holders.
 fn read_lantern(
+    home: &Home,
     holder: &Holder,
     lantern: &str,
 ) -> Result<(String, Option<String>, u64), HomeError> {
@@ -135,10 +139,23 @@ fn read_lantern(
         .and_then(Value::as_str)
         .ok_or_else(shape)?
         .to_owned();
+    let not_a_session = |what| HomeError::LitInNotASession {
+        lantern: lantern.to_owned(),
+        what,
+    };
     let lit_in = match data.get("lit_in") {
-        None | Some(Value::Null) => None,
-        Some(Value::String(session)) => Some(session.clone()),
-        Some(_) => return Err(shape()),
+        None => None,
+        Some(Value::Null) => return Err(not_a_session("is null")),
+        Some(Value::String(session)) => {
+            if safe_component("session id", session).is_err() {
+                return Err(not_a_session("is not a safe session name"));
+            }
+            if session_file(home, session).is_err() {
+                return Err(not_a_session("names no session of the home"));
+            }
+            Some(session.clone())
+        }
+        Some(_) => return Err(not_a_session("is not a string")),
     };
     Ok((point, lit_in, read))
 }
@@ -175,7 +192,7 @@ pub fn resolve_and_cut(
         });
     }
     let first = 0;
-    let (mut point, lit_in, mut bytes_read) = read_lantern(&holders[first], lantern)?;
+    let (mut point, lit_in, mut bytes_read) = read_lantern(home, &holders[first], lantern)?;
     let chosen = match (&lit_in, session) {
         (Some(lit_in), Some(named)) if lit_in != named => {
             return Err(HomeError::LanternNotLitHere {
@@ -202,7 +219,7 @@ pub fn resolve_and_cut(
         }
     };
     if chosen != first {
-        let (chosen_point, _, read) = read_lantern(&holders[chosen], lantern)?;
+        let (chosen_point, _, read) = read_lantern(home, &holders[chosen], lantern)?;
         point = chosen_point;
         bytes_read += read;
     }

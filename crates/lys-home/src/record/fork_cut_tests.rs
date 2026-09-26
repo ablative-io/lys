@@ -4,7 +4,8 @@
 //! assistant message in order with every side leaf left out, the bytes
 //! read are the lantern's row and the point's ancestry only, a lantern
 //! with a lit-in session cuts from it while an older record needs one
-//! named, and every refusal writes nothing. The fixture home built here is
+//! named, a `lit_in` that is not a session id is refused by name, and
+//! every refusal writes nothing. The fixture home built here is
 //! the one the fork and report gates build on.
 //!
 //! The lantern `L2` is written by hand carrying `lit_in`, the key the
@@ -455,6 +456,8 @@ fn a_lit_in_session_that_holds_no_copy_refuses_naming_the_holder_read() -> Gate 
         copy.append_entry(&reader.entry("e1")?)?;
         copy.append_entry(&reader.entry("e2")?)?;
         copy.append_entry(&lantern_entry("N2", "e2", "e2", Some("elsewhere")))?;
+        // A session of the home that holds no copy of the lantern.
+        home.create_session("elsewhere", "/fixture", None)?;
     }
     let mut refusals = 0;
     for (session, named) in [(None, "A"), (Some("A"), "A"), (Some(PARENT), PARENT)] {
@@ -470,5 +473,63 @@ fn a_lit_in_session_that_holds_no_copy_refuses_naming_the_holder_read() -> Gate 
         refusals += 1;
     }
     assert_eq!(refusals, 3);
+    Ok(())
+}
+
+#[test]
+fn a_lit_in_that_is_not_a_session_id_is_refused_by_name() -> Gate {
+    let (_dir, home, _) = fixture_home()?;
+    {
+        let reader = home.read_session(PARENT)?;
+        let mut copy = home.create_session("A", "/fixture", None)?;
+        copy.append_entry(&reader.entry("e1")?)?;
+        copy.append_entry(&reader.entry("e2")?)?;
+        for (id, lit_in) in [
+            ("N1", json!(null)),
+            ("N2", json!(5)),
+            ("N3", json!("../elsewhere")),
+            ("N4", json!("no-such-session")),
+        ] {
+            let mut entry = lantern_entry(id, "e2", "e2", Some("placeholder"));
+            let EntryBody::Custom {
+                data: Some(data), ..
+            } = &mut entry.body
+            else {
+                return Err("a custom entry with data".into());
+            };
+            data["lit_in"] = lit_in;
+            copy.append_entry(&entry)?;
+        }
+    }
+    let before = session_files(&home)?;
+    let mut refusals = 0;
+    for (id, what) in [
+        ("N1", "is null"),
+        ("N2", "is not a string"),
+        ("N3", "is not a safe session name"),
+        ("N4", "names no session of the home"),
+    ] {
+        for session in [None, Some("A")] {
+            let refused = resolve_and_cut(&home, id, session);
+            assert!(
+                matches!(
+                    &refused,
+                    Err(HomeError::LitInNotASession { lantern, what: found })
+                        if lantern == id && *found == what
+                ),
+                "{refused:?}"
+            );
+            assert!(
+                refused
+                    .err()
+                    .ok_or("refused")?
+                    .to_string()
+                    .starts_with("lit_in_not_a_session")
+            );
+            refusals += 1;
+        }
+    }
+    assert_eq!(refusals, 8);
+    assert_eq!(session_files(&home)?, before);
     Ok(())
 }

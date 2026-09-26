@@ -375,6 +375,18 @@ pub enum HomeError {
         lantern: String,
     },
 
+    /// A lantern's data carries a `lit_in` that is not a session id: null,
+    /// not a string, not a safe session name, or no session of the home.
+    #[error(
+        "lit_in_not_a_session: lantern `{lantern}` records a lit-in session that {what}; a fork cuts from the session a lantern was lit in and no other"
+    )]
+    LitInNotASession {
+        /// The lantern id.
+        lantern: String,
+        /// What is wrong with the recorded value, naming no content.
+        what: &'static str,
+    },
+
     /// A fork failed after its child session was created, and removing the
     /// child failed too, so the child's files stand half-written.
     #[error(

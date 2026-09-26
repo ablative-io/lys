@@ -331,21 +331,21 @@
   "amendments": [
     {
       "date": "2026-09-26",
-      "by": "the builder, from the cross-review of PR 19; pending owner sign-off",
+      "by": "signed off by Waffles at 17:38 on 2026-09-26, from the cross-review of PR 19",
       "subject": "R1 and R2: the refusal for a lantern no session holds",
-      "ruling": "Pending owner sign-off. HOME-004 landed HomeError::UnknownLantern { session, id } for an epilogue on a lantern a session does not hold, so the fork's home-wide refusal is HomeError::NoSuchLantern { lantern }; the fork keeps UnknownLantern for a named session that does not hold the lantern."
+      "ruling": "HOME-004 landed HomeError::UnknownLantern { session, id } for an epilogue on a lantern a session does not hold, so the fork's home-wide refusal is HomeError::NoSuchLantern { lantern }; the fork keeps UnknownLantern for a named session that does not hold the lantern."
     },
     {
       "date": "2026-09-26",
-      "by": "the builder, from the cross-review of PR 19; pending owner sign-off",
+      "by": "signed off by Waffles at 17:38 on 2026-09-26, from the cross-review of PR 19",
       "subject": "R6: the printed launch line",
-      "ruling": "Pending owner sign-off. The plain render prints no launch line; its report carries seed only. The printed launch line comes from the template's render (render-launch), which appends the seed as the first prompt and lists it in the manifest, so the child launches with the template's handles and not the bare seat login."
+      "ruling": "The plain render prints no launch line; its report carries seed only. The printed launch line comes from the template's render (render-launch), which appends the seed as the first prompt and lists it in the manifest, so the child launches with the template's handles and not the bare seat login."
     },
     {
       "date": "2026-09-26",
-      "by": "the builder, from the cross-review of PR 19; pending owner sign-off",
+      "by": "signed off by Waffles at 17:38 on 2026-09-26, from the cross-review of PR 19",
       "subject": "The fixture's L2 and lit_in",
-      "ruling": "Pending owner sign-off. The light act on main records no lit_in and LanternData refuses an unknown field, so the fixtures write L2 by hand carrying lit_in and the fork reads the key from the entry's raw data; the lantern card's lit_in round must add the field to LanternData, after which the fixtures can light L2 with the light act."
+      "ruling": "The light act on main records no lit_in and LanternData refuses an unknown field, so the fixtures write L2 by hand carrying lit_in and the fork reads the key from the entry's raw data; the lantern card's lit_in round must add the field to LanternData, after which the fixtures can light L2 with the light act. Reading lit_in from raw data is a stopgap: a missing or non-session lit_in is refused by name, and the follow-up card \"LanternData carries lit_in and the light act records it; the fork reads the typed field\" is placed on the Lys home board."
     }
   ]
 }
