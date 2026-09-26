@@ -33,3 +33,11 @@
 **S11.** As a person granting temporary access, I want its end date and ancestor restrictions enforced, so role changes or reinstatement cannot silently extend it.
 
 **S12.** As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
+
+## Administrator — Suspends, reinstates and retires identities, and reads why a check refused
+
+**S16.** As the administrator, I want to suspend, reinstate or retire an identity only by a signed act whose record is the one thing that changes its state, so that no state is ever set without a record saying who changed it, from what, to what and why.
+
+**S17.** As the responsible person, I want a suspended or retired agent of mine refused at every check and at its next session refresh by its state alone, whatever grants it holds, so that halting it never depends on finding and revoking every grant first.
+
+**S18.** As the administrator, I want the screen to show an identity's state and the record that put it there, for a retired identity exactly as for a live one, so that I can answer why a check refused from the record and not from memory.

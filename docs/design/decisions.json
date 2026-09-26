@@ -325,6 +325,44 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-027",
+      "title": "An identity's lifecycle state is folded from its signed transition records and never set directly",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "The lifecycle card's words, requested by tom; recorded with DIRECTORY-009",
+      "context": "ADR-011 makes register, activate, suspend, reinstate and retire the only transitions, each one signed audit record, and DIRECTORY-003 R5 records the state beside each identity with its projection equal to replay. Nothing on main said whether the state is a value an API, a migration or a repair may write, which would leave two sources of truth: the stored state and the records that should explain it (principle P4 forbids a change followed by a best-effort log).",
+      "decision": "The state at any moment is the fold of the identity's transition records in log order, from registered. No API, migration or repair sets a state; a transition validates against the folded state and the cause rule, appends its record through the directory's event path, and the state is read again by folding. A read answers the fold or refuses by name at the coordinate of a record the transition table refuses, and never answers a state past it, repairs the log or skips the record. Rejected: a stored state column set at transition and audited after it; a repair path that writes a state; and treating provisioned as a fifth state rather than a view over the facts beside the state.",
+      "quote": "the state at any moment is folded from the log and never set directly",
+      "consequences": [
+        "DIRECTORY-009 R3 builds the fold with a state type of exactly four values, and the state field DIRECTORY-003 R5's projection keeps is filled from the fold and from nothing else.",
+        "Retirement closes the identity and never its record: a retired identity's state, transitions and the record that put it there are read exactly as a live one's, and no row deletes or hides a record (L2, CN21).",
+        "A record the table refuses is a refusal named at its coordinate, answered by verifying the leaf against its receipt and reading the log by hand; the log is never repaired.",
+        "Every check that reads state reads the fold, so a suspended or retired identity fails by state alone whatever grants it holds."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-028",
+      "title": "A suspension takes effect at the next check, a session refresh is a check, and no Rauthy session is revoked at once",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "The lead's answer L1 to the lifecycle card, from the lifecycle document on main; recorded with DIRECTORY-009",
+      "context": "The lifecycle card asked whether a Rauthy session that outlives a suspension is revoked at once or at its next refresh. The lifecycle document says suspend and revoke both take effect at the next check and neither promises to roll back an action already admitted, and that a suspended identity's running executions stop at their next admission (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:51-53 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:23); the directory design keeps open whether suspending a person also ends their sign-in session at Rauthy (its non-goals).",
+      "decision": "A suspension or retirement takes effect at the next check and not before. The directory's resolution of a Rauthy-authenticated session at sign-in and at refresh is a check, so a session that outlives a suspension is refused at its next refresh and at every access check before that, by state, whatever grants it holds. Nothing in DIRECTORY-009 calls Rauthy to revoke, end or invalidate a session, keeps a list of sessions to end, or rolls back an admitted action. An at-once revocation of the Rauthy session would be a later revision of the suspend transition, and whether suspending also ends the sign-in session at Rauthy stays open as the design records it. Rejected: revoking the session at Rauthy at once within this brief, and treating a refresh as something other than a check.",
+      "quote": "A refresh is a check, so a Rauthy session that outlives the suspension is refused at its next refresh and at every access check before that, by state, whatever grants it holds",
+      "consequences": [
+        "DIRECTORY-009 R4 answers the access check state first and R5 refuses a suspended or retired identity at sign-in and at refresh by name, with the grant answerer called zero times.",
+        "The directory design gains constraint CN20 and a non-goal for the at-once revocation, so the later revision is a deliberate act and not a drift.",
+        "DIRECTORY-007 R4's step-1 leg that a suspended identity's sign-in is not refused on state is superseded when DIRECTORY-009 R5 lands, and the brief that lands second reconciles it under CN9.",
+        "An action admitted before a suspension stands; the record of the suspension is the only thing appended."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

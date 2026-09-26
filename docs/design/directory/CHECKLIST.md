@@ -47,3 +47,12 @@
 - [ ] **C28** — Observed grant usage names its source and time; not seen is not reported as never used.
 - [ ] **C29** — The You and delegation screens show real server authority, separate service accounts from sign-in identities, and preserve personal versus administrator visibility.
 - [ ] **C30** — The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success.
+
+## Lifecycle states and transitions (DIRECTORY-009)
+
+- [ ] **C36** — docs/design/identity/LIFECYCLE-CONTRACT.md carries the four states with provisioned as a view, the five transitions each with who may cause it and no policy actor, the record rule, the fold rule, the check conjunction, the next-check rule with a refresh as a check, the retired rule, what the screen shows, the six named refusals with their acts, and what IDENTITY-EVENTS.md must carry before the code rows start.
+- [ ] **C37** — A transition is admitted only from the administrator or, for an agent, its responsible person as its registration record names them; every other actor, and an unattested one, is refused lifecycle_actor_not_permitted with nothing appended (d009_r2_ac1 to d009_r2_ac4).
+- [ ] **C38** — The state is answered only by folding the identity's transition records in log order over a type of exactly four values; nothing sets a state; a record the table refuses makes the read refuse lifecycle_fold_invalid at its coordinate; reads never write the log (d009_r3_ac1 to d009_r3_ac5).
+- [ ] **C39** — An access check is the conjunction, active and grant exists and grant fresh, state first: a registered, suspended, retired or unknown identity is refused by state with the grant answerer called zero times, the grant legs pass through DIRECTORY-006 R4's decision with its names, and an answered check appends nothing (d009_r4_ac1 to d009_r4_ac5).
+- [ ] **C40** — At sign-in and at every refresh the directory service refuses a suspended or retired identity by name before any grant question, calls Rauthy to revoke nothing, rolls back no admitted action, and admits an active identity at refresh whatever grants it holds (d009_r5_ac1 to d009_r5_ac5).
+- [ ] **C41** — One typed read answers an identity's state, the record that put it there, the actions available in that state, its full history and provisioned as a view, and one typed list is filterable by state and kind; a retired identity reads exactly as a live one and no operation deletes, hides, redacts or truncates a record (d009_r6_ac1 to d009_r6_ac5).
