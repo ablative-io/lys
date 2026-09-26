@@ -20,7 +20,7 @@ use crate::error::HomeError;
 use crate::harness::claude_code::{API, PROVIDER, projects_slug};
 use crate::record::blocks::Hash;
 use crate::record::entries::{CUSTOM_AUTHORED, EntryBody};
-use crate::record::{Session, fresh_id, safe_component};
+use crate::record::{Session, safe_component};
 
 /// Where and for whom to render.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -268,8 +268,11 @@ fn loss(part: &Value, reason: &str) -> Loss {
     }
 }
 
-/// Entry ids that already look like Claude Code uuids are kept; others get one.
-fn record_uuid(id: &str) -> String {
+/// Entry ids that already look like Claude Code uuids are kept; any other id
+/// maps to the uuid shaped from the SHA-256 of its bytes, so the same session
+/// renders the same bytes every time (R2). Nothing random enters a render.
+#[must_use]
+pub fn record_uuid(id: &str) -> String {
     let uuid_shaped = id.len() == 36
         && id.bytes().enumerate().all(|(i, b)| {
             if matches!(i, 8 | 13 | 18 | 23) {
@@ -281,7 +284,7 @@ fn record_uuid(id: &str) -> String {
     if uuid_shaped {
         id.to_owned()
     } else {
-        let h = fresh_id();
+        let h = Hash::of(id.as_bytes()).to_string();
         format!(
             "{}-{}-4{}-8{}-{}",
             &h[..8],
