@@ -271,6 +271,38 @@
       },
       "depends_on": [],
       "notes": "Renumbered from the HOME-002 and RM-006 it was written as, since the launch template took HOME-002 and RM-006, the context record HOME-003 and RM-007, and the lanterns HOME-004 and RM-008 first. Stands on HOME-001's render (R4) and CLI (R9), already on main at 0073b966, so no roadmap dependency is written. Further units, not written: Make the Claude Code import deterministic for the same transcript; Render tool parts from the stored block so a round trip adds only the new turn; Move the render's default Claude Code version off 2.1.281. ADR-016 is proposed and binds the fork and launch cards' id derivation."
+    },
+    {
+      "id": "RM-010",
+      "title": "Fork a session from a lantern's point and launch the child",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "Stage 5b of the home: lys-home fork takes a lantern id, resolves it to the session it was lit in, cuts that session's chain at the last assistant message at or before the lantern's point, and writes a child session holding the parent's own lines with its ancestry on both sides (the header's parentSession, a lys.forked_from entry in the child, a lys.fork entry at the parent's head), adding nothing to the block store and rewriting nothing in the parent. A user-message point is carried as a seed prompt the child's render writes beside the rendered file and the launch line passes as the first prompt. The child renders and launches through the launch template, measured on the installed Claude Code version.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-26T13:16:00+10:00",
+        "quote": "A lantern is a pathway back to a conversation with the self that lit it, and Claude Code resumes a session only from its end. This brief delivers the fork that makes the pathway: a new session in the home cut from the parent's chain at a lantern's point, carrying its ancestry on both sides, adding nothing to the block store and rewriting nothing in the parent, then rendered and launched like any session. It is stage 5b of the home and stands on the lantern card's lys.lantern entry (the design's solution and ADR-012).",
+        "context": "The stage 5b fork card on the Lys board, surveyed against lys main after the lantern card; the lead's answers settled that the fork stands on the lantern card and is built on the main it lands on, that the child launches through the launch template's line, that the copied lines are the parent's own bytes with the same hashes and the block store unchanged, that lys.forked_from is the first entry the fork writes, that parentSession carries the parent file's path as Pi reads it, that a user-message point is carried as a seed and never dropped, that a lantern resolves to its lit-in session (lit_in) with the older-record rule until the lantern card records it, that a lantern before any assistant message is refused nothing_to_fork, and that non-text parts of a carried message are counted, never refused. HOME-006 carries those answers."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-007",
+          "ADR-012",
+          "ADR-014",
+          "ADR-017",
+          "ADR-018"
+        ],
+        "briefs": [
+          "HOME-006"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-006",
+        "RM-008"
+      ],
+      "notes": "Renumbered from the HOME-002 it was written as; HOME-006 follows the lantern card (HOME-004, RM-008) and the launch template (HOME-002, RM-006), both on main, and after the render card (HOME-007), which took RM-009, ADR-016, C31 to C35, S18, S19 and CN9. Further units, not written: lit_in written by the light act (the lantern card's next round); a fork given tools, a lens or a briefing on what changed since the point; leases, budgets and kill rules; harnesses other than Claude Code."
     }
   ]
 }

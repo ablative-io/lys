@@ -18,6 +18,8 @@
 
 **S16.** As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
 
+**S20.** As an agent, I want to fork a new session from a lantern's point, carrying everything said up to that point and nothing after it, and launch the child like any session, so that I can go back and talk with the self that lit the lantern.
+
 ## Tom — Owns the platform and reads what a session was given
 
 **S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
@@ -29,6 +31,10 @@
 **S10.** As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
 
 **S12.** As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+**S21.** As Tom, I want a fork at a user message to carry that message as the child's first prompt beside the rendered file, with nothing from the parent's header but its working directory, so that the child starts at the coordinate and no credential, handle or launch setting is copied from the parent.
+
+**S23.** As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything.
 
 ## Reviewer — Checks the proofs before anything relies on them
 
@@ -43,3 +49,5 @@
 **S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
 
 **S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
