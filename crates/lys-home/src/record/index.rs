@@ -78,9 +78,23 @@ impl Index {
     }
 
     /// Load the index beside a session file, verifying it against the file's
-    /// length; rebuild it from the file when it is missing or stale. Returns
-    /// the header, the index, and whether a rebuild happened.
+    /// length; rebuild it from the file when it is missing or stale, and write
+    /// the rebuilt index beside the file. Returns the header, the index, and
+    /// whether a rebuild happened. This is the owner's load; a reader that
+    /// must write nothing uses [`Index::read`].
     pub fn load(session_file: &Path) -> Result<(SessionHeader, Self, bool), HomeError> {
+        let (header, index, rebuilt) = Self::read(session_file)?;
+        if rebuilt {
+            index.write_all()?;
+        }
+        Ok((header, index, rebuilt))
+    }
+
+    /// The index of a session file without writing anything: the cached
+    /// index beside the file when it is this file's, otherwise one built in
+    /// memory by scanning the file, left unwritten. Returns the header, the
+    /// index, and whether it was built by scanning.
+    pub fn read(session_file: &Path) -> Result<(SessionHeader, Self, bool), HomeError> {
         let (header, header_len) = read_header(session_file)?;
         let file_len = fs::metadata(session_file)
             .map_err(|e| HomeError::io("measuring the session file", session_file, e))?
@@ -99,7 +113,7 @@ impl Index {
                 Err(e) => return Err(e),
             }
         }
-        let index = Self::rebuild(session_file, header_len)?;
+        let index = Self::scan(session_file, header_len)?;
         Ok((header, index, true))
     }
 
@@ -169,8 +183,9 @@ impl Index {
         Ok(rows)
     }
 
-    /// Scan the session file once and write a fresh index beside it.
-    fn rebuild(session_file: &Path, header_len: u64) -> Result<Self, HomeError> {
+    /// Scan the session file once into an index held in memory; nothing is
+    /// written. [`Index::load`] writes the result beside the file.
+    fn scan(session_file: &Path, header_len: u64) -> Result<Self, HomeError> {
         let mut reader = BufReader::new(
             fs::File::open(session_file)
                 .map_err(|e| HomeError::io("opening the session file", session_file, e))?,
@@ -232,7 +247,6 @@ impl Index {
             offset += len;
         }
         index.end = offset;
-        index.write_all()?;
         Ok(index)
     }
 
@@ -313,6 +327,12 @@ impl Index {
     #[must_use]
     pub fn row(&self, id: &str) -> Option<&IndexRow> {
         self.by_id.get(id).map(|&i| &self.rows[i])
+    }
+
+    /// Every row, in file order.
+    #[must_use]
+    pub fn rows(&self) -> &[IndexRow] {
+        &self.rows
     }
 
     /// The last row appended.

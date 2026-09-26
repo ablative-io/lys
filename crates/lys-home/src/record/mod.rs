@@ -35,6 +35,9 @@ pub mod given;
 #[cfg(test)]
 mod given_tests;
 pub mod index;
+pub mod reader;
+#[cfg(test)]
+pub(crate) mod reader_tests;
 #[cfg(test)]
 mod record_tests;
 pub mod templates;
@@ -50,6 +53,7 @@ use crate::error::HomeError;
 use crate::record::blocks::BlockStore;
 use crate::record::entries::{Entry, EntryBase, EntryBody, SessionHeader};
 use crate::record::index::{Index, IndexRow, read_head, write_head};
+use crate::record::reader::SessionReader;
 use crate::record::templates::TemplateStore;
 
 /// The most bytes a session or block name may have.
@@ -143,6 +147,20 @@ impl Home {
     /// Open a session by id.
     pub fn open_session(&self, id: &str) -> Result<Session, HomeError> {
         Session::open(self.session_path(id)?)
+    }
+
+    /// Read a session by id without owning it: no lock is taken and nothing
+    /// is written beside the file (see [`SessionReader`]).
+    pub fn read_session(&self, id: &str) -> Result<SessionReader, HomeError> {
+        SessionReader::open(self.session_path(id)?)
+    }
+
+    /// The ids of every session under `sessions/`, in ascending byte order:
+    /// each regular file named `<id>.jsonl`, except an index file, which is
+    /// one named `<stem>.index.jsonl` whose first line is not a session
+    /// header. A file that cannot be read while listing refuses by path.
+    pub fn session_ids(&self) -> Result<Vec<String>, HomeError> {
+        reader::session_ids(&self.root.join("sessions"))
     }
 }
 
