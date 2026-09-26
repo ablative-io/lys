@@ -1,0 +1,289 @@
+{
+  "id": "HOME-008",
+  "cluster": "home",
+  "title": "Import a Claude Code compaction beside its original with a lys.loss account, list and check it, and render it as the compact_boundary pair",
+  "depends_on": [],
+  "blocked_by": [],
+  "checklist": [
+    "C71",
+    "C72",
+    "C73",
+    "C74",
+    "C75",
+    "C76",
+    "C77",
+    "C78",
+    "C79",
+    "C80",
+    "C81"
+  ],
+  "stories": [
+    "S32",
+    "S33",
+    "S34"
+  ],
+  "design_anchor": [
+    "ADR-012",
+    "ADR-015",
+    "ADR-016",
+    "ADR-029",
+    "ADR-030"
+  ],
+  "purpose": "A compaction is the first derived record, because the harness produces it. This brief makes the home keep a Claude Code compaction beside its original and say what it could not keep: both shapes Claude Code has written import as one Pi compaction entry that keeps what Claude Code kept (ADR-030), a lys.loss entry directly after it names the summarised span by ids, counts and SHA-256s only (ADR-029, CN11), a listing proves every summarised entry and block is still held, and the Claude Code render writes the compaction the way the current Claude Code writes it, measured to resume (P6). The summarised entries are never touched (P1) and no content leaves the home (P7, CN3).",
+  "task": "Today crates/lys-home/src/harness/claude_code/import.rs maps only a legacy summary record, to a compaction whose firstKeptEntryId is its own fresh id with tokensBefore 0 and leafUuid ignored; a compact_boundary record goes to event_of as a system lys.harness_event and its isCompactSummary record imports as a plain user message; and render.rs writes a compaction as a legacy summary line with leafUuid null. This brief replaces that mapping (R2), adds the lys.loss entry (R1, R3), gates the fixture end to end (R4), adds the listing (R5), renders the compact_boundary pair (R6) and proves it (R7). The first kept entry of a boundary is the earliest preserved uuid, never anchorUuid: in the survey's sample of 28 boundaries anchorUuid named the summary record itself in all 28, and all 94 preserved uuids sat before the boundary, so bounding by anchorUuid would count what Claude Code kept as lost. The compaction takes the isCompactSummary record's uuid and sits where it sat, so HOME-001 R3's parent-equals-source acceptance holds with no exception; the loss entry is a side leaf under it, off the chain. import.rs is at 473 of 500 code lines, so the mapping lives in compaction.rs and the span account in span.rs; import.rs gains only the calls and the bookkeeping of each entry's source line offset. Two cases are not settled by this brief and wait on the card lead's answers: a compact_boundary with no non-empty preservedMessages.uuids, and a compact_boundary with no isCompactSummary record under it; both import as they do today and no compaction is written for them. The listing's exit status when a check finds a missing entry or block also waits on the lead; this brief asserts only the report's content in that case. The proof's real session is a current compact_boundary session from the Claude Code install of the machine the proof runs on, read only; an older 2.0.53 file holding a legacy summary record may be imported as well but does not satisfy that line. Every compile, test battery and gate runs on the build machine; the proof's import and resume run with a lys-home binary built there. Out of scope: the home compacting a session itself; translation (stage 4b, its own card); changing what Claude Code writes; the handover letter (HOME-001 R12); writing loss entries into homes imported before this brief; and any harness but Claude Code.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Define the lys.loss custom entry",
+      "spec": "Add the custom type constant `lys.loss` to record/entries.rs and a record/loss.rs module holding its data, serialised with exactly these keys: compaction_id (the compaction's entry id), span_first and span_last (entry ids, null for an empty span), entries, messages, tool_calls, tool_results, blocks, line_bytes, block_bytes, side_leaf_entries and sidechain_entries (unsigned integers), tokens_before (an unsigned integer, null when the harness reported none), unresolved_logical_parent (a uuid string, null when none), first_line_sha256, last_line_sha256 and span_sha256 (64 lowercase hex characters, null for an empty span), summary_record (the SHA-256 of the compaction's source record block, null when there is none) and block_hashes (the span's distinct block hashes in first-reference order). WHEN a loss is appended for a compaction, THE SYSTEM SHALL append it as a custom entry whose parentId is the compaction's entry id, as the very next line of the session file after the compaction entry, and SHALL NOT move the head to it. THE SYSTEM SHALL NOT add a key to Pi's compaction entry, SHALL NOT put any message, tool or summary text into the data, and SHALL NOT name a side-leaf or sidechain entry by id.",
+      "acceptance": [
+        "A unit test serialises a loss with every field set and asserts the data object's keys are exactly the nineteen named in the spec, in no other spelling.",
+        "A unit test appends a compaction entry then its loss to a session and asserts the loss line is the session file's next line, its type is custom, its customType is lys.loss, its parentId is the compaction's id, and the session head is still the compaction's id.",
+        "A unit test serialises a loss with tokens_before and unresolved_logical_parent unset and asserts both are JSON null, not 0 and not absent.",
+        "`grep -n 'lys.loss' crates/lys-home/src/record/entries.rs` prints one line."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/record/loss.rs",
+          "crates/lys-home/src/record/loss_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/record/entries.rs",
+          "crates/lys-home/src/record/mod.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C74"
+      ],
+      "stories": [
+        "S32"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Map both Claude Code compaction shapes into one Pi compaction entry",
+      "spec": "In a new harness/claude_code/compaction.rs, called from import.rs, replacing the summary arm that pointed a compaction at itself. WHEN the importer reads a user record with isCompactSummary true whose parentUuid names a compact_boundary record already imported, THE SYSTEM SHALL store that record whole as a block and append one Pi compaction entry whose id is the record's uuid, whose parentId is the boundary's entry id, whose summary is the record's message content text, whose tokensBefore is the boundary's compactMetadata.preTokens, and whose firstKeptEntryId is, of the uuids in the boundary's compactMetadata.preservedMessages.uuids, the one imported earliest in the file; the compact_boundary record itself SHALL import as the lys.harness_event it imports as today. WHEN the importer reads a record of type summary, THE SYSTEM SHALL store it whole as a block and append a Pi compaction entry under a fresh id with the parent it has today, the record's summary, tokensBefore 0 because Pi's field is a number, and firstKeptEntryId the uuid its leafUuid names. IF a uuid in preservedMessages.uuids names no entry already in the session, or a leafUuid names none, THEN THE SYSTEM SHALL refuse the import with an error naming that uuid, as it refuses an unknown parent. IF the boundary's logicalParentUuid names no record in the file, THEN THE SYSTEM SHALL import the boundary under the chain's last entry as today and SHALL NOT refuse. THE SYSTEM SHALL NOT write the isCompactSummary record as a message entry, SHALL NOT use compactMetadata.preservedMessages.anchorUuid to find the first kept entry, SHALL NOT set a compaction's firstKeptEntryId to its own id, SHALL NOT re-parent any entry, and SHALL NOT change the id or parent of any message entry, so every message entry's parent still equals its source parentUuid. import.rs SHALL stay at or under 500 code lines.",
+      "acceptance": [
+        "Importing the fixture yields an entry 88888888-8888-4888-8888-888888888888 of type compaction whose parentId is 77777777-7777-4777-8777-777777777777, firstKeptEntryId is 55555555-5555-4555-8555-555555555555 (the preserved uuid earlier in the file, though the list names 66666666-6666-4666-8666-666666666666 first), tokensBefore is 12345 and summary is the text of line 8.",
+        "The imported session holds no message entry with id 88888888-8888-4888-8888-888888888888.",
+        "Importing the fixture yields exactly one other compaction entry, whose firstKeptEntryId is dddddddd-dddd-4ddd-8ddd-dddddddddddd and whose id is not dddddddd-dddd-4ddd-8ddd-dddddddddddd and not its own firstKeptEntryId.",
+        "A copy of the fixture whose preservedMessages.uuids is [66666666-6666-4666-8666-666666666666, eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee] is refused, and the error's text contains eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee; `lys-home import` on it through `run` exits 1 with eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee on stderr.",
+        "A copy of the fixture whose line 14 leafUuid is ffffffff-ffff-4fff-8fff-ffffffffffff is refused, and the error's text contains ffffffff-ffff-4fff-8fff-ffffffffffff.",
+        "A copy of the fixture whose line 7 logicalParentUuid is ffffffff-ffff-4fff-8fff-ffffffffffff imports with exit 0 and the same two compaction entries.",
+        "The existing round-trip test in tests/claude_code_round_trip.rs that every message entry's parent equals its source parentUuid passes unchanged, and a test asserts the same over every message entry of the imported fixture.",
+        "`git diff` of the landed change shows crates/lys-home/tests/claude_code_round_trip.rs unchanged.",
+        "A line count of crates/lys-home/src/harness/claude_code/import.rs excluding comments, blank lines and tests is at most 500."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/harness/claude_code/compaction.rs",
+          "crates/lys-home/src/harness/claude_code/compaction_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/harness/claude_code/import.rs",
+          "crates/lys-home/src/harness/claude_code/mod.rs",
+          "crates/lys-home/src/error.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C71",
+        "C72",
+        "C73"
+      ],
+      "stories": [
+        "S32"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Account for each compaction's span and append its loss entry",
+      "spec": "In a new harness/claude_code/span.rs. WHEN the importer appends a compaction entry, THE SYSTEM SHALL at once append its lys.loss entry (R1), computed over the span: the entries on the session's root-to-compaction path from the root, or from the previous compaction entry on that path, through the path entry just before the first kept entry, both ends included. span_first and span_last are the span's first and last entry ids; entries counts the span's entries; messages counts its message entries of every role; tool_calls counts the toolCall parts of its assistant messages; tool_results counts its message entries whose role is toolResult; block_hashes lists the distinct blocks its entries were stored as (each message part's block, an on-chain harness event's record block, a previous compaction's summary record block) and blocks counts them; block_bytes sums those blocks' byte lengths; line_bytes sums the byte lengths, without line terminators, of the distinct source-file lines the span's entries were imported from; first_line_sha256 and last_line_sha256 are the SHA-256 of the first and last of those lines in file order, without terminator, and span_sha256 the SHA-256 of those lines in file order, each followed by one line feed; side_leaf_entries counts the entries that are not sidechain entries and hang from a span entry off the path, and sidechain_entries the sidechain labels and sidechain records hanging from a span entry; tokens_before is the compaction's reported value (the boundary's preTokens, null for a legacy summary record and for a boundary without one); unresolved_logical_parent is the boundary's logicalParentUuid when it names no record in the file, else null; summary_record is the hash of the block R2 stored for the compaction's record. THE SYSTEM SHALL read span source lines by their offsets and SHALL NOT hold the source file or the session file whole in memory. THE SYSTEM SHALL NOT count or hash any entry from the first kept entry onward, SHALL NOT put a side-leaf or sidechain entry's line or id into a hash or the data, and SHALL NOT read a clock or a random source for any value in the data.",
+      "acceptance": [
+        "On the fixture, the entry following 88888888-8888-4888-8888-888888888888 is a lys.loss entry with parentId 88888888-8888-4888-8888-888888888888 and data: compaction_id 88888888-8888-4888-8888-888888888888, span_first 11111111-1111-4111-8111-111111111111, span_last 33333333-3333-4333-8333-333333333333, entries 3, messages 3, tool_calls 1, tool_results 1, blocks 4, side_leaf_entries 1, sidechain_entries 2, tokens_before 12345, unresolved_logical_parent null.",
+        "For that loss, the test computes from the fixture file, not from the home, the SHA-256 of line 1, of line 3 and of lines 1 to 3 each followed by a line feed, and the sum of the byte lengths of lines 1 to 3, and asserts first_line_sha256, last_line_sha256, span_sha256 and line_bytes equal them.",
+        "On the fixture, the entry following the legacy compaction is a lys.loss entry with span_first 88888888-8888-4888-8888-888888888888, span_last cccccccc-cccc-4ccc-8ccc-cccccccccccc, entries 4, messages 3, tool_calls 1, tool_results 1, blocks 4, side_leaf_entries 1, sidechain_entries 2, tokens_before null, and first_line_sha256, last_line_sha256, span_sha256 and line_bytes equal to the values the test computes from fixture lines 8, 9, 10 and 12.",
+        "For each loss, the test computes the SHA-256 of serde_json::to_vec of every part of the span's fixture lines and of the whole records the span's blocks hold, asserts block_hashes equals that set, and asserts block_bytes equals the sum of the sizes of the files blocks/<hh>/<hash> the home holds for them.",
+        "Neither loss data names 44444444-4444-4444-8444-444444444444, bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb or any id of a sidechain label or tool_completed side leaf.",
+        "On the copy of the fixture whose line 7 logicalParentUuid is ffffffff-ffff-4fff-8fff-ffffffffffff, the first loss's unresolved_logical_parent is ffffffff-ffff-4fff-8fff-ffffffffffff and every other key equals the original fixture's first loss.",
+        "No loss data names 55555555-5555-4555-8555-555555555555, 66666666-6666-4666-8666-666666666666 or 77777777-7777-4777-8777-777777777777: the preserved entries and the boundary are outside both spans."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/harness/claude_code/span.rs",
+          "crates/lys-home/src/harness/claude_code/span_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/harness/claude_code/import.rs",
+          "crates/lys-home/src/harness/claude_code/mod.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C74",
+        "C75",
+        "C76"
+      ],
+      "stories": [
+        "S32"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Gate the compaction fixture's import, context path and two-home equality end to end",
+      "spec": "Add crates/lys-home/tests/fixtures/compaction.jsonl, a synthetic Claude Code file of fourteen lines carrying no real transcript content, each record with a fixed timestamp and every part's content distinct from every other part's: 1 a user text record 11111111-1111-4111-8111-111111111111 (parentUuid null); 2 an assistant record 22222222-2222-4222-8222-222222222222 with one text part and one tool_use part (id toolu_01), parent line 1; 3 a user record 33333333-3333-4333-8333-333333333333 holding exactly one tool_result part for toolu_01, parent line 2; 4 an assistant text record 44444444-4444-4444-8444-444444444444 with isSidechain true, agentId a1 and parentUuid null; 5 an assistant text record 55555555-5555-4555-8555-555555555555, parent line 3; 6 a user text record 66666666-6666-4666-8666-666666666666, parent line 5; 7 a system record 77777777-7777-4777-8777-777777777777 with subtype compact_boundary, parentUuid null, logicalParentUuid 66666666-6666-4666-8666-666666666666 and compactMetadata {trigger manual, preTokens 12345, preservedMessages {anchorUuid 88888888-8888-4888-8888-888888888888, uuids [66666666-6666-4666-8666-666666666666, 55555555-5555-4555-8555-555555555555]}}; 8 a user record 88888888-8888-4888-8888-888888888888 with isCompactSummary true and isVisibleInTranscriptOnly true, parent line 7, whose message content is one string, the first summary; 9 an assistant record 99999999-9999-4999-8999-999999999999 with one tool_use part (id toolu_02), parent line 8; 10 a user record aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa holding exactly one tool_result part for toolu_02, parent line 9; 11 an assistant text record bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb with isSidechain true, agentId a2 and parentUuid null; 12 an assistant text record cccccccc-cccc-4ccc-8ccc-cccccccccccc, parent line 10; 13 a user text record dddddddd-dddd-4ddd-8ddd-dddddddddddd, parent line 12; 14 a legacy record of type summary whose summary is the second summary, holding a code word that appears nowhere else in the fixture, and whose leafUuid is dddddddd-dddd-4ddd-8ddd-dddddddddddd. WHEN the fixture is imported through lys_home::cli::run into a session named `compacted`, THE SYSTEM SHALL give a session whose context path at the head is the legacy compaction then the entry its leafUuid names, and whose context path with the head moved to the last entry before the legacy summary is the first compaction, then the kept entries from the earliest preserved uuid, then what follows. WHEN the fixture is imported into two fresh homes, THE SYSTEM SHALL write lys.loss lines that are equal byte for byte once the entry's id, parentId and timestamp and the data's compaction_id are replaced by a fixed mark. THE SYSTEM SHALL NOT put a span entry on a context path, SHALL NOT put the summary text on a context path more than once, and the test SHALL NOT mask any field but those four.",
+      "acceptance": [
+        "With the head at cccccccc-cccc-4ccc-8ccc-cccccccccccc, the context path's entry ids are exactly [88888888-8888-4888-8888-888888888888, 55555555-5555-4555-8555-555555555555, 66666666-6666-4666-8666-666666666666, 77777777-7777-4777-8777-777777777777, 99999999-9999-4999-8999-999999999999, aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa, cccccccc-cccc-4ccc-8ccc-cccccccccccc]: the preserved entries 55555555-5555-4555-8555-555555555555 and 66666666-6666-4666-8666-666666666666 are on it and are outside both losses' counts.",
+        "With the head at the file's head, the context path's entry ids are exactly [the legacy compaction's id, dddddddd-dddd-4ddd-8ddd-dddddddddddd].",
+        "Neither context path holds 11111111-1111-4111-8111-111111111111, 22222222-2222-4222-8222-222222222222 or 33333333-3333-4333-8333-333333333333.",
+        "On each context path, the count of entries whose summary or message text has the SHA-256 of that path's compaction summary text is exactly 1, counted by hash with the text never printed.",
+        "Two imports of the fixture into two temporary homes give, for each of the two compactions, lys.loss lines whose bytes are equal after masking id, parentId, timestamp and data.compaction_id, and the test's mask list is exactly those four names.",
+        "Every line of the imported session file after the header parses as a JSON object with type, id, parentId and timestamp, and each lys.loss line has type custom and an object data.",
+        "The test names and assertion messages in tests/compaction_import.rs carry no text of the fixture's records."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/tests/compaction_import.rs",
+          "crates/lys-home/tests/fixtures/compaction.jsonl"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C77",
+        "C78"
+      ],
+      "stories": [
+        "S32",
+        "S34"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "List a session's compactions and check each span through the index and the block store",
+      "spec": "Add `lys-home compactions --home <dir> --session <id>` in cli/compactions.rs, wired into the Command enum in cli.rs, over a record/compactions.rs module. WHEN run on a session, THE SYSTEM SHALL print one JSON object {session, compactions} to stdout, where compactions lists every compaction entry in the session file in file order, each as: compaction (its id), first_kept, tokens_before, loss (the id of the lys.loss entry whose compaction_id names it, or null), status (accounted or unaccounted), act, span (the loss data's ids, counts, byte counts and hashes, without block_hashes, or null) and check {entries_read, entries_missing, blocks_held, blocks_missing}. The check SHALL read every span entry by id through the index, walking parents from span_last to span_first, and SHALL list in entries_missing each id it cannot read and the span_first it never reaches; it SHALL check every hash in the loss's block_hashes and its summary_record against the block store, counting as held a block that is present and whose bytes hash to its name and listing every other hash in blocks_missing. IF a compaction has no lys.loss entry naming it, or its firstKeptEntryId is its own id, THEN THE SYSTEM SHALL report it with status unaccounted, loss null when none, span and check null, and act `re-import the source file into a new home`, and act is null for an accounted compaction. THE SYSTEM SHALL find compaction and lys.loss entries in one pass over the session file holding one line at a time and SHALL NOT load the session file whole. THE SYSTEM SHALL NOT refuse an unaccounted compaction, SHALL NOT write to the home, the session or its index, and SHALL NOT print any summary, message or tool text on stdout or stderr.",
+      "acceptance": [
+        "On the imported fixture, the report lists two compactions in file order, the first with compaction 88888888-8888-4888-8888-888888888888, status accounted, act null, check entries_read 3, entries_missing [], blocks_held equal to 5 (its four block_hashes and its summary_record), blocks_missing [].",
+        "On the imported fixture, the second compaction's check has entries_read 4 and entries_missing [] and blocks_missing [], and its span equals its loss data without block_hashes.",
+        "In a copy of the imported home with one block file named in the first loss's block_hashes deleted, the report's first check lists exactly that hash in blocks_missing and the second check is unchanged.",
+        "In a copy of the imported home with that block file's bytes changed and its name kept, the report's first check lists exactly that hash in blocks_missing.",
+        "A session holding a compaction entry built by hand whose firstKeptEntryId is its own id and no lys.loss entry is reported with status unaccounted, loss null, span null, check null and act `re-import the source file into a new home`, the command exits 0, and the session file's SHA-256 is equal before and after.",
+        "The listing leaves the session file, its index and its head file with the SHA-256 they had before it ran.",
+        "The report printed for the fixture contains no string of eight or more characters taken from any fixture record's text content, checked by the test against each part's text."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/record/compactions.rs",
+          "crates/lys-home/src/record/compactions_tests.rs",
+          "crates/lys-home/src/cli/compactions.rs",
+          "crates/lys-home/tests/compactions_cli.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/cli.rs",
+          "crates/lys-home/src/record/mod.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C79"
+      ],
+      "stories": [
+        "S33"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Render a compaction as the compact_boundary and isCompactSummary pair",
+      "spec": "In render.rs, replacing the legacy summary line. WHEN the Claude Code render meets a compaction entry on the context path, THE SYSTEM SHALL write a system record with subtype compact_boundary, content `Conversation compacted`, level info, parentUuid null, logicalParentUuid null and compactMetadata {preTokens: the compaction's tokensBefore}, whose uuid is the UUID version 5 over the session's namespace (ADR-016) and the name `<compaction id>#compact_boundary`, then a user record with isCompactSummary true and isVisibleInTranscriptOnly true whose message is {role user, content: the compaction's summary}, whose uuid is the compaction's id as record_uuid derives it and whose parentUuid is the boundary record's uuid, each carrying the fields every rendered record carries with the compaction's timestamp; the next rendered record's parentUuid SHALL be that summary record's uuid. THE SYSTEM SHALL NOT write a record of type summary, SHALL NOT write a lys.loss line or any other custom entry, SHALL NOT change the derived uuid of any role-record entry, and SHALL NOT read a clock or a random source.",
+      "acceptance": [
+        "Rendering the imported fixture session `compacted` with its head at cccccccc-cccc-4ccc-8ccc-cccccccccccc writes, in order, a record of type system and subtype compact_boundary whose uuid is 4e12f7de-6b53-55f9-a825-7f1f9254c8a6 (computed independently with Python's uuid.uuid5 of uuid.uuid5(32c05904-d1f1-550c-9eee-2f6c8f98b665, 'compacted') and '88888888-8888-4888-8888-888888888888#compact_boundary'), then a user record with isCompactSummary true, uuid 88888888-8888-4888-8888-888888888888 and parentUuid 4e12f7de-6b53-55f9-a825-7f1f9254c8a6, then the records for 55555555-5555-4555-8555-555555555555, 66666666-6666-4666-8666-666666666666, 99999999-9999-4999-8999-999999999999, aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa and cccccccc-cccc-4ccc-8ccc-cccccccccccc, the first of which has parentUuid 88888888-8888-4888-8888-888888888888.",
+        "Rendering the imported fixture at its head writes exactly three records: a compact_boundary system record, an isCompactSummary user record whose parentUuid is the boundary's uuid, and the record for dddddddd-dddd-4ddd-8ddd-dddddddddddd whose parentUuid is the summary record's uuid.",
+        "In both rendered files, no line has type summary and no line contains `lys.loss`.",
+        "In each rendered file, the count of lines whose message content text has the SHA-256 of the compaction's summary is exactly 1, counted by hash.",
+        "Rendering the imported fixture twice at the same head to two paths gives two files of equal SHA-256.",
+        "The existing tests in render_tests.rs and the pinned hash of tests/claude_code_round_trip.rs pass unchanged."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-home/src/harness/claude_code/render.rs",
+          "crates/lys-home/src/harness/claude_code/render_tests.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C80"
+      ],
+      "stories": [
+        "S34"
+      ]
+    },
+    {
+      "id": "R7",
+      "title": "Prove it on a real compacted session and a resume on Claude Code 2.1.283, and write it down",
+      "spec": "Add docs/design/home/PROOF-COMPACTION.md with two sections, carrying hashes, counts, ids, versions and commands only. The first: one Claude Code session file holding at least one compact_boundary record, every one of which is followed by its isCompactSummary record and carries a non-empty preservedMessages.uuids, taken from the Claude Code projects directory of the machine the proof runs on and never written; its SHA-256 before the import and after the listing; its count of compact_boundary records; the `claude --version` output of that machine; the lys-home commit built from; the import command into a scratch home outside the Claude Code configuration directory; and the `lys-home compactions` report for the imported session, with every loss's counts and hashes and its check. The second: the compaction fixture imported and rendered at its head, resumed with `claude -p --resume <rendered file> --fork-session` and a prompt asking for the code word the summary holds, from a directory that is neither the rendered file's directory nor the session's cwd, on a machine where `claude --version` prints 2.1.283, with that output, the exit status, the rendered file's SHA-256, and the SHA-256 of the answer with surrounding whitespace trimmed beside the SHA-256 of the code word. Write the lys.loss entry, both compaction shapes and the context path into RECORD.md, name the subcommand in crates/lys-home/README.md, and regenerate the cluster's rendered markdown and briefs/HOME-008.md with render-cluster.py and render-brief.py. THE SYSTEM SHALL NOT write anything under the Claude Code projects directory, SHALL NOT commit the real session or its home, and SHALL NOT put any line of transcript or summary text in the proof document.",
+      "acceptance": [
+        "PROOF-COMPACTION.md records the real source file's SHA-256 twice, before the import and after the listing, and the two are equal.",
+        "PROOF-COMPACTION.md records a compact_boundary count of at least 1 and a listing report in which every compaction has status accounted, entries_missing [] and blocks_missing [].",
+        "PROOF-COMPACTION.md records `claude --version` output of 2.1.283 beside the resume command, the resume's exit status 0, and an answer SHA-256 equal to the code word's SHA-256.",
+        "A search of PROOF-COMPACTION.md for the fixture's code word and for each fixture record's text finds nothing.",
+        "RECORD.md contains the strings `lys.loss`, `compact_boundary`, `isCompactSummary`, `preservedMessages.uuids` and `leafUuid`.",
+        "crates/lys-home/README.md contains `lys-home compactions`.",
+        "`sh scripts/design/gate.sh` exits 0, so DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/HOME-008.md are what their JSON renders to."
+      ],
+      "files": {
+        "create": [
+          "docs/design/home/PROOF-COMPACTION.md",
+          "docs/design/home/briefs/HOME-008.md"
+        ],
+        "modify": [
+          "docs/design/home/RECORD.md",
+          "crates/lys-home/README.md",
+          "docs/design/home/DESIGN.md",
+          "docs/design/home/CHECKLIST.md",
+          "docs/design/home/USER-STORIES.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C81"
+      ],
+      "stories": [
+        "S33",
+        "S34"
+      ]
+    }
+  ],
+  "boundaries": [
+    "No byte of a source Claude Code file is changed and nothing is written under the Claude Code projects directory (CN1).",
+    "No summarised entry is removed, rewritten or re-parented, no block is deleted, and no existing home is rewritten (P1).",
+    "No field is added to Pi's compaction entry or any other Pi entry; lys data lives only in custom entries (P2, CN4).",
+    "No message, tool or summary text appears in a lys.loss entry, the listing's output, an error, a log line, a test name or the proof document (P7, CN3).",
+    "No change to the derived uuid of any role-record entry or to CN9's byte determinism; the only role added is compact_boundary (ADR-016, ADR-030).",
+    "The render never writes a lys.loss line, a lantern or any other custom entry, and never writes a legacy summary line.",
+    "No compaction is produced by the home, no translation and no handover work, and no harness other than Claude Code.",
+    "A compact_boundary with no non-empty preservedMessages.uuids, or with no isCompactSummary record under it, imports as it does today until the card lead answers.",
+    "No file exceeds 500 code lines, and no unwrap, expect or panic in library code.",
+    "The design's structure array is the whole file list; a path outside it is not created."
+  ],
+  "verification": [
+    "From the repository root: cargo fmt --all leaves the tree unchanged.",
+    "cargo clippy --all-targets --all-features -- -D warnings and cargo clippy --all-targets -- -D warnings exit 0.",
+    "cargo test --workspace --all-features exits 0 and lists the tests of R1 to R6 as passed.",
+    "cargo doc --no-deps --all-features and cargo doc --no-deps exit 0 with no warnings.",
+    "sh scripts/design/gate.sh exits 0.",
+    "python3 -c \"import uuid;ns=uuid.uuid5(uuid.UUID('32c05904-d1f1-550c-9eee-2f6c8f98b665'),'compacted');print(uuid.uuid5(ns,'88888888-8888-4888-8888-888888888888#compact_boundary'))\" prints 4e12f7de-6b53-55f9-a825-7f1f9254c8a6, the value R6's test asserts.",
+    "Import crates/lys-home/tests/fixtures/compaction.jsonl into a scratch home with lys-home import, run lys-home compactions on it, and check the report lists two accounted compactions with empty entries_missing and blocks_missing.",
+    "grep -rn 'anchorUuid' crates/lys-home/src prints no line that reads it to find a first kept entry.",
+    "git diff of the landed change leaves crates/lys-home/tests/claude_code_round_trip.rs unchanged."
+  ],
+  "amendments": [
+    {
+      "date": "2026-09-27",
+      "by": "the lead of the home card, answering the compaction survey",
+      "subject": "The importer did not already map a compaction",
+      "ruling": "The words' clause that the importer already turns the summary record into Pi's compaction entry with its summary and first kept entry is wrong: the importer pointed the compaction at itself with tokensBefore 0 and did not read compact_boundary at all. This brief replaces that mapping. The words are kept as they were typed in the roadmap row's provenance."
+    }
+  ]
+}

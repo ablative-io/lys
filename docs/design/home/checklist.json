@@ -275,6 +275,66 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Compactions",
+      "items": [
+        {
+          "id": "C71",
+          "text": "A compact_boundary record followed by its isCompactSummary user record imports as a lys.harness_event for the boundary and one Pi compaction entry under the summary record's uuid, the child of the boundary's entry, whose firstKeptEntryId is the earliest in file order of compactMetadata.preservedMessages.uuids and whose tokensBefore is compactMetadata.preTokens; the summary record is not a message entry.",
+          "done": false
+        },
+        {
+          "id": "C72",
+          "text": "A legacy summary record imports as a Pi compaction entry whose firstKeptEntryId is the entry its leafUuid names, never the compaction's own id.",
+          "done": false
+        },
+        {
+          "id": "C73",
+          "text": "A compaction whose first kept entry is not on record is refused with an error naming that uuid.",
+          "done": false
+        },
+        {
+          "id": "C74",
+          "text": "Directly after each compaction entry the importer appends one lys.loss custom entry whose parent is the compaction and whose data holds only ids, counts, byte counts and SHA-256 hashes, with the keys RECORD.md sets down.",
+          "done": false
+        },
+        {
+          "id": "C75",
+          "text": "A lys.loss entry's span is the root-to-first-kept path from the root or the previous compaction to the entry before the first kept one; its three SHA-256s are over those entries' source lines in file order, and side-leaf and sidechain entries hanging from the span are counted by number only.",
+          "done": false
+        },
+        {
+          "id": "C76",
+          "text": "A compact_boundary whose logicalParentUuid names no record in the file imports, and its lys.loss entry names that uuid as unresolved.",
+          "done": false
+        },
+        {
+          "id": "C77",
+          "text": "Two imports of the compaction fixture into two homes give lys.loss lines equal byte for byte once id, parentId, timestamp and data.compaction_id are masked.",
+          "done": false
+        },
+        {
+          "id": "C78",
+          "text": "The context path of an imported compacted session is the compaction, then the kept entries preserved uuids included, then what follows; no span entry is on it and the summary text is on it once.",
+          "done": false
+        },
+        {
+          "id": "C79",
+          "text": "lys-home compactions prints one JSON report of a session's compactions, each with its loss entry, the span's ids, counts and hashes and a check that every span entry is readable by id and every named block is held; a compaction with no loss entry or pointing at itself is reported unaccounted by entry id.",
+          "done": false
+        },
+        {
+          "id": "C80",
+          "text": "The Claude Code render writes a compaction as a compact_boundary record followed by an isCompactSummary user record, then the kept entries, with no legacy summary line and no lys.loss line, and the summary text once.",
+          "done": false
+        },
+        {
+          "id": "C81",
+          "text": "PROOF-COMPACTION.md records one real compact_boundary session imported read-only with its listing as counts and hashes and its source SHA-256 equal before and after, and a rendered compacted fixture resumed on Claude Code 2.1.283 answering from the summary, by hashes only.",
+          "done": false
+        }
+      ]
     }
   ]
 }
