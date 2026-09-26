@@ -8,10 +8,10 @@
 //! block is dropped and named by hash in the loss account beside the file. A
 //! compaction becomes Claude Code's `summary` record. Custom entries (the lys
 //! ones included) and labels do not render. An existing target path is
-//! refused by name and nothing is written. The report carries the launch
-//! line, `claude --resume '<path>'`, and for a child forked at a user
-//! message the seed file written beside the rendered file and the line that
-//! passes it as the first prompt ([`super::seed`]); the line is never run.
+//! refused by name and nothing is written. For a child forked at a user
+//! message the report names the seed file written beside the rendered file
+//! ([`super::seed`]); no launch line is printed here, since a launch line
+//! comes only from the template's render (`render-launch`).
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -21,7 +21,7 @@ use serde_json::{Value, json};
 use sha1::{Digest, Sha1};
 
 use crate::error::HomeError;
-use crate::harness::claude_code::seed::{resume_line, seed_of, seed_path, write_seed};
+use crate::harness::claude_code::seed::{seed_of, seed_path, write_seed};
 use crate::harness::claude_code::{API, PROVIDER, projects_slug};
 use crate::record::blocks::{Hash, hex_of};
 use crate::record::entries::{CUSTOM_AUTHORED, EntryBody};
@@ -73,9 +73,6 @@ pub struct RenderReport {
     pub authored: bool,
     /// Canon examples placed before the session's own entries.
     pub inherited: u64,
-    /// The launch line: the rendered file resumed by path, with the seed as
-    /// the first prompt when there is one. Printed, never run.
-    pub launch: String,
     /// The seed file written beside the rendered file, for a child forked
     /// at a user message; `None` otherwise.
     pub seed: Option<PathBuf>,
@@ -273,7 +270,6 @@ pub fn render_claude_code(
     if let (Some(seed), Some(file)) = (&seed, &seed_file) {
         write_seed(file, seed)?;
     }
-    let launch = resume_line(&path, seed_file.as_deref());
     Ok(RenderReport {
         path,
         loss_path,
@@ -283,7 +279,6 @@ pub fn render_claude_code(
         dropped: losses.len() as u64,
         authored,
         inherited,
-        launch,
         seed: seed_file,
     })
 }

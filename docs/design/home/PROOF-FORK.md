@@ -51,7 +51,7 @@ never written.
 
 | lantern | point | kind of point | lit_at |
 | --- | --- | --- | --- |
-| `f97e279de4938213e934f79646e419aa` (A) | `7389b620-3244-447a-816a-36e831893aa6` | an assistant message, the session's 223rd record: the summary of the conversion it did | `2026-09-26T06:07:11.37Z` |
+| `f97e279de4938213e934f79646e419aa` (A) | `7389b620-3244-447a-816a-36e831893aa6` | an assistant message, the session's 223rd record | `2026-09-26T06:07:11.37Z` |
 | `03a597d63100148487d19071b825657e` (B) | `35b5364e-7496-46db-aa3c-b863416b5237` | a user message, the session's 78th record | `2026-09-26T06:07:11.52Z` |
 
 The light act on this tree records no `lit_in`, so both resolve by the
@@ -90,19 +90,19 @@ Pi's loader on the child, `PI=<scratch>/proof-lantern/pi node <scratch>/pi-load-
 | field | value |
 | --- | --- |
 | template | `<scratch>/template.json`, hash `00159b76e9188d541596fe3a9cd98886b5aaf2f55bfcac15783bdb2fe767cfbb`: `harness` `claude-code`; flags `--strict-mcp-config --allowedTools 'Bash(printenv:*)'`; `transcript` fill `resume-by-path`, canon null; `mcp` `{"mcpServers": {}}`; `env` one variable `LYS_PROOF_MODE`; `secrets.use_only` one entry, variable `LYS_PROOF_TOKEN`, handle `handle-proof-0006`; `readable` empty; `instructions` one line asking for the answer and nothing else |
-| render | `records` 79 (the child's 79 messages), `thinking_kept` 17, `thinking_as_text` 0, `dropped` 0, `seed` null, `launch` (the render's own line) `claude --resume '<scratch>/out-a/6f0c2b7e-….jsonl'` |
+| render | `records` 79 (the child's 79 messages), `thinking_kept` 17, `thinking_as_text` 0, `dropped` 0, `seed` null; the render report carries no launch line |
 | session head | `bdb006f2de7d9932f8cfff917f14c1d3d89e65dce793cef7fc4491b9c59bbfde`; event `d63bd5131427ac905eae09c42e7f7d1d`; manifest `a5459451ca2813e5e97f28edcfbb73fdd70d7b44543ed75969414bc25a242652`; given `5c90c04fbee25b618d639e6b682800e6`, 3 documents |
 | files, in manifest order | `6f0c2b7e-….jsonl` `ec27f1854febfe19a80326e63eb0bba294252b060e4f4e89ece9ed42dceea81f`; `6f0c2b7e-….loss.json` `6f628ca5c4a74974034a64fb0d28e6f95bb2bf27127d277e89ce3abce20e9664`; `mcp.json` `d8e397af03b5b032f21d0aa967086f0c78b33c87b76f2e9898ae0a144df7de02`; `env.json` `ec1d4d943d026a0d0c66ae59ed80b8d1b70b11fa9533671a9c2086132b5078bb`; `instructions.md` `a5cc916f3f258b64e56bab747c6b9c9b147e7cb0bb3ea07e0361f49723296966` (five files, no seed) |
 
 ### The launch line, run
 
 The line run is the launch template's line from the `render-launch`
-report (not the render's resume-by-path line), by hand and never by the
+report, the one launch line the tool prints, by hand and never by the
 tool, from `<scratch>/elsewhere` (neither `<scratch>/out-a` nor the
 session's cwd), in print mode with one question appended. The question
-(redacted, as every message of the session is) asks for one number the
-parent's chain holds only at or before the point, in records 121 to 223 of
-the source and in none after; `--max-turns 1` since no tool is needed.
+(redacted, as every message of the session is) has a one-word answer that
+the parent's chain holds only at or before the point, in records 121 to 223
+of the source and in none after; `--max-turns 1` since no tool is needed.
 
 ```
 claude --resume <scratch>/out-a/6f0c2b7e-4a1d-4c3e-8b5f-1e2d3c4b5a60.jsonl --fork-session --mcp-config <scratch>/out-a/mcp.json --settings <scratch>/out-a/env.json --append-system-prompt-file <scratch>/out-a/instructions.md --strict-mcp-config --allowedTools 'Bash(printenv:*)' -p --max-turns 1 --output-format json '<question>'
@@ -162,7 +162,7 @@ The launch line the report printed, the template's line with the seed as the fir
 claude --resume <scratch>/out-b/6f0c2b7e-4a1d-4c3e-8b5f-1e2d3c4b5a61.jsonl --fork-session --mcp-config <scratch>/out-b/mcp.json --settings <scratch>/out-b/env.json --append-system-prompt-file <scratch>/out-b/instructions.md --strict-mcp-config --allowedTools 'Bash(printenv:*)' "$(cat '<scratch>/out-b/6f0c2b7e-4a1d-4c3e-8b5f-1e2d3c4b5a61.seed.txt')"
 ```
 
-Run by hand from `<scratch>/elsewhere` with `-p --max-turns 4 --output-format json` inserted before the seed argument, nothing else changed. A first attempt with `--max-turns 1` exited 1 (`subtype` error_max_turns, `num_turns` 2, `stop_reason` tool_use, 7,381 ms, its continuation `ec63c801-a182-4037-984a-4a26d5be33f9.jsonl` left where it landed): the seed is a spoken turn from a Dot conversation, and the child answered it by calling a tool first, so one turn was not enough for its reply; the run recorded here is the second attempt, with four turns allowed.
+Run by hand from `<scratch>/elsewhere` with `-p --max-turns 4 --output-format json` inserted before the seed argument, nothing else changed. A first attempt with `--max-turns 1` exited 1 (`subtype` error_max_turns, `num_turns` 2, `stop_reason` tool_use, 7,381 ms, its continuation `ec63c801-a182-4037-984a-4a26d5be33f9.jsonl` left where it landed): the child answered the seed by calling a tool first, so one turn was not enough for its reply; the run recorded here is the second attempt, with four turns allowed.
 
 | field | value |
 | --- | --- |
@@ -304,9 +304,9 @@ The files this card adds: `src/record/fork_cut.rs` 182, `src/record/fork.rs`
   child answered the carried turn as the conversation it came from would,
   reaching for the Dot tool the parent had used, which one turn did not
   allow and four did (`new_tool_uses` 1, `repeated_tool_use_ids` 0).
-- The line run was the launch template's, so the child ran with the
-  template's flags, settings and handle, not the bare seat login; the
-  render's own resume-by-path line was printed and not run.
+- The line run was the launch template's, the one launch line the tool
+  prints, so the child ran with the template's flags, settings and handle,
+  not the bare seat login.
 - It does not measure whether the copied thinking blocks reached the model:
   as in the two earlier proofs, the 17 and 2 thinking records were not
   carried into the continuations. It does not exercise `lit_in`, since the

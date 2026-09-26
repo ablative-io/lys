@@ -1,13 +1,13 @@
-//! Gates on the seed and the launch line (HOME-006 R6): an assistant-point
-//! child renders its four messages with the plain resume line and no seed;
-//! a carried-point child writes the seed's exact bytes beside the rendered
-//! file, its text lives there and nowhere else, and the line passes it; a
-//! seed path already present is refused by name with nothing rendered; the
-//! parent itself renders with the plain line. No test name carries a
-//! content sentinel.
+//! Gates on the seed (HOME-006 R6): an assistant-point child renders its
+//! four messages with no seed; a carried-point child writes the seed's
+//! exact bytes beside the rendered file, its text lives there and nowhere
+//! else, and the report names it; a seed path already present is refused
+//! by name with nothing rendered; the parent itself renders with no seed;
+//! and no render report carries a launch line, which only the template's
+//! render prints. No test name carries a content sentinel.
 
 use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::error::HomeError;
 use crate::harness::claude_code::render::{RenderReport, RenderTarget, render_claude_code};
@@ -15,6 +15,7 @@ use crate::harness::claude_code::seed::HEADING;
 use crate::record::Home;
 use crate::record::fork::fork;
 use crate::record::fork_cut_tests::{PARENT, SENTINELS, fixture_home};
+use serde_json::Value;
 
 type Gate = Result<(), Box<dyn Error>>;
 
@@ -31,6 +32,14 @@ fn render(home: &Home, session: &str, out: PathBuf) -> Result<RenderReport, Home
     render_claude_code(&session, &target, None)
 }
 
+/// The report as JSON, which must name no launch line.
+fn report_json(report: &RenderReport) -> Result<Value, Box<dyn Error>> {
+    let value: Value = serde_json::to_value(report)?;
+    assert!(value.get("launch").is_none());
+    assert!(value.get("seed").is_some());
+    Ok(value)
+}
+
 fn sentinels_in(text: &str) -> usize {
     let mut checked = 0;
     for sentinel in SENTINELS {
@@ -41,23 +50,20 @@ fn sentinels_in(text: &str) -> usize {
 }
 
 #[test]
-fn an_assistant_point_child_renders_with_the_plain_line_and_no_seed() -> Gate {
+fn an_assistant_point_child_renders_with_no_seed_and_no_launch_line() -> Gate {
     let (dir, home, lanterns) = fixture_home()?;
     let child = fork(&home, &lanterns.l5, None)?.child;
     let out = dir.path().join("out").join("a.jsonl");
-    let report = render(&home, &child, out.clone())?;
+    let report = render(&home, &child, out)?;
     assert_eq!(report.records, 4);
     assert_eq!(report.seed, None);
-    assert_eq!(
-        report.launch,
-        format!("claude --resume '{}'", out.display())
-    );
+    assert_eq!(report_json(&report)?["seed"], Value::Null);
     assert!(!dir.path().join("out").join("a.seed.txt").exists());
     Ok(())
 }
 
 #[test]
-fn a_carried_point_child_writes_the_seed_beside_the_file_and_the_line_passes_it() -> Gate {
+fn a_carried_point_child_writes_the_seed_beside_the_file_and_names_it() -> Gate {
     let (dir, home, lanterns) = fixture_home()?;
     let child = fork(&home, &lanterns.l6, None)?.child;
     let out = dir.path().join("out").join("b.jsonl");
@@ -70,14 +76,7 @@ fn a_carried_point_child_writes_the_seed_beside_the_file_and_the_line_passes_it(
         lanterns.l6
     );
     assert_eq!(std::fs::read(&seed)?, expected.as_bytes());
-    assert_eq!(
-        report.launch,
-        format!(
-            "claude --resume '{}' \"$(cat '{}')\"",
-            out.display(),
-            seed.display()
-        )
-    );
+    assert_eq!(report_json(&report)?["seed"], serde_json::json!(seed));
     let rendered = std::fs::read_to_string(&out)?;
     for text in [
         "fixture-text-1",
@@ -90,7 +89,9 @@ fn a_carried_point_child_writes_the_seed_beside_the_file_and_the_line_passes_it(
     assert!(!rendered.contains("fixture-text-6"));
     let loss = std::fs::read_to_string(&report.loss_path)?;
     assert_eq!(sentinels_in(&loss), 8);
-    assert_eq!(sentinels_in(&serde_json::to_string(&report)?), 8);
+    let printed = serde_json::to_string(&report)?;
+    assert_eq!(sentinels_in(&printed), 8);
+    assert!(!printed.contains("claude --resume"));
     Ok(())
 }
 
@@ -114,14 +115,11 @@ fn a_seed_path_already_present_is_refused_by_name_and_nothing_is_rendered() -> G
 }
 
 #[test]
-fn the_parent_itself_renders_with_the_plain_line_and_no_seed() -> Gate {
+fn the_parent_itself_renders_with_no_seed_and_no_launch_line() -> Gate {
     let (dir, home, _) = fixture_home()?;
     let out = dir.path().join("out").join("p.jsonl");
-    let report = render(&home, PARENT, out.clone())?;
+    let report = render(&home, PARENT, out)?;
     assert_eq!(report.seed, None);
-    assert_eq!(
-        report.launch,
-        format!("claude --resume '{}'", Path::new(&out).display())
-    );
+    assert_eq!(report_json(&report)?["seed"], Value::Null);
     Ok(())
 }

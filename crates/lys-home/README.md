@@ -105,10 +105,11 @@ copied, the distinct block hashes the copied entries name that the store
 holds and those it does not, and whether and which entry was carried. A
 lantern at a user message is carried, not copied: `render` and
 `render-launch` of that child write the message's text parts beside the
-rendered file as `<stem>.seed.txt` under an in-band marker line, and their
-launch lines pass it as the first prompt (`render` prints
-`claude --resume '<path>' "$(cat '<seed>')"`; `render-launch` appends the
-same argument to the template's line and lists the seed in its manifest).
+rendered file as `<stem>.seed.txt` under an in-band marker line and report
+its path; the printed launch line comes from the template's render only:
+`render-launch` appends `"$(cat '<seed>')"` to the template's line as the
+first prompt and lists the seed in its manifest, and `render` prints no
+launch line.
 A lantern before any assistant message is refused `nothing_to_fork`.
 
 What the crate does not do: interpret, print or log transcript contents (errors

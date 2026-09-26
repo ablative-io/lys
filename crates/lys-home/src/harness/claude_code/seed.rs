@@ -1,5 +1,5 @@
-//! The seed prompt of a carried user message, and the launch line that
-//! passes it (HOME-006 R6).
+//! The seed prompt of a carried user message, and the argument that passes
+//! it on the template's launch line (HOME-006 R6).
 //!
 //! A child forked at a user message does not hold that message: the cut
 //! stopped at the assistant message before it, and the child's
@@ -12,10 +12,11 @@
 //! newline, then the message's text (its `content` when that is a string;
 //! otherwise the `text` of each `text` part in order, joined by newlines,
 //! every part that is not text left out, as `seed_left_out` counts them),
-//! with no trailing newline. The launch line is `claude --resume '<path>'`,
-//! and with a seed `claude --resume '<path>' "$(cat '<seed>')"`, the seed
-//! being the resumed session's first prompt; it is printed, never run
-//! (ADR-007). The seed's text never enters the rendered JSONL, the loss
+//! with no trailing newline. The render report names the seed file and
+//! prints no launch line: only the template's render (`render-launch`)
+//! prints one, with `"$(cat '<seed>')"` appended as the resumed session's
+//! first prompt, and never runs it (ADR-007). The seed's text never enters
+//! the rendered JSONL, the loss
 //! account or the report, and a seed path that already exists is refused by
 //! name before anything is written.
 
@@ -143,18 +144,4 @@ pub fn quoted(path: &Path) -> String {
 #[must_use]
 pub fn seed_argument(seed: &Path) -> String {
     format!("\"$(cat {})\"", quoted(seed))
-}
-
-/// The resume-by-path launch line, with the seed as its first prompt when
-/// there is one. Never run here.
-#[must_use]
-pub fn resume_line(rendered: &Path, seed: Option<&Path>) -> String {
-    match seed {
-        Some(seed) => format!(
-            "claude --resume {} {}",
-            quoted(rendered),
-            seed_argument(seed)
-        ),
-        None => format!("claude --resume {}", quoted(rendered)),
-    }
 }
