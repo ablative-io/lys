@@ -2,7 +2,11 @@
 
 Measured 26 September 2026, 16:06 to 16:08 AEST, on this Mac, with the
 lys-home binary built from card/home-006-forks at d684447 (R1 to R7, on the
-line rebased onto main d30fd6d after the render card landed), node v26.4.0, and the Pi checkout at `3d5cbe98` under `$PI`: the
+line rebased onto main d30fd6d after the render card landed; the review
+commits after it change refusals and the child's cleanup, not the cut, the
+copy, the report's counts or the render, and a re-measurement on the
+pushed head waits on the seat's session limit, which refused both launches
+with HTTP 429 at 16:33), node v26.4.0, and the Pi checkout at `3d5cbe98` under `$PI`: the
 scratch clone PROOF-LANTERN.md built (`git rev-parse HEAD` answers
 `3d5cbe98c3bc67ef8433bdeee45fbe5f0d8a24db`, `git status --short` empty,
 `packages/coding-agent/dist` built by its own tsgo). Every figure here is
@@ -31,11 +35,11 @@ home root (`sessions/<parent id>.jsonl`) so the home can move.
 
 ## The session, imported
 
-The session PROOF-RESUME.md and PROOF-LAUNCH.md measured: the Archie
-session of 11 September 2026 at
-`~/.claude/projects/<slug dir of the session cwd>/e1c27f5d-b418-472d-8ea8-b69bea49882f.jsonl`,
-not running at the time (`pgrep` found no process on it). Read, hashed and
-never written.
+The session PROOF-RESUME.md and PROOF-LAUNCH.md measured, named here by
+its hash only: the source whose SHA-256 is
+`793f4e87ea4608b2ddfb9d5dcbf1197d4245bde7ed1612630339a1cc1f6d15df`, under
+`~/.claude/projects/<slug dir of the session cwd>/`, not running at the
+time (`pgrep` found no process on it). Read, hashed and never written.
 
 | field | value |
 | --- | --- |
@@ -117,7 +121,7 @@ claude --resume <scratch>/out-a/6f0c2b7e-4a1d-4c3e-8b5f-1e2d3c4b5a60.jsonl --for
 | `<scratch>/out-a` after | the same five files, no sixth |
 | continuation | `~/.claude/projects/<slug dir>/b8322b16-6b4a-4ea4-bf76-dd59a237996e.jsonl`, `<slug dir>` being the run directory's slug (the projects listing gained that file and a `memory/` directory of Claude Code's own); sha256 `460767aa2c78f69fb8dccfde321c2ac868569e208f9f7b793e181315c8bd09a7`; read, hashed, left alone |
 | continuation lines | 92: 62 records copied from the rendered file (same uuids: every user and text record, none of the 17 thinking records, as PROOF-LAUNCH.md measured on 2.1.283), the new turn (1 user, 1 assistant), and Claude Code's own records (15 attachment, 3 mode, 3 atis-latch, 3 last-prompt, 2 queue-operation, 1 system, 1 cost-state); every record carries the fork's own `sessionId`, and the rendered uuid appears in no record |
-| answer | the reply is 3 characters; its SHA-256, trimmed of surrounding whitespace, stripped of one trailing full stop and lowercased, is `c78961d3d782d8a85d9344eedae027f43ce6b9fd35c8f355861a39e0d0ddecc5` |
+| answer | the reply's SHA-256, trimmed of surrounding whitespace, stripped of one trailing full stop and lowercased, is `c78961d3d782d8a85d9344eedae027f43ce6b9fd35c8f355861a39e0d0ddecc5` |
 | expected | the expected word normalised the same way: `c78961d3d782d8a85d9344eedae027f43ce6b9fd35c8f355861a39e0d0ddecc5` (equal) |
 
 `lys-home resume-check <scratch>/out-a/6f0c2b7e-….jsonl <continuation>`, exit 0:
@@ -162,14 +166,14 @@ The launch line the report printed, the template's line with the seed as the fir
 claude --resume <scratch>/out-b/6f0c2b7e-4a1d-4c3e-8b5f-1e2d3c4b5a61.jsonl --fork-session --mcp-config <scratch>/out-b/mcp.json --settings <scratch>/out-b/env.json --append-system-prompt-file <scratch>/out-b/instructions.md --strict-mcp-config --allowedTools 'Bash(printenv:*)' "$(cat '<scratch>/out-b/6f0c2b7e-4a1d-4c3e-8b5f-1e2d3c4b5a61.seed.txt')"
 ```
 
-Run by hand from `<scratch>/elsewhere` with `-p --max-turns 4 --output-format json` inserted before the seed argument, nothing else changed. A first attempt with `--max-turns 1` exited 1 (`subtype` error_max_turns, `num_turns` 2, `stop_reason` tool_use, 7,381 ms, its continuation `ec63c801-a182-4037-984a-4a26d5be33f9.jsonl` left where it landed): the child answered the seed by calling a tool first, so one turn was not enough for its reply; the run recorded here is the second attempt, with four turns allowed.
+Run by hand from `<scratch>/elsewhere` with `-p --max-turns 4 --output-format json` inserted before the seed argument, nothing else changed. A first attempt with `--max-turns 1` exited 1 (`subtype` error_max_turns, `num_turns` 2, `stop_reason` tool_use, 7,381 ms, its continuation `ec63c801-a182-4037-984a-4a26d5be33f9.jsonl` left where it landed); the run recorded here is the second attempt, with four turns allowed.
 
 | field | value |
 | --- | --- |
 | exit | 0, in 5,824 ms (`duration_api_ms` 5,380); `subtype` success, `is_error` false, `num_turns` 2, `permission_denials` empty, `stop_reason` end_turn |
 | stderr | one warning that no stdin data arrived in 3 s (print mode with no pipe); nothing else |
 | rendered file before / after | `ff0372d15d4c8eb6c688304b7c0c37ba87bd030405b985c37b1de3a12db6f495` both (equal) |
-| continuation | `~/.claude/projects/<slug dir>/59658558-430f-4958-826d-7452a3f4d806.jsonl`, sha256 `97ffc11216e8b7815a01ee49936dd50ce302dbd8af241a00ec3d44efe8d4e39a`; 51 lines: 18 copied from the rendered file (of 20; the 2 thinking records not carried), the new turns (2 user, 2 assistant: one `tool_use` of `mcp__dot__say`, which no server serves under `--strict-mcp-config` with an empty `mcp.json`, its `tool_result`, then a reply of 110 characters), and 29 of Claude Code's own records (16 attachment, 3 mode, 3 atis-latch, 3 last-prompt, 2 queue-operation, 1 system, 1 cost-state) |
+| continuation | `~/.claude/projects/<slug dir>/59658558-430f-4958-826d-7452a3f4d806.jsonl`, sha256 `97ffc11216e8b7815a01ee49936dd50ce302dbd8af241a00ec3d44efe8d4e39a`; 51 lines: 18 copied from the rendered file (of 20; the 2 thinking records not carried), the new turns (2 user, 2 assistant, holding one `tool_use` and its `tool_result`; no server is configured under `--strict-mcp-config` with an empty `mcp.json`), and 29 of Claude Code's own records (16 attachment, 3 mode, 3 atis-latch, 3 last-prompt, 2 queue-operation, 1 system, 1 cost-state) |
 | the seed as the first prompt | the first new `user` record's content is byte for byte the seed file (the marker line, the heading and the carried text), so the carried message reached the child as its first prompt |
 | resume-check | `{"command":"resume-check","report":{"forked_new_records":33,"forked_records":51,"new_tool_uses":1,"rendered_records":20,"repeated_tool_use_ids":0}}`, exit 0 |
 
@@ -300,10 +304,8 @@ The files this card adds: `src/record/fork_cut.rs` 182, `src/record/fork.rs`
   fork.
 - A child forked at a user message carries that message as its first
   prompt through the seed file the render wrote, and the seeded launch
-  exits 0 with the seed byte for byte as the fork's first user record; the
-  child answered the carried turn as the conversation it came from would,
-  reaching for the Dot tool the parent had used, which one turn did not
-  allow and four did (`new_tool_uses` 1, `repeated_tool_use_ids` 0).
+  exits 0 with the seed byte for byte as the fork's first user record
+  (`new_tool_uses` 1, `repeated_tool_use_ids` 0, four turns allowed).
 - The line run was the launch template's, the one launch line the tool
   prints, so the child ran with the template's flags, settings and handle,
   not the bare seat login.
