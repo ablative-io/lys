@@ -3,7 +3,7 @@
   "personas": [
     {
       "name": "Agent",
-      "role": "Runs in a harness and wants to continue somewhere else",
+      "role": "Continues a session imported from Claude Code on Codex",
       "stories": [
         {
           "id": "S1",
@@ -44,6 +44,14 @@
         {
           "id": "S41",
           "text": "As an agent that lights a lantern, I want it to record the session I lit it in and recall to show that session beside the point and the note, so that I know which session the lantern leads back to."
+        },
+        {
+          "id": "S28",
+          "text": "As an agent whose session was imported from Claude Code, I want it rendered as a Codex thread that Codex resumes, with every text, tool call and tool result carried whole, so that I continue on Codex knowing what the session knew rather than a clipped summary of it."
+        },
+        {
+          "id": "S31",
+          "text": "As a Codex thread translated from a home session, I want to open on a marker naming the session I was translated from, so that I never mistake myself for that session."
         }
       ]
     },
@@ -78,6 +86,10 @@
         {
           "id": "S23",
           "text": "As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything."
+        },
+        {
+          "id": "S29",
+          "text": "As Tom, I want every translation to carry an account, by entry id and hash, of what was kept, what changed and how, and what was lost and why, so that the difference between the session and its Codex fork can be read without reading the transcript."
         }
       ]
     },
@@ -124,6 +136,10 @@
         {
           "id": "S43",
           "text": "As the reviewer, I want the fork's tests to light their lanterns with the light act wherever it can produce them, so that the fork is proved on the record the light act really writes."
+        },
+        {
+          "id": "S30",
+          "text": "As the reviewer, I want the Codex rollout shape measured from files Codex 0.156.0 wrote and its resume recorded with hashes and counts, so that a later Codex version is refused until it is measured rather than assumed to match."
         }
       ]
     },
