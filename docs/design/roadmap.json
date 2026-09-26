@@ -303,6 +303,34 @@
         "RM-008"
       ],
       "notes": "Renumbered from the HOME-002 it was written as; HOME-006 follows the lantern card (HOME-004, RM-008) and the launch template (HOME-002, RM-006), both on main, and after the render card (HOME-007), which took RM-009, ADR-016, C31 to C35, S18, S19 and CN9. Further units, not written: lit_in written by the light act (the lantern card's next round); a fork given tools, a lens or a briefing on what changed since the point; leases, budgets and kill rules; harnesses other than Claude Code."
+    },
+    {
+      "id": "RM-016",
+      "title": "Carry the grant brief residue after PR 6 into the directory documents",
+      "status": "briefed",
+      "kind": "design",
+      "summary": "Three small items the 25 September grant-brief patch carries that main lacks after PR 6 (5593354) landed DIRECTORY-001 to DIRECTORY-006: DIRECTORY-005's frontend verification line; design.json inventory rows for vendor/rauthy, crates/lys and docs/design/decisions.json beside the eight rows main lists; and one intention sentence recording that Cambium later uses this issuer keeping its participant ids, while rows 06 and 07 stay a non-goal. Documents only under docs/design/directory; no code; no new ADR; no row's identifiers, estimates or dependency order change.",
+      "provenance": {
+        "requested_by": "archie",
+        "date": "2026-09-26",
+        "quote": "Three small items the 25 September grant-brief patch carries that main lacks after PR 6 (5593354) landed DIRECTORY-001 to DIRECTORY-006. Main wins wherever the patch contradicts it on ADR ids and lifecycle; nothing here reopens a settled row. The DIRECTORY-005 verification line: frontend checks pass with strict types and the generated API schema, with negative and crash-boundary tests. Add it to DIRECTORY-005's verification on main. The design.json inventory rows for vendor/rauthy, crates/lys and docs/design/decisions.json: main's inventory lists RAUTHY-BASELINE.md and CONFORMANCE.md instead. Add the three rows beside what main lists, keeping main's rows. The design.json intention sentence that Cambium later uses this issuer keeping its participant ids (rows 06 and 07): main covers rows 06 and 07 only as a non-goal. Add the sentence to the intention while the non-goal stands, so the direction is recorded without promising the rows. Boundaries: documents only under docs/design/directory; no code; no new ADR; no change to any row's identifiers, estimates or dependency order; the gate is scripts/design/gate.sh.",
+        "context": "The residue card on the Lys board, re-fired at main 1756688 after run a68a7767 passed its survey, answered round 1 and ended failed at 23:17 when the author desk's account pool was exhausted, the estate's blocker of 23:19 and nothing in the card's words. Its one answer, B1 (round 1, 22:49): the roadmap row is the brief's own ledger entry, written by the brief method the gate runs, and stands outside the documents-only boundary that governs the build's work; it is carried into DIRECTORY-008 as settled. The brief was written by hand by the card's lead on 26 September under the ruling of 23:49 that, with the brief author down, each lead writes their own briefs from the card's words and every answer given."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-004",
+          "ADR-009"
+        ],
+        "briefs": [
+          "DIRECTORY-008"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-001"
+      ],
+      "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
     }
   ]
 }

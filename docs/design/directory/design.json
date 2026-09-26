@@ -575,6 +575,16 @@
       "path": "surface/identity/src/generated/index.ts",
       "note": "Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch",
       "brief": "DIRECTORY-006"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-008.json",
+      "note": "the grant brief residue after PR 6: DIRECTORY-005's verification line, three inventory rows and the intention sentence, as requirements on the documents",
+      "brief": "DIRECTORY-008"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-008.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-008"
     }
   ],
   "inventory": [
