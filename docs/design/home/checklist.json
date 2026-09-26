@@ -106,7 +106,7 @@
         },
         {
           "id": "C15",
-          "text": "`lys-home fork` cuts from the session a lantern was lit in, never from a child holding a copy of its line, and refuses by name, creating no session and changing no byte of any session: a lantern id the home does not hold as a `lys.lantern` entry, a `--session` that is not the lantern's lit-in session (`lantern_not_lit_here`), an older-record lantern held by more than one session with no `--session` (`lantern_ambiguous`), and a lantern with no assistant message at or before its point (`nothing_to_fork`).",
+          "text": "`lys-home fork` cuts from the session a lantern was lit in, as its `lys.lantern` data records it under `lit_in`, never from a child holding a copy of its line, and refuses by name, creating no session and changing no byte of any session: a lantern id the home does not hold as a `lys.lantern` entry, a `--session` that is not the lantern's lit-in session (`lantern_not_lit_here`), an older-record lantern held by more than one session with no `--session` (`lantern_ambiguous`), and a lantern with no assistant message at or before its point (`nothing_to_fork`).",
           "done": false
         },
         {
@@ -136,7 +136,7 @@
         },
         {
           "id": "C21",
-          "text": "`lys-home fork` prints one JSON report of the child id, parent, lantern, point, cut entry, entry and block counts, coordinate_carried and the carried entry id, and never transcript content.",
+          "text": "`lys-home fork` prints one JSON report of the child id, parent, lantern, point, cut entry, entry and block counts (blocks the store holds, and hashes it does not), coordinate_carried and the carried entry id, and never transcript content.",
           "done": false
         },
         {
