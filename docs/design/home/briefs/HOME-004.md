@@ -144,7 +144,9 @@ WHEN asked to ship a home to a remote under a name, with a credential values fil
 
 **Files:**
 - create: crates/lys-home/src/ship/push.rs
+- create: crates/lys-home/src/ship/push_tests.rs
 - modify: crates/lys-home/src/ship/mod.rs
+- modify: crates/lys-home/src/error.rs
 
 **Checklist:**
 - C14 — Ship commits exactly a home's session files, their index and head files and its blocks store in the home's own git repository, pushes that commit as one ref to the remote named on the command line, and reports the commit, the ref and every lock or temporary file it left behind.
@@ -170,7 +172,9 @@ WHEN asked to fetch a name from a remote into a directory, THE SYSTEM SHALL firs
 
 **Files:**
 - create: crates/lys-home/src/ship/fetch.rs
+- create: crates/lys-home/src/ship/fetch_tests.rs
 - modify: crates/lys-home/src/ship/mod.rs
+- modify: crates/lys-home/src/error.rs
 
 **Checklist:**
 - C18 — Fetch brings the shipped ref into a new directory and refuses by name one that already holds a home; the fetched tree equals the shipped tree, so the session file, index, head and blocks hash-match the source, and every index is verified against its file and every head against its index.
@@ -197,6 +201,7 @@ WHEN R5's checks pass, THE SYSTEM SHALL mint one execution id for the fetch with
 - create: crates/lys-home/src/ship/arrival.rs
 - create: crates/lys-home/src/ship/arrival_tests.rs
 - modify: crates/lys-home/src/ship/mod.rs
+- modify: crates/lys-home/src/error.rs
 
 **Checklist:**
 - C19 — After the tree check, each fetched session gains exactly one appended lys.harness_event of kind arrival naming the source commit, the remote, the ref and a fresh execution id; the source session file is a byte prefix of the target's, the blocks still hash-match, and the index and head are the ones Session::append wrote for that entry.

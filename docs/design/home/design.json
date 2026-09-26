@@ -356,12 +356,12 @@
     },
     {
       "path": "crates/lys-home/src/error.rs",
-      "note": "named refusals for ship and fetch: stale index naming the index step, head mismatch, unshippable files, occupied target, a git step that failed",
+      "note": "named refusals for ship and fetch: stale index naming the index step, head mismatch, unshippable files, occupied target, arrival too large, a git step that failed; session held reuses the existing SessionHeld",
       "brief": "HOME-004"
     },
     {
       "path": "crates/lys-home/src/ship/mod.rs",
-      "note": "module declarations only: git, scan, push, fetch, arrival, cli",
+      "note": "module declarations only: git, scan, push, fetch, arrival, cli and their sibling test modules",
       "brief": "HOME-004"
     },
     {
@@ -390,8 +390,18 @@
       "brief": "HOME-004"
     },
     {
+      "path": "crates/lys-home/src/ship/push_tests.rs",
+      "note": "ship's tests: exactly the tracked set on one ref, the source unchanged, the stale-index, foreign-file, credential-hit and held-session refusals with no .git and no ref after, a missing head shipped as it is, a second ship parented on the first",
+      "brief": "HOME-004"
+    },
+    {
       "path": "crates/lys-home/src/ship/fetch.rs",
       "note": "fetch: refuse an occupied target, fetch one ref, check the tree and every index and head",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/ship/fetch_tests.rs",
+      "note": "fetch's tests: commit and tree equal to the ship's, the files hash-matching before the arrival, the occupied-target refusals, a head naming no entry refused after fetch, source and remote unchanged",
       "brief": "HOME-004"
     },
     {

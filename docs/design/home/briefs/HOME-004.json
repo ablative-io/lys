@@ -147,10 +147,12 @@
       ],
       "files": {
         "create": [
-          "crates/lys-home/src/ship/push.rs"
+          "crates/lys-home/src/ship/push.rs",
+          "crates/lys-home/src/ship/push_tests.rs"
         ],
         "modify": [
-          "crates/lys-home/src/ship/mod.rs"
+          "crates/lys-home/src/ship/mod.rs",
+          "crates/lys-home/src/error.rs"
         ],
         "delete": []
       },
@@ -179,10 +181,12 @@
       ],
       "files": {
         "create": [
-          "crates/lys-home/src/ship/fetch.rs"
+          "crates/lys-home/src/ship/fetch.rs",
+          "crates/lys-home/src/ship/fetch_tests.rs"
         ],
         "modify": [
-          "crates/lys-home/src/ship/mod.rs"
+          "crates/lys-home/src/ship/mod.rs",
+          "crates/lys-home/src/error.rs"
         ],
         "delete": []
       },
@@ -214,7 +218,8 @@
           "crates/lys-home/src/ship/arrival_tests.rs"
         ],
         "modify": [
-          "crates/lys-home/src/ship/mod.rs"
+          "crates/lys-home/src/ship/mod.rs",
+          "crates/lys-home/src/error.rs"
         ],
         "delete": []
       },

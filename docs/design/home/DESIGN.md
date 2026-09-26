@@ -117,14 +117,16 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `crates/lys-home/src/record/verify.rs` | read-only check of a session's index against its file and its head against its index; a missing head is legal; never rebuilds or writes | HOME-004 |
 | `crates/lys-home/src/record/verify_tests.rs` | the read-only check's tests: stale index, missing index, missing head, head naming no entry, nothing written | HOME-004 |
 | `crates/lys-home/src/record/mod.rs` | declares the verify module | HOME-004 |
-| `crates/lys-home/src/error.rs` | named refusals for ship and fetch: stale index naming the index step, head mismatch, unshippable files, occupied target, a git step that failed | HOME-004 |
-| `crates/lys-home/src/ship/mod.rs` | module declarations only: git, scan, push, fetch, arrival, cli | HOME-004 |
+| `crates/lys-home/src/error.rs` | named refusals for ship and fetch: stale index naming the index step, head mismatch, unshippable files, occupied target, arrival too large, a git step that failed; session held reuses the existing SessionHeld | HOME-004 |
+| `crates/lys-home/src/ship/mod.rs` | module declarations only: git, scan, push, fetch, arrival, cli and their sibling test modules | HOME-004 |
 | `crates/lys-home/src/ship/git.rs` | the git binary run with system and global config, hooks, signing, line-ending conversion and prompts shut off | HOME-004 |
 | `crates/lys-home/src/ship/git_tests.rs` | the git runner's tests: the machine's git configuration ignored, a failed push refused by name without git's output | HOME-004 |
 | `crates/lys-home/src/ship/scan.rs` | sorts a home's files into tracked, left behind and foreign, and scans the tracked ones for the named credential values and the five standard credential patterns, by file and offset | HOME-004 |
 | `crates/lys-home/src/ship/scan_tests.rs` | the classification and scan tests: the three sets, one hit at its offset, a test per pattern, the excluded shapes not matched, no value in any report | HOME-004 |
 | `crates/lys-home/src/ship/push.rs` | ship: lock every session, check every index, classify and scan, commit exactly the tracked set in the home's own repository, push one ref | HOME-004 |
+| `crates/lys-home/src/ship/push_tests.rs` | ship's tests: exactly the tracked set on one ref, the source unchanged, the stale-index, foreign-file, credential-hit and held-session refusals with no .git and no ref after, a missing head shipped as it is, a second ship parented on the first | HOME-004 |
 | `crates/lys-home/src/ship/fetch.rs` | fetch: refuse an occupied target, fetch one ref, check the tree and every index and head | HOME-004 |
+| `crates/lys-home/src/ship/fetch_tests.rs` | fetch's tests: commit and tree equal to the ship's, the files hash-matching before the arrival, the occupied-target refusals, a head naming no entry refused after fetch, source and remote unchanged | HOME-004 |
 | `crates/lys-home/src/ship/arrival.rs` | the arrival lys.harness_event: source commit, remote without userinfo, ref, execution id | HOME-004 |
 | `crates/lys-home/src/ship/arrival_tests.rs` | the arrival tests: the byte prefix, the index row and head, one execution id per fetch, userinfo removed, the 512-byte cap | HOME-004 |
 | `crates/lys-home/src/ship/cli.rs` | the ship, fetch and index subcommand arguments and their JSON reports | HOME-004 |
