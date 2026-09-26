@@ -1,5 +1,5 @@
 //! The `lys-home` command line: import, render, fewshot, ingest-call,
-//! resume-check, render-launch, given, given-check. Every command prints one
+//! resume-check, render-launch, given, given-check, lantern. Every command prints one
 //! JSON report of paths, hashes and counts, never transcript, block or body
 //! content. A missing required argument is refused by clap with exit code 2,
 //! naming the argument. A command that refuses exits 1, except `given-check`,
@@ -15,6 +15,7 @@ use clap::{Parser, Subcommand};
 use serde_json::{Value, json};
 
 use crate::cli::given::{GivenArgs, GivenCheckArgs, Outcome, STATUS_REFUSED};
+use crate::cli_lantern::LanternAction;
 use crate::error::HomeError;
 use crate::harness::claude_code::AUTHORED;
 use crate::harness::claude_code::import::import_claude_code;
@@ -177,6 +178,12 @@ pub enum Command {
     Given(GivenArgs),
     /// Check a document a given record lists against a file on disk by hash: exit 0 on matches, 1 on differs, 2 on a refusal.
     GivenCheck(GivenCheckArgs),
+    /// Lanterns: light one at an entry, add an epilogue, recall by note or by point.
+    Lantern {
+        /// What to do with them.
+        #[command(subcommand)]
+        action: LanternAction,
+    },
 }
 
 impl Command {
@@ -348,6 +355,7 @@ fn report(command: Command) -> Result<Value, HomeError> {
         Command::RenderLaunch(args) => render_launch(&args),
         Command::Given(args) => given::list(&args),
         Command::GivenCheck(args) => given::check(&args).map(|outcome| outcome.report),
+        Command::Lantern { action } => crate::cli_lantern::run(action),
     }
 }
 
