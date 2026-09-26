@@ -106,7 +106,7 @@
         },
         {
           "id": "C15",
-          "text": "PROOF-CHAIN.md names 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff as the commit measured, with the toolchain, the ast-grep version and the Jev model the outcomes were measured with.",
+          "text": "PROOF-CHAIN.md names 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff as the commit measured, with the toolchain, the ast-grep version and the Jev workflow the outcomes were measured with.",
           "done": false
         },
         {
@@ -121,7 +121,7 @@
         },
         {
           "id": "C18",
-          "text": "Each finding a named check reports is its own line in PROOF-CHAIN.md naming the check, the file and the HOME-001 rows whose files name it; observations no check reports sit under their own heading.",
+          "text": "Each finding a named check reports, the absent document of a partly present row among them, is its own line in PROOF-CHAIN.md naming the check, the file and the HOME-001 rows it holds, or that it holds none of the seven; observations no check reports sit under their own heading.",
           "done": false
         },
         {
@@ -136,7 +136,7 @@
         },
         {
           "id": "C21",
-          "text": "The card lands through src_pr and src_land with Jev and the gate; the seven cards are set done only on a green landing with no finding, and one card is filed per finding line.",
+          "text": "The card lands through src_pr and src_land with Jev and the gate; the seven cards are set done only on a green landing with no finding, a card carrying a partly present row stays in review, and one card is filed per finding line.",
           "done": false
         }
       ]
