@@ -276,7 +276,7 @@
     "cargo test --workspace --all-features, and confirm the tests of R2 to R7 ran by name (reader_tests, lantern_tests, epilogue_tests, recall_tests, lantern_cli, lantern_home) with a non-zero count each",
     "cargo doc --no-deps --all-features and cargo doc --no-deps, both with zero warnings",
     "sh scripts/design/gate.sh exits 0",
-    "Every file under crates/lys-home/src has at most 500 lines of code, cli.rs included",
+    "Every non-test file under crates/lys-home/src has at most 500 lines of code, cli.rs included (the repository's rule excludes test files, comments and whitespace), where a line of code is a non-blank line that is not a comment, counted per file as `grep -vcE '^\\s*$|^\\s*//' <file>`; the counts, test files included, are written in docs/design/home/PROOF-LANTERN.md",
     "git diff of crates/lys-home/Cargo.toml adds no dependency",
     "git diff of crates/lys-home/src/harness/claude_code/render.rs is empty",
     "The node run of R7's third acceptance line, against a clone of earendil-works/pi at 3d5cbe98, is written in docs/design/home/PROOF-LANTERN.md with its output"

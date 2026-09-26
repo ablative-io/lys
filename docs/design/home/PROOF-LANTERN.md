@@ -14,16 +14,18 @@ lantern. Built in a scratch home (`<scratch>/home`, not committed) with:
 
 ```
 lys-home import --home <scratch>/home --claude-code <scratch>/transcript.jsonl --session fixture-lantern
-lys-home lantern light --home <scratch>/home --session fixture-lantern --point <e2> --note "The Fold Held Under Replay" --by fixture-lighter
-lys-home lantern light --home <scratch>/home --session fixture-lantern --point <e2> --note "second look" --by fixture-lighter
-lys-home lantern epilogue --home <scratch>/home --session fixture-lantern --lantern <L1> --words "and the replay fold rings true" --by fixture-annotator
-lys-home lantern epilogue --home <scratch>/home --session fixture-lantern --lantern <L1> --words "a later word: cobalt" --by fixture-annotator
+lys-home lantern light --home <scratch>/home --session fixture-lantern --point <e2> --note <note> --by fixture-lighter
+lys-home lantern light --home <scratch>/home --session fixture-lantern --point <e2> --note <second note> --by fixture-lighter
+lys-home lantern epilogue --home <scratch>/home --session fixture-lantern --lantern <L1> --words <words one> --by fixture-annotator
+lys-home lantern epilogue --home <scratch>/home --session fixture-lantern --lantern <L1> --words <words two> --by fixture-annotator
 ```
 
 `transcript.jsonl` is five plain `user` records in Claude Code's shape,
 each of one short fixture line, so the import writes five message entries and
 no event. `<e2>` is the second record's uuid; `<L1>` is the `id` the first
-light printed. The session file after the four appends is 10 lines (the
+light printed; `<note>`, `<second note>`, `<words one>` and `<words two>`
+stand for the fixture's note and epilogue words, which the proof does not
+carry (P7). The session file after the four appends is 10 lines (the
 header and 9 entries), SHA-256
 `317a4fb555a6101f3c6e401054c19a3cd950e59d869da0c89e2694755f7d9bd6`.
 
@@ -81,3 +83,25 @@ exactly 2 `lys.lantern_epilogue`, as R7's third acceptance line states
 home, renders it for Claude Code beside a render of a copy taken before the
 first light, and finds 0 lines containing `lys.lantern`, the note or an
 epilogue's word, and the same line count (5) in both.
+
+## Lines of code per file (the brief's verification)
+
+A line of code is a non-blank line that is not a comment, counted per file
+with `grep -vcE '^\s*$|^\s*//' <file>` over every `.rs` file under
+`crates/lys-home/src`, tests included. The eight largest, measured on this
+tree after the rebase onto main `dfcca65`. Every non-test file is at most
+500; the one file over it, `src/record/call_tests.rs` at 519, is a test
+file the repository's rule excludes, held by main before this card and not
+changed by it:
+
+```
+$ cd crates/lys-home && for f in $(find src -name '*.rs' | sort); do printf "%s %s\n" "$(grep -vcE '^\s*$|^\s*//' $f)" "$f"; done | sort -rn | head -8
+519 src/record/call_tests.rs
+473 src/harness/claude_code/import.rs
+460 src/record/call.rs
+457 src/record/mod.rs
+430 src/cli.rs
+407 src/harness/claude_code/given_tests.rs
+396 src/record/index.rs
+393 src/record/record_tests.rs
+```

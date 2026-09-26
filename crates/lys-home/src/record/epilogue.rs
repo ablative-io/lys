@@ -6,8 +6,10 @@
 //! (ADR-014). The lantern entry and every earlier epilogue stay as they are;
 //! a lantern's story is its entry followed by its epilogues in file order.
 //! Entry ids are unique only within a session, so an epilogue is addressed
-//! by the session and the lantern's id together. Every refusal happens
-//! before the append and writes nothing; no error carries the words.
+//! by the session and the lantern's id together. The session is opened as
+//! its one owner first, then the lantern is checked, then the words; every
+//! refusal happens before the append and writes nothing; no error carries
+//! the words.
 
 use serde::{Deserialize, Serialize};
 
@@ -65,7 +67,6 @@ pub fn add_epilogue(
     words: &str,
     by: &str,
 ) -> Result<Added, HomeError> {
-    require_words("epilogue", words)?;
     let mut owner = own(home, session)?;
     let is_lantern = owner.contains(lantern)? && owner.entry(lantern)?.is_custom(CUSTOM_LANTERN);
     if !is_lantern {
@@ -74,6 +75,7 @@ pub fn add_epilogue(
             id: lantern.to_owned(),
         });
     }
+    require_words("epilogue", words)?;
     let ordinal = epilogues_so_far(&owner, lantern)? + 1;
     let data = EpilogueData {
         lantern: lantern.to_owned(),

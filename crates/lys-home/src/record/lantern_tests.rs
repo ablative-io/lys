@@ -197,3 +197,27 @@ fn each_refusal_names_itself_and_writes_nothing() -> Gate {
     assert_eq!(home.open_session(FIXTURE)?.head()?.map(str::to_owned), head);
     Ok(())
 }
+
+#[test]
+fn the_session_and_the_point_are_checked_before_the_note() -> Gate {
+    let (_dir, home) = fixture_home()?;
+    assert!(matches!(
+        light(&home, "no-such-session", "e2", "", LIGHTER),
+        Err(HomeError::UnknownSession { session }) if session == "no-such-session"
+    ));
+    assert!(matches!(
+        light(&home, FIXTURE, "no-such-entry", "", LIGHTER),
+        Err(HomeError::UnknownEntry { id, .. }) if id == "no-such-entry"
+    ));
+    let other = home.open_session(FIXTURE)?;
+    assert!(matches!(
+        light(&home, FIXTURE, "e2", "", LIGHTER),
+        Err(HomeError::SessionHeld { .. })
+    ));
+    drop(other);
+    assert!(matches!(
+        light(&home, FIXTURE, "e2", "", LIGHTER),
+        Err(HomeError::EmptyNote { what: "note" })
+    ));
+    Ok(())
+}

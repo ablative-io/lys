@@ -4,10 +4,11 @@
 //! session's head, carrying the point it marks, the note byte for byte as
 //! given, who lit it and when (ADR-014). The point may be any entry of the
 //! session that is not itself a lantern or an epilogue, the head or one the
-//! head has moved past. Lighting takes the session as its one owner and
-//! appends through the record's own path, so the line is durable before its
-//! index row and the head; every refusal happens before the append, and
-//! nothing of the session file changes on one. No error carries the note.
+//! head has moved past. Lighting takes the session as its one owner, then
+//! checks the point, then the note, in that order, and appends through the
+//! record's own path, so the line is durable before its index row and the
+//! head; every refusal happens before the append, and nothing of the session
+//! file changes on one. No error carries the note.
 
 use std::path::PathBuf;
 
@@ -66,7 +67,6 @@ pub fn light(
     note: &str,
     by: &str,
 ) -> Result<Lit, HomeError> {
-    require_words("note", note)?;
     let mut owner = own(home, session)?;
     let target = owner.entry(point)?;
     if target.is_custom(CUSTOM_LANTERN) || target.is_custom(CUSTOM_LANTERN_EPILOGUE) {
@@ -75,6 +75,7 @@ pub fn light(
             id: point.to_owned(),
         });
     }
+    require_words("note", note)?;
     let data = LanternData {
         point: point.to_owned(),
         note: note.to_owned(),

@@ -136,3 +136,27 @@ fn each_refusal_names_itself_and_writes_nothing() -> Gate {
     assert_eq!(file_len(&home)?, len);
     Ok(())
 }
+
+#[test]
+fn the_session_and_the_lantern_are_checked_before_the_words() -> Gate {
+    let (_dir, home, [l1, _, _, _]) = lit_fixture()?;
+    assert!(matches!(
+        add_epilogue(&home, "no-such-session", &l1, "", ANNOTATOR),
+        Err(HomeError::UnknownSession { session }) if session == "no-such-session"
+    ));
+    assert!(matches!(
+        add_epilogue(&home, FIXTURE, "e2", "", ANNOTATOR),
+        Err(HomeError::UnknownLantern { id, .. }) if id == "e2"
+    ));
+    let other = home.open_session(FIXTURE)?;
+    assert!(matches!(
+        add_epilogue(&home, FIXTURE, &l1, "", ANNOTATOR),
+        Err(HomeError::SessionHeld { .. })
+    ));
+    drop(other);
+    assert!(matches!(
+        add_epilogue(&home, FIXTURE, &l1, "", ANNOTATOR),
+        Err(HomeError::EmptyNote { what: "epilogue" })
+    ));
+    Ok(())
+}
