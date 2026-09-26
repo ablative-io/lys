@@ -7,15 +7,18 @@
 //! a lantern's story is its entry followed by its epilogues in file order.
 //! Entry ids are unique only within a session, so an epilogue is addressed
 //! by the session and the lantern's id together. The session is opened as
-//! its one owner first, then the lantern is checked, then the words; every
+//! its one owner first, then the lantern is checked (its type and its data's
+//! shape), then the words; every
 //! refusal happens before the append and writes nothing; no error carries
 //! the words.
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::error::HomeError;
-use crate::record::entries::{CUSTOM_LANTERN, CUSTOM_LANTERN_EPILOGUE, EntryBody, EpilogueData};
-use crate::record::lantern::{own, require_words};
+use crate::record::entries::{
+    CUSTOM_LANTERN, CUSTOM_LANTERN_EPILOGUE, Entry, EntryBody, EpilogueData,
+};
+use crate::record::lantern::{data_of, lantern_of, own, require_words};
 use crate::record::{Home, Session, now};
 
 /// What adding an epilogue reports: its entry id, the lantern, the session,
@@ -34,29 +37,25 @@ pub struct Added {
     /// When.
     pub added_at: String,
     /// Which epilogue of the lantern this is, from 1.
-    pub ordinal: u64,
+    pub ordinal: usize,
 }
 
-/// The epilogue data of an entry, when it is one.
-#[must_use]
-pub fn epilogue_of(body: &EntryBody) -> Option<EpilogueData> {
-    match body {
-        EntryBody::Custom {
-            custom_type,
-            data: Some(data),
-        } if custom_type == CUSTOM_LANTERN_EPILOGUE => EpilogueData::deserialize(data).ok(),
-        _ => None,
+/// The epilogue data of a `lys.lantern_epilogue` entry of `session`, refused
+/// by name when the entry is not one or its data is not the epilogue shape.
+pub fn epilogue_of(session: &str, entry: &Entry) -> Result<EpilogueData, HomeError> {
+    data_of(session, entry, CUSTOM_LANTERN_EPILOGUE)
+}
+
+/// How many epilogues of `lantern` the session already holds; an epilogue
+/// entry whose data is not the epilogue shape refuses by name.
+fn epilogues_so_far(owner: &Session, session: &str, lantern: &str) -> Result<usize, HomeError> {
+    let mut count = 0;
+    for entry in owner.customs_everywhere(CUSTOM_LANTERN_EPILOGUE)? {
+        if epilogue_of(session, &entry)?.lantern == lantern {
+            count += 1;
+        }
     }
-}
-
-/// How many epilogues of `lantern` the session already holds.
-fn epilogues_so_far(owner: &Session, lantern: &str) -> Result<u64, HomeError> {
-    let count = owner
-        .customs_everywhere(CUSTOM_LANTERN_EPILOGUE)?
-        .iter()
-        .filter(|entry| epilogue_of(&entry.body).is_some_and(|data| data.lantern == lantern))
-        .count();
-    Ok(u64::try_from(count).unwrap_or(u64::MAX))
+    Ok(count)
 }
 
 /// Add `words` as an epilogue to the lantern `lantern` of `session`, by `by`.
@@ -68,15 +67,24 @@ pub fn add_epilogue(
     by: &str,
 ) -> Result<Added, HomeError> {
     let mut owner = own(home, session)?;
-    let is_lantern = owner.contains(lantern)? && owner.entry(lantern)?.is_custom(CUSTOM_LANTERN);
-    if !is_lantern {
+    if !owner.contains(lantern)? {
         return Err(HomeError::UnknownLantern {
             session: session.to_owned(),
             id: lantern.to_owned(),
         });
     }
+    let target = owner.entry(lantern)?;
+    if !target.is_custom(CUSTOM_LANTERN) {
+        return Err(HomeError::UnknownLantern {
+            session: session.to_owned(),
+            id: lantern.to_owned(),
+        });
+    }
+    // A lantern whose data is not the lantern shape is refused by name, not
+    // taken on its type alone.
+    lantern_of(session, &target)?;
     require_words("epilogue", words)?;
-    let ordinal = epilogues_so_far(&owner, lantern)? + 1;
+    let ordinal = epilogues_so_far(&owner, session, lantern)? + 1;
     let data = EpilogueData {
         lantern: lantern.to_owned(),
         words: words.to_owned(),

@@ -12,10 +12,12 @@
 
 use std::path::PathBuf;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::HomeError;
-use crate::record::entries::{CUSTOM_LANTERN, CUSTOM_LANTERN_EPILOGUE, EntryBody, LanternData};
+use crate::record::entries::{
+    CUSTOM_LANTERN, CUSTOM_LANTERN_EPILOGUE, Entry, EntryBody, LanternData,
+};
 use crate::record::{Home, Session, now};
 
 /// What lighting reports: the lantern's entry id, its session, its point and
@@ -30,6 +32,34 @@ pub struct Lit {
     pub point: String,
     /// When it was lit.
     pub lit_at: String,
+}
+
+/// The data of a custom entry of `custom_type`, as `T`; an entry of another
+/// type, or one whose data is not that shape, is refused by name.
+pub(crate) fn data_of<T: for<'de> Deserialize<'de>>(
+    session: &str,
+    entry: &Entry,
+    custom_type: &str,
+) -> Result<T, HomeError> {
+    let shape = |source| HomeError::EntryShape {
+        session: session.to_owned(),
+        id: entry.id().to_owned(),
+        custom_type: custom_type.to_owned(),
+        source,
+    };
+    match &entry.body {
+        EntryBody::Custom {
+            custom_type: found,
+            data: Some(data),
+        } if found == custom_type => T::deserialize(data).map_err(|e| shape(Some(e))),
+        _ => Err(shape(None)),
+    }
+}
+
+/// The lantern data of a `lys.lantern` entry of `session`, refused by name
+/// when the entry is not one or its data is not the lantern shape.
+pub fn lantern_of(session: &str, entry: &Entry) -> Result<LanternData, HomeError> {
+    data_of(session, entry, CUSTOM_LANTERN)
 }
 
 /// The session file of `id` in the home, refused by name when no such file

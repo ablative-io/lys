@@ -110,6 +110,18 @@ impl Home {
         Ok(Self { root })
     }
 
+    /// A home at `root` for reading: nothing is created. A `root` that is
+    /// absent or has no `sessions/` directory is refused by name, so a
+    /// reader given the wrong path never makes a home there.
+    pub fn read(root: impl Into<PathBuf>) -> Result<Self, HomeError> {
+        let root = root.into();
+        if root.join("sessions").is_dir() {
+            Ok(Self { root })
+        } else {
+            Err(HomeError::NoHome { path: root })
+        }
+    }
+
     /// Where the home lives.
     #[must_use]
     pub fn root(&self) -> &Path {

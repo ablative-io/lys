@@ -5,8 +5,12 @@
 //! words; `recall` prints the rows and the sessions skipped, and is the one
 //! command that prints a note or an epilogue (ADR-015). `--by` is a required
 //! argument, a self-declared name as `canon add`'s is, never read from the
-//! environment. A refusal is printed on stderr by the binary and exits 1;
-//! a missing or conflicting argument is refused by clap with exit code 2.
+//! environment. Each command takes the home through [`Home::read`], which
+//! creates nothing: an absent or incomplete home is refused by name, so
+//! `recall` writes no file and no directory, and `light` and `epilogue`
+//! never make a home at a mistyped path. A refusal is printed on stderr by
+//! the binary and exits 1; a missing or conflicting argument is refused by
+//! clap with exit code 2.
 
 use std::path::PathBuf;
 
@@ -99,7 +103,7 @@ pub fn run(action: LanternAction) -> Result<Value, HomeError> {
             note,
             by,
         } => {
-            let home = Home::open(home)?;
+            let home = Home::read(home)?;
             report(&light(&home, &session, &point, &note, &by)?)
         }
         LanternAction::Epilogue {
@@ -109,11 +113,11 @@ pub fn run(action: LanternAction) -> Result<Value, HomeError> {
             words,
             by,
         } => {
-            let home = Home::open(home)?;
+            let home = Home::read(home)?;
             report(&add_epilogue(&home, &session, &lantern, &words, &by)?)
         }
         LanternAction::Recall(args) => {
-            let home = Home::open(args.home)?;
+            let home = Home::read(args.home)?;
             let found = match (args.note, args.session, args.point) {
                 (Some(words), _, _) => recall_by_note(&home, &words)?,
                 (None, Some(session), Some(point)) => recall_by_point(&home, &session, &point)?,

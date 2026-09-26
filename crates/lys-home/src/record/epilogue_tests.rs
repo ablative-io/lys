@@ -4,9 +4,11 @@
 
 use std::error::Error;
 
+use serde_json::json;
+
 use crate::error::HomeError;
 use crate::record::Home;
-use crate::record::entries::{CUSTOM_LANTERN_EPILOGUE, EpilogueData};
+use crate::record::entries::{CUSTOM_LANTERN, CUSTOM_LANTERN_EPILOGUE, EntryBody, EpilogueData};
 use crate::record::epilogue::{Added, add_epilogue, epilogue_of};
 use crate::record::lantern::light;
 use crate::record::lantern_tests::{LIGHTER, NOTE};
@@ -32,7 +34,7 @@ pub(crate) fn lit_fixture() -> Result<(tempfile::TempDir, Home, [String; 4]), Bo
 fn epilogue_data(home: &Home, id: &str) -> Result<EpilogueData, Box<dyn Error>> {
     let entry = home.read_session(FIXTURE)?.entry(id)?;
     assert!(entry.is_custom(CUSTOM_LANTERN_EPILOGUE));
-    Ok(epilogue_of(&entry.body).ok_or("not an epilogue")?)
+    Ok(epilogue_of(FIXTURE, &entry)?)
 }
 
 fn file_len(home: &Home) -> Result<u64, Box<dyn Error>> {
@@ -157,6 +159,41 @@ fn the_session_and_the_lantern_are_checked_before_the_words() -> Gate {
     assert!(matches!(
         add_epilogue(&home, FIXTURE, &l1, "", ANNOTATOR),
         Err(HomeError::EmptyNote { what: "epilogue" })
+    ));
+    Ok(())
+}
+
+#[test]
+fn an_entry_whose_data_is_not_its_shape_is_refused_by_name() -> Gate {
+    let (_dir, home, [l1, _, _, _]) = lit_fixture()?;
+    let len = file_len(&home)?;
+    let bad_lantern = {
+        let mut owner = home.open_session(FIXTURE)?;
+        owner.append(EntryBody::Custom {
+            custom_type: CUSTOM_LANTERN.to_owned(),
+            data: Some(json!({"anchors": []})),
+        })?
+    };
+    // A lantern is not taken on its type alone.
+    assert!(matches!(
+        add_epilogue(&home, FIXTURE, &bad_lantern, WORDS_ONE, ANNOTATOR),
+        Err(HomeError::EntryShape { id, custom_type, .. })
+            if id == bad_lantern && custom_type == CUSTOM_LANTERN
+    ));
+    let after_bad_lantern = file_len(&home)?;
+    assert!(after_bad_lantern > len);
+    // An epilogue that is not the shape stops the count, so no ordinal is guessed.
+    let bad_epilogue = {
+        let mut owner = home.open_session(FIXTURE)?;
+        owner.append(EntryBody::Custom {
+            custom_type: CUSTOM_LANTERN_EPILOGUE.to_owned(),
+            data: Some(json!({"lantern": l1, "words": 7})),
+        })?
+    };
+    assert!(matches!(
+        add_epilogue(&home, FIXTURE, &l1, WORDS_ONE, ANNOTATOR),
+        Err(HomeError::EntryShape { id, custom_type, .. })
+            if id == bad_epilogue && custom_type == CUSTOM_LANTERN_EPILOGUE
     ));
     Ok(())
 }

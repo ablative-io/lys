@@ -262,6 +262,39 @@ pub enum HomeError {
         id: String,
     },
 
+    /// A custom entry's data is not the shape its custom type names.
+    #[error(
+        "entry `{id}` of session {session} is a `{custom_type}` entry whose data is not that entry's shape; the fields are listed in docs/design/home/RECORD.md"
+    )]
+    EntryShape {
+        /// The session id.
+        session: String,
+        /// The entry id.
+        id: String,
+        /// The custom type the entry carries.
+        custom_type: String,
+        /// The deserialiser's error when the data was present and not the
+        /// shape; `None` when the entry is of another type or has no data.
+        #[source]
+        source: Option<serde_json::Error>,
+    },
+
+    /// A home was named to read that is absent or has no `sessions/` directory.
+    #[error(
+        "no home at {}: sessions/ is not a directory there; give --home the directory that holds sessions/", path.display()
+    )]
+    NoHome {
+        /// The directory named.
+        path: PathBuf,
+    },
+
+    /// A file name under `sessions/` is not Unicode text, so it cannot be a session id.
+    #[error("a file name under {} is not Unicode text and cannot be a session id; rename it", dir.display())]
+    NameNotUnicode {
+        /// The directory listed.
+        dir: PathBuf,
+    },
+
     /// A file render-launch would write already exists.
     #[error("render-launch target already exists: {}", path.display())]
     LaunchTargetExists {

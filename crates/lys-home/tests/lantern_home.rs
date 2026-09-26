@@ -18,7 +18,14 @@ type Gate = Result<(), Box<dyn Error>>;
 /// A home holding `fixture-lantern` with five message entries e1 to e5.
 fn fixture_home(dir: &Path) -> Result<Home, Box<dyn Error>> {
     let home = Home::open(dir.join("home"))?;
-    let mut session = home.create_session(FIXTURE, "/fixture", None)?;
+    five_messages(&home, FIXTURE)?;
+    Ok(home)
+}
+
+/// A session of the home with five message entries e1 to e5, its id in its
+/// header and its file name alike.
+fn five_messages(home: &Home, id: &str) -> Result<(), Box<dyn Error>> {
+    let mut session = home.create_session(id, "/fixture", None)?;
     let mut prev: Option<String> = None;
     for id in ["e1", "e2", "e3", "e4", "e5"] {
         session.append_entry(&Entry {
@@ -33,7 +40,7 @@ fn fixture_home(dir: &Path) -> Result<Home, Box<dyn Error>> {
         })?;
         prev = Some(id.to_owned());
     }
-    Ok(home)
+    Ok(())
 }
 
 fn render(home: &Home, session: &str, out: PathBuf) -> Result<String, Box<dyn Error>> {
@@ -54,9 +61,9 @@ fn render(home: &Home, session: &str, out: PathBuf) -> Result<String, Box<dyn Er
 fn a_rendered_file_carries_no_lantern_and_as_many_lines_as_before_lighting() -> Gate {
     let dir = tempfile::tempdir()?;
     let home = fixture_home(dir.path())?;
-    // A copy of the session taken before anything is lit, as its own session.
+    // The same five entries as their own session, taken before anything is lit.
     let unlit = "fixture-unlit";
-    std::fs::copy(home.session_path(FIXTURE)?, home.session_path(unlit)?)?;
+    five_messages(&home, unlit)?;
     let l1 = light(&home, FIXTURE, "e2", NOTE, "fixture-lighter")?.id;
     light(&home, FIXTURE, "e2", "second look", "fixture-lighter")?;
     add_epilogue(

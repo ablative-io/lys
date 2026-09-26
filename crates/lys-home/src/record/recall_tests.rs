@@ -7,8 +7,11 @@ use std::error::Error;
 
 use serde_json::Value;
 
+use serde_json::json;
+
 use crate::error::HomeError;
 use crate::record::Home;
+use crate::record::entries::{CUSTOM_LANTERN, EntryBody};
 use crate::record::epilogue_tests::{WORDS_ONE, WORDS_TWO, lit_fixture};
 use crate::record::lantern::light;
 use crate::record::lantern_tests::LIGHTER;
@@ -191,5 +194,51 @@ fn every_recall_writes_nothing_and_prints_no_transcript() -> Gate {
         assert!(!text.contains(TRANSCRIPT_LINE));
     }
     assert_eq!(snapshot(&home)?, before);
+    Ok(())
+}
+
+#[test]
+fn a_lantern_whose_data_is_not_the_shape_is_named_not_dropped() -> Gate {
+    let (_dir, home, [l1, _, _, _, l3]) = recall_fixture()?;
+    let bad = {
+        let mut owner = home.open_session(OTHER)?;
+        owner.append(EntryBody::Custom {
+            custom_type: CUSTOM_LANTERN.to_owned(),
+            data: Some(json!({"anchors": []})),
+        })?
+    };
+    let fold = recall_by_note(&home, "fold")?;
+    assert_eq!(ids(&fold), [l1.as_str()]);
+    assert_eq!(fold.skipped.len(), 1);
+    let skipped = fold.skipped.first().ok_or("nothing skipped")?;
+    assert_eq!(skipped.session, OTHER);
+    assert!(skipped.reason.contains(&bad));
+    assert!(matches!(
+        recall_by_point(&home, OTHER, "o1"),
+        Err(HomeError::EntryShape { session, id, custom_type, .. })
+            if session == OTHER && id == bad && custom_type == CUSTOM_LANTERN
+    ));
+    assert_eq!(ids(&recall_by_point(&home, FIXTURE, "e2")?).len(), 2);
+    drop(l3);
+    Ok(())
+}
+
+#[test]
+fn a_row_carries_the_id_the_home_lists_the_session_under() -> Gate {
+    let (_dir, home, [_, _, _, _, l3]) = recall_fixture()?;
+    // A file copied under another name keeps its header's id; recall names
+    // the session by the file the home lists, which is how the row is found.
+    std::fs::copy(
+        home.session_path(OTHER)?,
+        home.session_path("fixture-copy")?,
+    )?;
+    let report = recall_by_note(&home, "nothing shared")?;
+    let found: Vec<(&str, &str)> = report
+        .lanterns
+        .iter()
+        .map(|row| (row.session.as_str(), row.id.as_str()))
+        .collect();
+    assert_eq!(found, [("fixture-copy", l3.as_str()), (OTHER, l3.as_str())]);
+    assert!(report.skipped.is_empty());
     Ok(())
 }

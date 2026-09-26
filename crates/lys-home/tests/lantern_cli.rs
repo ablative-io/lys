@@ -241,3 +241,79 @@ fn light_epilogue_and_recall_print_their_reports_and_refuse_by_name() -> Gate {
     }
     Ok(())
 }
+
+/// The names under a directory, or none when it is absent.
+fn names_under(dir: &Path) -> Result<Vec<String>, Box<dyn Error>> {
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut names: Vec<String> = std::fs::read_dir(dir)?
+        .map(|entry| Ok(entry?.file_name().to_string_lossy().into_owned()))
+        .collect::<Result<_, Box<dyn Error>>>()?;
+    names.sort();
+    Ok(names)
+}
+
+#[test]
+fn an_absent_or_incomplete_home_is_refused_by_name_and_nothing_is_made() -> Gate {
+    let dir = tempfile::tempdir()?;
+    let absent = dir.path().join("nowhere");
+    let incomplete = dir.path().join("partial");
+    std::fs::create_dir(&incomplete)?;
+    std::fs::write(incomplete.join("notes.txt"), "not a home\n")?;
+    let mut runs = 0;
+    for home in [&absent, &incomplete] {
+        let home_arg = home.to_str().ok_or("home path is not text")?;
+        let before = names_under(home)?;
+        for args in [
+            vec!["recall", "--home", home_arg, "--note", "fold"],
+            vec![
+                "recall",
+                "--home",
+                home_arg,
+                "--session",
+                FIXTURE,
+                "--point",
+                "e2",
+            ],
+            vec![
+                "light",
+                "--home",
+                home_arg,
+                "--session",
+                FIXTURE,
+                "--point",
+                "e2",
+                "--note",
+                NOTE,
+                "--by",
+                "fixture-lighter",
+            ],
+            vec![
+                "epilogue",
+                "--home",
+                home_arg,
+                "--session",
+                FIXTURE,
+                "--lantern",
+                "l1",
+                "--words",
+                WORDS,
+                "--by",
+                "fixture-annotator",
+            ],
+        ] {
+            let output = lantern(&args)?;
+            let stderr = refused(&output, 1)?;
+            assert!(stderr.contains("sessions/"), "{stderr}");
+            assert!(stderr.contains(home_arg), "{stderr}");
+            assert_eq!(names_under(home)?, before);
+            runs += 1;
+        }
+    }
+    assert_eq!(runs, 8);
+    assert!(!absent.exists());
+    assert!(!incomplete.join("sessions").exists());
+    assert!(!incomplete.join("blocks").exists());
+    Ok(())
+}
