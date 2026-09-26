@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-24",
+  "updated": "2026-09-26",
   "decisions": [
     {
       "id": "ADR-001",
@@ -191,6 +191,25 @@
       "consequences": [
         "DIRECTORY-003 records the state beside each identity; no check reads it until the permission work of road step 2.",
         "The room's own questions stay with the proposal: whether a reason is mandatory on suspend and retire, and whether activation needs a credential handle (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:101-103)."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-012",
+      "title": "The context record is a lys.given custom entry of document hashes, never copies",
+      "status": "proposed",
+      "scope": "home",
+      "date": "",
+      "decided_by": "",
+      "context": "Step 4 of the identity platform is what a session was given, not only what it did. When the launch template renders a Claude Code session, nothing records which instruction documents that session was given, in what versions or order. Stage 6 will later sign over whatever shape this record takes, and the repository's wire-format rule freezes a shape once anything is signed under it, so the shape is decided on purpose now rather than left to the first implementation (docs/design/home/briefs/HOME-002.json).",
+      "decision": "The context record is one lys.given custom entry, appended after the render event, whose data is the harness name, the Claude Code version the load order was measured on, the kinds of document resolved, the documents in the measured order each as kind, path, byte length and SHA-256, and the names of the environment variables the template set. It is not a copy of each document into the block store, and not a content-bearing record, because the entry must hold no content under home P7 and CN3. It is unsigned and unencrypted now, and because it names hashes only, signing and encryption at rest can be added later without changing what is recorded.",
+      "quote": "",
+      "consequences": [
+        "RECORD.md carries lys.given's data shape beside the other lys custom entries.",
+        "A later change to the shape is a new custom type or version alongside, never a mutation of lys.given, once anything is signed over it.",
+        "Settings, hook output, plugin skill and agent listings and output styles are recorded by later cards as further kinds on this same entry shape.",
+        "A check of a file against the record is by hash only, and prints neither file."
       ],
       "supersedes": [],
       "superseded_by": ""
