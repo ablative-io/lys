@@ -4,14 +4,16 @@
 //! else, and the report names it; a seed path already present is refused
 //! by name with nothing rendered; the parent itself renders with no seed;
 //! and no render report carries a launch line, which only the template's
-//! render prints. No test name carries a content sentinel.
+//! render prints. A carried message of an odd shape, a session file with no
+//! directory and a `lys.forked_from` whose carried fields disagree are each
+//! refused by name. No test name carries a content sentinel.
 
 use std::error::Error;
 use std::path::PathBuf;
 
 use crate::error::HomeError;
 use crate::harness::claude_code::render::{RenderReport, RenderTarget, render_claude_code};
-use crate::harness::claude_code::seed::HEADING;
+use crate::harness::claude_code::seed::{HEADING, sessions_dir_of, text_of};
 use crate::record::Home;
 use crate::record::fork::fork;
 use crate::record::fork_cut_tests::{PARENT, SENTINELS, fixture_home};
@@ -121,5 +123,111 @@ fn the_parent_itself_renders_with_no_seed_and_no_launch_line() -> Gate {
     let report = render(&home, PARENT, out)?;
     assert_eq!(report.seed, None);
     assert_eq!(report_json(&report)?["seed"], Value::Null);
+    Ok(())
+}
+
+/// A user message entry whose content is `content`, as given.
+fn carried_with(content: &Value) -> crate::record::entries::Entry {
+    crate::record::entries::Entry {
+        base: crate::record::entries::EntryBase {
+            id: "c1".to_owned(),
+            parent_id: None,
+            timestamp: "2026-01-01T00:00:00.000Z".to_owned(),
+        },
+        body: crate::record::entries::EntryBody::Message {
+            message: serde_json::json!({"role": "user", "content": content, "timestamp": 0}),
+        },
+    }
+}
+
+#[test]
+fn a_carried_message_of_an_odd_shape_is_refused_and_never_read_as_empty() -> Gate {
+    let mut refusals = 0;
+    for content in [
+        Value::Null,
+        serde_json::json!(7),
+        serde_json::json!([{"text": "fixture"}]),
+        serde_json::json!([{"type": "text"}]),
+        serde_json::json!([{"type": "text", "text": 3}]),
+    ] {
+        let refused = text_of(&carried_with(&content));
+        assert!(
+            matches!(&refused, Err(HomeError::BodyShape { api: "seed", .. })),
+            "{refused:?}"
+        );
+        refusals += 1;
+    }
+    assert_eq!(refusals, 5);
+    assert_eq!(
+        text_of(&carried_with(&serde_json::json!("as a string")))?,
+        "as a string"
+    );
+    assert_eq!(
+        text_of(&carried_with(&serde_json::json!([
+            {"type": "text", "text": "one"},
+            {"type": "image", "data": "aWdub3JlZA=="},
+            {"type": "text", "text": "two"}
+        ])))?,
+        "one\ntwo"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_session_file_without_a_directory_is_refused_by_name() {
+    let mut refusals = 0;
+    for file in ["x.jsonl", "/"] {
+        let refused = sessions_dir_of(std::path::Path::new(file));
+        assert!(
+            matches!(
+                &refused,
+                Err(HomeError::NotAbsolute {
+                    what: "the session file",
+                    ..
+                })
+            ),
+            "{refused:?}"
+        );
+        refusals += 1;
+    }
+    assert_eq!(refusals, 2);
+    assert_eq!(
+        sessions_dir_of(std::path::Path::new("/home/sessions/a.jsonl")).ok(),
+        Some(std::path::Path::new("/home/sessions"))
+    );
+}
+
+#[test]
+fn a_forked_from_whose_carried_and_coordinate_carried_disagree_is_refused() -> Gate {
+    let (dir, home, lanterns) = fixture_home()?;
+    let mut refusals = 0;
+    for (n, data) in [
+        serde_json::json!({"parent_session": "parent", "lantern": "x", "point": "e6", "cut_at": "e5",
+            "coordinate_carried": true, "carried": null, "seed_left_out": {}}),
+        serde_json::json!({"parent_session": "parent", "lantern": "x", "point": "e5", "cut_at": "e5",
+            "coordinate_carried": false, "carried": "e6", "seed_left_out": {}}),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let child = fork(&home, &lanterns.l5, None)?.child;
+        let odd = {
+            let mut owner = home.open_session(&child)?;
+            owner.append(crate::record::entries::EntryBody::Custom {
+                custom_type: crate::record::entries::CUSTOM_FORKED_FROM.to_owned(),
+                data: Some(data),
+            })?
+        };
+        let out = dir.path().join("out").join(format!("odd-{n}.jsonl"));
+        let refused = render(&home, &child, out.clone());
+        assert!(
+            matches!(&refused, Err(HomeError::EntryShape { session, id, custom_type, .. })
+                if *session == child && *id == odd && custom_type == "lys.forked_from"),
+            "{refused:?}"
+        );
+        assert!(!out.exists());
+        refusals += 1;
+    }
+    assert_eq!(refusals, 2);
     Ok(())
 }

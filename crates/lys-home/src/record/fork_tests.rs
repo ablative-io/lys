@@ -5,7 +5,9 @@
 //! `lys.fork` line at its head with no earlier byte changed, no block is
 //! written, and a held parent is refused with nothing written. The report
 //! gates (R4) count entries and blocks, find an inline part's block by path
-//! themselves, and search the report for every content sentinel.
+//! themselves, and search the report for every content sentinel. A carried
+//! part without a type and a hash of the wrong shape are refused, and a
+//! fork that fails after its child was created removes the child.
 
 use std::collections::BTreeSet;
 use std::error::Error;
@@ -314,5 +316,126 @@ fn the_report_carries_no_content_sentinel() -> Gate {
         checked += 1;
     }
     assert_eq!(checked, 8);
+    Ok(())
+}
+
+/// A session `id` of a user text message, an assistant reply and a user
+/// message whose content is `content`, with an older-record lantern at
+/// that third entry.
+fn session_with_carried(home: &Home, id: &str, content: &Value) -> Result<String, Box<dyn Error>> {
+    let mut session = home.create_session(id, "/fixture", None)?;
+    session.append_entry(&user("e1", None, &[text_part("fixture-text-1")]))?;
+    session.append_entry(&assistant("e2", Some("e1"), &[text_part("fixture-text-2")]))?;
+    session.append_entry(&crate::record::entries::Entry {
+        base: crate::record::entries::EntryBase {
+            id: "e3".to_owned(),
+            parent_id: Some("e2".to_owned()),
+            timestamp: "2026-01-01T00:00:00.000Z".to_owned(),
+        },
+        body: EntryBody::Message {
+            message: json!({"role": "user", "content": content, "timestamp": 0}),
+        },
+    })?;
+    session.append_entry(&lantern_entry("N3", "e3", "e3", None))?;
+    Ok("N3".to_owned())
+}
+
+#[test]
+fn a_carried_part_without_a_type_is_refused_and_nothing_is_written() -> Gate {
+    let (_dir, home, _) = fixture_home()?;
+    let lantern = session_with_carried(&home, "untyped", &json!([{"text": "fixture-text-x"}]))?;
+    let before = session_files(&home)?;
+    let refused = fork(&home, &lantern, None);
+    assert!(
+        matches!(&refused, Err(HomeError::BodyShape { api: "fork", .. })),
+        "{refused:?}"
+    );
+    assert_eq!(session_files(&home)?, before);
+    Ok(())
+}
+
+fn custom(id: &str, custom_type: &str, data: Value) -> crate::record::entries::Entry {
+    crate::record::entries::Entry {
+        base: crate::record::entries::EntryBase {
+            id: id.to_owned(),
+            parent_id: None,
+            timestamp: "2026-01-01T00:00:00.000Z".to_owned(),
+        },
+        body: EntryBody::Custom {
+            custom_type: custom_type.to_owned(),
+            data: Some(data),
+        },
+    }
+}
+
+#[test]
+fn a_hash_of_the_wrong_shape_in_a_copied_entry_is_refused_as_its_shape() -> Gate {
+    use crate::record::fork_report::candidate_hashes;
+    let held = Hash::of(b"fixture-record").to_string();
+    let mut refusals = 0;
+    for (id, custom_type, data) in [
+        (
+            "h1",
+            CUSTOM_HARNESS_EVENT,
+            json!({"kind": "hook", "record": 5}),
+        ),
+        (
+            "h2",
+            CUSTOM_HARNESS_EVENT,
+            json!({"kind": "hook", "record": [&held]}),
+        ),
+        (
+            "c1",
+            "lys.call",
+            json!({"request": [&held, 5], "response": []}),
+        ),
+        ("c2", "lys.call", json!({"raw_request": {"hash": &held}})),
+    ] {
+        let refused = candidate_hashes("s", &[custom(id, custom_type, data)]);
+        assert!(
+            matches!(&refused, Err(HomeError::EntryShape { session, id: named, custom_type: kind, .. })
+                if session == "s" && named == id && kind == custom_type),
+            "{refused:?}"
+        );
+        refusals += 1;
+    }
+    assert_eq!(refusals, 4);
+    let counted = candidate_hashes(
+        "s",
+        &[
+            custom(
+                "t1",
+                CUSTOM_HARNESS_EVENT,
+                json!({"kind": "tool_completed", "record": null}),
+            ),
+            custom(
+                "c3",
+                "lys.call",
+                json!({"request": [&held], "raw_response": &held}),
+            ),
+        ],
+    )?;
+    assert_eq!(counted.len(), 1);
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_fork_that_fails_after_the_child_was_created_removes_the_child() -> Gate {
+    use std::os::unix::fs::PermissionsExt;
+    let (_dir, home, lanterns) = fixture_home()?;
+    let parent_file = home.session_path(PARENT)?;
+    let before = session_files(&home)?;
+    let writable = std::fs::metadata(&parent_file)?.permissions();
+    // The parent's lys.fork line cannot be appended to a file that refuses
+    // writes, and by then the child stands with all its lines.
+    std::fs::set_permissions(&parent_file, std::fs::Permissions::from_mode(0o444))?;
+    let refused = fork(&home, &lanterns.l5, None);
+    std::fs::set_permissions(&parent_file, writable)?;
+    assert!(
+        matches!(&refused, Err(HomeError::Io { context, .. }) if *context == "opening the session file"),
+        "{refused:?}"
+    );
+    assert_eq!(session_files(&home)?, before);
     Ok(())
 }

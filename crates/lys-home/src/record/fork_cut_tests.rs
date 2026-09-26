@@ -114,12 +114,16 @@ fn event(id: &str, parent: &str, kind: &str, record: &Hash) -> Result<Entry, Box
     })
 }
 
-/// A `lys.lantern` entry written by hand at `point`, with or without `lit_in`.
+/// A `lys.lantern` entry written by hand at `point`: with `lit_in`, the
+/// light act's data plus that key; without, the older record's `point`,
+/// `note` and `lit_by` exactly.
 pub(crate) fn lantern_entry(id: &str, parent: &str, point: &str, lit_in: Option<&str>) -> Entry {
-    let mut data = json!({"point": point, "note": NOTE, "lit_by": LIGHTER, "lit_at": now()});
-    if let Some(session) = lit_in {
-        data["lit_in"] = json!(session);
-    }
+    let data = match lit_in {
+        Some(session) => {
+            json!({"point": point, "note": NOTE, "lit_by": LIGHTER, "lit_at": now(), "lit_in": session})
+        }
+        None => json!({"point": point, "note": NOTE, "lit_by": LIGHTER}),
+    };
     Entry {
         base: base(id, Some(parent)),
         body: EntryBody::Custom {
@@ -439,5 +443,32 @@ fn each_refusal_names_the_lantern_and_writes_nothing() -> Gate {
             .join("A.jsonl")
             .exists()
     );
+    Ok(())
+}
+
+#[test]
+fn a_lit_in_session_that_holds_no_copy_refuses_naming_the_holder_read() -> Gate {
+    let (_dir, home, _) = fixture_home()?;
+    {
+        let reader = home.read_session(PARENT)?;
+        let mut copy = home.create_session("A", "/fixture", None)?;
+        copy.append_entry(&reader.entry("e1")?)?;
+        copy.append_entry(&reader.entry("e2")?)?;
+        copy.append_entry(&lantern_entry("N2", "e2", "e2", Some("elsewhere")))?;
+    }
+    let mut refusals = 0;
+    for (session, named) in [(None, "A"), (Some("A"), "A"), (Some(PARENT), PARENT)] {
+        let refused = resolve_and_cut(&home, "N2", session);
+        assert!(
+            matches!(
+                &refused,
+                Err(HomeError::LanternNotLitHere { lantern, session, lit_in })
+                    if lantern == "N2" && session == named && lit_in == "elsewhere"
+            ),
+            "{refused:?}"
+        );
+        refusals += 1;
+    }
+    assert_eq!(refusals, 3);
     Ok(())
 }

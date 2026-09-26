@@ -106,10 +106,12 @@ fn event(id: &str, parent: &str, kind: &str, record: &Hash) -> Result<Entry, Box
 }
 
 fn lantern_entry(id: &str, parent: &str, point: &str, lit_in: Option<&str>) -> Entry {
-    let mut data = json!({"point": point, "note": NOTE, "lit_by": LIGHTER, "lit_at": STAMP});
-    if let Some(session) = lit_in {
-        data["lit_in"] = json!(session);
-    }
+    let data = match lit_in {
+        Some(session) => {
+            json!({"point": point, "note": NOTE, "lit_by": LIGHTER, "lit_at": STAMP, "lit_in": session})
+        }
+        None => json!({"point": point, "note": NOTE, "lit_by": LIGHTER}),
+    };
     Entry {
         base: base(id, Some(parent)),
         body: EntryBody::Custom {

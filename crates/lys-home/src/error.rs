@@ -375,6 +375,20 @@ pub enum HomeError {
         lantern: String,
     },
 
+    /// A fork failed after its child session was created, and removing the
+    /// child failed too, so the child's files stand half-written.
+    #[error(
+        "fork of child {child} failed ({reason}), and removing the child failed too ({cleanup}); the child's files under sessions/ are half-written and the parent holds no lys.fork line for it"
+    )]
+    ForkHalfWritten {
+        /// The child's session id.
+        child: String,
+        /// The refusal that stopped the fork, as displayed.
+        reason: String,
+        /// The refusal the cleanup met, as displayed.
+        cleanup: String,
+    },
+
     /// A path that must be absolute is not: it would resolve against
     /// lys-home's own working directory, which is never the session's.
     #[error(

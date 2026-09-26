@@ -11,7 +11,10 @@
 //! session, the point and the lantern, a newline, the heading line, a
 //! newline, then the message's text (its `content` when that is a string;
 //! otherwise the `text` of each `text` part in order, joined by newlines,
-//! every part that is not text left out, as `seed_left_out` counts them),
+//! every part that is not text left out, as `seed_left_out` counts them; a
+//! part with no type, a text part with no text, content that is neither a
+//! string nor a list, and a `lys.forked_from` whose `coordinate_carried`
+//! and `carried` disagree are each refused by name),
 //! with no trailing newline. The render report names the seed file and
 //! prints no launch line: only the template's render (`render-launch`)
 //! prints one, with `"$(cat '<seed>')"` appended as the resumed session's
@@ -68,24 +71,55 @@ impl Seed {
 }
 
 /// The text of a carried message: its content when that is a string,
-/// otherwise its text parts in order joined by newlines.
-fn text_of(entry: &Entry) -> Result<String, HomeError> {
-    let EntryBody::Message { message } = &entry.body else {
-        return Err(HomeError::BodyShape {
-            api: "seed",
-            reason: "the carried entry is not a message",
-        });
+/// otherwise its text parts in order joined by newlines. A message whose
+/// content is neither, a part with no `type` string, and a text part with no
+/// `text` string are each refused by name rather than read as empty.
+pub(crate) fn text_of(entry: &Entry) -> Result<String, HomeError> {
+    let shape = |reason| HomeError::BodyShape {
+        api: "seed",
+        reason,
     };
-    Ok(match message.get("content") {
-        Some(Value::String(text)) => text.clone(),
-        Some(Value::Array(parts)) => parts
-            .iter()
-            .filter(|part| part.get("type").and_then(Value::as_str) == Some("text"))
-            .filter_map(|part| part.get("text").and_then(Value::as_str))
-            .collect::<Vec<&str>>()
-            .join("\n"),
-        _ => String::new(),
-    })
+    let EntryBody::Message { message } = &entry.body else {
+        return Err(shape("the carried entry is not a message"));
+    };
+    match message.get("content") {
+        Some(Value::String(text)) => Ok(text.clone()),
+        Some(Value::Array(parts)) => {
+            let mut texts = Vec::new();
+            for part in parts {
+                let kind = part
+                    .get("type")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| shape("a part of the carried message has no type"))?;
+                if kind != "text" {
+                    continue;
+                }
+                let text = part
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| shape("a text part of the carried message has no text"))?;
+                texts.push(text);
+            }
+            Ok(texts.join("\n"))
+        }
+        _ => Err(shape(
+            "the carried message's content is neither a string nor a list of parts",
+        )),
+    }
+}
+
+/// The `sessions/` directory a session file stands in; a file with no
+/// directory would resolve against lys-home's own working directory, which
+/// is never the home's, and is refused by name.
+pub(crate) fn sessions_dir_of(file: &Path) -> Result<&Path, HomeError> {
+    match file.parent() {
+        Some(dir) if !dir.as_os_str().is_empty() => Ok(dir),
+        _ => Err(HomeError::NotAbsolute {
+            what: "the session file",
+            shape: "without a directory",
+            path: file.to_path_buf(),
+        }),
+    }
 }
 
 /// The seed the session's path calls for: `None` unless the path carries a
@@ -100,11 +134,20 @@ pub fn seed_of(session: &Session, path: &[Entry]) -> Result<Option<Seed>, HomeEr
         return Ok(None);
     };
     let forked: ForkedFrom = data_of(&session.header().id, entry, CUSTOM_FORKED_FROM)?;
-    let Some(carried) = forked.carried.filter(|_| forked.coordinate_carried) else {
-        return Ok(None);
+    let carried = match (forked.coordinate_carried, forked.carried) {
+        (false, None) => return Ok(None),
+        (true, Some(carried)) => carried,
+        _ => {
+            return Err(HomeError::EntryShape {
+                session: session.header().id.clone(),
+                id: entry.id().to_owned(),
+                custom_type: CUSTOM_FORKED_FROM.to_owned(),
+                source: None,
+            });
+        }
     };
     safe_component("session id", &forked.parent_session)?;
-    let sessions = session.file().parent().unwrap_or_else(|| Path::new("."));
+    let sessions = sessions_dir_of(session.file())?;
     let parent = SessionReader::open(sessions.join(format!("{}.jsonl", forked.parent_session)))?;
     let text = text_of(&parent.entry(&carried)?)?;
     Ok(Some(Seed {

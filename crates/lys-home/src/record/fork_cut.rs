@@ -9,7 +9,10 @@
 //! another kind holds nothing. The lantern entry is read once, from the
 //! session the cut is taken from (a second time only when the first holder
 //! read turns out, by its `lit_in`, not to be that session), for its
-//! `point` and its `lit_in`; then the point's ancestry is read from the root
+//! `point` and its `lit_in` (the first holder in id order, and a named
+//! session is then checked against `lit_in`; a `lit_in` session that holds
+//! no copy refuses `lantern_not_lit_here` naming the holder read); then the
+//! point's ancestry is read from the root
 //! to the point in one pass, the point's entry being its last row. The cut
 //! is that chain up to the last `message` entry whose role is `assistant`,
 //! in chain order, with a compaction or a custom entry at its own place and
@@ -160,18 +163,18 @@ pub fn resolve_and_cut(
     }
     let holders = holders(home, lantern)?;
     let position = |id: &str| holders.iter().position(|holder| holder.id == id);
-    let first = match session {
-        Some(named) => position(named).ok_or_else(|| HomeError::UnknownLantern {
-            session: named.to_owned(),
-            id: lantern.to_owned(),
-        })?,
-        None if holders.is_empty() => {
-            return Err(HomeError::NoSuchLantern {
+    if holders.is_empty() {
+        return Err(match session {
+            Some(named) => HomeError::UnknownLantern {
+                session: named.to_owned(),
+                id: lantern.to_owned(),
+            },
+            None => HomeError::NoSuchLantern {
                 lantern: lantern.to_owned(),
-            });
-        }
-        None => 0,
-    };
+            },
+        });
+    }
+    let first = 0;
     let (mut point, lit_in, mut bytes_read) = read_lantern(&holders[first], lantern)?;
     let chosen = match (&lit_in, session) {
         (Some(lit_in), Some(named)) if lit_in != named => {
@@ -181,11 +184,15 @@ pub fn resolve_and_cut(
                 lit_in: lit_in.clone(),
             });
         }
-        (Some(lit_in), _) => position(lit_in).ok_or_else(|| HomeError::UnknownLantern {
-            session: lit_in.clone(),
+        (Some(lit_in), _) => position(lit_in).ok_or_else(|| HomeError::LanternNotLitHere {
+            lantern: lantern.to_owned(),
+            session: holders[first].id.clone(),
+            lit_in: lit_in.clone(),
+        })?,
+        (None, Some(named)) => position(named).ok_or_else(|| HomeError::UnknownLantern {
+            session: named.to_owned(),
             id: lantern.to_owned(),
         })?,
-        (None, Some(_)) => first,
         (None, None) if holders.len() == 1 => first,
         (None, None) => {
             return Err(HomeError::LanternAmbiguous {

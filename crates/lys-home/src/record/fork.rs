@@ -16,6 +16,9 @@
 //! that are not text and never copied. Nothing else of the parent enters the
 //! child: no header field but `cwd`, no credential, no handle, no launch
 //! setting; no block is written and no earlier byte of the parent changes.
+//! A failure after the child was created removes the child's files by name
+//! and returns the refusal that stopped the fork; a cleanup that fails too
+//! is refused naming both, so a half-written child is never silent.
 
 use std::collections::BTreeMap;
 use std::io::{Read, Seek, SeekFrom};
@@ -26,9 +29,9 @@ use serde_json::{Value, json};
 
 use crate::error::HomeError;
 use crate::record::entries::{CUSTOM_FORK, CUSTOM_FORKED_FROM, Entry, EntryBody};
-use crate::record::fork_cut::resolve_and_cut;
+use crate::record::fork_cut::{Cut, resolve_and_cut};
 use crate::record::fork_report::{ForkReport, candidate_hashes, count_held};
-use crate::record::index::{IndexRow, write_head};
+use crate::record::index::{Index, IndexRow, write_head};
 use crate::record::lantern::own;
 use crate::record::{Home, Session, custom_type_of, fresh_id, write_durable};
 
@@ -56,25 +59,80 @@ pub struct ForkedFrom {
 
 /// The parts of a carried message that are not text, counted by type; empty
 /// when nothing is carried, when the content is a string, or when every
-/// part is text.
-fn seed_left_out(carried: Option<&Entry>) -> BTreeMap<String, u64> {
+/// part is text. A part with no `type` string is refused by name, never
+/// counted under a made-up kind.
+fn seed_left_out(carried: Option<&Entry>) -> Result<BTreeMap<String, u64>, HomeError> {
     let mut out = BTreeMap::new();
     let Some(EntryBody::Message { message }) = carried.map(|entry| &entry.body) else {
-        return out;
+        return Ok(out);
     };
     let Some(parts) = message.get("content").and_then(Value::as_array) else {
-        return out;
+        return Ok(out);
     };
     for part in parts {
         let kind = part
             .get("type")
             .and_then(Value::as_str)
-            .unwrap_or("untyped");
+            .ok_or(HomeError::BodyShape {
+                api: "fork",
+                reason: "a part of the carried message has no type",
+            })?;
         if kind != "text" {
             *out.entry(kind.to_owned()).or_insert(0) += 1;
         }
     }
-    out
+    Ok(out)
+}
+
+/// Remove a child session's files by name after a fork failed part way:
+/// the session file, its index, its head, its lock and their temporaries.
+/// A file already gone is fine; any other failure is reported.
+fn remove_child(home: &Home, child: &str) -> Result<(), HomeError> {
+    let file = home.session_path(child)?;
+    let mut paths = vec![
+        file.clone(),
+        Index::index_path(&file),
+        Index::head_path(&file),
+        Index::lock_path(&file),
+    ];
+    paths.push(Index::index_path(&file).with_extension("jsonl.tmp"));
+    paths.push(Index::head_path(&file).with_extension("head.tmp"));
+    for path in paths {
+        match std::fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(HomeError::io("removing a half-written child", &path, e)),
+        }
+    }
+    Ok(())
+}
+
+/// Copy the cut into the child, append `lys.forked_from` as its head, and
+/// mark the parent; everything after the child was created.
+fn write_fork(
+    parent: &mut Session,
+    child: &mut Session,
+    child_id: &str,
+    cut: &Cut,
+    forked_from: &ForkedFrom,
+) -> Result<(), HomeError> {
+    for (row, entry) in cut.rows.iter().zip(&cut.entries) {
+        let line = read_line(&cut.file, row)?;
+        child.append_copied(entry, &line)?;
+    }
+    let data = serde_json::to_value(forked_from).map_err(|source| HomeError::Json {
+        context: "the forked_from data could not be serialised",
+        source,
+    })?;
+    child.append(EntryBody::Custom {
+        custom_type: CUSTOM_FORKED_FROM.to_owned(),
+        data: Some(data),
+    })?;
+    parent.append(EntryBody::Custom {
+        custom_type: CUSTOM_FORK.to_owned(),
+        data: Some(json!({"child": child_id})),
+    })?;
+    Ok(())
 }
 
 /// The exact bytes of one entry's line, read by its row's offset and length.
@@ -166,15 +224,7 @@ impl Session {
 /// after the child stands.
 pub fn fork(home: &Home, lantern: &str, session: Option<&str>) -> Result<ForkReport, HomeError> {
     let cut = resolve_and_cut(home, lantern, session)?;
-    let candidates = candidate_hashes(&cut.entries)?;
-    let mut parent = own(home, &cut.session)?;
-    let child_id = fresh_id();
-    let parent_path = format!("sessions/{}.jsonl", cut.session);
-    let mut child = home.create_session(&child_id, &parent.header().cwd, Some(&parent_path))?;
-    for (row, entry) in cut.rows.iter().zip(&cut.entries) {
-        let line = read_line(&cut.file, row)?;
-        child.append_copied(entry, &line)?;
-    }
+    let candidates = candidate_hashes(&cut.session, &cut.entries)?;
     let carried = cut.carried.as_ref().map(|entry| entry.id().to_owned());
     let forked_from = ForkedFrom {
         parent_session: cut.session.clone(),
@@ -183,20 +233,25 @@ pub fn fork(home: &Home, lantern: &str, session: Option<&str>) -> Result<ForkRep
         cut_at: cut.cut_at.clone(),
         coordinate_carried: cut.coordinate_carried(),
         carried: carried.clone(),
-        seed_left_out: seed_left_out(cut.carried.as_ref()),
+        seed_left_out: seed_left_out(cut.carried.as_ref())?,
     };
-    let data = serde_json::to_value(&forked_from).map_err(|source| HomeError::Json {
-        context: "the forked_from data could not be serialised",
-        source,
-    })?;
-    child.append(EntryBody::Custom {
-        custom_type: CUSTOM_FORKED_FROM.to_owned(),
-        data: Some(data),
-    })?;
-    parent.append(EntryBody::Custom {
-        custom_type: CUSTOM_FORK.to_owned(),
-        data: Some(json!({"child": child_id})),
-    })?;
+    let mut parent = own(home, &cut.session)?;
+    let child_id = fresh_id();
+    let parent_path = format!("sessions/{}.jsonl", cut.session);
+    let mut child = home.create_session(&child_id, &parent.header().cwd, Some(&parent_path))?;
+    if let Err(reason) = write_fork(&mut parent, &mut child, &child_id, &cut, &forked_from) {
+        // The child is released before its files go, so its lock is not held
+        // while they are removed; the parent stays owned until the end.
+        drop(child);
+        return Err(match remove_child(home, &child_id) {
+            Ok(()) => reason,
+            Err(cleanup) => HomeError::ForkHalfWritten {
+                child: child_id,
+                reason: reason.to_string(),
+                cleanup: cleanup.to_string(),
+            },
+        });
+    }
     let (blocks, unstored) = count_held(&home.blocks()?, &candidates);
     Ok(ForkReport {
         child: child_id,

@@ -10,7 +10,9 @@
 //! distinct candidates that name none. The importer stores a Claude Code
 //! part in its source form and writes a mapped part inline, so an inline
 //! thinking, tool-call or tool-result part names no block and counts as
-//! unstored. The report carries no part's text, no note and no entry's data.
+//! unstored. A hash key of the wrong shape, or a list item that is not a
+//! string, refuses as the entry's shape rather than being skipped. The
+//! report carries no part's text, no note and no entry's data.
 
 use std::collections::BTreeSet;
 
@@ -50,9 +52,18 @@ pub struct ForkReport {
 /// The distinct candidate hashes the copied entries name: each content
 /// part of a message entry by its own SHA-256, and each block hash a
 /// harness event or call record names in its data.
-pub fn candidate_hashes(entries: &[Entry]) -> Result<BTreeSet<Hash>, HomeError> {
+pub fn candidate_hashes(session: &str, entries: &[Entry]) -> Result<BTreeSet<Hash>, HomeError> {
     let mut out = BTreeSet::new();
     for entry in entries {
+        let shape = || HomeError::EntryShape {
+            session: session.to_owned(),
+            id: entry.id().to_owned(),
+            custom_type: match &entry.body {
+                EntryBody::Custom { custom_type, .. } => custom_type.clone(),
+                _ => String::new(),
+            },
+            source: None,
+        };
         match &entry.body {
             EntryBody::Message { message } => {
                 let Some(parts) = message.get("content").and_then(Value::as_array) else {
@@ -69,14 +80,18 @@ pub fn candidate_hashes(entries: &[Entry]) -> Result<BTreeSet<Hash>, HomeError> 
             EntryBody::Custom {
                 custom_type,
                 data: Some(data),
-            } if custom_type == CUSTOM_HARNESS_EVENT => named(data, &["record"], &mut out)?,
+            } if custom_type == CUSTOM_HARNESS_EVENT => {
+                named(data, &["record"], &[], &mut out, &shape)?;
+            }
             EntryBody::Custom {
                 custom_type,
                 data: Some(data),
             } if custom_type == CUSTOM_CALL => named(
                 data,
-                &["request", "response", "raw_request", "raw_response"],
+                &["raw_request", "raw_response"],
+                &["request", "response"],
                 &mut out,
+                &shape,
             )?,
             _ => {}
         }
@@ -84,22 +99,38 @@ pub fn candidate_hashes(entries: &[Entry]) -> Result<BTreeSet<Hash>, HomeError> 
     Ok(out)
 }
 
-/// The hashes `data` names under `keys`, each a hash string or a list of
-/// them; a value that is neither names nothing.
-fn named(data: &Value, keys: &[&str], out: &mut BTreeSet<Hash>) -> Result<(), HomeError> {
-    for key in keys {
+/// The hashes `data` names: each key of `strings` a hash string, each key
+/// of `lists` a list of hash strings. An absent or null key names nothing;
+/// a key of any other shape, or a list item that is not a string, is
+/// refused as the entry's shape rather than skipped.
+fn named(
+    data: &Value,
+    strings: &[&str],
+    lists: &[&str],
+    out: &mut BTreeSet<Hash>,
+    shape: &dyn Fn() -> HomeError,
+) -> Result<(), HomeError> {
+    for key in strings {
         match data.get(key) {
+            None | Some(Value::Null) => {}
             Some(Value::String(hash)) => {
                 out.insert(Hash::parse(hash)?);
             }
+            Some(_) => return Err(shape()),
+        }
+    }
+    for key in lists {
+        match data.get(key) {
+            None | Some(Value::Null) => {}
             Some(Value::Array(list)) => {
                 for item in list {
-                    if let Value::String(hash) = item {
-                        out.insert(Hash::parse(hash)?);
-                    }
+                    let Value::String(hash) = item else {
+                        return Err(shape());
+                    };
+                    out.insert(Hash::parse(hash)?);
                 }
             }
-            _ => {}
+            Some(_) => return Err(shape()),
         }
     }
     Ok(())
