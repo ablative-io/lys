@@ -1,7 +1,8 @@
 //! The `lys-home` command line: import, render, fewshot, ingest-call,
-//! resume-check. Every command prints one JSON report of paths, hashes and
-//! counts, never transcript, block or body content. A missing required
-//! argument is refused by clap with exit code 2, naming the argument.
+//! resume-check, render-launch. Every command prints one JSON report of
+//! paths, hashes and counts, never transcript, block or body content. A
+//! missing required argument is refused by clap with exit code 2, naming the
+//! argument.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -12,6 +13,7 @@ use serde_json::{Value, json};
 use crate::error::HomeError;
 use crate::harness::claude_code::AUTHORED;
 use crate::harness::claude_code::import::import_claude_code;
+use crate::harness::claude_code::launch::{LaunchArgs, render_launch};
 use crate::harness::claude_code::render::{RenderTarget, render_claude_code};
 use crate::record::call::{Api, CallMeta, ingest_call_files};
 use crate::record::canon::Role;
@@ -164,6 +166,8 @@ pub enum Command {
         /// The file the resume wrote.
         forked: PathBuf,
     },
+    /// Write the files a Claude Code launch needs from a kept template and a session.
+    RenderLaunch(LaunchArgs),
 }
 
 /// Run a command and return its report; a non-zero exit is the caller's to
@@ -193,8 +197,7 @@ pub fn run(cli: Cli) -> Result<Value, HomeError> {
         } => {
             let home = Home::open(home)?;
             let s = home.open_session(&session)?;
-            let user_home =
-                std::env::var_os("HOME").map_or_else(|| PathBuf::from("."), PathBuf::from);
+            let user_home = std::env::var_os("HOME").map(PathBuf::from);
             let target = RenderTarget {
                 session_id: uuid,
                 cwd,
@@ -203,7 +206,7 @@ pub fn run(cli: Cli) -> Result<Value, HomeError> {
                 out,
                 canon,
             };
-            let report = render_claude_code(&s, &target, &user_home)?;
+            let report = render_claude_code(&s, &target, user_home.as_deref())?;
             Ok(json!({"command": "render", "report": report}))
         }
         Command::Canon { action } => match action {
@@ -308,6 +311,7 @@ pub fn run(cli: Cli) -> Result<Value, HomeError> {
             }
             Ok(json!({"command": "resume-check", "report": check}))
         }
+        Command::RenderLaunch(args) => render_launch(&args),
     }
 }
 

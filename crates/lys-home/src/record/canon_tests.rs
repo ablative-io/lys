@@ -204,8 +204,12 @@ fn a_render_with_the_canon_places_it_first_and_applies_the_thinking_rule_to_it()
         out: Some(dir.path().join(name)),
         canon: Some(canon.clone()),
     };
-    let same =
-        render_claude_code(&own, &target("claude-opus-5-5", "same.jsonl"), dir.path()).unwrap();
+    let same = render_claude_code(
+        &own,
+        &target("claude-opus-5-5", "same.jsonl"),
+        Some(dir.path()),
+    )
+    .unwrap();
     assert_eq!(
         (
             same.records,
@@ -238,8 +242,12 @@ fn a_render_with_the_canon_places_it_first_and_applies_the_thinking_rule_to_it()
         );
         prev = l["uuid"].as_str();
     }
-    let other =
-        render_claude_code(&own, &target("claude-sonnet-5", "other.jsonl"), dir.path()).unwrap();
+    let other = render_claude_code(
+        &own,
+        &target("claude-sonnet-5", "other.jsonl"),
+        Some(dir.path()),
+    )
+    .unwrap();
     assert_eq!(
         (other.records, other.thinking_kept, other.thinking_as_text),
         (3, 0, 1)

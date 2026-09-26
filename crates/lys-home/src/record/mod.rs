@@ -18,6 +18,9 @@
 //! (the index is rebuilt by scanning, the head re-read), so what the process
 //! believes about the file never runs ahead of or behind the disk.
 
+pub mod beside;
+#[cfg(test)]
+mod beside_tests;
 pub mod blocks;
 #[cfg(test)]
 mod blocks_tests;
@@ -31,6 +34,9 @@ pub mod entries;
 pub mod index;
 #[cfg(test)]
 mod record_tests;
+pub mod templates;
+#[cfg(test)]
+mod templates_tests;
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -41,6 +47,7 @@ use crate::error::HomeError;
 use crate::record::blocks::BlockStore;
 use crate::record::entries::{Entry, EntryBase, EntryBody, SessionHeader};
 use crate::record::index::{Index, IndexRow, read_head, write_head};
+use crate::record::templates::TemplateStore;
 
 /// The most bytes a session or block name may have.
 pub const MAX_NAME_BYTES: usize = 200;
@@ -96,6 +103,13 @@ impl Home {
     /// The block store of this home.
     pub fn blocks(&self) -> Result<BlockStore, HomeError> {
         BlockStore::open(self.root.join("blocks"))
+    }
+
+    /// The template store of this home, `templates/` beside `sessions/` and
+    /// `blocks/`; its directory appears when the first template is stored.
+    #[must_use]
+    pub fn templates(&self) -> TemplateStore {
+        TemplateStore::at(self.root.join("templates"))
     }
 
     /// The path of a session file by id; an id that is not one safe path
@@ -181,7 +195,10 @@ impl Session {
     }
 
     /// Open an existing session file, loading or rebuilding its index and
-    /// reading its persisted head.
+    /// reading its persisted head. A file with no head beside it (one Pi
+    /// wrote) takes its last entry as the head, as Pi does on reopen, and
+    /// that head is persisted here and now, so a side leaf appended later
+    /// ([`Session::append_beside`]) can never be taken for the head.
     pub fn open(file: impl Into<PathBuf>) -> Result<Self, HomeError> {
         let file = file.into();
         let lock = take_lock(&file)?;
@@ -194,6 +211,9 @@ impl Session {
                 session: header.id,
                 id: id.clone(),
             });
+        }
+        if !Index::head_path(&file).is_file() {
+            write_head(&file, head.as_deref())?;
         }
         Ok(Self {
             file,
@@ -321,6 +341,21 @@ impl Session {
     /// an importer does, and advance the head to it. The parent must be on
     /// record or `None`.
     pub fn append_entry(&mut self, entry: &Entry) -> Result<(), HomeError> {
+        self.append_line(entry)?;
+        if let Err(e) = write_head(&self.file, Some(entry.id())) {
+            self.stale = true;
+            self.reconcile()?;
+            return Err(e);
+        }
+        self.head = Some(entry.id().to_owned());
+        Ok(())
+    }
+
+    /// The one durable write path: the entry line, then its index row, with
+    /// the head left where it stands. [`Session::append_entry`] moves the head
+    /// afterwards; [`Session::append_beside`] does not, so both reconcile the
+    /// same way when a step after the line fails.
+    fn append_line(&mut self, entry: &Entry) -> Result<(), HomeError> {
         self.reconcile()?;
         if self.index.row(entry.id()).is_some() {
             return Err(HomeError::DuplicateEntry {
@@ -359,12 +394,6 @@ impl Session {
             self.reconcile()?;
             drop(e);
         }
-        if let Err(e) = write_head(&self.file, Some(entry.id())) {
-            self.stale = true;
-            self.reconcile()?;
-            return Err(e);
-        }
-        self.head = Some(entry.id().to_owned());
         Ok(())
     }
 

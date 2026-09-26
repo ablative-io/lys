@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-25",
+  "updated": "2026-09-26",
   "items": [
     {
       "id": "RM-001",
@@ -152,6 +152,37 @@
         "RM-001"
       ],
       "notes": "Owned by Archie. The home cluster and HOME-001 landed on main with PR 8; the cached-index rule (lys-home Index::from_cached) is in that brief. Next: HOME-001 dispatched through the board."
+    },
+    {
+      "id": "RM-006",
+      "title": "Launch a session from its home on Claude Code through a kept template",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "The home keeps a launch template per harness, starting with Claude Code, as an object named by its hash; lys-home render-launch turns a template and a session into the files a Claude Code launch needs and a printed launch line that resumes the rendered file by path, and records each render on the session so a stranger can tell which template a session was launched with.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-26T06:15:00+10:00",
+        "quote": "A session's home holds the pieces a new session is made from, the record, the canon and the handover, but nothing yet turns them into a running session on a given harness. Tom ruled at 16:00 on 22 September that the home keeps a preset template per harness which maps the pieces onto that harness, and that the mapping covers the MCP configuration, the environment variables, which secrets the session may read and which it may only use through a handle, what is appended to the system prompt, and where the prior conversation goes, delivered as files and runtime variables, command mappings in text, never a transcript converter. The change is a launch template for Claude Code, kept in the home as a versioned object beside the record, with its schema in docs/design/home, and a lys-home subcommand that reads a template and a session and writes the files a Claude Code launch needs. The files are the rendered JSONL under the chosen uuid and cwd as R4 renders it, an MCP configuration file, an environment file, an appended instructions file, and the launch line that resumes by path as R9 states. The template has named slots. The transcript slot is the one slot no template can map generically, so the template names how this harness fills it, and Claude Code fills it by resuming the rendered file by path. A secret named in the template is written as its handle and never as its value, and the launch line reads the value through the broker at start, which the secrets rows own. Every render of a template records the template hash, the session head hash and the written paths in a lys.harness_event entry on the session, so a stranger can tell which template a session was launched with. The subcommand prints a JSON report of hashes and paths and never prints transcript, block or body content, and a missing argument exits 2 naming it. Acceptance is that a fixture template and the recorded session from PROOF-RESUME render to a directory whose files match recorded hashes, that the printed launch line resumes the rendered path with the template's flags, that a template naming a secret writes only the handle and a search of the written files for the fixture value finds nothing, that rendering the same template and session twice yields identical hashes, and that a template with an unknown slot is refused by name. Not in scope are any harness other than Claude Code, launching on another machine, and the broker's own read. Filed by Archie on Tom's 16:00 ruling of 22 September 2026 and HOME-001 R4, R9 and R12 on lys main 0073b966, at 06:15 on 26 September 2026.",
+        "context": "Filed on the ruling relayed at docs/design/identity/STATEMENT-2026-09-22.md line 181 and HOME-001 R4, R9 and R12, on lys main 0073b966; the card lead's answers on fork-on-resume, the fixture, use-only secrets, the unbuilt broker reader, the side-leaf event, the canon and the ruling's record are written into HOME-002."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-001",
+          "ADR-003",
+          "ADR-004",
+          "ADR-007",
+          "ADR-012"
+        ],
+        "briefs": [
+          "HOME-002"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-005"
+      ],
+      "notes": "Further units, not written: Wire the secret slot's start-time read to the broker once SECRETS-002 lands; Launch from the template and capture the new session into the same home; Canon and handover slots in the launch template; Target profiles: sandbox and VM rendered from the template (P8); Launch on a second machine from a fetched home (stage 3); Templates for a second harness; manifold seat document consuming the printed launch line."
     }
   ]
 }

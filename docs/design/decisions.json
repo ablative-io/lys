@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-24",
+  "updated": "2026-09-26",
   "decisions": [
     {
       "id": "ADR-001",
@@ -191,6 +191,26 @@
       "consequences": [
         "DIRECTORY-003 records the state beside each identity; no check reads it until the permission work of road step 2.",
         "The room's own questions stay with the proposal: whether a reason is mandatory on suspend and retire, and whether activation needs a credential handle (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:101-103)."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-012",
+      "title": "A harness launch template is kept in the home by hash, and each render is recorded on the session beside its context path",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-26",
+      "decided_by": "Tom's ruling of 22 September 2026 that the home keeps a preset template per harness (relayed at docs/design/identity/STATEMENT-2026-09-22.md line 181), with the card lead's answers on HOME-002 of 26 September 2026",
+      "context": "The home holds the record, the canon and the handover, but nothing turns them into a running session on a harness. The record's lys.harness_event kinds were closed at five (RECORD.md), the home had only sessions/ and blocks/, and appending an entry advances the head, so recording a render on the session would have moved the very head a second render hashes.",
+      "decision": "A launch template per harness is a JSON object with named slots (transcript, mcp, env, secrets, instructions) plus flags, stored in the home under templates/ by its SHA-256; lys-home renders a template and a session into files and runtime variables with command mappings in text, prints the launch line and never runs it, and records each render as a sixth lys.harness_event kind, template_render, hung as a side leaf beside the context path with the written paths in a manifest block named by hash. Rejected: a transcript converter or adapter protocol per harness, a template kept outside the home (a seat document of another tool), and a render event that advances the head, which would change the session head hash between two renders of the same session.",
+      "quote": "",
+      "consequences": [
+        "RECORD.md's list of lys.harness_event kinds grows to six; the five existing kinds and the 512-byte data cap do not change.",
+        "The session gains an append that does not move the head and a head hash: the SHA-256 of the head entry's line.",
+        "Claude Code's transcript slot is filled by resuming the rendered file by path with --fork-session, so the rendered file is never written after the render.",
+        "A use-only secret is only ever its handle; a readable secret is refused until the secrets rows build the broker reader, whose command mapping the template carries as text.",
+        "Each further harness is its own template and its own measurement; manifold, the door and aion may consume the printed line and none is a dependency (ADR-004)."
       ],
       "supersedes": [],
       "superseded_by": ""

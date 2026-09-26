@@ -20,7 +20,7 @@ use crate::error::HomeError;
 use crate::harness::claude_code::{API, PROVIDER, projects_slug};
 use crate::record::blocks::Hash;
 use crate::record::entries::{CUSTOM_AUTHORED, EntryBody};
-use crate::record::{Session, fresh_id, safe_component};
+use crate::record::{Session, safe_component};
 
 /// Where and for whom to render.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -85,15 +85,19 @@ pub fn default_path(home_dir: &Path, cwd: &str, session_id: &str) -> Result<Path
         .join(format!("{session_id}.jsonl")))
 }
 
-/// Render the session's context path for Claude Code.
+/// Render the session's context path for Claude Code. `user_home` is the
+/// directory `.claude/projects` sits under, needed only when `target.out` is
+/// `None`; asked for then and absent, the render is refused by name and
+/// nothing is written.
 pub fn render_claude_code(
     session: &Session,
     target: &RenderTarget,
-    user_home: &Path,
+    user_home: Option<&Path>,
 ) -> Result<RenderReport, HomeError> {
-    let path = match &target.out {
-        Some(out) => out.clone(),
-        None => default_path(user_home, &target.cwd, &target.session_id)?,
+    let path = match (&target.out, user_home) {
+        (Some(out), _) => out.clone(),
+        (None, Some(home)) => default_path(home, &target.cwd, &target.session_id)?,
+        (None, None) => return Err(HomeError::NoRenderPlace),
     };
     if path.exists() {
         return Err(HomeError::Exists { path });
@@ -268,8 +272,11 @@ fn loss(part: &Value, reason: &str) -> Loss {
     }
 }
 
-/// Entry ids that already look like Claude Code uuids are kept; others get one.
-fn record_uuid(id: &str) -> String {
+/// Entry ids that already look like Claude Code uuids are kept; any other id
+/// maps to the uuid shaped from the SHA-256 of its bytes, so the same session
+/// renders the same bytes every time (R2). Nothing random enters a render.
+#[must_use]
+pub fn record_uuid(id: &str) -> String {
     let uuid_shaped = id.len() == 36
         && id.bytes().enumerate().all(|(i, b)| {
             if matches!(i, 8 | 13 | 18 | 23) {
@@ -281,7 +288,7 @@ fn record_uuid(id: &str) -> String {
     if uuid_shaped {
         id.to_owned()
     } else {
-        let h = fresh_id();
+        let h = Hash::of(id.as_bytes()).to_string();
         format!(
             "{}-{}-4{}-8{}-{}",
             &h[..8],
