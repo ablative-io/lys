@@ -57,7 +57,8 @@
     "ADR-015",
     "ADR-016",
     "ADR-017",
-    "ADR-018"
+    "ADR-018",
+    "ADR-029"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -650,6 +651,16 @@
       "path": "docs/design/home/PROOF-FORK.md",
       "note": "the measured fork: Pi's parentSession read, a real session forked, rendered and launched, as hashes, counts and exit codes",
       "brief": "HOME-006"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.json",
+      "note": "the lit-in brief: LanternData's lit_in, recorded by the light act, reported by recall and read by the fork",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-008"
     }
   ],
   "inventory": [

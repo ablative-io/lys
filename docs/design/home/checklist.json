@@ -275,6 +275,41 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The lit-in session",
+      "items": [
+        {
+          "id": "C71",
+          "text": "LanternData carries an optional lit_in, the session that held the point when the lantern was lit, keeping a present null or non-string value distinct from an absent key, and still refuses an unknown key.",
+          "done": false
+        },
+        {
+          "id": "C72",
+          "text": "The light act writes lit_in as the id of the session it appends the lantern to, and its report carries lit_in beside id, session, point and lit_at.",
+          "done": false
+        },
+        {
+          "id": "C73",
+          "text": "Recall rows carry lit_in beside point, note and lit_by: the lighting session for a lantern the light act lit, null for a lantern whose data has no lit_in; a lantern whose lit_in is present and not a session id is never listed as a row.",
+          "done": false
+        },
+        {
+          "id": "C74",
+          "text": "The fork reads lit_in from the typed lantern data and never from a raw JSON key: a lantern with no lit_in resolves by its holders, and a present lit_in that is null, not a string, not a safe session name, or names no session of the home refuses lit_in_not_a_session naming which.",
+          "done": false
+        },
+        {
+          "id": "C75",
+          "text": "The fork's fixtures light L2 and every other lantern the light act can produce with the light act, and write by hand only the lanterns it cannot produce, each marked in its test as standing for such a record.",
+          "done": false
+        },
+        {
+          "id": "C76",
+          "text": "RECORD.md and the lys-home README document lit_in, and PROOF-FORK.md keeps its measured older-record line with a note that the light act now records lit_in.",
+          "done": false
+        }
+      ]
     }
   ]
 }
