@@ -19,6 +19,7 @@ pub const SECRET_KIND: &str = "secret";
 pub struct SpiceGrants {
     engine: SpiceDb,
     action: Action,
+    read_action: Action,
 }
 
 impl std::fmt::Debug for SpiceGrants {
@@ -38,13 +39,17 @@ fn refused(reason: String) -> SecretsError {
 
 impl SpiceGrants {
     /// Reaches the engine the directory's configuration names, asking for
-    /// `action` on each use.
+    /// `action` on each use and `read_action` on each sealed-record read.
     ///
     /// # Errors
     ///
     /// When the configuration does not read, names no engine, or the engine
     /// cannot be reached.
-    pub fn from_directory(config: &Path, action: &str) -> Result<Self, SecretsError> {
+    pub fn from_directory(
+        config: &Path,
+        action: &str,
+        read_action: &str,
+    ) -> Result<Self, SecretsError> {
         let config = Config::load(config)
             .map_err(|error| refused(format!("the directory configuration: {error}")))?;
         let settings = config.spicedb.clone().ok_or_else(|| {
@@ -56,7 +61,12 @@ impl SpiceGrants {
         let engine =
             SpiceDb::open(&settings, &model).map_err(|error| refused(error.to_string()))?;
         let action = Action::new(action).map_err(|error| refused(error.to_string()))?;
-        Ok(Self { engine, action })
+        let read_action = Action::new(read_action).map_err(|error| refused(error.to_string()))?;
+        Ok(Self {
+            engine,
+            action,
+            read_action,
+        })
     }
 }
 
@@ -69,6 +79,16 @@ fn identity(text: &str) -> Option<IdentityId> {
 
 impl PermissionCheck for SpiceGrants {
     fn may_use(&self, holder: &str, secret: &str) -> Result<Permitted, Denied> {
+        self.check(&self.action, holder, secret)
+    }
+
+    fn may_read(&self, identity: &str, record: &str) -> Result<Permitted, Denied> {
+        self.check(&self.read_action, identity, record)
+    }
+}
+
+impl SpiceGrants {
+    fn check(&self, action: &Action, holder: &str, secret: &str) -> Result<Permitted, Denied> {
         let denied = |reason: String| Denied {
             reason,
             no_person_root: false,
@@ -80,13 +100,13 @@ impl PermissionCheck for SpiceGrants {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_or(0, |elapsed| elapsed.as_secs());
-        match self.engine.check(&resource, &self.action, subject, now) {
+        match self.engine.check(&resource, action, subject, now) {
             Ok(true) => Ok(Permitted {
                 person: "the directory's grant chain".to_owned(),
             }),
             Ok(false) => Err(denied(format!(
                 "the directory gives no {} on {SECRET_KIND}/{secret}",
-                self.action.as_str()
+                action.as_str()
             ))),
             Err(error) => Err(denied(format!(
                 "the permission engine did not answer: {error}"
@@ -107,7 +127,7 @@ pub enum Grants {
 impl Grants {
     /// Every grant the broker can list, as (identity, secret, granted by).
     /// Directory grants are listed by the directory itself.
-    pub fn list(&self) -> Result<Vec<(String, String, Option<String>)>, SecretsError> {
+    pub fn list(&self) -> Result<Vec<crate::files::GrantView>, SecretsError> {
         match self {
             Self::File(file) => file.list(),
             Self::Directory(_) => Ok(Vec::new()),
@@ -120,6 +140,13 @@ impl PermissionCheck for Grants {
         match self {
             Self::File(file) => file.may_use(identity, secret),
             Self::Directory(engine) => engine.may_use(identity, secret),
+        }
+    }
+
+    fn may_read(&self, identity: &str, record: &str) -> Result<Permitted, Denied> {
+        match self {
+            Self::File(file) => file.may_read(identity, record),
+            Self::Directory(engine) => engine.may_read(identity, record),
         }
     }
 }

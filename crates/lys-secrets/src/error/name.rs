@@ -1,0 +1,63 @@
+//! The one-word name of every refusal, as audit lines and screens carry it.
+
+use super::SecretsError;
+
+impl SecretsError {
+    /// The refusal's name, the word audit lines record as the outcome.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::StoreKeyMissing { .. } => "StoreKeyMissing",
+            Self::KeyFileMisplaced { .. } => "KeyFileMisplaced",
+            Self::KeyFilePermissions { .. } => "KeyFilePermissions",
+            Self::KeyFileExists { .. } => "KeyFileExists",
+            Self::StoreKeyMismatch { .. } => "StoreKeyMismatch",
+            Self::StoreKeyRetired { .. } => "StoreKeyRetired",
+            Self::StoreNotFound { .. } => "StoreNotFound",
+            Self::StoreAlreadyExists { .. } => "StoreAlreadyExists",
+            Self::StoreCorrupt { .. } => "StoreCorrupt",
+            Self::EntryBindingMismatch { .. } => "EntryBindingMismatch",
+            Self::EntryRolledBack { .. } => "EntryRolledBack",
+            Self::EntryUnsealFailed { .. } => "EntryUnsealFailed",
+            Self::SecretExists { .. } => "SecretExists",
+            Self::SecretUnknown { .. } => "SecretUnknown",
+            Self::AccountUnknown { .. } => "AccountUnknown",
+            Self::AccountExists { .. } => "AccountExists",
+            Self::NoAccountAvailable { .. } => "NoAccountAvailable",
+            Self::InvalidName { .. } => "InvalidName",
+            Self::InvalidLifetime { .. } => "InvalidLifetime",
+            Self::HandleUnknown => "HandleUnknown",
+            Self::HandleExpired { .. } => "HandleExpired",
+            Self::HandleDropped { .. } => "HandleDropped",
+            Self::HandleWrongIdentity { .. } => "HandleWrongIdentity",
+            Self::PresentationInvalid { .. } => "PresentationInvalid",
+            Self::PresentationReplayed { .. } => "PresentationReplayed",
+            Self::PresentationStale { .. } => "PresentationStale",
+            Self::OperationIdTooShort { .. } => "OperationIdTooShort",
+            Self::PermissionDenied { .. } => "PermissionDenied",
+            Self::AuditLineUnreadable { .. } => "AuditLineUnreadable",
+            Self::AuditSignatureInvalid { .. } => "AuditSignatureInvalid",
+            Self::AuditProofInvalid { .. } => "AuditProofInvalid",
+            Self::AuditLineMissing { .. } => "AuditLineMissing",
+            Self::LeaseExhausted { .. } => "LeaseExhausted",
+            Self::LeaseWindowClosed { .. } => "LeaseWindowClosed",
+            Self::NoPersonRoot { .. } => "NoPersonRoot",
+            Self::OperationIdReused { .. } => "OperationIdReused",
+            Self::SpendCapReached { .. } => "SpendCapReached",
+            Self::NoRelation { .. } => "NoRelation",
+            Self::RelationRemoved { .. } => "RelationRemoved",
+            Self::KeyNotReadable { .. } => "KeyNotReadable",
+            Self::NotFound => "NotFound",
+            Self::MemoryNotUsable { .. } => "MemoryNotUsable",
+            Self::ReservationMissing { .. } => "ReservationMissing",
+            Self::StoreLocked { .. } => "StoreLocked",
+            Self::StatePoisoned => "StatePoisoned",
+            Self::Grants(_) => "Grants",
+            Self::Identity(_) => "Identity",
+            Self::Random { .. } => "Random",
+            Self::Encoding { .. } => "Encoding",
+            Self::Io { .. } => "Io",
+            Self::Trust(_) => "Trust",
+            Self::Log(_) => "Log",
+        }
+    }
+}
