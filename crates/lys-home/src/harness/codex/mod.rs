@@ -4,5 +4,6 @@
 //! same session: the rollout opens with an in-band marker saying so, and the
 //! durable link back is the account and a `lys.translation` side leaf.
 
+pub mod zone;
 #[cfg(test)]
 mod zone_tests;
