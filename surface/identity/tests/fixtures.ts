@@ -1,4 +1,5 @@
 import type { AgentView, MeView, PeopleView, ReceiptAnswer } from '../src/generated';
+import type { ActionBody, Grant, Permit, WhoBody } from '../src/generated/grants';
 
 // Fixture API responses in the shapes read_api.rs answers. Names are test names.
 
@@ -85,12 +86,50 @@ export const ME: MeView = {
   service_accounts: [],
 };
 
+export const ROOT_G = 'grant-' + hex(31);
+export const LEDGER_G = 'grant-' + hex(32);
+export const SCRIBE_G = 'grant-' + hex(33);
+const at = (d: number, m: number) => new Date(2026, m - 1, d, 12, 0).getTime() / 1000;
+
+const grant = (g: Partial<Grant> & Pick<Grant, 'id' | 'holder' | 'relation' | 'actions' | 'pass_on' | 'source'>): Grant => ({
+  issuer: ADA, responsible: ADA, resource: { kind: 'project', id: 'identity' }, window: { starts_at: at(27, 9), ends_at: null },
+  model_version: 1, operation: 'op-' + hex(200), revoked: false, ...g,
+});
+
+export const GRANTS: Grant[] = [
+  grant({ id: ROOT_G, holder: ADA, relation: 'owner', actions: ['edit', 'grant', 'view'], pass_on: { kind: 'to', actions: ['edit', 'view'], recipients: ['agent'] }, source: null, window: { starts_at: at(27, 9), ends_at: at(27, 10) } }),
+  grant({ id: LEDGER_G, holder: ADA, relation: 'viewer', actions: ['view'], pass_on: { kind: 'use_only' }, source: null, resource: { kind: 'project', id: 'ledger' } }),
+  grant({ id: SCRIBE_G, holder: SCRIBE, relation: 'viewer', actions: ['view'], pass_on: { kind: 'use_only' }, source: ROOT_G, window: { starts_at: at(27, 9), ends_at: at(4, 10) } }),
+];
+
+const permit = (path: string[], scope: string[]): Permit => ({ permitted: true, grant: path[path.length - 1], path, responsible: ADA, scope, model_version: 1, revision: 7 });
+
+/** /grants/why for Ada: view and edit on project:identity through her root grant; anything else refused. */
+export const why = (body: unknown): Answer => {
+  const b = body as ActionBody;
+  if (b.resource.id === 'identity') return ok(permit([ROOT_G], ['edit', 'grant', 'view']));
+  if (b.resource.id === 'ledger' && b.action === 'view') return ok(permit([LEDGER_G], ['view']));
+  return refused(409, 'NotHeld', `NotHeld: ${ADA} holds no grant of ${b.action} on project:${b.resource.id}`);
+};
+
+/** /grants/who: Ada on everything she holds, the scribe on view of project:identity. */
+export const who = (body: unknown): Answer => {
+  const b = body as WhoBody;
+  const holders = [];
+  if (b.resource.id === 'identity') holders.push({ ...permit([ROOT_G], ['edit', 'grant', 'view']), holder: ADA });
+  if (b.resource.id === 'ledger' && b.action === 'view') holders.push({ ...permit([LEDGER_G], ['view']), holder: ADA });
+  if (b.resource.id === 'identity' && b.action === 'view') holders.push({ ...permit([ROOT_G, SCRIBE_G], ['view']), holder: SCRIBE });
+  return ok({ holders, revision: 7, complete: true, next: null });
+};
+
 export type Answer = { status: number; body: unknown };
+/** A route's answer, or a function of the posted body for routes that are asked. */
+export type Route = Answer | ((body: unknown) => Answer);
 export const ok = (body: unknown): Answer => ({ status: 200, body });
 export const refused = (status: number, refusal: string, reason: string): Answer => ({ status, body: { refusal, reason } });
 
 /** Every route the screens read, answered as the service answers them. */
-export const SERVICE: Record<string, Answer> = {
+export const SERVICE: Record<string, Route> = {
   '/directory/people': ok(DIRECTORY),
   '/people': ok(OWN),
   ['/directory/agents/' + SCRIBE]: ok(SCRIBE_VIEW),
@@ -99,4 +138,8 @@ export const SERVICE: Record<string, Answer> = {
   '/receipts/5': ok(RECEIPTS[5]),
   '/me': ok(ME),
   '/authority': ok('Step 1 of the directory has one administrator.'),
+  '/grants': ok({ grants: GRANTS, revision: 7 }),
+  'POST /grants/why': why,
+  'POST /grants/who': who,
+  'POST /grants': ok({ operation: 'op-x', grant: 'grant-' + hex(34), index: 3, receipt: {} }),
 };

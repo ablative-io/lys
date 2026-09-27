@@ -32,6 +32,8 @@ export interface Shell {
   setCursor: (cursor: number) => void;
   filterKind: KindFilter;
   setFilterKind: (kind: KindFilter) => void;
+  drawer: ReactNode | null;
+  openDrawer: (content: ReactNode) => void;
 }
 
 const ShellContext = createContext<Shell | null>(null);
@@ -61,11 +63,12 @@ export function ShellProvider({ children }: { children: ReactNode }) {
   const [rows, setRows] = useState<string[]>([]);
   const [cursor, setCursor] = useState(0);
   const [filterKind, setFilterKind] = useState<KindFilter>('all');
+  const [drawer, setDrawer] = useState<ReactNode | null>(null);
   const opener = useRef<Element | null>(null);
   const explainOpener = useRef<Element | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const state = useRef({ paletteOpen, explaining });
-  state.current = { paletteOpen, explaining };
+  const state = useRef({ paletteOpen, explaining, drawerOpen: drawer !== null });
+  state.current = { paletteOpen, explaining, drawerOpen: drawer !== null };
 
   const setLabels = useCallback((on: boolean) => {
     setPref('labels', on ? 'labels' : 'icons');
@@ -106,8 +109,9 @@ export function ShellProvider({ children }: { children: ReactNode }) {
   }, []);
   const closeAll = useCallback(() => {
     explainOff();
-    if (state.current.paletteOpen) {
+    if (state.current.paletteOpen || state.current.drawerOpen) {
       setPaletteOpen(false);
+      setDrawer(null);
       const back = opener.current;
       opener.current = null;
       queueMicrotask(() => returnFocus(back));
@@ -120,6 +124,10 @@ export function ShellProvider({ children }: { children: ReactNode }) {
     explainOpener.current = opener.current || document.activeElement;
     opener.current = null;
     setExplaining(true);
+  }, []);
+  const openDrawer = useCallback((content: ReactNode) => {
+    opener.current = opener.current || document.activeElement;
+    setDrawer(content);
   }, []);
   const openPalette = useCallback(() => {
     opener.current = document.activeElement;
@@ -138,10 +146,11 @@ export function ShellProvider({ children }: { children: ReactNode }) {
       dockMode, toggleDock, closeDock, helpSel, showHelp,
       paletteOpen, openPalette, explaining, explainOn, explainOff, closeAll,
       toastText, toastShown, toast, rows, cursor, setRows, setCursor, filterKind, setFilterKind,
+      drawer, openDrawer,
     }),
     [labels, toggleLabels, setLabels, dockRight, setDockSide, toggleDockSide, dockMode, toggleDock,
       closeDock, helpSel, showHelp, paletteOpen, openPalette, explaining, explainOn, explainOff,
-      closeAll, toastText, toastShown, toast, rows, cursor, filterKind],
+      closeAll, toastText, toastShown, toast, rows, cursor, filterKind, drawer, openDrawer],
   );
   return <ShellContext.Provider value={value}>{children}</ShellContext.Provider>;
 }

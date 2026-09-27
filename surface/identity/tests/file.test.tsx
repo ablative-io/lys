@@ -12,7 +12,7 @@ describe("An agent's file", () => {
     expect($('#state')?.textContent).toBe('active');
     expect($('.file .head .pill.human')?.getAttribute('href')).toBe('#/file/' + ADA);
     expect($('.file .head')?.textContent).toContain('since 22 Sep');
-    expect($$('.tabs a').map((a) => a.textContent)).toEqual(['Role', 'Access', 'Provisioning', 'Memory and context', 'Credentials', 'Sessions', 'Certificate', 'Record2']);
+    expect($$('.tabs a').map((a) => a.textContent)).toEqual(['Role', 'Access1', 'Provisioning', 'Memory and context', 'Credentials', 'Sessions', 'Certificate', 'Record2']);
   });
 
   it('shows role and version as not recorded, never a sample role', async () => {
@@ -32,7 +32,7 @@ describe("An agent's file", () => {
     await mount('#/file/' + SCRIBE);
     await press('2', {}, document.body);
     expect(location.hash).toBe(`#/file/${SCRIBE}/access`);
-    expect($('.tabs a.on')?.textContent).toBe('Access');
+    expect($('.tabs a.on')?.textContent).toBe('Access1');
     await press('7', {}, document.body);
     expect(location.hash).toBe(`#/file/${SCRIBE}/certificate`);
     await press('1', {}, document.body);
@@ -40,7 +40,7 @@ describe("An agent's file", () => {
   });
 
   it('marks every section with no server as not built', async () => {
-    for (const tab of ['access', 'provisioning', 'memory', 'credentials', 'sessions', 'certificate']) {
+    for (const tab of ['provisioning', 'memory', 'credentials', 'sessions', 'certificate']) {
       unmountAll();
       document.body.innerHTML = '';
       await mount(`#/file/${SCRIBE}/${tab}`);
