@@ -13,22 +13,27 @@
 //! session, then each context-path entry in order. Every line's outer
 //! `timestamp` is an entry's stamp exactly as that entry records it. When
 //! both files are written and synced, the `lys.translation` side leaf is
-//! appended beside the context path ([`super::leaf`]). No clock,
+//! appended beside the context path ([`super::leaf`]); when writing the
+//! account or appending the leaf fails, the files this run wrote are
+//! removed, so a retry finds no target standing. The session file is read
+//! once, through its own index, for the path, the context path and every
+//! entry beside them. No clock,
 //! random source or network is read, nothing is written outside `--out`, and
 //! Codex's thread index is never written.
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::error::HomeError;
 use crate::harness::claude_code::render::record_uuid;
-use crate::harness::codex::account::{Account, Rows, part_hash, write_new};
-use crate::harness::codex::beside::{Beside, carried_prompt};
+use crate::harness::codex::account::{Account, Rows, part_hash, remove_written, write_new};
+use crate::harness::codex::beside::Beside;
 use crate::harness::codex::leaf::{HARNESS, TranslationData, append_leaf};
-use crate::harness::codex::parts::{NO_TEXT, kind_of, message_items, not_carried};
-use crate::harness::codex::zone::{check_version, local_time, parse_stamp, zone_of};
+use crate::harness::codex::parts::{Item, NO_TEXT, Part, items_of, kind_of};
+use crate::harness::codex::zone::{check_version, in_zone, parse_stamp, zone_of};
 use crate::record::Session;
 use crate::record::blocks::Hash;
 use crate::record::entries::{Entry, EntryBody};
@@ -59,51 +64,67 @@ pub struct Translation {
 
 /// One rollout line, in the order Codex writes its keys.
 #[derive(Serialize)]
-struct Line<'a> {
+struct Line<'a, P> {
     timestamp: &'a str,
     ordinal: usize,
     #[serde(rename = "type")]
     kind: &'static str,
-    payload: Value,
+    payload: P,
 }
 
-/// The rollout's lines as they are built.
+/// The `session_meta` payload, its keys in sorted order.
+#[derive(Serialize)]
+struct Meta<'a> {
+    cli_version: &'a str,
+    cwd: &'a str,
+    id: &'a str,
+    session_id: &'a str,
+    timestamp: &'a str,
+}
+
+/// The rollout's lines as they are built, serialised straight into one
+/// buffer.
 #[derive(Default)]
 pub(crate) struct Lines {
-    text: String,
+    text: Vec<u8>,
     count: usize,
 }
 
 impl Lines {
     /// Add one line whose outer stamp is `stamp`.
-    fn push(&mut self, stamp: &str, kind: &'static str, payload: Value) -> Result<(), HomeError> {
+    fn push<P: Serialize>(
+        &mut self,
+        stamp: &str,
+        kind: &'static str,
+        payload: P,
+    ) -> Result<(), HomeError> {
         let line = Line {
             timestamp: stamp,
             ordinal: self.count,
             kind,
             payload,
         };
-        let text = serde_json::to_string(&line).map_err(|source| HomeError::Json {
+        serde_json::to_writer(&mut self.text, &line).map_err(|source| HomeError::Json {
             context: "a rollout line could not be serialised",
             source,
         })?;
-        self.text.push_str(&text);
-        self.text.push('\n');
+        self.text.push(b'\n');
         self.count += 1;
         Ok(())
     }
 
     /// Add one response item.
-    pub(crate) fn item(&mut self, stamp: &str, item: Value) -> Result<(), HomeError> {
+    pub(crate) fn item(&mut self, stamp: &str, item: &Item<'_>) -> Result<(), HomeError> {
         self.push(stamp, "response_item", item)
     }
 
     /// Add one message of one `input_text` part.
     pub(crate) fn message(&mut self, stamp: &str, role: &str, text: &str) -> Result<(), HomeError> {
-        self.item(
-            stamp,
-            json!({"type": "message", "role": role, "content": [{"type": "input_text", "text": text}]}),
-        )
+        let content = vec![Part::Text {
+            text,
+            kind: "input_text",
+        }];
+        self.item(stamp, &Item::message(role, content))
     }
 }
 
@@ -139,19 +160,26 @@ pub fn translate(
 ) -> Result<Translation, HomeError> {
     check_version(codex_version)?;
     let zone = zone_of(zone)?;
-    let (path, _) = session.path()?;
-    let context = session.context_path()?;
-    let head = path.last().ok_or(HomeError::BodyShape {
+    let beside = Beside::read(session)?;
+    let head = beside.path().next_back().ok_or(HomeError::BodyShape {
         api: "translate-codex",
         reason: "the session holds no entry to translate",
     })?;
-    for entry in &context {
-        parse_stamp(entry.id(), &entry.base.timestamp)?;
+    let mut head_instant = None;
+    for entry in beside.context() {
+        let instant = parse_stamp(entry.id(), &entry.base.timestamp)?;
+        if std::ptr::eq(entry, head) {
+            head_instant = Some(instant);
+        }
     }
     let head_stamp = head.base.timestamp.as_str();
-    let local = local_time(head.id(), head_stamp, &zone)?;
-    let session_id = session.header().id.clone();
-    let thread = record_uuid(&session_id, head.id());
+    let head_instant = match head_instant {
+        Some(instant) => instant,
+        None => parse_stamp(head.id(), head_stamp)?,
+    };
+    let local = in_zone(head.id(), head_instant, &zone)?;
+    let session_id = session.header().id.as_str();
+    let thread = record_uuid(session_id, head.id());
     let name = format!(
         "rollout-{}-{}.jsonl",
         local.strftime("%Y-%m-%dT%H-%M-%S"),
@@ -172,42 +200,40 @@ pub fn translate(
     let head_hash = session.head_hash()?.to_string();
     let mut lines = Lines::default();
     let mut rows = Rows::default();
-    let meta = json!({"id": thread, "session_id": thread, "timestamp": head_stamp,
-        "cwd": session.header().cwd, "cli_version": codex_version});
-    lines.push(head_stamp, "session_meta", meta)?;
+    let meta = Meta {
+        cli_version: codex_version,
+        cwd: &session.header().cwd,
+        id: &thread,
+        session_id: &thread,
+        timestamp: head_stamp,
+    };
+    lines.push(head_stamp, "session_meta", &meta)?;
     let marker = format!(
         "<TRANSLATED CONTEXT: THIS CODEX THREAD IS A FORK OF HOME SESSION {session_id} AT HEAD HASH {head_hash}, RENDERED FOR CODEX {codex_version}, NOT THAT SESSION>"
     );
     lines.message(head_stamp, "developer", &marker)?;
-    let compaction = path
-        .iter()
+    let compaction = beside
+        .path()
         .rev()
         .find(|entry| matches!(entry.body, EntryBody::Compaction { .. }));
-    let beside = Beside::read(session, &path, &context)?;
     if let Some(compaction) = compaction {
         let reason = format!(
             "left off the context path by compaction {}",
             compaction.id()
         );
-        for entry in path
-            .iter()
-            .filter(|e| !context.iter().any(|c| c.id() == e.id()))
-        {
-            rows.lost(entry.id(), None, entry_kind(entry), &reason);
-            beside.left_behind(entry.id(), &reason, &mut rows);
-        }
+        beside.compacted_away(&reason, &mut rows);
     }
     let mut blocks = 0u64;
-    for entry in &context {
-        blocks += walk_entry(entry, &mut lines, &mut rows)?;
-        beside.after_entry(entry, &mut lines, &mut rows)?;
+    for &n in beside.context_positions() {
+        blocks += walk_entry(beside.entry(n), &mut lines, &mut rows)?;
+        beside.after_entry(n, &mut lines, &mut rows)?;
     }
-    carried_prompt(session, &context, &mut lines, &mut rows)?;
+    beside.carried_prompt(session, &mut lines, &mut rows)?;
     let account = Account {
-        session: session_id,
+        session: session_id.to_owned(),
         head: head.id().to_owned(),
         head_hash,
-        thread: thread.clone(),
+        thread,
         codex_version: codex_version.to_owned(),
         rows,
     };
@@ -215,28 +241,36 @@ pub fn translate(
         context: "the loss account could not be serialised",
         source,
     })?;
+    let leaf = TranslationData {
+        harness: HARNESS.to_owned(),
+        codex_version: codex_version.to_owned(),
+        thread: account.thread.clone(),
+        head: account.head.clone(),
+        head_hash: account.head_hash.clone(),
+        rollout: relative,
+        rollout_sha256: Hash::of(&lines.text).to_string(),
+        account_sha256: Hash::of(&account_bytes).to_string(),
+    };
+    let entries = beside.context_positions().len() as u64;
+    drop(beside);
     if let Some(dir) = rollout.parent() {
         std::fs::create_dir_all(dir)
             .map_err(|e| HomeError::io("creating the rollout directory", dir, e))?;
     }
-    write_new(&rollout, lines.text.as_bytes())?;
-    write_new(&account_path, &account_bytes)?;
-    let leaf = TranslationData {
-        harness: HARNESS.to_owned(),
-        codex_version: codex_version.to_owned(),
-        thread: thread.clone(),
-        head: account.head.clone(),
-        head_hash: account.head_hash.clone(),
-        rollout: relative,
-        rollout_sha256: Hash::of(lines.text.as_bytes()).to_string(),
-        account_sha256: Hash::of(&account_bytes).to_string(),
-    };
-    append_leaf(session, &leaf)?;
+    write_new(&rollout, &lines.text)?;
+    if let Err(e) = write_new(&account_path, &account_bytes) {
+        remove_written(&[&rollout]);
+        return Err(e);
+    }
+    if let Err(e) = append_leaf(session, &leaf) {
+        remove_written(&[&rollout, &account_path]);
+        return Err(e);
+    }
     Ok(Translation {
         rollout,
         account: account_path,
-        thread,
-        entries: context.len() as u64,
+        thread: account.thread,
+        entries,
         blocks,
         kept: account.rows.kept.len() as u64,
         changed: account.rows.changed.len() as u64,
@@ -250,8 +284,8 @@ fn walk_entry(entry: &Entry, lines: &mut Lines, rows: &mut Rows) -> Result<u64, 
     let id = entry.id();
     match &entry.body {
         EntryBody::Message { message } => {
-            for item in message_items(id, message, rows) {
-                lines.item(stamp, item)?;
+            for item in items_of(id, message, rows) {
+                lines.item(stamp, &item)?;
             }
             Ok(match message.get("content") {
                 Some(Value::Array(parts)) => parts.len() as u64,
@@ -261,26 +295,34 @@ fn walk_entry(entry: &Entry, lines: &mut Lines, rows: &mut Rows) -> Result<u64, 
         }
         EntryBody::Compaction { summary, .. } => {
             let text = format!("<COMPACTION SUMMARY {id}>\n{summary}");
-            marked(entry, ("compaction", "COMPACTION SUMMARY", "summary"), rows)?;
+            marked(entry, ("compaction", "COMPACTION SUMMARY", "summary"), rows);
             lines.message(stamp, "developer", &text)?;
             Ok(0)
         }
         EntryBody::BranchSummary { summary, .. } => {
             let text = format!("<BRANCH SUMMARY {id}>\n{summary}");
-            marked(entry, ("branch_summary", "BRANCH SUMMARY", "summary"), rows)?;
+            marked(entry, ("branch_summary", "BRANCH SUMMARY", "summary"), rows);
             lines.message(stamp, "developer", &text)?;
             Ok(0)
         }
         EntryBody::CustomMessage { content, .. } => {
-            let mut texts = Vec::new();
+            let mut text = format!("<CUSTOM MESSAGE {id}>\n");
             let mut walked = 1;
+            let mut first = true;
+            let mut add = |said: &str| {
+                if !first {
+                    text.push('\n');
+                }
+                text.push_str(said);
+                first = false;
+            };
             match content {
-                Value::String(text) => texts.push(text.as_str()),
+                Value::String(said) => add(said),
                 Value::Array(parts) => {
                     walked = parts.len() as u64;
                     for (index, part) in parts.iter().enumerate() {
                         match (kind_of(part), part.get("text").and_then(Value::as_str)) {
-                            ("text", Some(text)) => texts.push(text),
+                            ("text", Some(said)) => add(said),
                             ("text", None) => {
                                 rows.lost(id, Some(part_hash(part)), "text", NO_TEXT);
                             }
@@ -292,8 +334,7 @@ fn walk_entry(entry: &Entry, lines: &mut Lines, rows: &mut Rows) -> Result<u64, 
                 }
                 _ => walked = 0,
             }
-            let text = format!("<CUSTOM MESSAGE {id}>\n{}", texts.join("\n"));
-            marked(entry, ("custom_message", "CUSTOM MESSAGE", "content"), rows)?;
+            marked(entry, ("custom_message", "CUSTOM MESSAGE", "content"), rows);
             lines.message(stamp, "developer", &text)?;
             Ok(walked)
         }
@@ -306,22 +347,51 @@ fn walk_entry(entry: &Entry, lines: &mut Lines, rows: &mut Rows) -> Result<u64, 
 
 /// The changed row of an entry carried as marked developer text, naming each
 /// key of the entry beyond its frame and the one whose text is carried.
-fn marked(
-    entry: &Entry,
-    (before, marker, carried): (&str, &str, &str),
-    rows: &mut Rows,
-) -> Result<(), HomeError> {
-    let value = serde_json::to_value(entry).map_err(|source| HomeError::Json {
-        context: "an entry could not be serialised",
-        source,
-    })?;
+fn marked(entry: &Entry, (before, marker, carried): (&str, &str, &str), rows: &mut Rows) {
     let mut how = vec![format!(
         "carried as developer text under the {marker} marker"
     )];
-    how.extend(not_carried(
-        &value,
-        &["type", "id", "parentId", "timestamp", carried],
-    ));
+    how.extend(
+        body_keys(&entry.body)
+            .into_iter()
+            .filter(|key| *key != carried)
+            .map(|key| format!("{key} not carried")),
+    );
     rows.changed(entry.id(), None, before, "marked text", &how.join("; "));
-    Ok(())
+}
+
+/// The keys a marked entry's body writes beside `type`, `id`, `parentId`
+/// and `timestamp`, sorted and each once, as its line in the session file
+/// holds them. Every field is named, so a field added to one of these
+/// bodies must be placed here before this compiles.
+fn body_keys(body: &EntryBody) -> BTreeSet<&str> {
+    let (named, rest): (&[&str], _) = match body {
+        EntryBody::Compaction {
+            summary: _,
+            first_kept_entry_id: _,
+            tokens_before: _,
+            rest,
+        } => (&["summary", "firstKeptEntryId", "tokensBefore"], Some(rest)),
+        EntryBody::BranchSummary {
+            from_id: _,
+            summary: _,
+            rest,
+        } => (&["fromId", "summary"], Some(rest)),
+        EntryBody::CustomMessage {
+            custom_type: _,
+            content: _,
+            rest,
+        } => (&["customType", "content"], Some(rest)),
+        _ => (&[], None),
+    };
+    let frame = ["type", "id", "parentId", "timestamp"];
+    named
+        .iter()
+        .copied()
+        .chain(
+            rest.into_iter()
+                .flat_map(|rest| rest.keys().map(String::as_str)),
+        )
+        .filter(|key| !frame.contains(key))
+        .collect()
 }
