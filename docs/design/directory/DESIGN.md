@@ -170,6 +170,8 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `crates/lys-identity/src/grants/cannot_give.rs` | the closed reason set, its precedence, and the per-recipient cannot-give list computed from the authority and lineage decisions | DIRECTORY-024 |
 | `crates/lys-identity/tests/grant_cannot_give.rs` | the cannot-give fixture, precedence, in-force, source-mark, service-account and no-rank cases | DIRECTORY-024 |
 | `crates/lys-identity-server/tests/grant_cannot_give.rs` | the cannot-give operation across routes, its wire values and its refusals | DIRECTORY-024 |
+| `crates/lys-identity-server/src/grant_contract/requests.rs` | the cannot-give request: the source grant and the chosen recipient | DIRECTORY-024 |
+| `crates/lys-identity-server/src/grant_contract/views.rs` | the cannot-give answer: its items, the closed reason set on the wire and the source mark | DIRECTORY-024 |
 | `surface/identity/src/features/grants/CannotGiveList.tsx` | renders the server's cannot-give answer and nothing else | DIRECTORY-024 |
 | `surface/identity/src/features/grants/cannotGiveAnswer.ts` | decodes the cannot-give answer and refuses an unknown reason by name | DIRECTORY-024 |
 | `surface/identity/tests/cannot_give.test.tsx` | the cannot-give list on the delegation form against fixture answers | DIRECTORY-024 |

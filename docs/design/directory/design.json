@@ -612,6 +612,16 @@
       "brief": "DIRECTORY-024"
     },
     {
+      "path": "crates/lys-identity-server/src/grant_contract/requests.rs",
+      "note": "the cannot-give request: the source grant and the chosen recipient",
+      "brief": "DIRECTORY-024"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grant_contract/views.rs",
+      "note": "the cannot-give answer: its items, the closed reason set on the wire and the source mark",
+      "brief": "DIRECTORY-024"
+    },
+    {
       "path": "surface/identity/src/features/grants/CannotGiveList.tsx",
       "note": "renders the server's cannot-give answer and nothing else",
       "brief": "DIRECTORY-024"
