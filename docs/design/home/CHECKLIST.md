@@ -76,3 +76,14 @@
 - [ ] **C42** — A fork writes no block, rewrites no earlier byte of the parent, and copies nothing from the parent but its cwd: no credential, handle or launch setting enters the child.
 - [ ] **C43** — lys-home fork --home --lantern [--session] prints one JSON report on success, exits 1 with the refusal on stderr and nothing on stdout, and takes no point or entry id.
 - [ ] **C44** — Rendering a child whose coordinate was carried writes the carried message's text parts as a seed prompt beside the rendered file under an in-band marker line, the render report names it, the template's launch line (printed by render-launch only) passes it as the first prompt and is never run, and PROOF-FORK.md records a fork launched on the installed Claude Code version as hashes, counts, paths, commands, versions and exit codes only.
+
+## The given statement
+
+- [ ] **C181** — render-launch with no key records the lys.given entry with the same data as before, writes no statement, and its report's signing is unsigned.
+- [ ] **C182** — render-launch records given_sha256, the SHA-256 of the RFC 8785 bytes of the lys.given entry's data, in the render manifest block and prints it in its report, and the template_render event keeps its shape without it.
+- [ ] **C183** — render-launch with a key signs those bytes as a lys/attestation/v2 statement kept as a block named by a lys.given_statement entry under the lys.given entry and as given-statement.cose and given-data.json under --out, and its report's signing is signed.
+- [ ] **C184** — lys verify --attestation accepts the given statement with given-data.json, and refuses a copy with one byte altered with its one message and exit status 1, under a stated command that names the refused file.
+- [ ] **C185** — A stated command compares the verified statement's signer public key with the test key's and exits 0, and exits 1 for a statement signed by a second test key.
+- [ ] **C186** — A byte search of the fixture's statement, payload file, statement block, statement entry and render report finds no fixture secret value and no fixture transcript text.
+- [ ] **C187** — The statement's signed payload hash equals the manifest's and the report's given_sha256 and the SHA-256 recomputed from the lys.given entry in the session file for the same render.
+- [ ] **C188** — lys verify --cert with a test authority's public key accepts the given statement against a test certificate issued over the signing test key, and exits 1 against one issued over a second test key.
