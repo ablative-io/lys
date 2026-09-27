@@ -345,6 +345,14 @@ pub enum SecretsError {
         /// The record's name.
         record: String,
     },
+    /// A handle asked for on a memory record, which is read and never used.
+    #[error(
+        "MemoryNotUsable: {record} is a memory record, read by name and never used through a handle (act: read it under the read relation)"
+    )]
+    MemoryNotUsable {
+        /// The record's name.
+        record: String,
+    },
     /// A read of a record that is not there to be read.
     #[error("NotFound: no record by that name (act: ask for a record by a name you can discover)")]
     NotFound,

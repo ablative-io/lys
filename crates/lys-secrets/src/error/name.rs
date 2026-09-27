@@ -47,6 +47,7 @@ impl SecretsError {
             Self::RelationRemoved { .. } => "RelationRemoved",
             Self::KeyNotReadable { .. } => "KeyNotReadable",
             Self::NotFound => "NotFound",
+            Self::MemoryNotUsable { .. } => "MemoryNotUsable",
             Self::ReservationMissing { .. } => "ReservationMissing",
             Self::StoreLocked { .. } => "StoreLocked",
             Self::StatePoisoned => "StatePoisoned",

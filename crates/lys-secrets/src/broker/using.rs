@@ -12,7 +12,6 @@ use crate::error::SecretsError;
 use crate::handle::{HandleToken, Presentation};
 use crate::permission::PermissionCheck;
 use crate::secret::Secret;
-use crate::store::EntryClass;
 
 use super::admit::Admission;
 use super::{Broker, UseError, Used};
@@ -165,9 +164,12 @@ impl<P: PermissionCheck> Broker<P> {
                 .insert(operation.clone(), ("admitted".to_owned(), mark.clone()));
             record.open.insert(operation.clone(), reserved.unwrap_or(0));
         }
-        let opened = self
-            .store
-            .open_for_use(&self.store_key, &entry, EntryClass::Credential);
+        let opened = match self.store.entry(&entry).map(|view| view.class) {
+            Some(class) => self.store.open_for_use(&self.store_key, &entry, class),
+            None => Err(SecretsError::SecretUnknown {
+                name: entry.clone(),
+            }),
+        };
         let credential = match opened {
             Ok(credential) => credential,
             Err(refusal) => {

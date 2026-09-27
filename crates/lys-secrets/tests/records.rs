@@ -124,3 +124,54 @@ fn a_removed_relation_is_named_and_stays_named_after_a_restart() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn a_key_is_used_through_a_handle_and_memory_is_never_handed_out() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let paths = paths(&root)?;
+    let grants = reader();
+    for record in ["notes", "signing-key"] {
+        grants.grant(SecretRelation {
+            identity: "agent:noor".to_owned(),
+            secret: record.to_owned(),
+            granted_by: Some("person:tom".to_owned()),
+        });
+    }
+    let mut broker = Broker::create(&paths, grants, Box::new(|| 1))?;
+    broker.seal_record(
+        "notes",
+        EntryClass::Memory,
+        "person:tom",
+        &Secret::from_slice(b"memory"),
+    )?;
+    broker.seal_record(
+        "signing-key",
+        EntryClass::Key,
+        "person:tom",
+        &Secret::from_slice(b"key-bytes"),
+    )?;
+    let agent =
+        lys_core::Ed25519Identity::load_or_generate(&root.path().join("keys").join("agent.key"))?;
+    let holder = lys_secrets::Holder {
+        identity: "agent:noor".to_owned(),
+        key: agent.public_key_bytes(),
+    };
+    assert_eq!(
+        refusal(broker.issue(&holder, "notes", 1, 60_000)),
+        "MemoryNotUsable"
+    );
+    let issued = broker.issue(&holder, "signing-key", 1, 60_000)?;
+    let presentation = lys_secrets::Presentation::sign(
+        &issued.id,
+        &lys_secrets::new_operation_id()?,
+        1,
+        [7; 32],
+        &agent,
+    )?;
+    let used = broker.use_handle(&issued.token, &presentation, |key| key.expose().to_vec())?;
+    match used {
+        lys_secrets::Used::Forwarded { answer, .. } => assert_eq!(answer, b"key-bytes"),
+        lys_secrets::Used::Retried { outcome } => return Err(outcome.into()),
+    }
+    Ok(())
+}

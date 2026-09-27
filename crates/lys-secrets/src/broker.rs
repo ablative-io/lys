@@ -330,10 +330,18 @@ impl<P: PermissionCheck> Broker<P> {
         not_after_ms: i64,
         spend_cap: Option<u64>,
     ) -> Result<IssuedHandle, SecretsError> {
-        if self.store.entry(secret).is_none() {
-            return Err(SecretsError::SecretUnknown {
-                name: secret.to_owned(),
-            });
+        match self.store.entry(secret).map(|entry| entry.class) {
+            None => {
+                return Err(SecretsError::SecretUnknown {
+                    name: secret.to_owned(),
+                });
+            }
+            Some(EntryClass::Memory) => {
+                return Err(SecretsError::MemoryNotUsable {
+                    record: secret.to_owned(),
+                });
+            }
+            Some(EntryClass::Credential | EntryClass::Key) => {}
         }
         let now = (self.clock)();
         if not_after_ms <= now || max_uses == 0 {
