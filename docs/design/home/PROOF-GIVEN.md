@@ -208,10 +208,10 @@ entry lines.
 - The real render's entry names hashes only; the search above finds no line
   of any document in this file.
 
-## The given statement, checked by a stranger (HOME-016 R6)
+## The given statement, checked by a stranger (HOME-018 R6)
 
 Run on Dean's laptop with the `lys` and `lys-home` debug binaries built by
-`cargo +1.97.1 build -p lys -p lys-home` from hand/HOME-016 at ff6da53 (the
+`cargo +1.97.1 build -p lys -p lys-home` from the branch hand/HOME-016 at ff6da53 (the
 code commit; the commit carrying this section changes documents only). The
 scratch directory is fresh: `home/sessions/fixture.jsonl` is a copy of
 `crates/lys-home/tests/fixtures/launch/session.jsonl`; `template.json` is

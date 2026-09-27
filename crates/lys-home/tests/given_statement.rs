@@ -1,4 +1,4 @@
-//! The given statement end to end through the built binary (HOME-016 R3 and
+//! The given statement end to end through the built binary (HOME-018 R3 and
 //! R4): the fixture template, with a fixture secret value in its env slot,
 //! rendered over the fixture session with no key, with two test keys made
 //! here in temporary directories, and with keys that must be refused. No
