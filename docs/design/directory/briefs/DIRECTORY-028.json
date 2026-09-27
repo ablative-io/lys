@@ -1,0 +1,291 @@
+{
+  "id": "DIRECTORY-028",
+  "cluster": "directory",
+  "title": "Draw the access graph from Access's answers only (conformance row 8.3)",
+  "depends_on": [
+    "DIRECTORY-005",
+    "DIRECTORY-006"
+  ],
+  "blocked_by": [
+    "DIRECTORY-005 landed on lys main, shown by a command anyone can run from any directory: git clone https://github.com/ablative-io/lys lys-check && cd lys-check && test -d surface/identity && grep -rq 'ID001_STANDALONE' surface/identity && grep -rq 'ID001_SCREEN_REFUSAL' surface/identity exits 0. At the commit this brief was written against it exits 1, because surface/identity does not exist.",
+    "DIRECTORY-006 landed on lys main, shown by a command anyone can run from any directory: git clone https://github.com/ablative-io/lys lys-check && cd lys-check && test -f crates/lys-identity-server/src/grants.rs && grep -q 'GRANT_EXPLAIN' crates/lys-identity-server/tests/grant_explanations.rs && test -f surface/identity/src/generated/index.ts && grep -rq 'GRANT_SCREEN' surface/identity/tests exits 0. At the commit this brief was written against it exits 1, because crates/lys-identity-server does not exist.",
+    "Reconcile R1 against DIRECTORY-006 as landed before dispatch: if the identity server already serves the permission model's resources with their parents (a hidden parent marked withheld), their declared actions and the model version, read-only and under R1's visibility rule, R1's files become that route's and R1's acceptance is run against it unchanged; otherwise R1 adds the route as written.",
+    "A frontend test command for surface/identity that anyone can run from a fresh clone, named by DIRECTORY-005's reviewed manifest for surface/identity/. None of the project's seven gate legs runs a frontend test today, so this brief's surface tests are exercised by no gate until that command exists.",
+    "Reconcile R6's modify paths against DIRECTORY-005's and DIRECTORY-006's landed manifests before dispatch. DIRECTORY-005 declares its screens only as surface/identity/, so its directory preview drawer and identity record screen are named at the paths the identity surface was built at on the branch hand/identity-surface at c94ab69 (surface/identity/src/features/people/Preview.tsx and surface/identity/src/features/file/IdentityFile.tsx); the You page is named at DIRECTORY-006 R6's declared path. Any path that differs on landing is written into R6's files and the design's structure array by a revision of this brief before dispatch (CN9).",
+    "The lead's answer on the Show in graph link for the screens present at build time that show no single identity (sign-in, the delegation form and the grant explanation); until it is given, R6 places the link only on the screens that show one identity.",
+    "Sign-off of this brief through the card chain before it is dispatched; the card is created blocked on DIRECTORY-005 and DIRECTORY-006 so it cannot dispatch early (CN12)."
+  ],
+  "checklist": [
+    "C222",
+    "C223",
+    "C224",
+    "C225",
+    "C226",
+    "C227",
+    "C228"
+  ],
+  "stories": [
+    "S95",
+    "S96",
+    "S97"
+  ],
+  "design_anchor": [
+    "ADR-003",
+    "ADR-004",
+    "ADR-010",
+    "ADR-011",
+    "ADR-085"
+  ],
+  "purpose": "The access graph screen in surface/identity/, the row that passes conformance row 8.3: the graph draws the same answers as Access and never computes its own. Access is DIRECTORY-006 R5's grant and explanation seam: the grant list (GET /grants), the forward question (POST /grants/why), which answers yes with the path to a person or no with the named reason, each with the model version used (row 8.1), and the reverse question (POST /grants/who), who can reach a resource (row 8.2). The screen follows the graph of the accepted mock-up docs/design/identity/mockup/index.v5.html (sha256 e67622e19f450e2335029f293f18b4757801f3245758a8b667521afa120ab91f, lines 1309 to 1354) except where ADR-085 replaces the mock-up's own reckoning: grant edges and every reachability come only from Access answers, a resource's parent and an agent's responsible person are recorded facts drawn as recorded, and the graph holds no rule of its own. DIRECTORY-006 R6 hands the graph's rendering to this brief; Access's contract is not amended here.",
+  "task": "Add one read-only route to the identity server that serves the permission model's resources with their parents (R1), build the graph module under surface/identity/src/features/graph/ (R2 to R5), reach it by its deep links and the Show in graph links (R6), and prove it with the import-boundary test (R7) and the fixture comparison against the real DIRECTORY-006 evaluator (R8). The requirements are in dependency order: every file a requirement's acceptance uses is created by that requirement or an earlier one. Every path is relative to the repository root (CN3). Nothing in surface/ or crates/lys-identity-server exists at the commit this brief was written against; every file below is created or modified on top of what DIRECTORY-005 and DIRECTORY-006 land, and each modify path is reconciled against their landed manifests before dispatch (CN9).\n\nWhat the graph draws. It draws what Access says, and nothing more. Grant edges and every reachability come only from Access answers returned by the directory, and the graph holds no rule of its own. It draws a path exactly as Access returns it, and a no as Access's reason. When a POST /grants/why refusal names a blocking grant, the graph draws that grant as the mock-up's dashed does not stand edge with the reason Access gives; a held grant that is revoked or expired is drawn dashed only because the forward question on it is refused and that refusal names it. When Access no longer returns a grant at all, it disappears from the next draw. The graph never infers on its own that a grant does not stand, and never judges standing from a grant's fields. A resource's parent and an agent's responsible person are recorded facts, not rules, and the graph draws them as recorded: an agent's responsible person from the directory's records, and a resource's parent from the permission model (DIRECTORY-006 R1 GRANT_MODEL, R2 GRANT_ANCESTRY), read through R1's route, which records nothing and adds no directory resource record. R1's route shows a caller a resource only where they hold a grant on it or on one of its ancestors, and a directory administrator under DIRECTORY-006 R6 sees every resource whether or not they hold a grant; pass-on authority confers no further visibility. When a resource's parent is hidden from the caller, the route serves the resource with parent {withheld: true}, and the graph draws a small parent withheld mark and no containment edge, never a root and never the parent's name. The route also serves each resource's declared actions and the model version it read them under. Nothing about containment is computed in the page.\n\nWhat the person sees. A person opens the graph over what they may see, their own reach (DIRECTORY-006 R6). Before a question the graph shows the people, agents and resources the person may see, with containment and answers-to edges from the records, and no grant edges. Choosing a person or agent reads GET /grants for the grants that identity holds and the caller may see and, for each resource and action those grants carry, asks POST /grants/why, which records nothing, and draws each answer as given; no reach operation is added, and the answer is complete for what the caller may see, paged by the grant list. Choosing a resource asks POST /grants/who, as row 8.2 does, once for each action R1's route serves for it. The reverse question needs its own visibility permission (DIRECTORY-006 R5); a directory administrator with that permission sees the whole directory. A hidden grant is never drawn or hinted at, and a question the person may not ask is refused by name. The graph has three toggles, as the mock-up has: Grants shows or hides the Access answers already drawn without asking again, Containment, and Who answers for whom.\n\nVersions and freshness. Every grant and does not stand edge carries the model version of the Access answer it came from, and each containment edge the model version of R1's answer it came from, shown as the answers' versions are. When a draw holds more than one version, a line above the graph says so and names each; the graph neither refuses a mixed picture nor re-asks. The graph asks Access on navigating to the graph, reloading it, or pressing a visible refresh control, and does not re-ask on its own. It shows the time of its draw beside the version.\n\nReaching the graph. This brief adds the deep links #/graph and #/graph/<id> and a Show in graph link on every screen present at build time that shows one identity: the directory's preview drawer, where the mock-up carries it (index.v5.html:1206), and the identity record screen, each for people and agents alike, and the You page, for the signed-in person. The rail entry and the g h shortcut belong to the shell card AL4OyeKG, which registers every screen's route and key; until the shell lands, the graph is reached by its deep links and the Show in graph links.\n\nThe Access client is DIRECTORY-006's generated module surface/identity/src/generated/index.ts, regenerated from the server schema for R1's route and otherwise used as it is. The graph fixture directory, stated once here and written out twice, in crates/lys-identity-server/tests/grant_resources.rs for the server test and in surface/identity/tests/fixtures/graph-directory.ts for the surface tests: people person-owner (holds P-owner on resource-org), person-plain (holds P-plain on resource-b) and person-auditor (a directory administrator holding the reverse question's visibility permission and no grant); agents agent-owner (responsible person person-owner) and agent-plain (responsible person person-plain); resources resource-org (no parent), resource-a and resource-b (each with parent resource-org); grants G1 (agent-owner on resource-a, from P-owner), G2 (agent-plain on resource-b, from P-plain) and G3 (agent-owner on resource-b, from P-owner, with a time window ending at instant E on the server's named clock). Only person-auditor holds the reverse question's visibility permission. Both copies are seeded into the standalone identity server with disposable local dependencies through DIRECTORY-003's and DIRECTORY-006's own typed operations, the Rust copy by calling them in the Rust tree and the surface copy through the server's routes, so every Access answer a test compares against comes from the real evaluator and never from a stub the test wrote. Test identifiers: GRAPH_RESOURCES, GRAPH_BOUNDARY, GRAPH_EVERY_PAIR, GRAPH_REVOKED, GRAPH_EXPIRED, GRAPH_VISIBILITY, GRAPH_VERSION, GRAPH_OUTAGE, each named in the test that carries it.\n\nOut of scope: the rail entry and g h shortcut (shell card AL4OyeKG); a suspended holder drawn from Access's answer, which waits for the lifecycle card once suspension is decided and folded; Show in graph links on screens that land later; recording row 8.3's brief in CONFORMANCE.md; any change to Access's contract, lys-core or a published wire format; the suspension semantics and the grant representation, which stay open.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Serve the permission model's resources with their parents, read-only",
+      "spec": "WHEN an authenticated caller asks GET /grants/resources, THE SYSTEM SHALL answer, in crates/lys-identity-server/src/grant_resources.rs registered in crates/lys-identity-server/src/routes.rs, with each resource of the permission model (DIRECTORY-006 R1 GRANT_MODEL, R2 GRANT_ANCESTRY) the caller may see, its parent, the actions the model declares for it, and the model version the answer was read under, calling the same authority owner as DIRECTORY-006 R5's operations. A caller sees a resource only where they hold a grant on it or on one of its ancestors, or where they are a directory administrator under DIRECTORY-006 R6's administrator view, who sees every resource whether or not they hold a grant. IF a resource's parent is a resource the caller may not see, THEN THE SYSTEM SHALL answer that resource with parent {withheld: true}. IF the caller is unauthenticated, or the permission engine is unavailable, THEN THE SYSTEM SHALL answer with a named refusal. THE SYSTEM SHALL NOT record, append or mutate anything on this route; SHALL NOT name, count or hint at a resource the caller may not see, a withheld parent included; SHALL NOT answer a resource whose parent is withheld as having no parent; SHALL NOT widen what a caller sees because they hold pass-on authority on a grant; SHALL NOT answer an outage as an empty list (ADR-004); and SHALL NOT add a resource record to the directory.",
+      "acceptance": [
+        "crates/lys-identity-server/tests/grant_resources.rs (GRAPH_RESOURCES) states the graph fixture directory of the Task in Rust and seeds it through DIRECTORY-003's and DIRECTORY-006's typed operations before its first request; as person-owner, the answer holds exactly the ids resource-org, resource-a and resource-b; resource-org has no parent, resource-a and resource-b each have parent resource-org, and each resource's actions equal the actions the model declares for it.",
+        "GRAPH_RESOURCES, as person-auditor, who holds no grant: the answer holds exactly resource-org, resource-a and resource-b, with the same parents as person-owner's answer.",
+        "GRAPH_RESOURCES, as person-plain: the answer holds exactly one resource, resource-b, whose parent is {withheld: true}, and the serialised response body contains 0 occurrences of the strings resource-org and resource-a.",
+        "GRAPH_RESOURCES, as person-owner: the answer's model version equals the model version of the POST /grants/why answer for agent-owner on resource-a asked in the same test.",
+        "GRAPH_RESOURCES: an unauthenticated request is answered with the named unauthenticated refusal; with the permission engine stopped, a request as person-owner is answered with the named outage refusal and no resource list.",
+        "GRAPH_RESOURCES: the authoritative event count and the permission projection revision are equal before and after one request from each of person-owner, person-auditor and person-plain; the test asserts it made 3 such requests."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/grant_resources.rs",
+          "crates/lys-identity-server/tests/grant_resources.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/routes.rs",
+          "surface/identity/src/generated/index.ts"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C224"
+      ],
+      "stories": [
+        "S95"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Build the graph's grant edges from Access answers only",
+      "spec": "WHEN an Access answer arrives for a question the graph asked, THE SYSTEM SHALL build its edges in surface/identity/src/features/graph/graphModel.ts from that answer alone, rendered by surface/identity/src/features/graph/GraphScreen.tsx with its side panel and refusal element: for a POST /grants/why answer that permits, one grant edge per step of the returned path, in the returned order, between the nodes the step names, labelled with the step's relation as returned; for a POST /grants/why refusal that names a blocking grant, one dashed does not stand edge for that grant carrying the reason text Access gives; for a refusal that names no grant, no edge, and Access's reason text in the side panel; for a POST /grants/who answer, each returned holder with its returned path, drawn the same way. IF the Access client call fails, THEN THE SYSTEM SHALL show the refusal the client reports, by its name, and draw no grant edge for that question. THE SYSTEM SHALL NOT draw a grant edge or a reachability highlight without an Access answer behind it; SHALL NOT draw a does not stand edge except for a grant a refusal names; SHALL NOT judge standing, ancestry, expiry or reachability from a grant's fields or any record (ADR-011); SHALL NOT shorten, re-root, merge or reorder a returned path, whose last step reaches a person (ADR-003); SHALL NOT write reason wording of its own; SHALL NOT keep an edge from an earlier draw that the current draw's answers do not return; and SHALL NOT draw an Access outage as an empty graph (ADR-004).",
+      "acceptance": [
+        "surface/identity/tests/graph.test.tsx: given one permitting POST /grants/why answer, of DIRECTORY-006's generated type, whose path has three steps, the model built from it holds exactly three grant edges, and their (from, to, label) triples equal the three steps' in the returned order.",
+        "surface/identity/tests/graph.test.tsx: given one POST /grants/why refusal that names grant G1 with reason text R, the model holds exactly 1 does not stand edge, it carries G1's id, its reason text equals R character for character, and the model holds 0 grant edges.",
+        "surface/identity/tests/graph.test.tsx: given one POST /grants/why refusal that names no grant, with reason text R, the model holds 0 grant edges and 0 does not stand edges, and the rendered side panel's text contains R character for character.",
+        "surface/identity/tests/graph.test.tsx: given a grant list returning G1 whose fields carry a revoked state and an end time before the test clock, and a permitting POST /grants/why answer for G1's resource and action, the model holds a grant edge carrying G1's id and 0 does not stand edges.",
+        "surface/identity/tests/graph.test.tsx: given a first draw from a grant list returning G1 with a permitting answer, and a second draw from a grant list that does not return G1 and answers none of which names G1, the second draw holds 0 edges carrying G1's id.",
+        "surface/identity/tests/graph.test.tsx: when the Access client call rejects with a transport failure, the screen renders the refusal element carrying the name the client reports, and the draw holds 0 grant edges and 0 does not stand edges."
+      ],
+      "files": {
+        "create": [
+          "surface/identity/src/features/graph/graphModel.ts",
+          "surface/identity/src/features/graph/GraphScreen.tsx",
+          "surface/identity/tests/graph.test.tsx"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C223"
+      ],
+      "stories": [
+        "S95",
+        "S97"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Draw the view before a question and the recorded relations",
+      "spec": "WHEN the graph opens with no node chosen, THE SYSTEM SHALL show, in surface/identity/src/features/graph/recordEdges.ts through the generated module surface/identity/src/generated/index.ts, the people and agents the directory's listing rules return to the signed-in person and the resources R1's route returns to them, with no grant edge. WHILE the Containment toggle is on, THE SYSTEM SHALL draw one containment edge from each shown resource to the parent R1's route returns for it, and, for a resource whose parent R1's route returns as {withheld: true}, a parent withheld mark on that resource and no containment edge. WHILE the Who answers for whom toggle is on, THE SYSTEM SHALL draw one answers-to edge from each shown agent to its recorded responsible person. WHILE the Grants toggle is off, THE SYSTEM SHALL hide the grant and does not stand edges already drawn, and WHEN it is turned on again, THE SYSTEM SHALL show them again, in both cases without asking Access. Each toggle is a native button reachable by the Tab key and pressed by the Enter key. THE SYSTEM SHALL NOT draw a grant edge before a node is chosen; SHALL NOT compute a resource's parent, an ancestor or a responsible person, or draw one R1's route or the directory's records did not return; SHALL NOT show a resource R1's route did not return; SHALL NOT draw a resource whose parent is withheld as a root, or name its withheld parent; and SHALL NOT ask Access when a toggle changes.",
+      "acceptance": [
+        "surface/identity/tests/acceptance/graph.spec.ts (GRAPH_VISIBILITY), with the graph fixture directory of surface/identity/tests/fixtures/graph-directory.ts seeded, signed in as person-auditor with no node chosen: the draw holds exactly 8 nodes (person-owner, person-plain, person-auditor, agent-owner, agent-plain, resource-org, resource-a, resource-b), 2 containment edges (resource-a to resource-org, resource-b to resource-org), 2 answers-to edges (agent-owner to person-owner, agent-plain to person-plain), 0 grant edges and 0 does not stand edges.",
+        "surface/identity/tests/acceptance/graph.spec.ts (GRAPH_VISIBILITY), signed in as person-plain with no node chosen: the identity node ids drawn equal, as a set, the ids of the identity records the directory lists to person-plain through the generated module; the resource node ids drawn are exactly resource-b; resource-b carries the parent withheld mark; the draw holds 0 containment edges and 0 grant edges; and the serialised rendered document contains 0 occurrences of resource-org, resource-a, G1 and G3.",
+        "surface/identity/tests/acceptance/graph.spec.ts, signed in as person-auditor with no node chosen: turning Containment off leaves 0 containment edges and turning it on restores 2; turning Who answers for whom off leaves 0 answers-to edges and turning it on restores 2; the client's request log holds 0 requests issued during the four toggle presses.",
+        "surface/identity/tests/graph.test.tsx: after a draw holding 3 grant edges and 1 does not stand edge, pressing Grants leaves 0 grant and 0 does not stand edges drawn, pressing it again restores 3 and 1, and the client issues 0 requests across both presses; focusing Grants with the Tab key and pressing Enter has the same effect as clicking it.",
+        "surface/identity/tests/graph.test.tsx: given R1's answer holding resource-org with no parent and resource-b with parent {withheld: true}, the draw holds 0 containment edges, resource-b carries exactly 1 parent withheld mark, and resource-org carries 0 parent withheld marks."
+      ],
+      "files": {
+        "create": [
+          "surface/identity/src/features/graph/recordEdges.ts",
+          "surface/identity/tests/fixtures/graph-directory.ts",
+          "surface/identity/tests/acceptance/graph.spec.ts"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C225"
+      ],
+      "stories": [
+        "S95"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Ask Access about the chosen node under the person's permissions",
+      "spec": "WHEN the person chooses a person or agent node, THE SYSTEM SHALL, in surface/identity/src/features/graph/graphQuestions.ts through the generated module, read GET /grants for the grants that identity holds and the caller may see, following every page of the list, and for each resource and action those grants carry ask POST /grants/why once for that identity, that resource and that action, and draw each answer as R2 says. WHEN the person chooses a resource node, THE SYSTEM SHALL ask POST /grants/who once for each action R1's route returns for that resource, and draw exactly the holders and paths returned. IF Access refuses a question the person may not ask, THEN THE SYSTEM SHALL show that refusal by the name and reason Access returns and draw no holder for it. IF a POST /grants/who answer names a continuation, THEN THE SYSTEM SHALL mark that answer incomplete and draw only the holders returned. Each node is reachable by the Tab key and chosen by the Enter key as by a click. THE SYSTEM SHALL NOT compute a reach of its own, walk ancestors or ask a question for a resource and action no listed grant carries; SHALL NOT add, drop or hint at a holder or grant Access did not return (no id, label, count or placeholder for a hidden grant); SHALL NOT present an incomplete answer as the whole set; and SHALL NOT answer a refused question by asking other questions in its place.",
+      "acceptance": [
+        "surface/identity/tests/acceptance/graph.spec.ts, signed in as person-auditor, choosing agent-owner: the client issues GET /grants for agent-owner, then one POST /grants/why per distinct (resource, action) that G1 and G3 carry and no other POST /grants/why; the test asserts that count is greater than 0 and that the draw holds an edge carrying G1's id whose path equals the answer returned for G1's resource and action.",
+        "surface/identity/tests/acceptance/graph.spec.ts (GRAPH_VISIBILITY), signed in as person-auditor, choosing resource-a: the client issues one POST /grants/who per action R1's route returns for resource-a, and the holders drawn equal, as a set of ids, the union of the holders those answers return, which includes agent-owner.",
+        "surface/identity/tests/acceptance/graph.spec.ts (GRAPH_VISIBILITY), signed in as person-plain, choosing resource-b: every POST /grants/who is refused, the side panel shows the refusal's name and reason text character for character as returned, the draw holds 0 holder highlights for resource-b, and the client's request log holds 0 requests issued after the first refusal.",
+        "surface/identity/tests/acceptance/graph.spec.ts (GRAPH_VISIBILITY), signed in as person-plain, choosing agent-plain: the draw holds an edge carrying G2's id, and the serialised rendered document contains 0 occurrences of G1, G3, resource-a and resource-org.",
+        "surface/identity/tests/graph.test.tsx: given a POST /grants/who answer of two holders that names a continuation, the panel carries the element with data-incomplete=\"true\" and lists exactly 2 holders; given the same answer with no continuation, no element with data-incomplete=\"true\" is rendered.",
+        "surface/identity/tests/graph.test.tsx: given a grant list of two pages, the client issues 2 GET /grants requests and the POST /grants/why requests cover the grants of both pages.",
+        "surface/identity/tests/graph.test.tsx: moving focus to a resource node with the Tab key and pressing Enter issues the same requests as clicking that node."
+      ],
+      "files": {
+        "create": [
+          "surface/identity/src/features/graph/graphQuestions.ts"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C226"
+      ],
+      "stories": [
+        "S95",
+        "S96"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Name each answer's model version and the draw time, and redraw only when asked",
+      "spec": "THE SYSTEM SHALL show, in surface/identity/src/features/graph/GraphScreen.tsx, on each grant and does not stand edge the model version of the Access answer it came from, as that answer carries it, and on each containment edge the model version of R1's answer it came from, in the same way. WHILE a draw holds answers, R1's answer among them, of more than one model version, THE SYSTEM SHALL show a line above the graph that says so and names each version. THE SYSTEM SHALL show the time of the draw beside the version. WHEN the person navigates to the graph, reloads it, or presses the visible refresh control, THE SYSTEM SHALL draw again by asking Access afresh. The refresh control is a native button reachable by the Tab key and pressed by the Enter key. The layout in surface/identity/src/features/graph/graphLayout.ts is deterministic: the same nodes and edges place every node at the same coordinates on every draw. THE SYSTEM SHALL NOT re-ask Access on its own (no timer, poll or push); SHALL NOT refuse to draw a picture of mixed versions; SHALL NOT re-ask because the versions differ; and SHALL NOT show a model version that neither an Access answer nor R1's answer in the draw returned.",
+      "acceptance": [
+        "surface/identity/tests/graph.test.tsx: given a draw built from two answers, one carrying model version v7 and one carrying v8, every edge's shown model version equals the version of the answer it came from, and the line above the graph contains both v7 and v8.",
+        "surface/identity/tests/graph.test.tsx: given a draw built only from answers carrying v7, no mixed-version line is rendered and the version shown beside the draw time is v7.",
+        "surface/identity/tests/graph.test.tsx: given R1's answer carrying model version v7 and one POST /grants/why answer carrying v8, each containment edge shows v7, each grant edge shows v8, and the line above the graph contains both v7 and v8.",
+        "surface/identity/tests/graph.test.tsx: with the test clock fixed at a named instant T and the zone UTC, the draw time element's datetime attribute equals T in ISO 8601 form and its text equals T formatted as YYYY-MM-DD HH:MM:SS UTC.",
+        "surface/identity/tests/graph.test.tsx: after a draw that issued N Access requests, advancing the fake timers by 600000 milliseconds issues 0 further requests; pressing the refresh control then issues N requests; focusing the refresh control with the Tab key and pressing Enter issues N more.",
+        "surface/identity/tests/acceptance/graph.spec.ts, signed in as person-auditor with agent-owner chosen: reloading the page issues the same number of Access requests as the first draw.",
+        "surface/identity/tests/graph.test.tsx: laying out the same model twice gives equal x and y coordinates for every node."
+      ],
+      "files": {
+        "create": [
+          "surface/identity/src/features/graph/graphLayout.ts"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C227"
+      ],
+      "stories": [
+        "S95",
+        "S96"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Reach the graph by its deep links and the Show in graph links",
+      "spec": "WHEN the location is #/graph/<id> for an identity or resource id, THE SYSTEM SHALL open the graph with that node chosen and ask Access about it as R4 says; WHEN the location is #/graph, THE SYSTEM SHALL open the view before a question (R3). The route is registered in surface/identity/src/routes.tsx. Each screen present at build time that shows one identity SHALL carry exactly one Show in graph link, surface/identity/src/features/graph/ShowInGraphLink.tsx, to #/graph/<that identity's id>: the directory's preview drawer in surface/identity/src/features/people/Preview.tsx and the identity record screen in surface/identity/src/features/file/IdentityFile.tsx, each for a person and for an agent, and the You page in surface/identity/src/features/grants/YouGrants.tsx, for the signed-in person. THE SYSTEM SHALL NOT add a rail entry or the g h shortcut, which the shell card AL4OyeKG registers; SHALL NOT point a Show in graph link at any node other than the identity its screen shows; and SHALL NOT add any grant, revoke or delegate control to the graph.",
+      "acceptance": [
+        "surface/identity/tests/acceptance/graph.spec.ts, signed in as person-auditor, opening #/graph/agent-owner: the graph opens with agent-owner chosen and the client issues the GET /grants and POST /grants/why requests R4 names for agent-owner.",
+        "surface/identity/tests/acceptance/graph.spec.ts, signed in as person-auditor, opening #/graph: the draw holds 0 grant edges and the client issues 0 POST /grants/why and 0 POST /grants/who requests.",
+        "Directory preview drawer, surface/identity/tests/acceptance/graph.spec.ts, signed in as person-auditor: previewing agent-plain from the directory shows exactly one link whose text is Show in graph and whose href is #/graph/agent-plain; previewing person-plain shows exactly one such link, whose href is #/graph/person-plain.",
+        "Identity record screen, surface/identity/tests/acceptance/graph.spec.ts, signed in as person-auditor: the record screen for agent-plain contains exactly one link whose text is Show in graph and whose href is #/graph/agent-plain; the record screen for person-plain contains exactly one such link, whose href is #/graph/person-plain.",
+        "You page, surface/identity/tests/acceptance/graph.spec.ts, signed in as person-plain: the You page contains exactly one link whose text is Show in graph and whose href is #/graph/person-plain.",
+        "From the repository root: grep -rn \"g h\" surface/identity/src/features/graph/ prints nothing and exits 1."
+      ],
+      "files": {
+        "create": [
+          "surface/identity/src/features/graph/ShowInGraphLink.tsx"
+        ],
+        "modify": [
+          "surface/identity/src/routes.tsx",
+          "surface/identity/src/features/people/Preview.tsx",
+          "surface/identity/src/features/file/IdentityFile.tsx",
+          "surface/identity/src/features/grants/YouGrants.tsx"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C228"
+      ],
+      "stories": [
+        "S95"
+      ]
+    },
+    {
+      "id": "R7",
+      "title": "Prove the graph module holds no permission logic of its own",
+      "spec": "The test surface/identity/tests/graph_boundary.test.ts (GRAPH_BOUNDARY) reads every source file under surface/identity/src/features/graph/, collects every import specifier, follows every relative import transitively, and fails on any specifier other than react, a relative path resolving inside surface/identity/src/features/graph/, and the relative path resolving to surface/identity/src/generated/index.ts, the Access client. Because the permission engine is Rust and cannot be imported by TypeScript, the same test also fails when any file in the module declares a function or constant named can, reach, whoCan, standing, ancestors, chainOf or grantsOf (the mock-up's own rule functions, index.v5.html:418-445), and when any file references the generated module's delegate or revoke operation. The test SHALL count the files and specifiers it checked and SHALL fail when either count is zero; it SHALL NOT pass by scanning nothing.",
+      "acceptance": [
+        "surface/identity/tests/graph_boundary.test.ts reports that it checked 6 source files and more than 0 import specifiers, and passes on the module as built.",
+        "Adding the line import { GrantExplanation } from '../grants/GrantExplanation'; to surface/identity/src/features/graph/graphModel.ts makes GRAPH_BOUNDARY fail while every test in surface/identity/tests/graph.test.tsx passes.",
+        "Adding the line function standing() { return true; } to surface/identity/src/features/graph/graphModel.ts makes GRAPH_BOUNDARY fail while every test in surface/identity/tests/graph.test.tsx passes.",
+        "Adding a reference to the generated module's revoke operation to surface/identity/src/features/graph/GraphScreen.tsx makes GRAPH_BOUNDARY fail while every test in surface/identity/tests/graph.test.tsx passes."
+      ],
+      "files": {
+        "create": [
+          "surface/identity/tests/graph_boundary.test.ts"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C222"
+      ],
+      "stories": [
+        "S97"
+      ]
+    },
+    {
+      "id": "R8",
+      "title": "Compare every drawn edge with the real evaluator over a fixture directory",
+      "spec": "The fixture surface/identity/tests/fixtures/graph-directory.ts (created by R3) is seeded into the standalone identity server with disposable local dependencies through DIRECTORY-003's and DIRECTORY-006's own typed operations, and the tests this requirement adds to surface/identity/tests/acceptance/graph.spec.ts (created by R3) compare what the graph draws with what that server's Access returns for the same question. A pair is one identity, one resource and one action that resource declares. THE SYSTEM SHALL NOT compare the graph against a stub of Access or against answers the test wrote, and SHALL NOT need Cambium, Aion, Argus or Manifold (ADR-004). The test evidence names conformance row 8.3 and pins the mock-up hash e67622e19f450e2335029f293f18b4757801f3245758a8b667521afa120ab91f.",
+      "acceptance": [
+        "GRAPH_EVERY_PAIR: signed in as person-auditor, for every identity (5) on every resource (3) and every action R1's route returns for that resource, the test asks POST /grants/why through the generated module; it asserts that the number of pairs compared equals 5 times the sum of the three resources' action counts and is greater than 0, and that at least 1 answer permits and at least 1 refuses. For each identity it draws the graph with that identity chosen and asserts that every grant edge drawn equals, step for step in order, the path of a permitting answer for the same identity, resource and action, and that every does not stand edge drawn carries the id of the grant a refusal for the same identity, resource and action names, with that refusal's reason text character for character; it asserts the number of drawn edges compared is greater than 0.",
+        "GRAPH_EVERY_PAIR: for each of the 3 resources and each action R1's route returns for it, the holders the graph draws for that resource equal, as a set of ids, the holders the POST /grants/who answer returns; the test asserts the number of reverse questions compared is greater than 0.",
+        "GRAPH_REVOKED: signed in as person-auditor with agent-owner chosen, the draw holds a grant edge carrying G1's id; after G1 is revoked through DIRECTORY-006's revoke operation and the refresh control is pressed, the draw holds 0 grant edges carrying G1's id, and the number of does not stand edges carrying G1's id equals the number of that draw's POST /grants/why refusals naming G1, which the test asserts is greater than 0, each edge carrying its refusal's reason text character for character.",
+        "GRAPH_EXPIRED: signed in as person-auditor with agent-owner chosen, the draw holds a grant edge carrying G3's id; after the server's named clock is advanced past E and the refresh control is pressed, the draw holds 0 grant edges carrying G3's id, and the number of does not stand edges carrying G3's id equals the number of that draw's POST /grants/why refusals naming G3, which the test asserts is greater than 0, each edge carrying its refusal's reason text character for character.",
+        "GRAPH_VERSION: for every edge drawn in GRAPH_EVERY_PAIR, the model version shown on it equals the model version of the server's answer it came from; the test asserts the number of edges checked is greater than 0.",
+        "GRAPH_OUTAGE: with the permission engine stopped, signed in as person-auditor, choosing agent-owner shows the refusal element carrying the outage refusal's name as the server returns it, and the draw holds 0 grant edges.",
+        "From the repository root: grep -c 'e67622e19f450e2335029f293f18b4757801f3245758a8b667521afa120ab91f' surface/identity/tests/acceptance/graph.spec.ts prints 1, and grep -c 'conformance 8.3' surface/identity/tests/acceptance/graph.spec.ts prints a number greater than 0."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "surface/identity/tests/acceptance/graph.spec.ts"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C223",
+        "C226",
+        "C227"
+      ],
+      "stories": [
+        "S96",
+        "S97"
+      ]
+    }
+  ],
+  "boundaries": [
+    "No permission, ancestry, standing, expiry, containment or reachability logic in the graph module under surface/identity/src/features/graph/, and no grant data read other than through Access's answers; responsible people come from the directory's records and resource parents from R1's route, as recorded, a withheld parent drawn only as its mark.",
+    "R1's route records nothing and adds no directory resource record; it serves what the permission model holds, under the visibility of the grants and the directory administrator view, and never names a parent it withholds.",
+    "No mutation from the graph: it has no grant, revoke or delegate control; the only mutations in this brief are the fixture seeding, G1's revocation and the clock advance in the tests, through DIRECTORY-003's and DIRECTORY-006's own operations.",
+    "DIRECTORY-006 is consumed, not amended: no reach operation and no list of grants that do not stand is added to Access.",
+    "No hidden grant's or hidden resource's id, label, count or existence reaches a person who may not see it (DIRECTORY-006 R5, GRANT_EXPLAIN).",
+    "No sample-data authority calculation ships (DIRECTORY-006 R6); the mock-up's can, reach, whoCan and standing are a conformance specification, not code to port.",
+    "No rail entry and no g h shortcut: the shell card AL4OyeKG registers every screen's route and key.",
+    "No suspended-holder drawing and no dependency on DIRECTORY-009: the suspension semantics stay open as DESIGN.md records, and the grant representation stays open; this brief decides neither.",
+    "lys-core, its published wire formats and lys/delegation/v1 are unchanged; no file of IDENTITY-001, no mock-up file and docs/design/identity/CONFORMANCE.md change.",
+    "The card is not moved to a dispatching status until both landed checks in blocked_by exit 0 on lys main."
+  ],
+  "verification": [
+    "Before dispatch, from any directory: git clone https://github.com/ablative-io/lys lys-check && cd lys-check && test -d surface/identity && grep -rq 'ID001_STANDALONE' surface/identity && grep -rq 'ID001_SCREEN_REFUSAL' surface/identity exits 0 (DIRECTORY-005 landed).",
+    "Before dispatch, from any directory: git clone https://github.com/ablative-io/lys lys-check && cd lys-check && test -f crates/lys-identity-server/src/grants.rs && grep -q 'GRANT_EXPLAIN' crates/lys-identity-server/tests/grant_explanations.rs && test -f surface/identity/src/generated/index.ts && grep -rq 'GRANT_SCREEN' surface/identity/tests exits 0 (DIRECTORY-006 landed).",
+    "From the repository root: python3 scripts/design/validate.py docs/design/directory and python3 scripts/design/check-coverage.py docs/design/directory exit 0, and sh scripts/design/gate.sh exits 0.",
+    "From the repository root: grep -rEn 'GRAPH_RESOURCES' crates/lys-identity-server/tests and grep -rEn 'GRAPH_BOUNDARY|GRAPH_EVERY_PAIR|GRAPH_REVOKED|GRAPH_EXPIRED|GRAPH_VISIBILITY|GRAPH_VERSION|GRAPH_OUTAGE' surface/identity/tests together find each of the eight identifiers in a test.",
+    "The frontend test command DIRECTORY-005's manifest names runs surface/identity/tests/graph_boundary.test.ts, surface/identity/tests/graph.test.tsx and surface/identity/tests/acceptance/graph.spec.ts with strict types, and the reviewer records the count of tests run and passed for each file.",
+    "The three drift injections of R7 are made one at a time on a scratch branch; each fails GRAPH_BOUNDARY and no test in surface/identity/tests/graph.test.tsx, and the reviewer records the failing test's name for each.",
+    "The repository battery from the exact revision: cargo fmt --check; cargo clippy --all-targets --all-features -- -D warnings; cargo clippy --all-targets -- -D warnings; cargo test --workspace --all-features; cargo doc --no-deps --all-features; cargo doc --no-deps, all clean."
+  ]
+}
