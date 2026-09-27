@@ -42,8 +42,11 @@ pub mod fork_report;
 #[cfg(test)]
 pub(crate) mod fork_tests;
 pub mod given;
+pub mod given_statement;
 #[cfg(test)]
-mod given_tests;
+mod given_statement_tests;
+#[cfg(test)]
+pub(crate) mod given_tests;
 mod helpers;
 mod home;
 pub mod index;

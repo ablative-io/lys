@@ -13,6 +13,7 @@ categories = ["database-implementations"]
 [dependencies]
 clap.workspace = true
 jiff.workspace = true
+lys-core.workspace = true
 rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
