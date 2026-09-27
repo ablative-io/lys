@@ -51,8 +51,8 @@
 ## Sign-in identities belong to people (conformance row 1.2)
 
 - [ ] **C313** — Binding to an agent a provider account linked to a person is refused by name and writes nothing, while an agent's own machine account, linked to no person, is accepted as its issuer-subject binding.
-- [ ] **C314** — A person's link of a provider account the directory already binds to an agent is refused by name, stating that the account is an agent's own account, and the agent's binding stands.
+- [ ] **C314** — A person's link of a provider account the directory already binds to an agent is refused by name, stating that the account is an agent's own account; the agent's binding stands, and the agent is named in the directory's history to its responsible person and a directory administrator, never to the person trying to link.
 - [ ] **C315** — Delegating from a sign-in identity is refused by name for an agent recipient and for a person recipient, while a service-access grant consented through the same provider account is admitted by the grant rules alone.
 - [ ] **C316** — The explanation seam lists each of a person's sign-in identities on the cannot-give list with the reason 'sign-in identity', whoever the recipient is.
 - [ ] **C317** — A sign-in identity refusal shows the provider and subject to the identity's owner and a directory administrator only; anyone else sees the act, the recipient and that a sign-in identity is involved.
-- [ ] **C318** — Every sign-in identity refusal leaves the log and projection unchanged, and one counted test over the store after the two directory refusals finds no agent record carrying a sign-in identity.
+- [ ] **C318** — Each refusal of an act that would give an agent a sign-in identity leaves the log and projection unchanged, and one counted test over the store after the two directory refusals finds no agent record carrying a sign-in identity.

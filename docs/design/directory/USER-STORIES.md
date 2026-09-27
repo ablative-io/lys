@@ -46,4 +46,4 @@
 
 ## Directory administrator — Resolves a refused act
 
-**S140.** As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.
+**S140.** As a directory administrator, I want a refusal to show me the provider and subject involved, and which agent holds a binding a person tried to link, so that I can tell which account and which agent a refused act touched.

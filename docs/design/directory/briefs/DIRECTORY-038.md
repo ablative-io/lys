@@ -19,17 +19,17 @@ title: Refuse by name every directory act that would give a sign-in identity to 
 > - ADR-105 — Sign-in identities belong to people only; the harness login token is the one named exception — A sign-in identity, a provider account linked to a person in the directory, belongs to that person only: lys never links, delegates or issues from it to an agent, and refuses each such act of its own by name. An agent's own machine account, bound to no person, is a service account and stays allowed. An issuer and subject is bound to one holder, whichever came first. The harness login token recorded at docs/design/identity/STATEMENT-2026-09-22.md:43 and :167 and docs/design/identity/PROVISIONING-2026-09-22.md:18 is the one named exception; it never passes through anything lys issues, links or delegates, and it is not redefined. Rejected: letting a person lend a sign-in identity to their own agent, and redefining the login token so the rule could be claimed without an exception.
 > **Checklist:**
 > - C313 — Binding to an agent a provider account linked to a person is refused by name and writes nothing, while an agent's own machine account, linked to no person, is accepted as its issuer-subject binding.
-> - C314 — A person's link of a provider account the directory already binds to an agent is refused by name, stating that the account is an agent's own account, and the agent's binding stands.
+> - C314 — A person's link of a provider account the directory already binds to an agent is refused by name, stating that the account is an agent's own account; the agent's binding stands, and the agent is named in the directory's history to its responsible person and a directory administrator, never to the person trying to link.
 > - C315 — Delegating from a sign-in identity is refused by name for an agent recipient and for a person recipient, while a service-access grant consented through the same provider account is admitted by the grant rules alone.
 > - C316 — The explanation seam lists each of a person's sign-in identities on the cannot-give list with the reason 'sign-in identity', whoever the recipient is.
 > - C317 — A sign-in identity refusal shows the provider and subject to the identity's owner and a directory administrator only; anyone else sees the act, the recipient and that a sign-in identity is involved.
-> - C318 — Every sign-in identity refusal leaves the log and projection unchanged, and one counted test over the store after the two directory refusals finds no agent record carrying a sign-in identity.
+> - C318 — Each refusal of an act that would give an agent a sign-in identity leaves the log and projection unchanged, and one counted test over the store after the two directory refusals finds no agent record carrying a sign-in identity.
 > **Stories:**
 > - S136 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want the directory to refuse every act that would give that account to an agent, so that no agent can ever hold my sign-in.
 > - S137 (Person who signs in, Keeps their sign-in identities to themselves) — As a person delegating to an agent or another person, I want my sign-in identities listed as things I cannot give with the reason 'sign-in identity', so that I know why they are never offered.
 > - S138 (Person who signs in, Keeps their sign-in identities to themselves) — As an agent's responsible person, I want my agent's own machine account accepted as its binding and kept as the agent's, so that the agent has its own service account without holding anyone's sign-in.
 > - S139 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request.
-> - S140 (Directory administrator, Resolves a refused act) — As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.
+> - S140 (Directory administrator, Resolves a refused act) — As a directory administrator, I want a refusal to show me the provider and subject involved, and which agent holds a binding a person tried to link, so that I can tell which account and which agent a refused act touched.
 
 ## Purpose
 
@@ -39,7 +39,7 @@ Conformance row 1.2 says a sign-in identity is never lent to or held by an agent
 
 Build R1 to R7 in order, once DIRECTORY-003, DIRECTORY-004 and DIRECTORY-006 have landed on lys main (blocked_by gives the one command that checks each). R1 classifies an issuer-subject pair from the directory's signed history; R2 is the one refusal value and its two views; R3 refuses a person's provider account as an agent's binding and accepts an agent's own machine account; R4 refuses a person's link of a provider account the directory already binds to an agent; R5 refuses delegating from a sign-in identity at DIRECTORY-006 admission; R6 serves the reason 'sign-in identity' on the cannot-give list and chooses the refusal's view at the grant seam; R7 is the one test over the store. Every path is relative to the repository root (CN3).
 
-The rule. The directory refuses, by name, every act that would give an agent a sign-in identity. The refusal names the act, the agent and the sign-in identity, and states that sign-in identities belong to people only. Nothing an agent holds or presents is ever a person's sign-in session or token. A sign-in identity is a provider account linked to a person in the directory, and only that is refused. An agent's own machine account, bound to the agent and to no person, is a service account under row 1.3's separate list, and registering it as the agent's issuer-subject binding under DIRECTORY-003 R1 is allowed. A provider account already linked to a person is refused for an agent by name. An issuer and subject is bound to one holder in the directory, whichever came first: when a person links a provider account whose issuer and subject the directory already binds to an agent, the person's link is refused by name, stating that the account is an agent's own account, the agent's binding stands, and nothing is removed or flagged.
+The rule. The directory refuses, by name, every act that would give an agent a sign-in identity. The refusal names the act, the agent and the sign-in identity, and states that sign-in identities belong to people only. Nothing an agent holds or presents is ever a person's sign-in session or token. A sign-in identity is a provider account linked to a person in the directory, and only that is refused. An agent's own machine account, bound to the agent and to no person, is a service account under row 1.3's separate list, and registering it as the agent's issuer-subject binding under DIRECTORY-003 R1 is allowed. A provider account already linked to a person is refused for an agent by name. An issuer and subject is bound to one holder in the directory, whichever came first: when a person links a provider account whose issuer and subject the directory already binds to an agent, the person's link is refused by name, stating that the account is an agent's own account, the agent's binding stands, and nothing is removed or flagged. That refusal names the agent to the agent's responsible person and to directory administrators, and withholds it from the person trying to link: the person linking is told that the account is an agent's own account and may not be linked to a person, and no agent id, name or responsible person is in that refusal. The refusal is recorded in the directory's history, and there the agent is named, so the responsible person and an administrator read which agent holds the binding. The words' 'each refusal writes nothing to the directory' governs the two acts that would give an agent a sign-in identity; the reverse-order refusal is a person's act and is recorded.
 
 Acceptance, as corrected by the lead's ruling. Linking a provider account to an agent is refused by name; delegating from a sign-in identity to an agent is refused by name; each refusal writes nothing to the directory; and no agent record in the directory ever carries a sign-in identity, checked by one test over the store after the two directory refusals. The third refusal, a credential request for an agent that presents a person's sign-in token refused by name, is the broker's finding (finding 1).
 
@@ -96,7 +96,7 @@ THE SYSTEM SHALL define one refusal for acts that would give a sign-in identity 
 
 **Stories:**
 - S139 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request.
-- S140 (Directory administrator, Resolves a refused act) — As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.
+- S140 (Directory administrator, Resolves a refused act) — As a directory administrator, I want a refusal to show me the provider and subject involved, and which agent holds a binding a person tried to link, so that I can tell which account and which agent a refused act touched.
 
 ### R3: Refuse a person's provider account as an agent's binding and accept an agent's own machine account
 
@@ -122,14 +122,17 @@ WHEN a caller asks the DIRECTORY-003 R1 binding API to bind an issuer-subject pa
 
 ### R4: Refuse a person's link of a provider account the directory binds to an agent
 
-WHEN the link path asks the directory, by issuer-subject pair, whether a person may link that provider account, and R1 classifies the pair as an agent's own account, THE SYSTEM SHALL refuse by name for the act link to a person, stating that the account is an agent's own account. THE SYSTEM SHALL NOT remove, flag, move or alter the agent's binding, SHALL NOT write any event, and SHALL answer only a caller authenticated as the link-audit source the DIRECTORY-003 R4 receiver already admits. WHEN the pair is bound to no agent, THE SYSTEM SHALL answer that the directory holds no agent binding for it, and SHALL NOT decide anything the fork's own refusals decide (DIRECTORY-004 R1). The check is served by the standalone identity server beside the receiver; the fork-side call that asks it is finding 2 in the task.
+WHEN the link path asks the directory, by issuer-subject pair, whether a person may link that provider account, and R1 classifies the pair as an agent's own account, THE SYSTEM SHALL refuse by name for the act link to a person, stating that the account is an agent's own account and may not be linked to a person, and SHALL record the refusal as one signed entry in the directory's history that names the person trying to link, the issuer-subject pair and the agent holding the binding. THE SYSTEM SHALL show which agent holds the binding only to that agent's responsible person and to a directory administrator (DIRECTORY-003 R3), the same split DIRECTORY-006 R5 makes for a sign-in identity's provider and subject. The refusal returned for the person trying to link SHALL NOT carry the agent's id, the agent's name or the agent's responsible person in any form, and the history entry read as that person SHALL NOT name the agent. THE SYSTEM SHALL NOT remove, flag, move or alter the agent's binding, SHALL NOT write any event other than that one history entry, and SHALL answer only a caller authenticated as the link-audit source the DIRECTORY-003 R4 receiver already admits. WHEN the pair is bound to no agent, THE SYSTEM SHALL answer that the directory holds no agent binding for it, SHALL write no event, and SHALL NOT decide anything the fork's own refusals decide (DIRECTORY-004 R1). The check is served by the standalone identity server beside the receiver; the fork-side call that asks it is finding 2 in the task.
 
 **Acceptance:**
-- With issuer https://github.com subject gh-7 bound to agent B as B's own account, the check asked for person P returns the refusal naming act link to a person and stating that the account is an agent's own account; the log's length and the projection's digest are unchanged, and R1 still returns agent's own account naming B.
+- With issuer https://github.com subject gh-7 bound to agent B, named build-bot and responsible person Q, as B's own account, the check asked for person P returns the refusal naming act link to a person and stating that the account is an agent's own account and may not be linked to a person; the log gains exactly one entry, the refusal's history entry, and R1 still returns agent's own account naming B.
+- A search of the body returned for P in that refusal finds neither B's agent id nor the name build-bot nor Q's id: zero matches for each.
+- The refusal's history entry read as the configured administrator names agent B, and the same entry read as Q names agent B.
+- The same history entry read as P finds neither B's agent id nor the name build-bot: zero matches for each.
 - The check for issuer https://github.com subject gh-8, bound to no agent, returns that the directory holds no agent binding for it, and the log's length is unchanged.
-- An unauthenticated caller is refused by name and receives no answer about gh-7.
-- A caller authenticated as the configured administrator, which is not the link-audit source, is refused by name and receives no answer about gh-7.
-- The test counts the four cases it drove and asserts the count is 4.
+- An unauthenticated caller is refused by name, receives no answer about gh-7, and the log's length is unchanged.
+- A caller authenticated as the configured administrator, which is not the link-audit source, is refused by name, receives no answer about gh-7, and the log's length is unchanged.
+- The test counts the four checks it drove (gh-7 for P, gh-8, unauthenticated, administrator) and the three history reads (administrator, Q, P), and asserts the counts are 4 and 3.
 
 **Files:**
 - create: crates/lys-identity-server/src/sign_in_link_check.rs
@@ -137,10 +140,11 @@ WHEN the link path asks the directory, by issuer-subject pair, whether a person 
 - modify: crates/lys-identity-server/src/routes.rs
 
 **Checklist:**
-- C314 — A person's link of a provider account the directory already binds to an agent is refused by name, stating that the account is an agent's own account, and the agent's binding stands.
+- C314 — A person's link of a provider account the directory already binds to an agent is refused by name, stating that the account is an agent's own account; the agent's binding stands, and the agent is named in the directory's history to its responsible person and a directory administrator, never to the person trying to link.
 
 **Stories:**
 - S138 (Person who signs in, Keeps their sign-in identities to themselves) — As an agent's responsible person, I want my agent's own machine account accepted as its binding and kept as the agent's, so that the agent has its own service account without holding anyone's sign-in.
+- S140 (Directory administrator, Resolves a refused act) — As a directory administrator, I want a refusal to show me the provider and subject involved, and which agent holds a binding a person tried to link, so that I can tell which account and which agent a refused act touched.
 
 ### R5: Refuse delegating from a sign-in identity at grant admission, for every recipient
 
@@ -185,7 +189,7 @@ WHEN a person asks DIRECTORY-006 R5's explanation seam what they cannot give to 
 **Stories:**
 - S137 (Person who signs in, Keeps their sign-in identities to themselves) — As a person delegating to an agent or another person, I want my sign-in identities listed as things I cannot give with the reason 'sign-in identity', so that I know why they are never offered.
 - S139 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request.
-- S140 (Directory administrator, Resolves a refused act) — As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.
+- S140 (Directory administrator, Resolves a refused act) — As a directory administrator, I want a refusal to show me the provider and subject involved, and which agent holds a binding a person tried to link, so that I can tell which account and which agent a refused act touched.
 
 ### R7: Prove over the store that no agent record carries a sign-in identity
 
@@ -200,7 +204,7 @@ After the two directory refusals, linking a provider account to an agent (R3) an
 - create: crates/lys-identity/tests/sign_in_store.rs
 
 **Checklist:**
-- C318 — Every sign-in identity refusal leaves the log and projection unchanged, and one counted test over the store after the two directory refusals finds no agent record carrying a sign-in identity.
+- C318 — Each refusal of an act that would give an agent a sign-in identity leaves the log and projection unchanged, and one counted test over the store after the two directory refusals finds no agent record carrying a sign-in identity.
 
 **Stories:**
 - S136 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want the directory to refuse every act that would give that account to an agent, so that no agent can ever hold my sign-in.
@@ -222,5 +226,5 @@ After the two directory refusals, linking a provider account to an agent (R3) an
 
 - From the repository root: sh scripts/design/gate.sh exits 0.
 - At implementation time, from the exact revision, each command exits 0: cargo fmt --all; cargo clippy --all-targets --all-features -- -D warnings; cargo clippy --all-targets -- -D warnings; cargo test --workspace --all-features; cargo doc --no-deps --all-features; cargo doc --no-deps. After cargo fmt --all, git diff --exit-code exits 0. Report each refusal case and each counted leg the tests exercised.
-- Drift injection, each failing exactly one test file, the one built for the check, and no other. First: make R2's view for anyone else carry an error code that varies with the sign-in identity's provider and subject without containing either; exactly one test file fails, crates/lys-identity/tests/sign_in_refusal_views.rs (its byte-identical case), because no other test compares those views across two sign-in identities. Second: make R4's refusal append one event; exactly one test file fails, crates/lys-identity-server/tests/sign_in_link_check.rs, because no other test drives R4. Revert both.
+- Drift injection, each failing exactly one test file, the one built for the check, and no other. First: make R2's view for anyone else carry an error code that varies with the sign-in identity's provider and subject without containing either; exactly one test file fails, crates/lys-identity/tests/sign_in_refusal_views.rs (its byte-identical case), because no other test compares those views across two sign-in identities. Second: make R4's refusal returned for the person trying to link carry the agent's id; exactly one test file fails, crates/lys-identity-server/tests/sign_in_link_check.rs, because no other test drives R4. Revert both.
 - Before reporting row 1.2 passed, confirm the broker's card carries finding 1's acceptance line and that it passes; until then row 1.2 is reported as tested in part by this card and awaiting the broker.
