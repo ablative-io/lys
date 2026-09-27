@@ -327,7 +327,7 @@
       "superseded_by": ""
     },
     {
-      "id": "ADR-055",
+      "id": "ADR-019",
       "title": "The fork's ablative branch moves only from a green candidate, with its previous head kept under a tag",
       "status": "decided",
       "scope": "rauthy-rebase",
