@@ -6,6 +6,7 @@ members = [
     "crates/lys-core",
     "crates/lys-home",
     "crates/lys-identity",
+    "crates/lys-identity-server",
     "crates/lys-log-store",
     "tests/identity_contract",
 ]
@@ -50,6 +51,11 @@ tracing = "0.1"
 x25519-dalek = { version = "2", features = ["serde", "static_secrets"] }
 x509-parser = "0.16"
 zeroize = { version = "1", features = ["derive"] }
+
+# The directory service. Each pinned, and TLS is rustls only.
+axum = "=0.8.9"
+openidconnect = { version = "=4.0.1", default-features = false, features = ["reqwest", "rustls-tls"] }
+tokio = { version = "=1.53.1", features = ["macros", "net", "rt-multi-thread", "signal", "sync"] }
 
 # CLI
 clap = { version = "4", features = ["derive"] }

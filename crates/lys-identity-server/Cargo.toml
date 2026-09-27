@@ -1,0 +1,25 @@
+[package]
+name = "lys-identity-server"
+description = "The lys directory service: OIDC sign-in, the configured administrator's admission, and the directory's HTTP API."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+axum.workspace = true
+lys-core.workspace = true
+lys-identity.workspace = true
+lys-log-store.workspace = true
+openidconnect.workspace = true
+rand.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true
