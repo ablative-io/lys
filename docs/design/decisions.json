@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,25 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-031",
+      "title": "The Claude Code render refuses by name what it cannot shape and never writes a default in place of a value the record did not carry",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's rulings and answers to the render-refusal survey; recorded with HOME-008",
+      "context": "The Claude Code render filled in a default wherever a home record was missing a field or carried one of the wrong type (an empty role, tool_use_id, text, name or model, an empty content array or input object, is_error false, end_turn for any stopReason, a null signature) and serialised its loss account and the hashes of dropped parts with unwrap_or_default, so a broken session rendered to a file that looked whole and the render reported success.",
+      "decision": "Every value the render copies from a message entry must be present and of the type the target field takes; a missing field or a field of another type refuses the render by the session, the entry id, the field and the expected type, and nothing is written. The value itself is never named, except an unmapped stopReason, which is named because it is a protocol value and not transcript. Every serialisation the render needs, the records, the dropped parts it hashes and the loss account, is done before any directory or file is created, and a failure refuses by name. Only three values are written that the record does not carry, and they are format constants Claude Code's file requires on every record: gitBranch \"\", usage {input_tokens 0, output_tokens 0} and stop_sequence null. Only one field reads a meaning from its absence: a thinking part with no `redacted` field is not redacted, since in Pi's grammar the field is optional and its absence is the source's own statement; a `redacted` present and not a boolean refuses. stopReason is mapped by one explicit arm per value Pi's grammar carries: toolUse to tool_use, length to max_tokens, stop to end_turn, error to stop_sequence (the value Claude Code writes on its own errored turns, measured), and aborted, for which Claude Code writes no value of its own, refuses by name, as does any other value. A present role the render does not know is still skipped. render-launch stores its template in the home only after the render has succeeded. Rejected: rendering a default and naming it in the loss account, refusing only missing fields and copying wrongly typed ones, mapping every unknown stopReason to end_turn, and keeping the template a refused launch had already stored.",
+      "quote": "",
+      "consequences": [
+        "A session, canon or fork child holding an entry the render cannot shape no longer renders; the refusal names the entry to repair and nothing is written.",
+        "Sessions the importer wrote with a redacted_thinking part that carried no data hold thinkingSignature null and now refuse to render; the importer's own defaults are the other half of the defect and belong to the importer card, not to the render.",
+        "A session holding an aborted turn does not render until the Claude Code format has a value for it.",
+        "The bytes rendered from a session that carries every field do not change, so every pinned render hash stands."
       ],
       "supersedes": [],
       "superseded_by": ""
