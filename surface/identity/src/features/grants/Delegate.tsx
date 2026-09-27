@@ -99,7 +99,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
             ),
           )}
         </div>
-        <div className="note">Greyed: more than you hold. Relations are those the service has resolved in grants you can see.</div>
+        <div className="note">Greyed: more than you hold.</div>
       </div>
       <div className="field">
         <label htmlFor="dLease">Lasts</label>

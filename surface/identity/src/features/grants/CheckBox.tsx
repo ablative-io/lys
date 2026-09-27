@@ -72,7 +72,7 @@ export function CheckBox({ w, who }: { w: GrantWorld; who?: string }) {
   if (who) {
     return (
       <div className="check">
-        <h2>Can {firstName(nameOf(w, who), w.who.get(who)?.kind)} do this?</h2>
+        <h2>Can {firstName(nameOf(w, who))} do this?</h2>
         <div className="q" style={{ marginTop: 10 }}>{resSelect}{permSelect}{button}</div>
         <div className="answer-box" id="answer">
           {shown ?? <span className="note">The answer shows the path to a person, or the reason it is refused, and which version of the model it used.</span>}
