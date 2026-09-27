@@ -4,7 +4,7 @@ One signed committed directory event is both the identity change and its audit r
 
 ## Status
 
-Written for the joint review R2 asks for. No durable bytes are signed under this envelope until that review is recorded below.
+Reviewed jointly as R2 asks, and accepted. The review is recorded below. Durable bytes may be signed under this envelope from the commit that records it.
 
 ## The envelope
 
@@ -48,7 +48,7 @@ A profile is the map `1` display name (text).
 
 Lifecycle states are `1` registered, `2` active, `3` suspended, `4` retired. Transitions are `1` activate, `2` suspend, `3` reinstate, `4` retire. A transition event is refused unless its `to` is the state the table gives from its `from`: activate is registered to active, suspend is active to suspended, reinstate is suspended to active, and retire is active or suspended to retired. Suspend and retire name a reason.
 
-A link-audit event records the issuer's observation as the receiver accepted it, under the source's own operation id. It is an observation, kept apart from any claim a person made. Its fields follow R4 as written, and they are checked again against row 01's typed contract when that contract is reviewed.
+A link-audit event records the issuer's observation as the receiver accepted it, under the source's own operation id. It is an observation, kept apart from any claim a person made. Its fields follow R4 as written. Row 01's typed link-audit contract must equal this payload: a wire format is kept for ever, so the contract follows the wire and never the other way round.
 
 ## Strict reading
 
@@ -65,8 +65,8 @@ Two SHA-256 hashes touch an event, and they are named apart. Neither is a BLAKE3
 
 ## Review
 
-Open for Archie's joint review. Points for the review:
+Reviewed jointly by Archie and Buckley on DIRECTORY-003 at 6590854, and accepted. The rulings:
 
-1. The canonical head writer is lys-identity's own, because lys-core's is private to lys-core and lys-core is not changed by this row.
-2. The actor is the login binding plus provenance, not a directory person id, because in step 1 the administrator is configured by issuer and subject and need not be registered.
-3. The link-audit payload fields are drawn from R4 before row 01's typed contract exists.
+1. lys-identity keeps its own canonical head writer, and lys-core does not change. A test pins the writer to RFC 8949 Appendix A's head vectors at every width boundary (0, 23, 24, 255, 256, 65535, 65536, 4294967295 and 4294967296), so a drift from the shortest form fails on its own line, not only through a round trip that could be wrong both ways.
+2. The actor is the login binding plus its provenance. The step-1 administrator is configured by issuer and subject. A reader resolves a binding to a person through the directory when it reads, never when the event is written.
+3. The link-audit payload is taken from R4 now, and row 01's typed contract must equal it.
