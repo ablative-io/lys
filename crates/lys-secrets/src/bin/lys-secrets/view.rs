@@ -46,7 +46,9 @@ pub async fn grants(State(shared): State<Arc<Shared>>) -> Answer {
         .map_err(|error| failed(&error))?;
     let grants: Vec<Value> = rows
         .into_iter()
-        .map(|(identity, secret, granted_by)| json!({ "identity": identity, "secret": secret, "granted_by": granted_by }))
+        .map(|(identity, secret, relation, granted_by)| {
+            json!({ "identity": identity, "secret": secret, "relation": relation, "granted_by": granted_by })
+        })
         .collect();
     Ok(Json(json!({ "grants": grants })))
 }

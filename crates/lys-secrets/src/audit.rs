@@ -15,7 +15,7 @@ use crate::error::SecretsError;
 use crate::fsutil::{ensure_outside, io, write_atomic};
 use crate::keys::StoreKey;
 
-const LINE_DOMAIN: &str = "lys-secrets/audit-line/v1";
+const LINE_DOMAIN: &str = "lys-secrets/audit-line/v2";
 const SIGNED_DOMAIN: &str = "lys-secrets/audit-signed/v1";
 const ANCHOR_DOMAIN: &str = "lys-secrets/audit-anchor/v1";
 
@@ -32,6 +32,16 @@ pub enum AuditKind {
     Seal,
     /// The store key was rotated.
     Rotation,
+    /// A secret's use moved to its next account.
+    NextAccount,
+    /// An admitted call's outcome, with what it spent.
+    Settlement,
+    /// A sealed record was read, or a read refused.
+    SealedRead,
+    /// An OAuth access token was refreshed, or a grant revoked upstream.
+    Refresh,
+    /// A seat's own login was handed to it at spawn.
+    SpawnLogin,
 }
 
 impl AuditKind {
@@ -43,6 +53,11 @@ impl AuditKind {
             Self::Drop => "drop",
             Self::Seal => "seal",
             Self::Rotation => "rotation",
+            Self::NextAccount => "next_account",
+            Self::Settlement => "settlement",
+            Self::SealedRead => "sealed_read",
+            Self::Refresh => "refresh",
+            Self::SpawnLogin => "spawn_login",
         }
     }
 
@@ -53,6 +68,11 @@ impl AuditKind {
             b"drop" => Some(Self::Drop),
             b"seal" => Some(Self::Seal),
             b"rotation" => Some(Self::Rotation),
+            b"next_account" => Some(Self::NextAccount),
+            b"settlement" => Some(Self::Settlement),
+            b"sealed_read" => Some(Self::SealedRead),
+            b"refresh" => Some(Self::Refresh),
+            b"spawn_login" => Some(Self::SpawnLogin),
             _ => None,
         }
     }
@@ -74,8 +94,15 @@ pub struct AuditLine {
     pub secret: Option<String>,
     /// The call's operation id, in hex.
     pub operation: Option<String>,
+    /// A keyed mark of the request a use was for, in hex. Only the broker
+    /// can compute it, so it tells a reused operation id without saying
+    /// what the request was.
+    pub request: Option<String>,
     /// The lease's use count after this line.
     pub uses: Option<u64>,
+    /// The spend reserved (on a use) or settled (on a settlement), for a
+    /// lease with a spend cap.
+    pub spend: Option<u64>,
     /// The outcome: `issued`, `admitted`, a refusal's name, `dropped`.
     pub outcome: String,
 }
@@ -331,9 +358,14 @@ fn encode_line(line: &AuditLine) -> Result<Vec<u8>, SecretsError> {
     optional(&mut encoding, line.identity.as_deref())?;
     optional(&mut encoding, line.secret.as_deref())?;
     optional(&mut encoding, line.operation.as_deref())?;
+    optional(&mut encoding, line.request.as_deref())?;
     optional(
         &mut encoding,
         line.uses.map(|uses| uses.to_string()).as_deref(),
+    )?;
+    optional(
+        &mut encoding,
+        line.spend.map(|spend| spend.to_string()).as_deref(),
     )?;
     encoding.field(line.outcome.as_bytes())?;
     Ok(encoding.into_bytes())
@@ -363,10 +395,17 @@ fn decode_signed(index: u64, bytes: &[u8], key: &[u8; 32]) -> Result<AuditLine, 
     let identity = read_optional(&mut reader)?;
     let secret = read_optional(&mut reader)?;
     let operation = read_optional(&mut reader)?;
+    let request = read_optional(&mut reader)?;
     let uses = read_optional(&mut reader)?
         .map(|text| {
             text.parse::<u64>()
                 .map_err(|_number| unreadable("the use count is not a number".to_owned()))
+        })
+        .transpose()?;
+    let spend = read_optional(&mut reader)?
+        .map(|text| {
+            text.parse::<u64>()
+                .map_err(|_number| unreadable("the spend is not a number".to_owned()))
         })
         .transpose()?;
     let outcome = String::from_utf8(reader.field()?.to_vec())
@@ -378,7 +417,9 @@ fn decode_signed(index: u64, bytes: &[u8], key: &[u8; 32]) -> Result<AuditLine, 
         identity,
         secret,
         operation,
+        request,
         uses,
+        spend,
         outcome,
     })
 }

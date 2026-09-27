@@ -1,6 +1,7 @@
 //! Handles and presentations. A handle is 32 random bytes bound to one
 //! identity; the broker keeps only its digest. Whoever presents it signs a
-//! presentation naming the handle id, the call's operation id and the time.
+//! presentation naming the handle id, the call's operation id, the time and
+//! the digest of the one request it is for.
 
 use std::fmt;
 
@@ -12,9 +13,26 @@ use crate::error::SecretsError;
 use crate::secret::Secret;
 
 /// The domain every presentation payload opens with.
-pub const PRESENTATION_DOMAIN: &str = "lys-secrets/presentation/v1";
+pub const PRESENTATION_DOMAIN: &str = "lys-secrets/presentation/v2";
 /// The shortest operation id the broker takes.
 pub const MIN_OPERATION_ID: usize = 16;
+/// The domain a request digest opens with.
+pub const REQUEST_DOMAIN: &str = "lys-secrets/request/v1";
+
+/// The digest of one request: its method, its path with query, and its body.
+/// A presentation signs it, so a presentation is good for that request only.
+///
+/// # Errors
+///
+/// `Encoding` when a part is too long to encode.
+pub fn request_digest(method: &str, path: &str, body: &[u8]) -> Result<[u8; 32], SecretsError> {
+    let mut encoding = Canonical::new(REQUEST_DOMAIN)?;
+    encoding
+        .field(method.as_bytes())?
+        .field(path.as_bytes())?
+        .field(&sha256(body))?;
+    Ok(sha256(&encoding.into_bytes()))
+}
 
 /// A handle's id: random, never derived from the handle, and what every
 /// record and audit line names.
@@ -97,6 +115,9 @@ pub struct Presentation {
     pub operation_id: Vec<u8>,
     /// When it was signed, in milliseconds since the epoch.
     pub signed_at_ms: i64,
+    /// The digest of the request it is for. It never travels: the broker
+    /// computes it from the request it is given.
+    pub request: [u8; 32],
     /// The presenter's signature over the payload.
     pub attestation: Attestation,
 }
@@ -113,8 +134,9 @@ impl Presentation {
         ]
     }
 
-    /// Reads a presentation from its four text values. A value that does
-    /// not read is the one `PresentationInvalid`.
+    /// Reads a presentation from its four text values and the digest of
+    /// the request that carried them. A value that does not read is the one
+    /// `PresentationInvalid`.
     ///
     /// # Errors
     ///
@@ -124,6 +146,7 @@ impl Presentation {
         operation: &str,
         signed_at: &str,
         signature: &str,
+        request: [u8; 32],
     ) -> Result<Self, SecretsError> {
         let invalid = || SecretsError::PresentationInvalid {
             handle: handle_id.to_owned(),
@@ -136,12 +159,13 @@ impl Presentation {
             handle_id: HandleId(handle_id.to_owned()),
             operation_id,
             signed_at_ms,
+            request,
             attestation,
         })
     }
 
     /// Signs a presentation of `handle_id` for `operation_id` at
-    /// `signed_at_ms` with `key`.
+    /// `signed_at_ms`, for the request whose digest is `request`, with `key`.
     ///
     /// # Errors
     ///
@@ -150,14 +174,16 @@ impl Presentation {
         handle_id: &HandleId,
         operation_id: &[u8],
         signed_at_ms: i64,
+        request: [u8; 32],
         key: &Ed25519Identity,
     ) -> Result<Self, SecretsError> {
         check_operation_id(operation_id)?;
-        let payload = payload(handle_id, operation_id, signed_at_ms)?;
+        let payload = payload(handle_id, operation_id, signed_at_ms, &request)?;
         Ok(Self {
             handle_id: handle_id.clone(),
             operation_id: operation_id.to_vec(),
             signed_at_ms,
+            request,
             attestation: sign_attestation(&payload, key),
         })
     }
@@ -165,7 +191,12 @@ impl Presentation {
     /// Verifies the signature against `registered`, the key of the identity
     /// the handle is bound to. Every failure is the one `PresentationInvalid`.
     pub(crate) fn verify(&self, registered: &[u8; 32]) -> Result<(), SecretsError> {
-        let payload = payload(&self.handle_id, &self.operation_id, self.signed_at_ms)?;
+        let payload = payload(
+            &self.handle_id,
+            &self.operation_id,
+            self.signed_at_ms,
+            &self.request,
+        )?;
         verify_attestation_by_signer(&self.attestation, &payload, registered).map_err(|_invalid| {
             SecretsError::PresentationInvalid {
                 handle: self.handle_id.to_string(),
@@ -196,11 +227,13 @@ fn payload(
     handle_id: &HandleId,
     operation_id: &[u8],
     signed_at_ms: i64,
+    request: &[u8; 32],
 ) -> Result<Vec<u8>, SecretsError> {
     let mut encoding = Canonical::new(PRESENTATION_DOMAIN)?;
     encoding
         .field(handle_id.as_str().as_bytes())?
         .field(operation_id)?
-        .field(&signed_at_ms.to_be_bytes())?;
+        .field(&signed_at_ms.to_be_bytes())?
+        .field(request)?;
     Ok(encoding.into_bytes())
 }

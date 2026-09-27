@@ -2,135 +2,41 @@
 //! standard input, grant and revoke its use, issue and drop handles, sign a
 //! presentation as an agent, read the audit log, and serve the proxy.
 
+mod args;
+mod cli;
 mod files;
+mod oauth_proxy;
 mod serve;
 mod spice;
 mod view;
 
-use std::io::Read;
-use std::path::PathBuf;
+use std::io::{Read, Write};
 use std::process::ExitCode;
 
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use lys_core::Ed25519Identity;
 use lys_secrets::{
-    Broker, HandleId, Holder, Presentation, Secret, SecretsError, new_operation_id, to_hex,
+    Broker, EntryClass, HandleId, Holder, Presentation, Relation, Secret, SecretsError,
+    new_operation_id, request_digest, to_hex,
 };
 
+use args::RecordClass;
+use cli::{Cli, Command, Where};
 use files::{FileGrants, Layout, Route, now_ms};
-use spice::{Grants, SpiceGrants};
+use spice::Grants;
 
-#[derive(Parser)]
-#[command(name = "lys-secrets", about = "The lys secrets broker")]
-struct Cli {
-    #[command(subcommand)]
-    command: Command,
-}
-
-#[derive(clap::Args)]
-struct Where {
-    /// The broker's folder: the sealed store, the audit log, routes and grants.
-    #[arg(long)]
-    root: PathBuf,
-    /// The key folder, outside the broker's folder.
-    #[arg(long)]
-    keys: PathBuf,
-}
-
-#[derive(Subcommand)]
-enum Command {
-    /// Make a new broker: store, audit log and both keys.
-    Init(Where),
-    /// Seal the credential read from standard input, bound to one upstream.
-    Seal {
-        #[command(flatten)]
-        at: Where,
-        #[arg(long)]
-        name: String,
-        #[arg(long)]
-        owner: String,
-        /// The only origin the credential is ever sent to.
-        #[arg(long)]
-        upstream: String,
-        /// The request header that carries it.
-        #[arg(long, default_value = "authorization")]
-        header: String,
-        /// Text written before the credential in that header.
-        #[arg(long, default_value = "Bearer ")]
-        prefix: String,
-    },
-    /// Grant an identity the use of a secret, in a person's name.
-    Grant {
-        #[arg(long)]
-        root: PathBuf,
-        #[arg(long)]
-        identity: String,
-        #[arg(long)]
-        secret: String,
-        #[arg(long)]
-        by: String,
-    },
-    /// Revoke an identity's use of a secret; the next use is refused.
-    Revoke {
-        #[arg(long)]
-        root: PathBuf,
-        #[arg(long)]
-        identity: String,
-        #[arg(long)]
-        secret: String,
-    },
-    /// Issue a handle to an identity whose key file is named.
-    Issue {
-        #[command(flatten)]
-        at: Where,
-        #[arg(long)]
-        identity: String,
-        /// The holder's key file; only its public half is registered.
-        #[arg(long)]
-        holder_key: PathBuf,
-        #[arg(long)]
-        secret: String,
-        #[arg(long, default_value_t = 10)]
-        uses: u64,
-        #[arg(long, default_value_t = 60)]
-        minutes: i64,
-        /// The Lys directory's configuration; when named, the issue is
-        /// judged by the directory's grants.
-        #[arg(long)]
-        directory_config: Option<PathBuf>,
-        #[arg(long, default_value = "edit")]
-        use_action: String,
-    },
-    /// Drop a handle.
-    Drop {
-        #[command(flatten)]
-        at: Where,
-        #[arg(long)]
-        handle_id: String,
-    },
-    /// As the holder: sign a presentation for one call and print its headers.
-    Sign {
-        #[arg(long)]
-        key: PathBuf,
-        #[arg(long)]
-        handle_id: String,
-    },
-    /// Print the audit log, every line's signature checked.
-    Log(Where),
-    /// Serve the proxy on a local address.
-    Serve {
-        #[command(flatten)]
-        at: Where,
-        #[arg(long, default_value = "127.0.0.1:8472")]
-        listen: String,
-        /// The Lys directory's configuration; when named, every use is
-        /// judged by the directory's grants on `secret/<name>`.
-        #[arg(long)]
-        directory_config: Option<PathBuf>,
-        /// The action the directory must give on the secret for a use.
-        #[arg(long, default_value = "edit")]
-        use_action: String,
-    },
+fn read_credential() -> Result<Secret, SecretsError> {
+    let mut value = Vec::new();
+    std::io::stdin()
+        .read_to_end(&mut value)
+        .map_err(|source| SecretsError::Io {
+            context: "reading the credential from standard input".to_owned(),
+            source,
+        })?;
+    while value.last().is_some_and(u8::is_ascii_whitespace) {
+        value.pop();
+    }
+    Ok(Secret::new(value))
 }
 
 fn open(at: &Where) -> Result<Broker<Grants>, SecretsError> {
@@ -166,18 +72,9 @@ fn run(command: Command) -> Result<(), SecretsError> {
             upstream,
             header,
             prefix,
+            spend_header,
         } => {
-            let mut value = Vec::new();
-            std::io::stdin()
-                .read_to_end(&mut value)
-                .map_err(|source| SecretsError::Io {
-                    context: "reading the credential from standard input".to_owned(),
-                    source,
-                })?;
-            while value.last().is_some_and(u8::is_ascii_whitespace) {
-                value.pop();
-            }
-            let value = Secret::new(value);
+            let value = read_credential()?;
             let layout = Layout::new(&at.root, &at.keys);
             let mut broker = open(&at)?;
             broker.seal(&name, &owner, &value)?;
@@ -187,6 +84,7 @@ fn run(command: Command) -> Result<(), SecretsError> {
                     upstream,
                     header,
                     prefix,
+                    spend_header,
                 },
             )?;
             println!("sealed {name} ({} bytes, not shown)", value.len());
@@ -196,17 +94,32 @@ fn run(command: Command) -> Result<(), SecretsError> {
             identity,
             secret,
             by,
+            relation,
         } => {
-            FileGrants::new(Layout::grants_in(&root)).set(&identity, &secret, Some(&by))?;
-            println!("{identity} may use {secret}, granted by {by}");
+            let relation = Relation::from(relation);
+            FileGrants::new(Layout::grants_in(&root)).set(
+                relation,
+                &identity,
+                &secret,
+                Some(&by),
+            )?;
+            println!(
+                "{identity} holds {} on {secret}, granted by {by}",
+                relation.label()
+            );
         }
         Command::Revoke {
             root,
             identity,
             secret,
+            relation,
         } => {
-            FileGrants::new(Layout::grants_in(&root)).remove(&identity, &secret)?;
-            println!("{identity} may no longer use {secret}");
+            let relation = Relation::from(relation);
+            FileGrants::new(Layout::grants_in(&root)).remove(relation, &identity, &secret)?;
+            println!(
+                "{identity} no longer holds {} on {secret}",
+                relation.label()
+            );
         }
         Command::Issue {
             at,
@@ -215,41 +128,139 @@ fn run(command: Command) -> Result<(), SecretsError> {
             secret,
             uses,
             minutes,
-            directory_config,
-            use_action,
+            spend_cap,
+            directory,
         } => {
             let key = Ed25519Identity::load(&holder_key)?;
             let holder = Holder {
                 identity,
                 key: key.public_key_bytes(),
             };
-            let mut broker = match directory_config {
-                Some(config) => open_with(
-                    &at,
-                    Grants::Directory(SpiceGrants::from_directory(&config, &use_action)?),
-                )?,
-                None => open(&at)?,
-            };
-            let issued = broker.issue(
+            let layout = Layout::new(&at.root, &at.keys);
+            let mut broker = open_with(&at, directory.grants(&layout)?)?;
+            let issued = broker.issue_capped(
                 &holder,
                 &secret,
                 uses,
                 now_ms().saturating_add(minutes.saturating_mul(60_000)),
+                spend_cap,
             )?;
             println!("handle_id {}", issued.id);
             println!("handle {}", to_hex(issued.token.expose()));
         }
-        Command::Drop { at, handle_id } => {
+        Command::AddAccount {
+            at,
+            secret,
+            account,
+        } => {
+            let value = read_credential()?;
             let mut broker = open(&at)?;
-            let outcome = broker.drop_handle(&HandleId::from_text(&handle_id))?;
-            println!("{handle_id}: {outcome:?}");
+            broker.add_account(&secret, &account, &value)?;
+            println!(
+                "sealed account {account} of {secret} ({} bytes, not shown)",
+                value.len()
+            );
         }
-        Command::Sign { key, handle_id } => {
+        Command::NextAccount { at, secret } => {
+            let mut broker = open(&at)?;
+            let account = broker.next_account(&secret)?;
+            println!("{secret} now uses account {account}");
+        }
+        Command::RestoreAccount {
+            at,
+            secret,
+            account,
+        } => {
+            let mut broker = open(&at)?;
+            broker.restore_account(&secret, &account)?;
+            println!("account {account} of {secret} is back in service");
+        }
+        Command::Accounts { at, secret } => {
+            let broker = open(&at)?;
+            for view in broker.store().accounts(&secret) {
+                let state = if view.resting {
+                    "resting"
+                } else if view.current {
+                    "in use"
+                } else {
+                    "ready"
+                };
+                println!("{:<16} {state}", view.account);
+            }
+        }
+        Command::Drop {
+            at,
+            handle_id,
+            revoke_upstream,
+        } => {
+            let mut broker = open(&at)?;
+            let id = HandleId::from_text(&handle_id);
+            let outcome = broker.drop_handle(&id)?;
+            println!("{handle_id}: {outcome:?}");
+            if revoke_upstream {
+                let confirmed = oauth_proxy::revoke_after_drop(&mut broker, &id)?;
+                let said = if confirmed {
+                    "confirmed"
+                } else {
+                    "not confirmed"
+                };
+                println!("upstream revocation {said}");
+            }
+        }
+        Command::SealOauth {
+            at,
+            name,
+            owner,
+            upstream,
+        } => {
+            let layout = Layout::new(&at.root, &at.keys);
+            let subject = oauth_proxy::seal(
+                &mut open(&at)?,
+                &layout,
+                &name,
+                &owner,
+                upstream,
+                &read_credential()?,
+            )?;
+            println!("sealed OAuth grant {name} for {subject} (tokens not shown)");
+        }
+        Command::SpawnLogin {
+            at,
+            seat,
+            secret,
+            directory,
+        } => {
+            let layout = Layout::new(&at.root, &at.keys);
+            let mut broker = open_with(&at, directory.grants(&layout)?)?;
+            let (account, login) = broker.spawn_login(&seat, &secret)?;
+            std::io::stdout()
+                .write_all(login.expose())
+                .map_err(|source| SecretsError::Io {
+                    context: "writing the login to standard output".to_owned(),
+                    source,
+                })?;
+            eprintln!("{seat} took the login of {secret}@{account}");
+        }
+        Command::Sign {
+            key,
+            handle_id,
+            method,
+            path,
+            body,
+        } => {
             let key = Ed25519Identity::load(&key)?;
+            let body = match body {
+                Some(file) => std::fs::read(&file).map_err(|error| SecretsError::Io {
+                    context: format!("reading {}", file.display()),
+                    source: error,
+                })?,
+                None => Vec::new(),
+            };
             let presentation = Presentation::sign(
                 &HandleId::from_text(&handle_id),
                 &new_operation_id()?,
                 now_ms(),
+                request_digest(&method, &path, &body)?,
                 &key,
             )?;
             let [id, operation, signed_at, signature] = presentation.to_wire();
@@ -276,18 +287,45 @@ fn run(command: Command) -> Result<(), SecretsError> {
         Command::Serve {
             at,
             listen,
-            directory_config,
-            use_action,
+            directory,
         } => {
             let layout = Layout::new(&at.root, &at.keys);
-            let grants = match directory_config {
-                Some(config) => {
-                    Grants::Directory(SpiceGrants::from_directory(&config, &use_action)?)
-                }
-                None => Grants::File(FileGrants::new(layout.grants())),
-            };
-            let broker = open_with(&at, grants)?;
+            let broker = open_with(&at, directory.grants(&layout)?)?;
             serve::serve(broker, layout, &listen)?;
+        }
+        Command::SealRecord {
+            at,
+            name,
+            owner,
+            class,
+        } => {
+            let value = read_credential()?;
+            let class = match class {
+                RecordClass::Memory => EntryClass::Memory,
+                RecordClass::Key => EntryClass::Key,
+            };
+            open(&at)?.seal_record(&name, class, &owner, &value)?;
+            println!("sealed {name} ({} bytes, not shown)", value.len());
+        }
+        Command::ReadRecord {
+            at,
+            identity,
+            name,
+            from,
+            len,
+            directory,
+        } => {
+            let layout = Layout::new(&at.root, &at.keys);
+            let mut broker = open_with(&at, directory.grants(&layout)?)?;
+            let piece = len.map(|len| from..from.saturating_add(len));
+            let piece = piece.or((from > 0).then_some(from..usize::MAX));
+            let read = broker.read_record(&identity, &name, piece)?;
+            std::io::stdout()
+                .write_all(read.expose())
+                .map_err(|source| SecretsError::Io {
+                    context: "writing the record to standard output".to_owned(),
+                    source,
+                })?;
         }
     }
     Ok(())

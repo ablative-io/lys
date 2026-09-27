@@ -4,7 +4,7 @@
 //! drops and retry outcomes are read back from the audit log at start, so a
 //! broker killed at any point reopens to what the log says.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -14,17 +14,25 @@ use crate::audit::{AuditKind, AuditLine, AuditLog};
 use crate::encoding::hex;
 use crate::error::SecretsError;
 use crate::fsutil::{io, write_atomic};
-use crate::handle::{HandleId, HandleToken, Holder, IssuedHandle, Presentation};
+use crate::handle::{HandleId, HandleToken, Holder, IssuedHandle};
 use crate::keys::StoreKey;
 use crate::permission::PermissionCheck;
 use crate::secret::Secret;
 use crate::store::{EntryClass, SecretStore};
 
-use admit::Admission;
-
+mod accounts;
 mod admit;
+mod inflight;
+mod lineage;
+mod oauth_grants;
+mod records;
 mod rotation;
+mod spawn;
+mod using;
 
+pub use using::{Admitted, Ticket};
+
+const ROTATING: &str = "rotating ";
 const HANDLES: &str = "handles.json";
 const LOG_ORIGIN: &str = "lys.local/secrets-audit";
 /// How far a presentation's time may be from the broker's clock.
@@ -98,8 +106,22 @@ struct HandleRecord {
     used: u64,
     #[serde(skip)]
     dropped: bool,
+    /// Each operation id this handle was used under: its first outcome and
+    /// the mark of the request it was for.
     #[serde(skip)]
-    operations: BTreeMap<String, String>,
+    operations: BTreeMap<String, (String, String)>,
+    /// The most the lease may spend, when it is capped.
+    #[serde(default)]
+    spend_cap: Option<u64>,
+    /// Spend settled so far.
+    #[serde(skip)]
+    settled: u64,
+    /// Reservations admitted and not yet settled, by operation id.
+    #[serde(skip)]
+    open: BTreeMap<String, u64>,
+    /// The handle this one was derived from.
+    #[serde(default)]
+    parent: Option<String>,
 }
 
 /// The secrets broker.
@@ -113,6 +135,9 @@ pub struct Broker<P: PermissionCheck> {
     clock: Clock,
     handles_path: PathBuf,
     paths: BrokerPaths,
+    /// Every (identity, record) pair the log shows read, so a refusal after
+    /// a relation's removal is named `RelationRemoved`.
+    readers: BTreeSet<(String, String)>,
 }
 
 impl<P: PermissionCheck> std::fmt::Debug for Broker<P> {
@@ -151,6 +176,7 @@ impl<P: PermissionCheck> Broker<P> {
         let broker = Self {
             handles_path: paths.store_dir.join(HANDLES),
             paths: paths.clone(),
+            readers: BTreeSet::new(),
             store,
             store_key,
             audit_key,
@@ -186,23 +212,54 @@ impl<P: PermissionCheck> Broker<P> {
             .into_iter()
             .map(|record| (record.id.clone(), record))
             .collect();
+        let mut rotating = None;
+        let mut readers = BTreeSet::new();
         for recorded in audit.replay()? {
             let line = recorded.line;
-            let Some(record) = line.handle.as_ref().and_then(|id| handles.get_mut(id)) else {
+            if line.kind == AuditKind::SealedRead && line.outcome == records::READ {
+                if let (Some(identity), Some(record)) = (line.identity, line.secret) {
+                    readers.insert((identity, record));
+                }
+                continue;
+            }
+            if line.kind == AuditKind::Rotation {
+                rotating = line.outcome.strip_prefix(ROTATING).map(str::to_owned);
+                continue;
+            }
+            let Some(id) = line.handle.clone() else {
                 continue;
             };
             match line.kind {
-                AuditKind::Drop => record.dropped = true,
+                AuditKind::Drop => {
+                    if let Some(record) = handles.get_mut(&id) {
+                        record.dropped = true;
+                    }
+                }
                 AuditKind::Use if line.outcome == "admitted" => {
-                    record.used = record.used.saturating_add(1);
-                    if let Some(operation) = line.operation {
-                        record.operations.insert(operation, line.outcome);
+                    if let (Some(operation), Some(mark)) = (&line.operation, &line.request) {
+                        lineage::admitted(
+                            &mut handles,
+                            &id,
+                            (operation, mark),
+                            line.spend.unwrap_or(0),
+                        );
+                    }
+                }
+                AuditKind::Settlement => {
+                    if let Some(operation) = &line.operation {
+                        lineage::settled(
+                            &mut handles,
+                            &id,
+                            operation,
+                            &line.outcome,
+                            line.spend.unwrap_or(0),
+                        );
                     }
                 }
                 _ => {}
             }
         }
-        Ok(Self {
+        let mut broker = Self {
             store,
             store_key,
             audit_key,
@@ -212,7 +269,11 @@ impl<P: PermissionCheck> Broker<P> {
             clock,
             handles_path,
             paths: paths.clone(),
-        })
+            readers,
+        };
+        broker.settle_rotation(rotating.as_deref())?;
+        broker.settle_unknown_outcomes()?;
+        Ok(broker)
     }
 
     /// The sealed store, for listing entries. No secret byte is reachable.
@@ -253,7 +314,7 @@ impl<P: PermissionCheck> Broker<P> {
     ///
     /// # Errors
     ///
-    /// `SecretUnknown`, `NoPersonRoot`, `PermissionDenied`, `InvalidLifetime`.
+    /// As [`Broker::issue_capped`].
     pub fn issue(
         &mut self,
         holder: &Holder,
@@ -261,10 +322,36 @@ impl<P: PermissionCheck> Broker<P> {
         max_uses: u64,
         not_after_ms: i64,
     ) -> Result<IssuedHandle, SecretsError> {
-        if self.store.entry(secret).is_none() {
-            return Err(SecretsError::SecretUnknown {
-                name: secret.to_owned(),
-            });
+        self.issue_capped(holder, secret, max_uses, not_after_ms, None)
+    }
+
+    /// Issues a handle as [`Broker::issue`] does, with a hard cap on what
+    /// its calls may spend when `spend_cap` is given: each call reserves
+    /// before it is forwarded and settles after.
+    ///
+    /// # Errors
+    ///
+    /// `SecretUnknown`, `NoPersonRoot`, `PermissionDenied`, `InvalidLifetime`.
+    pub fn issue_capped(
+        &mut self,
+        holder: &Holder,
+        secret: &str,
+        max_uses: u64,
+        not_after_ms: i64,
+        spend_cap: Option<u64>,
+    ) -> Result<IssuedHandle, SecretsError> {
+        match self.store.entry(secret).map(|entry| entry.class) {
+            None => {
+                return Err(SecretsError::SecretUnknown {
+                    name: secret.to_owned(),
+                });
+            }
+            Some(EntryClass::Memory) => {
+                return Err(SecretsError::MemoryNotUsable {
+                    record: secret.to_owned(),
+                });
+            }
+            Some(EntryClass::Credential | EntryClass::Key | EntryClass::OAuth) => {}
         }
         let now = (self.clock)();
         if not_after_ms <= now || max_uses == 0 {
@@ -302,6 +389,10 @@ impl<P: PermissionCheck> Broker<P> {
             used: 0,
             dropped: false,
             operations: BTreeMap::new(),
+            spend_cap,
+            settled: 0,
+            open: BTreeMap::new(),
+            parent: None,
         };
         self.record(
             AuditKind::Issue,
@@ -313,74 +404,6 @@ impl<P: PermissionCheck> Broker<P> {
         self.handles.insert(record.id.clone(), record);
         self.write_handles()?;
         Ok(IssuedHandle { id, token })
-    }
-
-    /// Swaps `token` for its credential inside `forward`, after checking the
-    /// handle, the presentation, the lease and the permission, in that order.
-    /// The credential is never returned; only `forward`'s answer is.
-    ///
-    /// # Errors
-    ///
-    /// One named refusal per attempt, each recorded in the audit log.
-    pub fn use_handle<R>(
-        &mut self,
-        token: &HandleToken,
-        presentation: &Presentation,
-        forward: impl FnOnce(&Secret) -> R,
-    ) -> Result<Used<R>, UseError> {
-        let operation = hex(&presentation.operation_id);
-        match self.admit(token, presentation, &operation) {
-            Ok(Admission::Retry(outcome)) => Ok(Used::Retried { outcome }),
-            Ok(Admission::Fresh {
-                id,
-                identity,
-                secret,
-                uses_left,
-                used,
-            }) => {
-                self.record(
-                    AuditKind::Use,
-                    (Some(&id), Some(&identity), Some(&secret)),
-                    Some(&operation),
-                    Some(used),
-                    "admitted",
-                )?;
-                if let Some(record) = self.handles.get_mut(&id) {
-                    record.used = used;
-                    record.operations.insert(operation, "admitted".to_owned());
-                }
-                let credential =
-                    self.store
-                        .open_for_use(&self.store_key, &secret, EntryClass::Credential)?;
-                let answer = forward(&credential);
-                Ok(Used::Forwarded { answer, uses_left })
-            }
-            Err(refusal) => {
-                let handle = self.find(token).map(|record| {
-                    (
-                        record.id.clone(),
-                        record.identity.clone(),
-                        record.secret.clone(),
-                    )
-                });
-                let (id, identity, secret) = match &handle {
-                    Some((id, identity, secret)) => (
-                        Some(id.as_str()),
-                        Some(identity.as_str()),
-                        Some(secret.as_str()),
-                    ),
-                    None => (None, None, None),
-                };
-                self.record(
-                    AuditKind::Use,
-                    (id, identity, secret),
-                    Some(&operation),
-                    None,
-                    refusal.name(),
-                )?;
-                Err(refusal)
-            }
-        }
     }
 
     /// Drops the handle `id`; its next presentation is refused.
@@ -413,22 +436,39 @@ impl<P: PermissionCheck> Broker<P> {
     fn record(
         &mut self,
         kind: AuditKind,
-        (handle, identity, secret): Subject<'_>,
-        operation: Option<&str>,
+        subject: Subject<'_>,
+        call: Option<(&str, &str)>,
         uses: Option<u64>,
         outcome: &str,
     ) -> Result<u64, SecretsError> {
-        let line = AuditLine {
+        let line = self.line(kind, subject, call, uses, outcome);
+        self.append(&line)
+    }
+
+    fn append(&mut self, line: &AuditLine) -> Result<u64, SecretsError> {
+        self.audit.append(line, self.audit_key.identity())
+    }
+
+    fn line(
+        &self,
+        kind: AuditKind,
+        (handle, identity, secret): Subject<'_>,
+        call: Option<(&str, &str)>,
+        uses: Option<u64>,
+        outcome: &str,
+    ) -> AuditLine {
+        AuditLine {
             kind,
             at_ms: (self.clock)(),
             handle: handle.map(str::to_owned),
             identity: identity.map(str::to_owned),
             secret: secret.map(str::to_owned),
-            operation: operation.map(str::to_owned),
+            operation: call.map(|(operation, _mark)| operation.to_owned()),
+            request: call.map(|(_operation, mark)| mark.to_owned()),
             uses,
+            spend: None,
             outcome: outcome.to_owned(),
-        };
-        self.audit.append(&line, self.audit_key.identity())
+        }
     }
 
     fn write_handles(&self) -> Result<(), SecretsError> {

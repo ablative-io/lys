@@ -2,6 +2,11 @@
 //! lys/sealed-envelope/v1, and its binding (entry id, name, class, owner and
 //! sequence) is carried as the authenticated prefix of the sealed plaintext,
 //! so a ciphertext moved between entries or rolled back in place is refused.
+//!
+//! Each sealing is its own file, named by entry id and sequence, and the
+//! index names the one in force. A replacement or a rotation writes its new
+//! sealings beside the old, and the index write is the one moment it takes
+//! effect; a sealing the index does not name is swept when the store opens.
 
 use std::collections::BTreeMap;
 use std::fs::{self, File};
@@ -15,6 +20,10 @@ use crate::error::SecretsError;
 use crate::fsutil::{io, write_atomic};
 use crate::keys::StoreKey;
 use crate::secret::Secret;
+
+mod accounts;
+
+pub use accounts::AccountView;
 
 const INDEX: &str = "index.json";
 const ENTRIES: &str = "entries";
@@ -34,6 +43,10 @@ pub enum EntryClass {
     Key,
     /// A memory, read by those it is shared with.
     Memory,
+    /// An OAuth service grant, used only through the proxy, which refreshes
+    /// its access token itself.
+    #[serde(rename = "oauth")]
+    OAuth,
 }
 
 impl EntryClass {
@@ -42,6 +55,7 @@ impl EntryClass {
             Self::Credential => "credential",
             Self::Key => "key",
             Self::Memory => "memory",
+            Self::OAuth => "oauth",
         }
     }
 }
@@ -65,6 +79,8 @@ pub struct EntryView {
 struct Index {
     key_id: String,
     entries: BTreeMap<String, EntryView>,
+    #[serde(default)]
+    accounts: BTreeMap<String, accounts::Ring>,
 }
 
 /// The sealed store, held open by one broker at a time.
@@ -95,6 +111,7 @@ impl SecretStore {
             index: Index {
                 key_id: key.id().as_str().to_owned(),
                 entries: BTreeMap::new(),
+                accounts: BTreeMap::new(),
             },
             _lock: lock,
         };
@@ -128,11 +145,38 @@ impl SecretStore {
                 presented: key.id().as_str().to_owned(),
             });
         }
-        Ok(Self {
+        let store = Self {
             dir: dir.to_path_buf(),
             index,
             _lock: lock,
-        })
+        };
+        store.sweep()?;
+        Ok(store)
+    }
+
+    /// Removes every sealing the index does not name: the old sealings of a
+    /// replacement or a rotation, and the new ones of a rotation that never
+    /// took effect.
+    fn sweep(&self) -> Result<(), SecretsError> {
+        let entries = self.dir.join(ENTRIES);
+        let listing =
+            fs::read_dir(&entries).map_err(io(format!("listing {}", entries.display())))?;
+        for found in listing {
+            let found = found.map_err(io(format!("listing {}", entries.display())))?;
+            let path = found.path();
+            let in_force = self
+                .index
+                .entries
+                .values()
+                .any(|view| self.entry_path(view) == path);
+            if !in_force {
+                fs::remove_file(&path).map_err(io(format!(
+                    "removing the sealing {} no entry names",
+                    path.display()
+                )))?;
+            }
+        }
+        Ok(())
     }
 
     /// The store's directory.
@@ -207,12 +251,13 @@ impl SecretStore {
         self.write_entry(key, &view, value)?;
         self.index.entries.insert(name.to_owned(), view.clone());
         self.write_index()?;
+        self.sweep()?;
         Ok(view)
     }
 
     /// Reseals every entry to `new`, advancing each sequence, beside the
     /// current sealing. Nothing is read under `new` until
-    /// [`SecretStore::commit_rotation`] runs after the rotation's audit line.
+    /// [`SecretStore::commit_rotation`] writes the index.
     pub(crate) fn prepare_rotation(
         &self,
         old: &StoreKey,
@@ -223,33 +268,25 @@ impl SecretStore {
             let value = self.open_for_use(old, &view.name, view.class)?;
             let mut next = view.clone();
             next.sequence = next.sequence.saturating_add(1);
-            Self::write_sealing(new, &next, &value, &self.next_path(&next.id))?;
+            Self::write_sealing(new, &next, &value, &self.entry_path(&next))?;
             staged.push(next);
         }
         Ok(staged)
     }
 
     /// Makes the staged sealings current and records `new` as the store's
-    /// key.
+    /// key, in one index write, then sweeps the old sealings.
     pub(crate) fn commit_rotation(
         &mut self,
         new: &StoreKey,
         staged: Vec<EntryView>,
     ) -> Result<(), SecretsError> {
-        for view in &staged {
-            let from = self.next_path(&view.id);
-            let to = self.entry_path(&view.id);
-            fs::rename(&from, &to).map_err(io(format!("moving {} into place", from.display())))?;
-        }
         for view in staged {
             self.index.entries.insert(view.name.clone(), view);
         }
         new.id().as_str().clone_into(&mut self.index.key_id);
-        self.write_index()
-    }
-
-    fn next_path(&self, id: &str) -> PathBuf {
-        self.dir.join(ENTRIES).join(format!("{id}.next.sealed"))
+        self.write_index()?;
+        self.sweep()
     }
 
     /// Opens `name` for use under `key`, refusing any binding other than the
@@ -267,7 +304,7 @@ impl SecretStore {
             .ok_or_else(|| SecretsError::SecretUnknown {
                 name: name.to_owned(),
             })?;
-        let path = self.entry_path(&view.id);
+        let path = self.entry_path(view);
         let bytes = fs::read(&path).map_err(io(format!("reading {}", path.display())))?;
         let envelope = decode_envelope(&bytes)?;
         let plain =
@@ -312,7 +349,7 @@ impl SecretStore {
         view: &EntryView,
         value: &Secret,
     ) -> Result<(), SecretsError> {
-        Self::write_sealing(key, view, value, &self.entry_path(&view.id))
+        Self::write_sealing(key, view, value, &self.entry_path(view))
     }
 
     fn write_sealing(
@@ -339,8 +376,10 @@ impl SecretStore {
         write_atomic(path, &encoded.into_bytes())
     }
 
-    fn entry_path(&self, id: &str) -> PathBuf {
-        self.dir.join(ENTRIES).join(format!("{id}.sealed"))
+    fn entry_path(&self, view: &EntryView) -> PathBuf {
+        self.dir
+            .join(ENTRIES)
+            .join(format!("{}.{}.sealed", view.id, view.sequence))
     }
 
     fn write_index(&self) -> Result<(), SecretsError> {

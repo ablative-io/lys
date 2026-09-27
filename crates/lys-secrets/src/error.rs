@@ -3,6 +3,8 @@
 
 use std::path::PathBuf;
 
+mod name;
+
 /// A named refusal or failure of the secrets broker.
 #[derive(Debug, thiserror::Error)]
 pub enum SecretsError {
@@ -315,6 +317,86 @@ pub enum SecretsError {
         /// The operation id.
         operation: String,
     },
+    /// A sealed record read by an identity without the `read` relation.
+    #[error(
+        "NoRelation: {identity} holds no read relation on {record} (act: ask the record's owner for the relation)"
+    )]
+    NoRelation {
+        /// The asking identity.
+        identity: String,
+        /// The record's name.
+        record: String,
+    },
+    /// A sealed record read after the identity's `read` relation was removed.
+    #[error(
+        "RelationRemoved: the read relation of {identity} on {record} was removed (act: ask the record's owner to restore the relation)"
+    )]
+    RelationRemoved {
+        /// The asking identity.
+        identity: String,
+        /// The record's name.
+        record: String,
+    },
+    /// A read of a key or credential, which is used and never read.
+    #[error(
+        "KeyNotReadable: {record} is used through the proxy and never read (act: use the key through the proxy)"
+    )]
+    KeyNotReadable {
+        /// The record's name.
+        record: String,
+    },
+    /// A handle asked for on a memory record, which is read and never used.
+    #[error(
+        "MemoryNotUsable: {record} is a memory record, read by name and never used through a handle (act: read it under the read relation)"
+    )]
+    MemoryNotUsable {
+        /// The record's name.
+        record: String,
+    },
+    /// A derived handle asked for by a holder who neither owns the secret
+    /// nor holds the right to lend it.
+    #[error(
+        "LendingNotPermitted: {holder} neither owns {secret} nor holds the right to lend it (act: ask the secret's owner for the lend relation)"
+    )]
+    LendingNotPermitted {
+        /// The holder asking to lend.
+        holder: String,
+        /// The secret's name.
+        secret: String,
+    },
+    /// A derived handle asked for with a bound past the handle above it.
+    #[error(
+        "BeyondAncestry: a handle derived from {handle} must stay within its uses, window and spend (act: ask for bounds within the handle it is derived from)"
+    )]
+    BeyondAncestry {
+        /// The handle derived from.
+        handle: String,
+    },
+    /// A read of a record that is not there to be read.
+    #[error("NotFound: no record by that name (act: ask for a record by a name you can discover)")]
+    NotFound,
+    /// A reservation would take a capped lease past its cap.
+    #[error(
+        "SpendCapReached: handle {handle} has {left} of its spend cap {cap} left and asked to reserve {asked} (act: ask the grant's owner to raise the spend cap)"
+    )]
+    SpendCapReached {
+        /// The handle id.
+        handle: String,
+        /// The lease's cap.
+        cap: u64,
+        /// What is left after settled spend and open reservations.
+        left: u64,
+        /// The reservation asked for.
+        asked: u64,
+    },
+    /// A use of a capped lease named no amount to reserve.
+    #[error(
+        "ReservationMissing: handle {handle} has a spend cap and the call reserved nothing (act: send the amount the call may spend)"
+    )]
+    ReservationMissing {
+        /// The handle id.
+        handle: String,
+    },
     /// Another broker holds the store.
     #[error("StoreLocked: another broker holds the store at {path} (act: stop the other broker)")]
     StoreLocked {
@@ -385,58 +467,5 @@ impl From<lys_identity::grants::GrantError> for SecretsError {
 impl From<lys_identity::IdentityError> for SecretsError {
     fn from(error: lys_identity::IdentityError) -> Self {
         Self::Identity(Box::new(error))
-    }
-}
-
-impl SecretsError {
-    /// The refusal's name, the word audit lines record as the outcome.
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::StoreKeyMissing { .. } => "StoreKeyMissing",
-            Self::KeyFileMisplaced { .. } => "KeyFileMisplaced",
-            Self::KeyFilePermissions { .. } => "KeyFilePermissions",
-            Self::KeyFileExists { .. } => "KeyFileExists",
-            Self::StoreKeyMismatch { .. } => "StoreKeyMismatch",
-            Self::StoreKeyRetired { .. } => "StoreKeyRetired",
-            Self::StoreNotFound { .. } => "StoreNotFound",
-            Self::StoreAlreadyExists { .. } => "StoreAlreadyExists",
-            Self::StoreCorrupt { .. } => "StoreCorrupt",
-            Self::EntryBindingMismatch { .. } => "EntryBindingMismatch",
-            Self::EntryRolledBack { .. } => "EntryRolledBack",
-            Self::EntryUnsealFailed { .. } => "EntryUnsealFailed",
-            Self::SecretExists { .. } => "SecretExists",
-            Self::SecretUnknown { .. } => "SecretUnknown",
-            Self::AccountUnknown { .. } => "AccountUnknown",
-            Self::AccountExists { .. } => "AccountExists",
-            Self::NoAccountAvailable { .. } => "NoAccountAvailable",
-            Self::InvalidName { .. } => "InvalidName",
-            Self::InvalidLifetime { .. } => "InvalidLifetime",
-            Self::HandleUnknown => "HandleUnknown",
-            Self::HandleExpired { .. } => "HandleExpired",
-            Self::HandleDropped { .. } => "HandleDropped",
-            Self::HandleWrongIdentity { .. } => "HandleWrongIdentity",
-            Self::PresentationInvalid { .. } => "PresentationInvalid",
-            Self::PresentationReplayed { .. } => "PresentationReplayed",
-            Self::PresentationStale { .. } => "PresentationStale",
-            Self::OperationIdTooShort { .. } => "OperationIdTooShort",
-            Self::PermissionDenied { .. } => "PermissionDenied",
-            Self::AuditLineUnreadable { .. } => "AuditLineUnreadable",
-            Self::AuditSignatureInvalid { .. } => "AuditSignatureInvalid",
-            Self::AuditProofInvalid { .. } => "AuditProofInvalid",
-            Self::AuditLineMissing { .. } => "AuditLineMissing",
-            Self::LeaseExhausted { .. } => "LeaseExhausted",
-            Self::LeaseWindowClosed { .. } => "LeaseWindowClosed",
-            Self::NoPersonRoot { .. } => "NoPersonRoot",
-            Self::OperationIdReused { .. } => "OperationIdReused",
-            Self::StoreLocked { .. } => "StoreLocked",
-            Self::StatePoisoned => "StatePoisoned",
-            Self::Grants(_) => "Grants",
-            Self::Identity(_) => "Identity",
-            Self::Random { .. } => "Random",
-            Self::Encoding { .. } => "Encoding",
-            Self::Io { .. } => "Io",
-            Self::Trust(_) => "Trust",
-            Self::Log(_) => "Log",
-        }
     }
 }

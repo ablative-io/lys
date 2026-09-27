@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use lys_secrets::{BrokerPaths, Denied, PermissionCheck, Permitted, SecretsError};
+use lys_secrets::{BrokerPaths, Denied, PermissionCheck, Permitted, Relation, SecretsError};
 use serde::{Deserialize, Serialize};
 
 /// The broker's clock.
@@ -38,6 +38,10 @@ pub struct Route {
     pub header: String,
     /// Text before the credential in that header.
     pub prefix: String,
+    /// The upstream answer header that reports what a call spent, for a
+    /// lease with a spend cap. With none, a call settles at its reservation.
+    #[serde(default)]
+    pub spend_header: Option<String>,
 }
 
 /// The broker's folders.
@@ -107,7 +111,16 @@ struct GrantRow {
     identity: String,
     secret: String,
     granted_by: Option<String>,
+    #[serde(default = "use_relation")]
+    relation: String,
 }
+
+fn use_relation() -> String {
+    Relation::Use.label().to_owned()
+}
+
+/// A grant as (identity, secret, relation, granted by).
+pub type GrantView = (String, String, String, Option<String>);
 
 /// Grants kept in a file and read afresh on every check, so a revocation
 /// takes effect at the next use with no restart.
@@ -135,42 +148,52 @@ impl FileGrants {
         fs::write(&self.path, bytes).map_err(io_error(format!("writing {}", self.path.display())))
     }
 
-    pub fn set(&self, identity: &str, secret: &str, by: Option<&str>) -> Result<(), SecretsError> {
+    pub fn set(
+        &self,
+        relation: Relation,
+        identity: &str,
+        secret: &str,
+        by: Option<&str>,
+    ) -> Result<(), SecretsError> {
         let mut rows = self.rows()?;
-        rows.retain(|row| !(row.identity == identity && row.secret == secret));
+        rows.retain(|row| !row.is(relation, identity, secret));
         rows.push(GrantRow {
             identity: identity.to_owned(),
             secret: secret.to_owned(),
             granted_by: by.map(str::to_owned),
+            relation: relation.label().to_owned(),
         });
         self.write(&rows)
     }
 
-    /// Every grant as (identity, secret, granted by).
-    pub fn list(&self) -> Result<Vec<(String, String, Option<String>)>, SecretsError> {
+    /// Every grant as (identity, secret, relation, granted by).
+    pub fn list(&self) -> Result<Vec<GrantView>, SecretsError> {
         Ok(self
             .rows()?
             .into_iter()
-            .map(|row| (row.identity, row.secret, row.granted_by))
+            .map(|row| (row.identity, row.secret, row.relation, row.granted_by))
             .collect())
     }
 
-    pub fn remove(&self, identity: &str, secret: &str) -> Result<(), SecretsError> {
+    pub fn remove(
+        &self,
+        relation: Relation,
+        identity: &str,
+        secret: &str,
+    ) -> Result<(), SecretsError> {
         let mut rows = self.rows()?;
-        rows.retain(|row| !(row.identity == identity && row.secret == secret));
+        rows.retain(|row| !row.is(relation, identity, secret));
         self.write(&rows)
     }
-}
 
-impl PermissionCheck for FileGrants {
-    fn may_use(&self, identity: &str, secret: &str) -> Result<Permitted, Denied> {
+    fn check(&self, relation: Relation, identity: &str, secret: &str) -> Result<Permitted, Denied> {
         let rows = self.rows().map_err(|error| Denied {
             reason: format!("the grants file does not read: {error}"),
             no_person_root: false,
         })?;
         match rows
             .into_iter()
-            .find(|row| row.identity == identity && row.secret == secret)
+            .find(|row| row.is(relation, identity, secret))
         {
             Some(GrantRow {
                 granted_by: Some(person),
@@ -183,9 +206,29 @@ impl PermissionCheck for FileGrants {
                 no_person_root: true,
             }),
             None => Err(Denied {
-                reason: "no use relation".to_owned(),
+                reason: format!("no {} relation", relation.label()),
                 no_person_root: false,
             }),
         }
+    }
+}
+
+impl GrantRow {
+    fn is(&self, relation: Relation, identity: &str, secret: &str) -> bool {
+        self.relation == relation.label() && self.identity == identity && self.secret == secret
+    }
+}
+
+impl PermissionCheck for FileGrants {
+    fn may_use(&self, identity: &str, secret: &str) -> Result<Permitted, Denied> {
+        self.check(Relation::Use, identity, secret)
+    }
+
+    fn may_read(&self, identity: &str, record: &str) -> Result<Permitted, Denied> {
+        self.check(Relation::Read, identity, record)
+    }
+
+    fn may_lend(&self, identity: &str, secret: &str) -> Result<Permitted, Denied> {
+        self.check(Relation::Lend, identity, secret)
     }
 }
