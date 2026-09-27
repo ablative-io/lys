@@ -94,6 +94,12 @@ enum Command {
         uses: u64,
         #[arg(long, default_value_t = 60)]
         minutes: i64,
+        /// The Lys directory's configuration; when named, the issue is
+        /// judged by the directory's grants.
+        #[arg(long)]
+        directory_config: Option<PathBuf>,
+        #[arg(long, default_value = "edit")]
+        use_action: String,
     },
     /// Drop a handle.
     Drop {
@@ -209,13 +215,21 @@ fn run(command: Command) -> Result<(), SecretsError> {
             secret,
             uses,
             minutes,
+            directory_config,
+            use_action,
         } => {
             let key = Ed25519Identity::load(&holder_key)?;
             let holder = Holder {
                 identity,
                 key: key.public_key_bytes(),
             };
-            let mut broker = open(&at)?;
+            let mut broker = match directory_config {
+                Some(config) => open_with(
+                    &at,
+                    Grants::Directory(SpiceGrants::from_directory(&config, &use_action)?),
+                )?,
+                None => open(&at)?,
+            };
             let issued = broker.issue(
                 &holder,
                 &secret,
