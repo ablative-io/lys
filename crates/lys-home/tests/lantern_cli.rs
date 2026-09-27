@@ -101,8 +101,12 @@ fn light_epilogue_and_recall_print_their_reports_and_refuse_by_name() -> Gate {
         "fixture-lighter",
     ])?;
     let report = one_object(&lit)?;
-    assert_eq!(sorted_keys(&report), ["id", "lit_at", "point", "session"]);
+    assert_eq!(
+        sorted_keys(&report),
+        ["id", "lit_at", "lit_in", "point", "session"]
+    );
     assert_eq!(report["session"], FIXTURE);
+    assert_eq!(report["lit_in"], FIXTURE);
     assert_eq!(report["point"], "e2");
     let l1 = report["id"].as_str().ok_or("no id")?.to_owned();
     assert_eq!(head_of(&home)?.0, l1);
