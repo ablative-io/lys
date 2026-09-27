@@ -7,9 +7,11 @@
 
 pub mod admission;
 pub mod config;
+pub mod dev_seed;
 pub mod error;
 pub mod link_audit_api;
 pub mod oidc;
+pub mod read_api;
 pub mod receipts_api;
 pub mod routes;
 pub mod session;

@@ -21,5 +21,8 @@ serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 
+[dev-dependencies]
+identity-contract = { path = "../../tests/identity_contract" }
+
 [lints]
 workspace = true

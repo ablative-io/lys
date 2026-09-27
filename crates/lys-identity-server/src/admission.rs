@@ -11,7 +11,7 @@ use lys_identity::{Actor, LoginBinding};
 use crate::error::ServerError;
 
 /// What step 1 lets the administrator do, shown to every caller before they act.
-pub const AUTHORITY: &str = "Step 1 of the directory has one administrator, configured by issuer and subject. The administrator may register people, register agents under themselves, change profiles, bind logins and record lifecycle states. Every other caller may read nothing and change nothing. No grant is written and no state is enforced in step 1.";
+pub const AUTHORITY: &str = "Step 1 of the directory has one administrator, configured by issuer and subject. The administrator may register people, register agents under themselves, change profiles, bind logins and record lifecycle states. Every other caller may read only their own person, sign-in identities and agents, and change nothing. No grant is written and no state is enforced in step 1.";
 
 /// The two callers step 1 admits.
 #[derive(Debug, Clone, PartialEq, Eq)]

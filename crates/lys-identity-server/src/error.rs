@@ -20,6 +20,12 @@ pub enum ServerError {
         /// Why the caller is not admitted.
         reason: &'static str,
     },
+    /// The caller is signed in through a login bound to no person, so no personal view is theirs.
+    #[error("NoPerson: the signed-in login is bound to no person in the directory")]
+    NoPerson,
+    /// The agent is not one the caller may see: the directory does not hold it, or it answers to another person.
+    #[error("AgentNotVisible: no agent by that id is visible to the signed-in caller")]
+    AgentNotVisible,
     /// A sign-in answer names a state this service did not issue, or one already used.
     #[error("SignInStateUnknown: the sign-in answer does not match a sign-in this service began")]
     SignInStateUnknown,
@@ -59,7 +65,8 @@ impl ServerError {
     fn status(&self) -> StatusCode {
         match self {
             Self::NotSignedIn => StatusCode::UNAUTHORIZED,
-            Self::NotAdmitted { .. } => StatusCode::FORBIDDEN,
+            Self::NotAdmitted { .. } | Self::NoPerson => StatusCode::FORBIDDEN,
+            Self::AgentNotVisible => StatusCode::NOT_FOUND,
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. } => StatusCode::BAD_GATEWAY,
             Self::ConfigInvalid { .. } | Self::DirectoryUnavailable { .. } => {

@@ -193,6 +193,15 @@ impl Service {
     /// Start the service over a fresh log, with the fake issuer's administrator
     /// and link-audit source configured.
     pub async fn start() -> Result<Self, Box<dyn Error>> {
+        Ok(Self::start_with(|_| Ok(())).await?.0)
+    }
+
+    /// Start the service as [`Service::start`] does, after `prepare` has
+    /// written to the directory its configuration names, answering what
+    /// `prepare` answered.
+    pub async fn start_with<T: Send>(
+        prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
+    ) -> Result<(Self, T), Box<dyn Error>> {
         let dir = tempfile::TempDir::new()?;
         secret_file(&dir.path().join("issuer.key"), &[3; 32])?;
         secret_file(&dir.path().join("service.key"), &[9; 32])?;
@@ -220,17 +229,21 @@ impl Service {
             secure_cookie: false,
         };
         config.validate()?;
+        let prepared = prepare(&config)?;
         let app = service(&config).await?;
         tokio::spawn(async move { axum::serve(listener, app).await });
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .build()?;
-        Ok(Self {
-            base,
-            issuer,
-            client,
-            dir,
-        })
+        Ok((
+            Self {
+                base,
+                issuer,
+                client,
+                dir,
+            },
+            prepared,
+        ))
     }
 
     /// Begin a sign-in and let the issuer answer it as `login`, answering the

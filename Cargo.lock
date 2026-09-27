@@ -1451,6 +1451,7 @@ name = "lys-identity-server"
 version = "0.2.0"
 dependencies = [
  "axum",
+ "identity-contract",
  "lys-core",
  "lys-identity",
  "lys-log-store",

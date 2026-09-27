@@ -1,4 +1,5 @@
 //! The HTTP routes mapping requests to the directory, each mutation behind admission.
+//! The read-only views the identity screens draw are in `read_api`.
 
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, PoisonError};
@@ -42,16 +43,7 @@ type Shared = Arc<AppState>;
 /// Open the directory, discover the issuer and answer the service's routes,
 /// as `config` says. The log is created when its directory does not exist.
 pub async fn service(config: &Config) -> Result<Router, ServerError> {
-    if !config.log_dir.exists() {
-        FileLeafStore::create(&config.log_dir, &config.log_origin).map_err(|error| {
-            ServerError::ConfigInvalid {
-                reason: format!("the log could not be created: {error}"),
-            }
-        })?;
-    }
-    let log_dir = config.log_dir.clone();
-    let reopen = Box::new(move || FileLeafStore::open(&log_dir));
-    let directory = Directory::open(reopen, load_service_key(&config.event_key_file)?)?;
+    let directory = open_directory(config)?;
     Ok(router(Arc::new(AppState {
         directory: Mutex::new(directory),
         oidc: Oidc::discover(config).await?,
@@ -61,6 +53,24 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
             config.link_audit_binding()?,
         ),
     })))
+}
+
+/// Open the directory `config` names, creating its log when the log's
+/// directory does not exist.
+pub fn open_directory(config: &Config) -> Result<Directory<FileLeafStore>, ServerError> {
+    if !config.log_dir.exists() {
+        FileLeafStore::create(&config.log_dir, &config.log_origin).map_err(|error| {
+            ServerError::ConfigInvalid {
+                reason: format!("the log could not be created: {error}"),
+            }
+        })?;
+    }
+    let log_dir = config.log_dir.clone();
+    let reopen = Box::new(move || FileLeafStore::open(&log_dir));
+    Ok(Directory::open(
+        reopen,
+        load_service_key(&config.event_key_file)?,
+    )?)
 }
 
 /// The service's routes over `state`.
@@ -76,6 +86,7 @@ pub fn router(state: Shared) -> Router {
         .route("/identities/{id}/profile", post(change_profile))
         .route("/identities/{id}/transitions", post(transition))
         .route("/people/{id}/logins", post(bind_login))
+        .merge(crate::read_api::routes())
         .merge(crate::receipts_api::routes())
         .merge(crate::link_audit_api::routes())
         .with_state(state)
