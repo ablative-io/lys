@@ -60,7 +60,7 @@ describe('The delegation form (conformance 2.1 to 2.3)', () => {
     expect(body.operation).toMatch(/^op-[0-9a-f]{32}$/);
     expect(body.window.ends_at).not.toBeNull();
     expect($('#drawer')?.classList.contains('open')).toBe(false);
-    expect($('#toast')?.textContent).toContain("Given. Ada's scribe can now view project:identity, through you.");
+    expect($('#toast')?.textContent).toContain("Given. Scribe can now view project:identity, through you.");
   });
 
   it('shows the service refusal by name and records nothing as given', async () => {
@@ -115,12 +115,12 @@ describe("What you can't give (conformance 2.4)", () => {
 describe('Can X do this? (conformance 8.1)', () => {
   it("answers yes with the path to a person on an agent's file", async () => {
     const { posted } = await mount(`#/file/${SCRIBE}/access`);
-    expect($$('.file .card .chain .pill').map((p) => p.textContent)).toEqual(['Ada (test person) · owner of project:identity', "Ada's scribe · viewer of project:identity"]);
+    expect($$('.file .card .chain .pill').map((p) => p.textContent)).toEqual(['Ada (test person) · owner of project:identity', "Scribe · viewer of project:identity"]);
     await choose($('#cPerm'), 'view');
     await press('c', {}, document.body);
     expect(posted.some((p) => p.path === '/grants/who')).toBe(true);
     expect($('#answer .verdict-mark')?.textContent).toBe('Yes');
-    expect($('#answer .chain')?.textContent).toContain("Ada's scribe · viewer of project:identity");
+    expect($('#answer .chain')?.textContent).toContain("Scribe · viewer of project:identity");
     expect($('#answer .meta-line')?.textContent).toContain('model v1');
     expect($('#answer .meta-line')?.textContent).toContain('change 7');
   });
@@ -155,7 +155,7 @@ describe('Who can reach this? (conformance 8.2)', () => {
   it('lists everyone with what they can do, from the same answers', async () => {
     await mount('#/access/who/project:identity');
     const rows = $$('#whoCan .row').map((r) => r.textContent);
-    expect(rows).toEqual(['Ada (test person)edit, grant, view', "Ada's scribeview"]);
+    expect(rows).toEqual(['Ada (test person)edit, grant, view', "Scribeview"]);
     await choose($('select[aria-label="Resource"]'), 'project:ledger');
     expect(location.hash).toBe('#/access/who/project:ledger');
     expect($$('#whoCan .row').map((r) => r.textContent)).toEqual(['Ada (test person)view']);

@@ -62,16 +62,16 @@ const PLAN: [(&str, &[(&str, LifecycleState)]); 2] = [
     (
         "Ada (test person)",
         &[
-            ("Ada's scribe", LifecycleState::Active),
-            ("Ada's courier", LifecycleState::Registered),
-            ("Ada's archivist", LifecycleState::Suspended),
+            ("Scribe", LifecycleState::Active),
+            ("Courier", LifecycleState::Registered),
+            ("Archivist", LifecycleState::Suspended),
         ],
     ),
     (
         "Bea (test person)",
         &[
-            ("Bea's reviewer", LifecycleState::Active),
-            ("Bea's lamplighter", LifecycleState::Retired),
+            ("Reviewer", LifecycleState::Active),
+            ("Lamplighter", LifecycleState::Retired),
         ],
     ),
 ];

@@ -63,7 +63,7 @@ describe('shell (conformance 9.1)', () => {
     await mount('#/people');
     await press('k', { ctrlKey: true }, document.body);
     const input = $('#palIn') as HTMLInputElement;
-    expect($$('#palList .it').some((i) => i.textContent?.includes("Ada's scribe"))).toBe(true);
+    expect($$('#palList .it').some((i) => i.textContent?.includes("Scribe"))).toBe(true);
     await press('ArrowDown', {}, input);
     expect($('#palList .it.sel')?.textContent).toContain('Bea (test person)');
     await press('ArrowUp', {}, input);

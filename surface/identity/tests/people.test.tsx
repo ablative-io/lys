@@ -8,7 +8,7 @@ describe('People and agents', () => {
   it('lists the directory from the service: people first, then agents with their person', async () => {
     const { requests } = await mount('#/people');
     expect(requests).toContain('/directory/people');
-    expect(names()).toEqual(['Ada (test person)', 'Bea (test person)', "Ada's scribe", "Ada's courier", "Ada's archivist", "Bea's reviewer", "Bea's lamplighter"]);
+    expect(names()).toEqual(['Ada (test person)', 'Bea (test person)', "Scribe", "Courier", "Archivist", "Reviewer", "Lamplighter"]);
     const scribe = $(`tr[data-href="#/file/${SCRIBE}"]`);
     expect(scribe?.textContent).toContain('agent');
     expect(scribe?.textContent).toContain('active');
@@ -18,9 +18,9 @@ describe('People and agents', () => {
 
   it('flags an agent whose person is retired (conformance 3.1)', async () => {
     await mount('#/people');
-    const reviewer = $$('tbody tr').find((tr) => tr.textContent?.includes("Bea's reviewer"));
+    const reviewer = $$('tbody tr').find((tr) => tr.textContent?.includes("Reviewer"));
     expect(reviewer?.textContent).toContain('(retired)');
-    const lamplighter = $$('tbody tr').find((tr) => tr.textContent?.includes("Bea's lamplighter"));
+    const lamplighter = $$('tbody tr').find((tr) => tr.textContent?.includes("Lamplighter"));
     expect(lamplighter?.textContent).not.toContain('(retired)');
   });
 
@@ -35,8 +35,8 @@ describe('People and agents', () => {
     expect($('.preview h2')?.textContent).toBe('Ada (test person)');
     await press('j', {}, document.body);
     await press('j', {}, document.body);
-    expect($('tr.cursor td')?.textContent).toBe("Ada's scribe");
-    expect($('.preview h2')?.textContent).toBe("Ada's scribe");
+    expect($('tr.cursor td')?.textContent).toBe("Scribe");
+    expect($('.preview h2')?.textContent).toBe("Scribe");
     await press('k', {}, document.body);
     expect($('.preview h2')?.textContent).toBe('Bea (test person)');
     await press('Enter', {}, document.body);
@@ -69,7 +69,7 @@ describe('People and agents', () => {
       '/directory/people': refused(403, 'NotAdmitted', 'NotAdmitted: only the configured administrator may do this in step 1'),
     });
     expect(requests).toEqual(expect.arrayContaining(['/directory/people', '/people']));
-    expect(names()).toEqual(['Ada (test person)', "Ada's scribe", "Ada's courier", "Ada's archivist"]);
+    expect(names()).toEqual(['Ada (test person)', "Scribe", "Courier", "Archivist"]);
     expect(text()).toContain('Your own records');
   });
 
