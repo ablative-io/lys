@@ -1,0 +1,35 @@
+{
+  "cluster": "lys-log-store",
+  "personas": [
+    {
+      "name": "Log operator",
+      "role": "Opens a log store after a crash",
+      "stories": [
+        {
+          "id": "S1",
+          "text": "As a log operator, I want to be told which leftover temporary files opening my store ignored, so that what an interrupted append left behind is visible rather than skipped in silence."
+        }
+      ]
+    },
+    {
+      "name": "Third-party verifier",
+      "role": "Checks a leaf without lys",
+      "stories": [
+        {
+          "id": "S2",
+          "text": "As a third-party verifier, I want a leaf from a store written after this change to verify with the standalone Python verifier, so that checking a leaf still needs no lys code."
+        }
+      ]
+    },
+    {
+      "name": "Witness operator",
+      "role": "Runs a witness anchor that observes other logs' checkpoints",
+      "stories": [
+        {
+          "id": "S3",
+          "text": "As a witness operator, I want each observation to cost only the leaves recorded since the previous one, so that the witness stays usable as its own log grows."
+        }
+      ]
+    }
+  ]
+}

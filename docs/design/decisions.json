@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,25 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-097",
+      "title": "The witness keeps a derived per-origin projection in memory and folds only new leaves",
+      "status": "decided",
+      "scope": "lys-log-store",
+      "date": "2026-09-27",
+      "decided_by": "The lead for the identity line, answering the survey of the card behind RM-058",
+      "context": "observe in lys-anchor's witness rebuilt its per-origin projection from index 0 on every call, so one observe parsed every leaf before it and n observes cost about n squared over two parses. The card offered two remedies: scan backward from the newest leaf and stop at the first match, or keep a per-origin position. A backward scan still parses the whole log for an origin the witness has never seen. The projection's module invariant also says nothing in it is stored.",
+      "decision": "The witness's per-origin projection is built by one pass when the anchor is opened. It records how many leaves it has folded, and each observe folds only the leaves recorded since then before comparing, then adds the note it just recorded. The projection lives in memory only and is derived from the leaves, so discarding it and folding again gives the same answer, and it is never authoritative. Observe is bounded for a known origin and a first sighting alike. Rejected: the backward scan, which leaves a first sighting unbounded. Also rejected: any stored index, which would be a second copy of the truth beside the leaves.",
+      "quote": "",
+      "consequences": [
+        "observe takes the caller's kept projection, and never calls rebuild or rebuild_prefix itself.",
+        "A test holds the kept projection equal to a fresh rebuild after every observe, including after a rollback, so last recorded wins still holds.",
+        "The parse count per observe is asserted on a counter of the parse path, never on elapsed time.",
+        "The projection stays behind the federation feature and is never written to storage."
       ],
       "supersedes": [],
       "superseded_by": ""
