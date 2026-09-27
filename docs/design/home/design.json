@@ -198,7 +198,7 @@
     },
     {
       "path": "docs/design/home/RECORD.md",
-      "note": "the home record written down: Pi's grammar as adopted, the two lys custom entries, the block store, the loss account",
+      "note": "the home record written down: Pi's grammar as adopted, the lys custom entries (the handover's rule-less lys.inherited among them), the block store, the loss account",
       "brief": "HOME-001"
     },
     {
@@ -268,12 +268,12 @@
     },
     {
       "path": "crates/lys-home/src/record/handover.rs",
-      "note": "the handover: take the outgoing session's letter turn (thinking intact) and seed the successor with it as lys.inherited",
+      "note": "the handover (HOME-015): the letter, a run of assistant entries on the outgoing path, copied whole into a new successor home after a rule-less lys.inherited entry, then a session_info named inherited from the outgoing session; every refusal before anything is written",
       "brief": "HOME-001"
     },
     {
       "path": "docs/design/home/PROOF-HANDOVER.md",
-      "note": "measured: a successor seeded with an inherited letter, whether 2.1.281 replays the signed thinking, and seeded against plain on one card",
+      "note": "measured (HOME-015): an elicited letter handed over by ids and hashes with its signatures compared, whether the inherited signed block appears in a resumed continuation's own file, and the seeded and plain card counts recorded as not run",
       "brief": "HOME-001"
     },
     {

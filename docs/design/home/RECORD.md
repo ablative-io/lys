@@ -129,7 +129,34 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   has `authored: true`, no source, and provider, api and model `authored`.
   The canon is appended only, through the repository's review, and rendered
   first (before a session's own entries) when a render is given `--canon`;
-  R4's thinking rule applies to every inherited thinking block.
+  R4's thinking rule applies to every inherited thinking block. Every
+  `lys.inherited` entry in the canon file is a canon example and states its
+  rule: the canon loader refuses one whose data has no `rule` by name,
+  `canon_example_without_rule`, naming its entry id, so `canon add` and a
+  render with `--canon` both refuse it before writing anything.
+  The handover (HOME-015, HOME-001 R12, ADR-058) uses the same custom type
+  without a rule, since a letter is not a rule: `{authored, from_session,
+  from_entries, provider, api, model, curated_at, curated_by}`, with
+  `authored` false, `from_session` and `curated_by` the outgoing session's
+  id, `from_entries` the letter's entry ids in path order, provider, api and
+  model those of the first letter entry, and `curated_at` the last letter
+  entry's timestamp. `lys-home handover` writes it as the first entry of the
+  one session of a new successor home (fresh id, the outgoing header's cwd,
+  no parentSession), followed by the letter's entries copied whole, each
+  keeping its id, timestamp and message with only its parent link rewritten,
+  then a `session_info` named `inherited from <outgoing session id>` with no
+  other field. That first entry is what says the successor's first memory is
+  inherited; the handover's report reads `inherited` from it. A rule-less
+  `lys.inherited` entry in a session of a home is read without the canon's
+  check. The outgoing session is read without being owned and nothing is
+  written under its home. Before anything is created the handover refuses by
+  name: `letter_not_assistant` (a letter entry that is not an assistant
+  message), `letter_not_contiguous` (a letter entry off the root-to-head
+  path, or not the child of the entry named before it), `letter_authored`
+  (a letter entry whose message carries provider `authored`),
+  `letter_without_thinking` (no letter entry holds a thinking block) and
+  `successor_not_empty` (the successor path exists and is not an empty
+  directory).
 - `lys.lantern` (HOME-004 R1, R3): `{point, note, lit_by, lit_at}`. `point` is
   the entry id of an entry of the same session that is neither a lantern nor
   an epilogue (the head or any entry the head has moved past); `note` is the
