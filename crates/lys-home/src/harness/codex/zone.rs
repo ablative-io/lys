@@ -79,11 +79,20 @@ pub fn parse_stamp(entry: &str, stamp: &str) -> Result<OffsetDateTime, HomeError
 
 /// An entry's stamp as the local date and time in the zone, to the second.
 pub fn local_time(entry: &str, stamp: &str, zone: &TimeZone) -> Result<DateTime, HomeError> {
-    let instant = parse_stamp(entry, stamp)?;
+    in_zone(entry, parse_stamp(entry, stamp)?, zone)
+}
+
+/// An instant already parsed from an entry's stamp, as the local date and
+/// time in the zone, to the second.
+pub fn in_zone(
+    entry: &str,
+    instant: OffsetDateTime,
+    zone: &TimeZone,
+) -> Result<DateTime, HomeError> {
     let seconds = Timestamp::from_second(instant.unix_timestamp())
         .ok()
         .ok_or_else(|| HomeError::StampNotRfc3339 {
             entry: entry.to_owned(),
         })?;
-    Ok(seconds.to_zoned(zone.clone()).datetime())
+    Ok(zone.to_datetime(seconds))
 }

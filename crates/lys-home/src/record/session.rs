@@ -1,6 +1,7 @@
 //! One open session file: its lock, its index and head, the durable append
 //! and the reads of the path from the head to the root.
 
+use std::borrow::Borrow;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -318,32 +319,45 @@ impl Session {
     /// after it; without one, the whole path.
     pub fn context_path(&self) -> Result<Vec<Entry>, HomeError> {
         let (path, _) = self.path()?;
-        let compaction = path
+        Ok(match Self::context_positions(&path) {
+            None => path,
+            Some(positions) => positions.into_iter().map(|n| path[n].clone()).collect(),
+        })
+    }
+
+    /// The positions in a root-to-head path of its context path, in the
+    /// order [`Session::context_path`] gives them; `None` when the path holds
+    /// no compaction and the context path is the whole path.
+    pub(crate) fn context_positions<E: Borrow<Entry>>(path: &[E]) -> Option<Vec<usize>> {
+        let ci = path
             .iter()
-            .rposition(|e| matches!(e.body, EntryBody::Compaction { .. }));
-        let Some(ci) = compaction else {
-            return Ok(path);
-        };
+            .rposition(|e| matches!(e.borrow().body, EntryBody::Compaction { .. }))?;
         let EntryBody::Compaction {
             first_kept_entry_id,
             ..
-        } = &path[ci].body
+        } = &path[ci].borrow().body
         else {
-            return Ok(path);
+            return None;
         };
         let mut out = Vec::with_capacity(path.len());
-        out.push(path[ci].clone());
-        let mut keeping = false;
-        for entry in &path[..ci] {
-            if entry.id() == first_kept_entry_id {
-                keeping = true;
-            }
-            if keeping {
-                out.push(entry.clone());
-            }
+        out.push(ci);
+        if let Some(first) = path[..ci]
+            .iter()
+            .position(|e| e.borrow().id() == first_kept_entry_id)
+        {
+            out.extend(first..ci);
         }
-        out.extend(path[ci + 1..].iter().cloned());
-        Ok(out)
+        out.extend(ci + 1..path.len());
+        Some(out)
+    }
+
+    /// Every entry of the file in file order, read through this owner's
+    /// index with the file opened once.
+    pub fn entries(&self) -> Result<Vec<Entry>, HomeError> {
+        self.fresh()?;
+        let rows: Vec<&IndexRow> = self.index.rows().iter().collect();
+        let (entries, _) = self.index.read_rows_from(&self.file, &rows)?;
+        Ok(entries)
     }
 
     /// The custom entries of a given custom type on the path, root first.

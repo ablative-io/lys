@@ -430,3 +430,37 @@ fn unparsed_stamp_is_refused_and_nothing_written() -> Gate {
     assert!(!out.exists() || std::fs::read_dir(&out)?.next().is_none());
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn failed_write_leaves_nothing_and_a_retry_translates() -> Gate {
+    let (dir, home) = one_head()?;
+    let out = dir.path().join("o");
+    let day = out.join("sessions").join("2000").join("01").join("02");
+    let account =
+        day.join("rollout-2000-01-02T14-04-05-11111111-1111-4111-8111-111111111111.loss.json");
+    std::fs::create_dir_all(&day)?;
+    // A dangling link passes the check before writing, then refuses the
+    // account's create, after the rollout is already written.
+    std::os::unix::fs::symlink(dir.path().join("nowhere"), &account)?;
+    let refused = run(&home, "s1", &out);
+    assert!(
+        matches!(&refused, Err(HomeError::TranslationTargetExists { path }) if *path == account),
+        "{refused:?}"
+    );
+    let mut left = Vec::new();
+    for found in std::fs::read_dir(&day)? {
+        left.push(found?.path());
+    }
+    assert_eq!(left, [account.as_path()]);
+    let leaves = home
+        .open_session("s1")?
+        .customs_everywhere(crate::record::entries::CUSTOM_TRANSLATION)?;
+    assert!(leaves.is_empty());
+    std::fs::remove_file(&account)?;
+    let done = run(&home, "s1", &out)?;
+    assert!(done.rollout.is_file());
+    assert_eq!(done.account, account);
+    assert!(account.is_file());
+    Ok(())
+}

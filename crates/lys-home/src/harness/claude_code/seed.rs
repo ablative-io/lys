@@ -133,6 +133,16 @@ pub fn seed_of(session: &Session, path: &[Entry]) -> Result<Option<Seed>, HomeEr
     else {
         return Ok(None);
     };
+    Ok(carried_by(session, entry)?.map(|(seed, _)| seed))
+}
+
+/// The seed a `lys.forked_from` entry calls for and the carried entry as the
+/// parent session holds it, read from the parent's file once; `None` when
+/// the entry carries no coordinate.
+pub(crate) fn carried_by(
+    session: &Session,
+    entry: &Entry,
+) -> Result<Option<(Seed, Entry)>, HomeError> {
     let forked: ForkedFrom = data_of(&session.header().id, entry, CUSTOM_FORKED_FROM)?;
     let carried = match (forked.coordinate_carried, forked.carried) {
         (false, None) => return Ok(None),
@@ -149,13 +159,15 @@ pub fn seed_of(session: &Session, path: &[Entry]) -> Result<Option<Seed>, HomeEr
     safe_component("session id", &forked.parent_session)?;
     let sessions = sessions_dir_of(session.file())?;
     let parent = SessionReader::open(sessions.join(format!("{}.jsonl", forked.parent_session)))?;
-    let text = text_of(&parent.entry(&carried)?)?;
-    Ok(Some(Seed {
+    let message = parent.entry(&carried)?;
+    let text = text_of(&message)?;
+    let seed = Seed {
         parent: forked.parent_session,
         point: forked.point,
         lantern: forked.lantern,
         text,
-    }))
+    };
+    Ok(Some((seed, message)))
 }
 
 /// The seed file beside a rendered file: `<stem>.seed.txt`.
