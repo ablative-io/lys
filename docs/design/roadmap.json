@@ -333,7 +333,7 @@
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
     },
     {
-      "id": "RM-070",
+      "id": "RM-072",
       "title": "Render a brief's prose list fields one entry per line",
       "status": "idea",
       "kind": "fix",
@@ -348,12 +348,12 @@
         "cluster": "directory",
         "decisions": [],
         "briefs": [
-          "DIRECTORY-009"
+          "DIRECTORY-039"
         ],
         "commits": []
       },
       "depends_on": [],
-      "notes": "Further units, not written: Carry the prose-list rule into the design-system method's render-brief.py and its tests. That unit is the design-system card the lead is carding in the method's repository; DIRECTORY-009 is blocked on it by the check in its blocked_by. RM-070 and DIRECTORY-009 are the ids this draft was first written under and are kept on amendment. Both are also held on other open branches: RM-070 by brief/home/8c927ad7-3b08-4bb2-b800-b7b7f024c85f, and DIRECTORY-009 by several directory brief and draft branches, each with a different brief. The next free ids after main and every open branch are RM-071 and DIRECTORY-039, and renumbering before landing is the lead's call."
+      "notes": "Further units, not written: Carry the prose-list rule into the design-system method's render-brief.py and its tests. That unit is the design-system card the lead is carding in the method's repository; DIRECTORY-039 is blocked on it by the check in its blocked_by. Ids renumbered before landing on the lead's answer, from RM-070 and DIRECTORY-009, which this draft was first written under and which other open branches hold (RM-070 by brief/home/8c927ad7-3b08-4bb2-b800-b7b7f024c85f at 3baebaa2, DIRECTORY-009 by several directory brief, draft and card-gate branches). RM-071 is left to HOME-020 on brief/home/e95fc653, which is taking it with ADR-111. Read immediately before writing: every head of origin was fetched (307 refs, main at a426b9a), and git grep of docs/design on every one of them found neither DIRECTORY-039 nor RM-072, so both are kept as the lead named them. No new ADR: the survey named no decision with stance new."
     }
   ]
 }
