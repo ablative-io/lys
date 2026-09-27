@@ -30,7 +30,7 @@ use serde_json::{Map, Value};
 use crate::error::HomeError;
 use crate::record::canon::{AUTHORED, Inherited};
 use crate::record::entries::{CUSTOM_INHERITED, Entry, EntryBody, INHERITED_FROM};
-use crate::record::index::{Index, read_head};
+use crate::record::index::read_head;
 use crate::record::lantern::session_file;
 use crate::record::reader::SessionReader;
 use crate::record::{Home, fresh_id};
@@ -65,20 +65,17 @@ pub fn handover(
     let outgoing = Home::read(home)?;
     let reader = SessionReader::open(session_file(&outgoing, from)?)?;
     let session = || reader.header().id.clone();
-    let mut entries = Vec::with_capacity(letter.len());
-    for id in letter {
-        let entry = reader.entry(id)?;
-        if message_of(&entry)
+    let entries = reader.entries(letter)?;
+    if let Some(entry) = entries.iter().find(|e| {
+        message_of(e)
             .and_then(|m| m.get("role"))
             .and_then(Value::as_str)
             != Some("assistant")
-        {
-            return Err(HomeError::LetterNotAssistant {
-                session: session(),
-                id: id.clone(),
-            });
-        }
-        entries.push(entry);
+    }) {
+        return Err(HomeError::LetterNotAssistant {
+            session: session(),
+            id: entry.id().to_owned(),
+        });
     }
     check_contiguous(&reader, &entries)?;
     if let Some(entry) = entries.iter().find(|e| field(e, "provider") == AUTHORED) {
@@ -87,13 +84,25 @@ pub fn handover(
             id: entry.id().to_owned(),
         });
     }
-    if !entries.iter().any(holds_thinking) {
+    let thinking = entries.iter().any(holds_thinking);
+    let (true, Some(first), Some(last)) = (thinking, entries.first(), entries.last()) else {
         return Err(HomeError::LetterWithoutThinking {
             session: session(),
             ids: letter.to_vec(),
         });
-    }
-    write_successor(&reader, letter, entries, successor)
+    };
+    let inherited = Inherited {
+        authored: false,
+        from_session: Some(session()),
+        from_entries: letter.to_vec(),
+        provider: field(first, "provider").to_owned(),
+        api: field(first, "api").to_owned(),
+        model: field(first, "model").to_owned(),
+        curated_at: last.base.timestamp.clone(),
+        curated_by: session(),
+        rule: None,
+    };
+    write_successor(&reader, &inherited, entries, successor)
 }
 
 /// Refuse a successor path that exists and is not an empty directory.
@@ -118,20 +127,18 @@ fn check_successor(successor: &Path) -> Result<(), HomeError> {
 }
 
 /// Refuse a letter whose entries do not stand next to each other on the
-/// root-to-head path in the order given. The head is read from the
-/// session's own index and the path walked through each `parentId`,
-/// reading only.
+/// root-to-head path in the order given. The path is the head's ancestry
+/// in the reader's own index, walked in memory without reading an entry.
 fn check_contiguous(reader: &SessionReader, entries: &[Entry]) -> Result<(), HomeError> {
-    let (_, index, _) = Index::read(reader.file())?;
-    let mut on_path = HashSet::new();
-    let mut at = read_head(reader.file(), &index)?;
-    while let Some(id) = at {
-        // An id seen twice would be a cycle; the walk stops there.
-        if !on_path.insert(id.clone()) {
-            break;
-        }
-        at = reader.entry(&id)?.base.parent_id;
-    }
+    let index = reader.index();
+    let on_path: HashSet<&str> = match read_head(reader.file(), index)? {
+        Some(head) => index
+            .ancestry(&head)?
+            .into_iter()
+            .map(|row| row.id.as_str())
+            .collect(),
+        None => HashSet::new(),
+    };
     let refused = |entry: &Entry| HomeError::LetterNotContiguous {
         session: reader.header().id.clone(),
         id: entry.id().to_owned(),
@@ -152,29 +159,12 @@ fn check_contiguous(reader: &SessionReader, entries: &[Entry]) -> Result<(), Hom
 /// `session_info` name, and read the first entry back.
 fn write_successor(
     reader: &SessionReader,
-    letter: &[String],
+    inherited: &Inherited,
     entries: Vec<Entry>,
     successor: &Path,
 ) -> Result<HandoverReport, HomeError> {
-    let from = reader.header().id.clone();
-    let (Some(first), Some(last)) = (entries.first(), entries.last()) else {
-        return Err(HomeError::LetterWithoutThinking {
-            session: from,
-            ids: letter.to_vec(),
-        });
-    };
-    let inherited = Inherited {
-        authored: false,
-        from_session: Some(from.clone()),
-        from_entries: letter.to_vec(),
-        provider: field(first, "provider").to_owned(),
-        api: field(first, "api").to_owned(),
-        model: field(first, "model").to_owned(),
-        curated_at: last.base.timestamp.clone(),
-        curated_by: from.clone(),
-        rule: None,
-    };
-    let data = serde_json::to_value(&inherited).map_err(|source| HomeError::Json {
+    let from = &reader.header().id;
+    let data = serde_json::to_value(inherited).map_err(|source| HomeError::Json {
         context: "the inherited entry could not be serialised",
         source,
     })?;

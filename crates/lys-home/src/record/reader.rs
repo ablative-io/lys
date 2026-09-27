@@ -90,17 +90,29 @@ impl SessionReader {
         self.index.rows().iter().map(|row| row.id.as_str())
     }
 
+    /// The index the reader opened with.
+    #[must_use]
+    pub fn index(&self) -> &Index {
+        &self.index
+    }
+
     /// One entry by id, read by seeking to it.
     pub fn entry(&self, id: &str) -> Result<Entry, HomeError> {
-        let row = self.index.row(id).ok_or_else(|| HomeError::UnknownEntry {
-            session: self.header.id.clone(),
-            id: id.to_owned(),
-        })?;
-        let (mut entries, _) = self.read_rows(&[row])?;
+        let (mut entries, _) = self.read_rows(&[self.row(id)?])?;
         entries.pop().ok_or(HomeError::StaleIndex {
             path: self.file.clone(),
             reason: "a row read no entry",
         })
+    }
+
+    /// Entries by id, in the order given, read in one pass over the file.
+    pub fn entries(&self, ids: &[String]) -> Result<Vec<Entry>, HomeError> {
+        let rows = ids
+            .iter()
+            .map(|id| self.row(id))
+            .collect::<Result<Vec<_>, _>>()?;
+        let (entries, _) = self.read_rows(&rows)?;
+        Ok(entries)
     }
 
     /// Every custom entry of a given custom type in the file, on any branch,
@@ -109,6 +121,13 @@ impl SessionReader {
         let rows = self.index.rows_of_custom(custom_type);
         let (entries, _) = self.read_rows(&rows)?;
         Ok(entries)
+    }
+
+    fn row(&self, id: &str) -> Result<&IndexRow, HomeError> {
+        self.index.row(id).ok_or_else(|| HomeError::UnknownEntry {
+            session: self.header.id.clone(),
+            id: id.to_owned(),
+        })
     }
 
     fn read_rows(&self, rows: &[&IndexRow]) -> Result<(Vec<Entry>, u64), HomeError> {
