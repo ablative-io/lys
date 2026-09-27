@@ -1,5 +1,5 @@
 import type { AgentView, MeView, PeopleView, ReceiptAnswer } from '../src/generated';
-import type { ActionBody, Grant, Permit, WhoBody } from '../src/generated/grants';
+import type { ActionBody, Grant, GrantModel, Permit, WhoBody } from '../src/generated/grants';
 
 // Fixture API responses in the shapes read_api.rs answers. Names are test names.
 
@@ -93,14 +93,17 @@ const at = (d: number, m: number) => new Date(2026, m - 1, d, 12, 0).getTime() /
 
 const grant = (g: Partial<Grant> & Pick<Grant, 'id' | 'holder' | 'relation' | 'actions' | 'pass_on' | 'source'>): Grant => ({
   issuer: ADA, responsible: ADA, resource: { kind: 'project', id: 'identity' }, window: { starts_at: at(27, 9), ends_at: null },
-  model_version: 1, operation: 'op-' + hex(200), revoked: false, ...g,
+  model_version: 1, operation: 'op-' + hex(200), revoked: false, revoked_at: null, revoked_revision: null, last_use: { seen: false }, ...g,
 });
 
 export const GRANTS: Grant[] = [
   grant({ id: ROOT_G, holder: ADA, relation: 'owner', actions: ['edit', 'grant', 'view'], pass_on: { kind: 'to', actions: ['edit', 'view'], recipients: ['agent'] }, source: null, window: { starts_at: at(27, 9), ends_at: at(27, 10) } }),
   grant({ id: LEDGER_G, holder: ADA, relation: 'viewer', actions: ['view'], pass_on: { kind: 'use_only' }, source: null, resource: { kind: 'project', id: 'ledger' } }),
-  grant({ id: SCRIBE_G, holder: SCRIBE, relation: 'viewer', actions: ['view'], pass_on: { kind: 'use_only' }, source: ROOT_G, window: { starts_at: at(27, 9), ends_at: at(4, 10) } }),
+  grant({ id: SCRIBE_G, holder: SCRIBE, relation: 'viewer', actions: ['view'], pass_on: { kind: 'use_only' }, source: ROOT_G, window: { starts_at: at(27, 9), ends_at: at(4, 10) }, last_use: { seen: true, at: at(27, 9), route: 'tool', use_event: 5 } }),
 ];
+
+/** GET /grants/model: the relations the service's model defines. */
+export const MODEL: GrantModel = { version: 3, relations: { editor: ['edit', 'view'], owner: ['edit', 'grant', 'view'], viewer: ['view'] } };
 
 const permit = (path: string[], scope: string[]): Permit => ({ permitted: true, grant: path[path.length - 1], path, responsible: ADA, scope, model_version: 1, revision: 7 });
 
@@ -139,6 +142,7 @@ export const SERVICE: Record<string, Route> = {
   '/me': ok(ME),
   '/authority': ok('Step 1 of the directory has one administrator.'),
   '/grants': ok({ grants: GRANTS, revision: 7 }),
+  '/grants/model': ok(MODEL),
   'POST /grants/why': why,
   'POST /grants/who': who,
   'POST /grants': ok({ operation: 'op-x', grant: 'grant-' + hex(34), index: 3, receipt: {} }),

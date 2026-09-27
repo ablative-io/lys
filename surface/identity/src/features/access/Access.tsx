@@ -4,7 +4,7 @@ import { keyable } from '../../shell/keyable';
 import { Gate } from '../signin/Gate';
 import { reachMap } from '../grants/check';
 import { CheckBox, resourcesSeen } from '../grants/CheckBox';
-import { grantNo, lastsText, nameOf, onText, passText, readGrantWorld, resourceLabel, standing } from '../grants/model';
+import { grantNo, lastUsedText, lastsText, nameOf, onText, passText, readGrantWorld, resourceLabel, standing } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import { Pill } from '../people/Pill';
 
@@ -103,7 +103,7 @@ function Body({ d, mode, arg }: { d: AccessData; mode: string; arg?: string }) {
                 <td className="sec">{g.source ? `${grantNo(g.source)} · ${up ? nameOf(w, up.holder) : 'not visible'}` : <span className="dim">root</span>}</td>
                 <td className="sec">{passText(g.pass_on)}</td>
                 <td className="sec">{lastsText(g)}</td>
-                <td className="sec"><span className="dim">not reported</span></td>
+                <td className="sec">{g.last_use.seen ? lastUsedText(g) : <span className="dim">{lastUsedText(g)}</span>}</td>
                 <td>{s.ok ? <><span className="dot s-active" />yes</> : <span style={{ color: 'var(--danger)' }} title={s.why}>no</span>}</td>
               </tr>
             );
@@ -111,7 +111,7 @@ function Body({ d, mode, arg }: { d: AccessData; mode: string; arg?: string }) {
         </tbody>
       </table>
       {w.list.grants.length ? null : <div className="dim" style={{ marginTop: 10 }}>No grant you can see.</div>}
-      <p className="note" style={{ marginTop: 8 }}>Last used is <span className="open-q">not built yet</span>: the service does not report observed use yet, and not seen is never shown as never used.</p>
+      <p className="note" style={{ marginTop: 8 }}>Last used is an exercise seen where access is enforced. Not seen means none was observed, never that it was never used.</p>
     </div>
   );
 }

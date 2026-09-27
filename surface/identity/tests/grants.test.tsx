@@ -41,8 +41,9 @@ describe('The delegation form (conformance 2.1 to 2.3)', () => {
   });
 
   it('offers only relations within what may be passed on, greying the rest', async () => {
-    await open();
-    expect($$('[data-pickrel]').map((c) => c.textContent)).toEqual(['viewer']);
+    const { requests } = await open();
+    expect(requests).toContain('/grants/model');
+    expect($$('[data-pickrel]').map((c) => c.textContent)).toEqual(['editor', 'viewer']);
     expect($('[data-pickrel].on')?.textContent).toBe('viewer');
     const greyed = $$('#drawer .chk').filter((c) => !c.dataset.pickrel).map((c) => c.textContent);
     expect(greyed).toEqual(['owner']);
@@ -63,6 +64,14 @@ describe('The delegation form (conformance 2.1 to 2.3)', () => {
     expect(body.window.ends_at).not.toBeNull();
     expect($('#drawer')?.classList.contains('open')).toBe(false);
     expect($('#toast')?.textContent).toContain("Given. Scribe can now view project:identity, through you.");
+  });
+
+  it('names a recipient who is not active as the service refuses it', async () => {
+    await open({ ...SERVICE, 'POST /grants': refused(409, 'IdentityNotActive', `IdentityNotActive: ${SCRIBE} is suspended, and only an active identity's grants are effective`) });
+    await click($('[data-act="delegatedo"]'));
+    expect($('#dAnswer b')?.textContent).toBe('IdentityNotActive');
+    expect($('#dAnswer .note')?.textContent).toContain('is suspended');
+    expect($('#drawer')?.classList.contains('open')).toBe(true);
   });
 
   it('shows the service refusal by name and records nothing as given', async () => {
@@ -121,8 +130,9 @@ describe('Can X do this? (conformance 8.1)', () => {
     await choose($('#cPerm'), 'view');
     await press('c', {}, document.body);
     expect(posted.some((p) => p.path === '/grants/who')).toBe(true);
+    expect(posted.some((p) => p.path === '/grants/check')).toBe(false);
     expect($('#answer .verdict-mark')?.textContent).toBe('Yes');
-    expect($('#answer .why')?.textContent).toBe('view needs viewers or owners.');
+    expect($('#answer .why')?.textContent).toBe('view needs viewers or editors or owners.');
     expect($('#answer .chain')?.textContent).toContain("Scribe · viewer of project:identity");
     expect($('#answer .meta-line')?.textContent).toContain('model v1');
     expect($('#answer .meta-line')?.textContent).toContain('change 7');
@@ -134,7 +144,7 @@ describe('Can X do this? (conformance 8.1)', () => {
     await click($('[data-act="check"]'));
     expect($('#answer .verdict-mark')?.textContent).toBe('No');
     expect($('#answer .tag')?.textContent).toBe('no grant');
-    expect($('#answer .meta-line')?.textContent).toContain('model not named in a refusal');
+    expect($('#answer .meta-line')?.textContent).toContain('model v3');
     expect($('#answer .meta-line')?.textContent).toContain('change 7');
   });
 
@@ -158,6 +168,7 @@ describe('Can X do this? (conformance 8.1)', () => {
     await choose($('#cPerm'), 'view');
     await click($('[data-act="check"]'));
     expect(posted.at(-1)?.path).toBe('/grants/why');
+    expect(posted.some((p) => p.path === '/grants/check')).toBe(false);
     expect($('#answer .verdict-mark')?.textContent).toBe('Yes');
   });
 
@@ -185,7 +196,9 @@ describe('Who can reach this? (conformance 8.2)', () => {
     expect($$('.check .card tr').map((r) => r.textContent)).toEqual(['project:identitybuilt inview']);
     const grants = $$('table tbody tr[data-href]').map((r) => r.querySelectorAll('td')[4].textContent);
     expect(grants).toEqual(['root', 'root', `G/${ROOT_G.slice(6, 14)} · Ada (test person)`]);
-    expect(text()).toContain('not reported');
+    const used = $$('table tbody tr[data-href]').map((r) => r.querySelectorAll('td')[7].textContent);
+    expect(used).toEqual(['not seen', 'not seen', '27 Sep 12:00 · tool']);
+    expect(text()).not.toContain('never used');
     expect(unreachable()).toEqual([]);
     expect(SCRIBE_G).toMatch(/^grant-/);
   });
@@ -198,5 +211,6 @@ describe('A grant card', () => {
     const card = $$('.file .card').find((c) => c.querySelector('.verdict-mark.no'));
     expect(card?.textContent).toContain('Scribe is suspended what suspension refuses: open');
     expect(text()).not.toContain('Allows:');
+    expect(card?.textContent).toContain('Last used: 27 Sep 12:00 · tool');
   });
 });

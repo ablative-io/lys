@@ -1,8 +1,9 @@
 import { useShell } from '../../shell/ShellContext';
 import type { Grant } from '../../generated/grants';
-import { grantNo, lastsText, nameOf, onText, passText, standing } from './model';
+import { clock } from '../file/time';
+import { grantNo, lastUsedText, lastsText, nameOf, onText, passText, standing } from './model';
 import type { GrantWorld } from './model';
-import { REVOKED, Revoke } from './Revoke';
+import { Revoke } from './Revoke';
 
 /** The chain from a person down to a grant, as pills. */
 export function Chain({ w, chain }: { w: GrantWorld; chain: Grant[] }) {
@@ -34,6 +35,7 @@ export function GrantCard({ w, g, chain, done }: { w: GrantWorld; g: Grant; chai
       <div className="note" style={{ marginTop: 6, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
         <span>Passable: {passText(g.pass_on)}</span>
         <span>Lasts: {lastsText(g)}</span>
+        <span>Last used: {lastUsedText(g)}</span>
         <span className="mono">{grantNo(g.id)}</span>
         {!g.revoked && w.who.get(g.holder)?.state !== 'retired' ? (
           <a href="#" data-act="revoke" data-g={g.id} style={{ color: 'var(--danger)' }} onClick={(e) => { e.preventDefault(); shell.openDrawer(<Revoke w={w} g={g} done={done} />); }}>
@@ -54,7 +56,7 @@ export function GrantCard({ w, g, chain, done }: { w: GrantWorld; g: Grant; chai
 
 /** After a revoke: the policy change, and what is still to design. */
 function Revocation({ g }: { g: Grant }) {
-  const made = REVOKED.get(g.id);
+  const made = g.revoked_at !== null && g.revoked_revision !== null ? { at: clock(g.revoked_at).split(' ').at(-1) ?? '', revision: g.revoked_revision } : null;
   return (
     <div className="card" style={{ marginTop: 8, background: 'var(--surface-default)' }}>
       <div className="note">

@@ -9,7 +9,7 @@ function revocable(): Record<string, Route> {
   let revoked = false;
   return {
     ...SERVICE,
-    '/grants': () => ok({ grants: GRANTS.map((g) => (revoked && g.id === ROOT_G ? { ...g, revoked: true } : g)), revision: revoked ? 8 : 7 }),
+    '/grants': () => ok({ grants: GRANTS.map((g) => (revoked && g.id === ROOT_G ? { ...g, revoked: true, revoked_at: Math.floor(Date.now() / 1000), revoked_revision: 8 } : g)), revision: revoked ? 8 : 7 }),
     [`POST /grants/${ROOT_G}/revoke`]: () => {
       revoked = true;
       return ok({ operation: 'op-x', grant: ROOT_G, index: 3, receipt: { revision: 8 } });
