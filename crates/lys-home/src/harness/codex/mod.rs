@@ -10,6 +10,8 @@ mod account_tests;
 pub mod parts;
 #[cfg(test)]
 mod parts_tests;
+#[cfg(test)]
+pub(crate) mod rollout_tests;
 pub mod zone;
 #[cfg(test)]
 mod zone_tests;
