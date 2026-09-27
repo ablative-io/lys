@@ -179,6 +179,7 @@ DIRECTORY-038 carries conformance row 1.2: sign-in identities belong to people o
 | `crates/lys-identity/tests/sign_in_classification.rs` | the four classes of an issuer-subject pair, through reopen | DIRECTORY-038 |
 | `crates/lys-identity/tests/sign_in_refusal_views.rs` | the two views of the refusal, and the absence of provider and subject from the view for anyone else | DIRECTORY-038 |
 | `crates/lys-identity/tests/sign_in_agent_binding.rs` | a person's provider account refused as an agent's binding, an agent's own machine account accepted | DIRECTORY-038 |
+| `crates/lys-identity/src/bindings.rs` | DIRECTORY-003 R1's binding module, reconciled against its reviewed manifest before dispatch: gains the refusal of a person's provider account as an agent's binding | DIRECTORY-038 |
 | `crates/lys-identity-server/src/sign_in_link_check.rs` | the directory's side of the link path: a person's link of an account bound to an agent refused by name and recorded in the history, the agent withheld from the person linking | DIRECTORY-038 |
 | `crates/lys-identity-server/tests/sign_in_link_check.rs` | the reverse-order refusal, its history entry naming the agent to the responsible person and the administrator and never to the person linking, the unbound answer and the two refused callers | DIRECTORY-038 |
 | `crates/lys-identity/tests/grant_sign_in_identity.rs` | delegating from a sign-in identity refused for agent and person recipients; a service-access grant on the same account admitted | DIRECTORY-038 |
