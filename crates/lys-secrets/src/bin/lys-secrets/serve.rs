@@ -206,7 +206,7 @@ async fn forward(
         let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
         match &called {
             Ok((_, Some(reported))) => broker.settle(ticket, *reported),
-            Ok((_, None)) => broker.settle(ticket, reserved),
+            Ok((_, None)) => broker.settle_unmetered(ticket),
             Err(_) => broker.settle_failed(ticket, reserved),
         }
     }

@@ -18,6 +18,7 @@ use super::{Broker, UseError, Used};
 
 const COMPLETED: &str = "completed";
 const UPSTREAM_FAILED: &str = "upstream_failed";
+const COMPLETED_UNMETERED: &str = "completed_unmetered";
 const COMPLETED_AFTER_DROP: &str = "completed_after_drop";
 const OUTCOME_UNKNOWN: &str = "outcome_unknown";
 
@@ -207,6 +208,18 @@ impl<P: PermissionCheck> Broker<P> {
         self.settle_as(ticket, spent, COMPLETED)
     }
 
+    /// Settles a call whose upstream answered without reporting what it
+    /// spent, as `completed_unmetered`: the full reservation stays counted,
+    /// and the line says it was not measured.
+    ///
+    /// # Errors
+    ///
+    /// The audit log's refusals.
+    pub fn settle_unmetered(&mut self, ticket: Ticket) -> Result<(), SecretsError> {
+        let reserved = ticket.reserved.unwrap_or(0);
+        self.settle_as(ticket, reserved, COMPLETED_UNMETERED)
+    }
+
     /// Settles a call whose upstream never answered, as `upstream_failed`,
     /// with what it may have spent.
     ///
@@ -228,7 +241,8 @@ impl<P: PermissionCheck> Broker<P> {
             ..
         } = ticket;
         let settled = reserved.map(|_reserved| spent);
-        let outcome = if outcome == COMPLETED && self.cut_off(&handle, &identity, &secret) {
+        let finished = outcome == COMPLETED || outcome == COMPLETED_UNMETERED;
+        let outcome = if finished && self.cut_off(&handle, &identity, &secret) {
             COMPLETED_AFTER_DROP
         } else {
             outcome
