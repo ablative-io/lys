@@ -157,6 +157,7 @@ impl<P: PermissionCheck> Broker<P> {
                 Some(reserve)
             }
         };
+        self.ancestry_admits(record, Some(reserve))?;
         let used = record.used.saturating_add(1);
         Ok(Admission::Fresh {
             id: record.id.clone(),

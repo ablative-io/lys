@@ -353,6 +353,36 @@ pub enum SecretsError {
         /// The record's name.
         record: String,
     },
+    /// A derived handle asked for by a holder who neither owns the secret
+    /// nor holds the right to lend it.
+    #[error(
+        "LendingNotPermitted: {holder} neither owns {secret} nor holds the right to lend it (act: ask the secret's owner for the lend relation)"
+    )]
+    LendingNotPermitted {
+        /// The holder asking to lend.
+        holder: String,
+        /// The secret's name.
+        secret: String,
+    },
+    /// A derived handle asked for with a bound past the handle above it.
+    #[error(
+        "BeyondAncestry: a handle derived from {handle} must stay within its uses, window and spend (act: ask for bounds within the handle it is derived from)"
+    )]
+    BeyondAncestry {
+        /// The handle derived from.
+        handle: String,
+    },
+    /// A handle asked for on a secret whose recipient policy excludes the
+    /// recipient.
+    #[error(
+        "RecipientRefused: {secret} may be handed to people only and {recipient} is not a person (act: hand it to a person, or ask its owner to change the recipient policy)"
+    )]
+    RecipientRefused {
+        /// The recipient asked for.
+        recipient: String,
+        /// The secret's name.
+        secret: String,
+    },
     /// A read of a record that is not there to be read.
     #[error("NotFound: no record by that name (act: ask for a record by a name you can discover)")]
     NotFound,

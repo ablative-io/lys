@@ -20,6 +20,7 @@ pub struct SpiceGrants {
     engine: SpiceDb,
     action: Action,
     read_action: Action,
+    lend_action: Action,
 }
 
 impl std::fmt::Debug for SpiceGrants {
@@ -49,6 +50,7 @@ impl SpiceGrants {
         config: &Path,
         action: &str,
         read_action: &str,
+        lend_action: &str,
     ) -> Result<Self, SecretsError> {
         let config = Config::load(config)
             .map_err(|error| refused(format!("the directory configuration: {error}")))?;
@@ -62,10 +64,12 @@ impl SpiceGrants {
             SpiceDb::open(&settings, &model).map_err(|error| refused(error.to_string()))?;
         let action = Action::new(action).map_err(|error| refused(error.to_string()))?;
         let read_action = Action::new(read_action).map_err(|error| refused(error.to_string()))?;
+        let lend_action = Action::new(lend_action).map_err(|error| refused(error.to_string()))?;
         Ok(Self {
             engine,
             action,
             read_action,
+            lend_action,
         })
     }
 }
@@ -84,6 +88,10 @@ impl PermissionCheck for SpiceGrants {
 
     fn may_read(&self, identity: &str, record: &str) -> Result<Permitted, Denied> {
         self.check(&self.read_action, identity, record)
+    }
+
+    fn may_lend(&self, identity: &str, secret: &str) -> Result<Permitted, Denied> {
+        self.check(&self.lend_action, identity, secret)
     }
 }
 
@@ -147,6 +155,13 @@ impl PermissionCheck for Grants {
         match self {
             Self::File(file) => file.may_read(identity, record),
             Self::Directory(engine) => engine.may_read(identity, record),
+        }
+    }
+
+    fn may_lend(&self, identity: &str, secret: &str) -> Result<Permitted, Denied> {
+        match self {
+            Self::File(file) => file.may_lend(identity, secret),
+            Self::Directory(engine) => engine.may_lend(identity, secret),
         }
     }
 }

@@ -23,6 +23,7 @@ use crate::store::{EntryClass, SecretStore};
 mod accounts;
 mod admit;
 mod inflight;
+mod lineage;
 mod oauth_grants;
 mod records;
 mod rotation;
@@ -118,6 +119,9 @@ struct HandleRecord {
     /// Reservations admitted and not yet settled, by operation id.
     #[serde(skip)]
     open: BTreeMap<String, u64>,
+    /// The handle this one was derived from.
+    #[serde(default)]
+    parent: Option<String>,
 }
 
 /// The secrets broker.
@@ -222,31 +226,35 @@ impl<P: PermissionCheck> Broker<P> {
                 rotating = line.outcome.strip_prefix(ROTATING).map(str::to_owned);
                 continue;
             }
-            let Some(record) = line.handle.as_ref().and_then(|id| handles.get_mut(id)) else {
+            let Some(id) = line.handle.clone() else {
                 continue;
             };
             match line.kind {
-                AuditKind::Drop => record.dropped = true,
+                AuditKind::Drop => {
+                    if let Some(record) = handles.get_mut(&id) {
+                        record.dropped = true;
+                    }
+                }
                 AuditKind::Use if line.outcome == "admitted" => {
-                    record.used = record.used.saturating_add(1);
-                    if let (Some(operation), Some(mark)) = (line.operation, line.request) {
-                        record
-                            .open
-                            .insert(operation.clone(), line.spend.unwrap_or(0));
-                        record.operations.insert(operation, (line.outcome, mark));
+                    if let (Some(operation), Some(mark)) = (&line.operation, &line.request) {
+                        lineage::admitted(
+                            &mut handles,
+                            &id,
+                            (operation, mark),
+                            line.spend.unwrap_or(0),
+                        );
                     }
                 }
                 AuditKind::Settlement => {
-                    if line.outcome == inflight::CANCELLED_AT_BOUNDARY {
-                        record.used = record.used.saturating_sub(1);
+                    if let Some(operation) = &line.operation {
+                        lineage::settled(
+                            &mut handles,
+                            &id,
+                            operation,
+                            &line.outcome,
+                            line.spend.unwrap_or(0),
+                        );
                     }
-                    if let Some(operation) = line.operation {
-                        record.open.remove(&operation);
-                        if let Some(entry) = record.operations.get_mut(&operation) {
-                            entry.0 = line.outcome;
-                        }
-                    }
-                    record.settled = record.settled.saturating_add(line.spend.unwrap_or(0));
                 }
                 _ => {}
             }
@@ -353,6 +361,7 @@ impl<P: PermissionCheck> Broker<P> {
                 max_ms: u128::from(u32::MAX),
             });
         }
+        self.recipient_admitted(&holder.identity, secret)?;
         match self.permissions.may_use(&holder.identity, secret) {
             Ok(_permit) => {}
             Err(denied) if denied.no_person_root => {
@@ -384,6 +393,7 @@ impl<P: PermissionCheck> Broker<P> {
             spend_cap,
             settled: 0,
             open: BTreeMap::new(),
+            parent: None,
         };
         self.record(
             AuditKind::Issue,

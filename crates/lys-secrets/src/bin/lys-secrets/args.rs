@@ -22,6 +22,9 @@ pub struct PermissionSource {
     /// The action the directory must give on a sealed record for a read.
     #[arg(long, default_value = "view")]
     read_action: String,
+    /// The action the directory must give on a secret for lending it on.
+    #[arg(long, default_value = "grant")]
+    lend_action: String,
 }
 
 impl PermissionSource {
@@ -31,6 +34,7 @@ impl PermissionSource {
                 config,
                 &self.use_action,
                 &self.read_action,
+                &self.lend_action,
             )?),
             None => Grants::File(FileGrants::new(layout.grants())),
         })
@@ -41,6 +45,7 @@ impl PermissionSource {
 pub enum RelationArg {
     Use,
     Read,
+    Lend,
 }
 
 impl From<RelationArg> for Relation {
@@ -48,6 +53,7 @@ impl From<RelationArg> for Relation {
         match relation {
             RelationArg::Use => Self::Use,
             RelationArg::Read => Self::Read,
+            RelationArg::Lend => Self::Lend,
         }
     }
 }

@@ -23,8 +23,10 @@ use crate::secret::Secret;
 
 mod accounts;
 mod lock;
+mod policy;
 
 pub use accounts::AccountView;
+pub use policy::Recipients;
 
 const INDEX: &str = "index.json";
 const ENTRIES: &str = "entries";
@@ -81,6 +83,8 @@ struct Index {
     entries: BTreeMap<String, EntryView>,
     #[serde(default)]
     accounts: BTreeMap<String, accounts::Ring>,
+    #[serde(default)]
+    recipients: BTreeMap<String, policy::Recipients>,
 }
 
 /// The sealed store, held open by one broker at a time.
@@ -112,6 +116,7 @@ impl SecretStore {
                 key_id: key.id().as_str().to_owned(),
                 entries: BTreeMap::new(),
                 accounts: BTreeMap::new(),
+                recipients: BTreeMap::new(),
             },
             _lock: lock,
         };

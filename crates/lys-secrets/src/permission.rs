@@ -24,6 +24,8 @@ pub enum Relation {
     Use,
     /// Reading a memory record.
     Read,
+    /// Lending a secret one does not own to another identity.
+    Lend,
 }
 
 impl Relation {
@@ -32,6 +34,7 @@ impl Relation {
         match self {
             Self::Use => "use",
             Self::Read => "read",
+            Self::Lend => "lend",
         }
     }
 }
@@ -53,4 +56,12 @@ pub trait PermissionCheck {
     ///
     /// [`Denied`] for every answer that is not a permit.
     fn may_read(&self, identity: &str, record: &str) -> Result<Permitted, Denied>;
+
+    /// Whether `identity`, not owning `secret`, holds a human-rooted right
+    /// to lend it: the `lend` relation.
+    ///
+    /// # Errors
+    ///
+    /// [`Denied`] for every answer that is not a permit.
+    fn may_lend(&self, identity: &str, secret: &str) -> Result<Permitted, Denied>;
 }
