@@ -1,0 +1,318 @@
+{
+  "id": "DIRECTORY-035",
+  "cluster": "directory",
+  "title": "Name the test that passes each grant conformance row",
+  "depends_on": [
+    "DIRECTORY-006"
+  ],
+  "blocked_by": [
+    "DIRECTORY-006 R1 to R5 landed on lys main, carried by PR 34 (hand/DIRECTORY-006-land at 334ec0e): checked by git fetch https://github.com/ablative-io/lys.git main && git ls-tree --name-only FETCH_HEAD -- crates/lys-identity/src/grants/admission.rs crates/lys-identity/tests/grant_last_used.rs, which prints both paths.",
+    "The identity screens landed on lys main, carried by PR 35 (hand/identity-surface-land at 6f57bf7): checked by git fetch https://github.com/ablative-io/lys.git main && git ls-tree --name-only FETCH_HEAD -- surface/identity/src/features/me/You.tsx surface/identity/src/features/grants/GrantCard.tsx surface/identity/tests/revoke.test.tsx, which prints all three paths.",
+    "Sign-off of this brief on its card before it is dispatched through the card's workflow chain."
+  ],
+  "checklist": [
+    "C279",
+    "C280",
+    "C281",
+    "C282",
+    "C283",
+    "C284",
+    "C285"
+  ],
+  "stories": [
+    "S124",
+    "S125",
+    "S126"
+  ],
+  "design_anchor": [
+    "ADR-003",
+    "ADR-004",
+    "ADR-010",
+    "ADR-011"
+  ],
+  "purpose": "Conformance rows 1.4, 1.5, 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4 are the grant rows of the directory, carried by the grant contract and seam DIRECTORY-006 landed and by the You, delegation, grant-card and revoke screens that landed from hand/identity-surface-land, yet nothing in the tree says which test passes which row. This brief names, for each row, the test that passes it and the command that runs it, over the landed server and screens; moves the judgement of whether a grant stands and when it ends to the server so the screen rows prove the service's answer; makes each row's test fail when its fact is taken away; registers the leg that runs the screen tests on every land; and writes the entries into the conformance table so a stranger can verify each row.",
+  "task": "After PR 34 and PR 35 land on main, build R1 to R9 in order. R1 adds standing and effective_ends_at to the existing GrantView, judged on the server over each grant's chain, with a refusal the caller may not read whole carried under its own name, a null grant and the withheld text; no route is added. R2 prefixes the crates/lys-identity tests of the relation bound, affirmative pass-on, the end bound at delegation, inherited expiry, cascading revocation and last used with their row; row 2.3's server test is the existing ancestry test, which already refuses an end past its source; row 2.6 carries one test per check that guards it: the existing expiry test for each end binding at exercise, the existing durability test's replay leg for the hop check at commit and on replay, one added test that stops at admission for admission's own check, and one added test that resolves a hand-built chain for the hop check at exercise; these two are the only server tests added to crates/lys-identity. R3 removes the client standing walk from the screens and renders the server's standing; R4 changes the delegation form and the grant card where rows 2.3 and 8.4 are not met. R5 names one vitest per screen row (1.4, 1.5, 2.3, 2.5, 8.4) in the screen's own test file, adding the three that do not exist. R6 registers the surface leg in the project's trees and re-copies the directory design's gate from them. R7 applies the seven drift injections once each and records which test failed. R8 appends this brief's entries to the eight Brief cells; R9 closes DIRECTORY-006 R6 against the files that exist. Changes made to meet a row's words, by row: 1.4, none beyond R3's reading of the server's standing; 1.5, none, the secrets clause stays unmet with the not-built panel naming SECRETS-002; 2.1 and 2.2, none; 2.3, the 'Ends no later than' row reads the source's effective end and loses its 'illustrative' tag (R1, R4); 2.5, the service answers derived grants of a revoked grant void (R1), You drops them from What you hold and from each agent's holdings, and the agent's Access tab keeps them void (R3), since a withdrawal is an append and the history stays visible; 2.6, none, its tests are named and two are added, for admission's own check and for the hop check at exercise (R2); 8.4, the grant card shows its window (R4). Row 2.3 carries two tests, the server's ancestry test, which proves the end bound at delegation, and the form's vitest; rows 2.5 and 8.4 carry a server test and a vitest each; row 2.6 carries four server tests. The earliest end lineage::resolve folds and expiry::within_window reads is a fourth guard of row 2.6, kept as defence in depth with no test and no injection of its own: lineage::resolve runs lineage::check_hop on every hop before that fold is read, so a derived grant ending after its source is refused ExpiryBeyondSource at exercise and the fold never decides on its own, and the drift rule's injection is not owed for a check no case reaches. Out of scope: the personal-secrets section of You, the judge of the conformance table by a demand leg, and any other conformance row. Heavy builds, test batteries and gates run at the venue the gate runs at, never on the authoring machine; only a small single-crate check runs there. Estimate: 6 focused implementer hours.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Carry each grant's effective standing and effective end on the grant view",
+      "spec": "WHEN the service answers a grant on GET /grants or GET /grants/{id}, THE SYSTEM SHALL write in its GrantView (crates/lys-identity-server/src/grant_contract/views.rs) two members beside the existing ones: standing and effective_ends_at. standing SHALL be judged on the server by lys_identity::grants::admission::effective over the grant's chain at the service's clock, the same judgement a check makes: {\"stands\": true} when effective answers a lineage, and {\"stands\": false, \"refusal\": <name>, \"grant\": <id or null>, \"reason\": <text>} when it refuses, where refusal, reason and grant are read from the ServerError that the existing grant_sight::as_seen_by returns for the refusal and the caller: refusal is that error's name as ServerError::name writes it, reason is that error's text, and grant is the id of the grant on the chain the refusal names when as_seen_by answers the refusal whole and null otherwise. WHEN as_seen_by withholds the refusal because it names a grant or identity the caller may not see, refusal SHALL carry the original refusal's name, which is the name ServerError::Withheld writes (its text begins with the refusal it carries), never the word Withheld; reason SHALL be ServerError::Withheld's text, '<refusal>: the refusal names a grant or identity the caller may not inspect'; and grant SHALL be null. effective_ends_at SHALL be the earliest end on the grant's chain, read from Lineage.ends, and null when nothing on the chain ends or the chain does not resolve. Because admission refuses a derived grant that ends after any end on its chain (check_end in crates/lys-identity/src/grants/lineage.rs, called for every ancestor from crates/lys-identity/src/grants/admission.rs, and lineage::check_hop in crates/lys-identity/src/grants/lineage.rs when a chain is resolved), effective_ends_at is always the grant's own end. The members' TypeScript mirror in surface/identity/src/generated/grants.ts SHALL change with them. The existing members, revoked with its doc 'Whether it was revoked directly' and window.ends_at with its doc 'no end of its own', SHALL keep their meaning. THE SYSTEM SHALL NOT add a route, a request body, a query parameter or any member beyond these two, SHALL NOT change the grant envelope, the grant log's leaves or any receipt format, and SHALL NOT reveal through reason or grant a grant or identity the caller may not see.",
+      "acceptance": [
+        "In crates/lys-identity-server/tests/grants.rs a new test a_derived_grant_whose_source_is_revoked_reads_void_naming_the_revoked_source issues a root grant and a grant derived from it, revokes the root, reads GET /grants as the root's holder, and asserts the derived grant's standing is exactly {\"stands\": false, \"refusal\": \"Revoked\", \"grant\": <the root's id>, \"reason\": <the text GrantError::Revoked writes for the root>} while its revoked member is false.",
+        "In the same file a new test a_delegation_ending_after_its_ancestor_is_refused_and_effective_end_is_the_grants_own issues a root ending at T+1000 and proves three things: POST /grants for a grant derived from the root ending at T+1001 is refused with refusal ExpiryBeyondSource and the grant revision read before and after it is unchanged, so no grant is created; a grant derived from the root ending at T+500 reads effective_ends_at T+500 on GET /grants and on GET /grants/{id}, equal to its own window.ends_at; and a second root with no end and a grant derived from it with no end each read effective_ends_at null.",
+        "In the same file a new test a_derived_grant_whose_chain_names_an_identity_the_caller_may_not_see_reads_withheld builds, through the service's existing routes and persons only, a chain of three grants on one resource: it registers two persons through POST /people and binds a login to each through POST /people/{id}/logins; the administrator activates each of the two persons through POST /identities/{id}/transitions with transition activate, since a person registered through POST /people starts registered and the service refuses a grant to or from an identity that is not active; the administrator then issues a root grant to the first person with pass-on to persons; the first person, signed in, delegates from it to the second person with pass-on to persons; and the second person, signed in, delegates from that grant to BEA, use-only. BEA does not see the middle grant, whose holder and responsible are the second person and whose issuer is the first person. It then moves the first person from active to suspended through POST /identities/{id}/transitions with transition suspend and reads GET /grants signed in as BEA. BEA's grant's standing is exactly {\"stands\": false, \"refusal\": \"IdentityNotActive\", \"grant\": null, \"reason\": \"IdentityNotActive: the refusal names a grant or identity the caller may not inspect\"}, and the first person's id and the root grant's id each occur 0 times in the whole response body text.",
+        "A grant that stands reads standing exactly {\"stands\": true} on GET /grants and on GET /grants/{id}, asserted in the second test for the root ending at T+1000 and for its derived grant ending at T+500, read at a service clock before T+500.",
+        "cargo test -p lys-identity-server --all-features --test grants reports 8 passed and 0 failed (5 at the start of the build plus the three tests above).",
+        "rg -n 'effective_ends_at: number \\| null' surface/identity/src/generated/grants.ts prints exactly one line, inside the Grant interface, and that interface's standing member is typed as the union of {stands: true} and {stands: false; refusal: string; grant: string | null; reason: string}.",
+        "git diff --stat <base>..HEAD -- crates/lys-core crates/lys-identity/src/grants/codec.rs crates/lys-identity/src/grants/receipt.rs crates/lys-identity/src/grants/events.rs prints nothing, where <base> is the commit the build started from, and git diff <base>..HEAD -- crates/lys-identity-server/src/routes.rs prints nothing."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/grant_contract/views.rs",
+          "crates/lys-identity-server/src/grants.rs",
+          "crates/lys-identity-server/tests/grants.rs",
+          "surface/identity/src/generated/grants.ts"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C280"
+      ],
+      "stories": [
+        "S125"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Name the server's grant tests by the row each passes",
+      "spec": "The crates/lys-identity integration tests of the relation bound, affirmative pass-on, the end bound at delegation, inherited expiry (each end binding at exercise, the hop check at commit and on replay, admission's own check, and the hop check at exercise), cascading revocation and last used SHALL each carry their conformance row in their name as a row_<major>_<minor>_ prefix put before the existing name, so the DIRECTORY-006 acceptance key the name already carries stays readable; a test that carries two rows carries both prefixes, in row order. The renames are exactly: grant_contract.rs grant_model_judges_by_action_sets_and_keeps_its_version to row_2_1_grant_model_judges_by_action_sets_and_keeps_its_version; grant_contract.rs grant_contract_supplies_no_permission_by_default to row_2_2_grant_contract_supplies_no_permission_by_default; grant_delegation.rs grant_use_vs_lend_use_only_is_exercised_and_never_passed_on to row_2_2_grant_use_vs_lend_use_only_is_exercised_and_never_passed_on; grant_delegation.rs grant_recipient_each_kind_is_permitted_or_refused_by_name to row_2_2_grant_recipient_each_kind_is_permitted_or_refused_by_name; grant_delegation.rs grant_ancestry_refuses_at_the_blocking_boundary_and_explains_a_permitted_chain to row_2_1_row_2_3_grant_ancestry_refuses_at_the_blocking_boundary_and_explains_a_permitted_chain, since its ActionsOutside and ResourceOutside refusals are the relation bound (row 2.1) and its ExpiryBeyondSource refusals, for a requested end one second past its source's end and for no end under a source that ends, are the end bound at delegation (row 2.3); grant_delegation.rs grant_agent_parity_routes_decide_alike_and_pass_on_decides_who_delegates to row_2_2_grant_agent_parity_routes_decide_alike_and_pass_on_decides_who_delegates, since pass-on decides who delegates (row 2.2); grant_expiry.rs grant_expiry_every_end_binds_at_its_boundary_and_no_role_change_extends_it to row_2_6_grant_expiry_every_end_binds_at_its_boundary_and_no_role_change_extends_it, since its exercises at each end are refused Expired naming the grant whose end binds (the check at exercise); grant_faults.rs grant_durability_every_boundary_answers_replay_or_names_what_is_unresolved to row_2_6_grant_durability_every_boundary_answers_replay_or_names_what_is_unresolved, since its leg 'a committed event past its source's end is refused by the projector' appends a signed grant ending after its source to the log past admission, reopens the service so the log is replayed, and asserts the book refuses it ExpiryBeyondSource, writes no relationship for it and holds nothing for its holder (the hop check lineage::check_hop runs at commit and on replay); grant_revocation.rs grant_revoke_withdraws_every_derived_grant_and_leaves_the_independent_one to row_2_5_grant_revoke_withdraws_every_derived_grant_and_leaves_the_independent_one; grant_last_used.rs grant_last_used_an_exercise_is_recorded_with_its_holder_route_and_time to row_8_4_grant_last_used_an_exercise_is_recorded_with_its_holder_route_and_time, grant_last_used_a_reopen_restores_it_from_the_log to row_8_4_grant_last_used_a_reopen_restores_it_from_the_log and grant_last_used_a_refused_check_writes_no_use to row_8_4_grant_last_used_a_refused_check_writes_no_use. Row 2.3's server test is the renamed ancestry test. Two tests are added, both to grant_expiry.rs. The first is for admission's own check (check_end, called in crates/lys-identity/src/grants/admission.rs judge_delegation for every grant on the source's lineage): row_2_6_admission_refuses_a_delegation_ending_past_its_source_before_any_commit builds with the test world a root held by one of the world's people, ending at T0+1000 whose pass-on lets both recipient kinds be given read, then calls lys_identity::grants::admission::judge_delegation directly, with the world's grant book, the directory's projection, the support model and the world's clock, on a request from the root's holder to another of the world's people deriving from that root for relation tern ending at T0+1001, and asserts Err(GrantError::ExpiryBeyondSource) with requested '<T0+1001>', source_grant the root's id and source_ends T0+1000, and that the book holds the same records after the call as before it; it never calls World::delegate or Grants::delegate, so the identical refusal the hop check makes at commit is never reached. The second is for the hop check at exercise (lineage::check_hop, called by lineage::resolve in crates/lys-identity/src/grants/lineage.rs on every hop of the walk admission::effective runs through GrantBook::lineage whenever a grant is exercised): row_2_6_resolve_refuses_a_derived_grant_ending_past_its_source_at_exercise writes two grants by hand into a map, as grant_delegation.rs's cycle() writes its chain, so neither admission nor the book's check at commit ever runs on them: a root held by a person, issued by that person, for relation tern with actions read and a pass-on of read to both recipient kinds, window starting at T0 and ending at T0+1000; and a grant derived from that root, issued by the same person to the same person, on the same resource with actions read and the same pass-on, window starting at T0 and ending at T0+2000. It resolves the derived grant with lys_identity::grants::lineage::resolve over that map and asserts Err(GrantError::ExpiryBeyondSource) with requested '<T0+2000>', source_grant the root's id and source_ends T0+1000. The book cannot be built past its own check from outside the crate, since GrantBook::apply runs GrantBook::check, which runs lineage::check_hop itself, so the test stands on the walk every exercise at a time between the two ends runs, and resolve takes no time: the refusal it asserts is the one such an exercise gets. THE SYSTEM SHALL NOT change any renamed test's body or weaken, remove or skip any assertion in it, SHALL NOT rename a test outside the list above, SHALL NOT add a test to crates/lys-identity/tests other than row_2_6_admission_refuses_a_delegation_ending_past_its_source_before_any_commit and row_2_6_resolve_refuses_a_derived_grant_ending_past_its_source_at_exercise, and SHALL NOT mark any test #[ignore].",
+      "acceptance": [
+        "cargo test -p lys-identity --all-features -- --list (at the venue) lists 26 tests in all under the seven grant_* integration binaries (grant_contract, grant_delegation, grant_expiry, grant_faults, grant_last_used, grant_receipts, grant_revocation): the 24 at the start of the build plus row_2_6_admission_refuses_a_delegation_ending_past_its_source_before_any_commit and row_2_6_resolve_refuses_a_derived_grant_ending_past_its_source_at_exercise.",
+        "rg -c '^fn row_' crates/lys-identity/tests prints grant_contract.rs:2, grant_delegation.rs:4, grant_expiry.rs:3, grant_faults.rs:1, grant_revocation.rs:1 and grant_last_used.rs:3, and rg -c '^fn row_' crates/lys-identity/tests/grant_receipts.rs prints nothing.",
+        "For every renamed test, git diff <base>..HEAD -- <its file> shows its fn line as the only changed line of its body, where <base> is the commit the build started from.",
+        "cargo test -p lys-identity --all-features --test grant_delegation -- --exact row_2_1_row_2_3_grant_ancestry_refuses_at_the_blocking_boundary_and_explains_a_permitted_chain reports 1 passed and 0 failed, and its body still asserts GrantError::ExpiryBeyondSource with source_ends equal to the source's end for a requested end one second later and for a requested no end, and GrantError::ActionsOutside and GrantError::ResourceOutside for a relation and a resource outside the source.",
+        "cargo test -p lys-identity --all-features --test grant_expiry -- --exact row_2_6_admission_refuses_a_delegation_ending_past_its_source_before_any_commit reports 1 passed and 0 failed, rg -n 'judge_delegation' crates/lys-identity/tests/grant_expiry.rs prints at least one line inside that test, and the test's body contains no call to delegate.",
+        "cargo test -p lys-identity --all-features --test grant_expiry -- --exact row_2_6_resolve_refuses_a_derived_grant_ending_past_its_source_at_exercise reports 1 passed and 0 failed, rg -n 'resolve' crates/lys-identity/tests/grant_expiry.rs prints at least one line inside that test, and the test's body contains no call to delegate, apply or judge_delegation.",
+        "rg -n '#\\[ignore\\]' crates/lys-identity/tests prints nothing."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity/tests/grant_contract.rs",
+          "crates/lys-identity/tests/grant_delegation.rs",
+          "crates/lys-identity/tests/grant_expiry.rs",
+          "crates/lys-identity/tests/grant_faults.rs",
+          "crates/lys-identity/tests/grant_revocation.rs",
+          "crates/lys-identity/tests/grant_last_used.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C279"
+      ],
+      "stories": [
+        "S126"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Render the service's standing on every screen and remove the client walk",
+      "spec": "WHILE a grant screen shows whether a grant stands, THE SYSTEM SHALL read the grant's standing member as R1 answers it and nothing else: GrantCard.tsx (the void mark, the reason line and the chain pills), You.tsx (What you hold lists the signed-in person's grants whose standing stands, and the held() line that lists each agent's holdings lists only the agent's grants whose standing stands, in place of its filter on !g.revoked, so a grant derived from a revoked source never shows under its agent), Access.tsx, file/sections.tsx and model.ts cannotGive. standing() SHALL be removed from surface/identity/src/features/grants/model.ts with its Standing type. WHEN a grant's standing does not stand and names a grant other than itself, THE SYSTEM SHALL show it marked void with the text 'it derives from <grantNo of the named grant>, which no longer stands' followed by the service's reason; WHEN it names the grant itself or no grant, THE SYSTEM SHALL show it void with the service's reason alone. The open-question tag 'what suspension refuses: open' SHALL stay on a void grant whose refusal is IdentityNotActive and whose own holder the service answers as suspended. surface/identity/tests/fixtures.ts SHALL answer every fixture grant with both R1 members, and every fixture that answers a revoked grant SHALL answer the standing the service would: the revoked grant and each grant derived from it void with refusal Revoked naming the revoked grant. THE SYSTEM SHALL NOT walk source ids, compare a window with the clock, or read a holder's lifecycle state to decide whether a grant stands, SHALL NOT keep any other client derivation of standing, and SHALL NOT change the ADR-010 structure or the orange accent of any screen.",
+      "acceptance": [
+        "rg -n 'standing\\(' surface/identity/src prints nothing, and rg -n 'Date.now' surface/identity/src/features/grants/model.ts prints nothing.",
+        "rg -n '\\.revoked' surface/identity/src/features/me/You.tsx prints nothing, and R5's row 2.5 test asserts that after the source is revoked the derived grant is absent from its agent's holdings on You.",
+        "In revoke.test.tsx, after the revoke the agent's Access tab card for the derived viewer grant contains 'void' and 'which no longer stands' and the revoked-grant fixture's reason text, and the test's title reads 'withdraws it through the service, and on the Access tab what derives from it stays, void'.",
+        "The grants.test.tsx test 'shows a void grant of a suspended holder with the open question, and no Allows line' passes with its fixture answering the Scribe grant standing {stands: false, refusal: 'IdentityNotActive', grant: null, reason: <the IdentityNotActive text for Scribe as suspended>}, and asserts the card contains that reason followed by 'what suspension refuses: open'.",
+        "A fixture grant answered with standing {stands: true} and window.ends_at one second in the past renders on its GrantCard with no 'void' mark, asserted in grants.test.tsx: the screen does not compare the window with the clock."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "surface/identity/src/features/grants/model.ts",
+          "surface/identity/src/features/grants/GrantCard.tsx",
+          "surface/identity/src/features/me/You.tsx",
+          "surface/identity/src/features/access/Access.tsx",
+          "surface/identity/src/features/file/sections.tsx",
+          "surface/identity/tests/fixtures.ts"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C280",
+        "C281"
+      ],
+      "stories": [
+        "S124",
+        "S125"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Meet rows 2.3 and 8.4 on the delegation form and the grant card",
+      "spec": "WHEN the delegation form opens for a source grant, THE SYSTEM SHALL show in its 'Where it comes from' card the rows Source grant, Actions it allows, You may pass it on and 'Ends no later than', the last reading the day of the source's effective_ends_at as R1 answers it, and 'no end' when effective_ends_at is null. The 'illustrative' open-question tag on that row SHALL be removed, and the row SHALL NOT read source.window.ends_at. WHILE a GrantCard shows a grant, THE SYSTEM SHALL show its window as 'Window: <day of window.starts_at> to <day of effective_ends_at>', and 'Window: from <day of window.starts_at>, no end' when effective_ends_at is null, in place of the 'Lasts' line, beside its chain (its source) and 'Last used'. THE SYSTEM SHALL NOT change the window the form requests, the relations it offers or what it sends, and SHALL NOT change lastUsedText or the 'not seen' text of a grant with no use event.",
+      "acceptance": [
+        "rg -n 'illustrative' surface/identity/src/features/grants/Delegate.tsx prints nothing, and rg -n 'effective_ends_at' surface/identity/src/features/grants/Delegate.tsx prints the line of the 'Ends no later than' row, and the window the form sends for '7 days' and for 'no end' is the one it sent at the start of the build, asserted by the existing test 'gives through the service, naming source, recipient, relation and an end no later than the source'.",
+        "With a source whose window.ends_at and effective_ends_at are both the fixture's end at(27, 10), the form's first card contains 'Ends no later than' followed by day(at(27, 10)), and with the same source answered with window.ends_at null and effective_ends_at null, a chain with no end at any hop, it contains 'Ends no later than' followed by 'no end' (asserted by R5's row 2.3 test). A source with no end of its own under an ancestor that ends is not a fixture: admission refuses such a grant, and that refusal is proven by row_2_6_admission_refuses_a_delegation_ending_past_its_source_before_any_commit (R2, R7), not by a vitest.",
+        "A GrantCard for a grant with window.starts_at S and effective_ends_at E contains 'Window: ' + day(S) + ' to ' + day(E), and one with effective_ends_at null contains 'Window: from ' + day(S) + ', no end'; neither contains 'Lasts:' (asserted by R5's row 8.4 test)."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "surface/identity/src/features/grants/Delegate.tsx",
+          "surface/identity/src/features/grants/GrantCard.tsx"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C281"
+      ],
+      "stories": [
+        "S125"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Name one vitest per screen row over the service's answers",
+      "spec": "THE SYSTEM SHALL carry, each in the vitest file of the screen it reads, one vitest named by its row whose assertions read the row's words from a fixture service answer and from nothing else. row_1_4_what_you_hold_shows_each_grant_its_source_and_whether_it_may_be_passed_on in grants.test.tsx is the existing What you hold test renamed, with its assertions of source ('root' for a root grant, the source holder's name for a derived one) and pass-on kept. row_2_3_the_form_shows_the_source_grant_its_actions_may_pass_on_and_the_effective_end in grants.test.tsx is the existing delegation-form test renamed, asserting the Source grant, Actions it allows, You may pass it on and 'Ends no later than' rows over two answers the service gives: ROOT_G as fixtures.ts holds it, whose own end at(27, 10) is its effective end, shown as that day, and ROOT_G answered with window.ends_at null and effective_ends_at null, a chain with no end at any hop, shown as 'no end'. A source with no end of its own under an ancestor that ends is not used, since admission refuses such a grant and the service never holds it; that refusal is proven by row_2_6_admission_refuses_a_delegation_ending_past_its_source_before_any_commit. row_8_4_a_grant_card_shows_last_used_its_source_and_window_and_never_never_used is added to grants.test.tsx: a GrantCard for a grant with no use event shows 'Last used: not seen', its chain names its source, it shows its window as R4 writes it, and its text contains no 'never used'. row_1_5_an_administrators_people_shows_others_while_you_shows_only_the_persons_own is added to me.test.tsx: signed in as the administrator ADA, whom the fixture service admits to /directory/people, over a service answer local to this test that leaves fixtures.ts unchanged. Its answer to GET /directory/people is fixtures.ts DIRECTORY with one more person appended, CAL, 'Cal (test person)', state 'active', with no agents. Its answer to GET /grants carries, beside the fixture grants, one foreign grant, CAL_G: a root grant (source null) issued by ADA, active, to CAL, active, as viewer of project:atlas with actions ['view'], pass-on use-only, responsible CAL, window starting at the fixture's start with no end; its chain is CAL_G alone, a root grant the administrator issues to an active person, which admission admits, and the service answers it with standing {stands: true} and effective_ends_at null. BEA, retired, holds no grant in this test. So the service answers CAL_G as standing and only You's holder check keeps it out of What you hold. The People screen lists CAL's display name and BEA's display name, and You lists only the signed-in person's agents (Scribe, Courier and Archivist, none of Reviewer and Lamplighter) and What you hold lists only the grants the signed-in person holds (the fixture's owner of project:identity and viewer of project:ledger), not CAL_G's viewer of project:atlas, identifying each row by its relation and resource only and never reading its From cell, and You's personal-secrets card still reads 'The secrets store is SECRETS-002.'. row_2_5_what_you_hold_drops_the_grants_derived_from_a_revoked_one is added to revoke.test.tsx over a service answer that adds to the fixture grants three grants on project:handbook, every holder and every delegator of which is an identity fixtures.ts answers as active (ADA and Scribe; BEA, retired in fixtures.ts, is not in this chain): HANDBOOK_G, a root grant ADA issued to ADA as editor with pass-on of view to persons and agents; LENT_G, derived from HANDBOOK_G, delegated by ADA to Scribe as viewer with pass-on of view to persons, ADA answering for Scribe; and RETURNED_G, derived from LENT_G, delegated by Scribe to ADA as viewer, use-only. Each hop's recipient kind and actions lie within its source's pass-on, each holder and each delegator is active, and each grant's responsible is the person the directory records, so admission admits all three with ADA as the root's holder and the first delegator and Scribe as the second. Signed in as ADA, the test reads You, revokes HANDBOOK_G through its revoke control on ADA's Access tab (#/file/<ADA>/access), where GrantCard renders the Revoke control because ADA is active and HANDBOOK_G is not revoked, and reads You again, where the service now answers HANDBOOK_G, LENT_G and RETURNED_G with standing void, refusal Revoked naming HANDBOOK_G. Before the revoke You's What you hold lists editor of project:handbook and viewer of project:handbook, and Scribe's holdings on You list viewer of project:handbook; after it, none of them does, while owner of project:identity, viewer of project:ledger and Scribe's viewer of project:identity stay. The test identifies each row by its relation and resource only and never reads a From cell or a Last used line. The Access tab's keeping of those grants void is the existing revoke test R3 retitles. Each existing describe title that names a conformance row a row test now carries SHALL drop the row number so each of rows 1.4, 1.5, 2.3, 2.5 and 8.4 is named by exactly one vitest. THE SYSTEM SHALL NOT use it.skip, it.todo, describe.skip or .only, SHALL NOT compute a row's words in a test from anything other than the fixture answer and the rendered screen, and SHALL NOT use sample-data authority or a simulated confirmation timer.",
+      "acceptance": [
+        "In surface/identity, npx vitest run reports 65 tests passed and 0 failed: the 62 at the start of the build plus the three added row tests for 1.5, 2.5 and 8.4.",
+        "rg -c \"it\\('row_[0-9]_[0-9]_\" surface/identity/tests prints grants.test.tsx:3 (rows 1.4, 2.3 and 8.4), me.test.tsx:1 (row 1.5) and revoke.test.tsx:1 (row 2.5), and nothing for any other file.",
+        "rg -n 'conformance (1\\.4|1\\.5|2\\.3|2\\.5|8\\.4)|conformance 2\\.1 to 2\\.3' surface/identity/tests prints nothing.",
+        "rg -n '\\.skip|\\.todo|\\.only' surface/identity/tests prints nothing.",
+        "The row 1.5 test asserts the People screen's names include 'Cal (test person)' and 'Bea (test person)', You's agent names equal exactly ['Scribe', 'Courier', 'Archivist'], You's What you hold rows, each identified by its relation and resource only, equal exactly the signed-in person's owner of project:identity and viewer of project:ledger, with no viewer of project:atlas, the test reads no From cell, and You's personal-secrets card text contains 'The secrets store is SECRETS-002.'.",
+        "In the row 1.5 fixture, CAL_G's holder is CAL and its issuer ADA, each answered with state 'active' in the test's /directory/people answer, CAL_G's source is null, its standing is {stands: true} and its effective_ends_at is null, and no grant in the test's /grants answer has holder BEA.",
+        "With You's holder check (the g.holder comparison against the signed-in person in surface/identity/src/features/me/You.tsx) removed, the row 1.5 test fails at its What you hold assertion, which then reads four rows: owner of project:identity, viewer of project:ledger, Scribe's viewer of project:identity and viewer of project:atlas.",
+        "The row 2.5 test asserts You's What you hold holds 4 rows before the revoke (owner of project:identity, viewer of project:ledger, editor of project:handbook, viewer of project:handbook) and 2 after (owner of project:identity, viewer of project:ledger), and Scribe's holdings on You hold 2 rows before (viewer of project:identity, viewer of project:handbook) and 1 after (viewer of project:identity); the revoke is posted to /grants/<HANDBOOK_G>/revoke from the Revoke control of ADA's Access tab; and with the service's post-revoke answer for RETURNED_G replaced by its pre-revoke answer, standing {stands: true}, the test fails at its What you hold assertion.",
+        "In the row 2.5 fixture, every holder and every issuer of HANDBOOK_G, LENT_G and RETURNED_G is ADA or SCRIBE, each answered with state 'active' in fixtures.ts, and none of them is BEA, whose state fixtures.ts answers as 'retired'."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "surface/identity/tests/grants.test.tsx",
+          "surface/identity/tests/me.test.tsx",
+          "surface/identity/tests/revoke.test.tsx"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C279",
+        "C281",
+        "C282"
+      ],
+      "stories": [
+        "S124",
+        "S125",
+        "S126"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Register the surface leg that runs the identity vitests",
+      "spec": "THE SYSTEM SHALL add to docs/design/project.json's trees one entry for the tree surface/identity with one leg named surface, whose command is 'npm cit' (npm's install-clean-and-test: npm ci from surface/identity/package-lock.json, then the package's test script, vitest run), whose requires are 'tool:node', 'tool:npm' and 'lockfile:package-lock.json', and whose cadence is round. Each screen row's stated command is that leg's runner filtered to the row's test name: in surface/identity, after npm ci, npx vitest run tests/<file> -t <row test name>. After the tree is appended to project.json, the gate of docs/design/directory/design.json SHALL be re-copied verbatim from project.json's trees as they then stand, so it carries every leg of every tree project.json holds on the main the build starts from, and DESIGN.md SHALL be re-rendered with python3 scripts/design/render-cluster.py docs/design/directory. THE SYSTEM SHALL NOT change any existing tree or leg in docs/design/project.json, SHALL NOT change surface/identity/package.json or its lockfile, and SHALL NOT make the leg demand-only.",
+      "acceptance": [
+        "python3 scripts/design/validate.py docs/design/project.json exits 0.",
+        "python3 -c \"import json; t=[x for x in json.load(open('docs/design/project.json'))['trees'] if x['tree']=='surface/identity']; print(len(t), [(l['name'], l['command'], l['requires'], l['cadence']) for l in t[0]['legs']])\" prints 1 [('surface', 'npm cit', ['tool:node', 'tool:npm', 'lockfile:package-lock.json'], 'round')].",
+        "python3 -c \"import json; p=json.load(open('docs/design/project.json'))['trees']; d=json.load(open('docs/design/directory/design.json'))['gate']; print('equal' if p == d else 'differ')\" prints equal.",
+        "git diff <base>..HEAD -- docs/design/project.json adds lines only inside the trees array, for the surface/identity entry, and removes none, where <base> is the commit the build started from.",
+        "Run at the venue in surface/identity, npm cit exits 0 and its vitest summary reports 65 passed and 0 failed."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/project.json",
+          "docs/design/directory/design.json",
+          "docs/design/directory/DESIGN.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C284"
+      ],
+      "stories": [
+        "S126"
+      ]
+    },
+    {
+      "id": "R7",
+      "title": "Prove each row's test fails when the row's fact is taken away",
+      "spec": "WHEN each of the seven drift injections below is applied alone to the built tree, THE SYSTEM SHALL show exactly one failing test across the suite that runs it, and it SHALL be the named test of that row; each injection is applied once, measured, and reverted before the next, and none is committed. (1) A grant shown without its source: You.tsx's What you hold 'From' cell renders empty for every grant; the surface suite fails only row_1_4_what_you_hold_shows_each_grant_its_source_and_whether_it_may_be_passed_on, since the row 1.5 test reads no From cell. (2) May-pass-on read from a missing prohibition: codec.rs read_pass_on answers a null pass-on member as PassOn::To with the grant's own actions and both recipient kinds in place of refusing it; the lys-identity suite fails only row_2_2_grant_contract_supplies_no_permission_by_default. (3) A derived grant surviving its source's revocation: recovery.rs's GrantChange::Revoke arm removes the relationships of the revoked grant alone, not of the grants derived from it; the workspace suite fails only row_2_5_grant_revoke_withdraws_every_derived_grant_and_leaves_the_independent_one. (4) Not seen rendered as never used: GrantCard.tsx's 'Last used' renders 'never used' for a grant whose last_use.seen is false; the surface suite fails only row_8_4_a_grant_card_shows_last_used_its_source_and_window_and_never_never_used. (5) A derived grant surviving its source's end, past admission's own check: judge_delegation in crates/lys-identity/src/grants/admission.rs no longer calls check_end for the grants on the source's lineage; the workspace suite fails only row_2_6_admission_refuses_a_delegation_ending_past_its_source_before_any_commit, since wherever another test reaches commit the hop check refuses the same delegation with the same ExpiryBeyondSource. (6) A derived grant surviving its source's end, past the hop check at commit and on replay: GrantBook::check in crates/lys-identity/src/grants/projection.rs, on an issue event whose source is a grant, runs every check of lineage::check_hop except its closing check_end on the grant's end and its source's, while lineage::resolve still calls check_hop whole; the workspace suite fails only row_2_6_grant_durability_every_boundary_answers_replay_or_names_what_is_unresolved, at its 'refused by name' assertion, since the replayed grant enters the book, while admission's check_end still refuses every delegation the other tests ask for. (7) A derived grant surviving its source's end, past the hop check at exercise: lineage::resolve in crates/lys-identity/src/grants/lineage.rs, on each hop, runs every check of lineage::check_hop except its closing check_end, while GrantBook::check still calls check_hop whole; the workspace suite fails only row_2_6_resolve_refuses_a_derived_grant_ending_past_its_source_at_exercise, since resolve answers the derived grant's lineage with the root's end as its earliest, so an exercise between the two ends is refused only by the fold's Expired naming the source, not ExpiryBeyondSource at the hop, while no other test's book holds a chain the check at commit let through. Each injection changes one call site, so the hop check at commit and the hop check at exercise are each proven by a case only it catches. The earliest-end fold in lineage::resolve, read by expiry::within_window, is the fourth guard of row 2.6 and has no injection: check_hop runs on every hop before the fold is read, so no case reaches the fold unrefused. IF an injection fails more than one test, THEN THE SYSTEM SHALL isolate the row's test with a case only it catches, without weakening the other failing test, and measure again. THE SYSTEM SHALL NOT leave any injection in the tree and SHALL NOT count an injection as proven when its row test did not run.",
+      "acceptance": [
+        "For injection (1), in surface/identity npx vitest run reports exactly 1 failed, named row_1_4_what_you_hold_shows_each_grant_its_source_and_whether_it_may_be_passed_on, and 64 passed.",
+        "For injection (2), cargo test -p lys-identity --all-features --no-fail-fast reports exactly 1 failed test, row_2_2_grant_contract_supplies_no_permission_by_default.",
+        "For injection (3), cargo test --workspace --all-features --no-fail-fast reports exactly 1 failed test, row_2_5_grant_revoke_withdraws_every_derived_grant_and_leaves_the_independent_one, failing at its RELATIONSHIPS_AFTER_ROOT_REVOKE assertion.",
+        "For injection (4), in surface/identity npx vitest run reports exactly 1 failed, named row_8_4_a_grant_card_shows_last_used_its_source_and_window_and_never_never_used, and 64 passed.",
+        "For injection (5), cargo test --workspace --all-features --no-fail-fast reports exactly 1 failed test, row_2_6_admission_refuses_a_delegation_ending_past_its_source_before_any_commit.",
+        "For injection (6), cargo test --workspace --all-features --no-fail-fast reports exactly 1 failed test, row_2_6_grant_durability_every_boundary_answers_replay_or_names_what_is_unresolved, failing at its 'refused by name' assertion.",
+        "For injection (7), cargo test --workspace --all-features --no-fail-fast reports exactly 1 failed test, row_2_6_resolve_refuses_a_derived_grant_ending_past_its_source_at_exercise, failing at its assertion of ExpiryBeyondSource.",
+        "After the seven measurements git status --porcelain -- crates surface prints only the files R1 to R5 change, and git diff <base>..HEAD -- crates/lys-identity/src/grants/codec.rs crates/lys-identity/src/grants/recovery.rs crates/lys-identity/src/grants/admission.rs crates/lys-identity/src/grants/lineage.rs crates/lys-identity/src/grants/projection.rs prints nothing."
+      ],
+      "files": {
+        "create": [],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C283"
+      ],
+      "stories": [
+        "S126"
+      ]
+    },
+    {
+      "id": "R8",
+      "title": "Name this brief's tests in the Brief cell of the eight rows",
+      "spec": "THE SYSTEM SHALL amend docs/design/identity/CONFORMANCE.md's Brief cell on rows 1.4, 1.5, 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4, and no other cell or row, in the '<brief id> <leg> <test name>' entry form: the kept planning text stays first, and this brief's entries follow it after '; ' when the cell holds no '; ' yet, and after ', ' at the end of the cell's existing entries when another brief's entries are already there on the main the build starts from. A test name for the tests leg is <binary>::<test name> and for the surface leg is <vitest file>::<test name>. The entries, in this order, are: row 1.4: 'DIRECTORY-035 surface grants.test.tsx::row_1_4_what_you_hold_shows_each_grant_its_source_and_whether_it_may_be_passed_on'; row 1.5: 'DIRECTORY-035 surface me.test.tsx::row_1_5_an_administrators_people_shows_others_while_you_shows_only_the_persons_own, SECRETS-002 none'; row 2.1: 'DIRECTORY-035 tests grant_contract::row_2_1_grant_model_judges_by_action_sets_and_keeps_its_version'; row 2.2: 'DIRECTORY-035 tests grant_contract::row_2_2_grant_contract_supplies_no_permission_by_default'; row 2.3: 'DIRECTORY-035 tests grant_delegation::row_2_1_row_2_3_grant_ancestry_refuses_at_the_blocking_boundary_and_explains_a_permitted_chain, DIRECTORY-035 surface grants.test.tsx::row_2_3_the_form_shows_the_source_grant_its_actions_may_pass_on_and_the_effective_end'; row 2.5: 'DIRECTORY-035 tests grant_revocation::row_2_5_grant_revoke_withdraws_every_derived_grant_and_leaves_the_independent_one, DIRECTORY-035 surface revoke.test.tsx::row_2_5_what_you_hold_drops_the_grants_derived_from_a_revoked_one'; row 2.6: 'DIRECTORY-035 tests grant_expiry::row_2_6_grant_expiry_every_end_binds_at_its_boundary_and_no_role_change_extends_it, DIRECTORY-035 tests grant_expiry::row_2_6_admission_refuses_a_delegation_ending_past_its_source_before_any_commit, DIRECTORY-035 tests grant_expiry::row_2_6_resolve_refuses_a_derived_grant_ending_past_its_source_at_exercise, DIRECTORY-035 tests grant_faults::row_2_6_grant_durability_every_boundary_answers_replay_or_names_what_is_unresolved'; row 8.4: 'DIRECTORY-035 tests grant_last_used::row_8_4_grant_last_used_an_exercise_is_recorded_with_its_holder_route_and_time, DIRECTORY-035 surface grants.test.tsx::row_8_4_a_grant_card_shows_last_used_its_source_and_window_and_never_never_used'. The 1.5 entries say that this brief proves the agents and grants clauses and that the personal-secrets clause waits for SECRETS-002; row 1.5 passes in full only when SECRETS-002 lands and its card adds the personal-secrets section to You. THE SYSTEM SHALL NOT change a #, Behaviour, Kind or Owner cell, any other row, the legend or any other brief's entry, and SHALL NOT claim row 1.5's personal-secrets clause.",
+      "acceptance": [
+        "Where the build starts from a main on which the eight Brief cells read exactly the planning text (1.4 'DIRECTORY-001 R3 (amend)', 1.5 'DIRECTORY (amend)', 2.1 'DIRECTORY-001 R3 (amend)', 2.2 'DIRECTORY (amend)', 2.3 'DIRECTORY (amend)', 2.5 'DIRECTORY-001 R3 (exists)', 2.6 'DIRECTORY (new row)', 8.4 'DIRECTORY (amend)'), the cells read afterwards exactly the planning text followed by '; ' and the entries above, e.g. row 2.2 reads 'DIRECTORY (amend); DIRECTORY-035 tests grant_contract::row_2_2_grant_contract_supplies_no_permission_by_default'.",
+        "Where a cell already holds another brief's entries after '; ', the cell afterwards is exactly that text followed by ', ' and this brief's entries for the row.",
+        "git diff --no-ext-diff --numstat <base>..HEAD -- docs/design/identity/CONFORMANCE.md prints 8 added and 8 deleted, where <base> is the commit the build started from.",
+        "For each of the eight rows, splitting its Brief cell after its last '; ' on ', ' yields this brief's entries for the row as listed, each matching ^[A-Z][A-Z0-9]*-[0-9]{3} ([a-z][a-z0-9-]* [^ ,]+|none)$.",
+        "Each entry's stated command exits 0 at the venue: row 1.4: (in surface/identity, after npm ci) npx vitest run tests/grants.test.tsx -t row_1_4_what_you_hold_shows_each_grant_its_source_and_whether_it_may_be_passed_on; row 1.5: (in surface/identity, after npm ci) npx vitest run tests/me.test.tsx -t row_1_5_an_administrators_people_shows_others_while_you_shows_only_the_persons_own; row 2.1: cargo test -p lys-identity --all-features --test grant_contract -- --exact row_2_1_grant_model_judges_by_action_sets_and_keeps_its_version; row 2.2: cargo test -p lys-identity --all-features --test grant_contract -- --exact row_2_2_grant_contract_supplies_no_permission_by_default; row 2.3: cargo test -p lys-identity --all-features --test grant_delegation -- --exact row_2_1_row_2_3_grant_ancestry_refuses_at_the_blocking_boundary_and_explains_a_permitted_chain; row 2.3: (in surface/identity, after npm ci) npx vitest run tests/grants.test.tsx -t row_2_3_the_form_shows_the_source_grant_its_actions_may_pass_on_and_the_effective_end; row 2.5: cargo test -p lys-identity --all-features --test grant_revocation -- --exact row_2_5_grant_revoke_withdraws_every_derived_grant_and_leaves_the_independent_one; row 2.5: (in surface/identity, after npm ci) npx vitest run tests/revoke.test.tsx -t row_2_5_what_you_hold_drops_the_grants_derived_from_a_revoked_one; row 2.6: cargo test -p lys-identity --all-features --test grant_expiry -- --exact row_2_6_grant_expiry_every_end_binds_at_its_boundary_and_no_role_change_extends_it; row 2.6: cargo test -p lys-identity --all-features --test grant_expiry -- --exact row_2_6_admission_refuses_a_delegation_ending_past_its_source_before_any_commit; row 2.6: cargo test -p lys-identity --all-features --test grant_expiry -- --exact row_2_6_resolve_refuses_a_derived_grant_ending_past_its_source_at_exercise; row 2.6: cargo test -p lys-identity --all-features --test grant_faults -- --exact row_2_6_grant_durability_every_boundary_answers_replay_or_names_what_is_unresolved; row 8.4: cargo test -p lys-identity --all-features --test grant_last_used -- --exact row_8_4_grant_last_used_an_exercise_is_recorded_with_its_holder_route_and_time; row 8.4: (in surface/identity, after npm ci) npx vitest run tests/grants.test.tsx -t row_8_4_a_grant_card_shows_last_used_its_source_and_window_and_never_never_used; each server command reports 1 passed, and each vitest command reports 1 passed and the rest of the file skipped by the filter."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/identity/CONFORMANCE.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C279",
+        "C282",
+        "C285"
+      ],
+      "stories": [
+        "S126"
+      ]
+    },
+    {
+      "id": "R9",
+      "title": "Close DIRECTORY-006 R6 against the screens that landed",
+      "spec": "THE SYSTEM SHALL amend DIRECTORY-006 R6's files in docs/design/directory/briefs/DIRECTORY-006.json so it names the files that exist in place of the four that do not: surface/identity/src/features/grants/YouGrants.tsx becomes surface/identity/src/features/me/You.tsx, surface/identity/src/features/grants/DelegateGrant.tsx becomes surface/identity/src/features/grants/Delegate.tsx, surface/identity/src/features/grants/GrantExplanation.tsx becomes surface/identity/src/features/grants/Answer.tsx, and surface/identity/tests/acceptance/grants.spec.ts becomes surface/identity/tests/me.test.tsx and surface/identity/tests/revoke.test.tsx, and SHALL append to R6's spec one sentence saying the screens landed from hand/identity-surface-land at 6f57bf7 (PR 35), not from a build of this brief. In docs/design/directory/design.json's structure, the four rows naming surface/identity/src/features/grants/YouGrants.tsx, surface/identity/src/features/grants/DelegateGrant.tsx, surface/identity/src/features/grants/GrantExplanation.tsx and surface/identity/tests/acceptance/grants.spec.ts SHALL be removed, since the rows for You.tsx, Delegate.tsx, me.test.tsx and revoke.test.tsx already stand; one row SHALL be added for surface/identity/src/features/grants/Answer.tsx under brief DIRECTORY-035 when no row names it; no row is respelled, and the grants.spec.ts row is removed, not split. THE SYSTEM SHALL re-render DIRECTORY-006.md and DESIGN.md with python3 scripts/design/render-cluster.py docs/design/directory. THE SYSTEM SHALL NOT change any other member of DIRECTORY-006 (its id, requirements R1 to R5, R6's acceptance, checklist, stories, boundaries or verification) and SHALL NOT change docs/design/identity/briefs/IDENTITY-001.*, and SHALL NOT leave any structure path named twice.",
+      "acceptance": [
+        "rg -c 'YouGrants|DelegateGrant|GrantExplanation|acceptance/grants.spec' docs/design/directory/briefs/DIRECTORY-006.json docs/design/directory/briefs/DIRECTORY-006.md docs/design/directory/design.json docs/design/directory/DESIGN.md prints nothing.",
+        "python3 -c \"import json, collections; c=collections.Counter(s['path'] for s in json.load(open('docs/design/directory/design.json'))['structure']); print([p for p, n in c.items() if n > 1])\" prints [], and the same structure holds exactly one row whose path is surface/identity/src/features/grants/Answer.tsx.",
+        "Every path in DIRECTORY-006 R6's files exists in the tree: for each, test -e <path> exits 0.",
+        "rg -c 'hand/identity-surface-land at 6f57bf7' docs/design/directory/briefs/DIRECTORY-006.json prints 1, and the same over DIRECTORY-006.md prints 1.",
+        "python3 -c \"import json; a=json.load(open('docs/design/directory/briefs/DIRECTORY-006.json')); print([r['id'] for r in a['requirements']])\" prints ['R1', 'R2', 'R3', 'R4', 'R5', 'R6'], and git diff <base>..HEAD -- docs/design/identity/briefs prints nothing."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/directory/briefs/DIRECTORY-006.json",
+          "docs/design/directory/briefs/DIRECTORY-006.md",
+          "docs/design/directory/design.json",
+          "docs/design/directory/DESIGN.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C285"
+      ],
+      "stories": [
+        "S126"
+      ]
+    }
+  ],
+  "boundaries": [
+    "No new server route, request body, query parameter, grant member beyond standing and effective_ends_at, or screen seam; the service's existing routes and the screens' existing api.ts calls are the whole seam.",
+    "No change to lys-core, to any published lys wire format, or to the grant envelope, grant log leaves or receipt formats PR 34 carries.",
+    "No CONFORMANCE.md row other than 1.4, 1.5, 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4, and no #, Behaviour, Kind or Owner cell, changes; row 1.5's personal-secrets clause is not claimed.",
+    "No existing DIRECTORY-006 assertion is weakened or removed while tests are renamed, and the case counts stay those at the start of the build plus the tests this brief adds.",
+    "No #[ignore], #[allow], _-prefixed unused variable, it.skip, it.todo, describe.skip or .only stands in for a fix.",
+    "No drift injection is committed.",
+    "docs/design/identity/briefs/IDENTITY-001.* is not changed.",
+    "The row tests use no sample-data authority and no simulated confirmation timer.",
+    "Every screen change keeps ADR-010's Aion structure and orange accent, and no lifecycle state (ADR-011) changes meaning.",
+    "Heavy builds, test batteries and full gates run at the venue the gate runs at; only a small, warm, single-crate check runs on the authoring machine."
+  ],
+  "verification": [
+    "From the repository root: sh scripts/design/gate.sh exits 0.",
+    "At the venue: cargo fmt --all leaves no change, and cargo clippy --all-targets --all-features -- -D warnings, cargo clippy --all-targets -- -D warnings, cargo test --workspace --all-features, cargo doc --no-deps --all-features and cargo doc --no-deps all exit 0.",
+    "At the venue, in surface/identity: npm cit exits 0 with 65 vitests passed and 0 failed, and npx tsc --noEmit exits 0.",
+    "Each of the fourteen stated per-row commands in R8 exits 0 and reports 1 passed.",
+    "The dev report records, for each of R7's seven injections, the command run and the one failing test's name.",
+    "git diff --name-only <base>..HEAD lists only files named in R1 to R9, where <base> is the commit the build started from."
+  ]
+}

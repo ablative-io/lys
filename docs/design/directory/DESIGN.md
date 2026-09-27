@@ -165,6 +165,22 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `surface/identity/src/generated/index.ts` | Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch | DIRECTORY-006 |
 | `docs/design/directory/briefs/DIRECTORY-008.json` | the grant brief residue after PR 6: DIRECTORY-005's verification line, three inventory rows and the intention sentence, as requirements on the documents | DIRECTORY-008 |
 | `docs/design/directory/briefs/DIRECTORY-008.md` | rendered markdown | DIRECTORY-008 |
+| `docs/design/directory/briefs/DIRECTORY-035.json` | the grant conformance rows of the directory, each named to the test that passes it | DIRECTORY-035 |
+| `docs/design/directory/briefs/DIRECTORY-035.md` | rendered markdown | DIRECTORY-035 |
+| `crates/lys-identity-server/src/grant_contract/views.rs` | the grant view the screens read; DIRECTORY-035 adds each grant's effective standing and effective end | DIRECTORY-035 |
+| `crates/lys-identity/tests/grant_last_used.rs` | the last-used tests of conformance 8.4, named by their row under DIRECTORY-035 | DIRECTORY-035 |
+| `surface/identity/src/generated/grants.ts` | the grant wire types the screens compile against, mirroring views.rs; gains the two effective fields | DIRECTORY-035 |
+| `surface/identity/src/features/grants/model.ts` | the grant screens' reading of the service's answers; loses the client standing walk | DIRECTORY-035 |
+| `surface/identity/src/features/grants/GrantCard.tsx` | one grant with its chain, window, last use and standing (conformance 8.4) | DIRECTORY-035 |
+| `surface/identity/src/features/grants/Delegate.tsx` | the delegation form (conformance 2.3): source grant, actions, may-pass-on and the end bound | DIRECTORY-035 |
+| `surface/identity/src/features/me/You.tsx` | the You page: What you hold (conformance 1.4) and the personal scope of conformance 1.5 | DIRECTORY-035 |
+| `surface/identity/src/features/access/Access.tsx` | the access screens that list grants with their standing and last use | DIRECTORY-035 |
+| `surface/identity/src/features/file/sections.tsx` | an identity file's sections that read which grants stand | DIRECTORY-035 |
+| `surface/identity/tests/fixtures.ts` | the vitests' fixture service answers | DIRECTORY-035 |
+| `surface/identity/tests/me.test.tsx` | the You vitests, carrying row 1.5's test | DIRECTORY-035 |
+| `surface/identity/tests/revoke.test.tsx` | the Revoke vitests, carrying row 2.5's screen test | DIRECTORY-035 |
+| `docs/design/project.json` | the project's trees and legs; DIRECTORY-035 registers the surface leg | DIRECTORY-035 |
+| `docs/design/identity/CONFORMANCE.md` | the identity conformance table; DIRECTORY-035 amends the Brief cell of rows 1.4, 1.5, 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4 | DIRECTORY-035 |
 
 ## Inventory
 
