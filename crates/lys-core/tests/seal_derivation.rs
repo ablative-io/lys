@@ -4,8 +4,8 @@
 //!
 //! # Why this file hardcodes the tag instead of importing it
 //!
-//! The construction is documented in `docs/design/lys-core/DESIGN.md` (D6)
-//! and `docs/design/lys-core/CHECKLIST.md` (C45) as
+//! The construction is documented in `docs/design/lys-core/DESIGN-PRE-METHOD.md` (D6)
+//! and `docs/design/lys-core/CHECKLIST-PRE-METHOD.md` (C45) as
 //!
 //! ```text
 //! HKDF-SHA256 info = b"lys-sealed-envelope/v1"
