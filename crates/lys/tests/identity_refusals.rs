@@ -7,10 +7,15 @@
 
 pub mod identity_support;
 
+use std::time::{Duration, Instant};
+
 use identity_support::compose::{self, require_runtime};
 use identity_support::fixtures::{Deployment, TestResult, output_text, succeeded};
 
 const REMOTE_HOST: &str = "192.0.2.10";
+
+/// How long Rauthy, started with no reachable database, is given to answer.
+const RAUTHY_ANSWERS_WITHIN: Duration = Duration::from_secs(20);
 
 fn remote_database(text: &str) -> String {
     text.lines()
@@ -136,8 +141,19 @@ fn id001_deploy_refusal_unavailable_database_is_named() -> TestResult {
     let deployment = Deployment::new("unavailable", |text| remote_database(&text))?;
     compose::render(&deployment)?;
     compose::up(&deployment, &["rauthy"])?;
-    std::thread::sleep(std::time::Duration::from_secs(20));
-    let health = deployment.lys("health")?;
+    // Rauthy is given until the deadline to come up and answer; health is
+    // read as soon as it answers anything but unreachable.
+    let deadline = Instant::now() + RAUTHY_ANSWERS_WITHIN;
+    let health = loop {
+        let health = deployment.lys("health")?;
+        let reached = !output_text(&health)
+            .lines()
+            .any(|line| line.starts_with("rauthy unready: rauthy_unreachable"));
+        if reached || Instant::now() >= deadline {
+            break health;
+        }
+        std::thread::sleep(Duration::from_secs(2));
+    };
     let text = output_text(&health);
     assert!(!health.status.success(), "{text}");
     assert!(

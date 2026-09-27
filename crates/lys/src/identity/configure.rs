@@ -225,12 +225,9 @@ fn reconcile_theme(
     let mut current = api.get_theme(&client.id)?;
     current.client_id.clone_from(&client.id);
     let desired = mapping.apply(role, &current);
-    let (stored, outcome) = if desired == current {
-        (current, "unchanged")
-    } else {
-        (api.put_theme(&desired)?, "applied")
-    };
-    let pairs = contrast_pairs(&stored.dark)?;
+    // Contrast is measured on the theme about to be written, so a theme that
+    // fails it never reaches Rauthy.
+    let pairs = contrast_pairs(&desired.dark)?;
     if let Some(failing) = pairs.iter().find(|pair| !pair.passes()) {
         return Err(IdentityError::new(
             ErrorKind::ThemeInvalid,
@@ -242,6 +239,12 @@ fn reconcile_theme(
             ),
         ));
     }
+    let outcome = if desired == current {
+        "unchanged"
+    } else {
+        api.put_theme(&desired)?;
+        "applied"
+    };
     Ok(Operation {
         kind: "theme",
         resource: client.id.clone(),
@@ -310,3 +313,7 @@ pub fn run(config_path: &Path, json: bool) -> IdentityResult<()> {
     emitter.finish();
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "configure_tests.rs"]
+mod tests;
