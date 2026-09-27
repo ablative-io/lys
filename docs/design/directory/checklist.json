@@ -191,7 +191,7 @@
         },
         {
           "id": "C194",
-          "text": "docs/design/identity/IDENTITY-EVENTS.md extends lys/identity-event/v1 under a fresh joint review without changing its byte layout: session_started and session_ended are event kinds naming the agent and its responsible person, session_started carrying the launch record id, and neither carries a credential's value; the actor gains method codes 2 and 3, the change kinds gain 7 to 9, and every code is only ever appended.",
+          "text": "docs/design/identity/IDENTITY-EVENTS.md extends lys/identity-event/v1 under a fresh joint review without changing its byte layout: session_started and session_ended are event kinds naming the agent and its responsible person, session_started carrying the launch record id, agent_reported is the agent's accepted report itself, and a session ended by the agent is an agent_reported followed by a session_ended naming it; no event carries a credential's value; the actor gains method codes 2 and 3 with their issuer and subject stated, the change kinds gain 7 to 9, and every code is only ever appended.",
           "done": false
         },
         {

@@ -193,6 +193,13 @@ Brought forward as step-2 work under the lead's ruling of 27 September 2026: DIR
 | `tests/identity_contract/tests/agent_session_routes.rs` | the session routes, the one proof_invalid body, and the stop and list routes' admission (R8, R9, R10) | DIRECTORY-026 |
 | `docs/design/directory/briefs/DIRECTORY-026.json` | each session its own directory record with its own credential, started when the agent reports back with a signed challenge (R1 to R10) | DIRECTORY-026 |
 | `docs/design/directory/briefs/DIRECTORY-026.md` | rendered markdown | DIRECTORY-026 |
+| `crates/lys-identity/src/event.rs` | gains change kinds 7 session_started, 8 session_ended and 9 agent_reported, appended (DIRECTORY-026 R5) | DIRECTORY-026 |
+| `crates/lys-identity/src/encoding.rs` | encodes and decodes the three session change kinds without changing an existing kind's bytes (DIRECTORY-026 R5) | DIRECTORY-026 |
+| `crates/lys-identity/src/provenance.rs` | gains actor method codes 2 (agent, enrolled key) and 3 (agent, session credential), appended (DIRECTORY-026 R5) | DIRECTORY-026 |
+| `crates/lys-identity/Cargo.toml` | the session module's dependencies (DIRECTORY-026 R5) | DIRECTORY-026 |
+| `crates/lys-identity-server/src/lib.rs` | declares the session routes module (DIRECTORY-026 R8) | DIRECTORY-026 |
+| `crates/lys-identity-server/src/config.rs` | reads, validates and documents directory_id beside the service's other configured values (DIRECTORY-026 R8) | DIRECTORY-026 |
+| `tests/identity_contract/src/harness.rs` | starts the in-process service with a configured directory_id for the session route tests (DIRECTORY-026 R8) | DIRECTORY-026 |
 
 ## Inventory
 

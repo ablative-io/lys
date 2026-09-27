@@ -702,6 +702,41 @@
       "path": "docs/design/directory/briefs/DIRECTORY-026.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/event.rs",
+      "note": "gains change kinds 7 session_started, 8 session_ended and 9 agent_reported, appended (DIRECTORY-026 R5)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/encoding.rs",
+      "note": "encodes and decodes the three session change kinds without changing an existing kind's bytes (DIRECTORY-026 R5)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/provenance.rs",
+      "note": "gains actor method codes 2 (agent, enrolled key) and 3 (agent, session credential), appended (DIRECTORY-026 R5)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/Cargo.toml",
+      "note": "the session module's dependencies (DIRECTORY-026 R5)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity-server/src/lib.rs",
+      "note": "declares the session routes module (DIRECTORY-026 R8)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity-server/src/config.rs",
+      "note": "reads, validates and documents directory_id beside the service's other configured values (DIRECTORY-026 R8)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "tests/identity_contract/src/harness.rs",
+      "note": "starts the in-process service with a configured directory_id for the session route tests (DIRECTORY-026 R8)",
+      "brief": "DIRECTORY-026"
     }
   ],
   "inventory": [
