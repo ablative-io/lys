@@ -188,7 +188,7 @@
     },
     {
       "path": "crates/lys-home/src/record/mod.rs",
-      "note": "the home record: Pi's session tree read and written, leaf pointer, root-to-leaf path; append_entry calls the entry log after the head, and Session::open writes a pending leaf first (HOME-008)",
+      "note": "the home record: Pi's session tree read and written, leaf pointer, root-to-leaf path; append_entry calls the entry log after the head, and Session::open writes a pending leaf first and it declares leaf, entry_log, log_checkpoint, pending, open and verify with their tests (HOME-008)",
       "brief": "HOME-001"
     },
     {
@@ -213,7 +213,7 @@
     },
     {
       "path": "crates/lys-home/src/lib.rs",
-      "note": "module wiring: record and harness",
+      "note": "module wiring: record and harness; declares cli_entry_log and cli_open (HOME-008)",
       "brief": "HOME-001"
     },
     {
