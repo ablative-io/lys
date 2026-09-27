@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! The Codex translation through the public crate (HOME-009 R8): synthetic
 //! Claude Code files, carrying no real transcript, imported into a fresh home
 //! and translated through `lys-home translate-codex`. Every text part, tool

@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the call record: parts once by hash, raw bodies counted apart,
 //! idempotent on the call id, no response parts unless complete, absence
 //! recorded as absence, no header ever in the record.

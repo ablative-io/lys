@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! The `lys/delegation/v1` fixed vectors, pinned as literal hex.
 //!
 //! Five vectors are frozen here — **A** (domain), **B** (seat), **C** (wide
@@ -220,7 +221,6 @@
 //! `delegation` module and this file compiles to nothing.
 
 #![cfg(feature = "unstable-anchor")]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use lys_core::Ed25519Identity;
 use lys_core::delegation::{

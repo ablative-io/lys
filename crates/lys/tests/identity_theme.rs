@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! `ID001_THEME` and its counted contrast leg: both client themes, as the
 //! running Rauthy exports them, carry the declared estate mapping in dark
 //! mode and Rauthy's defaults everywhere else, persist after a restart, and

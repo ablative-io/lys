@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! D4/D6 conformance gate: round-trip the `lys/attestation/v2` `COSE_Sign1`
 //! implementation against the vendored Go `veraison/go-cose` reference
 //! implementation.
@@ -22,7 +23,6 @@
 //! Go-less environment never reduces byte-exact coverage (the primary
 //! copies of these vectors live in the always-run unit tests as well).
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod harness;
 

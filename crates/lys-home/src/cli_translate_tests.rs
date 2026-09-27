@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on `lys-home translate-codex` (HOME-009 R7): the report's exact
 //! keys and counts with no content in it or in the account, and each refusal
 //! leaving `--out` and the session as they were.

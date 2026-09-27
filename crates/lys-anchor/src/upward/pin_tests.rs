@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on [`pin()`] — one rule per case, and the DP14 claim asserted
 //! structurally rather than by comparing outputs.
 //!

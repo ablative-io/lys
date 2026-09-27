@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on the loss account (HOME-009 R2): exactly the top-level keys and
 //! row keys the brief names, a null hash on a row about an entry, and a part's
 //! hash taken over its bytes as the home entry holds it.

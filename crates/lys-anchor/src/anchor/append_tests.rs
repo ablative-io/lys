@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on [`Anchor::append`] — the ungated write path.
 //!
 //! # What this file is for, and what it deliberately leaves to `submit_tests`

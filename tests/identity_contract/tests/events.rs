@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! R2: the identity-event envelope gives each event one signed byte string and refuses every other.
 
 use std::error::Error;

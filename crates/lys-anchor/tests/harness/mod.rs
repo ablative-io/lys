@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Go-toolchain harness for `lys-anchor`'s conformance gates.
 //!
 //! # The Go scaffolds are `lys-core`'s, both of them
@@ -42,7 +43,6 @@
 //! quietly report a pass for a cross-check that never ran. A toolchain that is
 //! present but *broken* is always a hard failure.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::ffi::OsStr;
 use std::io::Write;

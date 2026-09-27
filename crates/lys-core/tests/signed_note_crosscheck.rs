@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Second-implementation conformance for D1/D6: cross-check the `lys`
 //! signed-note implementation against Cloudflare's independently written
 //! [`signed_note`] crate (`c2sp.org/signed-note` in Rust).
@@ -13,7 +14,6 @@
 //!
 //! Pure Rust, no toolchain requirement, runs unconditionally — no skip path.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;

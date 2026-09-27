@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Adversarial and end-to-end tests for receipt issuance and verification.
 //!
 //! Every proof here comes from a **real** `AppendOnlyTree`, never a synthetic
@@ -7,7 +8,6 @@
 //! confusion and malleability each get a case that would pass if the
 //! corresponding check were removed.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::*;
 use crate::attestation;

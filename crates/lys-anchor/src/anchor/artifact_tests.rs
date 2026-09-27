@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on [`Anchor::inclusion_artifact`].
 //!
 //! # The trap this file is shaped around

@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on [`SubmitterContext`] and [`AuthenticatedPeer`].
 //!
 //! # What can and cannot be checked here, stated before the checks

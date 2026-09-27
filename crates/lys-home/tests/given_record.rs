@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! The context record end to end through the built binary (HOME-003 R6):
 //! the fixture template rendered for a fixture working directory holding a
 //! CLAUDE.md and a memory index under the fixture config directory, with

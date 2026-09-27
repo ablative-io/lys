@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Round-trip and canonical-encoding-strictness tests for [`AnchorReceipt`].
 //!
 //! The mutants here all have or could have **cryptographically valid
@@ -7,7 +8,6 @@
 //! identity, and every downstream comparison (bundle dedup, a log of issued
 //! receipts, a cache key) then depends on which encoding you happened to see.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::*;
 

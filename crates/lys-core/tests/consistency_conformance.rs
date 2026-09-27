@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Conformance gate for consistency-path root derivation: lys's iterative walk
 //! against RFC 6962's own **recursive** definitions, transcribed in Go.
 //!
@@ -33,7 +34,6 @@
 //! See [`harness`] — vendored, network-free, and a hard failure rather than a
 //! skip when `LYS_REQUIRE_GO` is set.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod harness;
 
