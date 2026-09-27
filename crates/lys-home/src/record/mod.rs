@@ -51,6 +51,7 @@ mod given_statement_tests;
 pub(crate) mod given_tests;
 pub mod handover;
 mod handover_tests;
+pub mod hold;
 mod helpers;
 mod home;
 pub mod index;
@@ -72,6 +73,12 @@ mod session;
 pub mod templates;
 #[cfg(test)]
 mod templates_tests;
+pub mod tracked;
+#[cfg(test)]
+mod tracked_tests;
+pub mod verify;
+#[cfg(test)]
+mod verify_tests;
 
 pub use helpers::{MAX_NAME_BYTES, PI_FORMAT_VERSION, fresh_id, json_len, now, safe_component};
 pub use home::Home;

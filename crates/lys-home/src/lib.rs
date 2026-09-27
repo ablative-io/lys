@@ -27,8 +27,10 @@ pub mod cli_lantern;
 pub mod cli_translate;
 #[cfg(test)]
 mod cli_translate_tests;
+pub mod cli_move;
 pub mod error;
 pub mod harness;
+pub mod home_move;
 pub mod record;
 
 pub use error::HomeError;

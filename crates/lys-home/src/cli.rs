@@ -1,10 +1,13 @@
 //! The `lys-home` command line: import, render, fewshot, ingest-call,
-//! resume-check, render-launch, given, given-check, lantern, fork, handover. Every command prints one
+//! resume-check, render-launch, given, given-check, lantern, fork, handover,
+//! ship, fetch. Every command prints one
 //! JSON report of paths, hashes and counts, never transcript, block or body
 //! content. A missing required argument is refused by clap with exit code 2,
 //! naming the argument. A command that refuses exits 1, except `given-check`,
 //! which answers as `diff` does: 0 on matches, 1 on differs, 2 on a refusal
 //! ([`given`]).
+//! `ship` and `fetch` ([`crate::cli_move`]) print two refusals as reports on
+//! stdout with exit 1: `stale_index` and `verification_failed`.
 
 pub mod given;
 
@@ -18,6 +21,7 @@ use crate::cli::given::{GivenArgs, GivenCheckArgs, Outcome, STATUS_REFUSED};
 use crate::cli_fork::ForkArgs;
 use crate::cli_lantern::LanternAction;
 use crate::cli_translate::TranslateArgs;
+use crate::cli_move::{FetchArgs, ShipArgs};
 use crate::error::HomeError;
 use crate::harness::claude_code::AUTHORED;
 use crate::harness::claude_code::import::import_claude_code;
@@ -212,6 +216,10 @@ pub enum Command {
     TranslateCodex(TranslateArgs),
     /// Hand an outgoing session's letter to a new successor home as inherited memory.
     Handover(HandoverArgs),
+    /// Ship the home as the one ref refs/lys/home to a bare repository at a path on this machine.
+    Ship(ShipArgs),
+    /// Fetch a shipped home into a new, empty home and hang an arrival beside each session's head.
+    Fetch(FetchArgs),
 }
 
 impl Command {
@@ -237,6 +245,8 @@ pub fn run(cli: Cli) -> Result<Value, HomeError> {
 pub fn run_with_status(cli: Cli) -> Result<Outcome, HomeError> {
     match cli.command {
         Command::GivenCheck(args) => given::check(&args),
+        Command::Ship(args) => crate::cli_move::run_ship(&args),
+        Command::Fetch(args) => crate::cli_move::run_fetch(&args),
         other => report(other).map(Outcome::done),
     }
 }
@@ -394,6 +404,8 @@ fn report(command: Command) -> Result<Value, HomeError> {
             })?;
             Ok(json!({"command": "handover", "report": report}))
         }
+        Command::Ship(args) => crate::cli_move::run_ship(&args).map(|outcome| outcome.report),
+        Command::Fetch(args) => crate::cli_move::run_fetch(&args).map(|outcome| outcome.report),
     }
 }
 

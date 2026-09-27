@@ -117,6 +117,31 @@ impl Index {
         Ok((header, index, true))
     }
 
+    /// The cached index beside a session file when it is this file's, and
+    /// `None` when it is not: a row that does not parse, or rows the cached
+    /// read refuses (`from_cached`). Never scans the session file and
+    /// writes nothing, so a stale index is reported as stale rather than
+    /// rebuilt in memory (HOME-019 R2). An index file that cannot be opened
+    /// is refused by path.
+    pub(crate) fn cached_only(session_file: &Path) -> Result<Option<Self>, HomeError> {
+        let (_, header_len) = read_header(session_file)?;
+        let file_len = fs::metadata(session_file)
+            .map_err(|e| HomeError::io("measuring the session file", session_file, e))?
+            .len();
+        let index_file = Self::index_path(session_file);
+        match Self::read_rows(&index_file) {
+            Ok(rows) => Ok(Self::from_cached(
+                session_file,
+                index_file,
+                rows,
+                header_len,
+                file_len,
+            )),
+            Err(HomeError::Malformed { .. }) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
     /// The cached rows as an index, when they are one: each row starts where
     /// the one before ended, has a length, an id not yet seen and a parent
     /// already indexed (never itself), ends on a newline in the session file
