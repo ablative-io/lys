@@ -5,7 +5,7 @@
   "depends_on": [],
   "blocked_by": [
     "HOME-001 R10 (the little proxy) must land on main first: it creates crates/lys-home/src/proxy/forward.rs, error.rs and forward_tests.rs, brings the HTTP, async and TLS dependencies into crates/lys-home/Cargo.toml, and creates docs/design/home/PROOF-PROXY.md holding its session-key section. None of these exists on main at 7b53625. This brief is built on the main R10 lands on.",
-    "The live run in R6 needs a seat whose Claude Code login is a subscription, not an API key, on the installed Claude Code 2.1.283, in a session that is not the one running the proof, and a person watching it. It is a named step after the build, outside the gate."
+    "The live run in R7 needs a seat whose Claude Code login is a subscription, not an API key, on the installed Claude Code 2.1.283, in a session that is not the one running the proof, and a person watching it. It is a named step after the build, outside the gate."
   ],
   "checklist": [
     "C7",
@@ -14,7 +14,8 @@
     "C47",
     "C48",
     "C49",
-    "C50"
+    "C50",
+    "C51"
   ],
   "stories": [
     "S5"
@@ -26,7 +27,7 @@
     "ADR-019"
   ],
   "purpose": "HOME-001's third proof is that a subscription login survives a pass-through proxy, so the tee that records the stream has a place to live. HOME-001 R7 is that proof and is unbuilt. This brief builds it on R10's shared transport: the pass-through example, which forwards to the provider base URL on its command line and writes one four-field line per call, gated by loopback tests that need no provider; then one live run with a subscription login through it, recorded truthfully in PROOF-PROXY.md whether it completed or failed.",
-  "task": "Build HOME-001 R7 as its own card, on the main HOME-001 R10 lands on. R7's example shares R10's crates/lys-home/src/proxy/forward.rs and builds no second transport. In order: (1) forward.rs, which R10 creates, returns a named error to its caller when the upstream fails before any response (refused, reset, or broken before the status line) and synthesises nothing, so lys-proxy keeps R10's own behaviour (ADR-019); (2) crates/lys-home/examples/passthrough.rs takes exactly two positional arguments, the loopback address to listen on in the form 127.0.0.1:PORT and then the provider base URL, serves HTTP on that address and forwards every request through forward.rs, rewriting Host and dropping the fixed hop-by-hop list and passing everything else byte for byte; (3) once listening, it writes one four-field line per call (method, path, status, duration_ms) to stderr and nothing else, anywhere, its only other line being a refusal by name of a bad argument before it listens; (4) it answers 502 with an empty body when forward.rs fails before any upstream response, and closes the client connection when the upstream breaks after its status and headers were sent; (5) the loopback tests for (2) to (4) run in `cargo test --workspace --all-features` with no provider; (6) after the build, the named live run is made and its section is appended to PROOF-PROXY.md. The card is done when PROOF-PROXY.md records the live run truthfully, completed or failed, and what failed if it did. Split note: C7 and S5 are also claimed by HOME-001, whose R7 is the source this brief builds; C45 to C50 are this brief's alone. The person who runs the example chooses the port and sets ANTHROPIC_BASE_URL to the same address, so the example announces nothing; every gate test drives the example's server through its function that takes a TcpListener the test itself binds. Out of scope: any change to HOME-001.json or to the design's 2.1.281 lines (reported as a finding, not edited), any change to lys-proxy's behaviour, any stripping experiment, and installing any other Claude Code version.",
+  "task": "Build HOME-001 R7 as its own card, on the main HOME-001 R10 lands on. R7's example shares R10's crates/lys-home/src/proxy/forward.rs and builds no second transport. In order: (1) forward.rs, which R10 creates, returns a named error to its caller when the upstream fails before any response (refused, reset, or broken before the status line) and synthesises nothing, so lys-proxy keeps R10's own behaviour (ADR-019); (2) crates/lys-home/examples/passthrough.rs takes exactly two positional arguments, the loopback address to listen on in the form 127.0.0.1:PORT and then the provider base URL, serves HTTP on that address and forwards every request through forward.rs, rewriting Host and dropping the fixed hop-by-hop list and passing everything else byte for byte; (3) once listening, it writes one four-field line per call (method, path, status, duration_ms) to stderr and nothing else, anywhere, its only other line being a refusal by name of a bad argument before it listens; (4) it answers 502 with an empty body when forward.rs fails before any upstream response, and closes the client connection when the upstream breaks after its status and headers were sent; (5) the loopback tests for (2) to (4) run in `cargo test --workspace --all-features` with no provider; (6) the cluster's markdown, DESIGN.md, CHECKLIST.md and briefs/HOME-008.md, is rendered from its JSON with render-cluster.py, never by hand; (7) after the build, the named live run is made and its section is appended to PROOF-PROXY.md. The card is done when PROOF-PROXY.md records the live run truthfully, completed or failed, and what failed if it did. Split note: C7 and S5 are also claimed by HOME-001, whose R7 is the source this brief builds; C45 to C51 are this brief's alone. The person who runs the example chooses the port and sets ANTHROPIC_BASE_URL to the same address, so the example announces nothing; every gate test drives the example's server through its function that takes a TcpListener the test itself binds. Out of scope: any change to HOME-001.json or to the design's 2.1.281 lines (reported as a finding, not edited), any change to lys-proxy's behaviour, any stripping experiment, and installing any other Claude Code version.",
   "requirements": [
     {
       "id": "R1",
@@ -152,6 +153,31 @@
     },
     {
       "id": "R6",
+      "title": "Render the cluster's markdown from its JSON",
+      "spec": "Structure: docs/design/home/briefs/HOME-008.md is created, and docs/design/home/DESIGN.md and docs/design/home/CHECKLIST.md are re-rendered, by the method's scripts/design/render-cluster.py from the cluster's JSON as it stands, so DESIGN.md carries ADR-019 and CN5's definition of unchanged, and CHECKLIST.md carries C45 to C51. THE SYSTEM SHALL NOT edit a rendered markdown file by hand, SHALL NOT change the cluster's JSON documents in this requirement, and SHALL NOT change a rendered file other than these three.",
+      "acceptance": [
+        "`python3 scripts/design/render-cluster.py docs/design/home` run from the repository root at the branch head leaves `git status --porcelain docs/design/home` printing nothing.",
+        "`grep -c 'ADR-019' docs/design/home/DESIGN.md` prints a number greater than 0, and `grep -c 'Unchanged is defined as exactly this' docs/design/home/DESIGN.md` prints 1.",
+        "For each of the ids C45, C46, C47, C48, C49, C50 and C51, `grep -c '<id>' docs/design/home/CHECKLIST.md` prints at least 1.",
+        "`sh scripts/design/gate.sh` exits 0 from the repository root."
+      ],
+      "files": {
+        "create": [
+          "docs/design/home/briefs/HOME-008.md"
+        ],
+        "modify": [
+          "docs/design/home/DESIGN.md",
+          "docs/design/home/CHECKLIST.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C51"
+      ],
+      "stories": []
+    },
+    {
+      "id": "R7",
       "title": "The live subscription run, appended to PROOF-PROXY.md",
       "spec": "After the build lands, as a named step outside the gate: the seat of the lead who owns the home line (or another seat that lead names) runs Claude Code 2.1.283, the version installed now, logged in with a subscription and not an API key, with ANTHROPIC_BASE_URL pointing at the example, which forwards to https://api.anthropic.com; that lead watches. The card appends one live-run section to docs/design/home/PROOF-PROXY.md, below R10's session-key section, which it leaves byte for byte. The section SHALL record: the Claude Code version 2.1.283; the login kind as subscription; the seat that ran it; the listen address the example was given; the exact commands (the example's command line, with that listen address and https://api.anthropic.com as its two arguments, and the Claude Code launch line with ANTHROPIC_BASE_URL set to http:// and that same address); the outcome as `completed` or `failed`; every call line the run produced as method, path and status in the order written; the headers record, which is that every end-to-end request header the client sent passed unchanged and none was removed, that Host was rewritten to the upstream's authority, and the fixed list of hop-by-hop names dropped, copied from the source's list; and, on a failed run, the failing call's status code and the provider's error kind as Claude Code reported it. The section SHALL carry a finding that HOME-001's verification names Claude Code 2.1.281 while the run was measured on 2.1.283, for the design to update. WHEN the outcome is completed, the card SHALL set C7 to done in docs/design/home/checklist.json, re-render docs/design/home/CHECKLIST.md with the method's render-cluster.py, and name C7 beside the run, all in the card's own commit. IF the outcome is failed, THEN the card SHALL leave C7 open, SHALL NOT claim C7, and SHALL report the failure to that lead as a finding. The card SHALL NOT write a header value, a token, a body byte or error text into PROOF-PROXY.md or the dev record, SHALL NOT claim in its own added lines that the request was forwarded untouched, SHALL NOT run a variant that strips headers, SHALL NOT install another Claude Code version, SHALL NOT rewrite R10's section, and SHALL NOT edit HOME-001.json.",
       "acceptance": [
@@ -201,6 +227,6 @@
     "`cargo test -p lys-home --all-features --example passthrough` prints the five loopback tests of R5 and the refusal tests of R2 as passed and 0 ignored.",
     "crates/lys-home/examples/passthrough.rs and passthrough_tests.rs each hold at most 500 lines of code, counted without comments and blank lines.",
     "Read crates/lys-home/examples/passthrough.rs against R3: the only writes are the call-line function's `writeln!` and the refusal function's `writeln!`, and no code path passes a header value, a body byte, an argument's value or an error's text to either.",
-    "Read PROOF-PROXY.md's live-run section against R6: every figure is a version, a command, a status code, a method, a path, a header name or a count."
+    "Read PROOF-PROXY.md's live-run section against R7: every figure is a version, a command, a status code, a method, a path, a header name or a count."
   ]
 }

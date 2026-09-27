@@ -83,6 +83,11 @@
           "id": "C50",
           "text": "The pass-through example writes one four-field line per call (method, path, status, duration_ms) and no header value, body byte or error text anywhere.",
           "done": false
+        },
+        {
+          "id": "C51",
+          "text": "The home cluster's DESIGN.md, CHECKLIST.md and briefs/HOME-008.md are what scripts/design/render-cluster.py renders from its JSON, and none is edited by hand.",
+          "done": false
         }
       ]
     },
