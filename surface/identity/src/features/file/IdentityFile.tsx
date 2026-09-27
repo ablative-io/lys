@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams } from 'react-router';
 import { Refused, api, useLoad } from '../../api';
 import { kindOf } from '../../generated';
@@ -45,7 +46,7 @@ async function readPerson(id: string): Promise<FileData> {
 
 const readFile = (id: string): Promise<FileData> => (kindOf(id) === 'agent' ? readAgent(id) : readPerson(id));
 
-function File({ data, tab }: { data: FileData; tab: string }) {
+function File({ data, tab, reload }: { data: FileData; tab: string; reload: () => void }) {
   const shell = useShell();
   const { x, agent } = data;
   const kind = x.kind;
@@ -102,7 +103,7 @@ function File({ data, tab }: { data: FileData; tab: string }) {
             </a>
           ))}
         </nav>
-        <TabBody tab={tab} data={data} />
+        <TabBody tab={tab} data={data} reload={reload} />
       </div>
     </div>
   );
@@ -110,7 +111,8 @@ function File({ data, tab }: { data: FileData; tab: string }) {
 
 export function IdentityFile() {
   const { id = '', tab = 'profile' } = useParams();
-  const load = useLoad(() => readFile(id), id);
+  const [version, setVersion] = useState(0);
+  const load = useLoad(() => readFile(id), id + '#' + version);
   if (load.status === 'refused' && load.refused.status === 404 && load.refused.refusal.refusal !== 'Unanswered') {
     return (
       <div className="page">
@@ -122,5 +124,5 @@ export function IdentityFile() {
       </div>
     );
   }
-  return <Gate load={load} title="People and agents" ok={(data) => <File data={data} tab={tab} />} />;
+  return <Gate load={load} title="People and agents" ok={(data) => <File data={data} tab={tab} reload={() => setVersion((v) => v + 1)} />} />;
 }

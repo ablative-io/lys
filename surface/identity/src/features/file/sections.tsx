@@ -78,10 +78,10 @@ function Profile({ data }: { data: FileData }) {
   );
 }
 
-function Access({ data }: { data: FileData }) {
+function Access({ data, reload }: { data: FileData; reload: () => void }) {
   const shell = useShell();
   const { x, grants: w } = data;
-  const name = firstName(x.display_name, x.kind);
+  const name = firstName(x.display_name);
   if (!w) return <NotBuilt>The grants could not be read for this file.</NotBuilt>;
   const held = w.list.grants.filter((g) => g.holder === x.id);
   const reach = new Map<string, string[]>();
@@ -99,7 +99,7 @@ function Access({ data }: { data: FileData }) {
           <span>Grants</span>
           <span className="open-q" title="The grant representation is not yet decided">draft form</span>
         </div>
-        {held.length ? held.map((g) => <GrantCard key={g.id} w={w} g={g} chain={chainOf(w, g)} />) : <div className="dim">No grants.</div>}
+        {held.length ? held.map((g) => <GrantCard key={g.id} w={w} g={g} chain={chainOf(w, g)} done={reload} />) : <div className="dim">No grants.</div>}
         {x.kind === 'agent' && x.state !== 'retired' ? (
           <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
             <button
@@ -107,7 +107,7 @@ function Access({ data }: { data: FileData }) {
               data-act="grant"
               onClick={() =>
                 mineToGive && passable.length
-                  ? shell.openDrawer(<Delegate w={w} source={passable[0]} to={x.id} done={() => location.reload()} />)
+                  ? shell.openDrawer(<Delegate w={w} source={passable[0]} to={x.id} done={reload} />)
                   : shell.toast(mineToGive ? 'You hold nothing you may pass on to an agent' : `Only the person ${name} answers to gives it access`)
               }
             >
@@ -194,11 +194,11 @@ function Record({ data }: { data: FileData }) {
   );
 }
 
-export function TabBody({ tab, data }: { tab: string; data: FileData }) {
+export function TabBody({ tab, data, reload }: { tab: string; data: FileData; reload: () => void }) {
   const person = data.x.kind === 'person';
   switch (tab) {
     case 'access':
-      return <Access data={data} />;
+      return <Access data={data} reload={reload} />;
     case 'provisioning':
       return person ? <div className="dim">A person has no provisioning profile. Their own tools are their own.</div> : <NotBuilt>Provisioning profiles (model access, tools, skills, MCP servers, instructions) have no server yet.</NotBuilt>;
     case 'memory':

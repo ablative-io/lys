@@ -60,6 +60,13 @@ export interface DelegateBody {
   window: GrantWindow;
 }
 
+/** POST /grants/{id}/revoke: `RevokeBody`. The reason is 1 to 1024 bytes. */
+export interface RevokeBody {
+  operation: string;
+  route: RouteWire;
+  reason: string;
+}
+
 /** POST /grants/why: `ActionBody`. */
 export interface ActionBody {
   route: RouteWire;
