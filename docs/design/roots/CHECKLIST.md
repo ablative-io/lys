@@ -1,0 +1,15 @@
+# Roots — Checklist
+
+## The contract, recorded (R1)
+
+- [ ] **C1** — The cluster records, as the baseline, the five roots of docs/design/project.json before this card, each name and absolute directory exactly as the file spells them.
+- [ ] **C2** — The cluster records the root contract: each roots value is an object with exactly two fields, repository, a remote URL, and commit, a full 40-character hexadecimal commit hash; project.schema.json types each value that way with both fields required and no other field; one pin per root and no pin per design; the repositories map retired, its entries moved into root.repository and a project.json still carrying it refused by name; and the five pins the design was checked against.
+- [ ] **C3** — The cluster records the resolver: one launch setting, DS2_CHECKOUTS; the checkout named by the last path segment of the repository URL without .git; git cat-file -e on the commit in that checkout; a refusal by name naming the checkout path, the repository and the commit, with the act of fetching that commit into that checkout; never a fetch and never a clone; and what the resolver and the pin check may import: project.py only the standard library, legs.py and roots.py, legs.py only the standard library, the pin check only the standard library and ds2_ledger.project, none of them aion_worker, and the pin check finding workers/ by the line check-coverage.py uses.
+- [ ] **C4** — The cluster records the pin check: each root's pin beside origin's head read from the same checkout, the distance printed, exit 0 whatever the distance when every pin and origin head is present; a root whose checkout lacks its pin refused as pin_absent with the act of fetching that root's remote, a root with no refs/remotes/origin/HEAD refused as origin_head_unset with the act git remote set-head origin --auto, either making it exit 1 after every root is reported; and that a pin moves only by hand in a gated row, with no mover.
+- [ ] **C5** — The cluster records the two meanings of root, the $NAME/ launch tokens and the roots map, as an open point with both readings, and changes neither.
+- [ ] **C6** — The cluster's rendered markdown matches its JSON, scripts/design/gate.sh exits 0, and docs/design/project.json, scripts/design and docs/design/lys-core are unchanged by R1.
+
+## lys's roots in the new shape (R2)
+
+- [ ] **C7** — lys's copies of the method are refreshed from the method commit whose reader accepts the root object, before project.json changes; scripts/design/SOURCE.md names that commit; project.py, legs.py, render-cluster.py and render-brief.py are byte-identical to the method's, validate.py, check-coverage.py and check-root-pins.py differ only in the one line each that SOURCE.md names, and the schemas match.
+- [ ] **C8** — docs/design/project.json holds the five roots as objects carrying the recorded repository and commit; the method's reader at the named commit reads it and exits 0; and lys's own copies, under python3 -I, resolve a root, refuse a missing checkout by name, and print the pin lines with both refusals.
