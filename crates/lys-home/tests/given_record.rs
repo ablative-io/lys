@@ -45,7 +45,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()
         .fold(String::new(), |mut s, b| {
-            let _ = write!(s, "{b:02x}");
+            write!(s, "{b:02x}").expect("writing to a String cannot fail");
             s
         })
 }

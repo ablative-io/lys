@@ -49,7 +49,7 @@ fn leaf(index: u64) -> Vec<u8> {
 fn to_hex(bytes: &[u8]) -> String {
     use std::fmt::Write;
     bytes.iter().fold(String::new(), |mut acc, byte| {
-        let _ = write!(acc, "{byte:02x}");
+        write!(acc, "{byte:02x}").expect("writing to a String cannot fail");
         acc
     })
 }
