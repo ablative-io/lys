@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,29 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-030",
+      "title": "Carry the hand-written lys-core design into design.json, checklist.json and stories.json",
+      "status": "idea",
+      "kind": "design",
+      "summary": "The lys-core design on main is three hand-written documents with no JSON sources, and the first lys-core brief to add a design.json turns on the gate's render-and-compare for the cluster, which would replace them with that JSON's smaller scope. This item carries main's DESIGN.md, CHECKLIST.md (C1 to C65) and USER-STORIES.md (S1 to S23) at 7b536253 into design.json, checklist.json and stories.json with every C and S id and text unchanged, commits the rendered markdown, and records every place the render differs from main: layout only, apart from the checklist notes section and the rows for the cluster's own documents that the card's lead allows. Nothing new is designed and no code changes.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T12:52:00+10:00",
+        "quote": "The lys-core design on main is three hand-written documents, docs/design/lys-core/DESIGN.md, CHECKLIST.md and USER-STORIES.md, holding checklist items C1 to C65 and user stories S1 to S23. The design method renders those documents from design.json, checklist.json and stories.json, and the cluster has none of the three. The first lys-core brief to add a design.json makes the gate render the cluster, and the render would replace the hand-written documents with the JSON's much smaller scope, so the older design would be lost from the record. This card carries the whole of the hand-written design into the three JSON documents first, so that the render reproduces it.\n\nEvery checklist item keeps its C id and its text, every user story keeps its S id and its text, and every section of DESIGN.md is carried into design.json in the fields the design schema gives it. Nothing is reworded, merged, dropped or renumbered. Where a sentence of the hand-written documents has no field in the schema, the brief names it and places it in the nearest field that holds free text, and says so in its dev record. The rendered DESIGN.md, CHECKLIST.md and USER-STORIES.md are committed from the render.\n\nAcceptance is that scripts/design/validate.py accepts the three JSON documents; that scripts/design/gate.sh passes on the card's final tree; that checklist.json holds C1 to C65 and stories.json holds S1 to S23, each id once; that a script in the brief compares every C and S text in the rendered documents with the text on main at the commit this card starts from, and prints zero differences; and that every difference between the rendered DESIGN.md and main's DESIGN.md is listed in the dev record with its reason, and each is a difference of layout only.\n\nNot in scope are any new checklist item, user story or design decision, and any change to code. The self-signed card qVVhhP2b's brief, run 5f185fd4, waits for this card to land, and it adds its own rows after the carried ones.\n\nFiled by Archie, lead for the identity line, on 27 September 2026, in answer to round 2 of run 5f185fd4, against lys main 7b536253.",
+        "context": "The lys-core carry card on the Cambium board, filed by the identity line's lead in answer to round 2 of run 5f185fd4 (the self-signed card qVVhhP2b, whose brief waits for this card to land), against lys main 7b536253. Brief LYSCORE-001 was written by the brief author in run b1ff26fe from the card's words, the survey, and the lead's two answers: the checklist's intro note and two annotations go into design.json as one checklist-notes section, and the structure lists the cluster's own documents and the brief's own files; each is one of the two content differences the lead allows against the layout-only acceptance."
+      },
+      "links": {
+        "cluster": "lys-core",
+        "decisions": [],
+        "briefs": [
+          "LYSCORE-001"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Further units, not written: 'Reconcile the lys-core design with the tree as built' (the carried structure omits 22 tracked files under delegation/, receipt/, bundle/, ca/request.rs and keys/ssh.rs, and S12 and S14 describe superseded surfaces; correcting them rewords carried text, which this card forbids); 'Give the method a note field for checklists and personas' (a note slot in render-cluster.py and the checklist and stories schemas, a change to the shared design tooling in the method project, re-copied here). The qVVhhP2b card's brief takes the next lys-core brief number and C66 and S24 onward after this lands. RM-030 is the next id after main's highest (RM-016) and every open brief branch's (RM-029 highest, checked against origin's brief/* branches); LYSCORE-001 is the first brief in the cluster. No new ADR."
     }
   ]
 }

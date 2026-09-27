@@ -1,0 +1,574 @@
+{
+  "cluster": "lys-core",
+  "title": "Lys Core — Trust Primitives and CLI Surface",
+  "intention": "When this cluster is done, the hardened trust primitives live in this repository as `lys-core` — a standalone, domain-agnostic library with zero Meridian lineage — and the `lys` binary gives operators and auditors a command-line face over every primitive. An agent runtime signs session events with it. An auditor verifies a challenged log with it, offline, from nothing but a signed proof artifact, the leaf in question, and the log's verifier key. A future anchoring service consumes its roots and attestations. Nothing in the crate knows what an agent, session, or workspace is; domain meaning is applied by consumers.\n\nThe crate arrives only in its hardened form. Phase 0 (the adversarial review and fix pass on `meridian-trust`) is done; this cluster is the extraction (phase 1) plus the CLI surface (phase 2). Behaviour is ported unchanged except for three deliberate breaks made at the last free moment: the wire-format tags are renamed to lys-owned strings, the legacy pre-domain-separation attestation fallback is stripped, and the identity env var and OID constant take lys names.",
+  "problem": "The primitives exist today as `crates/meridian-trust` inside the Meridian workspace — hardened, adversarially reviewed, ~137 tests, with a live consumer. But they are unusable as the foundation of an open trust project in that shape:\n\n- The wire-format tags (`meridian-trust/attestation/v1`, `meridian-trust-sealed-envelope/v1`) are baked into every signature produced. Once anything durable is signed under a tag, that tag is frozen forever. The extraction is the last moment these strings can change.\n- The attestation verifier carries a dual-verify legacy fallback that exists only so Meridian's already-persisted attestations keep verifying. Lys must not inherit that caveat: v1 is domain-separated only.\n- The custom-extension OID constant, the identity env var, and the crate naming all carry Meridian identity into what must be a vendor-neutral library.\n- There is no operator or auditor surface. The library's defining promise — third parties verify without the operator's cooperation — has no tool a third party can actually run.\n\nConsumers are waiting on the extracted form: the Norn agent runtime (the primary consumer — signing persistence sink, cert-at-spawn, MCP-boundary verification), the future `lys-anchor` transparency service, and haematite commit attestation.",
+  "solution": "### D1: Domain-agnostic boundary\n\nThe founding rule carries over unchanged: `lys-core` knows no domain concepts. No agents, sessions, workspaces, peers, contracts, or members — and no Meridian references of any kind. It provides:\n\n- Ed25519 key management with X25519 derivation\n- A Certificate Authority that issues X.509 certificates for any subject\n- An RFC 6962 Merkle transparency log over any serializable leaf, or over raw leaf bytes\n- Signed tree heads as C2SP checkpoints in the signed-note envelope, and self-contained JSON proof artifacts a third party can verify unaided\n- Domain-separated signed attestations over any byte payload\n- Sealed envelopes for any byte payload, standalone or sender-authenticated\n\nConsumers compose meaning on top: Norn defines what an \"agent certificate\" or \"session event leaf\" is; the trust crate doesn't know or care. If a type references a domain concept, it does not belong in this crate.\n\n### D2: Key management (`lys_core::keys`)\n\n`Ed25519Identity` is the single long-term key type. Ported hardened behaviour:\n\n- `load_or_generate(path)` — loads a 32-byte seed file or generates one. Generation is race-free: the seed is written to a unique temp file (pid + per-process counter in the name) and published with a no-clobber `hard_link` — the first generator to publish wins permanently; a loser detects `AlreadyExists`, discards its candidate seed, and loads the persisted key. The key file on disk never changes once created.\n- Unix key files are created mode `0o600`; loading a file with loose permissions warns but does not fail.\n- `from_env()` — loads a base64-encoded 32-byte seed from **`LYS_IDENTITY_KEY`** (renamed from the Meridian variable). Missing or malformed values are `KeyManagement` errors, never panics.\n- All seed material — generated, file-read, or base64-decoded — lives in `Zeroizing` buffers.\n- `sign(message)` → `[u8; 64]`; `verify(public_key, message, signature)` uses `verify_strict` (malleability/torsion-safe) everywhere. No non-strict verification exists anywhere in the crate.\n- `Debug` output redacts the signing key; redaction is tested, not assumed.\n- `x25519_static_secret()` / `x25519_public_key()` derive the Montgomery-form X25519 keys from the Ed25519 identity via the standard clamped-scalar conversion, so one long-term key serves both signing and credential unsealing.\n\n### D3: Certificate Authority (`lys_core::ca`)\n\nEd25519-rooted X.509 issuance and verification:\n\n- `CertificateAuthority` wraps an `Ed25519Identity`; `issue_certificate(subject, ttl, extensions)` produces an `IssuedCertificate` (DER bytes, subject keypair, SHA-256 fingerprint, expiry, issuer public key; Debug-redacted).\n- **Proof of possession.** `issue_certificate` generates the subject keypair itself, so its certificate binds a key the *authority* minted — it is evidence about the authority, not about any holder, and anything layered on it (transparent issuance logging, a cert-gated write path) inherits that emptiness. `issue_certificate_for_request(request_der, subject, ttl, extensions)` is the path with a real binding: the holder presents a PKCS#10 request self-signed by a key they already control, and the certificate is signed over that key. It returns a `CertifiedKey`, which deliberately carries no private material — a separate type rather than an optional signing key, so the two outcomes cannot be confused. `create_certificate_request(identity, subject)` builds the holder's side.\n  - PKCS#10 rather than a lys-native tag: RFC 2986 already specifies this exchange and its self-signature *is* the canonical proof of possession, so `openssl req` interoperates in both directions and no permanent wire contract is invented.\n  - A request influences **exactly one** certificate field: the subject public key. Both issuance paths build their `CertificateParams` from the authority's inputs through a shared `leaf_params`, and requested extensions are refused rather than stripped. `subject` must equal the request's common name, so a holder cannot name themselves and an authority cannot certify them under a name they never asked for.\n  - `verify_certificate_request` parses with `x509-parser` but verifies with `ed25519-dalek::verify_strict`. x509-parser's own `verify_signature` routes Ed25519 to ring's non-strict verification, which accepts small-order and torsion keys — for which signatures verify with no private key known, reducing proof of possession to a formality anyone could satisfy for a key nobody controls.\n  - Unlike artifact verification elsewhere in the crate, request verification is **not** non-oracle: no authority secret participates and the requester already knows their own key, so precise diagnostics leak nothing and the operator needs them.\n  - **What proof of possession prevents is misattribution by key binding, and it protects the authority, not the verifier.** The tempting misreading — \"a verifier who checks a signature against the certified key has already observed key control, so the issuance-time check is ceremony\" — is how an authority talks itself into dropping it. The real attack: Mallory presents *Noor's* public key under the name `agent-mallory`; without the check the certificate issues, and every statement Noor legitimately signs then verifies against a certificate naming Mallory. No forgery, a genuinely valid certificate, and the `lys verify --cert` join reports success on a false statement. Requiring a signature over the request — which covers the subject name — means a presented key can only be certified by its holder, under the name they asked for.\n  - **A certificate does not record how it was issued.** X.509 has no marker for \"issued over a proven key\" and this crate adds none, so a relying party cannot tell from the artifact whether the certified key is holder-controlled; that rests on issuer policy. Narrower than it looks — a certificate over a discarded generated key binds a key nobody can sign with, so it fails closed rather than dangerously — but it is the argument for making issuance policy auditable by logging issuance transparently (DP3), not for a certificate field.\n  - **Requests are replayable, deliberately.** The signature covers the subject key and requested name and nothing tying it to one issuance, authority, or moment. That is sound: proof of possession is a claim about key control, not an authorisation of a particular issuance, and a replay yields a certificate over a key its holder already proved they hold. An authority that needs issuance *authorised* needs an access-control decision about the requester, which must not be built on the request's signature.\n- rcgen signing goes through a `RemoteKeyPair` adapter so the CA's private seed is never serialised into rcgen's key-pair representation, and a presented key reaches rcgen through a `PublicKeyData` adapter that cannot sign. `PKCS_ED25519` throughout.\n- `verify_certificate_chain(cert_der, issuer_public_key)` extracts the TBS bytes with `x509-parser` and verifies the signature with `ed25519-dalek::verify_strict` (x509-parser cannot verify Ed25519). The validity window is enforced in-crate: expired and not-yet-valid certificates are rejected, and `verify_certificate_chain_at(cert_der, issuer_public_key, instant)` verifies at an explicit instant for auditing historical records. Self-signed certificates are rejected.\n- `certificate_subject_public_key(cert_der)` recovers the 32-byte Ed25519 key a certificate vouches for. Parsing only — a key read from an *unverified* certificate is an attacker-chosen value, and the rustdoc says so. It exists to close the join: verifying a certificate proves an authority issued it and verifying an attestation proves a key signed a payload, but neither says the two concern one identity. Comparing this against an attestation's signer key is the check that connects them, and `lys verify --cert` is where that composition currently lives — deliberately in the CLI rather than the library, because the library's composed verifier is the one the anchor's verification bundle will need and designing it before that format settles would freeze a guess.\n- Capability claims travel as opaque DER in custom extensions under **`LYS_OID_ARC`** (`1.3.6.1.4.1.66364`). The payload is opaque to the crate; the consumer defines claim semantics — the cert *is* the permission object. The final component is IANA Private Enterprise Number 66364, assigned to lys; the arc is permanent and sub-arcs beneath it are ours to allocate (see [PEN-REGISTRATION.md](../../PEN-REGISTRATION.md)).\n\nRevocation tracking is deliberately absent (never built in the source crate; a first-class revocation story is an open product question — see repo DESIGN.md §Open questions).\n\n### D4: Merkle transparency log (`lys_core::merkle`, `lys_core::checkpoint`, `lys_core::tlog`)\n\n`AppendOnlyTree<L: Serialize>` provides RFC 6962 semantics over SHA-256, backed by `ct-merkle` behind a deliberately backing-agnostic API:\n\n- `append(leaf)` is the only mutation — the API exposes no delete or modify. Every argument is pre-checked so the underlying library cannot panic; out-of-range indices and invalid size pairs return `MerkleTree` errors.\n- Inclusion proofs (`prove_inclusion` / `verify_inclusion`) and consistency proofs (`prove_consistency` / `verify_consistency`), with byte round-tripping (`as_bytes` / `try_from_bytes`) on both proof types.\n- `RootHash::from_parts(root_hash, num_leaves)` / `to_parts()` — the external-verifier constructor. A third party holding only a published root and proof bytes can verify inclusion and consistency with no access to the tree. The external-verifier round trip is the defining test of the layer.\n- `reconstruct_from_leaves(leaves)` rebuilds an identical tree from a persisted leaf sequence — the crash-recovery path for consumers persisting leaves externally.\n- Leaf serialization is a **frozen wire contract**: leaves are canonical bytes; schema evolution means a new versioned leaf type, never a mutated one. This rule is documented at the module level. Two encodings are frozen and never mix within one tree — the typed postcard path, and the raw path (`RawLeaf`: leaf file bytes verbatim, no framing) that every `lys log` artifact uses.\n\nTwo layers ratified after this cluster was first written — decisions **D1** and **D2** in [WIRE-FORMATS.md](../WIRE-FORMATS.md) §2–§3 — ship on top of `merkle` and are part of the crate as built:\n\n- **`lys_core::checkpoint`** — the signed tree head: a C2SP tlog-checkpoint body wrapped in the C2SP signed-note envelope, Ed25519-signed, byte-compatible with the Go `sumdb/note` reference. `verify_checkpoint` **enforces** `checkpoint origin == verifier-key name`, so a key that signs two logs can never have one log's checkpoint accepted by a verifier configured for the other. Every failure mode — size, UTF-8, structure, unknown key, bad signature — collapses to the single `TrustError::NoteVerification`.\n- **`lys_core::tlog`** — self-contained JSON proof artifacts: an RFC 6962 proof plus the relevant signed checkpoint(s) embedded verbatim, identified by frozen `format` strings, with unknown fields rejected. Redundancy is checked, not trusted: every size an artifact declares is compared against the size inside its signature-verified checkpoint, and roots are recomputed rather than believed. Builders self-verify before returning, tree sizes at or beyond 2^53 are refused on both emit and verify, and every failure collapses to the single `TrustError::LogArtifactVerification`.\n\n### D5: Signed attestations (`lys_core::attestation`) — COSE_Sign1 v2, canonical-strict\n\n> **Superseded in part by decision D4 in [WIRE-FORMATS.md](../WIRE-FORMATS.md) §4.2**: the v1 JSON/preimage form this section originally specified was deleted unshipped; the byte-exact contract now lives there. As-built summary:\n\nSigned statements binding a key to a payload. The artifact is a tagged COSE_Sign1 (`lys/attestation/v2`); the signed preimage is the RFC 9052 §4.4 `Sig_structure`:\n\n```\nSig_structure = [\"Signature1\", protected, h'', claims]\nprotected     = {1: -8 (EdDSA), 3: \"application/vnd.lys.attestation.v2+cbor\", 4: signer key}\nclaims        = {1: SHA-256(payload), 2: unix-ms timestamp}\n```\n\n- The timestamp, payload hash, and signer key are all authenticated — inside the signature, not alongside it. Tampering with any of them fails verification.\n- The `Sig_structure` framing plus the signature-covered content type make attestation signatures structurally non-interchangeable with any other lys signing context (sealed-envelope binding, raw CA certificate signing, signed notes) — byte-0 disjoint, per WIRE-FORMATS §4.2.\n- **No fallback paths.** `verify_attestation` accepts the v2 `Sig_structure` and nothing else: the deleted v1 preimage (`b\"lys/attestation/v1\" || timestamp_le || hash`) and pre-domain-separation bare-hash signatures both fail (tests exist).\n- `Attestation { payload_hash: [u8; 32], signature: [u8; 64], signer_public_key: [u8; 32], timestamp: i64 }` carries **no serde**; the only durable form is `to_cose_bytes()`, and `from_cose_bytes` is canonical-encoding-strict.\n\n### D6: Sealed envelopes (`lys_core::seal`)\n\nX25519 ephemeral key agreement + HKDF-SHA256 + AES-256-GCM, the standard sealed-box construction with the keys bound into the KDF:\n\n- `seal(payload, recipient_public_key)` → `SealedEnvelope { ephemeral_public_key, ciphertext, nonce }`. Fresh ephemeral keypair per seal — forward secrecy per envelope.\n- HKDF info binds the domain tag and both public keys: `b\"lys-sealed-envelope/v1\" || ephemeral_public_key || recipient_public_key` (tag renamed from the Meridian string). **The HKDF info tag is the hyphen form** `lys-sealed-envelope/v1`; the format name and the authenticated composition's attestation context tag (`SEALED_ENVELOPE_CONTEXT_V1`) are the slash form `lys/sealed-envelope/v1`. They are deliberately different strings — separate domains, separately versioned — and they are not interchangeable: an implementer who feeds the slash form to HKDF derives a different key and cannot decrypt. WIRE-FORMATS.md §1 carries both.\n- Contributory-behaviour enforcement on **both** seal and open: a low-order public key producing a non-contributory shared secret is rejected before any key material is derived.\n- Every unseal failure — wrong key, tampered ciphertext, tampered nonce — collapses to the single undifferentiated `TrustError::UnsealFailed` through one failure arbiter (AES-GCM tag verification). No oracle, no timing split, no early return.\n- `sign_and_seal(payload, sender_identity, recipient_x25519_public_key)` / `open_and_verify(...)` compose attestation over the sealed bytes for sender-identity binding. The attestation covers every wire byte of the envelope (`attestation_bytes()`), and verification gates **before** the cipher is ever touched — a forged sender is rejected without decrypting anything.\n\n### D7: Wire formats are forever\n\nThe domain tags (`lys/attestation/v2`, `lys/sealed-envelope/v1`, and the distinct HKDF info tag `lys-sealed-envelope/v1`), the attestation `Sig_structure` layout, the HKDF info layout, both leaf encodings, the checkpoint and signed-note encodings, and the proof-artifact `format` strings are versioned wire contracts, frozen the moment anything durable is signed under them. [WIRE-FORMATS.md](../WIRE-FORMATS.md) §1 is the authoritative table. Evolving one means a new versioned constant and code path, never a mutation of the shipped one. The extraction renames the Meridian tags precisely because it is the last moment nothing has been signed under the lys names.\n\n### D8: CLI surface (`lys` binary)\n\n> **Superseded in part by decisions D1 and D2 in [WIRE-FORMATS.md](../WIRE-FORMATS.md) §2–§3**: the log subcommands emit C2SP signed-note checkpoints and self-contained JSON proof artifacts, and third-party verification takes the artifact, the leaf, and the verifier key rather than raw root parts plus proof bytes. As-built summary:\n\nThe auditor's and operator's tool — a thin clap surface over `lys-core`. Logic lives in the library; the binary parses arguments, dispatches, and maps results to exit codes (`0` success, `1` operational or verification failure, `2` clap argument errors). As built it carries its own `thiserror` error type with deliberately non-oracle failure messages, and no `anyhow`. Subcommands:\n\n- `lys key generate` / `lys key inspect` — generate and inspect identities (Ed25519 and derived X25519 public keys, and with `--note-name` the signed-note verifier-key string). **Never prints private key material** under any flag or format.\n- `lys ca issue` — issue a certificate with a capability-claim extension payload, signed by an issuer identity.\n- `lys ca verify` — verify a certificate chain against an issuer public key, with an optional explicit verification instant (the `verify_certificate_chain_at` path).\n- `lys attest` / `lys verify` — sign and verify `lys/attestation/v2` COSE_Sign1 artifacts over a payload file. (File paths only as built; there is no stdin path.)\n- `lys seal` / `lys open` — sealed-envelope transport of a payload file, authenticated composition only: `seal` writes the JSON envelope and the sender's COSE attestation, and `open` requires both, verifying before it decrypts.\n- `lys inspect attestation` / `lys inspect cert` — read-only viewers that print what a file says **without verifying any of it**, every output opening with an UNVERIFIED banner naming the command that does verify. Local files only.\n- `lys log init` / `append` / `checkpoint` / `prove` / `verify` — transparency-log operations over a persisted leaf sequence: `init` pins the log's origin exactly once and refuses re-initialization, `append` hashes a leaf file's raw bytes per RFC 6962, `checkpoint` signs a C2SP signed-note checkpoint over the current root, `prove` emits a self-contained JSON proof artifact with the relevant signed checkpoint(s) embedded, and `verify` checks an inclusion or consistency claim from **only** the artifact, the leaf, and the verifier key — no access to the store or the tree.\n\nThe phase proof: a log produced by one process is verified end-to-end by the CLI in another process that never sees the original tree.\n\nTests live in sibling `*_tests.rs` files throughout `merkle`, `ca`, `keys`, `attestation`, `checkpoint`, and `tlog`; `merkle/leaf.rs`, both `seal/` files, and several CLI modules currently carry inline `mod tests` instead (see [REVIEW-23-07.md](../../REVIEW-23-07.md) F12).\n\n### Checklist notes\n\n> **Reconciled against the shipped code, 2026-07-30.** [ROADMAP.md](../../ROADMAP.md) marks Phase 1 (extract to `lys-core`) and Phase 2 (the `lys` CLI) **DONE**, and the boxes below now record that: an item is ticked only where it was verified against this repository's own bytes.\n>\n> Four are deliberately left open. **C61–C63** are the build gates — verified by CI on every change, not by reading source. **C64** is not met: tests live inline rather than in sibling `*_tests.rs` files in `merkle/leaf.rs`, both `seal/` files, `error.rs`, and six CLI modules (see [REVIEW-23-07.md](../../REVIEW-23-07.md) F12).\n>\n> Items amended by a ratified wire-format decision carry an annotation above them and are restated as-built; the decisions themselves live in [WIRE-FORMATS.md](../WIRE-FORMATS.md), which is authoritative wherever this file disagrees. This is the phase-1/2 acceptance list only — the `checkpoint` and `tlog` layers ratified afterwards (WIRE-FORMATS D1 and D2) are specified in [DESIGN.md](DESIGN.md) D4 and pinned by their own test suites, not by items here.\n\n*(C38–C43 amended by WIRE-FORMATS.md decision D4: the attestation artifact is the `lys/attestation/v2` tagged COSE_Sign1; the v1 JSON/preimage form was deleted unshipped.)*\n\n*(C58–C59 superseded by WIRE-FORMATS.md decisions D1 and D2: `lys log` emits C2SP signed-note checkpoints and self-contained JSON proof artifacts, and third-party verification takes the artifact, the leaf, and the verifier key rather than raw root parts plus proof bytes. Restated as-built.)*",
+  "principles": [],
+  "decisions": [],
+  "goals": [
+    "`lys-core` compiles standalone in this repository with zero Meridian dependencies and zero Meridian references, behaviour-identical to the hardened source crate except the deliberate breaks (D5 legacy strip, D7 tag renames, `LYS_IDENTITY_KEY`, `LYS_OID_ARC`).",
+    "All hardening commitments hold in the ported code: `verify_strict` everywhere, validity-window enforcement with an `_at` variant, `RootHash::from_parts` external verification, authenticated timestamps with domain separation, contributory-DH rejection, seed zeroization, single-arbiter unsealing, race-free key generation.",
+    "Attestation verification is v2-only (WIRE-FORMATS.md D4): no legacy code path exists in the crate — neither the Meridian preimage nor the deleted-unshipped `lys/attestation/v1` form verifies.",
+    "An external verifier round-trips: inclusion and consistency proofs verify from published root parts and proof bytes alone.",
+    "The `lys` CLI covers every primitive, and a log produced in one process verifies end-to-end via the CLI in another with no access to the original tree.",
+    "`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and `cargo test --workspace` all pass clean."
+  ],
+  "non_goals": [
+    {
+      "text": "**Domain-specific semantics.** No agent, session, or claim vocabulary in the crate. Canonical agent claim schemas are phase 5.",
+      "reason": ""
+    },
+    {
+      "text": "**Storage traits.** In-memory operations only; persistence is the consumer's concern. The CLI persists leaf sequences as files, using `reconstruct_from_leaves` — that is CLI policy, not a library trait.",
+      "reason": ""
+    },
+    {
+      "text": "**Network operations.** `lys-core` is a pure library; the CLI is local-only. Transport belongs to `lys-anchor` (phase 4).",
+      "reason": ""
+    },
+    {
+      "text": "**Anchoring, receipts, SCITT/COSE.** The notary layer is `lys-anchor`; nothing in this cluster emits or verifies COSE receipts.",
+      "reason": ""
+    },
+    {
+      "text": "**Revocation infrastructure.** No CRLs, no OCSP, no revocation flag. Consumer-side today; a first-class answer is an open product question.",
+      "reason": ""
+    },
+    {
+      "text": "**MCP surface.** `lys-mcp` is a later phase.",
+      "reason": ""
+    },
+    {
+      "text": "**Zero-knowledge proofs.** Selective disclosure via salted-hash leaves + inclusion proofs is the v1 privacy story; ZK is a research direction.",
+      "reason": ""
+    }
+  ],
+  "structure": [
+    {
+      "path": "crates/lys-core/",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/Cargo.toml",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/tests/",
+      "note": "cross-implementation conformance suites",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/tests/cose_conformance.rs",
+      "note": "round-trip against veraison/go-cose",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/tests/go_conformance.rs",
+      "note": "round-trip against Go sumdb/note",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/tests/signed_note_crosscheck.rs",
+      "note": "crosscheck against Cloudflare signed_note",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/lib.rs",
+      "note": "pub mod + re-exports, hex_lower helper (D1)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/error.rs",
+      "note": "TrustError enum, TrustResult<T> (D1)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/keys/",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/keys/mod.rs",
+      "note": "pub mod / pub use only",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/keys/identity.rs",
+      "note": "Ed25519Identity: load_or_generate, from_env, sign, verify_strict, X25519 derivation, redaction (D2)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/keys/identity_tests.rs",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/ca/",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/ca/mod.rs",
+      "note": "pub mod / pub use only",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/ca/authority.rs",
+      "note": "CertificateAuthority: issue, verify chain, _at variant (D3)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/ca/certificate.rs",
+      "note": "IssuedCertificate, Debug redaction (D3)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/ca/extensions.rs",
+      "note": "LYS_OID_ARC, encode/decode extension (D3)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/ca/*_tests.rs",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/merkle/",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/merkle/mod.rs",
+      "note": "pub mod / pub use only",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/merkle/tree.rs",
+      "note": "AppendOnlyTree<L>: append, root, proofs, reconstruct (D4)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/merkle/proof.rs",
+      "note": "RootHash from_parts/to_parts, Inclusion/ConsistencyProof, verify_inclusion, verify_consistency, raw-leaf path (D4)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/merkle/leaf.rs",
+      "note": "leaf hashing, RawLeaf, frozen-wire-contract docs (D4)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/merkle/*_tests.rs",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/checkpoint/",
+      "note": "WIRE-FORMATS D1: signed tree heads",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/checkpoint/mod.rs",
+      "note": "pub mod / pub use only",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/checkpoint/body.rs",
+      "note": "CheckpointBody encode/parse (C2SP tlog-checkpoint)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/checkpoint/note.rs",
+      "note": "sign_note / verify_note / verify_checkpoint (C2SP signed-note; origin == key-name enforced)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/checkpoint/verifier_key.rs",
+      "note": "verifier-key strings and RFC 6962-style key IDs",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/checkpoint/*_tests.rs",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/tlog/",
+      "note": "WIRE-FORMATS D2: self-contained proof artifacts",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/tlog/mod.rs",
+      "note": "pub mod / pub use only",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/tlog/artifact.rs",
+      "note": "frozen JSON artifact shapes and format strings",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/tlog/build.rs",
+      "note": "self-verifying inclusion/consistency builders",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/tlog/verify.rs",
+      "note": "third-party verification, single non-oracle error",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/tlog/*_tests.rs",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/attestation/",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/attestation/mod.rs",
+      "note": "pub mod / pub use, invariant docs",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/attestation/artifact.rs",
+      "note": "Attestation type; to_cose_bytes / canonical-strict from_cose_bytes (D5)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/attestation/encoding.rs",
+      "note": "private byte-exact COSE_Sign1 encode + shape-pinned decode, Sig_structure assembly (D5)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/attestation/sign.rs",
+      "note": "sign_attestation, verify_attestation, verify_attestation_bytes over the v2 Sig_structure (D5)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/attestation/*_tests.rs",
+      "note": "sibling tests incl. golden vectors and mutants A–F",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/seal/",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/seal/mod.rs",
+      "note": "pub mod / pub use only",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/seal/sealed_envelope.rs",
+      "note": "seal/open, HKDF binding, contributory checks, single failure arbiter (D6)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/seal/authenticated.rs",
+      "note": "sign_and_seal / open_and_verify (D6)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/Cargo.toml",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/tests/",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/tests/cli_tests.rs",
+      "note": "key / attest / verify / ca / seal / open / inspect",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/tests/log_tests.rs",
+      "note": "log lifecycle incl. the cross-process third-party path",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/main.rs",
+      "note": "thin entry: parse args, dispatch, exit codes (D8)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/cli.rs",
+      "note": "clap definitions and help text only (D8)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/mod.rs",
+      "note": "pub mod only",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/key.rs",
+      "note": "lys key generate / inspect (D8)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/ca.rs",
+      "note": "lys ca issue / verify (D8)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/attest.rs",
+      "note": "lys attest (D8)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/verify.rs",
+      "note": "lys verify (D8)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/inspect.rs",
+      "note": "lys inspect attestation / cert (D8)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/seal.rs",
+      "note": "lys seal / open (D8)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/error.rs",
+      "note": "CLI error type, non-oracle failure messages (D8)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/files.rs",
+      "note": "file I/O incl. owner-only plaintext writes (D8)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/hex.rs",
+      "note": "hex parsing/formatting helpers (D8)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/pem.rs",
+      "note": "PEM encode/decode helpers (D8)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/log/",
+      "note": "",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/log/mod.rs",
+      "note": "pub mod only",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/log/init.rs",
+      "note": "lys log init (origin pinned once) (D8)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/log/append.rs",
+      "note": "lys log append (D8)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/log/checkpoint.rs",
+      "note": "lys log checkpoint (D8)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/log/prove.rs",
+      "note": "lys log prove inclusion / consistency (D8)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/log/verify.rs",
+      "note": "lys log verify inclusion / consistency (D8)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/log/store.rs",
+      "note": "leaf-sequence store: O_EXCL leaf writes, atomic tmp+rename state, rebuild on open (D8)",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/lys-core/design.json",
+      "note": "the lys-core design, carried from main's DESIGN.md",
+      "brief": "LYSCORE-001"
+    },
+    {
+      "path": "docs/design/lys-core/DESIGN.md",
+      "note": "rendered markdown",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/lys-core/checklist.json",
+      "note": "the lys-core checklist, carried from main's CHECKLIST.md",
+      "brief": "LYSCORE-001"
+    },
+    {
+      "path": "docs/design/lys-core/CHECKLIST.md",
+      "note": "rendered markdown",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/lys-core/stories.json",
+      "note": "the lys-core user stories, carried from main's USER-STORIES.md",
+      "brief": "LYSCORE-001"
+    },
+    {
+      "path": "docs/design/lys-core/USER-STORIES.md",
+      "note": "rendered markdown",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/lys-core/briefs/LYSCORE-001.json",
+      "note": "the brief that carries the hand-written lys-core design into the three JSON documents",
+      "brief": "LYSCORE-001"
+    },
+    {
+      "path": "docs/design/lys-core/briefs/LYSCORE-001.md",
+      "note": "rendered markdown",
+      "brief": "LYSCORE-001"
+    }
+  ],
+  "inventory": [],
+  "constraints": [
+    {
+      "id": "CN1",
+      "text": "**No domain types and no Meridian references.** If it names an agent, session, workspace, peer, contract, or anything Meridian, it doesn't belong here."
+    },
+    {
+      "id": "CN2",
+      "text": "**No storage traits, no network.** Pure library crate; CLI is local file I/O only."
+    },
+    {
+      "id": "CN3",
+      "text": "**`unsafe_code` forbidden.** All dependencies pure Rust."
+    },
+    {
+      "id": "CN4",
+      "text": "**No `unwrap` / `expect` / `panic` / `todo` in library code.** Tests opt out per-module."
+    },
+    {
+      "id": "CN5",
+      "text": "**Private key material never in `Debug`, logs, error messages, or CLI output.** Redaction tested, not assumed. Seed buffers are `Zeroizing`."
+    },
+    {
+      "id": "CN6",
+      "text": "**Wire formats are frozen.** Tags, preimage layouts, and leaf encodings version forward (`v2`), never mutate."
+    },
+    {
+      "id": "CN7",
+      "text": "**No file over 500 lines of code.** `mod.rs` carries only `pub mod` / `pub use` / module docs; tests live in sibling `*_tests.rs` files."
+    },
+    {
+      "id": "CN8",
+      "text": "**Every public item documented**; module-level `//!` docs state invariants."
+    },
+    {
+      "id": "CN9",
+      "text": "**Cryptographic changes require an adversarial review before landing.** This cluster ports hardened behaviour unchanged; any deviation beyond the four deliberate breaks (tag renames, legacy strip, env var, OID constant) is out of bounds."
+    }
+  ],
+  "gate": [
+    {
+      "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
+      "legs": [
+        {
+          "name": "fmt",
+          "command": "cargo fmt --all",
+          "requires": [
+            "tool:cargo",
+            "tool:rustfmt"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy-all-features",
+          "command": "cargo clippy --all-targets --all-features -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy",
+          "command": "cargo clippy --all-targets -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "tests",
+          "command": "cargo test --workspace --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc-all-features",
+          "command": "cargo doc --no-deps --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc",
+          "command": "cargo doc --no-deps",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
+          "requires": [
+            "tool:sh",
+            "tool:python3"
+          ],
+          "cadence": "round"
+        }
+      ]
+    }
+  ]
+}
