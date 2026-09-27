@@ -414,6 +414,69 @@ pub enum HomeError {
         /// The path given.
         path: PathBuf,
     },
+
+    /// A letter entry is not an assistant message.
+    #[error(
+        "letter_not_assistant: entry `{id}` of session {session} is not an assistant message; a letter is the outgoing session's own assistant turn"
+    )]
+    LetterNotAssistant {
+        /// The outgoing session id.
+        session: String,
+        /// The letter entry named.
+        id: String,
+    },
+
+    /// A letter entry does not stand, on the outgoing session's root-to-head
+    /// path, as the child of the letter entry named before it.
+    #[error(
+        "letter_not_contiguous: letter entry `{id}` of session {session} does not follow the entry before it on the root-to-head path; name the letter's entries in path order, each the child of the one before"
+    )]
+    LetterNotContiguous {
+        /// The outgoing session id.
+        session: String,
+        /// The first letter entry out of place.
+        id: String,
+    },
+
+    /// A letter entry's message carries provider `authored`.
+    #[error(
+        "letter_authored: entry `{id}` of session {session} carries provider `authored`; a letter is the session's own turn, never one written by hand"
+    )]
+    LetterAuthored {
+        /// The outgoing session id.
+        session: String,
+        /// The first authored letter entry.
+        id: String,
+    },
+
+    /// No letter entry holds a thinking block.
+    #[error(
+        "letter_without_thinking: the letter [{}] of session {session} holds no thinking block; a letter carries the session's own thinking", ids.join(", ")
+    )]
+    LetterWithoutThinking {
+        /// The outgoing session id.
+        session: String,
+        /// Every letter entry, in the order given.
+        ids: Vec<String>,
+    },
+
+    /// The successor path exists and is not an empty directory.
+    #[error(
+        "successor_not_empty: {} exists and is not an empty directory; name an absent path or an empty directory for the successor home", path.display()
+    )]
+    SuccessorNotEmpty {
+        /// The successor path given.
+        path: PathBuf,
+    },
+
+    /// A canon example's `lys.inherited` entry carries no rule.
+    #[error(
+        "canon_example_without_rule: canon example `{id}` has no `rule` in its lys.inherited data; every canon example states the rule it shows"
+    )]
+    CanonExampleWithoutRule {
+        /// The example's `lys.inherited` entry id.
+        id: String,
+    },
 }
 
 impl HomeError {
