@@ -19,6 +19,8 @@ pub mod read_views;
 pub mod receipts_api;
 pub mod routes;
 pub mod session;
+pub mod spicedb;
+mod spicedb_http;
 
 pub use config::Config;
 pub use error::ServerError;

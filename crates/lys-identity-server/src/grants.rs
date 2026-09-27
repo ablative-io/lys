@@ -37,9 +37,10 @@ use crate::grant_contract::{
 use crate::grant_sight::{as_seen_by, sees, sees_with, visible_or};
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
+use crate::spicedb::{Relationships, SpiceDb, SpiceDbSettings};
 
 /// The grants as the service holds them.
-pub type GrantState = Grants<FileLeafStore, MemoryRelationships>;
+pub type GrantState = Grants<FileLeafStore, Relationships>;
 
 /// What the grants are opened from.
 pub struct GrantSetup {
@@ -51,6 +52,8 @@ pub struct GrantSetup {
     pub key_file: PathBuf,
     /// The model grants are judged against.
     pub model: Model,
+    /// The permission engine the grants are mirrored into, if one is named.
+    pub spicedb: Option<SpiceDbSettings>,
 }
 
 impl GrantSetup {
@@ -63,13 +66,21 @@ impl GrantSetup {
             })?;
         }
         let log_dir = self.log_dir.clone();
-        Ok(Grants::open(
+        let relationships = match &self.spicedb {
+            Some(settings) => Relationships::SpiceDb(SpiceDb::open(settings, &self.model)?),
+            None => Relationships::Memory(MemoryRelationships::default()),
+        };
+        let mut grants = Grants::open(
             Box::new(move || FileLeafStore::open(&log_dir)),
             load_service_key(&self.key_file)?,
-            MemoryRelationships::default(),
+            relationships,
             self.model.clone(),
             root_authority,
-        )?)
+        )?;
+        if self.spicedb.is_some() {
+            grants.project()?;
+        }
+        Ok(grants)
     }
 }
 
@@ -119,6 +130,30 @@ pub(crate) fn with_grants<T>(
             grants,
             root,
         })
+    })
+}
+
+/// Refuse unless the permission engine, where one is named, gives the caller
+/// the action on the resource. The grants' own decision is made first and
+/// nothing is recorded, so a refusal the grants name is answered by its name.
+fn engine_permits(
+    grants: &mut GrantState,
+    directory: &Projection,
+    request: &ExerciseRequest,
+    at: u64,
+) -> Result<(), GrantError> {
+    if matches!(grants.relationships(), Relationships::Memory(_)) {
+        return Ok(());
+    }
+    let permit = grants.explain(directory, request, at, None)?;
+    let Relationships::SpiceDb(engine) = grants.relationships() else {
+        return Ok(());
+    };
+    if engine.check(&request.resource, &request.action, request.caller, at)? {
+        return Ok(());
+    }
+    Err(GrantError::PermissionAbsent {
+        grant: permit.grant.to_string(),
     })
 }
 
@@ -264,7 +299,10 @@ async fn check(
             resource,
             action,
         };
-        match judged.grants.check(judged.directory, &request, now(), None) {
+        let at = now();
+        let decided = engine_permits(&mut *judged.grants, judged.directory, &request, at)
+            .and_then(|()| judged.grants.check(judged.directory, &request, at, None));
+        match decided {
             Ok(permit) => Ok(Json(PermitView::from(&permit))),
             Err(error) => Err(as_seen_by(&judged, caller, error)),
         }

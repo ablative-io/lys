@@ -14,6 +14,7 @@ use lys_identity::grants::{Action, Model, Relation};
 use serde::Deserialize;
 
 use crate::error::ServerError;
+use crate::spicedb::SpiceDbSettings;
 
 /// An issuer and subject pair as the configuration names it.
 #[derive(Debug, Clone, Deserialize)]
@@ -59,6 +60,10 @@ pub struct Config {
     pub grant_log_origin: String,
     /// The file holding the permission model grants are judged against.
     pub grant_model_file: PathBuf,
+    /// The permission engine the grants are mirrored into. Without it the
+    /// relationships are held in memory.
+    #[serde(default)]
+    pub spicedb: Option<SpiceDbSettings>,
 }
 
 /// The permission model as its file writes it: a version, and each relation

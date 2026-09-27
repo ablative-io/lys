@@ -63,6 +63,7 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
             log_origin: config.grant_log_origin.clone(),
             key_file: config.event_key_file.clone(),
             model: config.grant_model()?,
+            spicedb: config.spicedb.clone(),
         },
     })))
 }
