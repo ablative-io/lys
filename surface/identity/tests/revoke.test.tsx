@@ -31,7 +31,7 @@ describe('Revoke (conformance 2.5)', () => {
     expect($('#drawer')?.classList.contains('open')).toBe(true);
     expect($('#drawer h2')?.textContent).toBe('Revoke owner of project:identity');
     expect(document.activeElement?.id).toBe('why');
-    expect($('#derived')?.textContent).toBe("Ada's scribe · viewerrevoked with it");
+    expect($('#derived')?.textContent).toBe("Scribe · viewerrevoked with it");
     expect(unreachable()).toEqual([]);
   });
 
@@ -81,8 +81,8 @@ describe('Revoke (conformance 2.5)', () => {
 describe('Names as the mock-up writes them', () => {
   it("uses the first word of the name, exactly as x.name.split(' ')[0]", async () => {
     await mount(`#/file/${SCRIBE}/access`);
-    expect($('.check h2')?.textContent).toBe("Can Ada's do this?");
+    expect($('.check h2')?.textContent).toBe("Can Scribe do this?");
     expect($('.section-h span')?.textContent).toBe('Grants');
-    expect($$('.section-h span').map((s) => s.textContent)).toContain("What Ada's can reach");
+    expect($$('.section-h span').map((s) => s.textContent)).toContain("What Scribe can reach");
   });
 });

@@ -26,7 +26,7 @@ describe('You', () => {
   it('lists your agents that still stand, with what each holds', async () => {
     await mount('#/me');
     const agents = $$('tr[data-href]').map((tr) => tr.querySelector('td')?.textContent);
-    expect(agents).toEqual(["Ada's scribe", "Ada's courier", "Ada's archivist"]);
+    expect(agents).toEqual(["Scribe", "Courier", "Archivist"]);
     expect($$('tr[data-href]')[0].textContent).toContain('viewer of project:identity');
     expect($$('tr[data-href]')[1].textContent).toContain('no access');
     expect(text()).not.toContain('finance-readonly');

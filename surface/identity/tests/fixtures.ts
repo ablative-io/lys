@@ -20,16 +20,16 @@ export const DIRECTORY: PeopleView = {
     {
       id: ADA, display_name: 'Ada (test person)', state: 'active',
       agents: [
-        { id: SCRIBE, display_name: "Ada's scribe", state: 'active' },
-        { id: COURIER, display_name: "Ada's courier", state: 'registered' },
-        { id: ARCHIVIST, display_name: "Ada's archivist", state: 'suspended' },
+        { id: SCRIBE, display_name: "Scribe", state: 'active' },
+        { id: COURIER, display_name: "Courier", state: 'registered' },
+        { id: ARCHIVIST, display_name: "Archivist", state: 'suspended' },
       ],
     },
     {
       id: BEA, display_name: 'Bea (test person)', state: 'retired',
       agents: [
-        { id: REVIEWER, display_name: "Bea's reviewer", state: 'active' },
-        { id: LAMPLIGHTER, display_name: "Bea's lamplighter", state: 'retired' },
+        { id: REVIEWER, display_name: "Reviewer", state: 'active' },
+        { id: LAMPLIGHTER, display_name: "Lamplighter", state: 'retired' },
       ],
     },
   ],
@@ -61,7 +61,7 @@ export const RECEIPTS: Record<number, ReceiptAnswer> = { 4: receipt(4, 2, REGIST
 
 export const SCRIBE_VIEW: AgentView = {
   id: SCRIBE,
-  display_name: "Ada's scribe",
+  display_name: "Scribe",
   person: { id: ADA, display_name: 'Ada (test person)', state: 'active' },
   needs_new_person: false,
   role: null,
@@ -73,7 +73,7 @@ export const SCRIBE_VIEW: AgentView = {
 export const REVIEWER_VIEW: AgentView = {
   ...SCRIBE_VIEW,
   id: REVIEWER,
-  display_name: "Bea's reviewer",
+  display_name: "Reviewer",
   person: { id: BEA, display_name: 'Bea (test person)', state: 'retired' },
   needs_new_person: true,
   provenance: { registered_by: { provider: ISSUER, subject: 'ada' }, events: [], registration: null },

@@ -15,7 +15,7 @@ if [ $# -ne 2 ]; then
 fi
 SERVICE=$1
 ADA=$(awk '/signs in as ada$/ { print $1 }' "$2")
-SCRIBE=$(awk '$2 == "Ada'"'"'s" && $3 == "scribe" { print $1 }' "$2")
+SCRIBE=$(awk '$2 == "Scribe" { print $1 }' "$2")
 JAR=$(mktemp)
 trap 'rm -f "$JAR"' EXIT
 
