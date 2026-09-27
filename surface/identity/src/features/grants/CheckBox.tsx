@@ -5,7 +5,7 @@ import { firstName } from '../people/directory';
 import { AnswerView } from './Answer';
 import { ask } from './check';
 import type { Answer } from './check';
-import { nameOf } from './model';
+import { nameOf, resourceLabel } from './model';
 import type { GrantWorld } from './model';
 
 /** Every resource a grant the caller can see is on, and the actions granted on it. */
@@ -54,7 +54,7 @@ export function CheckBox({ w, who }: { w: GrantWorld; who?: string }) {
 
   const resSelect = (
     <select id="cRes" value={res} onChange={(e) => pickRes(e.target.value)} aria-label="Resource">
-      {keys.map((k) => <option key={k} value={k}>{k}</option>)}
+      {[...resources].map(([k, v]) => <option key={k} value={k}>{resourceLabel(v.resource)}</option>)}
     </select>
   );
   const permSelect = (

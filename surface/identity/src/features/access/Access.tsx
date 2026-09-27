@@ -4,7 +4,7 @@ import { keyable } from '../../shell/keyable';
 import { Gate } from '../signin/Gate';
 import { reachMap } from '../grants/check';
 import { CheckBox, resourcesSeen } from '../grants/CheckBox';
-import { grantNo, lastsText, nameOf, onText, passText, readGrantWorld, standing } from '../grants/model';
+import { grantNo, lastsText, nameOf, onText, passText, readGrantWorld, resourceLabel, standing } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import { Pill } from '../people/Pill';
 
@@ -40,6 +40,7 @@ function Body({ d, mode, arg }: { d: AccessData; mode: string; arg?: string }) {
   const segs: [string, string][] = [['can', 'Can someone…'], ['reach', 'What can someone reach'], ['who', 'Who can reach something']];
   const ids = [...w.who.keys()];
   const resources = [...d.reach.keys()];
+  const labels = new Map([...resourcesSeen(w)].map(([k, v]) => [k, resourceLabel(v.resource)]));
   let q = <CheckBox w={w} />;
   if (mode === 'reach') {
     const id = arg && w.who.has(arg) ? arg : w.me.person.id;
@@ -64,7 +65,7 @@ function Body({ d, mode, arg }: { d: AccessData; mode: string; arg?: string }) {
         <div className="q" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span className="sec">Who can reach</span>
           <select aria-label="Resource" value={res} onChange={(e) => navigate('/access/who/' + e.target.value)}>
-            {resources.map((r) => <option key={r} value={r}>{r}</option>)}
+            {resources.map((r) => <option key={r} value={r}>{labels.get(r) ?? r}</option>)}
           </select>
           <span className="sec">?</span>
         </div>

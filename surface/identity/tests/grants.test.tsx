@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { $, $$, choose, click, mount, press, text, unreachable } from './harness';
-import { ADA, LEDGER_G, ROOT_G, SCRIBE, SCRIBE_G, SERVICE, ok, refused } from './fixtures';
+import { ADA, DIRECTORY, GRANTS, LEDGER_G, ROOT_G, SCRIBE, SCRIBE_G, SERVICE, ok, refused } from './fixtures';
 import type { DelegateBody } from '../src/generated/grants';
 
 const holdRows = () => $$('.grid2 > div:first-child table')[0].querySelectorAll('tbody tr');
@@ -122,6 +122,7 @@ describe('Can X do this? (conformance 8.1)', () => {
     await press('c', {}, document.body);
     expect(posted.some((p) => p.path === '/grants/who')).toBe(true);
     expect($('#answer .verdict-mark')?.textContent).toBe('Yes');
+    expect($('#answer .why')?.textContent).toBe('view needs viewers or owners.');
     expect($('#answer .chain')?.textContent).toContain("Scribe · viewer of project:identity");
     expect($('#answer .meta-line')?.textContent).toContain('model v1');
     expect($('#answer .meta-line')?.textContent).toContain('change 7');
@@ -133,6 +134,22 @@ describe('Can X do this? (conformance 8.1)', () => {
     await click($('[data-act="check"]'));
     expect($('#answer .verdict-mark')?.textContent).toBe('No');
     expect($('#answer .tag')?.textContent).toBe('no grant');
+    expect($('#answer .meta-line')?.textContent).toContain('model not named in a refusal');
+    expect($('#answer .meta-line')?.textContent).toContain('change 7');
+  });
+
+  it('tags a refusal for a suspended identity with the open question', async () => {
+    await mount('#/access/can', { ...SERVICE, 'POST /grants/why': refused(409, 'IdentityNotActive', `IdentityNotActive: ${ADA} is suspended, and only an active identity's grants are effective`) });
+    await click($('[data-act="check"]'));
+    expect($('#answer .tag')?.textContent).toBe('IdentityNotActive');
+    expect($('#answer .why .open-q')?.textContent).toBe('what suspension refuses: open');
+  });
+
+  it('names each resource as the mock-up does: a project by its id, anything else as name (type)', async () => {
+    const channel = { ...GRANTS[1], id: 'grant-' + '9'.repeat(32), resource: { kind: 'channel', id: 'general' } };
+    await mount('#/access/can', { ...SERVICE, '/grants': ok({ grants: [...GRANTS, channel], revision: 7 }) });
+    expect($$('#cRes option').map((o) => o.textContent)).toEqual(['project:identity', 'project:ledger', 'general (channel)']);
+    expect($$('#cRes option').map((o) => (o as HTMLOptionElement).value)).toEqual(['project:identity', 'project:ledger', 'channel:general']);
   });
 
   it("asks /grants/why for the caller's own question and shows its named refusal", async () => {
@@ -171,5 +188,15 @@ describe('Who can reach this? (conformance 8.2)', () => {
     expect(text()).toContain('not reported');
     expect(unreachable()).toEqual([]);
     expect(SCRIBE_G).toMatch(/^grant-/);
+  });
+});
+
+describe('A grant card', () => {
+  it('shows a void grant of a suspended holder with the open question, and no Allows line', async () => {
+    const suspend = (v: typeof DIRECTORY) => ({ ...v, people: v.people.map((p) => ({ ...p, agents: p.agents.map((a) => (a.id === SCRIBE ? { ...a, state: 'suspended' as const } : a)) })) });
+    await mount(`#/file/${SCRIBE}/access`, { ...SERVICE, '/directory/people': ok(suspend(DIRECTORY)), '/people': ok(suspend({ ...DIRECTORY, scope: 'personal', people: [DIRECTORY.people[0]] })) });
+    const card = $$('.file .card').find((c) => c.querySelector('.verdict-mark.no'));
+    expect(card?.textContent).toContain('Scribe is suspended what suspension refuses: open');
+    expect(text()).not.toContain('Allows:');
   });
 });
