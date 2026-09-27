@@ -13,18 +13,19 @@ use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use lys_secrets::{Broker, HandleToken, Presentation, Secret, SecretsError, Used, from_hex};
 
-use crate::files::{FileGrants, Layout};
+use crate::files::Layout;
+use crate::spice::Grants;
 
 const MAX_BODY: usize = 16 * 1024 * 1024;
 const REDACTED: &[u8] = b"[redacted]";
 
 pub(crate) struct Shared {
-    pub(crate) broker: Mutex<Broker<FileGrants>>,
+    pub(crate) broker: Mutex<Broker<Grants>>,
     pub(crate) layout: Layout,
     client: reqwest::Client,
 }
 
-pub fn serve(broker: Broker<FileGrants>, layout: Layout, listen: &str) -> Result<(), SecretsError> {
+pub fn serve(broker: Broker<Grants>, layout: Layout, listen: &str) -> Result<(), SecretsError> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()

@@ -18,6 +18,7 @@ axum.workspace = true
 clap.workspace = true
 lys-core.workspace = true
 lys-identity.workspace = true
+lys-identity-server.workspace = true
 lys-log-store.workspace = true
 rand.workspace = true
 rustix.workspace = true

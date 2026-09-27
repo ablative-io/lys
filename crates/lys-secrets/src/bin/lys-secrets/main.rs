@@ -4,6 +4,7 @@
 
 mod files;
 mod serve;
+mod spice;
 mod view;
 
 use std::io::Read;
@@ -17,6 +18,7 @@ use lys_secrets::{
 };
 
 use files::{FileGrants, Layout, Route, now_ms};
+use spice::{Grants, SpiceGrants};
 
 #[derive(Parser)]
 #[command(name = "lys-secrets", about = "The lys secrets broker")]
@@ -115,16 +117,24 @@ enum Command {
         at: Where,
         #[arg(long, default_value = "127.0.0.1:8472")]
         listen: String,
+        /// The Lys directory's configuration; when named, every use is
+        /// judged by the directory's grants on `secret/<name>`.
+        #[arg(long)]
+        directory_config: Option<PathBuf>,
+        /// The action the directory must give on the secret for a use.
+        #[arg(long, default_value = "edit")]
+        use_action: String,
     },
 }
 
-fn open(at: &Where) -> Result<Broker<FileGrants>, SecretsError> {
+fn open(at: &Where) -> Result<Broker<Grants>, SecretsError> {
     let layout = Layout::new(&at.root, &at.keys);
-    Broker::open(
-        &layout.paths(),
-        FileGrants::new(layout.grants()),
-        Box::new(now_ms),
-    )
+    open_with(at, Grants::File(FileGrants::new(layout.grants())))
+}
+
+fn open_with(at: &Where, grants: Grants) -> Result<Broker<Grants>, SecretsError> {
+    let layout = Layout::new(&at.root, &at.keys);
+    Broker::open(&layout.paths(), grants, Box::new(now_ms))
 }
 
 fn run(command: Command) -> Result<(), SecretsError> {
@@ -134,7 +144,7 @@ fn run(command: Command) -> Result<(), SecretsError> {
             layout.prepare()?;
             Broker::create(
                 &layout.paths(),
-                FileGrants::new(layout.grants()),
+                Grants::File(FileGrants::new(layout.grants())),
                 Box::new(now_ms),
             )?;
             println!(
@@ -249,9 +259,20 @@ fn run(command: Command) -> Result<(), SecretsError> {
                 );
             }
         }
-        Command::Serve { at, listen } => {
+        Command::Serve {
+            at,
+            listen,
+            directory_config,
+            use_action,
+        } => {
             let layout = Layout::new(&at.root, &at.keys);
-            let broker = open(&at)?;
+            let grants = match directory_config {
+                Some(config) => {
+                    Grants::Directory(SpiceGrants::from_directory(&config, &use_action)?)
+                }
+                None => Grants::File(FileGrants::new(layout.grants())),
+            };
+            let broker = open_with(&at, grants)?;
             serve::serve(broker, layout, &listen)?;
         }
     }
