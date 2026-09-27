@@ -1,9 +1,9 @@
 {
   "cluster": "directory",
   "title": "The standalone identity directory, with every grant rooted in a person",
-  "intention": "An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change. Cambium later uses this issuer, keeping its participant ids (rows 06 and 07); that direction is recorded here while rows 06 and 07 stay the non-goal recorded below, and this sentence promises neither row.",
+  "intention": "An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change. Cambium later uses this issuer, keeping its participant ids (row 06); that direction is recorded here while row 06 stays the non-goal recorded below, and this sentence does not promise it.",
   "problem": "IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands.",
-  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.",
+  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5. Row 07, the release proof, is carried by DIRECTORY-025 under ADR-078: it gates the exact pushed Lys, Rauthy and Cambium refs, verifies the row 03 and row 05 live install receipts, and records standalone acceptance on a staged, test-keyed install before any cutover. It checks row 01 by docs/design/identity/RAUTHY-BASELINE.md (closed), row 02 by DIRECTORY-002, row 04 by DIRECTORY-003, row 03 by DIRECTORY-004, row 05 by DIRECTORY-005, and row 06 by its lys half (card LsCN9H7-) and its Cambium half (card v0CuMstE).",
   "principles": [
     {
       "id": "P1",
@@ -50,7 +50,8 @@
     "ADR-008",
     "ADR-009",
     "ADR-010",
-    "ADR-011"
+    "ADR-011",
+    "ADR-078"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -61,8 +62,8 @@
   ],
   "non_goals": [
     {
-      "text": "Rows 06 (connect Cambium) and 07 (gate, install and demonstrate the release)",
-      "reason": "They change the Cambium repository and depend on IDENTITY-002, the upstream release rebase; they need a Cambium cluster or an agreed cross-repository arrangement first."
+      "text": "Row 06 (connect Cambium)",
+      "reason": "It changes the Cambium repository and depends on IDENTITY-002, the upstream release rebase; it needs a Cambium cluster or an agreed cross-repository arrangement first. Row 07 left this non-goal with DIRECTORY-025 (ADR-078)."
     },
     {
       "text": "Row 03's changes inside the Rauthy fork",
@@ -333,7 +334,7 @@
     },
     {
       "path": "deploy/identity/README.md",
-      "note": "install, readiness, backup and restore, and SpiceDB's step-1 sentence (DIRECTORY-002); the directory (DIRECTORY-003) and the screens (DIRECTORY-005)",
+      "note": "install, readiness, backup and restore, and SpiceDB's step-1 sentence (DIRECTORY-002); the directory (DIRECTORY-003) and the screens (DIRECTORY-005); the release rollback that never launches an older Rauthy binary against a forward-only migrated database (DIRECTORY-025)",
       "brief": "DIRECTORY-002"
     },
     {
@@ -585,6 +586,41 @@
       "path": "docs/design/directory/briefs/DIRECTORY-008.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-008"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-025.json",
+      "note": "row 07 of IDENTITY-001: gate, install and demonstrate the exact release, up to a staged, test-keyed install",
+      "brief": "DIRECTORY-025"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-025.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-025"
+    },
+    {
+      "path": "docs/design/project.json",
+      "note": "the project's gate trees; gains the demand-cadence identity-release leg",
+      "brief": "DIRECTORY-025"
+    },
+    {
+      "path": "CLAUDE.md",
+      "note": "the repository's standing instructions; its gate list gains one line naming the identity-release demand leg",
+      "brief": "DIRECTORY-025"
+    },
+    {
+      "path": "scripts/identity-gates/release.sh",
+      "note": "the identity-release leg: refuses an unclean tree, a vendor/rauthy pin off ablative and an unpushed HEAD, then runs the six lys legs and prints one JSON line per leg",
+      "brief": "DIRECTORY-025"
+    },
+    {
+      "path": "docs/design/identity/reports/IDENTITY-001-release.md",
+      "note": "row 07's release report: refs, venue legs, review, install, receipts, standalone acceptance, not met, reserved acts, status",
+      "brief": "DIRECTORY-025"
+    },
+    {
+      "path": "docs/design/identity/reports/IDENTITY-001-commands.jsonl",
+      "note": "row 07's command record: one JSON line per command run for the release",
+      "brief": "DIRECTORY-025"
     }
   ],
   "inventory": [
@@ -631,6 +667,18 @@
     {
       "path": "docs/design/decisions.json",
       "note": "the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row"
+    },
+    {
+      "path": "docs/design/project.json",
+      "note": "the project's gate trees: one tree '.', seven legs, every one cadence 'round'; the schema admits 'round' and 'demand'"
+    },
+    {
+      "path": "CLAUDE.md",
+      "note": "the repository's standing instructions; 'Gates before any commit' lists six commands and sh scripts/design/gate.sh is not among them"
+    },
+    {
+      "path": ".land/gates.sh",
+      "note": "the land gate: runs sh scripts/design/gate.sh and the six lys legs on every land, with no cadence; read, never changed by DIRECTORY-025"
     }
   ],
   "constraints": [
@@ -686,12 +734,19 @@
   "gate": [
     {
       "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
       "legs": [
         {
           "name": "fmt",
           "command": "cargo fmt --all",
           "requires": [
-            "place:here"
+            "tool:cargo",
+            "tool:rustfmt"
           ],
           "cadence": "round"
         },
@@ -699,7 +754,7 @@
           "name": "clippy-all-features",
           "command": "cargo clippy --all-targets --all-features -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -707,7 +762,7 @@
           "name": "clippy",
           "command": "cargo clippy --all-targets -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -715,7 +770,7 @@
           "name": "tests",
           "command": "cargo test --workspace --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -723,7 +778,7 @@
           "name": "doc-all-features",
           "command": "cargo doc --no-deps --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -731,36 +786,16 @@
           "name": "doc",
           "command": "cargo doc --no-deps",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        }
-      ]
-    },
-    {
-      "tree": "docs",
-      "legs": [
-        {
-          "name": "render",
-          "command": "python3 ../scripts/design/render-cluster.py design/directory",
-          "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
         {
-          "name": "validate",
-          "command": "python3 ../scripts/design/validate.py design/directory",
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        },
-        {
-          "name": "coverage",
-          "command": "python3 ../scripts/design/check-coverage.py design/directory",
-          "requires": [
-            "place:here"
+            "tool:sh",
+            "tool:python3"
           ],
           "cadence": "round"
         }

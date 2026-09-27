@@ -10,7 +10,7 @@ title: The standalone identity directory, with every grant rooted in a person
 
 ## Intention
 
-An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change. Cambium later uses this issuer, keeping its participant ids (rows 06 and 07); that direction is recorded here while rows 06 and 07 stay the non-goal recorded below, and this sentence promises neither row.
+An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change. Cambium later uses this issuer, keeping its participant ids (row 06); that direction is recorded here while row 06 stays the non-goal recorded below, and this sentence does not promise it.
 
 ## Problem
 
@@ -18,7 +18,7 @@ IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, an
 
 ## Solution
 
-Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.
+Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5. Row 07, the release proof, is carried by DIRECTORY-025 under ADR-078: it gates the exact pushed Lys, Rauthy and Cambium refs, verifies the row 03 and row 05 live install receipts, and records standalone acceptance on a staged, test-keyed install before any cutover. It checks row 01 by docs/design/identity/RAUTHY-BASELINE.md (closed), row 02 by DIRECTORY-002, row 04 by DIRECTORY-003, row 03 by DIRECTORY-004, row 05 by DIRECTORY-005, and row 06 by its lys half (card LsCN9H7-) and its Cambium half (card v0CuMstE).
 
 ## Principles
 
@@ -42,6 +42,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
 - ADR-010 — Every product shares one design and keeps its own accent; the identity product's is orange — The identity screens follow Aion's structure, typography, spacing and interaction, and Rauthy's client themes take the same colours, with no build dependency on Cambium or Aion. Each product keeps its own accent within the estate colour family: Cambium green, Aion blue and black, Argus light blue, Haematite mustard. The identity product's accent is orange (accent #D4975A, deep #A86B2E, wash #3D2A17 in the estate colour tokens), set apart from Manifold's copper. No product is silently made Aion-blue, and purple is not used.
 - ADR-011 — An identity is registered, active, suspended or retired — An identity is in one of four states: registered (exists in the directory, no grants, no credential handle, may not act), active (may act within its grants), suspended (kept whole, grants kept but not effective) and retired (permanent, history kept, never reactivated; a new identity is made instead). Register, activate, suspend, reinstate and retire are the only transitions, each one signed audit record naming the authenticated actor and their provenance, the identity, from, to, when and reason. Having a grant or a credential is a fact beside the state, not a state. A person is registered by first sign-in; an agent is registered by a signed-in person, who carries it as its responsible person for life and may cause every transition of their own agents. Source: docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:71-95.
+- ADR-078 — Row 07 is carried in the directory cluster up to a staged install, with its Cambium parts on Cambium-owned cards and the production acts left to Tom — Row 07 leaves the non-goal and is carried by a directory brief that stops at a staged install on the node the operator names, keyed with a test service key, where standalone acceptance is proved and recorded before any cutover. The Cambium install document lands through its own Cambium card with its own pull request and gate, and row 06's Cambium half stays on its own Cambium card; this brief names both as blockers and lists no Cambium file. The brief registers exactly one release leg, as a demand-cadence leg in docs/design/project.json, and every other row registers the leg it needs in its own brief. The production signing key, production receipts and the Cambium cutover are Tom's three acts. Rejected: leaving row 07 a non-goal beside a brief that carries it, listing the Cambium install document on this brief's wall, adding the release leg to .land/gates.sh where every land would run it, and standing up a staging Cambium inside this row.
 
 ## Goals
 
@@ -53,7 +54,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 
 ## Non-Goals
 
-- Rows 06 (connect Cambium) and 07 (gate, install and demonstrate the release) — They change the Cambium repository and depend on IDENTITY-002, the upstream release rebase; they need a Cambium cluster or an agreed cross-repository arrangement first.
+- Row 06 (connect Cambium) — It changes the Cambium repository and depends on IDENTITY-002, the upstream release rebase; it needs a Cambium cluster or an agreed cross-repository arrangement first. Row 07 left this non-goal with DIRECTORY-025 (ADR-078).
 - Row 03's changes inside the Rauthy fork — The fork is its own repository under vendor/rauthy; a row whose files live there needs its own brief in the fork, which does not yet exist and blocks DIRECTORY-004. DIRECTORY-004 names the fork files as work with their owner, not as files of this repository.
 - The grant representation: how one grant records who may exercise it, whether it may be passed on (person, agent or nobody), what it derives from, and whether it can be bounded. OPEN for Tom. — The statement leaves the exact delegation schema unsettled (docs/design/identity/STATEMENT-2026-09-22.md:21; ADR-003); AGENT-PARITY-2026-09-23's questions (docs/design/identity/AGENT-PARITY-2026-09-23.md:17-23) are inputs to it, not answers.
 - Suspension semantics: whether suspending a person also ends their sign-in session at Rauthy or only makes our checks refuse, and what else stops with a suspended identity. OPEN for Tom. — The lifecycle document asks it of the room (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:99-100, docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:104-105) and its states are only proposed (ADR-011); two systems, one decision.
@@ -114,7 +115,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `deploy/identity/versions.json` | pinned releases and image digests | DIRECTORY-002 |
 | `deploy/identity/config.example.toml` | example configuration without secrets, the database address included (DIRECTORY-002, DIRECTORY-003) | DIRECTORY-002 |
 | `deploy/identity/postgres-init.sql` | roles and schema namespaces for Rauthy and SpiceDB in one database | DIRECTORY-002 |
-| `deploy/identity/README.md` | install, readiness, backup and restore, and SpiceDB's step-1 sentence (DIRECTORY-002); the directory (DIRECTORY-003) and the screens (DIRECTORY-005) | DIRECTORY-002 |
+| `deploy/identity/README.md` | install, readiness, backup and restore, and SpiceDB's step-1 sentence (DIRECTORY-002); the directory (DIRECTORY-003) and the screens (DIRECTORY-005); the release rollback that never launches an older Rauthy binary against a forward-only migrated database (DIRECTORY-025) | DIRECTORY-002 |
 | `deploy/identity/rauthy-themes.json` | both Rauthy client themes | DIRECTORY-002 |
 | `deploy/identity/theme-map.md` | source tokens and colour conversions of the themes | DIRECTORY-002 |
 | `docs/design/identity/reports/IDENTITY-001-deployment.md` | row 02's report: digests, versions, resolved configuration without secrets, restore result | DIRECTORY-002 |
@@ -165,6 +166,13 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `surface/identity/src/generated/index.ts` | Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch | DIRECTORY-006 |
 | `docs/design/directory/briefs/DIRECTORY-008.json` | the grant brief residue after PR 6: DIRECTORY-005's verification line, three inventory rows and the intention sentence, as requirements on the documents | DIRECTORY-008 |
 | `docs/design/directory/briefs/DIRECTORY-008.md` | rendered markdown | DIRECTORY-008 |
+| `docs/design/directory/briefs/DIRECTORY-025.json` | row 07 of IDENTITY-001: gate, install and demonstrate the exact release, up to a staged, test-keyed install | DIRECTORY-025 |
+| `docs/design/directory/briefs/DIRECTORY-025.md` | rendered markdown | DIRECTORY-025 |
+| `docs/design/project.json` | the project's gate trees; gains the demand-cadence identity-release leg | DIRECTORY-025 |
+| `CLAUDE.md` | the repository's standing instructions; its gate list gains one line naming the identity-release demand leg | DIRECTORY-025 |
+| `scripts/identity-gates/release.sh` | the identity-release leg: refuses an unclean tree, a vendor/rauthy pin off ablative and an unpushed HEAD, then runs the six lys legs and prints one JSON line per leg | DIRECTORY-025 |
+| `docs/design/identity/reports/IDENTITY-001-release.md` | row 07's release report: refs, venue legs, review, install, receipts, standalone acceptance, not met, reserved acts, status | DIRECTORY-025 |
+| `docs/design/identity/reports/IDENTITY-001-commands.jsonl` | row 07's command record: one JSON line per command run for the release | DIRECTORY-025 |
 
 ## Inventory
 
@@ -179,6 +187,9 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - `vendor/rauthy` — the maintained Rauthy fork (ADR-009), the git submodule pinned at dd61ac3c84d6b238108dc8438b53043b5177a662, the upstream v0.36.2 commit the ablative branch was created from; DIRECTORY-004 moves the pin (structure row); read here, never changed by a document row
 - `crates/lys` — the lys CLI crate: Cargo.toml, src/main.rs, src/cli.rs and src/commands/ (attest, ca, key, log, inspect, files); DIRECTORY-002 adds src/identity/ and the identity subcommand to it (structure rows)
 - `docs/design/decisions.json` — the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row
+- `docs/design/project.json` — the project's gate trees: one tree '.', seven legs, every one cadence 'round'; the schema admits 'round' and 'demand'
+- `CLAUDE.md` — the repository's standing instructions; 'Gates before any commit' lists six commands and sh scripts/design/gate.sh is not among them
+- `.land/gates.sh` — the land gate: runs sh scripts/design/gate.sh and the six lys legs on every land, with no cadence; read, never changed by DIRECTORY-025
 
 ## Constraints
 
