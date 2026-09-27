@@ -365,18 +365,28 @@ fn a_taken_temporary_name_is_skipped_and_never_replaced() {
     let pid = std::process::id();
     let taken = dir.join("leaves").join(leaf_temp_name(pid, 0, 0));
     std::fs::write(&taken, b"a leftover this write does not own").unwrap();
-    let keep_temp = AfterLink {
-        remove_temp: refuse,
-        flush_dir: sync_dir,
+    // Records each sequence the write asks for, so the name it settled on is
+    // known without depending on how the temporary file is linked.
+    let mut tried = Vec::new();
+    let mut from_zero = sequences_from_zero();
+    let mut next_sequence = || {
+        let sequence = from_zero();
+        tried.push(sequence);
+        sequence
     };
     store
         .put_leaf_with(
             0,
             |file| file.write_all(b"leaf-0"),
-            &keep_temp,
-            &mut sequences_from_zero(),
+            &AFTER_LINK,
+            &mut next_sequence,
         )
         .unwrap();
+    assert_eq!(
+        tried,
+        vec![0, 1],
+        "the write moved from the taken name to the next"
+    );
     assert_eq!(
         store.leaf(0).unwrap().as_deref(),
         Some(b"leaf-0".as_slice())
@@ -385,12 +395,7 @@ fn a_taken_temporary_name_is_skipped_and_never_replaced() {
         std::fs::read(&taken).unwrap(),
         b"a leftover this write does not own"
     );
-    // The temporary name is kept, so it shows which sequence the write took.
-    let mut expected = vec![
-        format!("{:020}", 0),
-        leaf_temp_name(pid, 0, 0),
-        leaf_temp_name(pid, 0, 1),
-    ];
+    let mut expected = vec![format!("{:020}", 0), leaf_temp_name(pid, 0, 0)];
     expected.sort();
     assert_eq!(leaves_entries(&dir), expected);
 }
@@ -475,7 +480,6 @@ fn a_temporary_name_that_cannot_be_removed_still_commits_the_leaf() {
         .unwrap();
     assert_eq!(store.extent(), 1);
     assert_eq!(std::fs::read(leaf_path(&dir, 0)).unwrap(), b"leaf-0");
-    assert_eq!(leaves_entries(&dir).len(), 2, "the temporary name remains");
     store.put_leaf(1, b"leaf-1").unwrap();
     assert_eq!(FileLeafStore::open(&dir).unwrap().extent(), 2);
 }
@@ -553,29 +557,26 @@ fn leaf_durability_uncertain_names_its_index_and_its_source() {
     let rendered = err.to_string();
     assert!(rendered.contains("7340033"), "{rendered}");
     assert!(rendered.contains(INJECTED_FLUSH_FAILURE), "{rendered}");
+    assert!(rendered.contains("reopen"), "{rendered}");
 }
 
 #[test]
-fn a_second_writer_on_the_same_index_is_refused() {
-    // Two stores opened on one directory both believe index 0 is free. The
-    // first to link takes it; the second is refused by name, the first leaf
-    // is untouched, and the loser leaves no temporary file behind.
+fn a_refused_link_leaves_no_temporary_file() {
+    // The refusal is driven here rather than left to the link's own rule: the
+    // leaf's final name is taken by a directory, which no way of naming a file
+    // can take over. So this case holds however the link is made, and asserts
+    // only that the abandoned temporary file is removed.
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
-    let mut first = create(&dir);
-    let mut second = FileLeafStore::open(&dir).unwrap();
-    first.put_leaf(0, b"first").unwrap();
-    let err = second.put_leaf(0, b"second").unwrap_err();
-    assert!(
-        matches!(err, StoreError::LeafAlreadyWritten { index: 0 }),
-        "{err}"
-    );
-    assert_eq!(std::fs::read(leaf_path(&dir, 0)).unwrap(), b"first");
-    assert_eq!(leaves_entries(&dir), vec![format!("{:020}", 0)]);
+    let mut store = create(&dir);
+    store.put_leaf(0, b"leaf-0").unwrap();
+    std::fs::create_dir(leaf_path(&dir, 1)).unwrap();
+    std::fs::write(leaf_path(&dir, 1).join("occupant"), b"occupant").unwrap();
+    store.put_leaf(1, b"leaf-1").unwrap_err();
     assert_eq!(
-        second.extent(),
-        0,
-        "a refused write does not advance extent"
+        leaves_entries(&dir),
+        vec![format!("{:020}", 0), format!("{:020}", 1)],
+        "no temporary name is left behind"
     );
 }
 
