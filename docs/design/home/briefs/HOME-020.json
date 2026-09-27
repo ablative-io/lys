@@ -1,0 +1,327 @@
+{
+  "id": "HOME-020",
+  "cluster": "home",
+  "title": "Remove the work lys-home repeats on every call as a session grows, without changing a recorded byte",
+  "depends_on": [],
+  "blocked_by": [],
+  "checklist": [
+    "C45",
+    "C46",
+    "C47",
+    "C48",
+    "C49",
+    "C50",
+    "C51",
+    "C52",
+    "C53",
+    "C54"
+  ],
+  "stories": [
+    "S24",
+    "S25",
+    "S26",
+    "S27"
+  ],
+  "design_anchor": [
+    "ADR-012",
+    "ADR-014",
+    "ADR-016",
+    "ADR-017",
+    "ADR-107"
+  ],
+  "purpose": "lys-home repeats work on every call that grows with the session's length, and one open hides a real I/O error as a stale cache that it rebuilds and rewrites. This brief removes each repetition without changing what is recorded: a call-id map built once per open, a staged import that syncs its line file, its index and its head once each and publishes by rename (ADR-107), one pass over resume_check's ids, the canon's kept id set, an open bounded under CN7 that returns a real I/O error as that error and a read that rebuilds a cache found not to be the file's and retries once, the clones gone, and one uuid formatter. Counters on the read and sync paths prove the bounds, a test that makes the read fail proves the error, and a masked hash of an import's line bytes proves the record unchanged.",
+  "task": "The targets, at main's lines (fa3dd53, the same in lys-home at a426b9a): find_call (crates/lys-home/src/record/call.rs:332), used by ingest_call (:355), ingest_call_files (:404) and ingest_outcome (:455), reads and deserialises every lys.call entry on every ingest; import_claude_code (src/harness/claude_code/import.rs) appends each entry through append_entry (:135, :170, :195, :224, :239, :277 and :354), four syncs and a rename each, then moves the head once (:319); resume_check (src/cli.rs:501) counts every id of both transcripts once per distinct id; canon's append_example (src/record/canon.rs:364) walks every loaded entry per new one though load built the id set (:150); from_cached (src/record/index.rs:129) seeks and reads one byte per row on every open and its .ok()? turns open, seek and read failures into a stale verdict; context_path clones the entries of a path it owns (src/record/mod.rs:524, :527) and customs (:532) reads the whole path to filter it though index rows carry custom; the render's assistant arm (src/harness/claude_code/render.rs:176-180) and assistant_content (import.rs:441) clone whole content arrays to iterate them; uuid_shaped (cli.rs:430) repeats uuid_string's format (render.rs:324). The render's toolResult arm (render.rs:160) keeps its clone, which the output holds. Build R1's counters first; every bound is measured with them and never by time. The call-id map bounds the reads of an owner that keeps one Session open across calls; the CLI's ingest-call opens the session per call and still reads every lys.call entry once per open, which is its cost after this brief, and index rows carry no call id (a finding for the lys-proxy card, not this one). Only the import command's new session is staged; import_claude_code given an already-open session, and every other append, keeps per-append durability. The sync bound counts the session's own syncs; the block store's two per new block are counted beside it and unchanged. The open reads at most three rows by position, so CN7 holds; a row that is not the file's at a position not checked is caught when it is read, and that read drops the cache, rebuilds the index from the session file and retries once, refusing as Malformed when the rebuilt index fails it too, while a real I/O error is returned at once and never retried. The import-bytes proof masks the importer's fresh ids and the header timestamp and pins the parent commit's hash; import determinism stays a non-goal. HOME-013 (open) moves Session out of record/mod.rs; this brief is written against main and whichever lands second redoes its record/mod.rs edits. New logic goes in named files (io_counts.rs, staged.rs); record/mod.rs gains only module declarations, Session's new fields and the calls into them. Out of scope: the record format, the index layout, any new command or flag, import determinism, the block store's syncs, a persisted call-id lookup, and recovering a torn tail.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Count the entries a session reads and the syncs it and the block store make",
+      "spec": "Structural, with its behaviour stated. A new file crates/lys-home/src/record/io_counts.rs defines IoCounts, a public Copy value with three u64 fields, entries_read, syncs and index_rebuilds, and Session exposes its own as Session::io_counts(). A session opened with Session::open starts at zero; one made by Session::create holds the syncs create made. entries_read rises by one for every entry the Session deserialises from its file: through entry, path, context_path, customs, customs_everywhere and the call map's build (R2). syncs rises by one for every sync_all of the session file, its index file and its head file, and every sync of the sessions directory, that the Session's own writes make. index_rebuilds rises by one each time a read on the open Session drops its cached index and rebuilds it from the session file (R6); a rebuild at open is reported by index_was_rebuilt() as today and is not counted. BlockStore gains BlockStore::syncs(), rising by one for every sync_all of a block file and every directory sync that put and put_file make. The counters are held by the value that owns them, through atomics, so a read through &self counts. THE SYSTEM SHALL NOT use a process-wide counter, SHALL NOT measure time, and SHALL NOT change what any read or write does, which syncs happen, or their order; SessionReader gains no counter.",
+      "acceptance": [
+        "A session made by Home::create_session reports io_counts() equal to IoCounts { entries_read: 0, syncs: 4, index_rebuilds: 0 }: the session file, the sessions directory, the head file and the sessions directory.",
+        "After three Session::append calls on that session, io_counts().syncs is 16.",
+        "After Session::path() on that session, with the head at the third entry, io_counts().entries_read is 3; after a following Session::entry of the first entry's id it is 4.",
+        "Session::open of that session, with its index and head current, reports IoCounts { entries_read: 0, syncs: 0, index_rebuilds: 0 }.",
+        "A BlockStore on an empty home reports syncs() 0; after put(b\"one\") and put(b\"two\") it reports 4; after put(b\"one\") again it still reports 4."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/record/io_counts.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/record/mod.rs",
+          "crates/lys-home/src/record/index.rs",
+          "crates/lys-home/src/record/blocks.rs",
+          "crates/lys-home/src/record/record_tests.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C46"
+      ],
+      "stories": [
+        "S27"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Find a recorded call by id through a map built once per open",
+      "spec": "WHEN find_call is first asked for a call id on an open Session, THE SYSTEM SHALL build, once, a map from call id to entry id by reading every lys.call row of the index in file order, whatever its branch and wherever the head stands, and keeping for each call id the first entry that holds it; it SHALL answer this and every later find_call from that map. WHEN any append on the Session writes a lys.call entry (append, append_entry, append_beside, append_under), THE SYSTEM SHALL add its call id to a built map unless the map already holds that id. WHEN the Session reconciles from its file, THE SYSTEM SHALL drop the map, so the next find_call builds it again from the reloaded index. All three ingest paths (ingest_call, ingest_call_files and ingest_outcome) SHALL look up through find_call. THE SYSTEM SHALL NOT read a lys.call entry for a lookup once the map is built, SHALL NOT change what an ingest records, its idempotency, or the entry id a repeated call id returns, and SHALL NOT put a call id in the index or persist the map. The bound is for an owner that keeps one Session open across calls: the CLI's ingest-call opens the session for every call, so it still reads every lys.call entry once per open, when the map is built, and that is its cost after this brief.",
+      "acceptance": [
+        "A test in call_tests.rs ingests 100 calls with call ids c000 to c099 through ingest_call on one Session, drops it, reopens it with Session::open and ingests c100 through ingest_call: io_counts().entries_read rises by exactly 100 across that ingest.",
+        "On the same open Session, each of ten further ingests leaves io_counts().entries_read unchanged: c101 to c105 through ingest_call, repeated c000 and c001 through ingest_call, repeated c002 and c003 through ingest_call_files, and repeated c004 through ingest_outcome.",
+        "Each of the five repeated ingests returns the entry id first recorded for its call id, and the session file's length is the same before and after it.",
+        "On a Session whose map is built, a lys.call entry for call id beside appended with append_beside (the head not moved) is found by a following ingest_call of beside, which returns that entry's id and leaves the session file's length unchanged.",
+        "The seven existing tests in call_tests.rs pass unchanged, a_call_is_found_after_a_crash_before_the_head_advanced_and_after_the_head_moved among them."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-home/src/record/call.rs",
+          "crates/lys-home/src/record/mod.rs",
+          "crates/lys-home/src/record/call_tests.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C45"
+      ],
+      "stories": [
+        "S24",
+        "S27"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Stop cloning and reading what is already owned",
+      "spec": "THE SYSTEM SHALL build Session::context_path's result by moving entries out of the path it read (mod.rs lines 524 and 527 as main stands), with no Entry clone. THE SYSTEM SHALL have Session::customs (mod.rs line 532) take the path's index rows, keep those whose custom type is the one asked for, and read only those entries, in root-first order. THE SYSTEM SHALL have the Claude Code render's assistant arm (render.rs lines 176 to 180) and the importer's assistant_content (import.rs line 441) iterate the message's content array by reference, cloning a part only where the output holds it. THE SYSTEM SHALL NOT change which entries these return or their order, SHALL NOT change any rendered or recorded byte, and SHALL NOT change the render's toolResult arm (render.rs line 160), whose clone the output holds.",
+      "acceptance": [
+        "A test in record_tests.rs on a path of five entries, two of them lys.authored custom entries, gets both from customs(\"lys.authored\") in root-first order, and io_counts().entries_read rises by exactly 2.",
+        "A test in record_tests.rs on a path e1, e2, e3, e4, then a compaction e5 whose first kept entry is e3, then e6 gets from context_path the ids [e5, e3, e4, e6].",
+        "sed -n '/pub fn context_path/,/^    }/p' crates/lys-home/src/record/mod.rs | grep -c 'clone' prints 0.",
+        "sed -n '/^fn assistant_content/,/^}/p' crates/lys-home/src/harness/claude_code/import.rs | grep -c 'a.clone()' prints 0.",
+        "The render_tests and tests/claude_code_round_trip.rs pass unchanged, the_fixture_rendered_through_run_hashes_to_the_constant_pinned_here_and_in_proof_resume among them."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-home/src/record/mod.rs",
+          "crates/lys-home/src/harness/claude_code/render.rs",
+          "crates/lys-home/src/harness/claude_code/import.rs",
+          "crates/lys-home/src/record/record_tests.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C52"
+      ],
+      "stories": [
+        "S24"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Stage an import under a name beside its session and publish it once",
+      "spec": "WHEN the import command imports a transcript into a new session `<id>`, THE SYSTEM SHALL take the lock `<id>.lock`, refuse with Exists when `sessions/<id>.jsonl` exists, remove any remainder of an earlier part-way import of `<id>` (below), write the header to the staging file `sessions/<id>.jsonl.importing`, and append every imported entry to it with one write per line and no sync, keeping the index rows and the head in memory. It SHALL then publish, in this order: one sync of the staging file; the index rows written whole to `<id>.index.jsonl` through a temporary file, synced and renamed; the head written once to `<id>.head` through a temporary file, synced and renamed; one sync of the sessions directory; the staging file renamed to `<id>.jsonl`; one more sync of the sessions directory: five syncs of the session's own, whatever the record count. The staged session's lines, and the ImportReport, are what import_claude_code writes and reports today. IF the import fails or the process ends before the rename, THEN no `<id>.jsonl` exists; the next import of `<id>` and the next Session::open of `<id>.jsonl`, each after taking the lock, SHALL remove `<id>.jsonl.importing` when it is present and, when `<id>.jsonl` is absent, `<id>.index.jsonl` and `<id>.head`, and sync the sessions directory after any removal. docs/design/home/RECORD.md's section on what lys keeps beside the file SHALL state this rule beside the per-append durability order, as ADR-107 records it. THE SYSTEM SHALL NOT sync, write the index file or write the head per entry during a staged import; SHALL NOT list a staging file as a session; SHALL NOT extend reconcile or trim, rewrite or truncate a session file; SHALL NOT change the per-entry durability of import_claude_code given a session that is already open, or of any other append; and SHALL NOT change the block store's syncs, which stay outside the bound and are counted beside it.",
+      "acceptance": [
+        "A test in staged_tests.rs imports tests/fixtures/multi_result.jsonl (6 records) through the staged import and publish: the published session's io_counts().syncs is 5, and BlockStore::syncs() equals 2 times the report's blocks_new, both printed by the test for the record.",
+        "The same test over a transcript of 300 records it writes itself (150 user and 150 assistant text records in one parent chain) gives io_counts().syncs 5.",
+        "A staged import dropped after import_claude_code returns and before publish leaves sessions/<id>.jsonl absent, sessions/<id>.jsonl.importing present, and Home::session_ids() without <id>; the import command then run for the same id and transcript returns Ok, leaves no sessions/<id>.jsonl.importing, and the session it publishes opens with Session::open holding as many entries as its report's entries field.",
+        "With sessions/<id>.jsonl.importing, sessions/<id>.index.jsonl and sessions/<id>.head written by the test and no sessions/<id>.jsonl, Session::open of sessions/<id>.jsonl returns Err(HomeError::Io { .. }) and afterwards none of the three files exists.",
+        "The import command's report for multi_result.jsonl names the file sessions/multi.jsonl under the home.",
+        "The existing import_tests, render_tests and the four tests in tests/claude_code_round_trip.rs pass unchanged, the continuation import into an already-open session among them.",
+        "RECORD.md's section 'What lys keeps beside the file' holds a paragraph naming `<id>.jsonl.importing`, the publish order with its five syncs, what a crash before the rename leaves, and the removal on the next import or open."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/src/record/staged.rs",
+          "crates/lys-home/src/record/staged_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-home/src/record/mod.rs",
+          "crates/lys-home/src/record/index.rs",
+          "crates/lys-home/src/harness/claude_code/import.rs",
+          "crates/lys-home/src/cli.rs",
+          "docs/design/home/RECORD.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C47",
+        "C48"
+      ],
+      "stories": [
+        "S25",
+        "S27"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Count resume_check's tool-use ids in one pass",
+      "spec": "WHEN resume_check (cli.rs line 501 as main stands) compares a rendered and a forked transcript, THE SYSTEM SHALL count each transcript's tool_use ids in one pass over its records into a map from id to count, and SHALL report repeated_tool_use_ids as the sum, over the distinct ids of the rendered transcript, of the fork's count less the rendered count where that is positive. THE SYSTEM SHALL NOT scan a transcript once per id, and SHALL NOT change any ResumeReport field or the value any field takes.",
+      "acceptance": [
+        "resume_check_refuses_a_fork_that_repeats_a_tool_action in tests/claude_code_round_trip.rs passes unchanged.",
+        "A new test in tests/claude_code_round_trip.rs runs the resume-check command over a rendered file of two records whose tool_use ids are [a, b] and [a] and a fork of four records, those two with the same uuids then two new ones with ids [a, b] and [c], and gets rendered_records 2, forked_records 4, forked_new_records 2, repeated_tool_use_ids 2 and new_tool_uses 3.",
+        "resume_check's body holds no loop over tool_use ids nested inside another loop over tool_use ids."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-home/src/cli.rs",
+          "crates/lys-home/tests/claude_code_round_trip.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C49"
+      ],
+      "stories": [
+        "S24"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Open from the cached index with a bounded number of reads, rebuild on the first row that is not the file's, and return a real I/O error as that error",
+      "spec": "WHEN Index::read finds a cached index beside the session file, THE SYSTEM SHALL check every row in memory (it starts where the row before it ended, the first at the header's end; its len is not zero; its offset plus len does not overflow; its id is not already indexed; its parent, when it has one, is already indexed) and that the last row ends at the session file's length, and SHALL then read, through one buffered reader over the session file opened once, the final byte of the rows at positions 0, n/2 (integer division) and n-1 of the n rows, each distinct position once and in ascending order, with one seek each: at most three one-byte reads after the header whatever n is, and each byte must be a newline. from_cached takes the reader as a parameter of any type that is Read and Seek and returns Result<Option<Index>, HomeError>. IF an in-memory check fails, a checked byte is not a newline, or a read ends early with an unexpected end of file, THEN THE SYSTEM SHALL treat the cache as stale and rebuild from the session file as it does today. IF opening, seeking or reading the session file fails with any other error, THEN THE SYSTEM SHALL return HomeError::Io naming the operation and the session file from Index::read, and so from Index::load, Session::open and SessionReader::open, and SHALL NOT rebuild the index or write any file. THE SYSTEM SHALL NOT read a byte of any other row on a cache hit, SHALL NOT read the whole session file on a cache hit, and SHALL NOT change the index file's layout or the header read. A row whose boundaries sit inside the file's lines at a position that is not checked is no longer caught at open; it is caught when it is read, as follows. WHEN a read on an open Session (entry, path, context_path, customs, customs_everywhere or the call map's build) meets a row that is not the file's, that is Index::read_rows_from refusing it as StaleIndex (the entry's id differs from its row) or as Malformed (the bytes at the row do not parse as an entry), THE SYSTEM SHALL drop the cached index, rebuild it from the session file as Index::load does when its cache is stale (writing the rebuilt index beside the file), keep the head, add one to io_counts().index_rebuilds, and run the same read once more from the start against the rebuilt index. WHEN a read through an index that Index::read gave, and that writes nothing (a SessionReader's entry and customs_everywhere, the fork's reads of a lantern's holder and of the cut in fork_cut.rs, and the fork's copy of the parent's lines in fork.rs), meets such a row, or a copied line that does not end on a newline, THE SYSTEM SHALL rebuild that index in memory from the session file, write nothing, and run the same read once more against the rebuilt index, looking each row it reads up again by id; the fork keeps the rebuilt index for the rest of that fork. IF the rebuild or the retried read fails with StaleIndex or Malformed, THEN THE SYSTEM SHALL refuse with HomeError::Malformed naming the session file, and SHALL NOT retry again. IF any read of the session file fails with an I/O error, THEN THE SYSTEM SHALL return that error as HomeError::Io at once, and SHALL NOT treat it as stale, rebuild or retry. THE SYSTEM SHALL NOT retry more than once per read and SHALL NOT change what a read returns when the cached index is this file's.",
+      "acceptance": [
+        "A test in record_tests.rs builds a session of 10 entries, reads its cached rows, and calls from_cached with a reader over the session file's bytes that records every seek it is asked for: it returns Ok(Some(index)) holding 10 rows, and the recorded seeks are exactly three, to the final-byte offsets of rows 0, 5 and 9, in that order.",
+        "The same test over sessions of 1 and 2 entries records exactly one seek (row 0) and exactly two seeks (rows 0 and 1).",
+        "from_cached over the 10 rows with a reader whose every read returns an io::Error of kind Other returns Err(HomeError::Io { .. }) whose source has kind Other.",
+        "from_cached over the 10 rows with a reader whose every seek returns an io::Error of kind PermissionDenied returns Err(HomeError::Io { .. }) whose source has kind PermissionDenied.",
+        "from_cached over the 10 rows with a reader whose every read returns an io::Error of kind UnexpectedEof returns Ok(None).",
+        "The four tests in tests/cached_index.rs pass unchanged: the untouched index opens with index_was_rebuilt() false, and the self-parent row, the row naming a parent not yet indexed, and the rows shifted by one byte each open with index_was_rebuilt() true.",
+        "A new test in tests/cached_index.rs on a session of 10 entries whose last cached row claims one byte fewer than it holds opens with index_was_rebuilt() true and a path of 10 entries.",
+        "grep -n '.ok()?' crates/lys-home/src/record/index.rs prints nothing.",
+        "A test in tests/cached_index.rs on a session of 10 entries whose cached rows 1 and 2 are rewritten so that row 1 claims 3 bytes fewer and row 2 starts 3 bytes earlier and claims 3 bytes more (rows 0, 5 and 9 untouched) opens with index_was_rebuilt() false; a following Session::entry of the id of row 1 returns the entry of that id, io_counts().index_rebuilds is 1, and the index file on disk then holds 10 rows each ending on a newline of the session file.",
+        "On that same Session, a following Session::entry of the id of row 2 returns the entry of that id and io_counts().index_rebuilds stays 1.",
+        "A test in tests/cached_index.rs on a session of 10 entries, opened with index_was_rebuilt() false, whose entry at row 3 is then overwritten in the session file by the same number of bytes of the letter x ending in a newline, gets Err(HomeError::Malformed { .. }) from Session::entry of that entry's id, and a second call gets Err(HomeError::Malformed { .. }) again.",
+        "A test in tests/cached_index.rs on a session of 10 entries, opened, whose session file is then removed, gets Err(HomeError::Io { .. }) of kind NotFound from Session::path(), and io_counts().index_rebuilds is 0.",
+        "A test in tests/cached_index.rs on a session of 10 entries whose rows 1 and 2 are custom entries of type probe and whose cached rows 1 and 2 are shifted by 3 bytes as in the owner test above: SessionReader::open gives index_was_scanned() false; SessionReader::entry of row 1's id returns the entry of that id; customs_everywhere(\"probe\") returns exactly two entries, the ids of rows 1 and 2 in that order; and every file under the home's sessions/ directory has the same SHA-256 before the open and after these calls.",
+        "A test in tests/cached_index.rs on a session of 10 entries, opened by SessionReader::open with index_was_scanned() false, whose entry at row 3 is then overwritten in the session file by the same number of bytes of the letter x ending in a newline, gets Err(HomeError::Malformed { .. }) from SessionReader::entry of that entry's id, and every file under sessions/ has the same SHA-256 before and after the call.",
+        "A test in tests/cached_index.rs builds a session of 10 message entries in one line, user at even rows and assistant at odd rows, lights a lantern with light at row 9's entry (so the lantern is row 10 of 11 and the open samples rows 0, 5 and 10), and rewrites cached rows 1 and 2 as in the owner test: fork(&home, lantern, None) returns Ok with a report of 10 entries, the child's 10 lines after its header have, line for line, the SHA-256 of the parent's 10 lines after its header, and the parent's index file as it stood before the fork is a byte prefix of it after.",
+        "The same test with cached rows 9 and 10 rewritten instead, so that row 9 claims 3 bytes more and row 10 starts 3 bytes later and claims 3 bytes fewer (the lantern's row, read by the fork's holder read, now starts inside its line while its final byte is still a newline): fork(&home, lantern, None) returns Ok with a report of 10 entries, the child's 10 copied lines hash equal to the parent's as above, and the parent's index file as it stood before the fork is a byte prefix of it after.",
+        "The same test with cached rows 1 and 2 rewritten by one byte instead, so that row 1 claims 1 byte fewer and row 2 starts 1 byte earlier and claims 1 byte more (both still parse as their entries, so the cut's read succeeds and the fork's copy of row 1 meets a line that does not end on a newline): fork(&home, lantern, None) returns Ok with a report of 10 entries, the child's 10 copied lines hash equal to the parent's as above, and the parent's index file as it stood before the fork is a byte prefix of it after."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-home/src/record/index.rs",
+          "crates/lys-home/src/record/mod.rs",
+          "crates/lys-home/src/record/reader.rs",
+          "crates/lys-home/src/record/fork_cut.rs",
+          "crates/lys-home/src/record/fork.rs",
+          "crates/lys-home/src/record/record_tests.rs",
+          "crates/lys-home/tests/cached_index.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C51"
+      ],
+      "stories": [
+        "S24",
+        "S26"
+      ]
+    },
+    {
+      "id": "R7",
+      "title": "Keep the canon's id set and refuse a repeat by it",
+      "spec": "Canon gains a private field holding the set of entry ids load builds (canon.rs line 150), kept when load returns, and a public Canon::contains(id). WHEN an example is added, THE SYSTEM SHALL refuse a new entry whose id the set holds, or which repeats an id earlier in the same addition, with DuplicateEntry naming the canon and the id, as it does today. THE SYSTEM SHALL NOT walk the loaded entries per new entry (canon.rs line 364), SHALL NOT change load's refusals or the canon file, and SHALL NOT change Canon's public fields.",
+      "acceptance": [
+        "grep -n 'entries.iter().any' crates/lys-home/src/record/canon.rs prints nothing.",
+        "A test in canon_tests.rs loads a canon of three entries and gets Canon::contains true for each of their ids and false for absent.",
+        "A test in canon_tests.rs adding an example whose entry id is already in that canon gets Err(HomeError::DuplicateEntry { .. }) naming the canon and that id, and the canon file's bytes are the same before and after.",
+        "The four existing tests in canon_tests.rs pass unchanged."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-home/src/record/canon.rs",
+          "crates/lys-home/src/record/canon_tests.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C50"
+      ],
+      "stories": [
+        "S27"
+      ]
+    },
+    {
+      "id": "R8",
+      "title": "Write every uuid's hyphenated form through one function",
+      "spec": "THE SYSTEM SHALL write every uuid's 8-4-4-4-12 form through uuid_string in render.rs (line 324 as main stands). WHEN the fewshot command draws its session id or a record's uuid, THE SYSTEM SHALL draw 16 random bytes, set byte 6 to (byte & 0x0f) | 0x40 and byte 8 to (byte & 0x0f) | 0x80, and format them with uuid_string, so each id carries '4' at character 14 and '8' at character 19, counting from 0, as uuid_shaped's did. THE SYSTEM SHALL NOT keep uuid_shaped's own formatting (cli.rs line 430), SHALL NOT change uuid_string or anything it returns, and SHALL NOT change any rendered byte.",
+      "acceptance": [
+        "grep -n 'fn uuid_shaped' crates/lys-home/src/cli.rs prints nothing.",
+        "grep -rn '\"{}-{}-' crates/lys-home/src --include='*.rs' | grep -v '_tests.rs' prints exactly one line, in render.rs.",
+        "A new test in tests/claude_code_round_trip.rs runs the fewshot command over six turns and asserts that each record's uuid and sessionId is 36 characters with '-' at characters 8, 13, 18 and 23, '4' at 14 and '8' at 19, and 32 lowercase hex digits once the dashes are removed.",
+        "the_fixture_rendered_through_run_hashes_to_the_constant_pinned_here_and_in_proof_resume and the uuid_string tests in render_tests.rs pass unchanged."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-home/src/cli.rs",
+          "crates/lys-home/src/harness/claude_code/render.rs",
+          "crates/lys-home/tests/claude_code_round_trip.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C53"
+      ],
+      "stories": [
+        "S27"
+      ]
+    },
+    {
+      "id": "R9",
+      "title": "Prove an import's recorded bytes unchanged by a masked hash pinned at the parent commit",
+      "spec": "A new test file crates/lys-home/tests/import_bytes.rs, using only lys_home items present at the parent commit (cli::run with Command::Import), imports tests/fixtures/multi_result.jsonl into a fresh home as session multi through the import command, reads sessions/multi.jsonl, and masks it: the header line's timestamp value is replaced by the token T, and every run of exactly 32 lowercase hex digits with no hex digit on either side is replaced by # followed by its order of first appearance, counting from 0. It asserts that the SHA-256 of the masked bytes, in lowercase hex, equals a constant pinned in the file, which is the value the same file gives when run at the parent commit the change is built on. THE SYSTEM SHALL NOT change the importer's id draws or the header's timestamp to make the hash hold (import determinism stays a non-goal), SHALL NOT mask anything but those two, and SHALL NOT pin a value taken at the head alone.",
+      "acceptance": [
+        "cargo test -p lys-home --test import_bytes passes at the head.",
+        "With crates/lys-home/tests/import_bytes.rs copied into a worktree of the parent commit, cargo test -p lys-home --test import_bytes passes there.",
+        "The masking applied to {\"id\":\"0123456789abcdef0123456789abcdef\",\"parentId\":\"0123456789abcdef0123456789abcdef\",\"x\":\"fedcba9876543210fedcba9876543210\"} gives {\"id\":\"#0\",\"parentId\":\"#0\",\"x\":\"#1\"}, asserted in the same file.",
+        "The masking leaves a 64-digit hex block hash and the hyphenated uuid 11111111-1111-4111-8111-111111111111 unchanged, asserted in the same file.",
+        "Two imports of the fixture at the head into two fresh homes give different SHA-256 values of their raw line bytes and equal SHA-256 values of their masked bytes, asserted in the same file."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-home/tests/import_bytes.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C54"
+      ],
+      "stories": [
+        "S27"
+      ]
+    }
+  ],
+  "boundaries": [
+    "No byte of any recorded line changes: the session header's fields, every entry, lys.call, lys.harness_event and the ids the importer writes are as today.",
+    "The index file's layout (IndexRow's id, parent, offset, len and custom and their serialisation), the head file's content and the names and places of the index, head and lock files do not change; the only new name is the staging file `<id>.jsonl.importing`.",
+    "No new CLI command or flag, and no field added to any command's report.",
+    "Per-append durability is unchanged for append, append_entry, append_beside, append_under, move_head, lanterns, epilogues, forks, call ingest and an import into an already-open session; only the import command's staged session batches.",
+    "The block store's put and put_file write and sync as today; they are only counted.",
+    "Render output and ADR-016's derived uuids are byte-identical; the render hash pinned in tests/claude_code_round_trip.rs and PROOF-RESUME.md does not change.",
+    "The importer's fresh ids and the header's timestamp are drawn as today; import determinism is not attempted.",
+    "Reconcile is not extended and no session file is trimmed, rewritten or truncated.",
+    "No call id in the index and no call-id lookup persisted beside the file.",
+    "No existing test is edited, removed or ignored; tests are only added.",
+    "No unwrap, expect, panic, todo, unimplemented or unreachable in library code; no #[allow], #[ignore] or _-prefixed unused binding; no file over 500 lines of code.",
+    "The design's structure array is the whole file list; a path outside it is not created."
+  ],
+  "verification": [
+    "From the repository root: cargo fmt --all leaves the tree unchanged.",
+    "cargo clippy --all-targets --all-features -- -D warnings and cargo clippy --all-targets -- -D warnings exit 0.",
+    "cargo test --workspace --all-features exits 0, and its output lists every test that existed at fa3dd53 in lys-home as passed.",
+    "cargo doc --no-deps --all-features and cargo doc --no-deps exit 0 with no warnings.",
+    "sh scripts/design/gate.sh exits 0.",
+    "git diff fa3dd53 -- crates/lys-home/tests crates/lys-home/src/record/*_tests.rs crates/lys-home/src/harness/claude_code/*_tests.rs | grep -E '^-[^-]' prints nothing.",
+    "git diff fa3dd53 -- crates/lys-home/src/record/entries.rs crates/lys-home/tests/fixtures docs/design/home/PROOF-RESUME.md prints nothing.",
+    "Copy crates/lys-home/tests/import_bytes.rs into a worktree at fa3dd53 and run cargo test -p lys-home --test import_bytes there; it passes, as it does at the head.",
+    "grep -n '.ok()?' crates/lys-home/src/record/index.rs, grep -n 'fn uuid_shaped' crates/lys-home/src/cli.rs and grep -n 'entries.iter().any' crates/lys-home/src/record/canon.rs each print nothing."
+  ]
+}
