@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,43 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-054",
+      "title": "lys recognises test code by structure the file carries, for ast-grep and clippy alike",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for lys, in rulings to the lys-gate card's runs; recorded with LYSCORE-001",
+      "context": "An unwrap/expect/panic rule needs to tell test code from library code. 227 calls sat outside #[test] fns and #[cfg(test)] mods, in 2 fixtures and 47 sibling *_tests.rs files, and 106 files opted out of clippy with a per-module #![allow], which the new no-lint-bypass-attributes rule reports.",
+      "decision": "Test code is a file whose first line is #![cfg(test)], a #[cfg(test)] mod body, a #[test] fn body, or a path under a crate's tests/ directory; every file only ever compiled as a test carries the first-line marker, and clippy.toml's allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests replace the per-module #![allow]. Rejected: an exemption list of file names in the rule, and rewriting the test helpers' calls.",
+      "quote": "",
+      "consequences": [
+        "Every new fixture, sibling test file, integration root or test harness module begins with #![cfg(test)].",
+        "No rule or config holds a list of file names to exempt.",
+        "CLAUDE.md and Cargo.toml name clippy.toml in place of the per-module #![allow]; lys's clippy.toml takes the opposite setting from Cambium's.",
+        "No #[allow] of any kind replaces a removed one."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-055",
+      "title": "Cambium's ast-grep rules are carried into lys only where they can fire",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for lys, in rulings to the lys-gate card's runs; recorded with LYSCORE-001",
+      "context": "The words asked for the same rule set Cambium carries. Three of Cambium's six rules concern async code and door handlers, and lys has no async fn, no tokio and no std Mutex; Cambium carries no _name rule.",
+      "decision": "lys carries mod-rs-declarations-only, no-let-underscore-on-results and no-lint-bypass-attributes, and records no-std-mutex-in-async, no-timer-in-door-handlers and no-timer-import-in-door-handlers as not carried with the finding that they cannot fire; the _name rule is its own card. Rejected: copying all six rules, which would look like cover the scan cannot give.",
+      "quote": "",
+      "consequences": [
+        "The card that lands lys's first async code carries no-std-mutex-in-async and names this decision in its brief.",
+        "The lys and Cambium rule sets differ, and neither is edited to match the other.",
+        "A _name rule for lys is written by a card of its own that handles each binding by its act."
       ],
       "supersedes": [],
       "superseded_by": ""

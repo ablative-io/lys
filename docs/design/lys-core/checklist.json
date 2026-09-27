@@ -1,0 +1,150 @@
+{
+  "cluster": "lys-core",
+  "sections": [
+    {
+      "name": "Cluster documents",
+      "items": [
+        {
+          "id": "C1",
+          "text": "DESIGN-PRE-METHOD.md, CHECKLIST-PRE-METHOD.md and USER-STORIES-PRE-METHOD.md under docs/design/lys-core are byte-identical to DESIGN.md, CHECKLIST.md and USER-STORIES.md at 7b53625.",
+          "done": false
+        },
+        {
+          "id": "C2",
+          "text": "DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSCORE-001.md under docs/design/lys-core are what render-cluster.py renders, and sh scripts/design/gate.sh exits 0.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Rule set",
+      "items": [
+        {
+          "id": "C3",
+          "text": "sgconfig.yml at the repository root names rules/ast-grep as its only rule directory.",
+          "done": false
+        },
+        {
+          "id": "C4",
+          "text": "rules/ast-grep carries mod-rs-declarations-only, no-let-underscore-on-results and no-lint-bypass-attributes with the rule bodies Cambium carries at 1be80d8ec.",
+          "done": false
+        },
+        {
+          "id": "C5",
+          "text": "rules/ast-grep carries the error-severity rule no-unwrap-expect-panic-outside-tests, which reports unwrap, expect and panic outside test code recognised by structure.",
+          "done": false
+        },
+        {
+          "id": "C6",
+          "text": "Every rule in rules/ast-grep ignores vendor/**.",
+          "done": false
+        },
+        {
+          "id": "C7",
+          "text": "The brief records no-std-mutex-in-async, no-timer-in-door-handlers, no-timer-import-in-door-handlers and the _name rule as not carried, each with its finding.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Test code by structure",
+      "items": [
+        {
+          "id": "C8",
+          "text": "clippy.toml sets allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests to true.",
+          "done": false
+        },
+        {
+          "id": "C9",
+          "text": "Both fixture.rs files and the 88 sibling *_tests.rs files under src/ begin with #![cfg(test)] and carry no #![allow].",
+          "done": false
+        },
+        {
+          "id": "C10",
+          "text": "The 28 integration test roots and both tests/harness/mod.rs files begin with #![cfg(test)] and carry no #![allow].",
+          "done": false
+        },
+        {
+          "id": "C11",
+          "text": "The env-backed tests of Ed25519Identity::from_env call no set_var, remove_var or unsafe code, and from_env keeps its signature and its error texts.",
+          "done": false
+        },
+        {
+          "id": "C12",
+          "text": "The comment above #![cfg_attr(not(test), forbid(unsafe_code))] in lys-core's lib.rs says what is true after the env tests change, and the attribute is byte-identical.",
+          "done": false
+        },
+        {
+          "id": "C13",
+          "text": "grep finds zero #[allow], #![allow], #[expect] and #[ignore] under crates/.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Hits fixed at their cause",
+      "items": [
+        {
+          "id": "C14",
+          "text": "The tests/harness/mod.rs files of lys-core and lys-anchor and lys-home's harness/claude_code/mod.rs hold only module declarations and re-exports.",
+          "done": false
+        },
+        {
+          "id": "C15",
+          "text": "The `let _ =` hits in the two CLI hex writers, the 14 test-code writes, identity_tests.rs and json_output_tests.rs are gone.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Documents naming the policy",
+      "items": [
+        {
+          "id": "C16",
+          "text": "CLAUDE.md's coding-standards sentence and the Cargo.toml lint comment name clippy.toml's allow-*-in-tests in place of the per-module #![allow].",
+          "done": false
+        },
+        {
+          "id": "C17",
+          "text": "CLAUDE.md's gates block lists `ast-grep scan --config sgconfig.yml` and its count sentence matches the lines it lists.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "The gate leg",
+      "items": [
+        {
+          "id": "C18",
+          "text": "docs/design/project.json has a leg running `ast-grep scan --config sgconfig.yml` requiring tool:ast-grep, and validate.py accepts the file.",
+          "done": false
+        },
+        {
+          "id": "C19",
+          "text": ".land/gates.sh runs `leg ast-grep scan --config sgconfig.yml`.",
+          "done": false
+        },
+        {
+          "id": "C20",
+          "text": ".github/workflows/ci.yml installs ast-grep 0.44.1 and runs `ast-grep scan --config sgconfig.yml`.",
+          "done": false
+        },
+        {
+          "id": "C21",
+          "text": "`ast-grep scan --config sgconfig.yml` reports zero hits and exits 0 at the landed commit.",
+          "done": false
+        },
+        {
+          "id": "C22",
+          "text": "A never-landed scratch file with an unwrap and no #![cfg(test)] makes .land/gates.sh show the ast-grep leg red and every other leg green.",
+          "done": false
+        },
+        {
+          "id": "C23",
+          "text": "The leg lands only after origin/main's crates/lys-home/src/record/mod.rs has zero non-module lines, checked by command.",
+          "done": false
+        }
+      ]
+    }
+  ]
+}
