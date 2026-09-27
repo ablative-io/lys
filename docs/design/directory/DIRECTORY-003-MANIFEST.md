@@ -28,7 +28,7 @@ Every new file in the three new directories, with its one responsibility. A file
 
 | File | Responsibility |
 | --- | --- |
-| Cargo.toml | Package manifest. New workspace dependencies for review: axum and tokio for the HTTP service, and openidconnect for token validation against the configured issuer. |
+| Cargo.toml | Package manifest. New workspace dependencies, each pinned: axum 0.8.9 and tokio 1.53.1 for the HTTP service, and openidconnect 4.0.1 with default features off and only reqwest and rustls-tls on, for token validation against the configured issuer. TLS is rustls, never native-tls. |
 | src/main.rs | Binary entry: read the configuration, open the directory, serve. |
 | src/lib.rs | Declarations and re-exports only. |
 | src/config.rs | Typed configuration and its validation: listen address, log directory, event key file, OIDC issuer, and the administrator's configured issuer and subject (P9). No secret value in any diagnostic. |
@@ -59,6 +59,6 @@ Every new file in the three new directories, with its one responsibility. A file
 
 Cargo.toml and Cargo.lock gain the two crates, the test crate and the new dependencies. docs/design/identity/DIRECTORY-CONTRACT.md and docs/design/identity/IDENTITY-EVENTS.md are written as R1, R2 and R5 say. The deploy files under deploy/identity gain the directory service as R1 says, and they are not changed until DIRECTORY-002 has written them.
 
-## Open for the reviewer
+## Settled by the reviewer
 
-The event envelope in event.rs and encoding.rs signs durable bytes, so R2 has it reviewed jointly with Archie before it is committed. The three new dependencies need a yes. OIDC could be written by hand against the issuer's keys instead of openidconnect; I recommend the crate, because hand-written token validation is where sign-in bugs live.
+Archie approved this manifest as lead. The three new workspace dependencies are pinned as listed above, and TLS is rustls, never native-tls. Token checks go through openidconnect, never by hand. tests/identity_contract is a workspace test crate with the in-process fake issuer. The event envelope in event.rs and encoding.rs signs durable bytes, so those two files are committed on their own first, for the joint review R2 asks for, before the rest of the row is built on them.
