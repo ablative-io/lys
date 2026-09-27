@@ -23,6 +23,7 @@ use lys_identity::signer::load_service_key;
 use crate::admission::{AUTHORITY, Admission};
 use crate::config::Config;
 use crate::error::ServerError;
+use crate::grants::{GrantSetup, GrantState};
 use crate::oidc::Oidc;
 use crate::session::{Sessions, now};
 
@@ -36,6 +37,10 @@ pub struct AppState {
     pub sessions: Sessions,
     /// Who is admitted to what.
     pub admission: Admission,
+    /// The grants, opened on first use once the root authority exists.
+    pub grants: Mutex<Option<GrantState>>,
+    /// What the grants are opened from.
+    pub grant_setup: GrantSetup,
 }
 
 type Shared = Arc<AppState>;
@@ -52,6 +57,13 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
             config.administrator_binding()?,
             config.link_audit_binding()?,
         ),
+        grants: Mutex::new(None),
+        grant_setup: GrantSetup {
+            log_dir: config.grant_log_dir.clone(),
+            log_origin: config.grant_log_origin.clone(),
+            key_file: config.event_key_file.clone(),
+            model: config.grant_model()?,
+        },
     })))
 }
 
@@ -87,6 +99,7 @@ pub fn router(state: Shared) -> Router {
         .route("/identities/{id}/transitions", post(transition))
         .route("/people/{id}/logins", post(bind_login))
         .merge(crate::read_api::routes())
+        .merge(crate::grants::routes())
         .merge(crate::receipts_api::routes())
         .merge(crate::link_audit_api::routes())
         .with_state(state)
@@ -152,7 +165,7 @@ pub(crate) fn hex(bytes: &[u8]) -> String {
     text
 }
 
-fn identity_id(text: &str) -> Result<IdentityId, ServerError> {
+pub(crate) fn identity_id(text: &str) -> Result<IdentityId, ServerError> {
     if text.starts_with("agent-") {
         return AgentId::from_str(text)
             .map(IdentityId::Agent)

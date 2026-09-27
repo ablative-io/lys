@@ -149,6 +149,14 @@ impl Harness {
     }
 }
 
+/// The grant log's origin in every started service.
+pub const GRANT_ORIGIN: &str = "example.test/lys/grants";
+/// The permission model every started service judges grants against. Its
+/// relation names say nothing of their actions: `alpha` carries read and
+/// write, `beta` carries read alone.
+pub const GRANT_MODEL: &str =
+    r#"{"version":1,"relations":{"alpha":["read","write"],"beta":["read"]}}"#;
+
 /// The administrator's subject at the fake issuer.
 pub const ADMINISTRATOR: &str = "administrator-subject";
 /// The link-audit source's subject at the fake issuer.
@@ -227,7 +235,11 @@ impl Service {
             link_audit_source: configured(LINK_AUDIT_SOURCE),
             session_seconds: 600,
             secure_cookie: false,
+            grant_log_dir: dir.path().join("grant-log"),
+            grant_log_origin: GRANT_ORIGIN.to_owned(),
+            grant_model_file: dir.path().join("grant-model.json"),
         };
+        std::fs::write(&config.grant_model_file, GRANT_MODEL)?;
         config.validate()?;
         let prepared = prepare(&config)?;
         let app = service(&config).await?;

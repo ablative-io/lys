@@ -5,10 +5,12 @@
 //! start and held by openidconnect's `ClientSecret`, whose debug form is
 //! redacted. No diagnostic prints a secret value.
 
+use std::collections::BTreeSet;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 use lys_identity::LoginBinding;
+use lys_identity::grants::{Action, Model, Relation};
 use serde::Deserialize;
 
 use crate::error::ServerError;
@@ -51,6 +53,21 @@ pub struct Config {
     pub session_seconds: u64,
     /// Whether the session cookie is marked Secure.
     pub secure_cookie: bool,
+    /// The directory the grant log is kept in.
+    pub grant_log_dir: PathBuf,
+    /// The grant log's origin, used when the log is created.
+    pub grant_log_origin: String,
+    /// The file holding the permission model grants are judged against.
+    pub grant_model_file: PathBuf,
+}
+
+/// The permission model as its file writes it: a version, and each relation
+/// with the actions it carries.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ModelFile {
+    version: u64,
+    relations: std::collections::BTreeMap<String, Vec<String>>,
 }
 
 fn invalid(reason: impl Into<String>) -> ServerError {
@@ -100,6 +117,28 @@ impl Config {
             &self.link_audit_source.subject,
         )
         .map_err(|error| invalid(format!("link_audit_source: {error}")))
+    }
+
+    /// The permission model, read from its file and checked.
+    pub fn grant_model(&self) -> Result<Model, ServerError> {
+        let path = &self.grant_model_file;
+        let text = std::fs::read_to_string(path)
+            .map_err(|error| invalid(format!("{} could not be read: {error}", path.display())))?;
+        let file: ModelFile = serde_json::from_str(&text)
+            .map_err(|error| invalid(format!("{} is not a model: {error}", path.display())))?;
+        let mut relations = Vec::with_capacity(file.relations.len());
+        for (relation, actions) in file.relations {
+            let actions = actions
+                .iter()
+                .map(|action| Action::new(action))
+                .collect::<Result<BTreeSet<_>, _>>()
+                .map_err(|error| invalid(format!("grant model: {error}")))?;
+            let relation = Relation::new(&relation)
+                .map_err(|error| invalid(format!("grant model: {error}")))?;
+            relations.push((relation, actions));
+        }
+        Model::new(file.version, relations)
+            .map_err(|error| invalid(format!("grant model: {error}")))
     }
 
     /// The client secret, read from its file. The value is never part of an error.

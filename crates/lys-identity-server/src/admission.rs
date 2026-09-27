@@ -29,6 +29,11 @@ impl Admission {
         }
     }
 
+    /// The configured administrator's login.
+    pub fn administrator_login(&self) -> &LoginBinding {
+        &self.administrator
+    }
+
     /// Admit `actor` as the administrator, or refuse by name.
     pub fn administrator(&self, actor: &Actor) -> Result<(), ServerError> {
         if actor.binding() == &self.administrator {

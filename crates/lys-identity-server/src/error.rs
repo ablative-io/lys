@@ -4,6 +4,7 @@ use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use lys_identity::IdentityError;
+use lys_identity::grants::GrantError;
 
 /// Everything the service refuses.
 #[derive(Debug, thiserror::Error)]
@@ -11,6 +12,9 @@ pub enum ServerError {
     /// A directory refusal.
     #[error(transparent)]
     Identity(#[from] IdentityError),
+    /// A grant refusal, from the grants' one authority owner.
+    #[error(transparent)]
+    Grant(#[from] GrantError),
     /// The caller has no live session.
     #[error("NotSignedIn: sign in through the configured issuer first")]
     NotSignedIn,
@@ -26,6 +30,15 @@ pub enum ServerError {
     /// The agent is not one the caller may see: the directory does not hold it, or it answers to another person.
     #[error("AgentNotVisible: no agent by that id is visible to the signed-in caller")]
     AgentNotVisible,
+    /// The grant is not one the caller may see: the grants do not hold it, or it is another's.
+    #[error("GrantNotVisible: no grant by that id is visible to the signed-in caller")]
+    GrantNotVisible,
+    /// A grant refusal whose record names a grant or identity the caller may not see.
+    #[error("{refusal}: the refusal names a grant or identity the caller may not inspect")]
+    Withheld {
+        /// The refusal's name, as the whole refusal carries it.
+        refusal: String,
+    },
     /// A sign-in answer names a state this service did not issue, or one already used.
     #[error("SignInStateUnknown: the sign-in answer does not match a sign-in this service began")]
     SignInStateUnknown,
@@ -65,23 +78,68 @@ impl ServerError {
     fn status(&self) -> StatusCode {
         match self {
             Self::NotSignedIn => StatusCode::UNAUTHORIZED,
-            Self::NotAdmitted { .. } | Self::NoPerson => StatusCode::FORBIDDEN,
-            Self::AgentNotVisible => StatusCode::NOT_FOUND,
+            Self::NotAdmitted { .. } | Self::NoPerson | Self::Withheld { .. } => {
+                StatusCode::FORBIDDEN
+            }
+            Self::AgentNotVisible | Self::GrantNotVisible => StatusCode::NOT_FOUND,
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. } => StatusCode::BAD_GATEWAY,
             Self::ConfigInvalid { .. } | Self::DirectoryUnavailable { .. } => {
                 StatusCode::SERVICE_UNAVAILABLE
             }
-            Self::Identity(error) => match error {
-                IdentityError::IdentityUnknown { .. } => StatusCode::NOT_FOUND,
-                IdentityError::AppendUncertain { .. }
-                | IdentityError::LogUnavailable { .. }
-                | IdentityError::AppendRefused { .. }
-                | IdentityError::RandomSourceUnavailable { .. }
-                | IdentityError::KeyUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
-                _ => StatusCode::CONFLICT,
-            },
+            Self::Identity(error) => identity_status(error),
+            Self::Grant(error) => grant_status(error),
         }
+    }
+}
+
+fn identity_status(error: &IdentityError) -> StatusCode {
+    match error {
+        IdentityError::IdentityUnknown { .. } => StatusCode::NOT_FOUND,
+        IdentityError::AppendUncertain { .. }
+        | IdentityError::LogUnavailable { .. }
+        | IdentityError::AppendRefused { .. }
+        | IdentityError::RandomSourceUnavailable { .. }
+        | IdentityError::KeyUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
+        _ => StatusCode::CONFLICT,
+    }
+}
+
+fn grant_status(error: &GrantError) -> StatusCode {
+    match error {
+        GrantError::Identity(error) => identity_status(error),
+        GrantError::GrantIdMalformed { .. }
+        | GrantError::TokenInvalid { .. }
+        | GrantError::AuthorityAbsent { .. }
+        | GrantError::PassOnOutside
+        | GrantError::WindowInvalid { .. }
+        | GrantError::LineageMalformed { .. }
+        | GrantError::MemberUnknown { .. }
+        | GrantError::MemberMissing { .. }
+        | GrantError::RecipientKindUnknown { .. }
+        | GrantError::GrantMalformed { .. }
+        | GrantError::GrantNotCanonical
+        | GrantError::EventMalformed { .. }
+        | GrantError::EventNotCanonical
+        | GrantError::EventTooLarge { .. } => StatusCode::BAD_REQUEST,
+        GrantError::SourceUnknown { .. } | GrantError::GrantUnknown { .. } => StatusCode::NOT_FOUND,
+        GrantError::ModelInvalid { .. }
+        | GrantError::EventMismatch { .. }
+        | GrantError::VersionUnsupported { .. }
+        | GrantError::SignerMismatch
+        | GrantError::SignatureInvalid
+        | GrantError::ReceiptInvalid { .. }
+        | GrantError::LogUnavailable { .. }
+        | GrantError::LeafNotAnEvent { .. }
+        | GrantError::AppendRefused { .. }
+        | GrantError::OperationUnresolved { .. }
+        | GrantError::ProjectionPending { .. }
+        | GrantError::StaleDecision { .. }
+        | GrantError::PermissionEngineUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
+        GrantError::OperationReused { .. }
+        | GrantError::GrantExists { .. }
+        | GrantError::AlreadyRevoked { .. } => StatusCode::CONFLICT,
+        _ => StatusCode::FORBIDDEN,
     }
 }
 

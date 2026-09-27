@@ -9,6 +9,8 @@ pub mod admission;
 pub mod config;
 pub mod dev_seed;
 pub mod error;
+pub mod grant_contract;
+pub mod grants;
 pub mod link_audit_api;
 pub mod oidc;
 pub mod read_api;
