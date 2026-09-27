@@ -6,7 +6,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use lys_secrets::{BrokerPaths, Denied, PermissionCheck, Permitted, Relation, SecretsError};
+use lys_secrets::{
+    BrokerPaths, Denied, PermissionCheck, Permitted, Relation, SecretsError, ServiceKey,
+};
 use serde::{Deserialize, Serialize};
 
 /// The broker's clock.
@@ -95,6 +97,32 @@ impl Layout {
         }
         let bytes = fs::read(&path).map_err(io_error(format!("reading {}", path.display())))?;
         serde_json::from_slice(&bytes).map_err(json_error("routes file"))
+    }
+
+    fn services_path(&self) -> PathBuf {
+        self.root.join("services.json")
+    }
+
+    /// The screen services the broker trusts. None are trusted until one
+    /// is added.
+    pub fn services(&self) -> Result<Vec<ServiceKey>, SecretsError> {
+        let path = self.services_path();
+        if !path.exists() {
+            return Ok(Vec::new());
+        }
+        let bytes = fs::read(&path).map_err(io_error(format!("reading {}", path.display())))?;
+        serde_json::from_slice(&bytes).map_err(json_error("services file"))
+    }
+
+    /// Trusts the screen service `service`, replacing its key if it was
+    /// trusted already.
+    pub fn trust_service(&self, service: ServiceKey) -> Result<(), SecretsError> {
+        let mut services = self.services()?;
+        services.retain(|known| known.name != service.name);
+        services.push(service);
+        let bytes = serde_json::to_vec_pretty(&services).map_err(json_error("services file"))?;
+        let path = self.services_path();
+        fs::write(&path, bytes).map_err(io_error(format!("writing {}", path.display())))
     }
 
     pub fn add_route(&self, secret: &str, route: Route) -> Result<(), SecretsError> {

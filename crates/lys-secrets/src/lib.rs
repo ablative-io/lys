@@ -21,6 +21,7 @@ pub mod local_grants;
 pub mod oauth;
 pub mod permission;
 pub mod secret;
+pub mod service;
 pub mod store;
 
 pub use audit::{AuditKind, AuditLine, AuditLog, RecordedLine};
@@ -28,7 +29,7 @@ pub use broker::{
     Admitted, Broker, BrokerPaths, Clock, PRESENTATION_SKEW_MS, RevocationState, RevokeOutcome,
     Ticket, UpstreamRevocation, UseError, Used,
 };
-pub use error::{RevocationRefusal, SecretsError};
+pub use error::{RevocationRefusal, SecretsError, ServiceRefusal};
 pub use handle::{
     HandleId, HandleToken, Holder, IssuedHandle, Presentation, new_operation_id, request_digest,
 };
@@ -37,6 +38,7 @@ pub use local_grants::{LocalGrants, SecretRelation};
 pub use oauth::{OAuthGrant, Provenance, REFRESH_MARGIN_MS};
 pub use permission::{Denied, PermissionCheck, Permitted, Relation};
 pub use secret::Secret;
+pub use service::{OnBehalf, SERVICE_DOMAIN, ServiceKey, ServiceWindow};
 pub use store::{AccountView, EntryClass, EntryView, Recipients, Scope, SecretStore};
 
 /// `bytes` as lowercase hex.

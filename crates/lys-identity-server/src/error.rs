@@ -60,6 +60,22 @@ pub enum ServerError {
         /// What is wrong with it.
         reason: String,
     },
+    /// The secrets broker is not configured, or could not be reached or read.
+    #[error("SecretsUnavailable: {reason}")]
+    SecretsUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// The secrets broker refused the request, by name.
+    #[error("{refusal}: {reason}")]
+    SecretsRefused {
+        /// The status the broker answered with.
+        status: StatusCode,
+        /// The broker's name for the refusal.
+        refusal: String,
+        /// The broker's words.
+        reason: String,
+    },
     /// The directory's worker could not be reached.
     #[error("DirectoryUnavailable: {reason}")]
     DirectoryUnavailable {
@@ -83,10 +99,11 @@ impl ServerError {
             }
             Self::AgentNotVisible | Self::GrantNotVisible => StatusCode::NOT_FOUND,
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
-            Self::SignInFailed { .. } => StatusCode::BAD_GATEWAY,
+            Self::SignInFailed { .. } | Self::SecretsUnavailable { .. } => StatusCode::BAD_GATEWAY,
             Self::ConfigInvalid { .. } | Self::DirectoryUnavailable { .. } => {
                 StatusCode::SERVICE_UNAVAILABLE
             }
+            Self::SecretsRefused { status, .. } => *status,
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),
         }

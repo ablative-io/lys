@@ -218,3 +218,35 @@ fn leaving_a_scope_ends_the_use_and_a_team_secret_is_open_to_its_members_only() 
     assert!(names(&broker, "person:tom").is_empty());
     Ok(())
 }
+
+#[test]
+fn a_handles_revocation_is_told_only_to_those_who_may_discover_its_secret() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let keys = root.path().join("keys");
+    let mut broker = broker(root.path())?;
+    broker.seal("token", "person:dana", &Secret::from_slice(b"value"))?;
+    broker
+        .permissions()
+        .grant(relation("person:dana", "token", "person:dana"));
+    broker.set_scope(
+        "person:dana",
+        "token",
+        Scope::Personal("person:dana".to_owned()),
+    )?;
+    let dana = party(&keys, "person:dana")?;
+    let issued = broker.issue(&dana.holder, "token", 2, 50_000)?;
+    broker.use_handle(&issued.token, &sign(&issued, &dana)?, Secret::len)?;
+    let state = broker.revocation_state_as("person:dana", &issued.id)?;
+    assert!(!state.stopped_here);
+    assert_eq!(
+        refusal(broker.revocation_state_as("person:tom", &issued.id)),
+        "HandleUnknown"
+    );
+    broker.drop_handle(&issued.id)?;
+    assert!(
+        broker
+            .revocation_state_as("person:dana", &issued.id)?
+            .stopped_here
+    );
+    Ok(())
+}

@@ -41,6 +41,8 @@ pub struct AppState {
     pub grants: Mutex<Option<GrantState>>,
     /// What the grants are opened from.
     pub grant_setup: GrantSetup,
+    /// The secrets broker the secrets screens ask, when one is configured.
+    pub secrets: Option<crate::secrets_api::SecretsBroker>,
 }
 
 type Shared = Arc<AppState>;
@@ -65,6 +67,11 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
             model: config.grant_model()?,
             spicedb: config.spicedb.clone(),
         },
+        secrets: config
+            .secrets
+            .as_ref()
+            .map(crate::secrets_api::SecretsBroker::open)
+            .transpose()?,
     })))
 }
 
@@ -103,6 +110,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::grants::routes())
         .merge(crate::receipts_api::routes())
         .merge(crate::link_audit_api::routes())
+        .merge(crate::secrets_api::routes())
         .with_state(state)
 }
 

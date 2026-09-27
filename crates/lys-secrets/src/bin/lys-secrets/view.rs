@@ -1,8 +1,9 @@
 //! Read-only routes a screen reads: the sealed entries without their values,
 //! the grants, and the checked audit log. None of them carries a secret
-//! byte, a handle or a digest. Each is asked with a signed handle
-//! presentation and answers only with what the handle's identity may
-//! discover; a secret outside its scope is left out, as one not sealed.
+//! byte, a handle or a digest. Each is asked by a handle's holder or by a
+//! trusted screen service for a person (see `callers`), and answers only
+//! with what that identity may discover; a secret outside its scope is left
+//! out, as one not sealed.
 
 use std::sync::{Arc, PoisonError};
 
@@ -11,24 +12,20 @@ use axum::extract::{Request, State};
 use axum::http::StatusCode;
 use serde_json::{Value, json};
 
-use crate::serve::{Shared, signed};
+use crate::callers::{self, refused};
+use crate::serve::Shared;
 
 type Answer = Result<Json<Value>, (StatusCode, String)>;
 
 fn failed(error: &lys_secrets::SecretsError) -> (StatusCode, String) {
-    (StatusCode::INTERNAL_SERVER_ERROR, format!("{error}\n"))
+    refused(error)
 }
 
-/// The identity the request's signed handle speaks for. A screen route
-/// carries no body, so the presentation signs an empty one.
+/// The identity the request's caller speaks for. A screen route carries no
+/// body, so the signature covers an empty one.
 fn caller(shared: &Shared, request: Request) -> Result<String, (StatusCode, String)> {
     let (parts, _body) = request.into_parts();
-    let (token, presentation) =
-        signed(&parts, &[]).map_err(|(status, error)| (status, format!("{error}\n")))?;
-    let broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
-    broker
-        .caller(&token, &presentation)
-        .map_err(|error| (StatusCode::FORBIDDEN, format!("{error}\n")))
+    callers::caller(shared, &parts, &[]).map(|who| who.identity)
 }
 
 pub async fn secrets(State(shared): State<Arc<Shared>>, request: Request) -> Answer {

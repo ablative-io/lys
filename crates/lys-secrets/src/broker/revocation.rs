@@ -62,6 +62,28 @@ impl<P: PermissionCheck> Broker<P> {
         })
     }
 
+    /// Both parts of the revocation of the handle `id`, as `identity` may
+    /// discover them: only when it may discover the handle's secret. A
+    /// handle on a secret it may not discover answers as one never issued.
+    ///
+    /// # Errors
+    ///
+    /// `HandleUnknown`, and the audit log's refusals.
+    pub fn revocation_state_as(
+        &self,
+        identity: &str,
+        id: &HandleId,
+    ) -> Result<RevocationState, SecretsError> {
+        let record = self
+            .handles
+            .get(id.as_str())
+            .ok_or(SecretsError::HandleUnknown)?;
+        if !self.discovers(identity, &record.secret) {
+            return Err(SecretsError::HandleUnknown);
+        }
+        self.revocation_state(id)
+    }
+
     /// Records what the provider answered to revoking the grant behind the
     /// dropped handle `id`: confirmed, or unconfirmed with the reason.
     ///

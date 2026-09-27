@@ -149,6 +149,22 @@ pub enum Command {
         #[arg(long)]
         people_only: bool,
     },
+    /// Trust a screen service to ask on a signed-in person's behalf, by
+    /// its name and its Ed25519 public key in hex.
+    TrustService {
+        #[command(flatten)]
+        at: Where,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        public_key: String,
+    },
+    /// Print a screen service's public key in hex, making its private key
+    /// file first if there is none.
+    ServiceKey {
+        #[arg(long)]
+        key: PathBuf,
+    },
     /// List the secrets an identity may discover, without their values.
     List {
         #[command(flatten)]

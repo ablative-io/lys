@@ -64,6 +64,10 @@ pub struct Config {
     /// relationships are held in memory.
     #[serde(default)]
     pub spicedb: Option<SpiceDbSettings>,
+    /// The secrets broker the secrets screens ask. Without it those routes
+    /// answer `SecretsUnavailable`.
+    #[serde(default)]
+    pub secrets: Option<crate::secrets_api::SecretsSettings>,
 }
 
 /// The permission model as its file writes it: a version, and each relation

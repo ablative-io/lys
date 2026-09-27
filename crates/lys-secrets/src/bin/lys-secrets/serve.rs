@@ -18,13 +18,14 @@ use lys_secrets::{
 use crate::files::{Layout, Route};
 use crate::spice::Grants;
 
-const MAX_BODY: usize = 16 * 1024 * 1024;
+pub(crate) const MAX_BODY: usize = 16 * 1024 * 1024;
 const REDACTED: &[u8] = b"[redacted]";
 
 pub(crate) struct Shared {
     pub(crate) broker: Mutex<Broker<Grants>>,
     pub(crate) layout: Layout,
     pub(crate) client: reqwest::Client,
+    pub(crate) window: Mutex<lys_secrets::ServiceWindow>,
 }
 
 pub fn serve(broker: Broker<Grants>, layout: Layout, listen: &str) -> Result<(), SecretsError> {
@@ -39,6 +40,7 @@ pub fn serve(broker: Broker<Grants>, layout: Layout, listen: &str) -> Result<(),
         broker: Mutex::new(broker),
         layout,
         client: reqwest::Client::new(),
+        window: Mutex::new(lys_secrets::ServiceWindow::new()),
     });
     runtime.block_on(async move {
         let listener = tokio::net::TcpListener::bind(listen)
@@ -53,6 +55,15 @@ pub fn serve(broker: Broker<Grants>, layout: Layout, listen: &str) -> Result<(),
             .route("/_lys/audit", axum::routing::get(crate::view::audit))
             .route("/_lys/grants", axum::routing::get(crate::view::grants))
             .route("/_lys/next-account", axum::routing::post(next_account))
+            .route("/_lys/scope", axum::routing::post(crate::manage::scope))
+            .route(
+                "/_lys/recipients",
+                axum::routing::post(crate::manage::recipients),
+            )
+            .route(
+                "/_lys/revocation",
+                axum::routing::get(crate::manage::revocation),
+            )
             .fallback(proxy)
             .with_state(shared);
         axum::serve(listener, app)
