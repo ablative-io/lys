@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,37 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-032",
+      "title": "Sign what a session was given at render, checked offline with lys verify",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "The first of CONFORMANCE row 6.5's three signed statements: lys-home render-launch computes the SHA-256 of the lys.given entry's RFC 8785 data, reports it as given_sha256, and when given a key signs those bytes as a lys/attestation/v2 statement kept beside the lys.given entry and as the two files lys verify --attestation reads offline. A render with no key is unchanged and reports unsigned. Row 6.5 is partial until the start and role-move statements land with the START and ROLES cards.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T14:18:00+10:00",
+        "quote": "Conformance row 6.5 says three things are signed statements checked with lys verify --attestation: the start of an agent, what the agent was given, and a move of its role. HOME-003 on main records what a session was given as a lys.given entry at render, listed and checked by hash, but unsigned. lys-core on main already signs and verifies attestations. Nothing yet turns the start, the given record or a role move into a signed statement.\n\nThis card makes each of the three a signed attestation in lys-core's existing format. The given record of HOME-003 is signed at render over the hash it already records. A start is signed when a launch is recorded, over the launch id, the agent's directory id and the given record's hash. A role move is signed when it is recorded, over the agent, the role, the version moved from and the version moved to. Each statement is appended where its record already lives, and lys verify --attestation checks it offline. The signing key is a test key in tests and in the proof, and production keys stay Tom's acts (row 6.6).\n\nAcceptance is that lys verify --attestation accepts each of the three signed statements from a fixture; that altering one byte of each statement makes lys verify refuse it by name; that the given statement's signed hash equals the hash HOME-003 recorded for the same render; and that no statement carries a transcript line, a secret value or a credential, checked by a search of the fixture's statements for the fixture secret. The brief names row 6.5 as the row it passes. Where the start and the role move depend on records other briefs make (the START launch record and the ROLES version record), it signs the fields those briefs name and waits for them to land, each checked by a command a stranger can run.\n\nFiled by Archie, lead for the identity and home lines, on 27 September 2026, against lys main 7b536253.\n\nRulings of the lead, Archie, given on 27 September 2026 to the run 5cceabf9-7264-45ec-99a5-ff2d547eabf5 in answer to its round 1. That run took every answer and then failed before writing, when the account pool refused every session. They are settled here, and the author reopens none of them.\n\nThe SHA-256 of the lys.given entry's canonical custom.data. The words' 'the hash it already records' is wrong about the tree, and the brief corrects the sentence. render_launch computes that hash, records it in its render record beside the template, session head and manifest hashes, and signs over it. The acceptance equality then compares the signed hash with that recorded value for the same render.\n\nThis card lands the given statement only. The start statement and the role-move statement are named under further units not written, each attached to the card that makes its record, the START card 98qkhhCb and the ROLES card Ink1H1Os, and each is written when that record lands. No signer is built over fields no brief names yet. The brief says plainly that row 6.5 is partial until those two units land.\n\nThe existing single message stands, because the non-oracle rule stands. 'By name' means the refusal names the statement file it was checking and exits non-zero with lys verify's one message, never which field or byte was altered. The acceptance corrects its sentence to say that.\n\nThe given statement is signed by the home's key, which in tests and the proof is a test key. The lys verify command without --cert proves only that some key signed, so the acceptance also checks the signer. After lys verify accepts the statement, a stated command compares the attestation's signer public key with the fixture's test public key and fails on a difference, and a statement signed by a second test key fails that line. Checking against a trusted certificate comes with row 6.1's --cert, and the brief names that.\n\nIt still records the unsigned lys.given entry, as today, so no existing run changes. With a signing key given it also writes the signed statement. The report says in words whether the render was signed or unsigned, so nobody takes an unsigned render for a signed one. Acceptance lines cover both, a render without a key reports unsigned and writes no statement, and one with the test key writes a statement lys verify accepts.\n\nThis card is the asking. CONFORMANCE.md row 6.5, marked test, is part of the conformance test Tom set as the definition of done, and Tom's word of 27 September at 12:49, relayed by Waffles, is to get it all done. The brief records that as the reason the home design's signing non-goal is lifted for the given statement, amends that non-goal line in docs/design/home/design.json to say so, and leaves anchoring and receipts into a lys log as non-goals still. HOME-003 line 218 is historical and stays.",
+        "context": "The signed-statements card for CONFORMANCE row 6.5 on the Lys board, filed against lys main 7b536253 by the lead for the identity and home lines, with that lead's rulings on its first run carried into the card, and two further answers on this run: the given hash is recorded only in render-launch's report and in the signed statement, never in the kept template_render event; and lys verify's message stays unchanged, the stated acceptance command naming the file. HOME-008 carries those answers."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-003",
+          "ADR-007",
+          "ADR-012",
+          "ADR-013",
+          "ADR-047"
+        ],
+        "briefs": [
+          "HOME-008"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-007"
+      ],
+      "notes": "Further units, not written: Sign an agent's start when a launch is recorded (START 98qkhhCb); Sign a role move when it is recorded (ROLES Ink1H1Os); Check a given statement's signer against a trusted certificate with lys verify --cert (row 6.1). Ids: HOME-008 as the card's run named it; RM-032 and ADR-047 are the next after the highest on main and on every open brief branch at the time of writing (RM-031, ADR-046); C45 to C51, S24 to S26 and CN11 are the next after main's home cluster."
     }
   ]
 }
