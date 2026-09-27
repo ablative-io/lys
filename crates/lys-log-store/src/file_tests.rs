@@ -279,7 +279,7 @@ fn a_leftover_temporary_file_is_ignored_at_open() {
     store.put_leaf(0, b"leaf-0").unwrap();
     let leftover = dir
         .join("leaves")
-        .join(format!(".{}-{:020}-0.tmp", std::process::id() + 1, 1));
+        .join(leaf_temp_name(std::process::id() + 1, 1, 0));
     std::fs::write(&leftover, b"leaf-1-never-linked").unwrap();
     let mut reopened = FileLeafStore::open(&dir).unwrap();
     assert_eq!(reopened.extent(), 1);
@@ -302,7 +302,7 @@ fn open_leaves_a_leftover_temporary_file_byte_identical() {
     store.put_leaf(0, b"leaf-0").unwrap();
     let leftover = dir
         .join("leaves")
-        .join(format!(".{}-{:020}-0.tmp", std::process::id() + 1, 1));
+        .join(leaf_temp_name(std::process::id() + 1, 1, 0));
     std::fs::write(&leftover, b"half a leaf").unwrap();
     let before = leaves_entries(&dir);
     assert_eq!(FileLeafStore::open(&dir).unwrap().extent(), 1);
@@ -316,6 +316,95 @@ fn refuse(path: &Path) -> std::io::Result<()> {
         "injected failure at {}",
         path.display()
     )))
+}
+
+/// The message the injected leaves-directory flush failure carries.
+const INJECTED_FLUSH_FAILURE: &str = "injected leaves directory flush failure";
+
+/// A leaves-directory flush that always fails, with a kind no real flush in
+/// these tests returns, so the error that reaches the caller can be traced to
+/// this injection and no other.
+fn refuse_flush(_: &Path) -> std::io::Result<()> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::TimedOut,
+        INJECTED_FLUSH_FAILURE,
+    ))
+}
+
+#[test]
+fn leaf_temp_name_differs_by_sequence_and_by_pid() {
+    assert_ne!(leaf_temp_name(41, 3, 0), leaf_temp_name(41, 3, 1));
+    assert_ne!(leaf_temp_name(41, 3, 0), leaf_temp_name(42, 3, 0));
+    assert_eq!(
+        leaf_temp_name(41, 3, 5),
+        format!(".41-{:020}-5.tmp", 3),
+        "the name is the documented layout"
+    );
+}
+
+/// Rounds of the taken-name case. One round can miss when a concurrent test
+/// takes the predicted sequence number first; a miss in every one of these
+/// rounds is not a realistic outcome.
+const TAKEN_NAME_ROUNDS: u64 = 32;
+
+#[test]
+fn a_taken_temporary_name_is_skipped_and_never_replaced() {
+    // A leftover sits at the exact name this write would take first. Opening
+    // it with truncation would destroy bytes this write does not own; the
+    // write must move to the next name and leave the leftover whole.
+    //
+    // The sequence counter is shared by every test in this process, so another
+    // test can take the predicted number between the prediction and the write,
+    // and that round then exercises nothing. Repeating the round on successive
+    // leaves makes a collision near certain, and every round must hold.
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut store = create(&dir);
+    let mut leftovers = Vec::new();
+    for index in 0..TAKEN_NAME_ROUNDS {
+        let next = LEAF_TEMP_SEQUENCE.load(Ordering::Relaxed);
+        let taken = dir
+            .join("leaves")
+            .join(leaf_temp_name(std::process::id(), index, next));
+        std::fs::write(&taken, b"a leftover this write does not own").unwrap();
+        store
+            .put_leaf(index, format!("leaf-{index}").as_bytes())
+            .unwrap();
+        assert_eq!(
+            store.leaf(index).unwrap(),
+            Some(format!("leaf-{index}").into_bytes())
+        );
+        leftovers.push(taken);
+    }
+    assert_eq!(leftovers.len(), 32);
+    for taken in &leftovers {
+        assert_eq!(
+            std::fs::read(taken).unwrap(),
+            b"a leftover this write does not own",
+            "{}",
+            taken.display()
+        );
+    }
+}
+
+#[test]
+fn two_handles_writing_in_turn_leave_no_temporary_names() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut first = create(&dir);
+    first.put_leaf(0, b"leaf-0").unwrap();
+    first.put_leaf(1, b"leaf-1").unwrap();
+    let mut second = FileLeafStore::open(&dir).unwrap();
+    second.put_leaf(2, b"leaf-2").unwrap();
+    assert_eq!(first.extent(), 2);
+    assert_eq!(
+        leaves_entries(&dir),
+        vec![
+            format!("{:020}", 0),
+            format!("{:020}", 1),
+            format!("{:020}", 2)
+        ]
+    );
 }
 
 #[test]
@@ -347,7 +436,7 @@ fn a_failed_directory_flush_is_named_and_halts_the_handle_until_reopen() {
     store.put_leaf(0, b"leaf-0").unwrap();
     let no_flush = AfterLink {
         remove_temp: remove_file,
-        flush_dir: refuse,
+        flush_dir: refuse_flush,
     };
     let err = store
         .put_leaf_with(1, |file| file.write_all(b"leaf-1"), &no_flush)
@@ -372,6 +461,36 @@ fn a_failed_directory_flush_is_named_and_halts_the_handle_until_reopen() {
     assert_eq!(reopened.leaf(1).unwrap().unwrap(), b"leaf-1");
     reopened.put_leaf(2, b"leaf-2").unwrap();
     assert_eq!(reopened.extent(), 3);
+}
+
+#[test]
+fn a_failed_directory_flush_carries_the_flush_error_as_its_source() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut store = create(&dir);
+    let no_flush = AfterLink {
+        remove_temp: remove_file,
+        flush_dir: refuse_flush,
+    };
+    let err = store
+        .put_leaf_with(0, |file| file.write_all(b"leaf-0"), &no_flush)
+        .unwrap_err();
+    let StoreError::LeafDurabilityUncertain { source, .. } = err else {
+        panic!("expected LeafDurabilityUncertain, got {err}");
+    };
+    assert_eq!(source.kind(), std::io::ErrorKind::TimedOut);
+    assert_eq!(source.to_string(), INJECTED_FLUSH_FAILURE);
+}
+
+#[test]
+fn leaf_durability_uncertain_names_its_index_and_its_source() {
+    let err = StoreError::LeafDurabilityUncertain {
+        index: 7_340_033,
+        source: std::io::Error::new(std::io::ErrorKind::TimedOut, INJECTED_FLUSH_FAILURE),
+    };
+    let rendered = err.to_string();
+    assert!(rendered.contains("7340033"), "{rendered}");
+    assert!(rendered.contains(INJECTED_FLUSH_FAILURE), "{rendered}");
 }
 
 #[test]

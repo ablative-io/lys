@@ -84,6 +84,26 @@ pub enum StoreError {
         index: u64,
     },
 
+    /// Every temporary name tried for a leaf was already taken, so the leaf was
+    /// not written.
+    ///
+    /// A taken name is a leftover and is never replaced, so the write moves on
+    /// to the next one. Finding every name in the bound taken means something
+    /// other than leftovers is creating names in the leaves directory, which is
+    /// worth stopping for rather than trying past.
+    #[error(
+        "refusing to write leaf {index}: all {attempts} temporary names tried in {} were already taken, and a taken name is never replaced",
+        path.display()
+    )]
+    LeafTempNamesTaken {
+        /// The index of the leaf that was not written.
+        index: u64,
+        /// How many names were tried.
+        attempts: u32,
+        /// The leaves directory the names were tried in.
+        path: PathBuf,
+    },
+
     /// A leaf already exists at this index, so the write was refused.
     ///
     /// **This is the write-once rule firing, and it is the intended
