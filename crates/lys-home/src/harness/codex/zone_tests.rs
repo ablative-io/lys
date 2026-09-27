@@ -3,6 +3,7 @@
 //! version only, an IANA zone name resolved through the bundled database,
 //! and the refusals that name the act answering each.
 
+use crate::error::TranslateError;
 use std::error::Error;
 use std::path::PathBuf;
 
@@ -16,7 +17,9 @@ fn version_other_than_measured_is_refused() -> Gate {
     let refused = check_version("0.157.0");
     assert!(matches!(
         refused,
-        Err(HomeError::UnmeasuredCodexVersion { .. })
+        Err(HomeError::Translate(
+            TranslateError::UnmeasuredCodexVersion { .. }
+        ))
     ));
     assert_eq!(
         refused.err().map(|e| e.to_string()).as_deref(),
@@ -26,7 +29,9 @@ fn version_other_than_measured_is_refused() -> Gate {
     );
     assert!(matches!(
         check_version("0.156"),
-        Err(HomeError::UnmeasuredCodexVersion { .. })
+        Err(HomeError::Translate(
+            TranslateError::UnmeasuredCodexVersion { .. }
+        ))
     ));
     check_version("0.156.0")?;
     Ok(())
@@ -35,7 +40,10 @@ fn version_other_than_measured_is_refused() -> Gate {
 #[test]
 fn unnamed_zone_is_refused() {
     let absent = zone_of(None);
-    assert!(matches!(absent, Err(HomeError::UnnamedTimeZone { .. })));
+    assert!(matches!(
+        absent,
+        Err(HomeError::Translate(TranslateError::UnnamedTimeZone { .. }))
+    ));
     assert_eq!(
         absent.err().map(|e| e.to_string()).as_deref(),
         Some("TZ unset is not an IANA time zone name: set TZ to an IANA name")
@@ -47,7 +55,10 @@ fn unnamed_zone_is_refused() {
         "Australia//Sydney",
     ] {
         assert!(
-            matches!(zone_of(Some(value)), Err(HomeError::UnnamedTimeZone { .. })),
+            matches!(
+                zone_of(Some(value)),
+                Err(HomeError::Translate(TranslateError::UnnamedTimeZone { .. }))
+            ),
             "{value}"
         );
     }
@@ -56,7 +67,10 @@ fn unnamed_zone_is_refused() {
 #[test]
 fn unknown_zone_is_refused() {
     let refused = zone_of(Some("Mars/Olympus"));
-    assert!(matches!(refused, Err(HomeError::UnknownTimeZone { .. })));
+    assert!(matches!(
+        refused,
+        Err(HomeError::Translate(TranslateError::UnknownTimeZone { .. }))
+    ));
     assert_eq!(
         refused.err().map(|e| e.to_string()).as_deref(),
         Some("time zone Mars/Olympus is not in the time zone database: set TZ to an IANA name")
@@ -76,9 +90,9 @@ fn named_zone_resolves() -> Gate {
 
 #[test]
 fn translation_refusals_name_the_act() {
-    let exists = HomeError::TranslationTargetExists {
+    let exists = HomeError::Translate(TranslateError::TranslationTargetExists {
         path: PathBuf::from("a/b.jsonl"),
-    };
+    });
     assert_eq!(
         exists.to_string(),
         "translate-codex target already exists: a/b.jsonl; choose another --out"

@@ -20,6 +20,7 @@
 //! and returns the refusal that stopped the fork; a cleanup that fails too
 //! is refused naming both, so a half-written child is never silent.
 
+use crate::error::ForkError;
 use std::collections::BTreeMap;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
@@ -246,11 +247,11 @@ pub fn fork(home: &Home, lantern: &str, session: Option<&str>) -> Result<ForkRep
         drop(child);
         return Err(match remove_child(home, &child_id) {
             Ok(()) => reason,
-            Err(cleanup) => HomeError::ForkHalfWritten {
+            Err(cleanup) => HomeError::Fork(ForkError::ForkHalfWritten {
                 child: child_id,
                 reason: reason.to_string(),
                 cleanup: cleanup.to_string(),
-            },
+            }),
         });
     }
     let (blocks, unstored) = count_held(&home.blocks()?, &candidates);

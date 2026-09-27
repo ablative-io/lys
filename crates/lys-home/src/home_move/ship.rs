@@ -17,6 +17,7 @@
 //! no file of the tracked set, no index and no head. It does not scan the
 //! tracked files for secrets and offers no way to leave a session out.
 
+use crate::error::MoveError;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
@@ -82,23 +83,23 @@ pub fn ship(
     let home = Home::read(&home_dir)?;
     let sessions = home.session_ids()?;
     if sessions.is_empty() {
-        return Err(HomeError::EmptyHome { path: home_dir });
+        return Err(HomeError::Move(MoveError::EmptyHome { path: home_dir }));
     }
     let remote_exists = check_remote(&remote)?;
     let held = hold_all(&home, &sessions)?;
     for session in &sessions {
         let file = home.session_path(session)?;
         if !Index::index_path(&file).is_file() {
-            return Err(HomeError::IndexMissing {
+            return Err(HomeError::Move(MoveError::IndexMissing {
                 session: session.clone(),
                 home: home_dir,
-            });
+            }));
         }
         if !Index::head_path(&file).is_file() {
-            return Err(HomeError::HeadMissing {
+            return Err(HomeError::Move(MoveError::HeadMissing {
                 session: session.clone(),
                 home: home_dir,
-            });
+            }));
         }
     }
     let stale = verify_sessions(&home)?;
@@ -140,11 +141,11 @@ pub fn ship(
         && at != commit
         && !descends(&git, &at, &commit)?
     {
-        return Err(HomeError::RefDiverged {
+        return Err(HomeError::Move(MoveError::RefDiverged {
             git_ref: HOME_REF.to_owned(),
             remote_commit: at,
             commit,
-        });
+        }));
     }
     let refspec = format!("{commit}:{HOME_REF}");
     git.output(
@@ -188,10 +189,10 @@ fn check_remote(remote: &Path) -> Result<bool, HomeError> {
         Some("a directory that is not a bare repository")
     };
     match found {
-        Some(found) => Err(HomeError::RemoteNotBare {
+        Some(found) => Err(HomeError::Move(MoveError::RemoteNotBare {
             path: remote.to_path_buf(),
             found,
-        }),
+        })),
         None => Ok(true),
     }
 }
@@ -212,7 +213,9 @@ fn refuse_foreign(git: &Git, tracked: &[String]) -> Result<(), HomeError> {
     if foreign.is_empty() {
         Ok(())
     } else {
-        Err(HomeError::ForeignTracked { paths: foreign })
+        Err(HomeError::Move(MoveError::ForeignTracked {
+            paths: foreign,
+        }))
     }
 }
 
@@ -226,9 +229,9 @@ fn descends(git: &Git, ancestor: &str, commit: &str) -> Result<bool, HomeError> 
     match ran.code {
         Some(0) => Ok(true),
         Some(1) => Ok(false),
-        code => Err(HomeError::GitFailed {
+        code => Err(HomeError::Move(MoveError::GitFailed {
             subcommand: "merge-base".to_owned(),
             status: code.map_or_else(|| "a signal".to_owned(), |code| format!("exit code {code}")),
-        }),
+        })),
     }
 }

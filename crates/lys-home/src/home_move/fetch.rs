@@ -21,6 +21,7 @@
 //! `arrival_failed`. Nothing is written to the remote, no block or template
 //! is written, and no home-level id file exists.
 
+use crate::error::MoveError;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
@@ -111,9 +112,9 @@ fn check_target(target: &Path) -> Result<bool, HomeError> {
         return Ok(false);
     }
     if target.join("sessions").exists() {
-        return Err(HomeError::TargetHoldsHome {
+        return Err(HomeError::Move(MoveError::TargetHoldsHome {
             path: target.to_path_buf(),
-        });
+        }));
     }
     let empty = target.is_dir()
         && std::fs::read_dir(target)
@@ -123,22 +124,22 @@ fn check_target(target: &Path) -> Result<bool, HomeError> {
     if empty {
         Ok(true)
     } else {
-        Err(HomeError::TargetNotEmpty {
+        Err(HomeError::Move(MoveError::TargetNotEmpty {
             path: target.to_path_buf(),
-        })
+        }))
     }
 }
 
 /// Remove what fetch created; a removal that fails too refuses as
 /// `FetchHalfWritten`, carrying the reason fetch stopped.
 fn undo_or_report(created: &Created, target: &Path, reason: &str) -> Result<(), HomeError> {
-    created
-        .undo()
-        .map_err(|cleanup| HomeError::FetchHalfWritten {
+    created.undo().map_err(|cleanup| {
+        HomeError::Move(MoveError::FetchHalfWritten {
             path: target.to_path_buf(),
             reason: reason.to_owned(),
             cleanup: cleanup.to_string(),
         })
+    })
 }
 
 /// Everything after the first write: the fetch, the checkout, the
@@ -160,12 +161,12 @@ fn arrive(
         &[&"fetch", &"--quiet", &"--no-tags", &remote, &refspec],
         None,
     )?;
-    let commit = git
-        .commit_of(HOME_REF)?
-        .ok_or_else(|| HomeError::GitFailed {
+    let commit = git.commit_of(HOME_REF)?.ok_or_else(|| {
+        HomeError::Move(MoveError::GitFailed {
             subcommand: "fetch".to_owned(),
             status: format!("no {HOME_REF} after the fetch"),
-        })?;
+        })
+    })?;
     check_out(created, &git, target, &commit)?;
     let home = Home::read(target)?;
     let found = verify_home(&home)?;
@@ -239,9 +240,9 @@ fn append_arrivals(
                 })
             });
         if appended.is_err() {
-            return Err(HomeError::ArrivalFailed {
+            return Err(HomeError::Move(MoveError::ArrivalFailed {
                 step: format!("append to session `{session}`"),
-            });
+            }));
         }
         sessions.push(Arrived { session, execution });
     }
@@ -272,11 +273,13 @@ fn commit_arrivals(
         git.output(&[&"update-ref", &"--no-deref", &"HEAD", &commit], None)?;
         Ok(())
     });
-    committed.map_err(|e| HomeError::ArrivalFailed {
-        step: match e {
-            HomeError::GitFailed { subcommand, .. } => subcommand,
-            _ => "git".to_owned(),
-        },
+    committed.map_err(|e| {
+        HomeError::Move(MoveError::ArrivalFailed {
+            step: match e {
+                HomeError::Move(MoveError::GitFailed { subcommand, .. }) => subcommand,
+                _ => "git".to_owned(),
+            },
+        })
     })
 }
 

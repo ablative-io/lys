@@ -17,6 +17,7 @@
 //! `N1` to `N4`, whose `lit_in` is not a session id. No test name carries a
 //! content sentinel.
 
+use crate::error::ForkError;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::path::Path;
@@ -235,17 +236,17 @@ fn the_fork_custom_types_are_named_as_the_record_states() {
 fn each_fork_refusal_names_itself_and_the_ids_it_was_given() {
     let mut refusals = Vec::new();
 
-    let unknown = HomeError::NoSuchLantern {
+    let unknown = HomeError::Fork(ForkError::NoSuchLantern {
         lantern: "no-such-lantern".into(),
-    }
+    })
     .to_string();
     assert!(unknown.contains("no-such-lantern"), "{unknown}");
     refusals.push(unknown);
 
-    let ambiguous = HomeError::LanternAmbiguous {
+    let ambiguous = HomeError::Fork(ForkError::LanternAmbiguous {
         lantern: "x".into(),
         sessions: vec!["a".into(), "b".into()],
-    }
+    })
     .to_string();
     assert!(ambiguous.starts_with("lantern_ambiguous"), "{ambiguous}");
     for id in ["x", "a", "b"] {
@@ -253,11 +254,11 @@ fn each_fork_refusal_names_itself_and_the_ids_it_was_given() {
     }
     refusals.push(ambiguous);
 
-    let not_here = HomeError::LanternNotLitHere {
+    let not_here = HomeError::Fork(ForkError::LanternNotLitHere {
         lantern: "x".into(),
         session: "a".into(),
         lit_in: "b".into(),
-    }
+    })
     .to_string();
     assert!(not_here.starts_with("lantern_not_lit_here"), "{not_here}");
     for id in ["x", "a", "b"] {
@@ -265,9 +266,9 @@ fn each_fork_refusal_names_itself_and_the_ids_it_was_given() {
     }
     refusals.push(not_here);
 
-    let nothing = HomeError::NothingToFork {
+    let nothing = HomeError::Fork(ForkError::NothingToFork {
         lantern: "x".into(),
-    }
+    })
     .to_string();
     assert!(nothing.starts_with("nothing_to_fork"), "{nothing}");
     assert!(nothing.contains('x'), "{nothing}");
@@ -374,7 +375,7 @@ fn a_lit_in_lantern_cuts_from_its_session_and_an_older_record_needs_one_named() 
     assert!(
         matches!(
             &elsewhere,
-            Err(HomeError::LanternNotLitHere { lantern, session, lit_in })
+            Err(HomeError::Fork(ForkError::LanternNotLitHere { lantern, session, lit_in }))
                 if *lantern == lanterns.l2 && session == "A" && lit_in == PARENT
         ),
         "{elsewhere:?}"
@@ -384,7 +385,7 @@ fn a_lit_in_lantern_cuts_from_its_session_and_an_older_record_needs_one_named() 
     assert!(
         matches!(
             &ambiguous,
-            Err(HomeError::LanternAmbiguous { lantern, sessions })
+            Err(HomeError::Fork(ForkError::LanternAmbiguous { lantern, sessions }))
                 if lantern == "O2" && *sessions == ["A".to_owned(), PARENT.to_owned()]
         ),
         "{ambiguous:?}"
@@ -406,7 +407,7 @@ fn each_refusal_names_the_lantern_and_writes_nothing() -> Gate {
     for id in ["no-such-lantern", "e5"] {
         let refused = resolve_and_cut(&home, id, None);
         assert!(
-            matches!(&refused, Err(HomeError::NoSuchLantern { lantern }) if lantern == id),
+            matches!(&refused, Err(HomeError::Fork(ForkError::NoSuchLantern { lantern })) if lantern == id),
             "{refused:?}"
         );
         refusals.push(refused.err().ok_or("refused")?);
@@ -422,7 +423,7 @@ fn each_refusal_names_the_lantern_and_writes_nothing() -> Gate {
     refusals.push(elsewhere.err().ok_or("refused")?);
     let nothing = resolve_and_cut(&home, &lanterns.l1, None);
     assert!(
-        matches!(&nothing, Err(HomeError::NothingToFork { lantern }) if *lantern == lanterns.l1),
+        matches!(&nothing, Err(HomeError::Fork(ForkError::NothingToFork { lantern })) if *lantern == lanterns.l1),
         "{nothing:?}"
     );
     refusals.push(nothing.err().ok_or("refused")?);
@@ -478,7 +479,7 @@ fn a_lit_in_session_that_holds_no_copy_refuses_naming_the_holder_read() -> Gate 
         assert!(
             matches!(
                 &refused,
-                Err(HomeError::LanternNotLitHere { lantern, session, lit_in })
+                Err(HomeError::Fork(ForkError::LanternNotLitHere { lantern, session, lit_in }))
                     if lantern == "N2" && session == named && lit_in == "elsewhere"
             ),
             "{refused:?}"
@@ -528,7 +529,7 @@ fn a_lit_in_that_is_not_a_session_id_is_refused_by_name() -> Gate {
             assert!(
                 matches!(
                     &refused,
-                    Err(HomeError::LitInNotASession { lantern, what: found })
+                    Err(HomeError::Fork(ForkError::LitInNotASession { lantern, what: found }))
                         if lantern == id && *found == what
                 ),
                 "{refused:?}"

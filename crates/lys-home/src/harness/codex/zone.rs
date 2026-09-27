@@ -9,6 +9,7 @@
 //! A stamp is parsed as RFC 3339 and placed in the zone to the second, the
 //! fraction dropped.
 
+use crate::error::TranslateError;
 use jiff::Timestamp;
 use jiff::civil::DateTime;
 use jiff::tz::TimeZone;
@@ -25,9 +26,11 @@ pub fn check_version(version: &str) -> Result<(), HomeError> {
     if version == MEASURED_VERSION {
         Ok(())
     } else {
-        Err(HomeError::UnmeasuredCodexVersion {
-            version: version.to_owned(),
-        })
+        Err(HomeError::Translate(
+            TranslateError::UnmeasuredCodexVersion {
+                version: version.to_owned(),
+            },
+        ))
     }
 }
 
@@ -48,22 +51,21 @@ fn iana_shaped(name: &str) -> bool {
 /// does not hold is refused as unknown.
 pub fn zone_of(name: Option<&str>) -> Result<TimeZone, HomeError> {
     let Some(name) = name else {
-        return Err(HomeError::UnnamedTimeZone {
+        return Err(HomeError::Translate(TranslateError::UnnamedTimeZone {
             value: "unset".to_owned(),
-        });
+        }));
     };
     if !iana_shaped(name) {
-        return Err(HomeError::UnnamedTimeZone {
+        return Err(HomeError::Translate(TranslateError::UnnamedTimeZone {
             value: name.to_owned(),
-        });
+        }));
     }
     // The database's own error names only the zone, which the refusal names.
-    jiff::tz::db()
-        .get(name)
-        .ok()
-        .ok_or_else(|| HomeError::UnknownTimeZone {
+    jiff::tz::db().get(name).ok().ok_or_else(|| {
+        HomeError::Translate(TranslateError::UnknownTimeZone {
             zone: name.to_owned(),
         })
+    })
 }
 
 /// An entry's stamp parsed as RFC 3339; a stamp that does not parse is

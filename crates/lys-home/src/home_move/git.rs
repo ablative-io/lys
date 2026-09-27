@@ -14,6 +14,7 @@
 //! on disk. A command that exits non-zero refuses as `git_failed`, naming
 //! the subcommand and its exit code and nothing of its output.
 
+use crate::error::MoveError;
 use std::ffi::{OsStr, OsString};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -220,10 +221,10 @@ impl Git {
         if ids.len() == paths.len() {
             Ok(ids)
         } else {
-            Err(HomeError::GitFailed {
+            Err(HomeError::Move(MoveError::GitFailed {
                 subcommand: "hash-object".to_owned(),
                 status: format!("{} ids for {} files", ids.len(), paths.len()),
-            })
+            }))
         }
     }
 
@@ -282,7 +283,7 @@ fn failed(args: &[&dyn AsRef<OsStr>], code: Option<i32>) -> HomeError {
         arg.as_ref().to_string_lossy().into_owned()
     });
     let status = code.map_or_else(|| "a signal".to_owned(), |code| format!("exit code {code}"));
-    HomeError::GitFailed { subcommand, status }
+    HomeError::Move(MoveError::GitFailed { subcommand, status })
 }
 
 /// Split NUL-terminated output into its non-empty items.

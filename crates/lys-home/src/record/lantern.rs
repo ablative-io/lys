@@ -12,6 +12,7 @@
 //! checked against the home in one place, `lit_in_session`, which the
 //! fork and recall both call.
 
+use crate::error::ForkError;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -89,9 +90,11 @@ pub(crate) fn lit_in_session(
     lantern: &str,
     lit_in: &LitIn,
 ) -> Result<String, HomeError> {
-    let not_a_session = |what| HomeError::LitInNotASession {
-        lantern: lantern.to_owned(),
-        what,
+    let not_a_session = |what| {
+        HomeError::Fork(ForkError::LitInNotASession {
+            lantern: lantern.to_owned(),
+            what,
+        })
     };
     match lit_in {
         LitIn::Other(value) if value.is_null() => Err(not_a_session("is null")),

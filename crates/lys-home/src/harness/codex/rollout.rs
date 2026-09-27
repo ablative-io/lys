@@ -21,6 +21,7 @@
 //! random source or network is read, nothing is written outside `--out`, and
 //! Codex's thread index is never written.
 
+use crate::error::TranslateError;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -192,9 +193,11 @@ pub fn translate(
     let account_path = rollout.with_extension("loss.json");
     for target in [&rollout, &account_path] {
         if target.exists() {
-            return Err(HomeError::TranslationTargetExists {
-                path: target.clone(),
-            });
+            return Err(HomeError::Translate(
+                TranslateError::TranslationTargetExists {
+                    path: target.clone(),
+                },
+            ));
         }
     }
     let head_hash = session.head_hash()?.to_string();

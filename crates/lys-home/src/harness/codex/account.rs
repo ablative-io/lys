@@ -12,6 +12,7 @@
 //! names and fixed reason words only: never a text, an argument, an output,
 //! a summary, a note, an epilogue or a seed.
 
+use crate::error::TranslateError;
 use std::io::Write;
 use std::path::Path;
 
@@ -177,9 +178,11 @@ pub fn write_new(path: &Path, bytes: &[u8]) -> Result<(), HomeError> {
     {
         Ok(file) => file,
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            return Err(HomeError::TranslationTargetExists {
-                path: path.to_path_buf(),
-            });
+            return Err(HomeError::Translate(
+                TranslateError::TranslationTargetExists {
+                    path: path.to_path_buf(),
+                },
+            ));
         }
         Err(e) => return Err(HomeError::io("creating a translation file", path, e)),
     };

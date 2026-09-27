@@ -8,6 +8,7 @@
 //! `lit_in_not_a_session`. The lanterns appended by hand here stand for
 //! records the light act does not write.
 
+use crate::error::ForkError;
 use std::error::Error;
 
 use serde_json::Value;
@@ -357,7 +358,7 @@ fn a_lit_in_that_is_not_a_session_id_is_skipped_and_refused_by_name() -> Gate {
         assert!(
             matches!(
                 &refused,
-                Err(HomeError::LitInNotASession { lantern, what: found })
+                Err(HomeError::Fork(ForkError::LitInNotASession { lantern, what: found }))
                     if lantern == "n1" && *found == what
             ),
             "{refused:?}"

@@ -8,6 +8,7 @@
 //! did not create; then it checks that the target is gone when fetch made
 //! it, and still there and empty when it stood before.
 
+use crate::error::MoveError;
 use std::path::{Path, PathBuf};
 
 use crate::error::HomeError;
@@ -110,9 +111,9 @@ impl Created {
             let mut entries = std::fs::read_dir(&self.target)
                 .map_err(|e| HomeError::io("listing the target after removal", &self.target, e))?;
             if entries.next().is_some() {
-                return Err(HomeError::TargetNotEmpty {
+                return Err(HomeError::Move(MoveError::TargetNotEmpty {
                     path: self.target.clone(),
-                });
+                }));
             }
         } else if self.target.exists() {
             return Err(HomeError::io(

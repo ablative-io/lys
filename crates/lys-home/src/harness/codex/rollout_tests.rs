@@ -6,6 +6,7 @@
 //! text, entries a compaction left behind listed lost, and an unparsed stamp
 //! refused with nothing written.
 
+use crate::error::TranslateError;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
@@ -446,7 +447,7 @@ fn failed_write_leaves_nothing_and_a_retry_translates() -> Gate {
     std::os::unix::fs::symlink(dir.path().join("nowhere"), &account)?;
     let refused = run(&home, "s1", &out);
     assert!(
-        matches!(&refused, Err(HomeError::TranslationTargetExists { path }) if *path == account),
+        matches!(&refused, Err(HomeError::Translate(TranslateError::TranslationTargetExists { path })) if *path == account),
         "{refused:?}"
     );
     let mut left = Vec::new();

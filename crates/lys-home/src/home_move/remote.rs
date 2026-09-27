@@ -11,6 +11,7 @@
 //! directory) and made absolute, so git is always handed a path that
 //! begins with `/` and can never read it as a host.
 
+use crate::error::MoveError;
 use std::path::{Path, PathBuf};
 
 use crate::error::HomeError;
@@ -21,9 +22,9 @@ use crate::error::HomeError;
 pub fn take_remote(remote: &str, base: &Path) -> Result<PathBuf, HomeError> {
     let before_slash = remote.split('/').next().unwrap_or(remote);
     if remote.contains("://") || before_slash.contains(':') {
-        return Err(HomeError::RemoteNotLocal {
+        return Err(HomeError::Move(MoveError::RemoteNotLocal {
             remote: remote.to_owned(),
-        });
+        }));
     }
     let joined = base.join(remote);
     std::path::absolute(&joined).map_err(|e| HomeError::io("resolving the remote", &joined, e))

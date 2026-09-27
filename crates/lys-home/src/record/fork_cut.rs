@@ -31,6 +31,7 @@
 //! JSON. Every refusal comes before any file is created or written, and
 //! none carries a note or an entry's data.
 
+use crate::error::ForkError;
 use std::path::PathBuf;
 
 use serde_json::Value;
@@ -162,25 +163,27 @@ pub fn resolve_and_cut(
                 session: named.to_owned(),
                 id: lantern.to_owned(),
             },
-            None => HomeError::NoSuchLantern {
+            None => HomeError::Fork(ForkError::NoSuchLantern {
                 lantern: lantern.to_owned(),
-            },
+            }),
         });
     }
     let first = 0;
     let (mut point, lit_in, mut bytes_read) = read_lantern(home, &holders[first], lantern)?;
     let chosen = match (&lit_in, session) {
         (Some(lit_in), Some(named)) if lit_in != named => {
-            return Err(HomeError::LanternNotLitHere {
+            return Err(HomeError::Fork(ForkError::LanternNotLitHere {
                 lantern: lantern.to_owned(),
                 session: named.to_owned(),
                 lit_in: lit_in.clone(),
-            });
+            }));
         }
-        (Some(lit_in), _) => position(lit_in).ok_or_else(|| HomeError::LanternNotLitHere {
-            lantern: lantern.to_owned(),
-            session: holders[first].id.clone(),
-            lit_in: lit_in.clone(),
+        (Some(lit_in), _) => position(lit_in).ok_or_else(|| {
+            HomeError::Fork(ForkError::LanternNotLitHere {
+                lantern: lantern.to_owned(),
+                session: holders[first].id.clone(),
+                lit_in: lit_in.clone(),
+            })
         })?,
         (None, Some(named)) => position(named).ok_or_else(|| HomeError::UnknownLantern {
             session: named.to_owned(),
@@ -188,10 +191,10 @@ pub fn resolve_and_cut(
         })?,
         (None, None) if holders.len() == 1 => first,
         (None, None) => {
-            return Err(HomeError::LanternAmbiguous {
+            return Err(HomeError::Fork(ForkError::LanternAmbiguous {
                 lantern: lantern.to_owned(),
                 sessions: holders.iter().map(|holder| holder.id.clone()).collect(),
-            });
+            }));
         }
     };
     if chosen != first {
@@ -213,9 +216,9 @@ pub fn resolve_and_cut(
         .iter()
         .rposition(|entry| role_of(entry) == Some("assistant"))
     else {
-        return Err(HomeError::NothingToFork {
+        return Err(HomeError::Fork(ForkError::NothingToFork {
             lantern: lantern.to_owned(),
-        });
+        }));
     };
     let carried = entries
         .last()

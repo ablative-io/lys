@@ -3,6 +3,14 @@
 
 use std::path::PathBuf;
 
+mod fork;
+mod moving;
+mod translate;
+
+pub use fork::ForkError;
+pub use moving::MoveError;
+pub use translate::TranslateError;
+
 /// What went wrong, named so a caller can act on it.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -313,43 +321,12 @@ pub enum HomeError {
         reason: String,
     },
 
-    /// A file translate-codex would write already exists.
-    #[error("translate-codex target already exists: {}; choose another --out", path.display())]
-    TranslationTargetExists {
-        /// The file.
-        path: PathBuf,
-    },
-
     /// An entry's stamp does not parse as RFC 3339, so the translation cannot
     /// place it in time.
     #[error("entry {entry} has a stamp that is not RFC 3339: re-import the source file")]
     StampNotRfc3339 {
         /// The entry's id.
         entry: String,
-    },
-
-    /// A Codex version was named whose rollout shape was never measured.
-    #[error(
-        "Codex {version} has no measured rollout shape: render for 0.156.0 or card a measurement of the new version"
-    )]
-    UnmeasuredCodexVersion {
-        /// The version given.
-        version: String,
-    },
-
-    /// The time zone given is absent or not shaped as an IANA name.
-    #[error("TZ {value} is not an IANA time zone name: set TZ to an IANA name")]
-    UnnamedTimeZone {
-        /// The value given, or `unset` when none was.
-        value: String,
-    },
-
-    /// The time zone given is shaped as an IANA name and the bundled time
-    /// zone database does not hold it.
-    #[error("time zone {zone} is not in the time zone database: set TZ to an IANA name")]
-    UnknownTimeZone {
-        /// The zone given.
-        zone: String,
     },
 
     /// The session's config directory has no name: the template's env slot
@@ -377,78 +354,6 @@ pub enum HomeError {
         entry: String,
         /// The path named.
         path: PathBuf,
-    },
-
-    /// A lantern id was named that no session of the home holds as a
-    /// `lys.lantern` entry, an id of another kind of entry included.
-    #[error(
-        "no session of the home holds a lantern `{lantern}`; name the entry id a light report printed"
-    )]
-    NoSuchLantern {
-        /// The lantern id named.
-        lantern: String,
-    },
-
-    /// A lantern whose data carries no lit-in session is held by more than
-    /// one session, and none was named to cut from.
-    #[error(
-        "lantern_ambiguous: lantern `{lantern}` carries no lit-in session and is held by {}; name one of them with --session", sessions.join(", ")
-    )]
-    LanternAmbiguous {
-        /// The lantern id.
-        lantern: String,
-        /// Every session holding it, in ascending byte order.
-        sessions: Vec<String>,
-    },
-
-    /// A session was named to cut from that is not the one the lantern
-    /// records it was lit in.
-    #[error(
-        "lantern_not_lit_here: lantern `{lantern}` was lit in session {lit_in}, not in {session}; fork from {lit_in}, or leave --session out"
-    )]
-    LanternNotLitHere {
-        /// The lantern id.
-        lantern: String,
-        /// The session named.
-        session: String,
-        /// The session the lantern's data records it was lit in.
-        lit_in: String,
-    },
-
-    /// A lantern's point has no assistant message at or before it on its
-    /// chain, so there is nothing said yet to fork.
-    #[error(
-        "nothing_to_fork: lantern `{lantern}` sits before any assistant message; a fork carries what was said up to its point, and a point before the first reply would carry only a seed, which is a new session and not a fork"
-    )]
-    NothingToFork {
-        /// The lantern id.
-        lantern: String,
-    },
-
-    /// A lantern's data carries a `lit_in` that is not a session id: null,
-    /// not a string, not a safe session name, or no session of the home.
-    #[error(
-        "lit_in_not_a_session: lantern `{lantern}` records a lit-in session that {what}; a fork cuts from the session a lantern was lit in and no other"
-    )]
-    LitInNotASession {
-        /// The lantern id.
-        lantern: String,
-        /// What is wrong with the recorded value, naming no content.
-        what: &'static str,
-    },
-
-    /// A fork failed after its child session was created, and removing the
-    /// child failed too, so the child's files stand half-written.
-    #[error(
-        "fork of child {child} failed ({reason}), and removing the child failed too ({cleanup}); the child's files under sessions/ are half-written and the parent holds no lys.fork line for it"
-    )]
-    ForkHalfWritten {
-        /// The child's session id.
-        child: String,
-        /// The refusal that stopped the fork, as displayed.
-        reason: String,
-        /// The refusal the cleanup met, as displayed.
-        cleanup: String,
     },
 
     /// A path that must be absolute is not: it would resolve against
@@ -528,138 +433,17 @@ pub enum HomeError {
         id: String,
     },
 
-    /// A remote that is not a path on this machine: a URL of any scheme or
-    /// an scp-style `host:path`.
-    #[error(
-        "remote_not_local: `{remote}` is not a path on this machine; shipping off this machine waits for stage 3's encryption from the secrets step"
-    )]
-    RemoteNotLocal {
-        /// The remote as given.
-        remote: String,
-    },
+    /// A refusal of ship or fetch.
+    #[error(transparent)]
+    Move(#[from] MoveError),
 
-    /// A git command exited non-zero. None of its output is carried.
-    #[error("git_failed: git {subcommand} ended with {status}")]
-    GitFailed {
-        /// The git subcommand.
-        subcommand: String,
-        /// `exit code <n>`, or `a signal` when it had none.
-        status: String,
-    },
+    /// A refusal of a translation.
+    #[error(transparent)]
+    Translate(#[from] TranslateError),
 
-    /// Ship was asked to ship a home that lists no session.
-    #[error(
-        "empty_home: the home at {} holds no sessions, so there is nothing a fetch could arrive with; ship after a session has been captured", path.display()
-    )]
-    EmptyHome {
-        /// The home directory.
-        path: PathBuf,
-    },
-
-    /// The remote path exists and is not a bare repository.
-    #[error(
-        "remote_not_bare: {} is {found}; ship pushes only to a bare repository, and makes one where the path does not exist", path.display()
-    )]
-    RemoteNotBare {
-        /// The remote path.
-        path: PathBuf,
-        /// What was found there.
-        found: &'static str,
-    },
-
-    /// A session ship would snapshot is held by a live owner.
-    #[error(
-        "session_held: session `{session}` is held by a live owner; ship after that seat stops"
-    )]
-    HeldByOwner {
-        /// The session id.
-        session: String,
-    },
-
-    /// A session has no index file beside it.
-    #[error(
-        "index_missing: session `{session}` has no sessions/{session}.index.jsonl; run lys-home given --home {} --session {session}, which writes that session's index and head, then ship again", home.display()
-    )]
-    IndexMissing {
-        /// The session id.
-        session: String,
-        /// The home directory.
-        home: PathBuf,
-    },
-
-    /// A session has no head file beside it.
-    #[error(
-        "head_missing: session `{session}` has no sessions/{session}.head; run lys-home given --home {} --session {session}, which writes that session's index and head, then ship again", home.display()
-    )]
-    HeadMissing {
-        /// The session id.
-        session: String,
-        /// The home directory.
-        home: PathBuf,
-    },
-
-    /// The home's repository tracks paths outside the tracked set.
-    #[error(
-        "foreign_tracked: the home's repository tracks {} outside the tracked set; a shipped home carries only its sessions, indexes, heads, blocks and templates", paths.join(", ")
-    )]
-    ForeignTracked {
-        /// The paths, in ascending byte order.
-        paths: Vec<String>,
-    },
-
-    /// The remote's ref names a commit the commit to push does not descend from.
-    #[error(
-        "ref_diverged: the remote's {git_ref} is at {remote_commit}, and {commit} does not descend from it; ship never overwrites a ref and pushed nothing"
-    )]
-    RefDiverged {
-        /// The ref.
-        git_ref: String,
-        /// The commit the remote's ref names.
-        remote_commit: String,
-        /// The commit ship would push.
-        commit: String,
-    },
-
-    /// A fetch target already holds a home.
-    #[error(
-        "target_holds_home: {} already holds sessions/; fetch arrives only in a new, empty home", path.display()
-    )]
-    TargetHoldsHome {
-        /// The target directory.
-        path: PathBuf,
-    },
-
-    /// A fetch target exists and is not an empty directory.
-    #[error(
-        "target_not_empty: {} is not an empty directory; fetch arrives only in a new, empty home", path.display()
-    )]
-    TargetNotEmpty {
-        /// The target directory.
-        path: PathBuf,
-    },
-
-    /// Appending an arrival or committing the arrivals failed; everything
-    /// fetch created was removed.
-    #[error(
-        "arrival_failed: {step} failed, so no arrival was recorded and everything fetch created was removed"
-    )]
-    ArrivalFailed {
-        /// The step: `append to session <id>` or the git subcommand.
-        step: String,
-    },
-
-    /// A fetch refused, and removing what it created failed too.
-    #[error(
-        "fetch into {} failed ({reason}), and removing what it created failed too ({cleanup}); remove the target by hand before fetching again", path.display()
-    )]
-    FetchHalfWritten {
-        /// The target directory.
-        path: PathBuf,
-        /// The refusal that stopped the fetch, as displayed.
-        reason: String,
-        /// What the cleanup met.
-        cleanup: String,
-    },
+    /// A refusal of a fork.
+    #[error(transparent)]
+    Fork(#[from] ForkError),
 }
 
 /// Who holds a session, as a refusal names them.

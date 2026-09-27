@@ -9,6 +9,7 @@
 //! are released as the partial set is dropped.
 
 use crate::error::HomeError;
+use crate::error::MoveError;
 use crate::record::Home;
 use crate::record::lock::SessionLock;
 
@@ -41,9 +42,9 @@ pub fn hold_all(home: &Home, sessions: &[String]) -> Result<Held, HomeError> {
         match SessionLock::take(&file) {
             Ok(lock) => locks.push(lock),
             Err(HomeError::SessionHeld { .. }) => {
-                return Err(HomeError::HeldByOwner {
+                return Err(HomeError::Move(MoveError::HeldByOwner {
                     session: session.clone(),
-                });
+                }));
             }
             Err(e) => return Err(e),
         }
