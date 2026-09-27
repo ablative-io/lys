@@ -353,7 +353,7 @@
         "commits": []
       },
       "depends_on": [],
-      "notes": "Further units, not written: Carry the prose-list rule into the design-system method's render-brief.py and its tests. That unit is the design-system card the lead is carding in the method's repository; DIRECTORY-009 is blocked on it by the check in its blocked_by. RM-070 is the next id after the highest roadmap id held by main (RM-016) and every open brief branch (RM-069)."
+      "notes": "Further units, not written: Carry the prose-list rule into the design-system method's render-brief.py and its tests. That unit is the design-system card the lead is carding in the method's repository; DIRECTORY-009 is blocked on it by the check in its blocked_by. RM-070 and DIRECTORY-009 are the ids this draft was first written under and are kept on amendment. Both are also held on other open branches: RM-070 by brief/home/8c927ad7-3b08-4bb2-b800-b7b7f024c85f, and DIRECTORY-009 by several directory brief and draft branches, each with a different brief. The next free ids after main and every open branch are RM-071 and DIRECTORY-039, and renumbering before landing is the lead's call."
     }
   ]
 }
