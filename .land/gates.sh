@@ -21,6 +21,11 @@ identity_leg() {
     echo "container_runtime_missing: the identity leg needs a container runtime answering docker info"
     return 1
   fi
+  # The pin-clone test reads vendor/rauthy as a recursive clone checks it out.
+  if ! init_error=$(git submodule update --init vendor/rauthy 2>&1); then
+    echo "submodule_init_failed: git submodule update --init vendor/rauthy: $init_error"
+    return 1
+  fi
   if ! cargo clippy -p lys --all-features --test 'identity_*' -- -D warnings; then
     echo "identity_lint_failed: an identity target has a lint warning; no identity test was run"
     return 1

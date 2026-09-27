@@ -8,6 +8,7 @@
 pub mod identity_support;
 
 use std::collections::BTreeSet;
+use std::path::Path;
 use std::process::Command;
 
 use identity_support::compose::{self, require_runtime};
@@ -193,6 +194,14 @@ fn id001_pin_clone_vendor_rauthy_is_the_pinned_ablative_commit() -> TestResult {
     assert!(tree.contains(&format!("commit {pinned}")), "{tree}");
     let url = git(&["config", "-f", ".gitmodules", "submodule.vendor/rauthy.url"])?;
     assert_eq!(url, "https://github.com/ablative-io/rauthy.git");
+    let toplevel = git(&["-C", "vendor/rauthy", "rev-parse", "--show-toplevel"])?;
+    if !Path::new(&toplevel).ends_with("vendor/rauthy") {
+        return Err(format!(
+            "submodule_uninitialised: vendor/rauthy is not initialised, so git answers for \
+             {toplevel}; run git submodule update --init vendor/rauthy"
+        )
+        .into());
+    }
     let checked_out = git(&["-C", "vendor/rauthy", "rev-parse", "HEAD"])?;
     assert_eq!(
         checked_out, pinned,
