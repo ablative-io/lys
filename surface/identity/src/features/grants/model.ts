@@ -1,7 +1,7 @@
 import { api } from '../../api';
 import type { LifecycleState, MeView, PeopleView } from '../../generated';
 import { resourceText } from '../../generated/grants';
-import type { Grant, GrantList, PassOn } from '../../generated/grants';
+import type { Grant, GrantList, PassOn, ResourceRef } from '../../generated/grants';
 import { fileNo } from '../people/directory';
 import { day } from '../file/time';
 
@@ -40,6 +40,10 @@ export const grantNo = (id: string): string => 'G/' + id.slice(id.indexOf('-') +
 
 export const onText = (g: Grant): string => resourceText(g.resource);
 
+/** A resource as the mock-up's pickers name it: a project or organisation by its id, anything else as `name (type)`. */
+export const resourceLabel = (r: ResourceRef): string =>
+  r.kind === 'project' || r.kind === 'organisation' ? resourceText(r) : `${r.id} (${r.kind})`;
+
 /** The chain from the root grant down to `g`. */
 export function chainOf(w: GrantWorld, g: Grant): Grant[] {
   const out: Grant[] = [];
@@ -55,6 +59,8 @@ export interface Standing {
   ok: boolean;
   kind?: string;
   why?: string;
+  /** What a suspension refuses is an open question, so a suspended holder's reason says so. */
+  open?: boolean;
 }
 
 const now = () => Math.floor(Date.now() / 1000);
@@ -64,7 +70,7 @@ export function standing(w: GrantWorld, g: Grant, depth = 0): Standing {
   if (g.revoked) return { ok: false, kind: 'grant revoked', why: `grant ${grantNo(g.id)} was revoked` };
   if (g.window.ends_at !== null && g.window.ends_at <= now()) return { ok: false, kind: 'grant expired', why: `grant ${grantNo(g.id)} ended ${day(g.window.ends_at)}` };
   const holder = w.who.get(g.holder);
-  if (holder && holder.state !== 'active') return { ok: false, kind: 'identity not active', why: `${holder.name} is ${holder.state}` };
+  if (holder && holder.state !== 'active') return { ok: false, kind: 'identity not active', why: `${holder.name} is ${holder.state}`, open: holder.state === 'suspended' };
   if (g.source && depth < 64) {
     const up = w.byId.get(g.source);
     if (up) {
@@ -93,6 +99,19 @@ export function relationsSeen(w: GrantWorld): Map<string, string[]> {
   const out = new Map<string, string[]>();
   for (const g of w.list.grants) if (!out.has(g.relation)) out.set(g.relation, [...g.actions].sort());
   return out;
+}
+
+/**
+ * The relations that carry `action`, as the mock-up's answer names them
+ * (`post needs editors or owners`): narrowest first, by the actions each carries.
+ * The relation of the grant exercised is always among them.
+ */
+export function needsText(w: GrantWorld, action: string, held: string | null): string {
+  const carrying = [...relationsSeen(w)].filter(([, actions]) => actions.includes(action));
+  carrying.sort(([a, x], [b, y]) => x.length - y.length || a.localeCompare(b));
+  const names = carrying.map(([r]) => r);
+  if (held !== null && !names.includes(held)) names.push(held);
+  return `${action} needs ${names.map((r) => r + 's').join(' or ')}`;
 }
 
 /** Whether every action of `actions` is one `g` lets its holder pass on. */

@@ -34,7 +34,6 @@ export function GrantCard({ w, g, chain, done }: { w: GrantWorld; g: Grant; chai
       <div className="note" style={{ marginTop: 6, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
         <span>Passable: {passText(g.pass_on)}</span>
         <span>Lasts: {lastsText(g)}</span>
-        <span>Allows: {g.actions.join(', ')}</span>
         <span className="mono">{grantNo(g.id)}</span>
         {!g.revoked && w.who.get(g.holder)?.state !== 'retired' ? (
           <a href="#" data-act="revoke" data-g={g.id} style={{ color: 'var(--danger)' }} onClick={(e) => { e.preventDefault(); shell.openDrawer(<Revoke w={w} g={g} done={done} />); }}>
@@ -42,7 +41,12 @@ export function GrantCard({ w, g, chain, done }: { w: GrantWorld; g: Grant; chai
           </a>
         ) : null}
       </div>
-      {s.ok ? null : <div className="note" style={{ color: 'var(--danger)', marginTop: 4 }}>{s.why}</div>}
+      {s.ok ? null : (
+        <div className="note" style={{ color: 'var(--danger)', marginTop: 4 }}>
+          {s.why}
+          {s.open ? <> <span className="open-q">what suspension refuses: open</span></> : null}
+        </div>
+      )}
       {g.revoked ? <Revocation g={g} /> : null}
     </div>
   );

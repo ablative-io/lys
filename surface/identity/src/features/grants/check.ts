@@ -5,7 +5,7 @@ import { clock } from '../file/time';
 
 export type Answer =
   | { ok: true; who: string; action: string; resource: ResourceRef; permit: Permit; t: string }
-  | { ok: false; who: string; action: string; resource: ResourceRef; kind: string; why: string; t: string; revision: number | null };
+  | { ok: false; who: string; action: string; resource: ResourceRef; kind: string; why: string; t: string; revision: number | null; open: boolean };
 
 const checked = () => clock(Math.floor(Date.now() / 1000)).split(' ').at(-1) ?? '';
 
@@ -24,7 +24,8 @@ export async function ask(caller: string, who: string, whoName: string, resource
     } catch (error) {
       if (!(error instanceof Refused)) throw error;
       const { refusal, reason } = error.refusal;
-      return { ...base, ok: false, kind: refusal, why: reason.replace(/^[A-Za-z]+: /, ''), revision: null };
+      const open = refusal === 'IdentityNotActive' && / is suspended,/.test(reason);
+      return { ...base, ok: false, kind: refusal, why: reason.replace(/^[A-Za-z]+: /, ''), revision: null, open };
     }
   }
   let after: string | null = null;
@@ -43,6 +44,7 @@ export async function ask(caller: string, who: string, whoName: string, resource
     kind: 'no grant',
     why: `${whoName} holds no grant you may see that gives ${action} on ${resourceText(resource)}`,
     revision,
+    open: false,
   };
 }
 
