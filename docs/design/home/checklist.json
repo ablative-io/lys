@@ -93,6 +93,46 @@
           "id": "C13",
           "text": "At compaction or retirement the outgoing session's letter to its successor, with its real thinking, becomes the successor's first entry as lys.inherited; it is never authored and replays only to the same provider, api and model; seeded against plain is measured on a card.",
           "done": false
+        },
+        {
+          "id": "C45",
+          "text": "A lys.inherited entry's rule may be absent in the type and is skipped when absent, a canon entry with a rule serialises to the same bytes as before, and the canon loader refuses by name a canon example without a rule, naming its entry id and the missing field, which canon add and a render with --canon both reach; a rule-less lys.inherited entry in a session of a home reads cleanly.",
+          "done": false
+        },
+        {
+          "id": "C46",
+          "text": "A handover refuses by name before any file is created: a letter entry that is not an assistant message, a letter run whose entries do not stand next to each other on the outgoing path in the order given, a letter entry whose message carries provider `authored`, a letter holding no thinking block, and a successor path that exists and is not an empty directory.",
+          "done": false
+        },
+        {
+          "id": "C47",
+          "text": "A handover writes a new successor home holding one session with a fresh id, the outgoing header's cwd and no parentSession, and leaves every file of the outgoing home byte for byte as it was.",
+          "done": false
+        },
+        {
+          "id": "C48",
+          "text": "The successor session's first entry is a lys.inherited entry with no rule naming the outgoing session as from_session and curated_by, every letter id in path order as from_entries, the letter's provider, api and model, and the last letter entry's timestamp as curated_at.",
+          "done": false
+        },
+        {
+          "id": "C49",
+          "text": "Each letter entry follows in the successor with its id, timestamp and message equal to the source, every thinkingSignature byte for byte, and then one session_info entry named `inherited from <outgoing session id>` with no other field.",
+          "done": false
+        },
+        {
+          "id": "C50",
+          "text": "lys-home handover prints one JSON report naming the successor home, the session id and its file, with inherited true read from the successor's first entry, and no transcript content.",
+          "done": false
+        },
+        {
+          "id": "C51",
+          "text": "A successor rendered for another model carries each inherited signed thinking block as a text part with one loss-account entry naming it by hash, and rendered for the letter's own model keeps it whole with its signature.",
+          "done": false
+        },
+        {
+          "id": "C52",
+          "text": "PROOF-HANDOVER.md records the handover of an elicited letter by ids, hashes and the signature comparison, whether the inherited signed block appears in a resumed continuation's own file on the installed Claude Code beside 2.1.281, and the seeded and plain card counts as not run.",
+          "done": false
         }
       ]
     },

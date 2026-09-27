@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,25 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-058",
+      "title": "A handover is a rule-less lys.inherited entry and the letter's turn copied whole into a new successor home, its inheritance read from its first entry",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's answers to the handover survey; recorded with HOME-015",
+      "context": "HOME-001 R12 describes the handover, and the tree contradicts three of its sentences. An imported Claude Code turn holds its signed thinking and its text as separate entries, so one entry id cannot carry both. Pi's session_info carries only a name, and CN4 forbids lys data outside custom.data, so session_info cannot hold an inherited field. The canon's Inherited type requires a rule, a letter is not a rule, and the canon reader never reads an example's data today, so making the rule optional would let a rule-less example into the canon unrefused.",
+      "decision": "The letter is one or more entry ids, a run of assistant message entries standing next to each other on the outgoing session's path, in path order. Each entry is copied whole, keeping its id, its timestamp and its message, with only its parent link rewritten to chain onto the successor, and from_entries lists every id in that order. The successor is a new home directory, absent or empty, holding one new session with a fresh id, the outgoing header's cwd and no parentSession. Its first entry is a lys.inherited entry with no rule, then the copied entries, then a session_info whose name is `inherited from <outgoing session id>`, and no field is added to Pi's grammar. The first entry is what says the successor's first memory is inherited; the handover's own report reads it from there and prints inherited true, and the render report and its count of canon examples are unchanged. The canon loader newly refuses by name a canon example whose lys.inherited entry has no rule; a lys.inherited entry in a session of a home is read without that check. Rejected: merging the run into one message (composing the letter), copying one entry (half a letter), a session_info flag (breaks CN4), writing into the outgoing home, and setting parentSession, which ADR-017 keeps for a fork's ancestry.",
+      "quote": "",
+      "consequences": [
+        "A handover writes nothing when it refuses, and the outgoing home is only read. Every refusal is taken before the successor directory is created or written.",
+        "A letter entry that is not an assistant message, a run that is not contiguous on the path, an entry whose message carries provider `authored`, and a run with no thinking block are each refused by name, naming the entry. A successor path that holds anything is refused by name.",
+        "Inherited.rule is optional in the type and skipped when absent, so a canon entry with a rule serialises to the same bytes as before; canon add and a render with --canon refuse a canon holding a rule-less example.",
+        "Launching a successor from its handover through the launch template is a later unit; HOME-002's template gains no slot here (ADR-012)."
       ],
       "supersedes": [],
       "superseded_by": ""
