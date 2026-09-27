@@ -201,7 +201,7 @@
         },
         {
           "id": "C172",
-          "text": "Assigning a role, by the person the agent answers to or an owner of the role's project, makes a holding that names its role and version with grants copied from that version's templates, each admitted under DIRECTORY-006 for the assigning actor (conformance 4.7, ADR-085).",
+          "text": "Assigning a role, by the person the agent answers to or an owner of the role's project, makes a holding that names its role and version with grants copied from that version's templates, each admitted under DIRECTORY-006 for the assigning actor (conformance 4.7, ADR-089).",
           "done": false
         },
         {
@@ -221,7 +221,7 @@
         },
         {
           "id": "C176",
-          "text": "A move at the holder's next start leaves a running session on the version it started with, and a move now, taken only by the admitted operator, stops every open session of the agent first and names each in the move's record.",
+          "text": "A move at the holder's next start leaves a running session on the version it started with, and a move now, taken only by the admitted operator, stops every open session of the agent first and names in the move's record each session it caused to end.",
           "done": false
         },
         {
