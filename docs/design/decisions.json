@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,46 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-079",
+      "title": "A session credential is a random value the directory issues when the agent's signed report-back over a directory-issued challenge creates the session, and keeps only as a hash",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for the identity line, answering the session card's rounds; recorded with DIRECTORY-026",
+      "context": "Road step 2 keeps the enduring agent and each session's credential apart (docs/design/identity/STATEMENT-2026-09-22.md:166). The provision card's contract left what a session credential is open for the session card, naming three readings: a per-session lys certificate, a lys/delegation/v1 SpeaksFor delegation, and an ADR-001 handle. The product never runs an agent (ADR-007), so the directory never sees a start directly, and a crashed agent never reports its end. The start card ties a running agent to the command it was given through a launch record id. A new signed tag freezes the first time anything signs under it.",
+      "decision": "The session credential is 32 random bytes the directory issues when the session is created. The directory keeps only their SHA-256, on the session record, and returns the value once, in the answer to the report-back that created the session; the session presents the value to the directory, which is the only party that checks it. A session is created when the started agent first reports back and proves it is the agent with its enrolled key, and only for an agent whose certificate has been issued. Before reporting back, the agent asks the directory for a challenge: 32 random bytes the directory issues once, for that agent and a launch record id the agent supplies, kept until used or until it expires more than 60 seconds after issue. The proof is an Ed25519 signature under the tag lys/session-start/v1 (ADR-080). The directory verifies the signature before anything else: an unsigned or badly signed proof, or one naming an agent it does not hold or one with no enrolled key, is refused proof_invalid with one body and touches no challenge, and only a correctly signed proof receives the state-revealing refusals. It admits the proof only when the challenge is one it issued to that agent, unused and unexpired, the directory named is itself and the launch record id matches the challenge's, and it marks the challenge used in the same act that creates the session. Two acts end a session: the agent reporting its end with its credential, and the directory's administrator stopping it. Ending changes the record's state, so the credential is refused at once, naming the ended session. Rejected: a per-session lys certificate, because nobody verifies a session credential offline in this card, so a signed artifact buys nothing and would freeze a format before anything needs it; a lys/delegation/v1 SpeaksFor delegation, framed for an offline root key and a seat subject, whose module says not to invent a consumer; an ADR-001 handle, which waits on the unbuilt secrets broker (SECRETS-002); creating the session when a start command is rendered; and expiry of a session.",
+      "quote": "None of the three. The session credential is a random value the directory issues when the session is created. The directory keeps only its hash, on the session record, and the session presents the value to the directory. The reason is that in this card the directory is the only party that checks a session credential. Nobody verifies it offline, so a signed artifact buys nothing here and would freeze a format before anything needs it. A handle waits on the unbuilt secrets broker (SECRETS-002). SpeaksFor is framed for an offline root key and a seat subject, and delegation/mod.rs says not to invent a consumer. Refusing is a change to the record's state, so ending a session refuses its credential at once. The brief records this choice and its reason as an ADR at the next free id, and names a signed session credential as later work, for when a party other than the directory must check a session.",
+      "consequences": [
+        "The session credential is distinct from the agent's one certificate (ADR-008) and never replaces it. No session credential value appears in a start command, a launch record, an event, a log or a document; the session_started event carries only its SHA-256, which reveals nothing because the value is 32 random bytes.",
+        "P9 gives way narrowly: an agent authenticated by its enrolled key creates and ends its own session record, and nothing else. Every other mutation by a caller who is not an administrator is still refused in step 1 by name.",
+        "The launch record id is carried as supplied; the check that the launch record exists and belongs to the agent is the start card's, so the two cards do not depend on each other.",
+        "A session is refused to a retired agent and to an agent whose certificate has been revoked, the revocation read only through the certificate revocation card's fold, and no open session is ended by either. Suspension refuses nothing here while it stays open. Ending open sessions is the emergency-stop card's.",
+        "A crashed agent's session stays open until an operator stops it. Lapsing a stale session is its own card.",
+        "A signed session credential is later work, for when a party other than the directory must check a session. It is a new format with its own version and review, never a change to this one.",
+        "This decision supersedes, by closing it, the earlier draft of the same card (run d5055cc1) and the decision it held there, which never reached main."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-080",
+      "title": "lys/session-start/v1 signs five fields, the tag, the agent id, the directory's identifier, the launch record id and a directory-issued nonce, and is proposed in the wire-format register until ratified",
+      "status": "proposed",
+      "scope": "directory",
+      "date": "",
+      "decided_by": "",
+      "context": "The session card's report-back is a new signed statement, and a domain-separation tag freezes the first time anything signs under it (CLAUDE.md, wire formats are forever). docs/design/WIRE-FORMATS.md is the register every wire contract passes through, proposed, ratified, frozen, with ratification a recorded human decision in its decision log. The identity line's lead fixed the statement's content in the session card's rounds; the format itself is ratified in the register, not by this ledger.",
+      "decision": "The report-back is an Ed25519 signature by the agent's enrolled key over the 20 ASCII bytes of lys/session-start/v1, one 0x00 byte, then the agent directory id, the directory's own identifier and the launch record id, each as its UTF-8 length in 4 bytes big-endian followed by its bytes, then the 32-byte nonce, a challenge the directory issued once to that agent for that launch record id and admits for 60 seconds after issue. Freshness (the nonce), audience (the directory's identifier) and the launch record id are in the first version because the tag cannot gain them after it freezes. The format is proposed in docs/design/WIRE-FORMATS.md's decision log; the tests sign under it with disposable test keys only, and no production agent signs under it until the register shows it ratified. Rejected: a four-field message without the directory's identifier, which could not say which directory a proof was made for; a message without the launch record id, which could not tie a session to the command it was started by; a signature over the fields without a directory-issued nonce, which a replay would satisfy; and treating this ledger entry as the ratification, which the register reserves to its own decision log.",
+      "quote": "Five fields. The signed lys/session-start/v1 message carries the tag, the agent id, the directory's own identifier, the launch record id and the nonce. The later sentence adds the launch record id and removes nothing, and the acceptance line for a proof naming another directory stands.",
+      "consequences": [
+        "The statement is reviewed adversarially before any code signs under it, and a change after it freezes is a new tag alongside, never a mutation.",
+        "The status moves to decided when docs/design/WIRE-FORMATS.md's decision log records the format ratified; until then no production agent signs under lys/session-start/v1.",
+        "The bytes are a tagged, length-prefixed preimage signed with plain Ed25519, not COSE_Sign1: the directory is the only verifier, as for lys/sealed-envelope/v1, which WIRE-FORMATS.md keeps out of COSE on the same ground."
       ],
       "supersedes": [],
       "superseded_by": ""

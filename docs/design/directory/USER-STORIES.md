@@ -8,6 +8,8 @@
 
 **S5.** As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email.
 
+**S81.** As a responsible person, I want each session of my agent kept as its own record under that one agent, so that starting another session never makes another agent.
+
 ## Reviewer — Reviews a brief before any of its rows is dispatched
 
 **S2.** As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria.
@@ -17,6 +19,10 @@
 **S3.** As the operator, I want to install the identity product's dependencies on one PostgreSQL database whose host I choose, and restart or restore it without losing anyone, so that the product stands alone without Cambium or Manifold.
 
 **S6.** As the operator, I want the directory's screens to show every refusal, pending audit and outage as it is, so that I never act on a completed state that did not happen.
+
+**S82.** As the operator, I want to stop a session on the directory, so that its credential is refused even when the agent crashed and never reported its end.
+
+**S83.** As the operator, I want to list an agent's sessions with their states, so that I can see which of its session credentials are still accepted.
 
 ## Verifier — Checks a recorded identity change without the operator's cooperation
 
@@ -33,3 +39,7 @@
 **S11.** As a person granting temporary access, I want its end date and ancestor restrictions enforced, so role changes or reinstatement cannot silently extend it.
 
 **S12.** As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
+
+## Started agent — Reports back to the directory and presents its session credential
+
+**S80.** As a started agent, I want to present my session credential to the directory, so that it confirms I am my enduring agent in this session.

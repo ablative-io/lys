@@ -16,6 +16,10 @@
         {
           "id": "S5",
           "text": "As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email."
+        },
+        {
+          "id": "S81",
+          "text": "As a responsible person, I want each session of my agent kept as its own record under that one agent, so that starting another session never makes another agent."
         }
       ]
     },
@@ -40,6 +44,14 @@
         {
           "id": "S6",
           "text": "As the operator, I want the directory's screens to show every refusal, pending audit and outage as it is, so that I never act on a completed state that did not happen."
+        },
+        {
+          "id": "S82",
+          "text": "As the operator, I want to stop a session on the directory, so that its credential is refused even when the agent crashed and never reported its end."
+        },
+        {
+          "id": "S83",
+          "text": "As the operator, I want to list an agent's sessions with their states, so that I can see which of its session credentials are still accepted."
         }
       ]
     },
@@ -76,6 +88,16 @@
         {
           "id": "S12",
           "text": "As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect."
+        }
+      ]
+    },
+    {
+      "name": "Started agent",
+      "role": "Reports back to the directory and presents its session credential",
+      "stories": [
+        {
+          "id": "S80",
+          "text": "As a started agent, I want to present my session credential to the directory, so that it confirms I am my enduring agent in this session."
         }
       ]
     }
