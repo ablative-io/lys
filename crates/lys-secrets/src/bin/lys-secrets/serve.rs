@@ -25,6 +25,7 @@ pub(crate) struct Shared {
     pub(crate) broker: Mutex<Broker<Grants>>,
     pub(crate) layout: Layout,
     pub(crate) client: reqwest::Client,
+    pub(crate) window: Mutex<lys_secrets::ServiceWindow>,
 }
 
 pub fn serve(broker: Broker<Grants>, layout: Layout, listen: &str) -> Result<(), SecretsError> {
@@ -39,6 +40,7 @@ pub fn serve(broker: Broker<Grants>, layout: Layout, listen: &str) -> Result<(),
         broker: Mutex::new(broker),
         layout,
         client: reqwest::Client::new(),
+        window: Mutex::new(lys_secrets::ServiceWindow::new()),
     });
     runtime.block_on(async move {
         let listener = tokio::net::TcpListener::bind(listen)

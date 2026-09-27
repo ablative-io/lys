@@ -157,6 +157,23 @@ impl<P: PermissionCheck> Broker<P> {
         secret: &str,
         policy: crate::store::Recipients,
     ) -> Result<(), SecretsError> {
+        self.set_recipients_via(owner, secret, policy, None)
+    }
+
+    /// Sets the recipient policy of `secret`, as its owner, asked through
+    /// the screen service `via` when one carried the owner's word; the
+    /// audit line names it.
+    ///
+    /// # Errors
+    ///
+    /// As `set_recipients`.
+    pub fn set_recipients_via(
+        &mut self,
+        owner: &str,
+        secret: &str,
+        policy: crate::store::Recipients,
+        via: Option<&str>,
+    ) -> Result<(), SecretsError> {
         let owns = self
             .store
             .entry(secret)
@@ -168,7 +185,7 @@ impl<P: PermissionCheck> Broker<P> {
             }));
         }
         self.store.set_recipients(secret, policy)?;
-        let outcome = format!("recipients {}", policy.label());
+        let outcome = super::scope::with_via(format!("recipients {}", policy.label()), via);
         self.record(
             AuditKind::Seal,
             (None, Some(owner), Some(secret)),

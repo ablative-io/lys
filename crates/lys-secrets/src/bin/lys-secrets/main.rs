@@ -3,6 +3,7 @@
 //! presentation as an agent, read the audit log, and serve the proxy.
 
 mod args;
+mod callers;
 mod cli;
 mod files;
 mod manage;
@@ -213,6 +214,28 @@ fn run(command: Command) -> Result<(), SecretsError> {
             };
             open(&at)?.set_recipients(&by, &secret, policy)?;
             println!("{secret} may now be handed to {}", policy.label());
+        }
+        Command::TrustService {
+            at,
+            name,
+            public_key,
+        } => {
+            let key = lys_secrets::from_hex(&public_key)
+                .filter(|bytes| bytes.len() == 32)
+                .ok_or_else(|| SecretsError::Encoding {
+                    context: "service public key",
+                    reason: "not 32 bytes in hex".to_owned(),
+                })?;
+            let layout = Layout::new(&at.root, &at.keys);
+            layout.trust_service(lys_secrets::ServiceKey {
+                name: name.clone(),
+                public_key: to_hex(&key),
+            })?;
+            println!("{name} may now ask on a signed-in person's behalf");
+        }
+        Command::ServiceKey { key } => {
+            let identity = Ed25519Identity::load_or_generate(&key)?;
+            println!("{}", to_hex(&identity.public_key_bytes()));
         }
         Command::List { at, identity } => {
             for entry in open(&at)?.listing(&identity) {

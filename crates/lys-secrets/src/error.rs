@@ -6,9 +6,11 @@ use std::path::PathBuf;
 mod lending;
 mod name;
 mod revocation;
+mod service;
 
 pub use lending::LendingRefusal;
 pub use revocation::RevocationRefusal;
+pub use service::ServiceRefusal;
 
 /// A named refusal or failure of the secrets broker.
 #[derive(Debug, thiserror::Error)]
@@ -364,6 +366,9 @@ pub enum SecretsError {
     /// A provider revocation's confirmation refused.
     #[error(transparent)]
     Revocation(#[from] RevocationRefusal),
+    /// A screen service's request on a person's behalf refused.
+    #[error(transparent)]
+    Service(#[from] ServiceRefusal),
     /// A scope written as none of the three kinds.
     #[error(
         "InvalidScope: {text:?} is not a scope (act: name it as personal:<person>, team:<name> or organisation:<name>)"

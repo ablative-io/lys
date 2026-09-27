@@ -116,6 +116,23 @@ impl<P: PermissionCheck> Broker<P> {
         secret: &str,
         scope: Scope,
     ) -> Result<(), SecretsError> {
+        self.set_scope_via(owner, secret, scope, None)
+    }
+
+    /// Sets the scope of `secret`, as its owner, asked through the screen
+    /// service `via` when one carried the owner's word; the audit line
+    /// names it.
+    ///
+    /// # Errors
+    ///
+    /// As `set_scope`.
+    pub fn set_scope_via(
+        &mut self,
+        owner: &str,
+        secret: &str,
+        scope: Scope,
+        via: Option<&str>,
+    ) -> Result<(), SecretsError> {
         let owns = self
             .store
             .entry(secret)
@@ -126,7 +143,7 @@ impl<P: PermissionCheck> Broker<P> {
                 secret: secret.to_owned(),
             }));
         }
-        let outcome = format!("scope {}", scope.target());
+        let outcome = with_via(format!("scope {}", scope.target()), via);
         self.store.set_scope(secret, scope)?;
         self.record(
             AuditKind::Seal,
@@ -136,5 +153,13 @@ impl<P: PermissionCheck> Broker<P> {
             &outcome,
         )?;
         Ok(())
+    }
+}
+
+/// An audit outcome, naming the screen service that carried it when one did.
+pub(super) fn with_via(outcome: String, via: Option<&str>) -> String {
+    match via {
+        Some(service) => format!("{outcome} via {service}"),
+        None => outcome,
     }
 }
