@@ -3,7 +3,7 @@
   "title": "The standalone identity directory, with every grant rooted in a person",
   "intention": "An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change. Cambium later uses this issuer, keeping its participant ids (row 06); that direction is recorded here while row 06 stays the non-goal recorded below, and this sentence does not promise it.",
   "problem": "IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands.",
-  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5. Row 07, the release proof, is carried by DIRECTORY-025 under ADR-078: it gates the exact pushed Lys, Rauthy and Cambium refs, verifies the row 03 and row 05 live install receipts, and records standalone acceptance on a staged, test-keyed install before any cutover. It checks row 01 by docs/design/identity/RAUTHY-BASELINE.md (closed), row 02 by DIRECTORY-002, row 04 by DIRECTORY-003, row 03 by DIRECTORY-004, row 05 by DIRECTORY-005, and row 06 by its lys half (card LsCN9H7-) and its Cambium half (card v0CuMstE).",
+  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.",
   "principles": [
     {
       "id": "P1",
@@ -334,7 +334,7 @@
     },
     {
       "path": "deploy/identity/README.md",
-      "note": "install, readiness, backup and restore, and SpiceDB's step-1 sentence (DIRECTORY-002); the directory (DIRECTORY-003) and the screens (DIRECTORY-005); the release rollback that never launches an older Rauthy binary against a forward-only migrated database (DIRECTORY-025)",
+      "note": "install, readiness, backup and restore, and SpiceDB's step-1 sentence (DIRECTORY-002); the directory (DIRECTORY-003) and the screens (DIRECTORY-005)",
       "brief": "DIRECTORY-002"
     },
     {

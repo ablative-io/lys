@@ -52,7 +52,7 @@
 
 - [ ] **C186** — The identity-release leg is registered once, as a demand-cadence leg in docs/design/project.json running scripts/identity-gates/release.sh, named in one line of CLAUDE.md and mirrored in the directory design's gate, and .land/gates.sh is unchanged.
 - [ ] **C187** — Every required venue leg is recorded green on the exact pushed Lys, Rauthy and Cambium refs in IDENTITY-001-commands.jsonl and the release report, and a missing leg is named as a blocker.
-- [ ] **C188** — The staged install runs the tested refs on the node the operator names under a test service key, with its backups and a rollback that never launches an older Rauthy binary against a forward-only migrated database recorded.
-- [ ] **C189** — The row 03 and row 05 live install receipts are verified against the release refs and each is marked test-keyed.
+- [ ] **C188** — The row 03 and row 05 live install receipts are verified against the release refs and each is marked test-keyed.
+- [ ] **C189** — The staged install runs the tested refs on the node the operator names under a test service key, with its backups and a rollback that never launches an older Rauthy binary against a forward-only migrated database recorded.
 - [ ] **C190** — Standalone acceptance on the staged install is recorded before any cutover, with the staging statement at the demonstration's opening, who the two providers resolve to and the agent's recorded creation.
 - [ ] **C191** — Every requirement not met is named in the release report, preserved Cambium identities among them until the cutover, the three reserved acts are named, and no health check is counted as completion.

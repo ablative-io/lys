@@ -18,7 +18,7 @@ IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, an
 
 ## Solution
 
-Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5. Row 07, the release proof, is carried by DIRECTORY-025 under ADR-078: it gates the exact pushed Lys, Rauthy and Cambium refs, verifies the row 03 and row 05 live install receipts, and records standalone acceptance on a staged, test-keyed install before any cutover. It checks row 01 by docs/design/identity/RAUTHY-BASELINE.md (closed), row 02 by DIRECTORY-002, row 04 by DIRECTORY-003, row 03 by DIRECTORY-004, row 05 by DIRECTORY-005, and row 06 by its lys half (card LsCN9H7-) and its Cambium half (card v0CuMstE).
+Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.
 
 ## Principles
 
@@ -115,7 +115,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `deploy/identity/versions.json` | pinned releases and image digests | DIRECTORY-002 |
 | `deploy/identity/config.example.toml` | example configuration without secrets, the database address included (DIRECTORY-002, DIRECTORY-003) | DIRECTORY-002 |
 | `deploy/identity/postgres-init.sql` | roles and schema namespaces for Rauthy and SpiceDB in one database | DIRECTORY-002 |
-| `deploy/identity/README.md` | install, readiness, backup and restore, and SpiceDB's step-1 sentence (DIRECTORY-002); the directory (DIRECTORY-003) and the screens (DIRECTORY-005); the release rollback that never launches an older Rauthy binary against a forward-only migrated database (DIRECTORY-025) | DIRECTORY-002 |
+| `deploy/identity/README.md` | install, readiness, backup and restore, and SpiceDB's step-1 sentence (DIRECTORY-002); the directory (DIRECTORY-003) and the screens (DIRECTORY-005) | DIRECTORY-002 |
 | `deploy/identity/rauthy-themes.json` | both Rauthy client themes | DIRECTORY-002 |
 | `deploy/identity/theme-map.md` | source tokens and colour conversions of the themes | DIRECTORY-002 |
 | `docs/design/identity/reports/IDENTITY-001-deployment.md` | row 02's report: digests, versions, resolved configuration without secrets, restore result | DIRECTORY-002 |

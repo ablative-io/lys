@@ -196,12 +196,12 @@
         },
         {
           "id": "C188",
-          "text": "The staged install runs the tested refs on the node the operator names under a test service key, with its backups and a rollback that never launches an older Rauthy binary against a forward-only migrated database recorded.",
+          "text": "The row 03 and row 05 live install receipts are verified against the release refs and each is marked test-keyed.",
           "done": false
         },
         {
           "id": "C189",
-          "text": "The row 03 and row 05 live install receipts are verified against the release refs and each is marked test-keyed.",
+          "text": "The staged install runs the tested refs on the node the operator names under a test service key, with its backups and a rollback that never launches an older Rauthy binary against a forward-only migrated database recorded.",
           "done": false
         },
         {

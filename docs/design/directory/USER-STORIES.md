@@ -18,7 +18,7 @@
 
 **S6.** As the operator, I want the directory's screens to show every refusal, pending audit and outage as it is, so that I never act on a completed state that did not happen.
 
-**S77.** As the operator, I want the exact release installed on a node I name and shown to me as a staging install, so that I can accept the product standalone before anything is cut over.
+**S78.** As the operator, I want the exact release installed on a node I name and shown to me as a staging install, so that I can accept the product standalone before anything is cut over.
 
 ## Verifier — Checks a recorded identity change without the operator's cooperation
 
@@ -38,4 +38,4 @@
 
 ## Release reviewer — Decides from the record whether the release proof is complete
 
-**S78.** As the release reviewer, I want every command, result, ref and hash recorded with every unmet requirement named, so that completion rests on recorded evidence and never on a health check.
+**S77.** As the release reviewer, I want every command, result, ref and hash recorded with every unmet requirement named, so that completion rests on recorded evidence and never on a health check.
