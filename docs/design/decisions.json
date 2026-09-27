@@ -327,7 +327,7 @@
       "superseded_by": ""
     },
     {
-      "id": "ADR-081",
+      "id": "ADR-085",
       "title": "Every command given keeps its own signed launch record, and running is tied to it through lys/session-start/v1",
       "status": "decided",
       "scope": "directory",
@@ -346,7 +346,7 @@
       "superseded_by": ""
     },
     {
-      "id": "ADR-082",
+      "id": "ADR-086",
       "title": "The executable, its arguments and the working directory are fields of the reviewed profile version, never of a start request",
       "status": "decided",
       "scope": "directory",
@@ -364,7 +364,7 @@
       "superseded_by": ""
     },
     {
-      "id": "ADR-083",
+      "id": "ADR-087",
       "title": "Withdrawing a start request records only that the request no longer stands",
       "status": "decided",
       "scope": "directory",
@@ -382,7 +382,7 @@
       "superseded_by": ""
     },
     {
-      "id": "ADR-084",
+      "id": "ADR-088",
       "title": "One standing start per agent, and the command given as ids-only environment assignments before the recorded executable",
       "status": "decided",
       "scope": "directory",
