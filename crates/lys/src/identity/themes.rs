@@ -189,9 +189,8 @@ impl ThemeMapping {
                         format!("{name} takes {token}, not {}", field.token),
                     ));
                 }
-                let converted = hex_to_hsl(&field.hex).ok_or_else(|| {
-                    invalid(role, format!("{name}: {} is not #RRGGBB", field.hex))
-                })?;
+                let converted = hex_to_hsl(&field.hex)
+                    .map_err(|refusal| invalid(role, format!("{name}: {refusal}")))?;
                 if converted != field.hsl {
                     return Err(invalid(
                         role,
@@ -257,17 +256,26 @@ fn is_purple(hsl: [u16; 3]) -> bool {
     (255..=320).contains(&hsl[0]) && hsl[1] >= 15
 }
 
-/// Converts `#RRGGBB` to whole-number HSL.
-pub fn hex_to_hsl(hex: &str) -> Option<[u16; 3]> {
-    let digits = hex.strip_prefix('#').filter(|d| d.len() == 6)?;
-    let channel = |at: usize| u8::from_str_radix(digits.get(at..at + 2)?, 16).ok();
+/// Converts `#RRGGBB` to whole-number HSL, or names why it cannot.
+pub fn hex_to_hsl(hex: &str) -> Result<[u16; 3], String> {
+    let malformed = || format!("{hex} is not #RRGGBB");
+    let digits = hex
+        .strip_prefix('#')
+        .filter(|d| d.len() == 6)
+        .ok_or_else(malformed)?;
+    let channel = |at: usize| {
+        digits
+            .get(at..at + 2)
+            .and_then(|pair| u8::from_str_radix(pair, 16).ok())
+            .ok_or_else(malformed)
+    };
     let rgb = [channel(0)?, channel(2)?, channel(4)?].map(|c| f64::from(c) / 255.0);
     let max = rgb.iter().copied().fold(f64::MIN, f64::max);
     let min = rgb.iter().copied().fold(f64::MAX, f64::min);
     let lightness = f64::midpoint(max, min);
     let delta = max - min;
     if delta == 0.0 {
-        return Some([0, 0, to_whole(lightness * 100.0)]);
+        return Ok([0, 0, to_whole("lightness", lightness * 100.0, 100)?]);
     }
     let saturation = delta / (1.0 - (2.0 * lightness - 1.0).abs());
     let [red, green, blue] = rgb;
@@ -278,17 +286,31 @@ pub fn hex_to_hsl(hex: &str) -> Option<[u16; 3]> {
     } else {
         60.0 * ((red - green) / delta + 4.0)
     };
-    Some([
-        to_whole(hue) % 360,
-        to_whole(saturation * 100.0),
-        to_whole(lightness * 100.0),
+    Ok([
+        to_whole("hue", hue, 360)? % 360,
+        to_whole("saturation", saturation * 100.0, 100)?,
+        to_whole("lightness", lightness * 100.0, 100)?,
     ])
 }
 
-fn to_whole(value: f64) -> u16 {
-    format!("{:.0}", value.round().clamp(0.0, 360.0))
-        .parse()
-        .unwrap_or_default()
+/// Rounds `value` to the nearest whole number in `0..=max`, refusing a value
+/// outside that range (or not a number) by the component it measures. The
+/// whole number is found by bisecting the range, so no float is cast.
+fn to_whole(component: &str, value: f64, max: u16) -> Result<u16, String> {
+    let rounded = value.round();
+    if !(0.0..=f64::from(max)).contains(&rounded) {
+        return Err(format!("{component} {value} is outside 0 to {max}"));
+    }
+    let (mut low, mut high) = (0_u16, max);
+    while low < high {
+        let middle = low + (high - low).div_ceil(2);
+        if f64::from(middle) <= rounded {
+            low = middle;
+        } else {
+            high = middle - 1;
+        }
+    }
+    Ok(low)
 }
 
 fn hsl_to_rgb([hue, saturation, lightness]: [u16; 3]) -> [f64; 3] {
