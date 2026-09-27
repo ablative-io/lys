@@ -36,11 +36,13 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 - ADR-002 — The token revolver is the first consumer of the handle — The worker asks the broker for its next account instead of walking its own list; the store keeps the set of real accounts behind one handle and the proxy takes the next in turn and logs which one served each call. This replaces the account pool file.
 - ADR-003 — Everything is pegged to a human authority — A person signs in first; an agent is provisioned under that person with its own identity; the person's permissions are the ceiling and the agent holds an explicit subset; every grant says who may exercise it and who may pass it on; withdrawing the authority stops every grant derived from it. The exact delegation schema is not settled by this decision.
 - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
+- ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
+- ADR-076 — Ownership of a secret alone confers no revoke over the leases derived from it — The person acted for under a lease revokes it, and ownership of the secret the lease was issued from confers no revoke, over the owner revoking every credential derived from the secret, because who may revoke is a policy choice that ownership alone does not confer. Rejected: the owner revokes every credential derived from the secret.
 
 ## Goals
 
 - An implementation brief, SECRETS-002, covers every part of the temporary key model in the statement with numbered requirements and acceptance criteria.
-- Every checklist item and user story of the broker is covered by a SECRETS-002 requirement.
+- Every checklist item and user story of the broker is covered by a requirement of a SECRETS brief.
 - The token revolver can take its next account from the broker instead of its own list.
 
 ## Non-Goals
@@ -64,6 +66,31 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 | `crates/lys-core/src/delegation/mod.rs` | lys/delegation/v1; its docs record the handle and the lease's time window as applications of the delegation format (SECRETS-002 R1, R9) | SECRETS-002 |
 | `docs/design/WIRE-FORMATS.md` | the lys wire-format register; records the handle, sealed-record and lease formats before any is signed (SECRETS-002 R1, R6, R9) | SECRETS-002 |
 | `crates/lys-core/src/seal/mod.rs` | sealed envelopes; its docs record the sealed record as an application of lys/sealed-envelope/v1 (SECRETS-002 R6) | SECRETS-002 |
+| `docs/design/secrets/briefs/SECRETS-004.json` | the brief amending SECRETS-002 for CONFORMANCE rows 7.6 and 7.8: who may revoke a lease, the relinquish, and the scoped secrets list | SECRETS-004 |
+| `docs/design/secrets/briefs/SECRETS-004.md` | its rendered markdown | SECRETS-004 |
+| `docs/design/decisions.json` | the project decision ledger; gains proposed ADR-076, ownership alone confers no revoke (SECRETS-004 R1) | SECRETS-004 |
+| `Cargo.lock` | the workspace lockfile; gains the HTTP routing dependencies of crates/lys-secrets and its dependency on lys-identity (SECRETS-004 R4, R7) | SECRETS-004 |
+| `crates/lys-secrets/Cargo.toml` | the broker crate's manifest, created by SECRETS-003; gains the HTTP routing dependencies (SECRETS-004 R4) and the lys-identity dependency for the permission decision (SECRETS-004 R7) | SECRETS-003 |
+| `crates/lys-secrets/src/lib.rs` | the broker crate's module declarations, created by SECRETS-003; declares the SECRETS-004 modules | SECRETS-003 |
+| `crates/lys-secrets/src/store.rs` | the encrypted store, created by SECRETS-003; each secret record, the entry that carries its owning identity, gains its scope and its team (SECRETS-004 R3) | SECRETS-003 |
+| `crates/lys-secrets/src/lease.rs` | the lease record, created by SECRETS-003; each lease carries its holder, its person acted for, its source secret and its end (SECRETS-004 R3) | SECRETS-003 |
+| `crates/lys-secrets/src/secret.rs` | the redacting type for credential bytes, created by SECRETS-003; its fields unchanged, it gains only the declaration of its test module (SECRETS-004 R3) | SECRETS-003 |
+| `crates/lys-secrets/schema/secrets.zed` | the SpiceDB relations, created by SECRETS-003; gains the relations the seam asks (SECRETS-004 R7) | SECRETS-003 |
+| `crates/lys-secrets/tests/support/mod.rs` | shared test doubles, created by SECRETS-003; gains the two-people, two-teams fixture and the injected group claims (SECRETS-004 R4 to R7) | SECRETS-003 |
+| `crates/lys-secrets/src/teams.rs` | team_ids: the signed-in person's team ids from the group claims on their token, the one place they are read (SECRETS-004 R2) | SECRETS-004 |
+| `crates/lys-secrets/src/teams_tests.rs` | team_ids tests with injected claims (SECRETS-004 R2) | SECRETS-004 |
+| `crates/lys-secrets/src/access.rs` | the one seam every secret visibility, lease discovery and lease revoke check calls; answers from the record's fields, then through the permission decision in crates/lys-identity/src/grants/permission.rs (SECRETS-004 R3, R7) | SECRETS-004 |
+| `crates/lys-secrets/src/access_tests.rs` | seam tests answering from the record's fields (SECRETS-004 R3) | SECRETS-004 |
+| `crates/lys-secrets/src/secret_tests.rs` | the test that destructures the redacting type with no rest pattern, so it compiles only while its fields are SECRETS-003's (SECRETS-004 R3) | SECRETS-004 |
+| `crates/lys-secrets/src/secret_list.rs` | the scoped secrets list: organisation, team, mine, or no scope (SECRETS-004 R4) | SECRETS-004 |
+| `crates/lys-secrets/src/api/mod.rs` | the broker's HTTP routes, module declarations only (SECRETS-004 R4) | SECRETS-004 |
+| `crates/lys-secrets/src/api/secrets.rs` | GET /secrets with its scope parameter, and its refusal to an agent (SECRETS-004 R4) | SECRETS-004 |
+| `crates/lys-secrets/src/api/leases.rs` | GET /leases/{lease_id}, POST /leases/{lease_id}/revoke and POST /leases/{lease_id}/relinquish (SECRETS-004 R5, R6) | SECRETS-004 |
+| `crates/lys-secrets/src/revoke.rs` | the revoke by the person acted for, its refusals and the refusal of an already ended lease, end_with_upstream_pending, the one function that ends a lease with upstream pending for revoke and relinquish, and deliver_upstream_ack, the one writer of confirmed (SECRETS-004 R5, R6) | SECRETS-004 |
+| `crates/lys-secrets/src/relinquish.rs` | the holder's relinquish, recorded as its own act (SECRETS-004 R6) | SECRETS-004 |
+| `crates/lys-secrets/tests/secret_list.rs` | the CONFORMANCE 7.8 legs (SECRETS-004 R4) | SECRETS-004 |
+| `crates/lys-secrets/tests/lease_revoke.rs` | the CONFORMANCE 7.6 revoke legs and the always-no seam double (SECRETS-004 R5) | SECRETS-004 |
+| `crates/lys-secrets/tests/lease_relinquish.rs` | the CONFORMANCE 7.6 relinquish legs (SECRETS-004 R6) | SECRETS-004 |
 
 ## Inventory
 

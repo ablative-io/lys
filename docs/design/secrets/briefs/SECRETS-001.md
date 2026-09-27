@@ -15,7 +15,7 @@ title: Write the secrets broker implementation brief
 > - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
 > **Checklist:**
 > - C1 — SECRETS-002 is a design-system brief with one numbered requirement, carrying acceptance criteria and file paths, for each part of the temporary key model: the handle and the proxy swap with its audit line; rotation under one handle; the token revolver as the first consumer; OAuth refresh at the proxy; the seat's own login put into its environment at spawn; sealed knowledge tagged in SpiceDB; the three revocation cases, including the cancellation rule for calls in flight; and leases counted by uses, time window and spend.
-> - C2 — Every checklist item and user story the broker's implementation needs is recorded in this cluster and covered by a SECRETS-002 requirement.
+> - C2 — Every checklist item and user story the broker's implementation needs is recorded in this cluster and covered by a requirement of a SECRETS brief.
 > - C3 — The rendered markdown of this cluster matches its JSON.
 > **Stories:**
 > - S1 (Reviewer, Reviews a brief before any of its rows is dispatched) — As the reviewer, I want the secrets broker's implementation brief in the design-system form, with numbered requirements and criteria, so that its rows can be reviewed and dispatched one at a time.
@@ -111,7 +111,7 @@ THE SYSTEM SHALL add to checklist.json a section of the broker's implementation 
 - modify: docs/design/secrets/USER-STORIES.md
 
 **Checklist:**
-- C2 — Every checklist item and user story the broker's implementation needs is recorded in this cluster and covered by a SECRETS-002 requirement.
+- C2 — Every checklist item and user story the broker's implementation needs is recorded in this cluster and covered by a requirement of a SECRETS brief.
 - C3 — The rendered markdown of this cluster matches its JSON.
 
 **Stories:**
@@ -130,7 +130,7 @@ THE SYSTEM SHALL add to checklist.json a section of the broker's implementation 
   - modified: `docs/design/secrets/stories.json` — Adds personas Person, AI Agent, Token revolver, Engine, Operator and a Reviewer who reads the audit, with stories S2 to S11.
   - modified: `docs/design/secrets/USER-STORIES.md` — Re-rendered from stories.json.
 - Checklist delivery:
-  - [x] C2 — Every checklist item and user story the broker's implementation needs is recorded in this cluster and covered by a SECRETS-002 requirement. — C4 to C14 and S2 to S11 are recorded and each is covered by a SECRETS-002 requirement; coverage exits 0.
+  - [x] C2 — Every checklist item and user story the broker's implementation needs is recorded in this cluster and covered by a requirement of a SECRETS brief. — C4 to C14 and S2 to S11 are recorded and each is covered by a SECRETS-002 requirement; coverage exits 0.
   - [x] C3 — The rendered markdown of this cluster matches its JSON. — Re-rendering changes nothing.
 - Story delivery:
   - [x] S1 (Reviewer, Reviews a brief before any of its rows is dispatched) — As the reviewer, I want the secrets broker's implementation brief in the design-system form, with numbered requirements and criteria, so that its rows can be reviewed and dispatched one at a time. — The rendered SECRETS-002.md shows every requirement next to the item and story ids it covers.
