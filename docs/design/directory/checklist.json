@@ -185,67 +185,67 @@
       "name": "Starting an agent (CONFORMANCE section 5)",
       "items": [
         {
-          "id": "C209",
+          "id": "C229",
           "text": "No start path in the library, the route or the CLI spawns a process, and a test that reads the start files and gives a start with a marker-writing executable proves it (CONFORMANCE 5.1).",
           "done": false
         },
         {
-          "id": "C210",
+          "id": "C230",
           "text": "Before a command is given the five named checks run (the agent is active, its profile version is reviewed, the machine is allowed for the role, its virtual credentials are valid, the machine may reach what the profile needs), a failed check names itself in words, and no command is given (CONFORMANCE 5.2).",
           "done": false
         },
         {
-          "id": "C211",
+          "id": "C231",
           "text": "While a check's owning record does not exist, a start is refused by name, naming the check and the card that makes the record (Ink1H1Os, SECRETS-002, network row 8.5), and nothing is faked to let it through.",
           "done": false
         },
         {
-          "id": "C212",
+          "id": "C232",
           "text": "No credential value is on the command line or the clipboard, and a test reads both (CONFORMANCE 5.3).",
           "done": false
         },
         {
-          "id": "C213",
+          "id": "C233",
           "text": "A launch record naming the machine, the executable, the working directory, the profile version and the credential ids is kept for every command given, reads back after a restart, and a start given again from it is a new record naming the one it was copied from (CONFORMANCE 5.4).",
           "done": false
         },
         {
-          "id": "C214",
+          "id": "C234",
           "text": "A start request names only the agent, the profile version and the machine; the command given reads env LYS_AGENT_ID=<agent id> LYS_LAUNCH_RECORD=<launch record id> LYS_CREDENTIAL_IDS=<comma-separated credential ids> before the reviewed profile version's own executable and its recorded arguments, unchanged and in order, with the recorded working directory, each value shell-quoted and refused by name outside its id grammar; it is not a lys subcommand, and a request that sets the executable or the working directory is refused by name.",
           "done": false
         },
         {
-          "id": "C215",
+          "id": "C235",
           "text": "An agent shows as running only when its verified signed report names its launch record, and copying the command changes no state (CONFORMANCE 5.5).",
           "done": false
         },
         {
-          "id": "C216",
+          "id": "C236",
           "text": "With no report a start reads unconfirmed, never not started; the screen says the request stands and warns against asking elsewhere, and a second start for the agent is refused as start_unconfirmed (CONFORMANCE 5.6).",
           "done": false
         },
         {
-          "id": "C217",
+          "id": "C237",
           "text": "A withdrawal by the giver or anyone holding the same right records who and when and that the request no longer stands, never that the agent did not start, and a report arriving afterwards shows running with the withdrawal beside it.",
           "done": false
         },
         {
-          "id": "C218",
+          "id": "C238",
           "text": "Only the agent's responsible person and a directory administrator (in step 1, the admitted administrator) have a working Start; anyone else is refused by name, naming the agent and the right they lack.",
           "done": false
         },
         {
-          "id": "C219",
+          "id": "C239",
           "text": "The Start drawer and the unconfirmed notice are built on DIRECTORY-005's surface, and DIRECTORY-005's R1 and boundary name Start as the one control that works in step 1.",
           "done": false
         },
         {
-          "id": "C220",
-          "text": "The start route gives, gives again, withdraws and reads a start through the library and holds no start logic of its own, and the CLI answer lys identity start-command, the one subcommand of the identity group this card adds, prints exactly what the route answers for the same three inputs and starts nothing.",
+          "id": "C240",
+          "text": "The start route gives, gives again, withdraws and reads a start through the library and holds no start logic of its own, and the CLI answer lys identity start-command, the one subcommand this card adds to DIRECTORY-002's identity group, prints exactly what the route answers for the same three inputs and starts nothing.",
           "done": false
         },
         {
-          "id": "C221",
+          "id": "C241",
           "text": "A start resolves its agent to the enduring agent record the provision brief DIRECTORY-011 keeps and is refused by name, writing nothing, when there is none; a start never creates or changes an agent record and writes no session record, and a start of an agent already running is given as a new launch record naming the same agent, whose session record the report makes in the sessions brief's store.",
           "done": false
         }

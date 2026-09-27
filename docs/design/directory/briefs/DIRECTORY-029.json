@@ -1,5 +1,5 @@
 {
-  "id": "DIRECTORY-027",
+  "id": "DIRECTORY-029",
   "cluster": "directory",
   "title": "Check an agent before giving its start command, keep a launch record for every command given, and show it running only on its signed report",
   "depends_on": [
@@ -14,43 +14,42 @@
   "blocked_by": [
     "d5055cc1, the sessions brief, by its run whatever id it lands under (currently drafted as DIRECTORY-015, the brief this card's ruling amends; DIRECTORY-014 is another card): after the amendment its lys/session-start/v1 signed message holds five things, the tag, the agent's directory id, the directory's identifier, the launch record id and the directory-issued challenge, and the agent's report names the same launch record id it read from LYS_LAUNCH_RECORD. The launch record id is added before the tag freezes, while no agent signs under it; the lead sends this amendment to DIRECTORY-015's signed message. R10 and the running state of R13 are blocked on it by that name.",
     "Ink1H1Os, the ROLES card: the profile version record with its review record and the role's machines. R4 and R5 are blocked on it by that name.",
-    "The amendment to the roles card Ink1H1Os that R9 carries and its dev record records: Ink1H1Os's profile version record holds the executable, the arguments and the working directory as fields of the reviewed profile version (ADR-086), in that card's record and never in a copy this card keeps. R9 is blocked on Ink1H1Os by that name until its landed profile version record declares all three fields.",
+    "The amendment to the roles card Ink1H1Os that R9 carries and its dev record records: Ink1H1Os's profile version record holds the executable, the arguments and the working directory as fields of the reviewed profile version (ADR-087), in that card's record and never in a copy this card keeps. R9 is blocked on Ink1H1Os by that name until its landed profile version record declares all three fields. Ink1H1Os is a card on the Cambium board whose profile version record type has not landed in any repository, so R9 reads it only through the ProfileVersionRecords seam in crates/lys-identity/src/start/profile_command.rs; when that record lands, the file that implements the seam over it, and any Cargo manifest a dependency on its type needs, are named in R9's files by revising this brief before that part of R9 is dispatched.",
     "SECRETS-002: the virtual-credential (handle) record its R1 keeps, and the handle-resolving endpoint its R1 lands in the door repository (crates/cambium-door/src/http/secrets_handle.rs, door-owned; that brief sets no root naming the door repository yet). R6 is blocked on it by that name: R6's HandleRecords trait and its fixture tests can be built first, and the door client in crates/lys-identity-server/src/door_handles.rs is built and tested against that endpoint once it lands.",
     "CONFORMANCE row 8.5, the network record of machines and egress lists: proposed, with no brief or card yet. R7 is blocked on it by that name, and until it exists every start is refused by name at the egress check.",
     "DIRECTORY-003: crates/lys-identity, the signed directory event, the reviewed IDENTITY-EVENTS.md envelope, the administrator's admission and the lifecycle state. R1 to R3 wait on it; R3's check, the agent is active, reads the lifecycle state as the lifecycle card folds it on top of DIRECTORY-003 and is the row that ships first.",
-    "Paths this brief modifies that no landed manifest declares yet, each reconciled against its owner's reviewed manifest before dispatch, and the brief revised if a path differs: crates/lys-identity/src/lib.rs (R1) and docs/design/identity/IDENTITY-EVENTS.md (R10) against DIRECTORY-003's manifest; crates/lys-identity-server/src/routes.rs (R6, R12), surface/identity/src/routes.tsx and surface/identity/src/generated/index.ts (R13) against DIRECTORY-005's crates/lys-identity-server/ and surface/identity/ manifests. If the reviewed crates/lys-identity-server/ manifest carries no HTTP client for R6's door client, crates/lys-identity-server/Cargo.toml is added to R6's files before dispatch. crates/lys/src/identity/mod.rs and crates/lys/src/identity/cli.rs, which R12 creates to add the identity group, are also named as creates by DIRECTORY-002 R2: whichever of the two lands second modifies them, reconciled against the other's landed file before dispatch.",
-    "Paths this brief modifies that no landed manifest declares yet, each reconciled against its owner's reviewed manifest before dispatch, and the brief revised if a path differs: crates/lys-identity/src/lib.rs (R1) against DIRECTORY-003's crates/lys-identity/ manifest; crates/lys-identity-server/src/routes.rs (R12), surface/identity/src/routes.tsx and surface/identity/src/generated/index.ts (R13) against DIRECTORY-005's crates/lys-identity-server/ and surface/identity/ manifests; crates/lys/src/identity/cli.rs and crates/lys/src/identity/mod.rs (R12) against DIRECTORY-002's.",
+    "Paths this brief modifies that no landed manifest declares yet, because their owner briefs create them and have not landed, each reconciled against its owner's reviewed and landed manifest before dispatch, and the brief revised if a path differs: crates/lys-identity/src/lib.rs (R1) and docs/design/identity/IDENTITY-EVENTS.md (R10) against DIRECTORY-003's manifest; crates/lys-identity-server/src/routes.rs (R6, R12), surface/identity/src/routes.tsx and surface/identity/src/generated/index.ts (R13) against DIRECTORY-005's crates/lys-identity-server/ and surface/identity/ manifests; crates/lys/src/identity/mod.rs and crates/lys/src/identity/cli.rs (R12) against DIRECTORY-002's crates/lys/src/identity/ manifest, whose R2 creates the identity group this card's one subcommand joins. If the reviewed crates/lys-identity-server/ manifest carries no HTTP client for R6's door client, crates/lys-identity-server/Cargo.toml is added to R6's files before dispatch. If DIRECTORY-002's landed crates/lys/Cargo.toml already carries the HTTP client R12's CLI answer reaches the route with, crates/lys/Cargo.toml, Cargo.toml and Cargo.lock are taken out of R12's files before dispatch.",
     "DIRECTORY-011, the provision brief: a start reads its agent record, the enduring identity, and nothing else of that brief. R1's check that the agent exists is blocked on it by that name, and the agent record is read, never copied and never changed by a start.",
     "Review of the launch record and withdrawal event kinds R10 adds to IDENTITY-EVENTS.md before the first is signed, as an adversarial review of a signed format.",
     "Waffles' review of this written brief, under the DIRECTORY-001 boundary that no row brief is dispatched until Waffles has reviewed it; then the identity line lead's sign-off, and only then is the build fired. Do not dispatch from this schema-valid brief while any blocker above stands (as CN12 says for DIRECTORY-006)."
   ],
   "checklist": [
-    "C209",
-    "C210",
-    "C211",
-    "C212",
-    "C213",
-    "C214",
-    "C215",
-    "C216",
-    "C217",
-    "C218",
-    "C219",
-    "C220",
-    "C221"
+    "C229",
+    "C230",
+    "C231",
+    "C232",
+    "C233",
+    "C234",
+    "C235",
+    "C236",
+    "C237",
+    "C238",
+    "C239",
+    "C240",
+    "C241"
   ],
   "stories": [
-    "S84",
-    "S85",
-    "S86",
-    "S87",
-    "S88",
-    "S89",
-    "S90",
-    "S91",
-    "S92",
-    "S93",
-    "S94"
+    "S98",
+    "S99",
+    "S100",
+    "S101",
+    "S102",
+    "S103",
+    "S104",
+    "S105",
+    "S106",
+    "S107",
+    "S108"
   ],
   "design_anchor": [
     "ADR-001",
@@ -59,18 +58,18 @@
     "ADR-007",
     "ADR-010",
     "ADR-011",
-    "ADR-085",
     "ADR-086",
     "ADR-087",
-    "ADR-088"
+    "ADR-088",
+    "ADR-089"
   ],
   "purpose": "Make CONFORMANCE section 5 rows 5.1 to 5.6 true: lys checks an agent before giving its start command, gives the command without ever running the agent or putting a credential value on the command line or the clipboard, keeps a launch record for every command given, and shows the agent as running only when its signed report names that launch record. With no report the start is unconfirmed, never not started, and a request can be withdrawn without anyone claiming the agent did not start. This is ADR-007 built: check, give, record, never run. Each check reads its owner's record, so the directory never holds a copy of what the roles card, the door, the network record, the sessions brief or the provision brief keep.",
-  "task": "Build R1 to R13 in order. R1 and R2 fix what a start request is, that its agent exists as the enduring agent record DIRECTORY-011 keeps, and who may make one. R3 runs the five named checks and wires the one that needs only the lifecycle record, the agent is active; it ships first. R4 to R7 each add one check against its owner's record and each is blocked on that owner by name: Ink1H1Os (R4, R5), SECRETS-002 (R6) and network row 8.5 (R7). While an owner's record does not exist the start is refused by name, naming the check and the card, and nothing is faked to let a start through. R8 amends DIRECTORY-005 so that Start is the one control that works in step 1. R9 takes the executable, its arguments and the working directory from the reviewed profile version, and carries the amendment that puts those three fields in Ink1H1Os's profile version record. R10 defines the launch record and the withdrawal as signed events, derives running, unconfirmed and withdrawn from the records it reads, and answers whether a start for an agent stands unconfirmed: a withdrawn record no longer stands and a running one does not. R11 keeps the launch record, renders the command from it as env LYS_AGENT_ID, LYS_LAUNCH_RECORD and LYS_CREDENTIAL_IDS assignments before the recorded executable and its recorded arguments, refuses a value outside its id grammar as command_value_outside_grammar, gives a start again as a new record naming its source, refuses a second start as start_unconfirmed while R10 answers that one stands, and gives a second start of an agent that already reads as running by keeping only a new launch record, leaving the session record to the report in the sessions brief's store. R12 lands the route, which gives, gives again, withdraws and reads a start, the CLI answer (lys identity start-command <agent> --profile-version <pv> --machine <m>, the one subcommand of the identity group this card adds to the lys CLI, which prints exactly what the route answers for the same three inputs and is never the command given) and the no-spawn proof; R13 lands the Start drawer and the unconfirmed notice. In: CONFORMANCE rows 5.1 to 5.6, each with at least one acceptance line testing it (5.1 in R12; 5.2 in R3 to R7; 5.3 in R11, R12 and R13; 5.4 in R11; 5.5 in R10 and R13; 5.6 in R10, R11 and R13). Out: row 5.7 (terminal, sandbox, VM or container runners, proposed as separate products); how the command proves itself, which stays proposed; every record the checks read; a grant to start held by anyone else; the environment a runtime gives a started agent (SECRETS-002 R5), which the command-line and clipboard test does not cover. The brief carries 13 requirements, one more than the method's split signal, because the card holds the six rows as one landable unit and each check keeps its own row naming its owner. It is code-bearing, so it carries its own wall in its boundaries; the cluster's documents-only CN1 governs DIRECTORY-001's work, not this brief. R10, the state derivation, comes before R11's start_unconfirmed refusal, which cites it by number, so no requirement relies on a state a later one defines. The sessions brief is named in depends_on by its run d5055cc1, whatever id it lands under; its current draft carries DIRECTORY-015, and it is that brief whose lys/session-start/v1 signed message the ruling amends to five things: the tag, the agent's directory id, the directory's identifier, the launch record id and the directory-issued challenge.",
+  "task": "Build R1 to R13 in order. R1 and R2 fix what a start request is, that its agent exists as the enduring agent record DIRECTORY-011 keeps, and who may make one. R3 runs the five named checks and wires the one that needs only the lifecycle record, the agent is active; it ships first. R4 to R7 each add one check against its owner's record and each is blocked on that owner by name: Ink1H1Os (R4, R5), SECRETS-002 (R6) and network row 8.5 (R7). While an owner's record does not exist the start is refused by name, naming the check and the card, and nothing is faked to let a start through. R8 amends DIRECTORY-005 so that Start is the one control that works in step 1. R9 takes the executable, its arguments and the working directory from the reviewed profile version, and carries the amendment that puts those three fields in Ink1H1Os's profile version record. R10 defines the launch record and the withdrawal as signed events, derives running, unconfirmed and withdrawn from the records it reads, and answers whether a start for an agent stands unconfirmed: a withdrawn record no longer stands and a running one does not. R11 keeps the launch record, renders the command from it as env LYS_AGENT_ID, LYS_LAUNCH_RECORD and LYS_CREDENTIAL_IDS assignments before the recorded executable and its recorded arguments, refuses a value outside its id grammar as command_value_outside_grammar, gives a start again as a new record naming its source, refuses a second start as start_unconfirmed while R10 answers that one stands, and gives a second start of an agent that already reads as running by keeping only a new launch record, leaving the session record to the report in the sessions brief's store. R12 lands the route, which gives, gives again, withdraws and reads a start, the CLI answer (lys identity start-command <agent> --profile-version <pv> --machine <m>, the one subcommand this card adds to the lys identity group DIRECTORY-002 R2 creates, which prints exactly what the route answers for the same three inputs and is never the command given) and the no-spawn proof; R13 lands the Start drawer and the unconfirmed notice. In: CONFORMANCE rows 5.1 to 5.6, each with at least one acceptance line testing it (5.1 in R12; 5.2 in R3 to R7; 5.3 in R11, R12 and R13; 5.4 in R11; 5.5 in R10 and R13; 5.6 in R10, R11 and R13). Out: row 5.7 (terminal, sandbox, VM or container runners, proposed as separate products); how the command proves itself, which stays proposed; every record the checks read; a grant to start held by anyone else; the environment a runtime gives a started agent (SECRETS-002 R5), which the command-line and clipboard test does not cover. The brief carries 13 requirements, one more than the method's split signal, because the card holds the six rows as one landable unit and each check keeps its own row naming its owner. It is code-bearing, so it carries its own wall in its boundaries; the cluster's documents-only CN1 governs DIRECTORY-001's work, not this brief. R10, the state derivation, comes before R11's start_unconfirmed refusal, which cites it by number, so no requirement relies on a state a later one defines. The sessions brief is named in depends_on by its run d5055cc1, whatever id it lands under; its current draft carries DIRECTORY-015, and it is that brief whose lys/session-start/v1 signed message the ruling amends to five things: the tag, the agent's directory id, the directory's identifier, the launch record id and the directory-issued challenge.",
   "requirements": [
     {
       "id": "R1",
       "title": "Define the start request as the agent, the profile version and the machine, resolve the agent to its enduring record, and name every refusal",
-      "spec": "Structure: a start request names exactly three members, the agent, the profile version and the machine, in a new module crates/lys-identity/src/start/ declared from crates/lys-identity/src/lib.rs, which DIRECTORY-003 creates and this requirement modifies only after it lands. Every refusal of a start is one typed error variant with a stable name and words that say what refused: start_field_not_allowed, start_member_missing, agent_unknown, start_right_missing, agent_not_active, profile_version_not_reviewed, machine_not_allowed_for_role, virtual_credentials_not_valid, egress_not_reachable, check_record_missing, profile_version_field_missing, command_value_outside_grammar and start_unconfirmed. Behaviour: IF a start request carries any member beside those three, the executable and the working directory included, THEN THE SYSTEM SHALL refuse it by name as start_field_not_allowed, naming the member, and SHALL NOT run a check, give a command or keep a launch record. IF a start request lacks any of those three members, THEN THE SYSTEM SHALL refuse it by name as start_member_missing, naming the missing member, and SHALL NOT run a check, give a command or keep a launch record. The executable and the working directory come only from the reviewed profile version (R9, ADR-086). WHEN a start request is asked, THE SYSTEM SHALL resolve the agent it names to that agent's registered agent record, the enduring identity the provision brief DIRECTORY-011 keeps, before anything else runs, and every record the start keeps SHALL point at exactly that enduring agent id. IF no agent record exists for the agent named, THEN THE SYSTEM SHALL refuse the start by name as agent_unknown, naming the agent, and SHALL NOT run a check, give a command, keep a launch record or write any record: starting never creates an agent. THE SYSTEM SHALL NOT change the agent record, which holds no session credential, and SHALL NOT keep a copy of it. This check is blocked on DIRECTORY-011 by that name. THE SYSTEM SHALL NOT put a credential value in any refusal, its words, its Debug form or a log line.",
+      "spec": "Structure: a start request names exactly three members, the agent, the profile version and the machine, in a new module crates/lys-identity/src/start/ declared from crates/lys-identity/src/lib.rs, which DIRECTORY-003 creates and this requirement modifies only after it lands. Every refusal of a start is one typed error variant with a stable name and words that say what refused: start_field_not_allowed, start_member_missing, agent_unknown, start_right_missing, agent_not_active, profile_version_not_reviewed, machine_not_allowed_for_role, virtual_credentials_not_valid, egress_not_reachable, check_record_missing, profile_version_field_missing, command_value_outside_grammar and start_unconfirmed. Behaviour: IF a start request carries any member beside those three, the executable and the working directory included, THEN THE SYSTEM SHALL refuse it by name as start_field_not_allowed, naming the member, and SHALL NOT run a check, give a command or keep a launch record. IF a start request lacks any of those three members, THEN THE SYSTEM SHALL refuse it by name as start_member_missing, naming the missing member, and SHALL NOT run a check, give a command or keep a launch record. The executable and the working directory come only from the reviewed profile version (R9, ADR-087). WHEN a start request is asked, THE SYSTEM SHALL resolve the agent it names to that agent's registered agent record, the enduring identity the provision brief DIRECTORY-011 keeps, before anything else runs, and every record the start keeps SHALL point at exactly that enduring agent id. IF no agent record exists for the agent named, THEN THE SYSTEM SHALL refuse the start by name as agent_unknown, naming the agent, and SHALL NOT run a check, give a command, keep a launch record or write any record: starting never creates an agent. THE SYSTEM SHALL NOT change the agent record, which holds no session credential, and SHALL NOT keep a copy of it. This check is blocked on DIRECTORY-011 by that name. THE SYSTEM SHALL NOT put a credential value in any refusal, its words, its Debug form or a log line.",
       "acceptance": [
         "A request with agent agent-fixture-1, profile_version pv-fixture-1 and machine machine-fixture-1 parses into a start request holding exactly those three values.",
         "A request with the same three members plus executable /bin/sh is refused as start_field_not_allowed, its words contain 'executable', and the launch record count stays 0.",
@@ -92,12 +91,12 @@
         "delete": []
       },
       "checklist": [
-        "C214",
-        "C221"
+        "C234",
+        "C241"
       ],
       "stories": [
-        "S93",
-        "S94"
+        "S107",
+        "S108"
       ]
     },
     {
@@ -119,10 +118,10 @@
         "delete": []
       },
       "checklist": [
-        "C218"
+        "C238"
       ],
       "stories": [
-        "S92"
+        "S106"
       ]
     },
     {
@@ -146,12 +145,12 @@
         "delete": []
       },
       "checklist": [
-        "C210",
-        "C211"
+        "C230",
+        "C231"
       ],
       "stories": [
-        "S84",
-        "S85"
+        "S98",
+        "S99"
       ]
     },
     {
@@ -172,12 +171,12 @@
         "delete": []
       },
       "checklist": [
-        "C210",
-        "C211"
+        "C230",
+        "C231"
       ],
       "stories": [
-        "S84",
-        "S85"
+        "S98",
+        "S99"
       ]
     },
     {
@@ -198,12 +197,12 @@
         "delete": []
       },
       "checklist": [
-        "C210",
-        "C211"
+        "C230",
+        "C231"
       ],
       "stories": [
-        "S84",
-        "S85"
+        "S98",
+        "S99"
       ]
     },
     {
@@ -230,12 +229,12 @@
         "delete": []
       },
       "checklist": [
-        "C210",
-        "C211"
+        "C230",
+        "C231"
       ],
       "stories": [
-        "S84",
-        "S85"
+        "S98",
+        "S99"
       ]
     },
     {
@@ -256,21 +255,21 @@
         "delete": []
       },
       "checklist": [
-        "C210",
-        "C211"
+        "C230",
+        "C231"
       ],
       "stories": [
-        "S84",
-        "S85"
+        "S98",
+        "S99"
       ]
     },
     {
       "id": "R8",
       "title": "Amend DIRECTORY-005 so that Start is the one control that works in step 1",
-      "spec": "Structure: append one sentence to the spec of DIRECTORY-005 R1 and the same sentence to its boundary 'No grant, launch, secret or memory control is presented as working in step 1.': 'Under DIRECTORY-027, Start on the agent file is the one control that works in step 1, for the admitted administrator; every other grant, launch-profile, secret and memory control stays not working in step 1.' In the same edit, amend DIRECTORY-005 R1's third acceptance line so it agrees: its clause 'no control for launch, permissions, secrets or memory is presented as working' becomes 'no control for permissions, secrets or memory is presented as working', and the line gains the sentence 'Under DIRECTORY-027, the Start control is the one that brief gives, refused by name until the start is confirmed; permissions, secrets and memory are still not presented as working.' Re-render DIRECTORY-005.md from the JSON. THE SYSTEM SHALL NOT change any other text, identifier, dependency or acceptance line of DIRECTORY-005.",
+      "spec": "Structure: append one sentence to the spec of DIRECTORY-005 R1 and the same sentence to its boundary 'No grant, launch, secret or memory control is presented as working in step 1.': 'Under DIRECTORY-029, Start on the agent file is the one control that works in step 1, for the admitted administrator; every other grant, launch-profile, secret and memory control stays not working in step 1.' In the same edit, amend DIRECTORY-005 R1's third acceptance line so it agrees: its clause 'no control for launch, permissions, secrets or memory is presented as working' becomes 'no control for permissions, secrets or memory is presented as working', and the line gains the sentence 'Under DIRECTORY-029, the Start control is the one that brief gives, refused by name until the start is confirmed; permissions, secrets and memory are still not presented as working.' Re-render DIRECTORY-005.md from the JSON. THE SYSTEM SHALL NOT change any other text, identifier, dependency or acceptance line of DIRECTORY-005.",
       "acceptance": [
         "The diff of docs/design/directory/briefs/DIRECTORY-005.json changes exactly three strings: requirements/0/spec and the boundary quoted above, each ending with the appended sentence, and requirements/0/acceptance/2.",
-        "After the edit, DIRECTORY-005's requirements/0/acceptance/2 contains 'no control for permissions, secrets or memory is presented as working' and 'Under DIRECTORY-027, the Start control is the one that brief gives', and does not contain 'launch'.",
+        "After the edit, DIRECTORY-005's requirements/0/acceptance/2 contains 'no control for permissions, secrets or memory is presented as working' and 'Under DIRECTORY-029, the Start control is the one that brief gives', and does not contain 'launch'.",
         "python3 scripts/design/render-cluster.py over a copy of docs/design/directory writes a DIRECTORY-005.md byte-identical to the committed one."
       ],
       "files": {
@@ -282,16 +281,16 @@
         "delete": []
       },
       "checklist": [
-        "C219"
+        "C239"
       ],
       "stories": []
     },
     {
       "id": "R9",
       "title": "Take the executable, its arguments and the working directory from the reviewed profile version",
-      "spec": "The executable and the working directory a command runs are fields of the reviewed profile version (ADR-086), and the arguments it is given are the ones the profile version records. This requirement adds the executable, the arguments and the working directory to the profile version under the roles card Ink1H1Os's record, named in depends_on, as a named amendment to that card: the fields are added in Ink1H1Os's record and never in a copy this card keeps, the amendment is named in blocked_by, the dev record of this requirement carries it, and this requirement stays blocked on Ink1H1Os by that name until its landed profile version record declares the three fields. WHEN a command is to be given, THE SYSTEM SHALL read the executable, the recorded arguments and the working directory from the requested profile version's record, through one seam, the trait ProfileVersionRecords declared in crates/lys-identity/src/start/profile_command.rs, which answers for a profile version id the executable, the arguments and the working directory exactly as Ink1H1Os's record holds them, each or that it is missing. The implementation of that trait over Ink1H1Os's landed profile version record is written under this requirement when that record lands, and it is where the record is read; until then only the trait and its fixture exist. IF that record does not hold the executable or the working directory, THEN THE SYSTEM SHALL refuse as profile_version_field_missing naming the field and Ink1H1Os, and SHALL NOT take the executable, an argument or the working directory from the request, the machine, a default or the mock-up. THE SYSTEM SHALL NOT define a profile version record of its own.",
+      "spec": "The executable and the working directory a command runs are fields of the reviewed profile version (ADR-087), and the arguments it is given are the ones the profile version records. This requirement adds the executable, the arguments and the working directory to the profile version under the roles card Ink1H1Os's record, named in depends_on, as a named amendment to that card: the fields are added in Ink1H1Os's record and never in a copy this card keeps, the amendment is named in blocked_by, the dev record of this requirement carries it, and this requirement stays blocked on Ink1H1Os by that name until its landed profile version record declares the three fields. WHEN a command is to be given, THE SYSTEM SHALL read the executable, the recorded arguments and the working directory from the requested profile version's record, through one seam, the trait ProfileVersionRecords declared in crates/lys-identity/src/start/profile_command.rs, which answers for a profile version id the executable, the arguments and the working directory exactly as Ink1H1Os's record holds them, each or that it is missing. Ink1H1Os is a card on the Cambium board and its profile version record type has not landed in any repository, so that trait is the one place this card reads the record: this requirement takes no Cargo dependency on a roles-card type. The implementation of the trait over Ink1H1Os's landed profile version record, and any manifest a dependency on its type needs, are named in this requirement's files by revising the brief when that record lands (blocked_by); until then only the trait and its fixture exist. IF that record does not hold the executable or the working directory, THEN THE SYSTEM SHALL refuse as profile_version_field_missing naming the field and Ink1H1Os, and SHALL NOT take the executable, an argument or the working directory from the request, the machine, a default or the mock-up. THE SYSTEM SHALL NOT define a profile version record of its own.",
       "acceptance": [
-        "Reading crates/lys-identity/src/start/profile_command.rs finds the trait ProfileVersionRecords declaring exactly 3 reads for a profile version id: the executable, the arguments and the working directory.",
+        "Reading crates/lys-identity/src/start/profile_command.rs, the seam through which this card reads Ink1H1Os's profile version record, finds the trait ProfileVersionRecords declaring exactly 3 reads for a profile version id, named for the executable, the arguments and the working directory, and 0 other methods.",
         "rg -n 'struct ProfileVersion' crates/lys-identity/src/start finds 0 lines.",
         "With the profile version fixture pv-fixture-1 holding executable fixture-exec, arguments ['--fixture-arg', 'two words'] and working directory fixture-cwd, the start reads exactly 'fixture-exec', ['--fixture-arg', 'two words'] and 'fixture-cwd'.",
         "With pv-fixture-1 holding no working directory, the start is refused as profile_version_field_missing, its words contain 'working directory' and 'Ink1H1Os', and the launch record count is 0."
@@ -305,11 +304,11 @@
         "delete": []
       },
       "checklist": [
-        "C214"
+        "C234"
       ],
       "stories": [
-        "S89",
-        "S93"
+        "S103",
+        "S107"
       ]
     },
     {
@@ -343,14 +342,14 @@
         "delete": []
       },
       "checklist": [
-        "C215",
-        "C216",
-        "C217"
+        "C235",
+        "C236",
+        "C237"
       ],
       "stories": [
-        "S86",
-        "S87",
-        "S88"
+        "S100",
+        "S101",
+        "S102"
       ]
     },
     {
@@ -383,24 +382,24 @@
         "delete": []
       },
       "checklist": [
-        "C212",
-        "C213",
-        "C214",
-        "C216",
-        "C221"
+        "C232",
+        "C233",
+        "C234",
+        "C236",
+        "C241"
       ],
       "stories": [
-        "S84",
-        "S87",
-        "S89",
-        "S90",
-        "S94"
+        "S98",
+        "S101",
+        "S103",
+        "S104",
+        "S108"
       ]
     },
     {
       "id": "R12",
       "title": "Answer a start through the route and the CLI, and prove that no start path spawns a process",
-      "spec": "The start route in crates/lys-identity-server/src/start.rs, mounted from crates/lys-identity-server/src/routes.rs, which DIRECTORY-005 creates and this requirement modifies only after it lands, gives a start (POST /api/agents/<agent>/start with the profile version and the machine), gives it again from a kept record (POST /api/launch-records/<id>/start-again), withdraws it (POST /api/launch-records/<id>/withdraw) and reads its state (GET /api/launch-records/<id>/state), each through the library of R1 to R11, and holds no start logic of its own: every check, refusal, launch record and command it answers is the library's. The CLI answer is lys identity start-command <agent> --profile-version <pv> --machine <m>, in crates/lys/src/identity/start.rs. The lys CLI has no identity group yet, so this card adds the group, in crates/lys/src/identity/mod.rs and crates/lys/src/identity/cli.rs, declared from crates/lys/src/cli.rs and crates/lys/src/main.rs, with this one subcommand. WHEN it is run, it SHALL ask the route for a start with the same three inputs and print exactly what the route answers, and nothing else, so a person can copy the command into the machine's shell. It is not a launcher: it starts nothing and holds no process. It reaches the route over HTTP, so crates/lys/Cargo.toml, Cargo.toml and Cargo.lock gain an HTTP client dependency that meets the workspace's pure-Rust rule. WHEN a start is given, the route SHALL answer with the command, its working directory and its launch record; WHEN a start is refused, the route SHALL return every refusal by its name in words, and the CLI prints that answer. THE SYSTEM SHALL NOT spawn a process on any start path: no start file in the library, the route or the CLI names a process-spawning API, and a test proves it both by reading those files and by giving a start whose executable would leave a marker if it ran. THE SYSTEM SHALL NOT put a credential value in the route's answer, the CLI's output or its errors.",
+      "spec": "The start route in crates/lys-identity-server/src/start.rs, mounted from crates/lys-identity-server/src/routes.rs, which DIRECTORY-005 creates and this requirement modifies only after it lands, gives a start (POST /api/agents/<agent>/start with the profile version and the machine), gives it again from a kept record (POST /api/launch-records/<id>/start-again), withdraws it (POST /api/launch-records/<id>/withdraw) and reads its state (GET /api/launch-records/<id>/state), each through the library of R1 to R11, and holds no start logic of its own: every check, refusal, launch record and command it answers is the library's. The CLI answer is lys identity start-command <agent> --profile-version <pv> --machine <m>, in crates/lys/src/identity/start.rs. It joins the lys identity group DIRECTORY-002 R2 creates, with prepare, configure and health, in crates/lys/src/identity/mod.rs and crates/lys/src/identity/cli.rs, which this requirement modifies only after DIRECTORY-002 lands: this card adds the one subcommand start-command to that group and creates no group of its own. WHEN it is run, it SHALL ask the route for a start with the same three inputs and print exactly what the route answers, and nothing else, so a person can copy the command into the machine's shell. It is not a launcher: it starts nothing and holds no process. It reaches the route over HTTP, so crates/lys/Cargo.toml, Cargo.toml and Cargo.lock gain an HTTP client dependency that meets the workspace's pure-Rust rule, unless DIRECTORY-002's landed identity group already carries one (blocked_by). WHEN a start is given, the route SHALL answer with the command, its working directory and its launch record; WHEN a start is refused, the route SHALL return every refusal by its name in words, and the CLI prints that answer. THE SYSTEM SHALL NOT spawn a process on any start path: no start file in the library, the route or the CLI names a process-spawning API, and a test proves it both by reading those files and by giving a start whose executable would leave a marker if it ran. THE SYSTEM SHALL NOT put a credential value in the route's answer, the CLI's output or its errors.",
       "acceptance": [
         "POST /api/agents/agent-fixture-1/start with body {profile_version: pv-fixture-1, machine: machine-fixture-1}, every check fixture passing, answers with a command and a launch record id, and the marker file the fixture executable fixture-exec writes when run does not exist afterwards.",
         "lys identity start-command agent-fixture-1 --profile-version pv-fixture-1 --machine machine-fixture-1 against the test server, every check fixture passing, prints the command, the working directory 'fixture-cwd' and the launch record id, its stdout is byte-identical to the response body the test server recorded sending for that request, the marker file does not exist afterwards, and neither stdout nor stderr contains 'fixture-credential-value-1f3a'.",
@@ -412,22 +411,20 @@
         "The no-spawn test reads every start file this brief names under crates/lys-identity/src/start/, crates/lys-identity-server/src/start.rs and crates/lys/src/identity/start.rs, asserts the count of files read equals the count it lists, and finds 0 occurrences of 'std::process', 'tokio::process', 'Command::new', 'fork(' and 'exec('. (CONFORMANCE 5.1)",
         "The same scanner run over the fixture source text 'let c = std::process::Command::new(\"x\");' finds exactly 1 occurrence, so the scan is shown to fire.",
         "The route's JSON answer for the passing start does not contain 'fixture-credential-value-1f3a'.",
-        "Reading crates/lys/src/identity/cli.rs finds exactly 1 subcommand declared by this brief, start-command, and no subcommand that runs, spawns or supervises a process."
+        "Reading crates/lys/src/identity/cli.rs finds exactly 1 subcommand declared by this brief, start-command, beside DIRECTORY-002's prepare, configure and health, and no subcommand that runs, spawns or supervises a process."
       ],
       "files": {
         "create": [
           "crates/lys-identity-server/src/start.rs",
           "crates/lys-identity-server/tests/start.rs",
-          "crates/lys/src/identity/mod.rs",
-          "crates/lys/src/identity/cli.rs",
           "crates/lys/src/identity/start.rs",
           "crates/lys/tests/identity_start.rs",
           "crates/lys-identity/tests/start_no_spawn.rs"
         ],
         "modify": [
           "crates/lys-identity-server/src/routes.rs",
-          "crates/lys/src/cli.rs",
-          "crates/lys/src/main.rs",
+          "crates/lys/src/identity/mod.rs",
+          "crates/lys/src/identity/cli.rs",
           "crates/lys/Cargo.toml",
           "Cargo.toml",
           "Cargo.lock"
@@ -435,13 +432,13 @@
         "delete": []
       },
       "checklist": [
-        "C209",
-        "C212",
-        "C220"
+        "C229",
+        "C232",
+        "C240"
       ],
       "stories": [
-        "S90",
-        "S91"
+        "S104",
+        "S105"
       ]
     },
     {
@@ -473,20 +470,20 @@
         "delete": []
       },
       "checklist": [
-        "C212",
-        "C215",
-        "C216",
-        "C217",
-        "C218",
-        "C219"
+        "C232",
+        "C235",
+        "C236",
+        "C237",
+        "C238",
+        "C239"
       ],
       "stories": [
-        "S85",
-        "S86",
-        "S87",
-        "S88",
-        "S90",
-        "S92"
+        "S99",
+        "S100",
+        "S101",
+        "S102",
+        "S104",
+        "S106"
       ]
     }
   ],

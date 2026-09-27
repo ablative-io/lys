@@ -327,12 +327,12 @@
       "superseded_by": ""
     },
     {
-      "id": "ADR-085",
+      "id": "ADR-086",
       "title": "Every command given keeps its own signed launch record, and running is tied to it through lys/session-start/v1",
       "status": "decided",
       "scope": "directory",
       "date": "2026-09-27",
-      "decided_by": "Archie, lead for the identity line, in the rulings and answers to the start-an-agent survey; recorded with DIRECTORY-027",
+      "decided_by": "Archie, lead for the identity line, in the rulings and answers to the start-an-agent survey; recorded with DIRECTORY-029",
       "context": "ADR-007 renders the start command from a kept launch record and shows a session running only when the agent's report names it. CONFORMANCE 5.4 and 5.5 make both testable. The sessions brief's lys/session-start/v1 draft signs a directory identifier but no launch record id, so a report could not name the command it answers; no agent signs under the tag yet, so adding the id is free now and costs a new version after the tag freezes.",
       "decision": "Every command given keeps one launch record, a signed directory event naming the machine, the executable, the working directory, the profile version and the credential ids. Its id is carried in lys/session-start/v1, whose signed message then holds five things: the tag, the agent's directory id, the directory's identifier, the launch record id and the directory-issued challenge. The agent reads the id from LYS_LAUNCH_RECORD and its report names it, and running is tied to the command given through that id. A start given again copies a kept record into a new record with its own id that names the record it was copied from. Rejected: tying running to the agent id alone, re-issuing one record for every command given, and keeping the launch facts only in the command line.",
       "quote": "",
@@ -346,30 +346,30 @@
       "superseded_by": ""
     },
     {
-      "id": "ADR-086",
+      "id": "ADR-087",
       "title": "The executable, its arguments and the working directory are fields of the reviewed profile version, never of a start request",
       "status": "decided",
       "scope": "directory",
       "date": "2026-09-27",
-      "decided_by": "Archie, lead for the identity line, in the rulings and answers to the start-an-agent survey; recorded with DIRECTORY-027",
+      "decided_by": "Archie, lead for the identity line, in the rulings and answers to the start-an-agent survey; recorded with DIRECTORY-029",
       "context": "The command a person gives must be the one that was reviewed. If a start request could set what runs or where, the review of a profile version would say nothing about the command given.",
       "decision": "The executable, the arguments and the working directory are read from the reviewed profile version's record, as the mock-up draws them, and a start request names only the agent, the profile version and the machine. Rejected: letting a start request set either, and taking either from the machine or a default.",
       "quote": "",
       "consequences": [
         "A start request that sets the executable or the working directory is refused by name.",
-        "When the profile version's record does not yet hold the two fields, DIRECTORY-027 R9 adds them under the roles card Ink1H1Os's record, named in depends_on, and stays blocked on it by that name.",
+        "When the profile version's record does not yet hold the two fields, DIRECTORY-029 R9 adds them under the roles card Ink1H1Os's record, named in depends_on, and stays blocked on it by that name.",
         "The command given is the profile version's own executable, with the arguments the profile version records, invoked in its recorded working directory. No lys launcher subcommand is added, and the mock-up's 'identity start <slug>' line is illustrative only."
       ],
       "supersedes": [],
       "superseded_by": ""
     },
     {
-      "id": "ADR-087",
+      "id": "ADR-088",
       "title": "Withdrawing a start request records only that the request no longer stands",
       "status": "decided",
       "scope": "directory",
       "date": "2026-09-27",
-      "decided_by": "Archie, lead for the identity line, in the rulings and answers to the start-an-agent survey; recorded with DIRECTORY-027",
+      "decided_by": "Archie, lead for the identity line, in the rulings and answers to the start-an-agent survey; recorded with DIRECTORY-029",
       "context": "A start with no report is unconfirmed: the agent may or may not have started, and nobody can know it did not. A person still needs to take back a request they no longer want.",
       "decision": "A start request can be withdrawn by the person who gave it or anyone holding the same right. The withdrawal records that the request no longer stands, with who and when, and never that the agent did not start. If a signed report later arrives for the withdrawn launch record, the session shows as running with the withdrawal beside it. Rejected: recording a withdrawal as not started, and refusing a report that arrives after a withdrawal.",
       "quote": "",
@@ -382,12 +382,12 @@
       "superseded_by": ""
     },
     {
-      "id": "ADR-088",
+      "id": "ADR-089",
       "title": "One standing start per agent, and the command given as ids-only environment assignments before the recorded executable",
       "status": "decided",
       "scope": "directory",
       "date": "2026-09-27",
-      "decided_by": "Archie, lead for the identity line, in the rulings and answers to the start-an-agent survey; recorded with DIRECTORY-027",
+      "decided_by": "Archie, lead for the identity line, in the rulings and answers to the start-an-agent survey; recorded with DIRECTORY-029",
       "context": "A start with no report stands unconfirmed, and a second command for the same agent could start it twice. The command must carry the agent id, the launch record id and the credential ids to the agent without changing the arguments the profile version records, and without a credential value on the command line (CONFORMANCE 5.3).",
       "decision": "While a start for an agent stands unconfirmed, a second start for that agent, on any machine, is refused as start_unconfirmed, naming the standing request and the act that answers it: wait for its report, or withdraw it first. The given command reads env LYS_AGENT_ID=<agent id> LYS_LAUNCH_RECORD=<launch record id> LYS_CREDENTIAL_IDS=<comma-separated credential ids> <executable> <recorded arguments>, with the working directory set to the recorded one. The three values are ids only, each shell-quoted and refused by name if it holds anything outside its id grammar. Rejected: appending the ids to the recorded arguments, and giving a second command while one stands unconfirmed.",
       "quote": "",
