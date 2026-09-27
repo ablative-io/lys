@@ -2,7 +2,6 @@
 //! it names verifying over the record's canonical bytes, the head and the
 //! given entry's line unchanged, and statements read back in file order.
 
-use std::fmt::Write as _;
 use std::path::Path;
 
 use lys_core::Ed25519Identity;
@@ -35,10 +34,7 @@ fn line_of(session: &Session, id: &str) -> Result<String, Box<dyn std::error::Er
 }
 
 fn hex(bytes: &[u8]) -> String {
-    bytes.iter().fold(String::new(), |mut s, b| {
-        let _ = write!(s, "{b:02x}");
-        s
-    })
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 #[test]
