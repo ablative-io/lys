@@ -72,7 +72,7 @@ describe('shell (conformance 9.1)', () => {
   });
 
   it('shows every unbuilt screen as not built, with the mock-up heading', async () => {
-    for (const view of ['roles', 'resources', 'access', 'graph', 'requests', 'reviews', 'secrets', 'connections', 'network', 'sessions', 'model']) {
+    for (const view of ['roles', 'resources', 'graph', 'requests', 'reviews', 'secrets', 'connections', 'network', 'sessions', 'model']) {
       unmountAll();
       document.body.innerHTML = '';
       await mount('#/' + view);

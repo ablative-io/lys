@@ -7,7 +7,8 @@
 # Sign-in goes through the contract tests' fake issuer, which signs every
 # sign-in as the seed's first person, "ada"; the service itself does the whole
 # OIDC exchange. On first start the directory is filled by
-# lys-identity-dev-seed. Never point <state-dir> at records that matter.
+# lys-identity-dev-seed, and dev/seed-grants.sh then gives grants through the
+# grant routes. Never point <state-dir> at records that matter.
 # Binaries are read from CARGO_TARGET_DIR (default <repo>/target), release profile.
 set -eu
 
@@ -61,7 +62,22 @@ cat >"$STATE/config.json" <<JSON
   "administrator": { "issuer": "$ISSUER", "subject": "ada" },
   "link_audit_source": { "issuer": "$ISSUER", "subject": "link-audit" },
   "session_seconds": 28800,
-  "secure_cookie": false
+  "secure_cookie": false,
+  "grant_log_dir": "$STATE/grant-log",
+  "grant_log_origin": "dev.lys/grants",
+  "grant_model_file": "$STATE/model.json"
+}
+JSON
+
+# The development permission model: each relation and the actions it carries.
+cat >"$STATE/model.json" <<JSON
+{
+  "version": 1,
+  "relations": {
+    "owner": ["view", "edit", "grant"],
+    "editor": ["view", "edit"],
+    "viewer": ["view"]
+  }
 }
 JSON
 
@@ -74,6 +90,11 @@ echo $! >"$STATE/issuer.pid"
 sleep 1
 nohup "$BIN/lys-identity-server" "$STATE/config.json" >"$LOGS/service.log" 2>&1 &
 echo $! >"$STATE/service.pid"
+sleep 1
+if [ ! -f "$STATE/grants.seeded" ]; then
+  "$SURFACE/dev/seed-grants.sh" "http://127.0.0.1:$SERVICE_PORT" "$LOGS/seed.log" >"$LOGS/seed-grants.log" 2>&1
+  touch "$STATE/grants.seeded"
+fi
 
 cd "$SURFACE"
 npm run build >"$LOGS/app-build.log" 2>&1

@@ -1,4 +1,9 @@
 import type { ReactNode } from 'react';
+import { useShell } from '../../shell/ShellContext';
+import { CheckBox } from '../grants/CheckBox';
+import { Delegate } from '../grants/Delegate';
+import { GrantCard } from '../grants/GrantCard';
+import { chainOf, onText, passesToAgents, standing } from '../grants/model';
 import { CHANGE_KINDS } from '../../generated';
 import { Pill } from '../people/Pill';
 import { firstName } from '../people/directory';
@@ -74,7 +79,19 @@ function Profile({ data }: { data: FileData }) {
 }
 
 function Access({ data }: { data: FileData }) {
-  const name = firstName(data.x.display_name);
+  const shell = useShell();
+  const { x, grants: w } = data;
+  const name = firstName(x.display_name, x.kind);
+  if (!w) return <NotBuilt>The grants could not be read for this file.</NotBuilt>;
+  const held = w.list.grants.filter((g) => g.holder === x.id);
+  const reach = new Map<string, string[]>();
+  for (const g of held) {
+    if (!standing(w, g).ok) continue;
+    const key = onText(g);
+    reach.set(key, [...new Set([...(reach.get(key) ?? []), ...g.actions])]);
+  }
+  const passable = w.list.grants.filter((g) => g.holder === w.me.person.id && standing(w, g).ok && passesToAgents(g.pass_on));
+  const mineToGive = x.kind === 'agent' && x.person?.id === w.me.person.id && x.state !== 'retired';
   return (
     <div className="grid2">
       <div>
@@ -82,18 +99,39 @@ function Access({ data }: { data: FileData }) {
           <span>Grants</span>
           <span className="open-q" title="The grant representation is not yet decided">draft form</span>
         </div>
-        <NotBuilt>Grants arrive with DIRECTORY-006 R1 to R5, which are being built now. Nothing is shown until the server answers them.</NotBuilt>
+        {held.length ? held.map((g) => <GrantCard key={g.id} w={w} g={g} chain={chainOf(w, g)} />) : <div className="dim">No grants.</div>}
+        {x.kind === 'agent' && x.state !== 'retired' ? (
+          <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+            <button
+              className="btn"
+              data-act="grant"
+              onClick={() =>
+                mineToGive && passable.length
+                  ? shell.openDrawer(<Delegate w={w} source={passable[0]} to={x.id} done={() => location.reload()} />)
+                  : shell.toast(mineToGive ? 'You hold nothing you may pass on to an agent' : `Only the person ${name} answers to gives it access`)
+              }
+            >
+              Grant access
+            </button>
+            <button className="btn" data-act="toast" onClick={() => shell.toast('Temporary access goes through Requests, which is not built yet')}>Temporary access…</button>
+          </div>
+        ) : null}
       </div>
       <div>
-        <div className="section-h" style={{ marginTop: 0 }}><span>What {name} can reach</span></div>
-        <NotBuilt>Reach is answered from grants.</NotBuilt>
-        <div className="check">
-          <h2>Can {name} do this?</h2>
-          <div className="answer-box">
-            <span className="note">The answer shows the path to a person, or the reason it is refused, and which version of the model it used.</span>
-          </div>
-          <NotBuilt>The check is DIRECTORY-006 R5 (conformance 8.1).</NotBuilt>
+        <div className="section-h" style={{ marginTop: 0 }}>
+          <span>What {name} can reach</span>
+          <a href={'#/access/reach/' + x.id} className="note" style={{ letterSpacing: 0, textTransform: 'none' }}>open in Access</a>
         </div>
+        <div className="card">
+          {reach.size ? (
+            <table><tbody>
+              {[...reach].map(([res, acts]) => (
+                <tr key={res}><td>{res}</td><td><span className="svc built-in">built in</span></td><td className="mono">{acts.join(', ')}</td><td /></tr>
+              ))}
+            </tbody></table>
+          ) : <div className="dim">Nothing.</div>}
+        </div>
+        <CheckBox w={w} who={x.id} />
       </div>
     </div>
   );

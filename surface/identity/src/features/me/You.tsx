@@ -1,5 +1,9 @@
+import { useState } from 'react';
 import { api, useLoad } from '../../api';
 import type { AgentSummary, Login, MeView } from '../../generated';
+import { Delegate } from '../grants/Delegate';
+import { nameOf, onText, passText, passesToAgents, readGrantWorld, standing } from '../grants/model';
+import type { GrantWorld } from '../grants/model';
 import { keyable } from '../../shell/keyable';
 import { useShell } from '../../shell/ShellContext';
 import { useNavigate } from 'react-router';
@@ -9,12 +13,13 @@ import { NotBuilt } from '../file/sections';
 interface YouData {
   me: MeView;
   agents: AgentSummary[];
+  w: GrantWorld;
 }
 
 async function readYou(): Promise<YouData> {
-  const [me, own] = await Promise.all([api.me(), api.ownPeople()]);
-  const self = own.people.find((p) => p.id === me.person.id);
-  return { me, agents: (self?.agents ?? []).filter((a) => a.state !== 'retired') };
+  const [w, own] = await Promise.all([readGrantWorld(), api.ownPeople()]);
+  const self = own.people.find((p) => p.id === w.me.person.id);
+  return { me: w.me, agents: (self?.agents ?? []).filter((a) => a.state !== 'retired'), w };
 }
 
 /** An issuer URL named by its host, as a provider is shown. */
@@ -37,10 +42,13 @@ function SignInIdentity({ login, current }: { login: Login; current: boolean }) 
   );
 }
 
-function Page({ data }: { data: YouData }) {
+function Page({ data, reload }: { data: YouData; reload: () => void }) {
   const shell = useShell();
   const navigate = useNavigate();
-  const { me, agents } = data;
+  const { me, agents, w } = data;
+  const mine = w.list.grants.filter((g) => g.holder === me.person.id && standing(w, g).ok);
+  const held = (id: string) =>
+    w.list.grants.filter((g) => g.holder === id && !g.revoked).map((g) => `${g.relation} of ${onText(g)}`).join('; ');
   const same = (a: Login) => a.provider === me.signed_in.provider && a.subject === me.signed_in.subject;
   return (
     <div className="page">
@@ -57,7 +65,21 @@ function Page({ data }: { data: YouData }) {
           <table>
             <thead><tr><th>Relation</th><th>On</th><th>From</th><th>You may pass it on</th><th></th></tr></thead>
             <tbody>
-              <tr><td colSpan={5} className="dim"><span className="open-q">not built yet</span> Grants arrive with DIRECTORY-006 R1 to R5.</td></tr>
+              {mine.length ? mine.map((g) => (
+                <tr key={g.id}>
+                  <td className="mono" style={{ color: 'var(--accent)' }}>{g.relation}</td>
+                  <td className="mono">{onText(g)}</td>
+                  <td className="sec">{g.source ? nameOf(w, w.byId.get(g.source)?.holder ?? g.issuer) : 'root'}</td>
+                  <td>{g.pass_on.kind === 'to' ? <span className="pass">{passText(g.pass_on)}</span> : <span className="dim">no</span>}</td>
+                  <td>
+                    {passesToAgents(g.pass_on) && agents.length ? (
+                      <button className="btn" data-act="delegate" data-g={g.id} onClick={() => shell.openDrawer(<Delegate w={w} source={g} done={reload} />)}>
+                        Give to an agent…
+                      </button>
+                    ) : null}
+                  </td>
+                </tr>
+              )) : <tr><td colSpan={5} className="dim">Nothing yet.</td></tr>}
             </tbody>
           </table>
           <div className="section-h">
@@ -74,7 +96,7 @@ function Page({ data }: { data: YouData }) {
                   <tr key={a.id} data-href={'#/file/' + a.id} onClick={open} {...keyable(open)}>
                     <td>{a.display_name}</td>
                     <td><span className={'dot s-' + a.state} />{a.state}</td>
-                    <td className="sec"><span className="dim">access not built yet</span></td>
+                    <td className="sec">{held(a.id) || 'no access'}</td>
                   </tr>
                 );
               }) : <tr><td className="dim">None.</td></tr>}
@@ -121,6 +143,7 @@ function Page({ data }: { data: YouData }) {
 }
 
 export function You() {
-  const load = useLoad(readYou, 'me');
-  return <Gate load={load} title="Signed in as" ok={(data) => <Page data={data} />} />;
+  const [version, setVersion] = useState(0);
+  const load = useLoad(readYou, 'me' + version);
+  return <Gate load={load} title="Signed in as" ok={(data) => <Page data={data} reload={() => setVersion((v) => v + 1)} />} />;
 }
