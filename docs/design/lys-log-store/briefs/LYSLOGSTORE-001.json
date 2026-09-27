@@ -17,7 +17,9 @@
     "C10",
     "C11",
     "C12",
-    "C13"
+    "C13",
+    "C14",
+    "C15"
   ],
   "stories": [
     "S1",
@@ -31,8 +33,8 @@
     "ADR-059",
     "ADR-060"
   ],
-  "purpose": "FileLeafStore today names a leaf before writing it, so a crash or a failed write leaves a torn leaf that the next open counts and Log::open pins, and a failure after the leaf is named makes the store report its own leaf as another writer's. This brief makes a named leaf mean a whole, flushed leaf (ADR-059): each leaf is written and flushed in a hidden temporary file, linked into place without replacing anything, and the leaves directory is flushed; a writable open flushes leaves/ before counting, a read-only open counts without flushing, and neither counts or touches a leftover. LeafAlreadyWritten keeps meaning another writer only (ADR-060). DIRECTORY-003 lands after this brief, because its uncertain append settles by reading back a leaf it must be able to trust as committed, and this brief records that wait in DIRECTORY-003's depends_on.",
-  "task": "Change crates/lys-log-store/src/file.rs so put_leaf writes through a hidden temporary file named by leaf_temp_name and created by create_leaf_temp without replacing anything, from a sequence supplied to put_leaf_with, flushes it, gives it its final name with std::fs::hard_link, advances the extent at that link, removes the temporary name and flushes leaves/, and removes its own temporary file whenever it fails before a successful link (R2 to R4). Add StoreError::LeafDurabilityUncertain, carrying the index and the failed flush's std::io::Error as its source, in error.rs and name it in LeafStore::put_leaf's docs (R1). Make FileLeafStore::open flush leaves/ before counting and fail with Io when that flush fails, and add FileLeafStore::open_read_only, which performs open's checks without the flush (R5). Write the invariant into file.rs's module docs (R6). Add a cfg(test) fault seam (R7) and the tests with their drift table (R8). Add LYSLOGSTORE-001 to DIRECTORY-003's depends_on and re-render its markdown (R9). Order: R1 first, since R4 returns its variant; R7 after the steps it fails exist; R8 after R1 to R7.\n\nIn: error.rs's new variant, store.rs's put_leaf doc line, file.rs, file_tests.rs, and DIRECTORY-003's depends_on with its rendered markdown.\n\nOut: clearing leftover hidden temporary files that a crash stranded, which is a further unit not written here: an explicit maintenance act that runs only while holding the write lock. Open never deletes anything. Also out: any change to log.rs, to the LeafStore trait's methods, to the on-disk layout, to write_state's state.json.tmp, to any crate other than lys-log-store (the lys CLI and lys-anchor-cli keep calling FileLeafStore::open, and Anchor::open_read_only's code and tests are unchanged), to what put_leaf does on a handle opened by open_read_only, and to any field of DIRECTORY-003 other than depends_on (DIRECTORY-003's uncertain append treats LeafDurabilityUncertain as uncertain and settles by reading the leaf back, in its own card).\n\nThe refusal of a second writer is unchanged in meaning: it is still StoreError::LeafAlreadyWritten, now raised when the no-replace link finds the final name taken rather than by create_new.",
+  "purpose": "FileLeafStore today names a leaf before writing it, so a crash or a failed write leaves a torn leaf that the next open counts and Log::open pins, and a failure after the leaf is named makes the store report its own leaf as another writer's. This brief makes a named leaf mean a whole, flushed leaf (ADR-059): each leaf is written and flushed in a hidden temporary file, linked into place without replacing anything, and the leaves directory is flushed; a writable open flushes leaves/ before counting, a read-only open counts without flushing and returns a handle that refuses to write a leaf by name, and neither counts or touches a leftover. LeafAlreadyWritten keeps meaning another writer only (ADR-060). DIRECTORY-003 lands after this brief, because its uncertain append settles by reading back a leaf it must be able to trust as committed, and this brief records that wait in DIRECTORY-003's depends_on.",
+  "task": "Change crates/lys-log-store/src/file.rs so put_leaf writes through a hidden temporary file named by leaf_temp_name and created by create_leaf_temp without replacing anything, from a sequence supplied to put_leaf_with, flushes it, gives it its final name with std::fs::hard_link, advances the extent at that link, removes the temporary name and flushes leaves/, and removes its own temporary file whenever it fails before a successful link (R2 to R4). Add StoreError::LeafDurabilityUncertain, carrying the index and the failed flush's std::io::Error as its source, in error.rs and name it in LeafStore::put_leaf's docs (R1). Make FileLeafStore::open flush leaves/ before counting and fail with Io when that flush fails, and add FileLeafStore::open_read_only, which performs open's checks without the flush and returns a handle whose put_leaf is refused as the new StoreError::ReadOnly (R5). Write the invariant into file.rs's module docs (R6). Add a cfg(test) fault seam (R7) and the tests with their drift table (R8). Add LYSLOGSTORE-001 to DIRECTORY-003's depends_on and re-render its markdown (R9). Make Anchor::open_read_only's doc examples and lys-anchor's read-only tests open their store with FileLeafStore::open_read_only (R10). Order: R1 first, since R4 returns its variant; R7 after the steps it fails exist; R8 after R1 to R7; R10 after R5, which adds the constructor it calls.\n\nIn: error.rs's two new variants, store.rs's put_leaf doc line, file.rs, file_tests.rs, the three lys-anchor files that open a store for Anchor::open_read_only (crates/lys-anchor/src/anchor/read_only.rs, crates/lys-anchor/src/anchor/read_only_tests.rs and crates/lys-anchor/tests/standalone_is_complete.rs), and DIRECTORY-003's depends_on with its rendered markdown.\n\nOut: clearing leftover hidden temporary files that a crash stranded, which is a further unit not written here: an explicit maintenance act that runs only while holding the write lock. Open never deletes anything. Also out: any change to log.rs, to the LeafStore trait's methods, to the on-disk layout, to write_state's state.json.tmp, to any crate other than lys-log-store beyond R10's store-opening lines in lys-anchor (the lys CLI and lys-anchor-cli keep calling FileLeafStore::open, and Anchor::open_read_only's own code is unchanged), to what pin does on a handle opened by open_read_only, which is left to the lead who owns the card, and to any field of DIRECTORY-003 other than depends_on (DIRECTORY-003's uncertain append treats LeafDurabilityUncertain as uncertain and settles by reading the leaf back, in its own card).\n\nThe refusal of a second writer is unchanged in meaning: it is still StoreError::LeafAlreadyWritten, now raised when the no-replace link finds the final name taken rather than by create_new.",
   "requirements": [
     {
       "id": "R1",
@@ -140,18 +142,20 @@
     },
     {
       "id": "R5",
-      "title": "Flush leaves/ at a writable open before counting, count without flushing at a read-only open, and leave leftovers untouched",
-      "spec": "WHEN FileLeafStore::open reaches the leaf count, THE SYSTEM SHALL flush leaves/ with the existing fsync_dir helper before contiguous_extent enumerates it. IF that flush fails, THEN THE SYSTEM SHALL return StoreError::Io whose context names the leaves directory and the flush, and SHALL NOT count the leaves, return a store, or write any file. FileLeafStore gains a public constructor open_read_only(dir: &Path) -> StoreResult<Self>, documented as the open for a reader, such as the store handed to Anchor::open_read_only: WHEN it is called, THE SYSTEM SHALL perform every check FileLeafStore::open performs, in the same order, except the flush of leaves/, and SHALL count the leaves that are named; it SHALL NOT flush leaves/ and SHALL NOT fail because a flush of leaves/ would fail. contiguous_extent SHALL keep skipping every entry whose name begins with '.', so a leftover temporary file is never counted as a leaf. Neither FileLeafStore::open nor FileLeafStore::open_read_only SHALL delete, rename, truncate, write or otherwise change any file in the store's directory, and neither SHALL refuse to open because a leftover temporary file is present.",
+      "title": "Flush leaves/ at a writable open before counting, count without flushing at a read-only open, refuse a leaf write on a read-only handle, and leave leftovers untouched",
+      "spec": "WHEN FileLeafStore::open reaches the leaf count, THE SYSTEM SHALL flush leaves/ with the existing fsync_dir helper before contiguous_extent enumerates it. IF that flush fails, THEN THE SYSTEM SHALL return StoreError::Io whose context names the leaves directory and the flush, and SHALL NOT count the leaves, return a store, or write any file. FileLeafStore gains a public constructor open_read_only(dir: &Path) -> StoreResult<Self>, documented as the open for a reader, such as the store handed to Anchor::open_read_only: WHEN it is called, THE SYSTEM SHALL perform every check FileLeafStore::open performs, in the same order, except the flush of leaves/, and SHALL count the leaves that are named; it SHALL NOT flush leaves/ and SHALL NOT fail because a flush of leaves/ would fail. StoreError gains a variant ReadOnly with two fields, path: PathBuf, the store's directory, and operation: &'static str, the act refused, and the message `refusing to {operation} in the log store at {path}: it was opened read-only`; no existing variant's fields, message or documentation change. WHEN put_leaf is called on a handle returned by FileLeafStore::open_read_only, THE SYSTEM SHALL return StoreError::ReadOnly with path equal to the store's directory and operation `write a leaf`, before any other check, and SHALL NOT create, write, link, remove or flush any file; only a handle returned by FileLeafStore::open writes a leaf. contiguous_extent SHALL keep skipping every entry whose name begins with '.', so a leftover temporary file is never counted as a leaf. Neither FileLeafStore::open nor FileLeafStore::open_read_only SHALL delete, rename, truncate, write or otherwise change any file in the store's directory, and neither SHALL refuse to open because a leftover temporary file is present.",
       "acceptance": [
         "In crates/lys-log-store/src/file.rs, on the path `FileLeafStore::open` takes, the call to `fsync_dir` on the `leaves` directory comes before the call to `contiguous_extent`.",
         "Test `a_leftover_temporary_file_is_ignored_at_open`: a store holding leaf 0 = b\"leaf-0\", with a file holding b\"torn\" written into leaves/ under `leaf_temp_name(std::process::id() + 1, 1, 0)`, another writer's crash, opens with `extent()` 1; afterwards that file still exists and reads b\"torn\"; on the opened store `put_leaf(1, b\"leaf-1\")` returns `Ok(())`, `leaves/00000000000000000001` reads b\"leaf-1\", and the leftover still reads b\"torn\".",
         "Test `a_read_only_open_never_flushes_the_leaves_directory`: a store holding leaf 0 = b\"leaf-0\" and leaf 1 = b\"leaf-1\", opened read-only through the fault seam with the leaves/ flush at open armed to fail, returns `Ok` with `extent()` 2 and `leaf(1)` equal to `Some(b\"leaf-1\".to_vec())`; and `FileLeafStore::open_read_only` on the same directory, without the seam, returns a store whose `extent()` is 2.",
         "Test `a_writable_open_whose_leaves_flush_fails_is_refused_and_writes_nothing`: a store holding leaf 0 = b\"leaf-0\" and leaf 1 = b\"leaf-1\" has every file under its directory recorded as (path relative to the directory, bytes); opened writable through the fault seam with the leaves/ flush at open armed to fail, it returns `StoreError::Io` whose `context` contains `dir.join(\"leaves\").display().to_string()` and the substring `flush`, and whose source has `kind()` equal to `std::io::ErrorKind::TimedOut`; the set of (path, bytes) recorded afterwards equals the set recorded before.",
+        "Test `a_read_only_handle_refuses_put_leaf_by_name`: a store holding leaf 0 = b\"leaf-0\" has every file under its directory recorded as (path relative to the directory, bytes); on the handle `FileLeafStore::open_read_only` returns for it, `put_leaf(1, b\"leaf-1\")` returns `StoreError::ReadOnly { path, operation }` with `path` equal to the directory and `operation` equal to `write a leaf`, whose `to_string()` contains `dir.display().to_string()` and the substring `read-only`; `extent()` is then 1, and the set of (path, bytes) recorded afterwards equals the set recorded before.",
         "The existing test `an_unexpected_leaves_entry_is_detected_but_dotfiles_are_ignored` passes unchanged."
       ],
       "files": {
         "create": [],
         "modify": [
+          "crates/lys-log-store/src/error.rs",
           "crates/lys-log-store/src/file.rs"
         ],
         "delete": []
@@ -159,7 +163,8 @@
       "checklist": [
         "C6",
         "C7",
-        "C12"
+        "C12",
+        "C14"
       ],
       "stories": [
         "S2",
@@ -213,10 +218,10 @@
     {
       "id": "R8",
       "title": "Add the tests and prove each against its own drift",
-      "spec": "file_tests.rs gains the sixteen new tests named in R1, R2, R3, R4 and R5's acceptance lines and renames create_new_alone_refuses_a_leaf_this_store_never_saw to the_link_alone_refuses_a_leaf_this_store_never_saw with its assertions unchanged. Its text stops stating what this brief makes false, in four places, each naming the no-replace link instead of create_new with no assertion changed: the module-doc header sentence that says the index is refused once via create_new at the filesystem; the extent row of the absent-check table, which says create_new succeeds; the comment in extent_check_alone_refuses_a_deleted_leafs_index, which says create_new would succeed; and the comment in the renamed test, which says it isolates the create_new check. The absent-check table's second row is rewritten to name the no-replace link and drift injection 13 of this brief's verification, which replaces the link with an operation that replaces an existing entry. A new drift-injection table holds one row for each of drift injections 1 to 12 and 14 to 16, each naming the one test it fails. Each injection SHALL be applied and reverted before the change lands. No test SHALL be #[ignore]d, and no existing test other than the renamed one SHALL change beyond the comment named above.",
+      "spec": "file_tests.rs gains the seventeen new tests named in R1, R2, R3, R4 and R5's acceptance lines and renames create_new_alone_refuses_a_leaf_this_store_never_saw to the_link_alone_refuses_a_leaf_this_store_never_saw with its assertions unchanged. Its text stops stating what this brief makes false, in four places, each naming the no-replace link instead of create_new with no assertion changed: the module-doc header sentence that says the index is refused once via create_new at the filesystem; the extent row of the absent-check table, which says create_new succeeds; the comment in extent_check_alone_refuses_a_deleted_leafs_index, which says create_new would succeed; and the comment in the renamed test, which says it isolates the create_new check. The absent-check table's second row is rewritten to name the no-replace link and drift injection 13 of this brief's verification, which replaces the link with an operation that replaces an existing entry. A new drift-injection table holds one row for each of drift injections 1 to 12 and 14 to 17, each naming the one test it fails. Each injection SHALL be applied and reverted before the change lands. No test SHALL be #[ignore]d, and no existing test other than the renamed one SHALL change beyond the comment named above.",
       "acceptance": [
-        "`cargo test -p lys-log-store --all-features` runs 38 tests in `file::tests` and all 38 pass.",
-        "The module docs of crates/lys-log-store/src/file_tests.rs contain a new table with exactly fifteen injection rows, for drift injections 1 to 12 and 14 to 16 of this brief's verification, each naming exactly one test.",
+        "`cargo test -p lys-log-store --all-features` runs 39 tests in `file::tests` and all 39 pass.",
+        "The module docs of crates/lys-log-store/src/file_tests.rs contain a new table with exactly sixteen injection rows, for drift injections 1 to 12 and 14 to 17 of this brief's verification, each naming exactly one test.",
         "The absent-check table in those module docs has a row naming the no-replace link, drift injection 13 and the test `the_link_alone_refuses_a_leaf_this_store_never_saw`.",
         "`grep -c create_new crates/lys-log-store/src/file_tests.rs` prints 0.",
         "`git diff` of crates/lys-log-store/src/file_tests.rs removes no line containing `assert` from any test that exists before this change.",
@@ -259,6 +264,32 @@
       "stories": [
         "S1"
       ]
+    },
+    {
+      "id": "R10",
+      "title": "Open the store for Anchor::open_read_only with FileLeafStore::open_read_only",
+      "spec": "In lys-anchor, every call to Anchor::open_read_only in Anchor::open_read_only's two doc examples in crates/lys-anchor/src/anchor/read_only.rs, in crates/lys-anchor/src/anchor/read_only_tests.rs and in crates/lys-anchor/tests/standalone_is_complete.rs SHALL take as its store the value of FileLeafStore::open_read_only on the directory it opened with FileLeafStore::open before, so the one read-only path is the one they exercise. No other line of those files, and no other file of lys-anchor, SHALL change; Anchor::open_read_only's own code, signature and documentation other than the two examples SHALL NOT change, and no assertion in those tests SHALL change.",
+      "acceptance": [
+        "`grep -c 'FileLeafStore::open_read_only' crates/lys-anchor/src/anchor/read_only.rs` prints 2, `grep -c 'FileLeafStore::open_read_only' crates/lys-anchor/src/anchor/read_only_tests.rs` prints 2, and `grep -c 'FileLeafStore::open_read_only' crates/lys-anchor/tests/standalone_is_complete.rs` prints 1.",
+        "`grep -rn -A1 'Anchor::open_read_only(' crates/lys-anchor/src/anchor/read_only.rs crates/lys-anchor/src/anchor/read_only_tests.rs crates/lys-anchor/tests/standalone_is_complete.rs` prints no line containing `FileLeafStore::open(`.",
+        "`git diff --name-only -- crates/lys-anchor` lists exactly crates/lys-anchor/src/anchor/read_only.rs, crates/lys-anchor/src/anchor/read_only_tests.rs and crates/lys-anchor/tests/standalone_is_complete.rs, and every line `git diff -- crates/lys-anchor` adds contains `FileLeafStore::open_read_only`.",
+        "`cargo test -p lys-anchor --all-features` passes, including the doc tests of crates/lys-anchor/src/anchor/read_only.rs, the passing example and the compile_fail example each as before."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-anchor/src/anchor/read_only.rs",
+          "crates/lys-anchor/src/anchor/read_only_tests.rs",
+          "crates/lys-anchor/tests/standalone_is_complete.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C15"
+      ],
+      "stories": [
+        "S6"
+      ]
     }
   ],
   "boundaries": [
@@ -266,7 +297,7 @@
     "SHALL NOT add a method to the LeafStore trait or change any existing method's signature.",
     "SHALL NOT change the on-disk layout: log.json, state.json, leaves/<20-digit index> holding the raw leaf bytes, and the lys/log-dir/v1 marker.",
     "SHALL NOT modify crates/lys-log-store/src/log.rs, Log's append order or its one-leaf-ahead repair.",
-    "SHALL NOT change any file outside crates/lys-log-store other than DIRECTORY-003.json and DIRECTORY-003.md.",
+    "SHALL NOT change any file outside crates/lys-log-store other than DIRECTORY-003.json, DIRECTORY-003.md and R10's three lys-anchor files, and in those three only the lines that open a store for Anchor::open_read_only.",
     "SHALL NOT use StoreError::LeafAlreadyWritten for any failure other than another writer holding the index.",
     "SHALL NOT implement clearing of leftover temporary files that a crash stranded; that is a further unit. Removing this writer's own temporary file after its own failed write is not that unit.",
     "SHALL NOT add a dependency, unsafe code, or unwrap, expect, panic, todo, unimplemented or unreachable in library code.",
@@ -292,6 +323,7 @@
     "Drift injection 14: make FileLeafStore::open_read_only flush leaves/ before counting, as FileLeafStore::open does; exactly one test fails, a_read_only_open_never_flushes_the_leaves_directory. Revert.",
     "Drift injection 15: make FileLeafStore::open ignore a failed leaves/ flush and go on to count; exactly one test fails, a_writable_open_whose_leaves_flush_fails_is_refused_and_writes_nothing. Revert.",
     "Drift injection 16: remove `; reopen the store` from LeafDurabilityUncertain's message; exactly one test fails, the_uncertain_error_names_its_index_its_cause_and_the_reopen. Revert.",
+    "Drift injection 17: skip the ReadOnly refusal in put_leaf on a handle from FileLeafStore::open_read_only; exactly one test fails, a_read_only_handle_refuses_put_leaf_by_name. Revert.",
     "Confirm that a_reopen_after_an_uncertain_flush_counts_the_leaf_and_appends_at_the_next_index and two_handles_on_one_directory_leave_no_temporary_name have no injection row: the first guards the reopen path, and the open-time flush it rides on is verified by reading the line order in FileLeafStore::open, since no test here observes a power loss; the second guards the absence of leftovers across handles, whose removal steps drift injections 8 and 9 already isolate.",
     "grep -rn 'unwrap()\\|expect(\\|panic!' crates/lys-log-store/src/file.rs crates/lys-log-store/src/error.rs finds nothing outside the tests module."
   ]

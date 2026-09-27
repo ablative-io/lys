@@ -53,6 +53,11 @@
           "id": "C12",
           "text": "FileLeafStore::open_read_only performs FileLeafStore::open's checks without flushing leaves/, counts the named leaves, and does not fail because a flush of leaves/ would fail.",
           "done": false
+        },
+        {
+          "id": "C14",
+          "text": "put_leaf on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly naming the store's directory and the act, and writes nothing.",
+          "done": false
         }
       ]
     },
@@ -87,6 +92,16 @@
         {
           "id": "C13",
           "text": "DIRECTORY-003's depends_on names LYSLOGSTORE-001 after DIRECTORY-002, and no other field of DIRECTORY-003 changes.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Read-only callers",
+      "items": [
+        {
+          "id": "C15",
+          "text": "Anchor::open_read_only's doc examples and lys-anchor's read-only tests open their store with FileLeafStore::open_read_only, and nothing else in lys-anchor changes.",
           "done": false
         }
       ]
