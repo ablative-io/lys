@@ -223,6 +223,7 @@ pub fn judge_delegation(
             grant: request.source.to_string(),
         });
     }
+    active(directory, request.recipient)?;
     responsible_is(directory, request.recipient, request.responsible)?;
     if &request.resource != source.resource() {
         return Err(GrantError::ResourceOutside {

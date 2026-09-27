@@ -13,7 +13,7 @@ use super::admission::Route;
 use super::error::GrantError;
 use super::events::{GrantChange, GrantEvent};
 use super::lineage::{self, Lineage, check_hop};
-use super::types::{Grant, GrantId, Source};
+use super::types::{Grant, GrantId, Resource, Source};
 use crate::id::IdentityId;
 use crate::operation::OperationId;
 
@@ -24,6 +24,8 @@ pub struct Revocation {
     pub operation: OperationId,
     /// The index of the revoking event.
     pub index: u64,
+    /// When the revoking event was recorded, in seconds since the epoch.
+    pub at: u64,
     /// The reason given.
     pub reason: String,
 }
@@ -82,6 +84,7 @@ impl GrantRecord {
 pub struct GrantBook {
     records: BTreeMap<GrantId, GrantRecord>,
     children: BTreeMap<GrantId, BTreeSet<GrantId>>,
+    by_resource: BTreeMap<Resource, BTreeSet<GrantId>>,
     operations: HashMap<OperationId, u64>,
     refused: BTreeMap<u64, (OperationId, GrantError)>,
 }
@@ -112,6 +115,15 @@ impl GrantBook {
         self.records
             .values()
             .filter(move |record| record.grant.holder() == holder)
+    }
+
+    /// Every grant on `resource`, in id order.
+    pub fn on_resource<'a>(&'a self, resource: &Resource) -> impl Iterator<Item = &'a GrantRecord> {
+        self.by_resource
+            .get(resource)
+            .into_iter()
+            .flatten()
+            .filter_map(|id| self.records.get(id))
     }
 
     /// Every grant derived from `id`, directly or through others, in the order reached.
@@ -209,6 +221,10 @@ impl GrantBook {
                 if let Source::Grant(source) = grant.source() {
                     self.children.entry(source).or_default().insert(grant.id());
                 }
+                self.by_resource
+                    .entry(grant.resource().clone())
+                    .or_default()
+                    .insert(grant.id());
                 self.records.insert(
                     grant.id(),
                     GrantRecord {
@@ -224,6 +240,7 @@ impl GrantBook {
                     record.revoked = Some(Revocation {
                         operation: event.operation(),
                         index,
+                        at: event.recorded_at(),
                         reason: reason.clone(),
                     });
                 }

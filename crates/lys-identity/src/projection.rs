@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, HashMap};
 use crate::binding::LoginBinding;
 use crate::error::IdentityError;
 use crate::event::{Change, IdentityEvent};
-use crate::id::{IdentityId, PersonId};
+use crate::id::{AgentId, IdentityId, PersonId};
 use crate::lifecycle::LifecycleState;
 use crate::operation::OperationId;
 use crate::profile::Profile;
@@ -65,6 +65,7 @@ impl Record {
 pub struct Projection {
     records: BTreeMap<IdentityId, Record>,
     bindings: HashMap<LoginBinding, PersonId>,
+    agent_bindings: HashMap<LoginBinding, AgentId>,
     operations: HashMap<OperationId, u64>,
     link_sources: HashMap<String, u64>,
 }
@@ -94,6 +95,11 @@ impl Projection {
     /// The person a login is bound to.
     pub fn person_for(&self, binding: &LoginBinding) -> Option<PersonId> {
         self.bindings.get(binding).copied()
+    }
+
+    /// The agent a login is bound to, as its own machine account.
+    pub fn agent_for(&self, binding: &LoginBinding) -> Option<AgentId> {
+        self.agent_bindings.get(binding).copied()
     }
 
     /// The log index of the event an operation id made.
@@ -195,8 +201,13 @@ impl Projection {
                 let record = self.held(identity)?;
                 record.bindings.push(binding.clone());
                 record.events.push(index);
-                if let IdentityId::Person(person) = identity {
-                    self.bindings.insert(binding.clone(), person);
+                match identity {
+                    IdentityId::Person(person) => {
+                        self.bindings.insert(binding.clone(), person);
+                    }
+                    IdentityId::Agent(agent) => {
+                        self.agent_bindings.insert(binding.clone(), agent);
+                    }
                 }
             }
             Change::Transition { to, .. } => {

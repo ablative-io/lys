@@ -361,7 +361,10 @@ fn grant_agent_parity_routes_decide_alike_and_pass_on_decides_who_delegates() ->
     let passing = world.delegate(&passing)?.event.grant();
     let decisions = ROUTES.map(|route| {
         world.exercise(tom_agent, "read", route).map(|permit| {
-            assert!(permit.use_event.is_ok(), "{route:?}: the use is recorded");
+            assert!(
+                permit.use_event.as_ref().is_some_and(Result::is_ok),
+                "{route:?}: the use is recorded"
+            );
             (
                 permit.grant,
                 permit.path,

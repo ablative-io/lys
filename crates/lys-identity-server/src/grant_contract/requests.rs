@@ -1,5 +1,4 @@
-//! The grant routes' typed wire: every request body, and the JSON each answer
-//! is written as.
+//! The grant routes' request bodies.
 //!
 //! Every member of every body is required, and an unknown member is refused.
 //! A body is only a request: parsing it grants nothing, and every decision is
@@ -9,15 +8,14 @@ use std::collections::BTreeSet;
 use std::str::FromStr;
 
 use lys_identity::grants::{
-    Action, DelegateRequest, GrantId, GrantRecord, PassOn, Permit, RecipientKind, Recorded,
-    Relation, Resource, RevokeRequest, RootRequest, Route, Source, Window,
+    Action, DelegateRequest, GrantId, PassOn, RecipientKind, Relation, Resource, RevokeRequest,
+    RootRequest, Route, Window,
 };
 use lys_identity::{IdentityId, OperationId, PersonId};
 use serde::{Deserialize, Deserializer};
-use serde_json::{Value, json};
 
 use crate::error::ServerError;
-use crate::routes::{hex, identity_id};
+use crate::routes::identity_id;
 
 /// The most holders one page of a who-can answer carries.
 pub const PAGE_MAX: usize = 100;
@@ -256,80 +254,4 @@ pub struct WhoBody {
     /// The last grant of the previous page, or null.
     #[serde(deserialize_with = "nullable")]
     pub after: Option<String>,
-}
-
-fn pass_on_json(pass_on: &PassOn) -> Value {
-    match pass_on {
-        PassOn::UseOnly => json!({ "kind": "use_only" }),
-        PassOn::To {
-            actions,
-            recipients,
-        } => json!({
-            "kind": "to",
-            "actions": actions.iter().map(Action::as_str).collect::<Vec<_>>(),
-            "recipients": recipients.iter().map(ToString::to_string).collect::<Vec<_>>(),
-        }),
-    }
-}
-
-/// A grant, as a caller who may inspect it reads it.
-pub fn grant_json(record: &GrantRecord) -> Value {
-    let grant = record.grant();
-    let parts = grant.parts();
-    json!({
-        "id": grant.id().to_string(),
-        "issuer": parts.issuer.to_string(),
-        "holder": parts.holder.to_string(),
-        "responsible": parts.responsible.to_string(),
-        "resource": { "kind": parts.resource.kind(), "id": parts.resource.id() },
-        "relation": parts.relation.as_str(),
-        "actions": parts.actions.iter().map(Action::as_str).collect::<Vec<_>>(),
-        "pass_on": pass_on_json(&parts.pass_on),
-        "source": match parts.source {
-            Source::Root => Value::Null,
-            Source::Grant(id) => Value::String(id.to_string()),
-        },
-        "window": { "starts_at": parts.window.starts_at(), "ends_at": parts.window.ends_at() },
-        "model_version": parts.model_version,
-        "operation": parts.operation.to_string(),
-        "revoked": record.revoked().is_some(),
-    })
-}
-
-/// A recorded change and its receipt.
-pub fn recorded_json(recorded: &Recorded) -> Value {
-    let receipt = &recorded.receipt;
-    let coordinate = receipt.coordinate;
-    json!({
-        "operation": receipt.operation.to_string(),
-        "grant": receipt.grant.to_string(),
-        "index": recorded.index,
-        "receipt": {
-            "version": receipt.version,
-            "caller": receipt.caller.to_string(),
-            "change_kind": receipt.change_kind,
-            "payload_commitment": hex(&receipt.payload_commitment),
-            "payload_commitment_hash": "sha-256",
-            "revision": receipt.revision(),
-            "log": {
-                "index": coordinate.index,
-                "tree_size": coordinate.tree_size,
-                "root": hex(&coordinate.root),
-                "leaf_hash": hex(&coordinate.leaf_hash),
-            },
-        },
-    })
-}
-
-/// A permitted decision, with the authority path it rests on.
-pub fn permit_json(permit: &Permit) -> Value {
-    json!({
-        "permitted": true,
-        "grant": permit.grant.to_string(),
-        "path": permit.path.iter().map(ToString::to_string).collect::<Vec<_>>(),
-        "responsible": permit.root_person.to_string(),
-        "scope": permit.actions.iter().map(Action::as_str).collect::<Vec<_>>(),
-        "model_version": permit.model_version,
-        "revision": permit.revision,
-    })
 }

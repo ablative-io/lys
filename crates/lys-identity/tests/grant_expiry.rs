@@ -252,3 +252,33 @@ fn grant_reinstate_rechecks_every_grant_and_resurrects_none() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn grant_to_an_identity_that_is_not_active_is_refused_when_given() -> TestResult {
+    let mut world = World::new()?;
+    let (dana, tom) = (
+        IdentityId::Person(world.dana),
+        IdentityId::Person(world.tom),
+    );
+    let root = world.root(world.dana, "kite", pass(&["read"], &BOTH)?, None)?;
+    let now = world.now;
+    world.directory.transition(
+        administrator()?,
+        OperationId::generate()?,
+        tom,
+        Transition::Suspend,
+        "on leave",
+        now,
+    )?;
+    let before = world.events();
+    let request = world.request(dana, root, tom, "tern", PassOn::UseOnly, None)?;
+    assert!(matches!(
+        world.delegate(&request),
+        Err(GrantError::IdentityNotActive {
+            state: LifecycleState::Suspended,
+            ..
+        })
+    ));
+    assert_eq!(world.events(), before);
+    Ok(())
+}

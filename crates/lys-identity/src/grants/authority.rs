@@ -76,8 +76,9 @@ pub struct Permit {
     /// The revision of the permission relationships the decision was made at.
     pub revision: u64,
     /// The index of the use event recording this exercise in the grant log,
-    /// or why it could not be recorded.
-    pub use_event: Result<u64, GrantError>,
+    /// or why it could not be recorded. None for an explanation, which
+    /// records no use.
+    pub use_event: Option<Result<u64, GrantError>>,
 }
 
 /// A recorded grant change and where it stands.
@@ -308,9 +309,26 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
 
     /// Whether the caller may exercise the action on the resource at `at`,
     /// answered with the authority it rests on or refused by the boundary that
-    /// blocks it. `at_least` is a revision the caller requires the decision to
-    /// reflect, such as the one a receipt names.
+    /// blocks it, and the exercise recorded as a use event. `at_least` is a
+    /// revision the caller requires the decision to reflect, such as the one a
+    /// receipt names. This is the enforcement point: call it when the action is
+    /// about to be taken.
     pub fn check(
+        &mut self,
+        directory: &Projection,
+        request: &ExerciseRequest,
+        at: u64,
+        at_least: Option<u64>,
+    ) -> Result<Permit, GrantError> {
+        let mut permit = self.explain(directory, request, at, at_least)?;
+        permit.use_event = Some(self.record_use(request.caller, permit.grant, request.route, at));
+        Ok(permit)
+    }
+
+    /// The same decision as [`Grants::check`], by the same evaluator at the
+    /// same revision, and nothing recorded: answering why an identity may act,
+    /// or who can, is not an exercise.
+    pub fn explain(
         &mut self,
         directory: &Projection,
         request: &ExerciseRequest,
@@ -378,7 +396,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                         actions: grant.actions().clone(),
                         model_version: grant.parts().model_version,
                         revision: projected,
-                        use_event: Ok(0),
+                        use_event: None,
                     });
                     break;
                 }
@@ -387,8 +405,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                 }
             }
         }
-        if let Some(mut permit) = permitted {
-            permit.use_event = self.record_use(request.caller, permit.grant, request.route, at);
+        if let Some(permit) = permitted {
             return Ok(permit);
         }
         Err(refusal.unwrap_or_else(|| GrantError::NotHeld {

@@ -61,7 +61,7 @@ fn grant_last_used_an_exercise_is_recorded_with_its_holder_route_and_time() -> T
     );
     let before = world.events();
     let permit = world.exercise(tom, "read", Route::Tool)?;
-    let index = permit.use_event?;
+    let index = permit.use_event.ok_or("check records a use")??;
     assert_eq!(world.events(), before + 1, "one use event");
     assert_eq!(
         last_use(&world, grant)?,
@@ -82,7 +82,10 @@ fn grant_last_used_an_exercise_is_recorded_with_its_holder_route_and_time() -> T
     );
     assert_eq!(receipt.change_kind, 3);
     world.now += 60;
-    let later = world.exercise(tom, "read", Route::Browser)?.use_event?;
+    let later = world
+        .exercise(tom, "read", Route::Browser)?
+        .use_event
+        .ok_or("check records a use")??;
     assert_eq!(
         last_use(&world, grant)?,
         LastUse::Seen {
@@ -100,7 +103,8 @@ fn grant_last_used_a_reopen_restores_it_from_the_log() -> TestResult {
     let grant = lent(&mut world)?;
     let index = world
         .exercise(IdentityId::Person(world.tom), "read", Route::Api)?
-        .use_event?;
+        .use_event
+        .ok_or("check records a use")??;
     let seen = last_use(&world, grant)?;
     world.reopen(MemoryRelationships::default())?;
     assert_eq!(last_use(&world, grant)?, seen);

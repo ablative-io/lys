@@ -232,3 +232,48 @@ async fn a_grant_the_caller_may_not_inspect_leaks_nothing() -> TestResult {
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn a_page_followed_only_by_refused_holders_is_complete() -> TestResult {
+    let (service, seeded) = seeded().await?;
+    let ada = service.sign_in(login(ADMINISTRATOR)).await?;
+    let bea = service.sign_in(login(BEA)).await?;
+    let (private, lending, lent) = world(&service, &seeded, &ada, &bea).await?;
+    let ada_id = seeded.people[0].id.to_string();
+    let bea_id = seeded.people[1].id.to_string();
+    let agent_id = seeded.people[1].agents[0].id.to_string();
+    // Revoke the grant of whichever holder sorts last, so every holder that
+    // still permits sorts before every holder that is refused.
+    let last = [&ada_id, &bea_id, &agent_id]
+        .into_iter()
+        .max()
+        .ok_or("no holder")?;
+    let (grant, issuer, permitting) = if *last == ada_id {
+        (&private, &ada, 2)
+    } else if *last == bea_id {
+        (&lending, &ada, 1)
+    } else {
+        (&lent, &bea, 2)
+    };
+    let revoke = json!({ "operation": operation()?, "route": "api", "reason": "finished" });
+    post_ok(
+        &service,
+        &format!("/grants/{grant}/revoke"),
+        issuer,
+        &revoke,
+    )
+    .await?;
+
+    let mut ask = question("1");
+    ask["page_size"] = json!(permitting);
+    ask["after"] = Value::Null;
+    let page = post_ok(&service, "/grants/who", &ada, &ask).await?;
+    assert_eq!(
+        page["holders"].as_array().map(Vec::len),
+        Some(permitting),
+        "{page}"
+    );
+    assert_eq!(page["complete"], true, "{page}");
+    assert_eq!(page["next"], Value::Null, "{page}");
+    Ok(())
+}

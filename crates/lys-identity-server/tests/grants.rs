@@ -225,3 +225,131 @@ async fn the_same_request_is_permitted_through_the_api_the_tool_and_the_browser(
     assert_eq!(routes, 3);
     Ok(())
 }
+
+#[tokio::test]
+async fn a_check_records_its_use_and_an_explanation_records_nothing() -> TestResult {
+    let (service, seeded) = seeded().await?;
+    let bea = &seeded.people[1];
+    let ada_cookie = service.sign_in(login(ADMINISTRATOR)).await?;
+    let bea_cookie = service.sign_in(login(BEA)).await?;
+    let (status, issued) = service
+        .post(
+            "/grants/roots",
+            Some(&ada_cookie),
+            &root_body(&bea.id.to_string(), "1", &json!({ "kind": "use_only" }))?,
+        )
+        .await?;
+    assert_eq!(status, 200, "{issued}");
+    let grant = issued["grant"].as_str().ok_or("no grant")?.to_owned();
+    let question =
+        json!({ "route": "tool", "resource": { "kind": "doc", "id": "1" }, "action": "read" });
+
+    let (_, read) = service
+        .get(&format!("/grants/{grant}"), Some(&bea_cookie))
+        .await?;
+    assert_eq!(read["last_use"], json!({ "seen": false }), "{read}");
+
+    let before = revision(&service, &ada_cookie).await?;
+    for path in ["/grants/why", "/grants/who"] {
+        let mut body = question.clone();
+        if path == "/grants/who" {
+            body["page_size"] = json!(10);
+            body["after"] = Value::Null;
+        }
+        let (status, answer) = service.post(path, Some(&bea_cookie), &body).await?;
+        assert_eq!(status, 200, "{path}: {answer}");
+        assert!(
+            answer.get("use_event").is_none(),
+            "{path} records no use: {answer}"
+        );
+    }
+    assert_eq!(
+        revision(&service, &ada_cookie).await?,
+        before,
+        "an explanation wrote"
+    );
+    let (_, read) = service
+        .get(&format!("/grants/{grant}"), Some(&bea_cookie))
+        .await?;
+    assert_eq!(read["last_use"], json!({ "seen": false }), "{read}");
+
+    let (status, checked) = service
+        .post("/grants/check", Some(&bea_cookie), &question)
+        .await?;
+    assert_eq!(status, 200, "{checked}");
+    assert_eq!(checked["use_event"]["recorded"], true, "{checked}");
+    let index = checked["use_event"]["index"].clone();
+    assert_eq!(
+        revision(&service, &ada_cookie).await?,
+        before + 1,
+        "one use event"
+    );
+    let (_, read) = service
+        .get(&format!("/grants/{grant}"), Some(&bea_cookie))
+        .await?;
+    assert_eq!(read["last_use"]["seen"], true, "{read}");
+    assert_eq!(read["last_use"]["route"], "tool", "{read}");
+    assert_eq!(read["last_use"]["use_event"], index, "{read}");
+
+    let (status, refused) = service
+        .post(
+            "/grants/check",
+            Some(&bea_cookie),
+            &json!({ "route": "api", "resource": { "kind": "doc", "id": "2" }, "action": "read" }),
+        )
+        .await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["refusal"], "NotHeld", "{refused}");
+    assert_eq!(
+        revision(&service, &ada_cookie).await?,
+        before + 1,
+        "a refused check wrote"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_permission_model_is_served_to_a_signed_in_caller_only() -> TestResult {
+    let (service, _) = seeded().await?;
+    let bea = service.sign_in(login(BEA)).await?;
+    let (status, model) = service.get("/grants/model", Some(&bea)).await?;
+    assert_eq!(status, 200, "{model}");
+    assert_eq!(
+        model,
+        json!({ "version": 1, "relations": { "alpha": ["read", "write"], "beta": ["read"] } })
+    );
+    let (status, _) = service.get("/grants/model", None).await?;
+    assert_eq!(status, 401);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_revoked_grant_names_when_and_at_which_revision_it_was_revoked() -> TestResult {
+    let (service, seeded) = seeded().await?;
+    let ada = service.sign_in(login(ADMINISTRATOR)).await?;
+    let bea = seeded.people[1].id.to_string();
+    let (status, issued) = service
+        .post(
+            "/grants/roots",
+            Some(&ada),
+            &root_body(&bea, "1", &json!({ "kind": "use_only" }))?,
+        )
+        .await?;
+    assert_eq!(status, 200, "{issued}");
+    let grant = issued["grant"].as_str().ok_or("no grant")?.to_owned();
+    let (_, standing) = service.get(&format!("/grants/{grant}"), Some(&ada)).await?;
+    assert_eq!(standing["revoked_at"], Value::Null, "{standing}");
+    assert_eq!(standing["revoked_revision"], Value::Null, "{standing}");
+
+    let body = json!({ "operation": operation()?, "route": "api", "reason": "finished" });
+    let (status, revoked) = service
+        .post(&format!("/grants/{grant}/revoke"), Some(&ada), &body)
+        .await?;
+    assert_eq!(status, 200, "{revoked}");
+    let after = revision(&service, &ada).await?;
+    let (_, read) = service.get(&format!("/grants/{grant}"), Some(&ada)).await?;
+    assert_eq!(read["revoked"], true, "{read}");
+    assert!(read["revoked_at"].is_u64(), "{read}");
+    assert_eq!(read["revoked_revision"], json!(after), "{read}");
+    Ok(())
+}

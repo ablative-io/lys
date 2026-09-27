@@ -59,6 +59,12 @@ impl Model {
         self.version
     }
 
+    /// Every relation the model defines, with the actions it carries, in
+    /// the order of their names.
+    pub fn relations(&self) -> impl Iterator<Item = (&Relation, &BTreeSet<Action>)> {
+        self.relations.iter()
+    }
+
     /// The actions `relation` carries in this model.
     pub fn actions(&self, relation: &Relation) -> Result<&BTreeSet<Action>, GrantError> {
         self.relations

@@ -15,30 +15,26 @@
 //! or identity the caller may not see is answered with its name and without
 //! the record.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::sync::{Arc, PoisonError};
 
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use lys_identity::grants::lineage::MAX_DEPTH;
-use lys_identity::grants::{
-    ExerciseRequest, GrantError, GrantId, GrantRecord, Grants, MemoryRelationships, Model, Source,
-};
+use lys_identity::grants::{ExerciseRequest, GrantError, Grants, MemoryRelationships, Model};
 use lys_identity::projection::Projection;
 use lys_identity::signer::load_service_key;
-use lys_identity::{IdentityError, IdentityId, PersonId};
+use lys_identity::{IdentityId, PersonId};
 use lys_log_store::FileLeafStore;
-use serde_json::{Value, json};
 
 use crate::error::ServerError;
 use crate::grant_contract::{
-    ActionBody, DelegateBody, PAGE_MAX, RevokeBody, RootBody, WhoBody, grant_id, grant_json,
-    permit_json, recorded_json,
+    ActionBody, DelegateBody, GrantList, GrantView, HolderView, ModelView, PAGE_MAX, PermitView,
+    RecordedView, RevokeBody, RootBody, WhoBody, WhoPage, grant_id,
 };
+use crate::grant_sight::{as_seen_by, sees, sees_with, visible_or};
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
 
@@ -81,7 +77,9 @@ impl GrantSetup {
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/grants", get(list).post(delegate))
+        .route("/grants/model", get(model))
         .route("/grants/roots", post(issue_root))
+        .route("/grants/check", post(check))
         .route("/grants/why", post(why))
         .route("/grants/who", post(who))
         .route("/grants/{id}", get(read))
@@ -135,154 +133,46 @@ fn caller(
         return Ok(IdentityId::Person(person));
     }
     directory
-        .records()
-        .find(|(id, record)| {
-            matches!(id, IdentityId::Agent(_)) && record.bindings().contains(actor.binding())
-        })
-        .map(|(id, _)| *id)
+        .agent_for(actor.binding())
+        .map(IdentityId::Agent)
         .ok_or(ServerError::NoPerson)
-}
-
-fn is_root(caller: IdentityId, root: PersonId) -> bool {
-    caller == IdentityId::Person(root)
-}
-
-/// Whether `caller` may see the grant `record`.
-fn sees(judged: &Judged<'_>, caller: IdentityId, record: &GrantRecord) -> bool {
-    if is_root(caller, judged.root) {
-        return true;
-    }
-    let book = judged.grants.book();
-    let mut next = Some(record.grant());
-    let mut hops = 0;
-    while let Some(grant) = next {
-        let parts = grant.parts();
-        if parts.holder == caller
-            || parts.issuer == caller
-            || IdentityId::Person(parts.responsible) == caller
-        {
-            return true;
-        }
-        hops += 1;
-        next = match parts.source {
-            Source::Grant(id) if hops <= MAX_DEPTH => book.grant(id),
-            Source::Grant(_) | Source::Root => None,
-        };
-    }
-    false
-}
-
-/// Whether `caller` may see `identity`'s records: its own, an agent it answers for, or any as the root authority.
-fn sees_identity(judged: &Judged<'_>, caller: IdentityId, identity: IdentityId) -> bool {
-    identity == caller
-        || is_root(caller, judged.root)
-        || judged
-            .directory
-            .record(identity)
-            .and_then(lys_identity::projection::Record::responsible)
-            .is_some_and(|person| IdentityId::Person(person) == caller)
-}
-
-/// Whether `id` is on the authority path of a grant `caller` holds, where a
-/// why-permitted answer already names it.
-fn on_callers_path(judged: &Judged<'_>, caller: IdentityId, id: GrantId) -> bool {
-    let book = judged.grants.book();
-    book.held_by(caller).any(|record| {
-        let mut next = Some(record.grant());
-        let mut hops = 0;
-        while let Some(grant) = next {
-            if grant.id() == id {
-                return true;
-            }
-            hops += 1;
-            next = match grant.source() {
-                Source::Grant(source) if hops <= MAX_DEPTH => book.grant(source),
-                Source::Grant(_) | Source::Root => None,
-            };
-        }
-        false
-    })
-}
-
-/// Whether a refusal may name the grant `text` to `caller`.
-fn grant_seen(judged: &Judged<'_>, caller: IdentityId, text: &str) -> bool {
-    GrantId::from_str(text).ok().is_some_and(|id| {
-        on_callers_path(judged, caller, id)
-            || judged
-                .grants
-                .book()
-                .record(id)
-                .is_some_and(|record| sees(judged, caller, record))
-    })
-}
-
-/// Refuse a grant `caller` may not see exactly as a grant the grants do not hold.
-fn visible_or(
-    judged: &Judged<'_>,
-    caller: IdentityId,
-    id: GrantId,
-    unknown: GrantError,
-) -> Result<(), ServerError> {
-    match judged.grants.book().record(id) {
-        Some(record) if !sees(judged, caller, record) && !on_callers_path(judged, caller, id) => {
-            Err(unknown.into())
-        }
-        Some(_) | None => Ok(()),
-    }
-}
-
-fn identity_seen(judged: &Judged<'_>, caller: IdentityId, text: &str) -> bool {
-    crate::routes::identity_id(text).is_ok_and(|identity| sees_identity(judged, caller, identity))
-}
-
-/// The refusal as `caller` may read it: whole when every grant and identity it
-/// names is one the caller may see, else its name and the condition alone.
-fn as_seen_by(judged: &Judged<'_>, caller: IdentityId, error: GrantError) -> ServerError {
-    let hidden = match &error {
-        GrantError::Revoked { grant }
-        | GrantError::Expired { grant, .. }
-        | GrantError::NotStarted { grant, .. }
-        | GrantError::OperationUnresolved { grant, .. } => !grant_seen(judged, caller, grant),
-        GrantError::IdentityNotActive { identity, .. }
-        | GrantError::ResponsibleMismatch { identity, .. }
-        | GrantError::Identity(IdentityError::IdentityUnknown { identity }) => {
-            !identity_seen(judged, caller, identity)
-        }
-        _ => false,
-    };
-    if hidden {
-        ServerError::Withheld {
-            refusal: ServerError::from(error).name(),
-        }
-    } else {
-        error.into()
-    }
 }
 
 async fn list(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<GrantList>, ServerError> {
     with_grants(&state, |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
+        let mut known = HashMap::new();
         let grants = judged
             .grants
             .book()
             .records()
-            .filter(|record| sees(&judged, caller, record))
-            .map(grant_json)
-            .collect::<Vec<_>>();
-        Ok(Json(
-            json!({ "grants": grants, "revision": judged.grants.revision() }),
-        ))
+            .filter(|record| sees_with(&judged, caller, record, &mut known))
+            .map(GrantView::from)
+            .collect();
+        Ok(Json(GrantList {
+            grants,
+            revision: judged.grants.revision(),
+        }))
     })
+}
+
+/// The permission model, so a screen offers only the relations it defines.
+async fn model(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<ModelView>, ServerError> {
+    signed_in(&state, &headers)?;
+    Ok(Json(ModelView::from(&state.grant_setup.model)))
 }
 
 async fn read(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(id): Path<String>,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<GrantView>, ServerError> {
     let id = grant_id(&id)?;
     with_grants(&state, |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
@@ -292,7 +182,7 @@ async fn read(
             .record(id)
             .filter(|record| sees(&judged, caller, record))
             .ok_or(ServerError::GrantNotVisible)?;
-        Ok(Json(grant_json(record)))
+        Ok(Json(GrantView::from(record)))
     })
 }
 
@@ -300,13 +190,13 @@ async fn issue_root(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(body): Json<RootBody>,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<RecordedView>, ServerError> {
     with_grants(&state, |judged| {
         let request = body.request(caller(&state, &headers, judged.directory)?)?;
         let recorded = judged
             .grants
             .issue_root(judged.directory, &request, now())?;
-        Ok(Json(recorded_json(&recorded)))
+        Ok(Json(RecordedView::from(&recorded)))
     })
 }
 
@@ -314,7 +204,7 @@ async fn delegate(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(body): Json<DelegateBody>,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<RecordedView>, ServerError> {
     with_grants(&state, |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
         let request = body.request(caller)?;
@@ -327,7 +217,7 @@ async fn delegate(
             },
         )?;
         match judged.grants.delegate(judged.directory, &request, now()) {
-            Ok(recorded) => Ok(Json(recorded_json(&recorded))),
+            Ok(recorded) => Ok(Json(RecordedView::from(&recorded))),
             Err(error) => Err(as_seen_by(&judged, caller, error)),
         }
     })
@@ -338,7 +228,7 @@ async fn revoke(
     headers: HeaderMap,
     Path(id): Path<String>,
     Json(body): Json<RevokeBody>,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<RecordedView>, ServerError> {
     let id = grant_id(&id)?;
     with_grants(&state, |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
@@ -352,17 +242,19 @@ async fn revoke(
             },
         )?;
         match judged.grants.revoke(&request, now()) {
-            Ok(recorded) => Ok(Json(recorded_json(&recorded))),
+            Ok(recorded) => Ok(Json(RecordedView::from(&recorded))),
             Err(error) => Err(as_seen_by(&judged, caller, error)),
         }
     })
 }
 
-async fn why(
+/// The enforcement point: the caller is about to take the action, and a
+/// permitted check records the use.
+async fn check(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(body): Json<ActionBody>,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<PermitView>, ServerError> {
     let (route, resource, action) = body.parts()?;
     with_grants(&state, |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
@@ -373,7 +265,31 @@ async fn why(
             action,
         };
         match judged.grants.check(judged.directory, &request, now(), None) {
-            Ok(permit) => Ok(Json(permit_json(&permit))),
+            Ok(permit) => Ok(Json(PermitView::from(&permit))),
+            Err(error) => Err(as_seen_by(&judged, caller, error)),
+        }
+    })
+}
+
+async fn why(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<ActionBody>,
+) -> Result<Json<PermitView>, ServerError> {
+    let (route, resource, action) = body.parts()?;
+    with_grants(&state, |judged| {
+        let caller = caller(&state, &headers, judged.directory)?;
+        let request = ExerciseRequest {
+            caller,
+            route,
+            resource,
+            action,
+        };
+        match judged
+            .grants
+            .explain(judged.directory, &request, now(), None)
+        {
+            Ok(permit) => Ok(Json(PermitView::from(&permit))),
             Err(error) => Err(as_seen_by(&judged, caller, error)),
         }
     })
@@ -383,7 +299,7 @@ async fn who(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(body): Json<WhoBody>,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<WhoPage>, ServerError> {
     if body.page_size == 0 || body.page_size > PAGE_MAX {
         return Err(ServerError::RequestMalformed {
             reason: format!("page_size is 1 to {PAGE_MAX}"),
@@ -393,55 +309,55 @@ async fn who(
     let at = now();
     with_grants(&state, |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
-        let holders: BTreeSet<IdentityId> = judged
+        let after = body.after.as_deref();
+        let mut known = HashMap::new();
+        let holders: BTreeSet<(String, IdentityId)> = judged
             .grants
             .book()
-            .records()
+            .on_resource(&resource)
             .filter(|record| {
-                record.grant().resource() == &resource
-                    && record.grant().actions().contains(&action)
-                    && sees(&judged, caller, record)
+                record.grant().actions().contains(&action)
+                    && sees_with(&judged, caller, record, &mut known)
             })
-            .map(|record| record.grant().holder())
-            .collect();
-        let after = body.after.as_deref();
-        let mut ordered: Vec<(String, IdentityId)> = holders
-            .into_iter()
-            .map(|holder| (holder.to_string(), holder))
+            .map(|record| {
+                let holder = record.grant().holder();
+                (holder.to_string(), holder)
+            })
             .filter(|(text, _)| after.is_none_or(|after| text.as_str() > after))
             .collect();
-        ordered.sort();
-        let mut page = Vec::new();
-        let mut revision = judged.grants.revision();
-        let mut remaining = ordered.into_iter();
-        for (text, holder) in remaining.by_ref() {
-            let request = ExerciseRequest {
-                caller: holder,
-                route,
-                resource: resource.clone(),
-                action: action.clone(),
-            };
-            if let Ok(permit) = judged.grants.check(judged.directory, &request, at, None) {
-                revision = permit.revision;
-                let mut answer = permit_json(&permit);
-                answer["holder"] = Value::String(text);
-                page.push(answer);
-                if page.len() == body.page_size {
-                    break;
-                }
-            }
-        }
-        let next = if remaining.next().is_some() {
-            page.last()
-                .and_then(|last| last["holder"].as_str().map(str::to_owned))
+        // A holder is on a page only when its own grant permits the action,
+        // and the page names a next holder only when a later holder permits.
+        let (page, more) = {
+            let mut permitted = holders.into_iter().filter_map(|(text, holder)| {
+                let request = ExerciseRequest {
+                    caller: holder,
+                    route,
+                    resource: resource.clone(),
+                    action: action.clone(),
+                };
+                judged
+                    .grants
+                    .explain(judged.directory, &request, at, None)
+                    .ok()
+                    .map(|permit| HolderView {
+                        holder: text,
+                        permit: PermitView::from(&permit),
+                    })
+            });
+            let page: Vec<HolderView> = permitted.by_ref().take(body.page_size).collect();
+            let more = page.len() == body.page_size && permitted.next().is_some();
+            (page, more)
+        };
+        let next = if more {
+            page.last().map(|last| last.holder.clone())
         } else {
             None
         };
-        Ok(Json(json!({
-            "holders": page,
-            "revision": revision,
-            "complete": next.is_none(),
-            "next": next,
-        })))
+        Ok(Json(WhoPage {
+            holders: page,
+            revision: judged.grants.revision(),
+            complete: next.is_none(),
+            next,
+        }))
     })
 }
