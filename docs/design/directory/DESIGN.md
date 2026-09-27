@@ -42,6 +42,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
 - ADR-010 — Every product shares one design and keeps its own accent; the identity product's is orange — The identity screens follow Aion's structure, typography, spacing and interaction, and Rauthy's client themes take the same colours, with no build dependency on Cambium or Aion. Each product keeps its own accent within the estate colour family: Cambium green, Aion blue and black, Argus light blue, Haematite mustard. The identity product's accent is orange (accent #D4975A, deep #A86B2E, wash #3D2A17 in the estate colour tokens), set apart from Manifold's copper. No product is silently made Aion-blue, and purple is not used.
 - ADR-011 — An identity is registered, active, suspended or retired — An identity is in one of four states: registered (exists in the directory, no grants, no credential handle, may not act), active (may act within its grants), suspended (kept whole, grants kept but not effective) and retired (permanent, history kept, never reactivated; a new identity is made instead). Register, activate, suspend, reinstate and retire are the only transitions, each one signed audit record naming the authenticated actor and their provenance, the identity, from, to, when and reason. Having a grant or a credential is a fact beside the state, not a state. A person is registered by first sign-in; an agent is registered by a signed-in person, who carries it as its responsible person for life and may cause every transition of their own agents. Source: docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:71-95.
+- ADR-109 — The server judges a grant's standing and effective end over its chain; the screens render them and walk nothing — GrantView carries each grant's effective standing ({stands: true}, or {stands: false, refusal, grant, reason} read through the service's sight rules, so a withheld refusal names no grant or identity the caller may not see) and its effective end, both worked out on the server by the same judgement a check makes, and every screen renders those two members and walks no chain, compares no window with the clock and reads no holder's lifecycle state to decide standing. Rejected: keeping the client chain walk beside the server's judgement, and a screen-side derivation of the effective end.
 
 ## Goals
 
@@ -165,6 +166,22 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `surface/identity/src/generated/index.ts` | Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch | DIRECTORY-006 |
 | `docs/design/directory/briefs/DIRECTORY-008.json` | the grant brief residue after PR 6: DIRECTORY-005's verification line, three inventory rows and the intention sentence, as requirements on the documents | DIRECTORY-008 |
 | `docs/design/directory/briefs/DIRECTORY-008.md` | rendered markdown | DIRECTORY-008 |
+| `docs/design/directory/briefs/DIRECTORY-035.json` | the grant conformance rows of the directory, each named to the test that passes it | DIRECTORY-035 |
+| `docs/design/directory/briefs/DIRECTORY-035.md` | rendered markdown | DIRECTORY-035 |
+| `crates/lys-identity-server/src/grant_contract/views.rs` | the grant view the screens read; DIRECTORY-035 adds each grant's effective standing and effective end | DIRECTORY-035 |
+| `crates/lys-identity/tests/grant_last_used.rs` | the last-used tests of conformance 8.4, named by their row under DIRECTORY-035 | DIRECTORY-035 |
+| `surface/identity/src/generated/grants.ts` | the grant wire types the screens compile against, mirroring views.rs; gains the two effective fields | DIRECTORY-035 |
+| `surface/identity/src/features/grants/model.ts` | the grant screens' reading of the service's answers; loses the client standing walk | DIRECTORY-035 |
+| `surface/identity/src/features/grants/GrantCard.tsx` | one grant with its chain, window, last use and standing (conformance 8.4) | DIRECTORY-035 |
+| `surface/identity/src/features/grants/Delegate.tsx` | the delegation form (conformance 2.3): source grant, actions, may-pass-on and the end bound | DIRECTORY-035 |
+| `surface/identity/src/features/me/You.tsx` | the You page: What you hold (conformance 1.4) and the personal scope of conformance 1.5 | DIRECTORY-035 |
+| `surface/identity/src/features/access/Access.tsx` | the access screens that list grants with their standing and last use | DIRECTORY-035 |
+| `surface/identity/src/features/file/sections.tsx` | an identity file's sections that read which grants stand | DIRECTORY-035 |
+| `surface/identity/tests/fixtures.ts` | the vitests' fixture service answers | DIRECTORY-035 |
+| `surface/identity/tests/me.test.tsx` | the You vitests, carrying row 1.5's test | DIRECTORY-035 |
+| `surface/identity/tests/revoke.test.tsx` | the Revoke vitests, carrying row 2.5's screen test | DIRECTORY-035 |
+| `docs/design/project.json` | the project's trees and legs; DIRECTORY-035 registers the surface leg | DIRECTORY-035 |
+| `docs/design/identity/CONFORMANCE.md` | the identity conformance table; DIRECTORY-035 amends the Brief cell of rows 1.4, 1.5, 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4 | DIRECTORY-035 |
 
 ## Inventory
 

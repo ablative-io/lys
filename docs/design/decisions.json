@@ -325,6 +325,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-109",
+      "title": "The server judges a grant's standing and effective end over its chain; the screens render them and walk nothing",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-28",
+      "decided_by": "The lead for the identity line, in answer to the grant-rows conformance survey; recorded with DIRECTORY-035",
+      "context": "The identity screens decided whether a grant stands by walking its chain in the browser (model.ts standing(), with its own clock), while the service decides the same question when a grant is exercised. Two judges of one fact can disagree, and a conformance row proven on the screen would then prove the screen's opinion rather than the service's answer.",
+      "decision": "GrantView carries each grant's effective standing ({stands: true}, or {stands: false, refusal, grant, reason} read through the service's sight rules, so a withheld refusal names no grant or identity the caller may not see) and its effective end, both worked out on the server by the same judgement a check makes, and every screen renders those two members and walks no chain, compares no window with the clock and reads no holder's lifecycle state to decide standing. Rejected: keeping the client chain walk beside the server's judgement, and a screen-side derivation of the effective end.",
+      "quote": "",
+      "consequences": [
+        "Any screen that shows whether a grant stands reads GrantView.standing and nothing else; a client standing derivation is a review finding.",
+        "The two members are the only wire addition; no route, request body or query parameter is added for them, and the grant envelope, log leaves and receipts do not change.",
+        "Because admission refuses a derived grant that ends after any end on its chain, effective_ends_at is the grant's own end or null; a change to that admission rule must revisit this member."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
