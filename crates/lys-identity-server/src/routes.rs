@@ -17,7 +17,10 @@ use lys_log_store::FileLeafStore;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
+use lys_identity::signer::load_service_key;
+
 use crate::admission::{AUTHORITY, Admission};
+use crate::config::Config;
 use crate::error::ServerError;
 use crate::oidc::Oidc;
 use crate::session::{Sessions, now};
@@ -35,6 +38,30 @@ pub struct AppState {
 }
 
 type Shared = Arc<AppState>;
+
+/// Open the directory, discover the issuer and answer the service's routes,
+/// as `config` says. The log is created when its directory does not exist.
+pub async fn service(config: &Config) -> Result<Router, ServerError> {
+    if !config.log_dir.exists() {
+        FileLeafStore::create(&config.log_dir, &config.log_origin).map_err(|error| {
+            ServerError::ConfigInvalid {
+                reason: format!("the log could not be created: {error}"),
+            }
+        })?;
+    }
+    let log_dir = config.log_dir.clone();
+    let reopen = Box::new(move || FileLeafStore::open(&log_dir));
+    let directory = Directory::open(reopen, load_service_key(&config.event_key_file)?)?;
+    Ok(router(Arc::new(AppState {
+        directory: Mutex::new(directory),
+        oidc: Oidc::discover(config).await?,
+        sessions: Sessions::new(config.session_seconds, config.secure_cookie),
+        admission: Admission::new(
+            config.administrator_binding()?,
+            config.link_audit_binding()?,
+        ),
+    })))
+}
 
 /// The service's routes over `state`.
 pub fn router(state: Shared) -> Router {

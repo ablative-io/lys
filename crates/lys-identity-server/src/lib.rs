@@ -16,4 +16,4 @@ pub mod session;
 
 pub use config::Config;
 pub use error::ServerError;
-pub use routes::{AppState, router};
+pub use routes::{AppState, router, service};
