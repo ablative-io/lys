@@ -310,33 +310,6 @@ impl SpiceDb {
         }
         Ok(body.contains("PERMISSIONSHIP_HAS_PERMISSION"))
     }
-
-    /// Delete the mirror: every relationship of every kind, and its revision.
-    /// The grant log is untouched, and the next projection writes it again.
-    pub fn clear(&self) -> Result<(), GrantError> {
-        let kinds = self.kinds()?;
-        let every = kinds
-            .iter()
-            .map(String::as_str)
-            .chain(["grant", "lys_mirror"]);
-        for kind in every {
-            let filter = if kind == "lys_mirror" {
-                json!({"resourceType": kind, "optionalResourceId": self.mirror})
-            } else {
-                json!({"resourceType": kind})
-            };
-            let (status, body) = self.call(
-                "/v1/relationships/delete",
-                &json!({"relationshipFilter": filter}),
-            )?;
-            if status != 200 {
-                return Err(unavailable(format!(
-                    "the mirror could not be cleared: {body}"
-                )));
-            }
-        }
-        Ok(())
-    }
 }
 
 impl RelationshipStore for SpiceDb {
