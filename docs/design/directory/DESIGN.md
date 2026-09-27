@@ -193,9 +193,9 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity/tests/start_machine_role.rs` | R5 test: check that the machine is allowed for the role, from the role's machines in the roles card's record | DIRECTORY-029 |
 | `crates/lys-identity/src/start/credentials.rs` | its virtual credentials are valid, read from SECRETS-002's handle record; ids only | DIRECTORY-029 |
 | `crates/lys-identity/tests/start_credentials.rs` | R6 test: check that the agent's virtual credentials are valid, from the door's handle record | DIRECTORY-029 |
-| `crates/lys-identity-server/src/door_handles.rs` | the HandleRecords client of the door's handle-resolving endpoint (SECRETS-002 R1); ids and validity only; wired into the start route by R12 | DIRECTORY-029 |
-| `crates/lys-identity-server/tests/door_handles.rs` | R6 test: the HandleRecords door client against a local stub of the door's handle read shape; ids and validity only, no credential value carried on | DIRECTORY-029 |
-| `crates/lys-identity-server/examples/door_handles.rs` | R6 verification: asks the door client for one agent at a given door address and prints its answer | DIRECTORY-029 |
+| `crates/lys-identity-server/src/door_handles.rs` | the HandleRecords client of the door's handle-resolving endpoint (SECRETS-002 R1); ids and validity only, and an answer carrying a credential value is refused by name as credential_value_in_answer; wired into the start route by R12 | DIRECTORY-029 |
+| `crates/lys-identity-server/tests/door_handles.rs` | R6 test: the HandleRecords door client against a local stub of the door's handle read shape; ids and validity for an answer without a value, and the credential_value_in_answer refusal for an answer with one | DIRECTORY-029 |
+| `crates/lys-identity-server/examples/door_handles.rs` | R6 verification: reads the door's handle records through the same client for a given door address and agent, and prints credential ids and counts only, never a value | DIRECTORY-029 |
 | `crates/lys-identity/src/start/egress.rs` | the machine may reach what the profile needs, read from row 8.5's egress list | DIRECTORY-029 |
 | `crates/lys-identity/tests/start_egress.rs` | R7 test: check that the machine may reach what the profile needs, from its egress list | DIRECTORY-029 |
 | `crates/lys-identity/src/start/profile_command.rs` | the executable, its arguments and the working directory read from the reviewed profile version through the ProfileVersionRecords seam over Ink1H1Os's record | DIRECTORY-029 |

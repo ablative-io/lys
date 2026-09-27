@@ -695,17 +695,17 @@
     },
     {
       "path": "crates/lys-identity-server/src/door_handles.rs",
-      "note": "the HandleRecords client of the door's handle-resolving endpoint (SECRETS-002 R1); ids and validity only; wired into the start route by R12",
+      "note": "the HandleRecords client of the door's handle-resolving endpoint (SECRETS-002 R1); ids and validity only, and an answer carrying a credential value is refused by name as credential_value_in_answer; wired into the start route by R12",
       "brief": "DIRECTORY-029"
     },
     {
       "path": "crates/lys-identity-server/tests/door_handles.rs",
-      "note": "R6 test: the HandleRecords door client against a local stub of the door's handle read shape; ids and validity only, no credential value carried on",
+      "note": "R6 test: the HandleRecords door client against a local stub of the door's handle read shape; ids and validity for an answer without a value, and the credential_value_in_answer refusal for an answer with one",
       "brief": "DIRECTORY-029"
     },
     {
       "path": "crates/lys-identity-server/examples/door_handles.rs",
-      "note": "R6 verification: asks the door client for one agent at a given door address and prints its answer",
+      "note": "R6 verification: reads the door's handle records through the same client for a given door address and agent, and prints credential ids and counts only, never a value",
       "brief": "DIRECTORY-029"
     },
     {
