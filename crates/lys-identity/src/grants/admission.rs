@@ -9,9 +9,11 @@
 //! only by an affirmative pass-on member of the source grant.
 
 use super::error::GrantError;
+use super::expiry::within_window;
 use super::lineage::{Lineage, check_end};
 use super::model::Model;
 use super::projection::GrantBook;
+use super::revocation::unrevoked;
 use super::types::{
     Grant, GrantId, GrantParts, PassOn, RecipientKind, Relation, Resource, Source, Window,
 };
@@ -140,34 +142,12 @@ pub fn effective(
     at: u64,
 ) -> Result<Lineage, GrantError> {
     let lineage = book.lineage(grant)?;
-    for id in &lineage.path {
-        let record = book.record(*id).ok_or_else(|| GrantError::SourceUnknown {
-            grant: id.to_string(),
-        })?;
-        if record.revoked().is_some() {
-            return Err(GrantError::Revoked {
-                grant: id.to_string(),
-            });
-        }
-    }
-    if let Some((ended_at, by)) = lineage.ends
-        && at >= ended_at
-    {
-        return Err(GrantError::Expired {
-            grant: by.to_string(),
-            ended_at,
-        });
-    }
+    unrevoked(book, &lineage)?;
+    within_window(book, &lineage, at)?;
     for id in &lineage.path {
         let held = book.grant(*id).ok_or_else(|| GrantError::SourceUnknown {
             grant: id.to_string(),
         })?;
-        if at < held.window().starts_at() {
-            return Err(GrantError::NotStarted {
-                grant: id.to_string(),
-                starts_at: held.window().starts_at(),
-            });
-        }
         active(directory, held.holder())?;
         responsible_is(directory, held.holder(), held.responsible())?;
     }
@@ -280,40 +260,4 @@ pub fn judge_delegation(
         model_version: within.model_version,
         operation: request.operation,
     })
-}
-
-/// Refuse a revocation unless `caller` issued the grant, holds a grant it
-/// derives from, or is the root authority.
-pub fn judge_revoke(
-    book: &GrantBook,
-    root_authority: PersonId,
-    caller: IdentityId,
-    grant: GrantId,
-) -> Result<(), GrantError> {
-    let record = book.record(grant).ok_or_else(|| GrantError::GrantUnknown {
-        grant: grant.to_string(),
-    })?;
-    if record.revoked().is_some() {
-        return Err(GrantError::AlreadyRevoked {
-            grant: grant.to_string(),
-        });
-    }
-    if caller == IdentityId::Person(root_authority) || record.grant().parts().issuer == caller {
-        return Ok(());
-    }
-    let lineage = book.lineage(grant)?;
-    let holds_ancestor = lineage
-        .path
-        .iter()
-        .skip(1)
-        .filter_map(|ancestor| book.grant(*ancestor))
-        .any(|ancestor| ancestor.holder() == caller);
-    if holds_ancestor {
-        Ok(())
-    } else {
-        Err(GrantError::RevokeRefused {
-            caller: caller.to_string(),
-            grant: grant.to_string(),
-        })
-    }
 }
