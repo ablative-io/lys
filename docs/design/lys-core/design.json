@@ -3,7 +3,7 @@
   "title": "Lys Core — a certificate is self-signed by its keys, and the chain verifier says what it leaves to the caller",
   "intention": "A stranger holding a lys certificate and an authority's public key should get the same answer from lys-core as from reading the certificate by hand: who really signed it, and whether it is one the authority issued. Whether a certificate is self-signed is a fact about keys and a signature, never about a name, so a subject that happens to carry the authority's hex-key common name is judged on the key that really signed it.\n\nThe verifier should also say plainly what it proves and what it does not. A caller reading the documentation of verify_certificate_chain should learn, without reading the code, which checks ran and which questions (revocation, trust in the issuer key, possession of the subject key, anything above one level, what extensions mean) are still theirs to answer.",
   "problem": "verify_certificate_chain_at (crates/lys-core/src/ca/authority.rs) decides \"self-signed\" by comparing the raw subject and issuer distinguished-name bytes, before the algorithm and signature checks. The authority writes its issuer name as the lowercase hex of its public key, so a certificate the authority legitimately issues to a subject named with that same hex string has byte-identical names and is refused, even though its signature verifies under the authority's key. The rustdoc already records this as a known false positive of a heuristic. In the other direction, a certificate whose subject key is the issuer's own key and whose signature verifies under it (for example one issued by issue_certificate_for_request over a request made with the authority's own key) carries different names and verifies today, although it is self-signed by keys. The published lys CLI (lys ca verify, lys verify --cert), lys-anchor admission and the Norn runtime's MCP boundary all inherit both errors.\n\nSeparately, verify_certificate_chain's rustdoc is two lines that defer to the _at form and never says what is left to the caller. The revocation brief (DIRECTORY-013) records that gap as owned by its own card, and its fold calls verify_certificate_chain_at, so the order of the two cards matters.",
-  "solution": "One change in lys-core's ca/authority.rs, landed whole through the chain after DIRECTORY-013 has landed (ADR-045).\n\nThe distinguished-name comparison is removed. After the signature has verified strictly under the supplied issuer key, the verifier reads the certificate's subject public key and compares it with the supplied issuer key as decoded Ed25519 curve points; when they are the same point the certificate is self-signed and is refused with a CertificateVerification reason that says so (ADR-044). Placing the judgement after verify_strict makes it exactly the words' definition (same key and the signature verifies under that key), and comparing decoded points rather than raw bytes means a non-canonical encoding of the issuer's point is still the issuer's key. A subject key that is not a readable 32-byte Ed25519 key, or does not decode to a point, is not the issuer's key. The check order is otherwise unchanged: parse, Ed25519 algorithm, signature length, issuer-key decoding, strict signature, self-signed, validity window.\n\nThe rustdoc of the free verify_certificate_chain carries the caveat in full: what it checks, and what it leaves to the caller. verify_certificate_chain_at and CertificateAuthority::verify_certificate_chain describe the key-based rule, drop every mention of the name heuristic, and point to that caveat. The doc links only to items present in both feature shapes.\n\nConsumers see the change directly. lys ca verify and lys verify --cert exit 0 for the hex-common-name certificate and exit 1 for a certificate self-signed by keys; their failure message stays the one non-oracle line. lys-anchor's admission module doc keeps saying it rejects self-signed certificates, now defined by keys. DIRECTORY-013's fold issues a legitimately issued hex-common-name leaf and still records certificate_chain_invalid for a leaf self-signed by keys. CHANGELOG's Unreleased section records both changes. No crates.io release is cut (ADR-045). No wire format, domain tag or issuance field changes (CN1, CN4).",
+  "solution": "One change in lys-core's ca/authority.rs, landed whole through the chain after DIRECTORY-013 has landed (ADR-045).\n\nThe distinguished-name comparison is removed. After the signature has verified strictly under the supplied issuer key, the verifier reads the certificate's subject public key and compares it with the supplied issuer key as decoded Ed25519 curve points; when they are the same point the certificate is self-signed and is refused with a CertificateVerification reason that says so (ADR-044). Placing the judgement after verify_strict makes it exactly the words' definition (same key and the signature verifies under that key), and comparing decoded points rather than raw bytes means a non-canonical encoding of the issuer's point is still the issuer's key. A subject key that is not a readable 32-byte Ed25519 key, or does not decode to a point, is not the issuer's key. The check order is otherwise unchanged: parse, Ed25519 algorithm, signature length, issuer-key decoding, strict signature, self-signed, validity window.\n\nThe rustdoc of the free verify_certificate_chain carries the caveat in full: what it checks, and what it leaves to the caller. verify_certificate_chain_at and CertificateAuthority::verify_certificate_chain describe the key-based rule, drop every mention of the name heuristic, and point to that caveat. The doc links only to items present in both feature shapes.\n\nConsumers see the change directly. lys ca verify and lys verify --cert exit 0 for the hex-common-name certificate and exit 1 for a certificate self-signed by keys; their failure message stays the one non-oracle line. lys-anchor's admission module doc keeps saying it rejects self-signed certificates, now defined by keys. DIRECTORY-013's fold issues a legitimately issued hex-common-name leaf and still records certificate_chain_invalid for a leaf self-signed by keys. CHANGELOG's Unreleased section records both changes. No crates.io release is cut (ADR-045). No wire format, domain tag or issuance field changes (CN1, CN4).\n\nThe record follows the older design rather than replacing it. The hand-written DESIGN.md, CHECKLIST.md and USER-STORIES.md (C1 to C65, S1 to S23) are first carried into design.json, checklist.json and stories.json by their own card, and this brief's build waits for it. The brief then restates C23 in the carried checklist, adds C66 to C74 after C65, finds S5 and S11 already carried, restates the carried design's self-signed sentence with the key-based definition, and commits the render, which keeps every other carried item as it was.",
   "principles": [
     {
       "id": "P1",
@@ -33,7 +33,8 @@
     "A certificate the authority issues to the subject named by its own lowercase-hex public key verifies under the authority's key and is refused under any other key, in lys-core and through lys ca verify and lys verify --cert.",
     "A certificate whose subject key is the supplied issuer key and whose signature verifies under it is refused with the reason 'self-signed certificate rejected (subject key is the issuer key)'.",
     "The rustdoc of verify_certificate_chain names every check it makes and every question it leaves to the caller, and both cargo doc shapes build with no warning.",
-    "DIRECTORY-013's fold issues a legitimately issued hex-common-name leaf and records certificate_chain_invalid for a leaf self-signed by keys."
+    "DIRECTORY-013's fold issues a legitimately issued hex-common-name leaf and records certificate_chain_invalid for a leaf self-signed by keys.",
+    "docs/design/lys-core/checklist.json holds C1 to C74 in order, the carried C1 to C65 unchanged but for C23, and sh scripts/design/gate.sh exits 0."
   ],
   "non_goals": [
     {
@@ -60,12 +61,12 @@
   "structure": [
     {
       "path": "docs/design/lys-core/design.json",
-      "note": "this design",
+      "note": "this design; R7 restates the carried design's self-signed sentence",
       "brief": "LYSCORE-001"
     },
     {
       "path": "docs/design/lys-core/checklist.json",
-      "note": "the checklist rows LYSCORE-001 delivers",
+      "note": "the checklist rows LYSCORE-001 delivers; R7 adds them to the carried checklist",
       "brief": "LYSCORE-001"
     },
     {
@@ -76,6 +77,16 @@
     {
       "path": "docs/design/lys-core/briefs/LYSCORE-001.json",
       "note": "the brief: self-signed by keys, the verifier's caveat, and their consumers",
+      "brief": "LYSCORE-001"
+    },
+    {
+      "path": "docs/design/lys-core/DESIGN.md",
+      "note": "rendered from design.json; R7 commits the render",
+      "brief": "LYSCORE-001"
+    },
+    {
+      "path": "docs/design/lys-core/CHECKLIST.md",
+      "note": "rendered from checklist.json; R7 commits the render",
       "brief": "LYSCORE-001"
     },
     {
