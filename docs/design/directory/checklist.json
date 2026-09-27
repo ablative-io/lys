@@ -186,7 +186,7 @@
       "items": [
         {
           "id": "C303",
-          "text": ".land/gates.sh runs the surface's test command as a leg that fails by name when npm is missing, and the design's gate array measures the same surface leg.",
+          "text": ".land/gates.sh runs the surface's test command as a leg that fails by name when npm is missing, and the project setup's trees, with the design's gate array copying them, measure surface/identity by npm ci and npm test.",
           "done": false
         },
         {
@@ -206,7 +206,7 @@
         },
         {
           "id": "C307",
-          "text": "Every element with a click action is a button or a link, or has tabindex 0 and dispatches one click on Enter and Space, palette rows included.",
+          "text": "Every element with a click action is a button or a link, or has tabindex 0 and dispatches one click on Enter and Space, palette rows included, with no caller under surface/identity/src/features changed.",
           "done": false
         },
         {
@@ -221,7 +221,7 @@
         },
         {
           "id": "C310",
-          "text": "A Tab walk over every built route reaches every element with a click action and activates each with Enter and, for non-links, Space, with a non-zero count asserted.",
+          "text": "A Tab walk over every built route, driven by @testing-library/user-event, reaches every element with a click action other than those in a closed layer (the closed palette's rows, walked instead with the palette open) and the two dismiss backdrops, and activates each with Enter and, for non-links, Space, with a non-zero count asserted.",
           "done": false
         },
         {

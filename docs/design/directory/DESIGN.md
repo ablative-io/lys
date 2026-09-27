@@ -176,9 +176,10 @@ DIRECTORY-037 builds the shell to the mock-up on the surface pull request 35 lan
 | `docs/design/directory/briefs/DIRECTORY-037.json` | the identity surface shell brief: the route table, the two keyboard gaps closed in the shell and the mock-up, and the gate leg | DIRECTORY-037 |
 | `docs/design/directory/briefs/DIRECTORY-037.md` | rendered markdown | DIRECTORY-037 |
 | `.land/gates.sh` | the repository gate; DIRECTORY-037 adds the surface's test leg |  |
-| `surface/identity/package.json` | the surface package, arriving with pull request 35 (DIRECTORY-005); DIRECTORY-037 adds @testing-library/user-event as a development dependency | DIRECTORY-005 |
+| `docs/design/project.json` | the project setup the design's gate array copies; DIRECTORY-037 adds the surface/identity tree with its measured legs npm ci and npm test |  |
+| `surface/identity/package.json` | the surface package, arriving with pull request 35 (DIRECTORY-005); DIRECTORY-037 adds @testing-library/user-event 14.6.7 and its peer @testing-library/dom 10.4.2 as development dependencies | DIRECTORY-005 |
 | `surface/identity/package-lock.json` | the surface lock file, arriving with pull request 35 (DIRECTORY-005); follows package.json | DIRECTORY-005 |
-| `surface/identity/src/shell/keyable.ts` | makes a non-button click action focusable and answer Enter and Space; arrives with pull request 35, DIRECTORY-037 makes it dispatch the click | DIRECTORY-005 |
+| `surface/identity/src/shell/keyable.ts` | makes a non-button click action focusable and answer Enter and Space; arrives with pull request 35, DIRECTORY-037 keeps keyable(activate) and makes Enter and Space dispatch the click that runs it | DIRECTORY-005 |
 | `surface/identity/src/shell/Palette.tsx` | the command palette; arrives with pull request 35, DIRECTORY-037 makes its rows keyboard-reachable | DIRECTORY-005 |
 | `surface/identity/src/shell/keys.ts` | the shell key registry; arrives with pull request 35, DIRECTORY-037 makes j and k move focus and Enter open the focused row | DIRECTORY-005 |
 | `surface/identity/src/shell/routeTable.ts` | the one table of every screen and tab route, with its built column | DIRECTORY-037 |

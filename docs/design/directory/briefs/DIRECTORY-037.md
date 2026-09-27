@@ -16,14 +16,14 @@ title: Build the identity surface's shell to the mock-up and close its two keybo
 > - ADR-010 — Every product shares one design and keeps its own accent; the identity product's is orange — The identity screens follow Aion's structure, typography, spacing and interaction, and Rauthy's client themes take the same colours, with no build dependency on Cambium or Aion. Each product keeps its own accent within the estate colour family: Cambium green, Aion blue and black, Argus light blue, Haematite mustard. The identity product's accent is orange (accent #D4975A, deep #A86B2E, wash #3D2A17 in the estate colour tokens), set apart from Manifold's copper. No product is silently made Aion-blue, and purple is not used.
 > - ADR-104 — The shell and its mock-up change together, and a corrected mock-up is a new version beside the prior — A change to the shell's behaviour is made in the built shell and in the mock-up in the same change, and the corrected mock-up is written as a new file, index.v6.html, beside the prior, the way v4 was kept beside v5; CONFORMANCE.md's reference line and DIRECTORY-006's pin move to the new file in that change. Rejected: fixing only the build, which lets the definition drift from what is built; and editing index.v5.html in place, which moves a pinned hash under the briefs that cite it.
 > **Checklist:**
-> - C303 — .land/gates.sh runs the surface's test command as a leg that fails by name when npm is missing, and the design's gate array measures the same surface leg.
+> - C303 — .land/gates.sh runs the surface's test command as a leg that fails by name when npm is missing, and the project setup's trees, with the design's gate array copying them, measure surface/identity by npm ci and npm test.
 > - C304 — One route table names the 14 rail screens and the 30 hash-routed tabs with a built column, and the tests fail by name on a built row the shell does not serve.
 > - C305 — The rail toggles by its button and by [, kept under iam.labels across a reload, and the dock side switches by the Configuration Layout segment, by the palette act and by \, kept under iam.dock, with the layout flipped.
 > - C306 — The palette Go to entries and the fourteen g go-to letters reach every rail screen.
-> - C307 — Every element with a click action is a button or a link, or has tabindex 0 and dispatches one click on Enter and Space, palette rows included.
+> - C307 — Every element with a click action is a button or a link, or has tabindex 0 and dispatches one click on Enter and Space, palette rows included, with no caller under surface/identity/src/features changed.
 > - C308 — j and k move focus with the cursor without replacing the screen, and Enter opens the focused row.
 > - C309 — The help overlay places one numbered mark per explained element and states the count, swallows its dismissing click, and returns focus on Escape to the element that had it.
-> - C310 — A Tab walk over every built route reaches every element with a click action and activates each with Enter and, for non-links, Space, with a non-zero count asserted.
+> - C310 — A Tab walk over every built route, driven by @testing-library/user-event, reaches every element with a click action other than those in a closed layer (the closed palette's rows, walked instead with the palette open) and the two dismiss backdrops, and activates each with Enter and, for non-links, Space, with a non-zero count asserted.
 > - C311 — index.v6.html sits beside index.v5.html and differs from it by the focus fix and the keyboard fix only, each proved against v6 and shown failing on v5.
 > - C312 — CONFORMANCE.md line 3 names index.v6.html as the reference, and DIRECTORY-006's GRANT_CONFORMANCE line pins index.v6.html by its sha256.
 > **Stories:**
@@ -42,7 +42,7 @@ The shell is defined by docs/design/identity/mockup/index.v5.html and the built 
 
 The two gaps, as the tree has them. Focus: v5's explainOff (1449) selects [data-act="explain"], or #screen, not the element that had focus, so opening the overlay with ? (1466) does not return focus. Keyboard: KEYABLE (1558-1562) already covers the table rows at 1065, 1072 and 1367, but not the network map's node g.gn[data-act=node] (1362) nor the palette's div rows (1103); Enter at 1133 opens the cursor row rather than the focused one; and j and k (1132) move the cursor by re-rendering the screen without moving focus. Each fix is made in the built shell (R5, R6, with R7 proving the focus return the built shell already has) and in the mock-up (R9), and each has its acceptance line in both.
 
-In: the gate leg (R1); the route table and its checks (R2); the proof of the rail and dock side (R3) and of the palette and go-to keys (R4); Enter and Space on every click action, palette rows included (R5); the cursor moving focus (R6); the overlay's count, dismissal and focus return (R7); the Tab walk (R8); index.v6.html (R9); and naming v6 as the reference, with DIRECTORY-006's GRANT_CONFORMANCE pin moved to it (R10). Out: the contents of every screen, which do not change; building any screen the route table marks not yet; the assistant's composer, whose place in the dock holds a not-yet note naming row 9.4 as proposed, as pull request 35 has it; the Brief cells of CONFORMANCE.md rows 9.1 to 9.3; and a digit key for the file's eighth tab.
+In: the gate leg and the project setup's surface tree, copied into the design's gate array (R1); the route table and its checks (R2); the proof of the rail and dock side (R3) and of the palette and go-to keys (R4); Enter and Space on every click action, palette rows included (R5); the cursor moving focus (R6); the overlay's count, dismissal and focus return (R7); the Tab walk (R8); index.v6.html (R9); and naming v6 as the reference, with DIRECTORY-006's GRANT_CONFORMANCE pin moved to it (R10). Out: the contents of every screen, which do not change; building any screen the route table marks not yet; the assistant's composer, whose place in the dock holds a not-yet note naming row 9.4 as proposed, as pull request 35 has it; the Brief cells of CONFORMANCE.md rows 9.1 to 9.3; and a digit key for the file's eighth tab.
 
 The route table's built column is set from what main draws when this card lands. At 6f57bf7 that is the You, People and agents, Access and Configuration screens, the eight file tabs, the three Access modes and Configuration's Layout section. Configuration keeps rendering surface/identity/src/features/notyet/Settings.tsx: its row is marked built with a note that only Layout is built, and its other six sections are marked not yet, with the same note, because Settings.tsx shows them as not built yet inside the screen; their route is left as it stands. IF main draws a further screen or tab by the time this builds, the build stops and names it before marking it (CN9).
 
@@ -50,22 +50,26 @@ Tests run under the surface's own vitest and jsdom configuration. jsdom lays not
 
 ## Requirements
 
-### R1: Run the surface's test command as a leg of the repository gate
+### R1: Run the surface's test command as a leg of the repository gate and of the project setup's measured trees
 
-THE SYSTEM SHALL add to .land/gates.sh one leg, surface_leg, that runs npm ci and then npm test, both with surface/identity as the package directory, and counts the leg's exit status toward the gate's as every other leg's is counted, so the surface's test command runs on every landing. Beside it, the cluster design's gate array carries the same measurement as a surface leg for the tree surface/identity, the command npm install-ci-test (npm ci followed by npm test) with exit 0 expected, so a card_build round measures the surface as the landing does. The leg needs node on the build venue, checked by node --version printing a version; a venue without node is a blocker to fix on the venue and SHALL NOT be a reason to leave the surface unmeasured. IF npm is not on the PATH, THEN THE SYSTEM SHALL fail the leg with a line beginning surface_npm_missing: and SHALL NOT skip it. The leg SHALL NOT be scoped away by a changed-path filter, and no existing leg SHALL be removed, reordered or changed. This is the gate the tests of R2 to R9 run in; they are written in surface/identity/tests, where the surface's vitest configuration already looks.
+THE SYSTEM SHALL add to .land/gates.sh one leg, surface_leg, that runs npm ci and then npm test, both with surface/identity as the package directory, and counts the leg's exit status toward the gate's as every other leg's is counted, so the surface's test command runs on every landing. Beside it, THE SYSTEM SHALL add to the trees of docs/design/project.json one tree, surface/identity, whose measured legs are npm ci and then npm test, each with exit 0 expected, so a card_build round measures the surface as the landing does; and SHALL copy the project setup's trees, both of them, into docs/design/directory/design.json's gate array verbatim, re-rendering docs/design/directory/DESIGN.md, so the design copies the project setup again and carries no leg of its own. The legs need node on the build venue, checked by node --version printing a version; a venue without node is a blocker to fix on the venue and SHALL NOT be a reason to leave the surface unmeasured. IF npm is not on the PATH, THEN THE SYSTEM SHALL fail surface_leg with a line beginning surface_npm_missing: and SHALL NOT skip it. The leg SHALL NOT be scoped away by a changed-path filter, and no existing leg or tree SHALL be removed, reordered or changed. This is the gate the tests of R2 to R9 run in; they are written in surface/identity/tests, where the surface's vitest configuration already looks.
 
 **Acceptance:**
 - grep -c '^leg surface_leg$' .land/gates.sh prints 1, and git diff <base> -- .land/gates.sh, where <base> is the commit the build started from, shows added lines only.
 - With one assertion in surface/identity/tests/routes.test.tsx changed to expect a wrong row count, sh .land/gates.sh prints '--- status 1: surface_leg ---' and exits 1; with the assertion restored it prints '--- status 0: surface_leg ---'.
 - Run with a PATH that holds no npm, surface_leg prints a line beginning 'surface_npm_missing:' and its status line reads '--- status 1: surface_leg ---'.
-- On the build venue, node --version prints one line matching ^v[0-9]+\.[0-9]+\.[0-9]+$, and npm install-ci-test run in surface/identity exits 0.
-- docs/design/directory/design.json's gate array holds an entry whose tree is surface/identity with one leg named surface, command npm install-ci-test, cadence round, requiring tool:node and tool:npm.
+- On the build venue, node --version prints one line matching ^v[0-9]+\.[0-9]+\.[0-9]+$, and npm ci then npm test, run in surface/identity, each exit 0.
+- docs/design/project.json's trees hold two entries: the first equal to its entry at <base>, and the second whose tree is surface/identity with exactly two legs, the first with command npm ci and the second with command npm test, each with cadence round and requiring tool:node and tool:npm.
+- A python comparison prints True for json.load of docs/design/project.json's trees equal to json.load of docs/design/directory/design.json's gate, and python3 scripts/design/validate.py docs/design/project.json exits 0.
 
 **Files:**
 - modify: .land/gates.sh
+- modify: docs/design/project.json
+- modify: docs/design/directory/design.json
+- modify: docs/design/directory/DESIGN.md
 
 **Checklist:**
-- C303 — .land/gates.sh runs the surface's test command as a leg that fails by name when npm is missing, and the design's gate array measures the same surface leg.
+- C303 — .land/gates.sh runs the surface's test command as a leg that fails by name when npm is missing, and the project setup's trees, with the design's gate array copying them, measure surface/identity by npm ci and npm test.
 
 **Stories:**
 - S135 (Identity line lead, Keeping the mock-up and the build in step) — As the identity line lead, I want the mock-up and the built shell to change together and the proof to run in the gate, so that the mock-up stays the definition the build is held to.
@@ -132,13 +136,16 @@ WHEN a person chooses a Go to entry in the palette, THE SYSTEM SHALL route to th
 
 ### R5: Make every click action answer Enter and Space, palette rows included
 
-THE SYSTEM SHALL make every element that acts on a click a button or a link, or give it tabindex 0 and role button and make Enter and Space dispatch one click on that element, as the mock-up's KEYABLE rule does (index.v5.html:1558-1562). The shared helper surface/identity/src/shell/keyable.ts SHALL do this by dispatching the click, so the element's own click action runs, and SHALL NOT call a separate copy of the action. WHILE the palette is open, THE SYSTEM SHALL make each palette row (index.v5.html:1103) reachable by Tab from the palette's input, and WHEN Enter or Space is pressed on a focused row, SHALL choose that row and SHALL NOT choose the row the arrow selection marks. The arrow keys and Enter in the palette's input SHALL keep working as they do.
+THE SYSTEM SHALL make every element that acts on a click a button or a link, or give it tabindex 0 and role button and make Enter and Space dispatch one click on that element, as the mock-up's KEYABLE rule does (index.v5.html:1558-1562). The shared helper surface/identity/src/shell/keyable.ts SHALL keep its signature keyable(activate): it SHALL return the element's click handler as onClick, set to activate, beside tabIndex 0, role button and a key handler that, on Enter and Space, dispatches one click on the element itself, so activate runs once through that click; the key handler SHALL NOT call activate directly. Every caller that passes activate spreads keyable's props after its own onClick with the same action, so keyable's onClick is the one the element carries, and no caller SHALL change: the calls at surface/identity/src/features/people/People.tsx, features/me/You.tsx, features/access/Access.tsx, features/grants/Delegate.tsx and shell/Dock.tsx stay as they are, and activate is not left a dead parameter. WHILE the palette is open, THE SYSTEM SHALL make each palette row (index.v5.html:1103), each a div.it carrying data-n inside #palette in surface/identity/src/shell/Palette.tsx, reachable by Tab from the palette's input, and WHEN Enter or Space is pressed on a focused row, SHALL choose that row and SHALL NOT choose the row the arrow selection marks. The arrow keys and Enter in the palette's input SHALL keep working as they do. WHILE the palette is closed, its rows stay rendered, #palette SHALL keep aria-hidden true and #palIn tabindex -1 as Palette.tsx has them on the tree this builds on, and the rows SHALL NOT be reachable by Tab.
 
 **Acceptance:**
+- Rendered with an action that counts its calls, keyable(action)'s props on a div give the div tabIndex 0 and role button; Enter on the focused div counts one click event on the div and one call of the action, and Space counts the same; a mouse click counts one click and one call.
 - Enter on a focused People row dispatches exactly one click on that row, counted by a click listener on the row, and routes to that row's #/file/<id>; Space does the same.
+- git diff <base> --stat -- surface/identity/src/features surface/identity/src/shell/Dock.tsx prints nothing.
 - With the palette open and at least two rows listed, ArrowDown in #palIn marks the second row selected, Tab then focuses the first row, and Enter routes to the first row's destination, asserted against its hash.
 - Space on a focused palette row chooses it the same way, and the palette closes.
 - ArrowDown twice then Enter in #palIn still routes to the third row's destination.
+- With the palette closed, #palette carries aria-hidden true, #palIn has tabIndex -1, and no #palette .it[data-n] row has tabIndex 0.
 
 **Files:**
 - create: surface/identity/tests/keyable.test.tsx
@@ -146,7 +153,7 @@ THE SYSTEM SHALL make every element that acts on a click a button or a link, or 
 - modify: surface/identity/src/shell/Palette.tsx
 
 **Checklist:**
-- C307 — Every element with a click action is a button or a link, or has tabindex 0 and dispatches one click on Enter and Space, palette rows included.
+- C307 — Every element with a click action is a button or a link, or has tabindex 0 and dispatches one click on Enter and Space, palette rows included, with no caller under surface/identity/src/features changed.
 
 **Stories:**
 - S132 (Keyboard user, Working the identity screens without a mouse) — As a person working by keyboard, I want to reach and press every control on every screen without a mouse, so that nothing the screens offer is closed to me.
@@ -193,13 +200,15 @@ WHEN the help overlay opens, by ? outside a text field or by the help dock's Exp
 
 ### R8: Walk every built screen with Tab and activate every click action from the keyboard
 
-WHEN the surface's test command runs, THE SYSTEM SHALL, for every route-table row marked built, render the row's route, list every element with a click action there (every a with an href, every enabled button, and every element whose rendered props carry an onClick handler), move focus through the page with the Tab key alone, and fail naming the route and the element IF any listed element is never focused. It SHALL then activate each listed element with Enter, and each listed element that is not a link with Space, and fail naming the element IF a click on it is not recorded exactly once. The walk SHALL run once more with the help dock open. It SHALL NOT pass on a page where it listed no element. The Tab and key presses SHALL come from @testing-library/user-event, added as an exact-version development dependency, so the keys are pressed the way a browser presses them rather than by a helper written for this test.
+WHEN the surface's test command runs, THE SYSTEM SHALL, for every route-table row marked built, render the row's route and list every element with a click action there: every a with an href, every enabled button, and every element whose rendered props carry an onClick handler, except two kinds of element. First, an element inside a closed layer is not listed: a closed layer is an element carrying aria-hidden true, and on the tree this builds on the one such layer is the closed palette, #palette in surface/identity/src/shell/Palette.tsx, which Shell.tsx always renders and whose rows (#palette .it[data-n]) carry an onClick handler while it is closed; R5 keeps them out of the Tab order until the palette opens, and they are walked in the palette-open case below. Second, the two dismiss backdrops, #scrim (surface/identity/src/shell/Shell.tsx) and the overlay's [data-xabsorb] when it is present, are not listed. Those two are not click actions a person takes on an element: each is a layer behind what is open that closes it when the pointer lands outside it, and its keyboard equivalent is Escape, which closes the palette and the drawer the scrim sits behind and the overlay the dismiss layer belongs to; they SHALL NOT be listed and SHALL NOT be made focusable, and Shell.tsx SHALL NOT change. The walk SHALL move focus through the page with the Tab key alone and fail naming the route and the element IF any listed element is never focused. It SHALL then activate each listed element with Enter, and each listed element that is not a link with Space, and fail naming the element IF a click on it is not recorded exactly once. The walk SHALL run once more with the help dock open, and once more with the palette open, where it lists the open palette's rows (#palette .it[data-n]), reaches each by Tab starting from #palIn, and reopens the palette before activating each row, since choosing a row closes it. It SHALL NOT pass on a page where it listed no element. The Tab and key presses SHALL come from @testing-library/user-event 14.6.7, with its required peer @testing-library/dom 10.4.2, both added as exact-version development dependencies of surface/identity, so the keys are pressed the way a browser presses them rather than by a helper written for this test.
 
 **Acceptance:**
-- The walk runs 17 times, once per built row and once with the help dock open, and for each asserts the count of listed elements focused by Tab equals the count listed and that the count listed is greater than 0.
+- The walk runs 18 times, once per built row, once with the help dock open and once with the palette open, and for each asserts the count of listed elements focused by Tab equals the count listed and that the count listed is greater than 0; in the palette-open walk the count listed equals the number of #palette .it[data-n] rows rendered.
 - Every listed element records exactly one click on Enter, and every listed element that is not a link records exactly one click on Space.
+- On every walk with the palette closed, the elements carrying an onClick handler that the exclusion removed are exactly #scrim and every #palette .it[data-n] row, asserted by selector and by count: 1 plus the number of #palette .it[data-n] rows rendered, which is at least 19 (3 Acts rows and 16 Go to rows) with no directory loaded; with the overlay opened on the People route, they are exactly those plus the one [data-xabsorb], asserted as that count plus 1. In the palette-open walk, no #palette .it[data-n] row is removed and #scrim is, asserted as count 1.
 - A div with an onClick handler and no tabindex, planted into the dock-open walk's page by the test's own control case, makes that case fail naming the div; the real walks pass.
-- surface/identity/package.json lists @testing-library/user-event under devDependencies at an exact version, surface/identity/package-lock.json records it, and loading package.json at <base> and at the build's head in python finds the added devDependencies entry the only difference.
+- With the palette open, Escape closes it and #scrim loses the class open; with the drawer open, Escape removes the drawer's class open.
+- surface/identity/package.json lists @testing-library/user-event at 14.6.7 and @testing-library/dom at 10.4.2 under devDependencies, surface/identity/package-lock.json records both at those versions, and loading package.json at <base> and at the build's head in python finds those two added devDependencies entries the only difference.
 
 **Files:**
 - create: surface/identity/tests/walk.test.tsx
@@ -207,7 +216,7 @@ WHEN the surface's test command runs, THE SYSTEM SHALL, for every route-table ro
 - modify: surface/identity/package-lock.json
 
 **Checklist:**
-- C310 — A Tab walk over every built route reaches every element with a click action and activates each with Enter and, for non-links, Space, with a non-zero count asserted.
+- C310 — A Tab walk over every built route, driven by @testing-library/user-event, reaches every element with a click action other than those in a closed layer (the closed palette's rows, walked instead with the palette open) and the two dismiss backdrops, and activates each with Enter and, for non-links, Space, with a non-zero count asserted.
 
 **Stories:**
 - S132 (Keyboard user, Working the identity screens without a mouse) — As a person working by keyboard, I want to reach and press every control on every screen without a mouse, so that nothing the screens offer is closed to me.
@@ -258,23 +267,24 @@ THE SYSTEM SHALL change line 3 of docs/design/identity/CONFORMANCE.md so it name
 
 ## Boundaries
 
-- SHALL NOT change what any screen shows: no screen component's text, data, layout or controls change, and no file under surface/identity/src/features changes.
+- SHALL NOT change what any screen shows: no screen component's text, data, layout or controls change, and no file under surface/identity/src/features changes, nor surface/identity/src/shell/Shell.tsx or Dock.tsx.
 - SHALL NOT change which component any route renders, and SHALL NOT make routes.tsx read the route table.
 - SHALL NOT change index.v5.html or index.v4.html; index.v6.html differs from v5 only by the two fixes.
 - SHALL NOT build a screen or tab the route table marks not yet, and SHALL NOT present any control as working that is not (DIRECTORY-005).
 - SHALL NOT add an assistant composer or input to the dock; the assistant is conformance row 9.4, proposed.
 - SHALL NOT change any row, kind, brief cell or owner of CONFORMANCE.md; only its line 3 changes.
-- SHALL NOT change any published lys-core wire format or any crate.
+- SHALL NOT change any published lys-core wire format or any crate, and SHALL NOT change the project setup's existing tree or any leg of it.
 - SHALL NOT add a build dependency on Aion or Cambium packages, and SHALL NOT use Aion blue or purple (ADR-010).
 - SHALL NOT present running an agent as something the product does on any screen the rail reaches (ADR-007).
 - SHALL NOT decide the service name, the assistant runtime or row 9.4.
-- SHALL NOT add a dependency beyond @testing-library/user-event, a development dependency.
+- SHALL NOT add a dependency beyond @testing-library/user-event 14.6.7 and @testing-library/dom 10.4.2, both development dependencies.
 
 ## Verification
 
 - From any clone of lys, the blocked_by command prints both paths before the build starts.
 - npm ci then npm test, both with surface/identity as the package directory, pass, and the vitest summary lists routes, rail, goto, keyable, cursor, overlay, walk and mockup test files.
 - sh .land/gates.sh on the build venue prints '--- status 0: surface_leg ---' and exits 0.
+- docs/design/project.json's trees and docs/design/directory/design.json's gate array compare equal in python.
 - diff docs/design/identity/mockup/index.v5.html docs/design/identity/mockup/index.v6.html prints only hunks in the four ranges R9 names.
 - git diff --stat <base> lists only the files R1 to R10 name.
 - sh scripts/design/gate.sh exits 0.

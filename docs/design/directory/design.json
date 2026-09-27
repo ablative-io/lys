@@ -620,8 +620,13 @@
       "brief": ""
     },
     {
+      "path": "docs/design/project.json",
+      "note": "the project setup the design's gate array copies; DIRECTORY-037 adds the surface/identity tree with its measured legs npm ci and npm test",
+      "brief": ""
+    },
+    {
       "path": "surface/identity/package.json",
-      "note": "the surface package, arriving with pull request 35 (DIRECTORY-005); DIRECTORY-037 adds @testing-library/user-event as a development dependency",
+      "note": "the surface package, arriving with pull request 35 (DIRECTORY-005); DIRECTORY-037 adds @testing-library/user-event 14.6.7 and its peer @testing-library/dom 10.4.2 as development dependencies",
       "brief": "DIRECTORY-005"
     },
     {
@@ -631,7 +636,7 @@
     },
     {
       "path": "surface/identity/src/shell/keyable.ts",
-      "note": "makes a non-button click action focusable and answer Enter and Space; arrives with pull request 35, DIRECTORY-037 makes it dispatch the click",
+      "note": "makes a non-button click action focusable and answer Enter and Space; arrives with pull request 35, DIRECTORY-037 keeps keyable(activate) and makes Enter and Space dispatch the click that runs it",
       "brief": "DIRECTORY-005"
     },
     {
@@ -869,20 +874,6 @@
           "requires": [
             "tool:sh",
             "tool:python3"
-          ],
-          "cadence": "round"
-        }
-      ]
-    },
-    {
-      "tree": "surface/identity",
-      "legs": [
-        {
-          "name": "surface",
-          "command": "npm install-ci-test",
-          "requires": [
-            "tool:node",
-            "tool:npm"
           ],
           "cadence": "round"
         }
