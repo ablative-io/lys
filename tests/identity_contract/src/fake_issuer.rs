@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 use std::error::Error;
+use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::{Arc, Mutex, PoisonError};
 
@@ -48,6 +49,7 @@ struct Issued {
 struct Inner {
     issuer: String,
     key: Ed25519Identity,
+    standing: Option<Login>,
     next: Mutex<Option<Login>>,
     codes: Mutex<HashMap<String, Issued>>,
 }
@@ -63,9 +65,32 @@ impl FakeIssuer {
     pub async fn start(key_file: &Path) -> Result<Self, Box<dyn Error>> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let issuer = format!("http://{}", listener.local_addr()?);
+        Self::serve(listener, issuer, key_file, None)
+    }
+
+    /// Start an issuer listening on `bind` that names itself `issuer`, for a
+    /// development service a browser signs in to. Every sign-in the caller
+    /// has not chosen with [`FakeIssuer::sign_in_as`] is signed as `standing`.
+    pub async fn start_at(
+        bind: SocketAddr,
+        issuer: String,
+        key_file: &Path,
+        standing: Login,
+    ) -> Result<Self, Box<dyn Error>> {
+        let listener = tokio::net::TcpListener::bind(bind).await?;
+        Self::serve(listener, issuer, key_file, Some(standing))
+    }
+
+    fn serve(
+        listener: tokio::net::TcpListener,
+        issuer: String,
+        key_file: &Path,
+        standing: Option<Login>,
+    ) -> Result<Self, Box<dyn Error>> {
         let inner = Arc::new(Inner {
             issuer,
             key: Ed25519Identity::load(key_file)?,
+            standing,
             next: Mutex::new(None),
             codes: Mutex::new(HashMap::new()),
         });
@@ -146,6 +171,7 @@ async fn authorize(
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .take()
+        .or_else(|| inner.standing.clone())
     else {
         return refused("the test chose no login");
     };
