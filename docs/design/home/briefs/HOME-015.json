@@ -59,7 +59,38 @@
       ],
       "stories": [
         "S8"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/error.rs",
+            "change": "modified",
+            "note": "six named refusals, each beginning with its name and naming ids or the path only"
+          },
+          {
+            "path": "crates/lys-home/src/record/entries.rs",
+            "change": "modified",
+            "note": "CUSTOM_INHERITED documented for a canon example and a handover; INHERITED_FROM declared; no field added to the header, EntryBase or any EntryBody variant"
+          }
+        ],
+        "how": "Each refusal carries only session ids, entry ids or a path; the gate each_refusal_begins_with_its_name_and_names_what_it_refuses checks every acceptance line and INHERITED_FROM.",
+        "deviation": "Built by hand on hand/HOME-015 at the lead's direction, not through card_build_v3; clippy and tests ran on the build machine.",
+        "checklist": [
+          {
+            "id": "C46",
+            "done": true,
+            "note": "met; see how"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S8",
+            "satisfied": true,
+            "note": "served for the handover"
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -95,7 +126,53 @@
       ],
       "stories": [
         "S8"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/record/canon.rs",
+            "change": "modified",
+            "note": "Inherited.rule is Option<String>, defaulted and skipped when None; canon::load refuses a lys.inherited entry with no rule by name"
+          },
+          {
+            "path": "crates/lys-home/src/record/canon_tests.rs",
+            "change": "modified",
+            "note": "exactly the two named lines"
+          },
+          {
+            "path": "crates/lys-home/src/record/mod.rs",
+            "change": "modified",
+            "note": "exactly pub mod handover; and mod handover_tests;"
+          },
+          {
+            "path": "crates/lys-home/src/record/handover.rs",
+            "change": "created",
+            "note": "module documentation of the handover invariants"
+          },
+          {
+            "path": "crates/lys-home/src/record/handover_tests.rs",
+            "change": "created",
+            "note": "opens with #![cfg(test)]; the canon and serialisation gates"
+          }
+        ],
+        "how": "The rule check sits in canon::load, which canon add and a render with --canon both reach before writing; a session of a home is read by SessionReader, which never checks it. Gates: an_inherited_rule_is_written_when_present_and_skipped_when_absent, the_canon_refuses_an_example_without_a_rule_on_load_add_and_render, a_ruleless_inherited_entry_in_a_session_of_a_home_reads_cleanly. A rule that is present but null is refused as absent.",
+        "deviation": "Built by hand on hand/HOME-015 at the lead's direction, not through card_build_v3; clippy and tests ran on the build machine.",
+        "checklist": [
+          {
+            "id": "C45",
+            "done": true,
+            "note": "met; see how"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S8",
+            "satisfied": true,
+            "note": "served for the handover"
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -125,7 +202,38 @@
       ],
       "stories": [
         "S8"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/record/handover.rs",
+            "change": "modified",
+            "note": "the checks in order: successor path, session, assistant entries, contiguity on the root-to-head path read through read_head and SessionReader, authored, thinking"
+          },
+          {
+            "path": "crates/lys-home/src/record/handover_tests.rs",
+            "change": "modified",
+            "note": "the ten refusal cases"
+          }
+        ],
+        "how": "Every check runs before Home::open touches the successor; the outgoing session is read through SessionReader and Index::read, which write nothing. Gate: every_refusal_is_named_before_anything_is_written counts ten cases and compares every file hash under the outgoing home.",
+        "deviation": "Built by hand on hand/HOME-015 at the lead's direction, not through card_build_v3; clippy and tests ran on the build machine.",
+        "checklist": [
+          {
+            "id": "C46",
+            "done": true,
+            "note": "met; see how"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S8",
+            "satisfied": true,
+            "note": "served for the handover"
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -156,7 +264,48 @@
       ],
       "stories": [
         "S8"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/record/handover.rs",
+            "change": "modified",
+            "note": "write_successor: the rule-less lys.inherited entry, the letter entries with only parentId rewritten, the session_info name, and the report read back from the first entry"
+          },
+          {
+            "path": "crates/lys-home/src/record/handover_tests.rs",
+            "change": "modified",
+            "note": "the four-entry gates for an absent and an empty successor"
+          }
+        ],
+        "how": "Gates: the_letter_is_copied_whole_into_a_new_successor_home and an_empty_successor_directory_takes_the_same_four_entries.",
+        "deviation": "Built by hand on hand/HOME-015 at the lead's direction, not through card_build_v3; clippy and tests ran on the build machine.",
+        "checklist": [
+          {
+            "id": "C47",
+            "done": true,
+            "note": "met; see how"
+          },
+          {
+            "id": "C48",
+            "done": true,
+            "note": "met; see how"
+          },
+          {
+            "id": "C49",
+            "done": true,
+            "note": "met; see how"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S8",
+            "satisfied": true,
+            "note": "served for the handover"
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -181,7 +330,33 @@
       ],
       "stories": [
         "S8"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/cli.rs",
+            "change": "modified",
+            "note": "the handover subcommand and HandoverArgs; the module doc lists handover; 454 code lines"
+          }
+        ],
+        "how": "Gate: the_handover_subcommand_prints_its_report_and_refuses_by_name.",
+        "deviation": "Built by hand on hand/HOME-015 at the lead's direction, not through card_build_v3; clippy and tests ran on the build machine.",
+        "checklist": [
+          {
+            "id": "C50",
+            "done": true,
+            "note": "met; see how"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S8",
+            "satisfied": true,
+            "note": "served for the handover"
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -206,7 +381,33 @@
       ],
       "stories": [
         "S2"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/record/handover_tests.rs",
+            "change": "modified",
+            "note": "the two render gates on a successor written by the handover"
+          }
+        ],
+        "how": "No render code changed. Gates: a_successor_rendered_for_another_model_carries_its_thinking_as_text and a_successor_rendered_for_its_own_model_keeps_its_signed_thinking.",
+        "deviation": "Built by hand on hand/HOME-015 at the lead's direction, not through card_build_v3; clippy and tests ran on the build machine.",
+        "checklist": [
+          {
+            "id": "C51",
+            "done": true,
+            "note": "met; see how"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": "served for the handover"
+          }
+        ]
+      }
     },
     {
       "id": "R7",
@@ -236,7 +437,58 @@
       ],
       "stories": [
         "S8"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/home/RECORD.md",
+            "change": "modified",
+            "note": "the handover form of lys.inherited, the canon refusal and the five handover refusals"
+          },
+          {
+            "path": "docs/design/home/design.json",
+            "change": "modified",
+            "note": "the notes of the handover, proof and record rows"
+          },
+          {
+            "path": "docs/design/home/DESIGN.md",
+            "change": "modified",
+            "note": "re-rendered"
+          }
+        ],
+        "how": "The cluster was re-rendered with render-cluster.py and sh scripts/design/gate.sh exits 0.",
+        "deviation": "Built by hand on hand/HOME-015 at the lead's direction, not through card_build_v3; clippy and tests ran on the build machine.",
+        "checklist": [
+          {
+            "id": "C45",
+            "done": true,
+            "note": "met; see how"
+          },
+          {
+            "id": "C47",
+            "done": true,
+            "note": "met; see how"
+          },
+          {
+            "id": "C48",
+            "done": true,
+            "note": "met; see how"
+          },
+          {
+            "id": "C49",
+            "done": true,
+            "note": "met; see how"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S8",
+            "satisfied": true,
+            "note": "served for the handover"
+          }
+        ]
+      }
     },
     {
       "id": "R8",
@@ -262,7 +514,38 @@
       "stories": [
         "S5",
         "S2"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/home/PROOF-HANDOVER.md",
+            "change": "created",
+            "note": "the elicited letter, the handover by ids and hashes, the carry-over, and the card counts as not run"
+          }
+        ],
+        "how": "The signatures compare equal byte for byte; the carry-over is absent (0 parts); sent-to-model waits on R10.",
+        "deviation": "Built by hand on hand/HOME-015 at the lead's direction, not through card_build_v3; clippy and tests ran on the build machine. Claude Code on the build machine was signed out (exit 1, api_error), so the elicitation and the resume ran on the development Mac with the same Claude Code version, 2.1.283, and lys-home ran on the build machine; the files moved between them by scp and were compared by SHA-256. The letter's thinking was written signed with empty thinking text, so rendered for another model it is dropped and named (empty thinking dropped), not carried as a text part; the fixture gate measures the text-part path.",
+        "checklist": [
+          {
+            "id": "C52",
+            "done": true,
+            "note": "met; see how"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S5",
+            "satisfied": true,
+            "note": "served for the handover"
+          },
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": "served for the handover"
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
