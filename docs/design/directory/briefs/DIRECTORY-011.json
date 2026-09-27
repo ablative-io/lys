@@ -51,7 +51,27 @@
       ],
       "stories": [
         "S22"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. R1 adds a section to docs/design/identity/DIRECTORY-CONTRACT.md, and that file does not exist yet: `ls docs/design/identity/` on this branch lists no DIRECTORY-CONTRACT.md. DIRECTORY-003 creates it, and R1's spec says 'This row SHALL NOT create docs/design/identity/DIRECTORY-CONTRACT.md'. A section also has to come after the sections DIRECTORY-003 wrote, and none exist. Per acceptance row: (1) rg -c for the heading cannot print 1 because the file is absent. Not met. (2) The citation and the seven-rule numbered list have no section to go in. Not met. (3) The three-readings open question has no section to go in. Not met. The second half holds: no file under crates changed, so `git diff -U0 <base> HEAD -- crates | grep -c SpeaksFor` prints 0. (4) The RM-029 blocked-on statement has no section to go in. Not met. (5) Holds without an edit: no path changed and no line was removed, but there is no R1 commit that lists the contract. Not met. The source text is present and I checked it: docs/design/identity/STATEMENT-2026-09-22.md:162-167 holds Chippy's four adjustments, with adjustment 3 at line 166. So once DIRECTORY-003 lands, R1 can be written exactly as specified. What would unblock it: DIRECTORY-003 lands DIRECTORY-CONTRACT.md, and this card is re-run on a base that contains it.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C49",
+            "done": false,
+            "note": "Blocked: docs/design/identity/DIRECTORY-CONTRACT.md is absent because DIRECTORY-003 has not landed, and this brief may not create it."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S22",
+            "satisfied": false,
+            "note": "Blocked on DIRECTORY-003 creating the contract. Proving rule 5 is also blocked on RM-029, which the brief says has no card yet."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -74,7 +94,27 @@
       ],
       "stories": [
         "S23"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. R2 adds crates/lys-identity/tests/agent_without_session.rs. It must drive lys-identity's public registration, list and read (DIRECTORY-003 R1), and its expected member list must be copied from the agent-record list in docs/design/identity/DIRECTORY-CONTRACT.md. Neither exists: `ls crates/lys-identity` answers 'No such file or directory', and the contract file is absent. R2's spec forbids creating crates/lys-identity/ or the contract. A test file with no crate would not be built by the workspace. Writing a member list with no contract line to copy it from would be a value the test substitutes, which the spec forbids. Per acceptance row: (1) d011_r2_ac1 has no registration or list API to call. Not met. (2) d011_r2_ac2 has no contract member list to copy and no read to serialize. Not met. (3) `cargo test -p lys-identity --test agent_without_session` cannot run because the package does not exist. Not met. For the same reason the red-first commit cannot be made: without a crate it would fail to compile rather than fail a named test. What would unblock it: DIRECTORY-003 lands crates/lys-identity with its public registration, list and read, plus the contract's agent-record member list, on this card's base.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C50",
+            "done": false,
+            "note": "Blocked: crates/lys-identity and the contract's agent-record list do not exist until DIRECTORY-003 lands."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S23",
+            "satisfied": false,
+            "note": "Blocked on DIRECTORY-003. There is no directory yet in which to register or read an agent."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
