@@ -56,7 +56,7 @@ x509-parser = "0.16"
 zeroize = { version = "1", features = ["derive"] }
 
 # CLI
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive", "env"] }
 
 # Dev
 coset = "0.4"
