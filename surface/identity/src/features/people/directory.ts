@@ -31,8 +31,8 @@ export const fileNo = (id: string): string => {
   return (kindOf(id) === 'agent' ? 'A/' : 'P/') + hex.slice(0, 8);
 };
 
-/** A person by their first name, as the mock-up writes them; an agent by its whole name. */
-export const firstName = (name: string, kind: 'person' | 'agent' = 'person'): string => (kind === 'agent' ? name : name.split(' ')[0]);
+/** The first word of a name, exactly as the mock-up writes `x.name.split(' ')[0]`. */
+export const firstName = (name: string): string => name.split(' ')[0];
 
 /** An agent still standing whose person is retired needs a new person (conformance 3.1). */
 export const needsNewPerson = (x: Entry): boolean =>
