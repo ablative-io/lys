@@ -51,7 +51,7 @@
     "ADR-009",
     "ADR-010",
     "ADR-011",
-    "ADR-092"
+    "ADR-096"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -59,7 +59,7 @@
     "Every decision still open for Tom is recorded as open and decided nowhere in this cluster.",
     "The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6).",
     "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record.",
-    "DIRECTORY-028 draws the access graph (conformance 8.3) with grant edges and every reachability from Access's answers, and responsible people and resource parents as recorded, holding no permission rule of its own (ADR-092)."
+    "DIRECTORY-032 draws the access graph (conformance 8.3) with grant edges and every reachability from Access's answers, and responsible people and resource parents as recorded, holding no permission rule of its own (ADR-096)."
   ],
   "non_goals": [
     {
@@ -108,7 +108,7 @@
     },
     {
       "text": "The graph's rail entry and g h shortcut",
-      "reason": "The shell card AL4OyeKG registers every screen's route and key; DIRECTORY-028 adds only the graph's deep links and its Show in graph links."
+      "reason": "The shell card AL4OyeKG registers every screen's route and key; DIRECTORY-032 adds only the graph's deep links and its Show in graph links."
     }
   ],
   "structure": [
@@ -595,82 +595,82 @@
     {
       "path": "crates/lys-identity-server/src/grant_resources.rs",
       "note": "The read-only route serving the permission model's resources with their parents, declared actions and model version, for the access graph (conformance 8.3); created on top of DIRECTORY-006, reconcile against its landed manifest before dispatch",
-      "brief": "DIRECTORY-028"
+      "brief": "DIRECTORY-032"
     },
     {
       "path": "crates/lys-identity-server/tests/grant_resources.rs",
       "note": "The read-only route serving the permission model's resources with their parents, declared actions and model version, for the access graph (conformance 8.3); created on top of DIRECTORY-006, reconcile against its landed manifest before dispatch",
-      "brief": "DIRECTORY-028"
+      "brief": "DIRECTORY-032"
     },
     {
       "path": "surface/identity/src/features/graph/GraphScreen.tsx",
       "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
-      "brief": "DIRECTORY-028"
+      "brief": "DIRECTORY-032"
     },
     {
       "path": "surface/identity/src/features/graph/graphModel.ts",
       "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
-      "brief": "DIRECTORY-028"
+      "brief": "DIRECTORY-032"
     },
     {
       "path": "surface/identity/src/features/graph/recordEdges.ts",
       "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
-      "brief": "DIRECTORY-028"
+      "brief": "DIRECTORY-032"
     },
     {
       "path": "surface/identity/src/features/graph/graphQuestions.ts",
       "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
-      "brief": "DIRECTORY-028"
+      "brief": "DIRECTORY-032"
     },
     {
       "path": "surface/identity/src/features/graph/graphLayout.ts",
       "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
-      "brief": "DIRECTORY-028"
+      "brief": "DIRECTORY-032"
     },
     {
       "path": "surface/identity/src/features/graph/ShowInGraphLink.tsx",
       "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
-      "brief": "DIRECTORY-028"
+      "brief": "DIRECTORY-032"
     },
     {
       "path": "surface/identity/tests/graph_boundary.test.ts",
       "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
-      "brief": "DIRECTORY-028"
+      "brief": "DIRECTORY-032"
     },
     {
       "path": "surface/identity/tests/graph.test.tsx",
       "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
-      "brief": "DIRECTORY-028"
+      "brief": "DIRECTORY-032"
     },
     {
       "path": "surface/identity/tests/acceptance/graph.spec.ts",
       "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
-      "brief": "DIRECTORY-028"
+      "brief": "DIRECTORY-032"
     },
     {
       "path": "surface/identity/tests/fixtures/graph-directory.ts",
       "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
-      "brief": "DIRECTORY-028"
+      "brief": "DIRECTORY-032"
     },
     {
       "path": "surface/identity/src/features/people/Preview.tsx",
-      "note": "The directory's preview drawer (DIRECTORY-005); DIRECTORY-028 adds its Show in graph link. Named at the path the identity surface was built at; reconcile against DIRECTORY-005's landed manifest before dispatch",
-      "brief": "DIRECTORY-028"
+      "note": "The directory's preview drawer (DIRECTORY-005); DIRECTORY-032 adds its Show in graph link. Named at the path the identity surface was built at; reconcile against DIRECTORY-005's landed manifest before dispatch",
+      "brief": "DIRECTORY-032"
     },
     {
       "path": "surface/identity/src/features/file/IdentityFile.tsx",
-      "note": "The identity record screen (DIRECTORY-005); DIRECTORY-028 adds its Show in graph link. Named at the path the identity surface was built at; reconcile against DIRECTORY-005's landed manifest before dispatch",
-      "brief": "DIRECTORY-028"
+      "note": "The identity record screen (DIRECTORY-005); DIRECTORY-032 adds its Show in graph link. Named at the path the identity surface was built at; reconcile against DIRECTORY-005's landed manifest before dispatch",
+      "brief": "DIRECTORY-032"
     },
     {
-      "path": "docs/design/directory/briefs/DIRECTORY-028.json",
+      "path": "docs/design/directory/briefs/DIRECTORY-032.json",
       "note": "the access graph brief (conformance 8.3)",
-      "brief": "DIRECTORY-028"
+      "brief": "DIRECTORY-032"
     },
     {
-      "path": "docs/design/directory/briefs/DIRECTORY-028.md",
+      "path": "docs/design/directory/briefs/DIRECTORY-032.md",
       "note": "rendered markdown",
-      "brief": "DIRECTORY-028"
+      "brief": "DIRECTORY-032"
     }
   ],
   "inventory": [

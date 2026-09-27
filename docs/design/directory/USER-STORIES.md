@@ -36,8 +36,8 @@
 
 ## Graph viewer — Looks at who can reach what on the access graph
 
-**S110.** As a person signed in to the directory, I want to see what I may see as a graph, with my own reach drawn from Access's answers and the recorded containment and responsible people, so that what the graph shows is what the directory would decide.
+**S116.** As a person signed in to the directory, I want to see what I may see as a graph, with my own reach drawn from Access's answers and the recorded containment and responsible people, so that what the graph shows is what the directory would decide.
 
-**S111.** As a directory administrator holding the visibility permission, I want to ask the graph who can reach a resource and see Access's answer with its model version and the time it was drawn, so that I can review reach without the screen inventing any of it.
+**S117.** As a directory administrator holding the visibility permission, I want to ask the graph who can reach a resource and see Access's answer with its model version and the time it was drawn, so that I can review reach without the screen inventing any of it.
 
-**S112.** As a reviewer of conformance row 8.3, I want tests that compare every drawn edge with the real evaluator and prove the graph module holds no rule, so that the graph cannot drift from Access unnoticed.
+**S118.** As a reviewer of conformance row 8.3, I want tests that compare every drawn edge with the real evaluator and prove the graph module holds no rule, so that the graph cannot drift from Access unnoticed.
