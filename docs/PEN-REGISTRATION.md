@@ -47,7 +47,7 @@ the flip touched ten files across both crates and the design docs:
 - the `lys ca issue` help text in `crates/lys/src/cli.rs`, and the module and
   item docs in `crates/lys/src/commands/ca.rs`
 - this document, `docs/DESIGN.md`, `docs/RELEASE-CHECKLIST.md`,
-  `docs/design/lys-core/DESIGN.md`, and `docs/design/lys-core/CHECKLIST.md`
+  `docs/design/lys-core/DESIGN-PRE-METHOD.md`, and `docs/design/lys-core/CHECKLIST-PRE-METHOD.md`
 
 The help-text copy is the one a future arc change could silently strand, so it
 is pinned: a test renders the `ca issue` help and asserts it names the OID that
