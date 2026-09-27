@@ -94,16 +94,28 @@ impl SignedEvent {
     }
 }
 
-/// Sign `event` with the directory service's key.
-pub fn sign_event(event: IdentityEvent, service_key: &Ed25519Identity) -> SignedEvent {
+/// Sign `event` with the directory service's key, refusing an event larger
+/// than any event this directory reads back, so nothing is logged that
+/// [`verify_event`] would refuse for ever.
+pub fn sign_event(
+    event: IdentityEvent,
+    service_key: &Ed25519Identity,
+) -> Result<SignedEvent, IdentityError> {
     let body = encode_body(&event);
     let protected = protected_header(&service_key.public_key_bytes());
     let signature = service_key.sign(&sig_structure(&protected, &body));
-    SignedEvent {
-        bytes: cose_sign1(&protected, &body, &signature),
+    let bytes = cose_sign1(&protected, &body, &signature);
+    if bytes.len() > MAX_EVENT_BYTES {
+        return Err(IdentityError::EventTooLarge {
+            len: bytes.len(),
+            limit: MAX_EVENT_BYTES,
+        });
+    }
+    Ok(SignedEvent {
+        bytes,
         commitment: payload_commitment(&body),
         event,
-    }
+    })
 }
 
 /// Verify `message` against the directory service's public key and return the event it carries.
@@ -142,9 +154,7 @@ pub fn verify_event(
         return Err(IdentityError::SignatureInvalid);
     }
     let event = decode_body(&parts.payload)?;
-    if encode_body(&event) != parts.payload
-        || cose_sign1(&parts.protected, &parts.payload, &parts.signature) != message
-    {
+    if cose_sign1(&parts.protected, &parts.payload, &parts.signature) != message {
         return Err(IdentityError::EventNotCanonical);
     }
     Ok(SignedEvent {

@@ -723,6 +723,7 @@ version = "0.2.0"
 dependencies = [
  "lys-core",
  "lys-identity",
+ "lys-log-store",
  "tempfile",
 ]
 
@@ -884,9 +885,9 @@ version = "0.2.0"
 dependencies = [
  "ciborium",
  "lys-core",
+ "lys-log-store",
  "rand",
  "sha2",
- "tempfile",
  "thiserror 2.0.19",
 ]
 

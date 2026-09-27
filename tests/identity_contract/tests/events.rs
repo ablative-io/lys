@@ -112,13 +112,13 @@ fn every_change_signs_and_verifies_to_the_same_event_and_bytes() -> TestResult {
     let events = every_change()?;
     let mut verified = 0;
     for original in events {
-        let signed = sign_event(original.clone(), &key);
+        let signed = sign_event(original.clone(), &key)?;
         let read = verify_event(signed.bytes(), &key.public_key_bytes())?;
         assert_eq!(read.event(), &original);
         assert_eq!(read.bytes(), signed.bytes());
         assert_eq!(read.payload_commitment(), signed.payload_commitment());
         assert_eq!(
-            sign_event(original, &key).bytes(),
+            sign_event(original, &key)?.bytes(),
             signed.bytes(),
             "signing is deterministic"
         );
@@ -132,7 +132,7 @@ fn every_change_signs_and_verifies_to_the_same_event_and_bytes() -> TestResult {
 fn every_flipped_byte_is_refused() -> TestResult {
     let (key, _dir) = service_key(11)?;
     for original in every_change()? {
-        let signed = sign_event(original, &key);
+        let signed = sign_event(original, &key)?;
         let mut refused = 0;
         for index in 0..signed.bytes().len() {
             let mut altered = signed.bytes().to_vec();
@@ -150,7 +150,7 @@ fn every_flipped_byte_is_refused() -> TestResult {
 fn another_service_key_is_refused_by_name() -> TestResult {
     let (key, _dir) = service_key(11)?;
     let (other, _other_dir) = service_key(12)?;
-    let signed = sign_event(every_change()?.remove(0), &key);
+    let signed = sign_event(every_change()?.remove(0), &key)?;
     assert_eq!(
         verify_event(signed.bytes(), &other.public_key_bytes()),
         Err(IdentityError::SignerMismatch)
@@ -161,7 +161,7 @@ fn another_service_key_is_refused_by_name() -> TestResult {
 #[test]
 fn trailing_bytes_are_not_canonical() -> TestResult {
     let (key, _dir) = service_key(11)?;
-    let signed = sign_event(every_change()?.remove(0), &key);
+    let signed = sign_event(every_change()?.remove(0), &key)?;
     let mut padded = signed.bytes().to_vec();
     padded.push(0x00);
     assert_eq!(
@@ -271,8 +271,9 @@ mod directory_events {
 
     use identity_contract::fixtures::{administrator, op, shown};
     use identity_contract::harness::{Fault, Harness};
-    use lys_identity::IdentityError;
     use lys_identity::receipt::verify_receipt;
+    use lys_identity::{IdentityError, IdentityId};
+    use lys_log_store::{FileLeafStore, LeafStore};
 
     type TestResult = Result<(), Box<dyn Error>>;
 
@@ -283,12 +284,16 @@ mod directory_events {
         let (_, receipt) = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
         directory.register_person(administrator()?, op(2), shown("Grace")?, 11)?;
         let index = receipt.coordinate().index;
-        let leaf = directory.log().leaf(index).ok_or("leaf missing")?.to_vec();
-        let checkpoint = directory.log().head();
-        let proof = directory.log().inclusion_proof(index)?;
+        let leaf = directory
+            .log()?
+            .leaf(index)?
+            .ok_or("leaf missing")?
+            .to_vec();
+        let checkpoint = directory.log()?.head()?;
+        let proof = directory.log()?.inclusion_proof(index)?;
         let key = directory.service_key();
         verify_receipt(&receipt, &leaf, &key, checkpoint, &proof)?;
-        let other = directory.log().leaf(1).ok_or("leaf missing")?.to_vec();
+        let other = directory.log()?.leaf(1)?.ok_or("leaf missing")?.to_vec();
         assert!(verify_receipt(&receipt, &other, &key, checkpoint, &proof).is_err());
         let mut signature_flipped = leaf.clone();
         let last = signature_flipped.len() - 1;
@@ -307,10 +312,10 @@ mod directory_events {
         let (person, receipt) =
             directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
         assert_eq!(receipt.coordinate().index, 0);
-        assert_eq!(directory.log().len(), 1);
+        assert_eq!(directory.log()?.len()?, 1);
         let again = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
         assert_eq!(again.0, person, "the retry finds the one committed event");
-        assert_eq!(directory.log().len(), 1);
+        assert_eq!(directory.log()?.len()?, 1);
         Ok(())
     }
 
@@ -321,9 +326,9 @@ mod directory_events {
         harness.fail(Fault::BeforeLeaf);
         let refused = directory.register_person(administrator()?, op(1), shown("Ada")?, 10);
         assert!(matches!(refused, Err(IdentityError::AppendRefused { .. })));
-        assert_eq!(directory.log().len(), 0);
+        assert_eq!(directory.log()?.len()?, 0);
         directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
-        assert_eq!(directory.log().len(), 1);
+        assert_eq!(directory.log()?.len()?, 1);
         Ok(())
     }
 
@@ -347,6 +352,109 @@ mod directory_events {
         let live = directory.projection()?.clone();
         drop(directory);
         assert_eq!(harness.open()?.projection()?, &live);
+        Ok(())
+    }
+
+    fn leaf_file(harness: &Harness, index: u64) -> std::path::PathBuf {
+        harness
+            .log_path()
+            .join("leaves")
+            .join(format!("{index:020}"))
+    }
+
+    #[test]
+    fn a_torn_leaf_past_the_pin_is_refused_before_it_is_pinned() -> TestResult {
+        let harness = Harness::new(9)?;
+        let mut directory = harness.open()?;
+        directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        let whole = directory.log()?.leaf(0)?.ok_or("leaf missing")?.to_vec();
+        drop(directory);
+        std::fs::write(leaf_file(&harness, 1), &whole[..whole.len() / 2])?;
+        let refused = harness.open();
+        assert!(
+            matches!(
+                refused
+                    .as_ref()
+                    .map_err(|error| error.downcast_ref::<IdentityError>()),
+                Err(Some(IdentityError::LeafNotAnEvent { index: 1, .. }))
+            ),
+            "a torn leaf is refused by name"
+        );
+        let store = FileLeafStore::open(&harness.log_path())?;
+        assert_eq!(
+            store.pinned().tree_size,
+            1,
+            "the torn leaf was never pinned"
+        );
+        std::fs::remove_file(leaf_file(&harness, 1))?;
+        assert_eq!(harness.open()?.projection()?.records().count(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn a_second_writers_leaf_is_applied_when_an_append_finds_it() -> TestResult {
+        let harness = Harness::new(9)?;
+        let mut first = harness.open()?;
+        let mut second = harness.open()?;
+        first.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        let refused = second.register_person(administrator()?, op(2), shown("Grace")?, 11);
+        assert!(matches!(refused, Err(IdentityError::AppendRefused { .. })));
+        assert_eq!(
+            second.projection()?.records().count(),
+            1,
+            "the other writer's event is applied, not skipped"
+        );
+        let again = second.register_person(administrator()?, op(1), shown("Ada")?, 10);
+        assert!(
+            again.is_ok(),
+            "the adopted operation answers its first receipt"
+        );
+        second.register_person(administrator()?, op(2), shown("Grace")?, 11)?;
+        assert_eq!(second.log()?.len()?, 2);
+        let live = second.projection()?.clone();
+        drop((first, second));
+        assert_eq!(harness.open()?.projection()?, &live);
+        Ok(())
+    }
+
+    #[test]
+    fn nothing_reads_the_log_or_a_record_while_an_append_is_uncertain() -> TestResult {
+        let harness = Harness::new(9)?;
+        let mut directory = harness.open()?;
+        let (ada, _) = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        harness.fail(Fault::AfterLeafUnreadable);
+        let held = directory.register_person(administrator()?, op(2), shown("Grace")?, 11);
+        assert!(matches!(held, Err(IdentityError::LogUnavailable { .. })));
+        assert!(
+            directory.log().is_err(),
+            "the log is not served while uncertain"
+        );
+        assert!(
+            directory.record(IdentityId::Person(ada)).is_err(),
+            "no record is served while uncertain"
+        );
+        harness.fail(Fault::None);
+        assert_eq!(directory.log()?.len()?, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn the_same_operation_retried_after_the_log_was_unavailable_records_once() -> TestResult {
+        let harness = Harness::new(9)?;
+        let mut directory = harness.open()?;
+        harness.fail(Fault::AfterLeafUnreadable);
+        let held = directory.register_person(administrator()?, op(1), shown("Ada")?, 10);
+        assert!(matches!(held, Err(IdentityError::LogUnavailable { .. })));
+        harness.fail(Fault::None);
+        let (person, receipt) =
+            directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        assert_eq!(
+            receipt.coordinate().index,
+            0,
+            "the retry answers the first leaf"
+        );
+        assert_eq!(directory.log()?.len()?, 1);
+        assert!(directory.record(IdentityId::Person(person))?.is_some());
         Ok(())
     }
 }

@@ -35,7 +35,7 @@ An agent's responsible person must be registered, or the call is refused `Identi
 | `Directory::projection()` then `records()` | every identity, in id order |
 | `Record::profile()`, `state()`, `responsible()`, `bindings()`, `registered_by()`, `events()` | the record's parts, and the log indices of its events |
 
-A read answers only once any uncertain append is resolved. While one is held, every read and every change is refused `AppendUncertain` or `LogUnavailable`.
+A read answers only once any uncertain append is resolved. While one is held, every read and every change is refused `AppendUncertain` or `LogUnavailable`. Resolving it applies every leaf the log holds from that index on, whoever wrote it, before anything is answered. A leaf past the pin that is not a whole event this directory signed is refused `LeafNotAnEvent` before it is pinned, so it can be removed without equivocating. An event larger than the directory reads back is refused `EventTooLarge` before it is signed.
 
 ## Changes
 

@@ -12,7 +12,7 @@
 //! through it as well, so an event read back from the log obeys the same rules
 //! as one written today.
 
-use crate::binding::LoginBinding;
+use crate::binding::{ISSUER_MAX_BYTES, LoginBinding};
 use crate::error::IdentityError;
 use crate::id::{IdentityId, PersonId};
 use crate::lifecycle::{LifecycleState, Transition};
@@ -68,9 +68,9 @@ impl LinkObservation {
                 reason: "a source operation id is between 1 and 128 bytes",
             });
         }
-        if observer.is_empty() {
+        if observer.is_empty() || observer.len() > ISSUER_MAX_BYTES {
             return Err(IdentityError::ChangeMismatch {
-                reason: "an observation names the issuer that observed it",
+                reason: "an observation names the issuer that observed it, in 1 to 2048 bytes",
             });
         }
         Ok(Self {

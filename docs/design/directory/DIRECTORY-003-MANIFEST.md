@@ -16,6 +16,7 @@ Every new file in the three new directories, with its one responsibility. A file
 | src/lifecycle.rs | The four states, the transition table of R5, and refusal by name of any transition outside it. Records, never enforces (CN11). |
 | src/event.rs | The versioned event envelope and its typed payloads: register person, register agent under its responsible person, change profile, bind login, lifecycle transition, link-audit accepted. |
 | src/encoding.rs | Canonical encoding of an event and its commitment, named as SHA-256 and never a BLAKE3 content address (R2). |
+| src/encoding_tests.rs | The head writer's RFC 8949 vectors, as a sibling test file on Archie's review. |
 | src/signer.rs | The service's event signing key, held in Zeroizing memory, loaded from a key file the operator supplies, and the service attestation over each event. |
 | src/log.rs | Commit of one signed event through lys-log-store as one leaf, and reconciliation of an uncertain append by reading the leaf back before any affected read answers (P4, P5). |
 | src/projection.rs | The directory state rebuilt from the events at open, and advanced by each committed event. |

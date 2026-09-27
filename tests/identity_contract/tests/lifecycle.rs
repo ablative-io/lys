@@ -26,8 +26,8 @@ fn register_activate_suspend_reinstate_retire_is_five_signed_events() -> TestRes
     }
     let key = directory.service_key();
     let mut signed_about_agent = 0;
-    for index in 0..directory.log().len() {
-        let leaf = directory.log().leaf(index).ok_or("leaf missing")?;
+    for index in 0..directory.log()?.len()? {
+        let leaf = directory.log()?.leaf(index)?.ok_or("leaf missing")?;
         let event = verify_event(leaf, &key)?;
         if event.event().identity() == agent {
             assert_eq!(event.event().actor(), &administrator()?);
@@ -69,7 +69,7 @@ fn every_transition_outside_the_table_is_refused_and_the_log_does_not_grow() -> 
         "done",
         14,
     )?;
-    let size = directory.log().len();
+    let size = directory.log()?.len()?;
     let agent = IdentityId::Agent(agent);
     let unknown = IdentityId::Agent(AgentId::from_bytes([8; 16]));
     let cases = [
@@ -123,6 +123,6 @@ fn every_transition_outside_the_table_is_refused_and_the_log_does_not_grow() -> 
         Err(IdentityError::IdentityUnknown { .. })
     ));
     assert_eq!(cases.iter().filter(|case| case.is_err()).count(), 4);
-    assert_eq!(directory.log().len(), size);
+    assert_eq!(directory.log()?.len()?, size);
     Ok(())
 }

@@ -39,7 +39,7 @@ fn a_person_and_an_agent_keep_their_ids_and_history_across_a_reopen() -> TestRes
     assert_eq!(record.state(), LifecycleState::Registered);
     assert_eq!(record.events().len(), 2);
     assert_eq!(receipt.identity(), IdentityId::Agent(agent));
-    assert_eq!(reopened.log().len(), 3);
+    assert_eq!(reopened.log()?.len()?, 3);
     Ok(())
 }
 
@@ -54,7 +54,7 @@ fn an_agent_needs_a_registered_responsible_person_and_nothing_is_recorded_otherw
         refused,
         Err(IdentityError::IdentityUnknown { .. })
     ));
-    assert_eq!(directory.log().len(), 0);
+    assert_eq!(directory.log()?.len()?, 0);
     Ok(())
 }
 
@@ -65,9 +65,9 @@ fn the_same_operation_answers_once_and_a_different_request_under_it_is_refused()
     let first = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
     let again = directory.register_person(administrator()?, op(1), shown("Ada")?, 99)?;
     assert_eq!(first, again);
-    assert_eq!(directory.log().len(), 1);
+    assert_eq!(directory.log()?.len()?, 1);
     let other = directory.register_person(administrator()?, op(1), shown("Grace")?, 10);
     assert!(matches!(other, Err(IdentityError::OperationReused { .. })));
-    assert_eq!(directory.log().len(), 1);
+    assert_eq!(directory.log()?.len()?, 1);
     Ok(())
 }

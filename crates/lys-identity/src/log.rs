@@ -4,10 +4,11 @@
 //! An event is recorded when its leaf is durable in the log and the log's pin
 //! covers it, and not before. An append that fails may still have stored its
 //! leaf, so a failure is not a refusal: the log holds the append as uncertain,
-//! refuses every further append and every read that asks for the current
-//! state, and resolves it by opening the store again and reading the leaf at
-//! that index back. The leaf is there, so the change was recorded, or it is not,
-//! so the change was not. Nothing is answered as current while the answer
+//! refuses every further append and every read of the log, and resolves it by
+//! opening the store again and reading the leaf at that index back. The leaf
+//! is there, so the change was recorded, or it is not, so the change was not.
+//! Every leaf the reopened log holds from that index on is handed back to be
+//! applied, whoever wrote it. Nothing is answered as current while the answer
 //! could be either.
 
 use lys_core::merkle::{AppendOnlyTree, InclusionProof, RawLeaf, raw_leaf_hash};
@@ -38,6 +39,20 @@ pub enum Resolved {
     NotCommitted,
 }
 
+/// What resolving an uncertain append found, and every leaf it adopted.
+///
+/// The reopened log may hold leaves this handle never wrote, from another
+/// writer on the same store. They are adopted in log order, beside this
+/// handle's own leaf when it landed, and the caller applies every one before
+/// it answers anything as current.
+#[derive(Debug, Clone)]
+pub struct Reconciled {
+    /// Whether this handle's own leaf was recorded.
+    pub resolved: Resolved,
+    /// Every leaf from the uncertain index to the end of the reopened log.
+    pub adopted: Vec<(SignedEvent, Coordinate)>,
+}
+
 /// Opens the log's store afresh, to read back what a failed append left.
 pub type Reopen<S> = Box<dyn Fn() -> Result<S, StoreError> + Send + Sync>;
 
@@ -60,10 +75,39 @@ fn unavailable(error: &StoreError) -> IdentityError {
     }
 }
 
-/// Every leaf of `log` as a verified event with the coordinate it completed.
+/// Open the store `reopen` gives as a log, refusing before anything is pinned
+/// when a leaf past the pin is not a whole event this directory signed.
+///
+/// `Log::open` pins one leaf past the pin as an interrupted append. A torn
+/// or foreign leaf pinned there could never be removed without equivocating,
+/// so it is checked here first and refused by name while it is still unpinned.
+fn open_checked<S: LeafStore>(
+    reopen: &Reopen<S>,
+    service_key: &[u8; 32],
+) -> Result<Log<S>, IdentityError> {
+    let store = reopen().map_err(|error| unavailable(&error))?;
+    for index in store.pinned().tree_size..store.extent() {
+        let bytes = store
+            .leaf(index)
+            .map_err(|error| unavailable(&error))?
+            .ok_or_else(|| IdentityError::LeafNotAnEvent {
+                index,
+                reason: "the leaf is missing inside the store's extent".to_owned(),
+            })?;
+        verify_event(&bytes, service_key).map_err(|error| IdentityError::LeafNotAnEvent {
+            index,
+            reason: format!("the leaf past the pin was left unpinned: {error}"),
+        })?;
+    }
+    Log::open(store).map_err(|error| unavailable(&error))
+}
+
+/// Every leaf of `log` from `from` on, as a verified event with the
+/// coordinate it completed.
 fn replay<S: LeafStore>(
     log: &Log<S>,
     service_key: &[u8; 32],
+    from: u64,
 ) -> Result<Vec<(SignedEvent, Coordinate)>, IdentityError> {
     let mut tree = AppendOnlyTree::<RawLeaf>::new();
     let mut events = Vec::new();
@@ -74,12 +118,15 @@ fn replay<S: LeafStore>(
                 reason: "the leaf is missing inside the log's extent".to_owned(),
             });
         };
+        tree.append_raw(bytes);
+        if index < from {
+            continue;
+        }
         let event =
             verify_event(bytes, service_key).map_err(|error| IdentityError::LeafNotAnEvent {
                 index,
                 reason: error.to_string(),
             })?;
-        tree.append_raw(bytes);
         let (root, tree_size) = tree.root().to_parts();
         events.push((
             event,
@@ -101,9 +148,8 @@ impl<S: LeafStore> EventLog<S> {
         reopen: Reopen<S>,
         service_key: [u8; 32],
     ) -> Result<(Self, Vec<(SignedEvent, Coordinate)>), IdentityError> {
-        let log = Log::open(reopen().map_err(|error| unavailable(&error))?)
-            .map_err(|error| unavailable(&error))?;
-        let events = replay(&log, &service_key)?;
+        let log = open_checked(&reopen, &service_key)?;
+        let events = replay(&log, &service_key, 0)?;
         Ok((
             Self {
                 log,
@@ -120,30 +166,41 @@ impl<S: LeafStore> EventLog<S> {
         self.pending.is_some()
     }
 
-    /// The number of leaves in the log.
-    pub fn len(&self) -> u64 {
-        self.log.tree().len()
+    fn certain(&self) -> Result<&Log<S>, IdentityError> {
+        match &self.pending {
+            Some(pending) => Err(IdentityError::AppendUncertain {
+                index: pending.index,
+            }),
+            None => Ok(&self.log),
+        }
     }
 
-    /// Whether the log holds no leaf.
-    pub fn is_empty(&self) -> bool {
-        self.log.tree().is_empty()
+    /// The number of leaves in the log, refused while an append is uncertain.
+    pub fn len(&self) -> Result<u64, IdentityError> {
+        Ok(self.certain()?.tree().len())
     }
 
-    /// The log's current size and root.
-    pub fn head(&self) -> (u64, [u8; 32]) {
-        let (root, size) = self.log.tree().root().to_parts();
-        (size, root)
+    /// Whether the log holds no leaf, refused while an append is uncertain.
+    pub fn is_empty(&self) -> Result<bool, IdentityError> {
+        Ok(self.certain()?.tree().is_empty())
     }
 
-    /// The leaf bytes at `index`, if the log holds one there.
-    pub fn leaf(&self, index: u64) -> Option<&[u8]> {
-        self.log.leaf_bytes(index)
+    /// The log's current size and root, refused while an append is uncertain.
+    pub fn head(&self) -> Result<(u64, [u8; 32]), IdentityError> {
+        let (root, size) = self.certain()?.tree().root().to_parts();
+        Ok((size, root))
     }
 
-    /// An inclusion proof of the leaf at `index` in the log's current tree.
+    /// The leaf bytes at `index`, if the log holds one there, refused while
+    /// an append is uncertain.
+    pub fn leaf(&self, index: u64) -> Result<Option<&[u8]>, IdentityError> {
+        Ok(self.certain()?.leaf_bytes(index))
+    }
+
+    /// An inclusion proof of the leaf at `index` in the log's current tree,
+    /// refused while an append is uncertain.
     pub fn inclusion_proof(&self, index: u64) -> Result<InclusionProof, IdentityError> {
-        self.log
+        self.certain()?
             .tree()
             .prove_inclusion(index)
             .map_err(|error| IdentityError::LogUnavailable {
@@ -151,15 +208,13 @@ impl<S: LeafStore> EventLog<S> {
             })
     }
 
-    /// Append `event` as one leaf. A failed append is resolved before this
-    /// returns if the store can be read, and held uncertain if it cannot.
+    /// Append `event` as one leaf.
+    ///
+    /// A failed append may still have stored its leaf, so it is held
+    /// uncertain and answered `LogUnavailable` with the store's reason; the
+    /// caller resolves it with [`EventLog::reconcile`].
     pub fn append(&mut self, event: &SignedEvent) -> Result<Coordinate, IdentityError> {
-        if let Some(pending) = &self.pending {
-            return Err(IdentityError::AppendUncertain {
-                index: pending.index,
-            });
-        }
-        let index = self.log.tree().len();
+        let index = self.certain()?.tree().len();
         match self.log.append(event.bytes()) {
             Ok((index, leaf_hash)) => {
                 let (root, tree_size) = self.log.tree().root().to_parts();
@@ -175,47 +230,38 @@ impl<S: LeafStore> EventLog<S> {
                     index,
                     bytes: event.bytes().to_vec(),
                 });
-                match self.reconcile()? {
-                    Some(Resolved::Committed(coordinate)) => Ok(coordinate),
-                    Some(Resolved::NotCommitted) | None => Err(IdentityError::AppendRefused {
-                        reason: failure.to_string(),
-                    }),
-                }
+                Err(unavailable(&failure))
             }
         }
     }
 
-    /// Resolve a held uncertain append by reading its leaf back from a fresh
-    /// open of the store. Answers `None` when nothing was held.
-    pub fn reconcile(&mut self) -> Result<Option<Resolved>, IdentityError> {
-        let Some(pending) = self.pending.take() else {
+    /// Resolve a held uncertain append from a fresh open of the store, and
+    /// adopt every leaf from its index on. Answers `None` when nothing was
+    /// held. The hold stays until every step has succeeded.
+    pub fn reconcile(&mut self) -> Result<Option<Reconciled>, IdentityError> {
+        let Some(pending) = &self.pending else {
             return Ok(None);
         };
-        let reopened = (self.reopen)()
-            .map_err(|error| unavailable(&error))
-            .and_then(|store| Log::open(store).map_err(|error| unavailable(&error)));
-        let log = match reopened {
-            Ok(log) => log,
-            Err(error) => {
-                self.pending = Some(pending);
-                return Err(error);
+        let log = open_checked(&self.reopen, &self.service_key)?;
+        let size = log.tree().len();
+        if size < pending.index {
+            return Err(IdentityError::LogUnavailable {
+                reason: format!(
+                    "the reopened log holds {size} leaves, fewer than the {} it held before the append",
+                    pending.index
+                ),
+            });
+        }
+        let adopted = replay(&log, &self.service_key, pending.index)?;
+        let resolved = match adopted.first() {
+            Some((signed, coordinate)) if signed.bytes() == pending.bytes.as_slice() => {
+                Resolved::Committed(*coordinate)
             }
+            _ => Resolved::NotCommitted,
         };
         self.log = log;
-        if self.log.leaf_bytes(pending.index) != Some(pending.bytes.as_slice()) {
-            return Ok(Some(Resolved::NotCommitted));
-        }
-        let prefix = self
-            .log
-            .prefix_tree(pending.index + 1)
-            .map_err(|error| unavailable(&error))?;
-        let (root, tree_size) = prefix.root().to_parts();
-        Ok(Some(Resolved::Committed(Coordinate {
-            index: pending.index,
-            tree_size,
-            root,
-            leaf_hash: raw_leaf_hash(&pending.bytes),
-        })))
+        self.pending = None;
+        Ok(Some(Reconciled { resolved, adopted }))
     }
 
     /// The service key every leaf is verified against.

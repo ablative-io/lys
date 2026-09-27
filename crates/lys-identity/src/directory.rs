@@ -5,7 +5,10 @@
 //! appended as one leaf and only then applied and answered with its receipt.
 //! An append whose outcome is uncertain holds the directory: every change and
 //! every read of current state is refused `AppendUncertain` until the leaf is
-//! read back and the change is known to be recorded or not.
+//! read back and the change is known to be recorded or not. Every leaf the
+//! read-back finds from that index on is applied, whoever wrote it, before
+//! anything is answered. A leaf the projection refuses there breaks the
+//! directory: every later call is refused by name, as a restart would be.
 //!
 //! The operation id rule: the same operation id with the same request answers
 //! the first receipt again and records nothing; the same id with a different
@@ -20,7 +23,7 @@ use crate::error::IdentityError;
 use crate::event::{Change, IdentityEvent};
 use crate::id::{AgentId, IdentityId, PersonId};
 use crate::lifecycle::Transition;
-use crate::log::{EventLog, Reopen, Resolved};
+use crate::log::{EventLog, Reopen};
 use crate::operation::OperationId;
 use crate::profile::Profile;
 use crate::projection::{Projection, Record};
@@ -28,13 +31,16 @@ use crate::provenance::Actor;
 use crate::receipt::Receipt;
 use crate::signer::{SignedEvent, sign_event};
 
+/// Why the directory stopped answering, if it has.
+type Broken = Option<String>;
+
 /// The directory of people and agents over its log.
 pub struct Directory<S: LeafStore> {
     log: EventLog<S>,
     projection: Projection,
     key: Ed25519Identity,
     answered: HashMap<OperationId, (IdentityEvent, Receipt)>,
-    pending: Option<SignedEvent>,
+    broken: Broken,
 }
 
 impl<S: LeafStore> Directory<S> {
@@ -47,7 +53,7 @@ impl<S: LeafStore> Directory<S> {
             projection: Projection::new(),
             key,
             answered: HashMap::new(),
-            pending: None,
+            broken: None,
         };
         for (signed, coordinate) in events {
             directory.record_committed(&signed, Receipt::of(&signed, coordinate))?;
@@ -60,21 +66,34 @@ impl<S: LeafStore> Directory<S> {
         self.key.public_key_bytes()
     }
 
-    /// The log, for receipts and inclusion proofs.
-    pub fn log(&self) -> &EventLog<S> {
-        &self.log
+    /// The log, for receipts and inclusion proofs, once any uncertain append
+    /// is resolved.
+    pub fn log(&mut self) -> Result<&EventLog<S>, IdentityError> {
+        self.settle()?;
+        Ok(&self.log)
     }
 
-    /// Resolve an uncertain append before anything is answered as current.
+    /// Resolve an uncertain append, and apply every leaf it adopted, before
+    /// anything is answered as current.
     pub fn settle(&mut self) -> Result<(), IdentityError> {
-        if !self.log.is_uncertain() {
-            return Ok(());
+        if let Some(reason) = &self.broken {
+            return Err(IdentityError::LogUnavailable {
+                reason: reason.clone(),
+            });
         }
-        let resolved = self.log.reconcile()?;
-        let pending = self.pending.take();
-        if let (Some(Resolved::Committed(coordinate)), Some(signed)) = (resolved, pending) {
+        let Some(reconciled) = self.log.reconcile()? else {
+            return Ok(());
+        };
+        for (signed, coordinate) in reconciled.adopted {
             let receipt = Receipt::of(&signed, coordinate);
-            self.record_committed(&signed, receipt)?;
+            if let Err(refusal) = self.record_committed(&signed, receipt) {
+                let reason = format!(
+                    "leaf {} in the log is refused by the projection: {refusal}",
+                    coordinate.index
+                );
+                self.broken = Some(reason.clone());
+                return Err(IdentityError::LogUnavailable { reason });
+            }
         }
         Ok(())
     }
@@ -127,19 +146,26 @@ impl<S: LeafStore> Directory<S> {
     /// Judge, sign, append and apply one change.
     fn commit(&mut self, event: IdentityEvent) -> Result<Receipt, IdentityError> {
         self.projection.check(&event)?;
-        let signed = sign_event(event, &self.key);
-        match self.log.append(&signed) {
+        let signed = sign_event(event, &self.key)?;
+        let failure = match self.log.append(&signed) {
             Ok(coordinate) => {
                 let receipt = Receipt::of(&signed, coordinate);
                 self.record_committed(&signed, receipt.clone())?;
-                Ok(receipt)
+                return Ok(receipt);
             }
-            Err(error) => {
-                if self.log.is_uncertain() {
-                    self.pending = Some(signed);
-                }
-                Err(error)
-            }
+            Err(failure) => failure,
+        };
+        if !self.log.is_uncertain() {
+            return Err(failure);
+        }
+        // A settle that cannot read the log back keeps the hold, and the
+        // caller's retry of the same operation finds the answer once it can.
+        self.settle()?;
+        match self.answered.get(&signed.event().operation()) {
+            Some((event, receipt)) if event == signed.event() => Ok(receipt.clone()),
+            _ => Err(IdentityError::AppendRefused {
+                reason: failure.to_string(),
+            }),
         }
     }
 
