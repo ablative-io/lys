@@ -35,7 +35,7 @@ describe('The delegation form (conformance 2.1 to 2.3)', () => {
     expect(from).toContain('owner of project:identity');
     expect(from).toContain('Actions it allowsedit, grant, view');
     expect(from).toContain('You may pass it onagent');
-    expect(from).toContain('Ends no later thanillustrative27 Oct, when yours does');
+    expect(from).toContain('Ends no later than illustrative27 Oct, when yours does');
     expect($$('#dLease option').map((o) => o.textContent)).toEqual(['7 days', 'ends with assignment', 'no end']);
     expect(unreachable()).toEqual([]);
   });
