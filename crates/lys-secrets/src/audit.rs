@@ -289,7 +289,8 @@ impl AuditLog {
         let digest: [u8; 32] = crate::encoding::unhex(&anchor.last_digest)
             .and_then(|bytes| bytes.try_into().ok())
             .ok_or(SecretsError::AuditSignatureInvalid { index: anchor.len })?;
-        let signature = crate::encoding::unhex(&anchor.signature).unwrap_or_default();
+        let signature = crate::encoding::unhex(&anchor.signature)
+            .ok_or(SecretsError::AuditSignatureInvalid { index: anchor.len })?;
         let body = Self::anchor_body(anchor.len, &digest)?;
         Ed25519Identity::verify(&self.verifying_key, &body, &signature)
             .map_err(|_invalid| SecretsError::AuditSignatureInvalid { index: anchor.len })?;
