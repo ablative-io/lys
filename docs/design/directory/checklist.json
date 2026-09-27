@@ -206,7 +206,7 @@
         },
         {
           "id": "C283",
-          "text": "Each of the four drift injections (a grant shown without its source, may-pass-on read from a missing prohibition, a derived grant surviving its source's revocation, not seen rendered as never used) makes exactly one test fail, and it is the named test of that row.",
+          "text": "Each of the six drift injections (a grant shown without its source, may-pass-on read from a missing prohibition, a derived grant surviving its source's revocation, a derived grant surviving its source's end past admission's own check, the same past the hop check at commit and on replay, not seen rendered as never used) makes exactly one test fail, and it is the named test of that row.",
           "done": false
         },
         {
