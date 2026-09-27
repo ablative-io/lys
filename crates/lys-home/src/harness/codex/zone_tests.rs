@@ -13,7 +13,10 @@ type Gate = Result<(), Box<dyn Error>>;
 #[test]
 fn version_other_than_measured_is_refused() -> Gate {
     let refused = check_version("0.157.0");
-    assert!(matches!(refused, Err(HomeError::UnmeasuredCodexVersion { .. })));
+    assert!(matches!(
+        refused,
+        Err(HomeError::UnmeasuredCodexVersion { .. })
+    ));
     assert_eq!(
         refused.err().map(|e| e.to_string()).as_deref(),
         Some(
@@ -36,7 +39,12 @@ fn unnamed_zone_is_refused() {
         absent.err().map(|e| e.to_string()).as_deref(),
         Some("TZ unset is not an IANA time zone name: set TZ to an IANA name")
     );
-    for value in ["", ":/etc/localtime", "/Australia/Sydney", "Australia//Sydney"] {
+    for value in [
+        "",
+        ":/etc/localtime",
+        "/Australia/Sydney",
+        "Australia//Sydney",
+    ] {
         assert!(
             matches!(zone_of(Some(value)), Err(HomeError::UnnamedTimeZone { .. })),
             "{value}"
