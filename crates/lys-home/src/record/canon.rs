@@ -373,6 +373,7 @@ fn append_example(
         Err(std::fs::TryLockError::WouldBlock) => {
             return Err(HomeError::SessionHeld {
                 path: canon_path.to_path_buf(),
+                holder: None,
             });
         }
         Err(std::fs::TryLockError::Error(e)) => {

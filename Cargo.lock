@@ -966,6 +966,7 @@ dependencies = [
  "jiff",
  "lys-core",
  "rand",
+ "rustix",
  "serde",
  "serde_json",
  "sha1",

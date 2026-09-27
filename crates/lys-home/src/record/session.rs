@@ -10,6 +10,7 @@ use crate::record::blocks;
 use crate::record::entries::{Entry, EntryBase, EntryBody, SessionHeader};
 use crate::record::helpers::{custom_type_of, fresh_id, now, write_durable};
 use crate::record::index::{Index, IndexRow, read_head, write_head};
+use crate::record::lock::SessionLock;
 
 /// One open session file.
 #[derive(Debug)]
@@ -21,7 +22,7 @@ pub struct Session {
     /// Whether opening had to rebuild the index from the file.
     pub(super) rebuilt: bool,
     /// The exclusive lock on `<id>.lock`, held for the life of this owner.
-    pub(super) lock: std::fs::File,
+    pub(super) lock: SessionLock,
     /// Set when an append left the index or head behind the file; cleared by
     /// [`Session::reconcile`], which runs before anything else is admitted.
     pub(super) stale: bool,
@@ -33,7 +34,7 @@ impl Session {
     /// Create a session file at `file` with this header.
     pub fn create(file: impl Into<PathBuf>, header: SessionHeader) -> Result<Self, HomeError> {
         let file = file.into();
-        let lock = take_lock(&file)?;
+        let lock = SessionLock::take(&file)?;
         if file.exists() {
             return Err(HomeError::Exists { path: file });
         }
@@ -69,7 +70,7 @@ impl Session {
     /// ([`Session::append_beside`]) can never be taken for the head.
     pub fn open(file: impl Into<PathBuf>) -> Result<Self, HomeError> {
         let file = file.into();
-        let lock = take_lock(&file)?;
+        let lock = SessionLock::take(&file)?;
         let (header, index, rebuilt) = load_checked(&file)?;
         let head = read_head(&file, &index)?;
         if let Some(id) = &head
@@ -141,7 +142,7 @@ impl Session {
     /// The lock file this owner holds.
     #[must_use]
     pub fn lock_file(&self) -> &std::fs::File {
-        &self.lock
+        self.lock.file()
     }
 
     /// The session file.
@@ -376,27 +377,6 @@ impl Session {
         let rows = self.index.rows_of_custom(custom_type);
         let (entries, _) = self.index.read_rows_from(&self.file, &rows)?;
         Ok(entries)
-    }
-}
-
-/// Take the exclusive lock beside a session file, or refuse by name when
-/// another owner holds it. The lock is advisory and per open file, so it
-/// refuses a second owner in this process as well as in another.
-fn take_lock(file: &Path) -> Result<std::fs::File, HomeError> {
-    let path = Index::lock_path(file);
-    let lock = std::fs::OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .read(true)
-        .write(true)
-        .open(&path)
-        .map_err(|e| HomeError::io("opening the session lock", &path, e))?;
-    match lock.try_lock() {
-        Ok(()) => Ok(lock),
-        Err(std::fs::TryLockError::WouldBlock) => Err(HomeError::SessionHeld {
-            path: file.to_path_buf(),
-        }),
-        Err(std::fs::TryLockError::Error(e)) => Err(HomeError::io("locking the session", &path, e)),
     }
 }
 
