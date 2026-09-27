@@ -86,7 +86,7 @@
         },
         {
           "id": "C14",
-          "text": "FileLeafStore::open_read_only is a documented inherent constructor that never flushes, creates, writes, renames, links or removes a file, leftover temporary files included, and the LeafStore trait has the same methods as on main.",
+          "text": "FileLeafStore::open_read_only is a documented inherent constructor that refuses what FileLeafStore::open refuses with the same errors, reports the same leftover temporary files, and never flushes, creates, writes, renames, links or removes a file, leftover temporary files included, and the LeafStore trait has the same methods as on main.",
           "done": false
         },
         {
