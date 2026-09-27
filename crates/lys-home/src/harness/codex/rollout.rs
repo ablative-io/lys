@@ -23,6 +23,7 @@ use serde_json::{Value, json};
 use crate::error::HomeError;
 use crate::harness::claude_code::render::record_uuid;
 use crate::harness::codex::account::{Account, Rows, part_hash, write_new};
+use crate::harness::codex::beside::{Beside, carried_prompt};
 use crate::harness::codex::parts::{NO_TEXT, kind_of, message_items, not_carried};
 use crate::harness::codex::zone::{check_version, local_time, parse_stamp, zone_of};
 use crate::record::Session;
@@ -180,6 +181,7 @@ pub fn translate(
         .iter()
         .rev()
         .find(|entry| matches!(entry.body, EntryBody::Compaction { .. }));
+    let beside = Beside::read(session, &path, &context)?;
     if let Some(compaction) = compaction {
         let reason = format!(
             "left off the context path by compaction {}",
@@ -190,12 +192,15 @@ pub fn translate(
             .filter(|e| !context.iter().any(|c| c.id() == e.id()))
         {
             rows.lost(entry.id(), None, entry_kind(entry), &reason);
+            beside.left_behind(entry.id(), &reason, &mut rows);
         }
     }
     let mut blocks = 0u64;
     for entry in &context {
         blocks += walk_entry(entry, &mut lines, &mut rows)?;
+        beside.after_entry(entry, &mut lines, &mut rows)?;
     }
+    carried_prompt(session, &context, &mut lines, &mut rows)?;
     let account = Account {
         session: session_id,
         head: head.id().to_owned(),

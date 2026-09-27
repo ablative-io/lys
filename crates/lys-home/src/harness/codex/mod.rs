@@ -7,6 +7,7 @@
 pub mod account;
 #[cfg(test)]
 mod account_tests;
+pub mod beside;
 #[cfg(test)]
 mod beside_tests;
 pub mod parts;
