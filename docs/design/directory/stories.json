@@ -76,6 +76,10 @@
         {
           "id": "S12",
           "text": "As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect."
+        },
+        {
+          "id": "S76",
+          "text": "As a person giving part of my access, I want the form to list everything I cannot give to the recipient I chose, each with the one reason that stops it, so that I know what and why before I try, from the server's answer rather than my browser's guess."
         }
       ]
     }

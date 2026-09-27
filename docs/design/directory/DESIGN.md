@@ -165,6 +165,15 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `surface/identity/src/generated/index.ts` | Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch | DIRECTORY-006 |
 | `docs/design/directory/briefs/DIRECTORY-008.json` | the grant brief residue after PR 6: DIRECTORY-005's verification line, three inventory rows and the intention sentence, as requirements on the documents | DIRECTORY-008 |
 | `docs/design/directory/briefs/DIRECTORY-008.md` | rendered markdown | DIRECTORY-008 |
+| `docs/design/directory/briefs/DIRECTORY-024.json` | the cannot-give list: everything a person cannot give on the delegation form, with its one reason (conformance row 2.4) | DIRECTORY-024 |
+| `docs/design/directory/briefs/DIRECTORY-024.md` | rendered markdown | DIRECTORY-024 |
+| `crates/lys-identity/src/grants/cannot_give.rs` | the closed reason set, its precedence, and the per-recipient cannot-give list computed from the authority and lineage decisions | DIRECTORY-024 |
+| `crates/lys-identity/tests/grant_cannot_give.rs` | the cannot-give fixture, precedence, in-force, source-mark, service-account and no-rank cases | DIRECTORY-024 |
+| `crates/lys-identity-server/tests/grant_cannot_give.rs` | the cannot-give operation across routes, its wire values and its refusals | DIRECTORY-024 |
+| `surface/identity/src/features/grants/CannotGiveList.tsx` | renders the server's cannot-give answer and nothing else | DIRECTORY-024 |
+| `surface/identity/src/features/grants/cannotGiveAnswer.ts` | decodes the cannot-give answer and refuses an unknown reason by name | DIRECTORY-024 |
+| `surface/identity/tests/cannot_give.test.tsx` | the cannot-give list on the delegation form against fixture answers | DIRECTORY-024 |
+| `docs/design/identity/CONFORMANCE.md` | the conformance rows; DIRECTORY-024 changes only row 2.4's Brief column | DIRECTORY-024 |
 
 ## Inventory
 
