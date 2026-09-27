@@ -64,6 +64,10 @@ use serde::{Deserialize, Serialize};
 use crate::error::{StoreError, StoreResult};
 use crate::store::{LeafStore, PinnedRoot};
 
+mod left_behind;
+
+pub use left_behind::LeftBehind;
+
 /// Detection marker in `log.json`. A local-state version tag, not a wire
 /// contract.
 const LOG_DIR_FORMAT: &str = "lys/log-dir/v1";
@@ -105,6 +109,9 @@ pub struct FileLeafStore {
     /// The leaf whose directory flush failed on this handle, if any. While set,
     /// every append is refused until the store is reopened.
     durability_uncertain: Option<u64>,
+    /// The temporary names this handle could not remove after a link, in the
+    /// order it met them.
+    left_behind: Vec<LeftBehind>,
 }
 
 /// The two steps after a leaf is linked, kept as functions so that a test can
@@ -171,6 +178,7 @@ impl FileLeafStore {
             extent: 0,
             pinned,
             durability_uncertain: None,
+            left_behind: Vec::new(),
         })
     }
 
@@ -218,12 +226,20 @@ impl FileLeafStore {
             extent: contiguous_extent(dir)?,
             pinned,
             durability_uncertain: None,
+            left_behind: Vec::new(),
         })
     }
 
     /// The directory this store occupies.
     pub fn dir(&self) -> &Path {
         &self.dir
+    }
+
+    /// The temporary names this handle could not remove after linking a
+    /// leaf, each with the leaf it held and what the removal answered. Every
+    /// leaf named here is stored: only its temporary name is still there.
+    pub fn left_behind(&self) -> &[LeftBehind] {
+        &self.left_behind
     }
 
     /// Path of the leaf file for `index`.
@@ -276,9 +292,15 @@ impl FileLeafStore {
         link_leaf(&tmp_path, &self.leaf_path(index), index)?;
         self.extent += 1;
         // The leaf is committed under its final name, and open skips a hidden
-        // temporary name, so a name left behind here costs nothing but space.
-        let left_behind = (after_link.remove_temp)(&tmp_path);
-        drop(left_behind);
+        // temporary name, so a name left behind here fails no append. It is
+        // kept by name with its reason.
+        if let Err(source) = (after_link.remove_temp)(&tmp_path) {
+            self.left_behind.push(LeftBehind {
+                index,
+                path: tmp_path,
+                source,
+            });
+        }
         (after_link.flush_dir)(&leaves_dir).map_err(|source| {
             self.durability_uncertain = Some(index);
             StoreError::LeafDurabilityUncertain { index, source }
@@ -653,6 +675,9 @@ fn invalid_leaf_entry(dir: &Path, name: &str) -> StoreError {
         ),
     }
 }
+
+#[cfg(test)]
+mod left_behind_tests;
 
 #[cfg(test)]
 #[path = "file_tests.rs"]
