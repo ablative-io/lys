@@ -57,9 +57,11 @@ fn id001_deploy_restart_preserves_issuer_identity_and_database_contents() -> Tes
     compose::wait_ready(&deployment)?;
     succeeded(&deployment.lys("configure")?, "configure")?;
     let before = observe(&deployment)?;
+    // The pinned Rauthy builds its issuer as the public origin followed by
+    // /auth/v1/, trailing slash included, and relying parties compare it exactly.
     assert_eq!(
         before.issuer,
-        format!("http://localhost:{}/auth/v1", deployment.ports.rauthy)
+        format!("http://localhost:{}/auth/v1/", deployment.ports.rauthy)
     );
     assert!(!before.key_ids.is_empty(), "the issuer has no signing keys");
 

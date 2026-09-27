@@ -16,7 +16,7 @@ admin_email = "admin@identity.test"
 
 [issuer]
 # The public origin browsers reach Rauthy at. The issuer is this origin followed
-# by /auth/v1.
+# by /auth/v1/, trailing slash included; relying parties compare it exactly.
 #
 # Local origin: plain http is accepted only for a loopback host, as below.
 # TLS origin: name the https origin a TLS-terminating proxy serves, for example
