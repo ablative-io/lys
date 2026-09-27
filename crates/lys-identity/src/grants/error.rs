@@ -5,7 +5,9 @@
 //! on it. No variant carries a default: a refusal is never turned into a
 //! permission by leaving something out.
 
+use super::types::RecipientKind;
 use crate::error::IdentityError;
+use crate::lifecycle::LifecycleState;
 
 /// Errors returned by the grant contract, its model and its admission.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -102,6 +104,176 @@ pub enum GrantError {
         "GrantNotCanonical: the grant's bytes are not the canonical encoding of what they decode to"
     )]
     GrantNotCanonical,
+    /// A grant or request names a source grant the book does not hold.
+    #[error("SourceUnknown: no grant {grant} is held, so nothing derives from it")]
+    SourceUnknown {
+        /// The grant named.
+        grant: String,
+    },
+    /// An ancestry returns to a grant already on it, or runs past the longest ancestry walked.
+    #[error("LineageCycle: the ancestry returns to {grant}, and a cycle reaches no person")]
+    LineageCycle {
+        /// The grant met twice.
+        grant: String,
+    },
+    /// A grant names an issuer other than the holder of its source.
+    #[error(
+        "IssuerNotHolder: {grant} was issued by someone other than the holder of {source_grant}"
+    )]
+    IssuerNotHolder {
+        /// The grant.
+        grant: String,
+        /// Its source.
+        source_grant: String,
+    },
+    /// A caller asked to pass on a grant it does not hold.
+    #[error("NotHolder: {caller} does not hold {grant}")]
+    NotHolder {
+        /// The caller.
+        caller: String,
+        /// The grant named.
+        grant: String,
+    },
+    /// A request or grant is on a resource other than its source's.
+    #[error("ResourceOutside: {requested} is not the resource of {source_grant}")]
+    ResourceOutside {
+        /// The resource requested.
+        requested: String,
+        /// The source grant.
+        source_grant: String,
+    },
+    /// A grant that may be exercised but not passed on was asked to be passed on.
+    #[error("UseOnly: {grant} may be exercised and not passed on")]
+    UseOnly {
+        /// The use-only grant.
+        grant: String,
+    },
+    /// A grant may not be passed on to this kind of recipient.
+    #[error("RecipientRefused: {grant} may not be passed on to a {kind}")]
+    RecipientRefused {
+        /// The recipient's kind.
+        kind: RecipientKind,
+        /// The source grant.
+        grant: String,
+    },
+    /// A request asks to let the recipient pass on more than the source lets be passed on.
+    #[error(
+        "PassOnBeyondSource: the requested pass-on is wider than {source_grant} lets be passed on"
+    )]
+    PassOnBeyondSource {
+        /// The source grant.
+        source_grant: String,
+    },
+    /// A requested end is later than its source grant's end. It is refused, never clamped.
+    #[error(
+        "ExpiryBeyondSource: the requested end ({requested}) is later than {source_grant}, which ends at {source_ends}"
+    )]
+    ExpiryBeyondSource {
+        /// The end requested.
+        requested: String,
+        /// The source grant.
+        source_grant: String,
+        /// When the source ends.
+        source_ends: u64,
+    },
+    /// A request names a responsible person the directory does not record for the recipient.
+    #[error("ResponsibleMismatch: {identity} is answered for by {recorded}, not {named}")]
+    ResponsibleMismatch {
+        /// The identity.
+        identity: String,
+        /// The person the request named.
+        named: String,
+        /// The person the directory records.
+        recorded: String,
+    },
+    /// An identity on the path is not active, so no grant it holds is effective.
+    #[error(
+        "IdentityNotActive: {identity} is {state}, and only an active identity's grants are effective"
+    )]
+    IdentityNotActive {
+        /// The identity.
+        identity: String,
+        /// Its state.
+        state: LifecycleState,
+    },
+    /// A grant on the path was revoked.
+    #[error("Revoked: {grant} was revoked, and nothing derived from it is effective")]
+    Revoked {
+        /// The revoked grant.
+        grant: String,
+    },
+    /// A grant on the path has ended.
+    #[error("Expired: {grant} ended at {ended_at}")]
+    Expired {
+        /// The grant whose end was reached.
+        grant: String,
+        /// When it ended.
+        ended_at: u64,
+    },
+    /// A grant on the path has not started.
+    #[error("NotStarted: {grant} starts at {starts_at}")]
+    NotStarted {
+        /// The grant.
+        grant: String,
+        /// When it starts.
+        starts_at: u64,
+    },
+    /// A root grant was asked for by someone other than the configured root authority.
+    #[error(
+        "RootAuthorityRefused: {caller} is not the root authority, and only it issues a root grant"
+    )]
+    RootAuthorityRefused {
+        /// The caller.
+        caller: String,
+    },
+    /// A revocation was asked for by someone with no authority over the grant.
+    #[error("RevokeRefused: {caller} neither issued {grant} nor holds a grant it derives from")]
+    RevokeRefused {
+        /// The caller.
+        caller: String,
+        /// The grant.
+        grant: String,
+    },
+    /// A grant was already revoked.
+    #[error("AlreadyRevoked: {grant} is already revoked")]
+    AlreadyRevoked {
+        /// The grant.
+        grant: String,
+    },
+    /// A grant id is already held by the book.
+    #[error("GrantExists: {grant} is already issued")]
+    GrantExists {
+        /// The grant.
+        grant: String,
+    },
+    /// The caller holds no grant carrying the action on the resource.
+    #[error("NotHeld: {identity} holds no grant of {action} on {resource}")]
+    NotHeld {
+        /// The caller.
+        identity: String,
+        /// The resource.
+        resource: String,
+        /// The action.
+        action: String,
+    },
+    /// An operation id was already used for a different request.
+    #[error("OperationReused: {operation} already names a different request")]
+    OperationReused {
+        /// The operation id.
+        operation: String,
+    },
+    /// A grant event's parts do not fit together.
+    #[error("EventMismatch: {reason}")]
+    EventMismatch {
+        /// The rule the event broke.
+        reason: &'static str,
+    },
+    /// A request names a grant the book does not hold.
+    #[error("GrantUnknown: no grant {grant} is held")]
+    GrantUnknown {
+        /// The grant named.
+        grant: String,
+    },
     /// A directory refusal met while judging a grant.
     #[error(transparent)]
     Identity(#[from] IdentityError),
