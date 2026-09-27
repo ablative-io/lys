@@ -96,10 +96,10 @@ Tom's rules, in his words, with the date and time each was given.
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo clippy --all-targets -- -D warnings
-cargo test --workspace --all-features
+cargo test --workspace --all-features --no-fail-fast
 cargo doc --no-deps --all-features
 cargo doc --no-deps
-cargo clippy -p lys --all-features --test 'identity_*' -- -D warnings && cargo test -p lys --all-features --test 'identity_*'
+cargo clippy -p lys --all-features --test 'identity_*' -- -D warnings && cargo test -p lys --all-features --no-fail-fast --test 'identity_*'
 ```
 
 All five clean. No exceptions.

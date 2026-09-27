@@ -43,7 +43,7 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --workspace --no-fail-fast
         env:
           LYS_REQUIRE_GO: "1"
 
