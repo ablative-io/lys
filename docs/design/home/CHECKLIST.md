@@ -76,3 +76,12 @@
 - [ ] **C42** — A fork writes no block, rewrites no earlier byte of the parent, and copies nothing from the parent but its cwd: no credential, handle or launch setting enters the child.
 - [ ] **C43** — lys-home fork --home --lantern [--session] prints one JSON report on success, exits 1 with the refusal on stderr and nothing on stdout, and takes no point or entry id.
 - [ ] **C44** — Rendering a child whose coordinate was carried writes the carried message's text parts as a seed prompt beside the rendered file under an in-band marker line, the render report names it, the template's launch line (printed by render-launch only) passes it as the first prompt and is never run, and PROOF-FORK.md records a fork launched on the installed Claude Code version as hashes, counts, paths, commands, versions and exit codes only.
+
+## The config directory through --settings
+
+- [ ] **C83** — PROOF-GIVEN.md records three launches from render-launch's printed line through a template whose env slot alone sets CLAUDE_CONFIG_DIR to a fresh directory, with the measured machine's host and claude --version answer and, for CLAUDE.md and for the memory index, whether each was read from the template's directory or from HOME/.claude, as paths, counts and hashes only.
+- [ ] **C84** — RECORD.md and PROOF-GIVEN.md state the answer with every Claude Code version and host measured or cited, and on a no or split answer name the affected entries as lys.given entries whose config_dir.source is template and whose harness_version is 2.1.283, standing as written.
+- [ ] **C85** — On a no answer a render resolves the config directory as HOME/.claude with source home and never takes the template's CLAUDE_CONFIG_DIR as the path.
+- [ ] **C86** — On a no answer a render appends one lys.given.v2 entry whose config_dir is exactly {path, source, given_not_applied} and no lys.given entry, and lys.given's shape and its key-set test are unchanged.
+- [ ] **C87** — On a no answer lys-home given lists lys.given and lys.given.v2 entries together in file order, each marked version 1 or 2, and given-check checks each entry by its own version's shape.
+- [ ] **C88** — On a yes answer nothing under crates/ changes; on a split answer nothing under crates/ changes and RECORD.md and PROOF-GIVEN.md name each document with its directory and the per-document config directories card.

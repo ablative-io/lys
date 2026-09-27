@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,36 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-020",
+      "title": "Measure whether a template's CLAUDE_CONFIG_DIR moves the session's config directory, and record the directory the session uses",
+      "status": "idea",
+      "kind": "fix",
+      "summary": "The launch template's env slot reaches a Claude Code session only through the --settings file, and PROOF-GIVEN measured the config directory with CLAUDE_CONFIG_DIR in the process environment, so lys.given's source template is unmeasured. HOME-008 measures it through a rendered template on the named Claude Code version and records the answer in PROOF-GIVEN.md and RECORD.md. Yes: documents only. Split: documents only, naming the per-document config directories card. No: the resolver uses HOME/.claude with source home, lys.given.v2 beside lys.given carries the template's value as given and not applied, render-launch writes it, and given and given-check read both versions (ADR-031).",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T09:52:29+10:00",
+        "quote": "PROOF-GIVEN set CLAUDE_CONFIG_DIR in the process environment when it measured the config directory, but a launched session receives a template's environment through the settings file the launch line passes with --settings. If --settings does not move the session's config directory, every lys.given record whose source is the template names a directory the session never used. The proof launches a session through a rendered template whose environment names a config directory that exists nowhere else, and measures on the installed Claude Code, with its version named, whether the session reads its CLAUDE.md and memory index from that directory or from HOME; the answer is recorded in PROOF-GIVEN.md and RECORD.md, and if the answer is no, the resolver reads the config directory the way the session does and the template's value is recorded as given but named as not applied. Found by Waffles reviewing lys PR 16; first of the three follow-ups. Not in scope: any other template slot.\n\nRulings of the lead, Archie, given at 07:22 on 27 September 2026 to the first run bbf03665 in answer to its four survey questions. That run took all four and then failed while writing, on a worker that held no state for its author session (SessionStateAbsent). The failure was the worker's, not the brief's. These rulings are settled, and the author reopens none of them. G1: the config directory is HOME/.claude only. HOME-003 R2 stands: the renderer never reads its own process's CLAUDE_CONFIG_DIR, because the launching shell is not the renderer. If the measurement says --settings does not move the directory, the resolver resolves the config directory as HOME/.claude with source home. G2: if the measurement answers no, a new versioned type is added alongside lys.given, per ADR-013, because entries of the old version have been held in homes since PR 16 and the shape is not changed in place. The new version's config_dir carries the applied path and source as now, plus the template's value, named as given and not applied. If the measurement answers yes, the record's shape does not change and the card ends at the proof and RECORD.md. G3: a split is recorded in PROOF-GIVEN.md and RECORD.md, with each document and the directory it was read from, and the card stops there. Per-document directories in the resolver are a new card, which the brief names; the card does not guess a single applied directory for a split. G4: old entries stand as written. The record is append-only and nothing is appended to old sessions. The correction lives in PROOF-GIVEN.md and RECORD.md, which name the affected entries by version, source template and the Claude Code versions measured, so a reader of an old session can tell which entries name a directory the session did not use.",
+        "context": "The first of three follow-ups from the review of lys PR 16. The lead's rulings G1 to G4 are carried in the quote; the lead's answers to the survey's two open questions, on listing both versions in given and given-check and on the Claude Code versions measured and cited, are written into HOME-008."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-007",
+          "ADR-012",
+          "ADR-013",
+          "ADR-031"
+        ],
+        "briefs": [
+          "HOME-008"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-007"
+      ],
+      "notes": "Ids are the next after main's highest at 7b53625 and every open brief branch's: RM-020, ADR-031, C83 to C88, S35 to S37 and CN13 (open brief branches hold up to RM-019, ADR-030, C82, S34 and CN12). The brief id HOME-008 is the id this run was given; the open brief branch brief/home/5898fcb0 also holds a HOME-008, and whichever lands second renumbers. Further units, not written: Per-document config directories in the given resolver; The second and third follow-ups from the review of lys PR 16; Re-measure the config-directory rule on each Claude Code upgrade."
     }
   ]
 }

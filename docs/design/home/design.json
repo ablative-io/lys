@@ -57,7 +57,8 @@
     "ADR-015",
     "ADR-016",
     "ADR-017",
-    "ADR-018"
+    "ADR-018",
+    "ADR-031"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -70,7 +71,8 @@
     "Every launch-template render records what the session was given: one lys.given entry after the render event naming each instruction document Claude Code will load, and each file the render wrote, by path, byte length and SHA-256 in the measured order, with the environment variable names the template set, and never a document's content; lys-home lists those records and checks a file on disk against one by hash.",
     "A lantern lit on purpose at a past entry of a session is recalled from the home by a word of its note and by its point, with its epilogues after it and never a line of the transcript around it.",
     "The same session head rendered twice with the same target and the same lys-home version gives files of equal SHA-256, a fixture holding a tool record with more than one result included, and the fixture's hash is pinned by a test and recorded in PROOF-RESUME.md.",
-    "A session forked from a lantern's point holds the parent's own lines up to the last assistant message before the point, carries its ancestry on both sides, adds nothing to the block store, and is rendered and launched on the installed Claude Code version, measured, with a user-message point carried as the child's first prompt."
+    "A session forked from a lantern's point holds the parent's own lines up to the last assistant message before the point, carries its ancestry on both sides, adds nothing to the block store, and is rendered and launched on the installed Claude Code version, measured, with a user-message point carried as the child's first prompt.",
+    "Whether a launch template's CLAUDE_CONFIG_DIR, reaching the session through --settings, moves the session's config directory is measured on a named Claude Code version, and the context record names the directory the session reads from."
   ],
   "non_goals": [
     {
@@ -108,6 +110,14 @@
     {
       "text": "Rendering tool parts from the stored block, and moving the render's default Claude Code version off 2.1.281.",
       "reason": "Both change what a rendered file holds; the deterministic render changes nothing a file holds beyond the determinism."
+    },
+    {
+      "text": "Per-document config directories in the given resolver.",
+      "reason": "A split answer is recorded and the card stops; resolving CLAUDE.md and the memory index from different directories is its own card, and no single applied directory is guessed for a split."
+    },
+    {
+      "text": "Any launch template slot other than the env slot's CLAUDE_CONFIG_DIR.",
+      "reason": "The config-directory follow-up examines one variable's delivery; other slots are out of its scope."
     }
   ],
   "structure": [
@@ -650,6 +660,31 @@
       "path": "docs/design/home/PROOF-FORK.md",
       "note": "the measured fork: Pi's parentSession read, a real session forked, rendered and launched, as hashes, counts and exit codes",
       "brief": "HOME-006"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.json",
+      "note": "the config-directory brief: measure whether --settings moves the session's config directory, and record the directory the session uses",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/given_v2.rs",
+      "note": "the lys.given.v2 record, on a no answer: lys.given's data with config_dir {path, source, given_not_applied}",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/given_v2_tests.rs",
+      "note": "lys.given.v2's key-set, null and round-trip tests",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/tests/given_versions.rs",
+      "note": "given and given-check over a session holding one lys.given and one lys.given.v2 entry",
+      "brief": "HOME-008"
     }
   ],
   "inventory": [
@@ -734,6 +769,10 @@
     {
       "id": "CN10",
       "text": "A fork copies the parent file's own line bytes and writes no block; nothing of the parent's header but cwd, and no credential, handle or launch setting, enters the child; the parent gains one lys.fork entry at its head and no earlier byte of it changes."
+    },
+    {
+      "id": "CN13",
+      "text": "The context record names as its config directory only the directory the session reads from on the measured Claude Code version; a template's CLAUDE_CONFIG_DIR that --settings does not apply is recorded as given and not applied in lys.given.v2, lys.given's shape is not changed, and lys.given entries already written are never rewritten or appended to."
     }
   ],
   "gate": [

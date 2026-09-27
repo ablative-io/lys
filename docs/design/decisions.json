@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,24 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-031",
+      "title": "The context record names the config directory the session reads from; a template's value --settings does not apply is recorded as given and not applied, in a new version",
+      "status": "proposed",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "",
+      "context": "HOME-003 R2 ruled that a session's config directory is the template's CLAUDE_CONFIG_DIR, and lys.given has recorded source template whenever a template sets it. The template's env slot reaches a launched Claude Code session only through the settings file the launch line passes with --settings, and PROOF-GIVEN measured the config directory with CLAUDE_CONFIG_DIR in the process environment instead, so the rule was stated from the implementation's assumption and never measured. lys.given entries have been held in homes since lys PR 16, so the shape cannot change in place (ADR-013, wire formats are forever).",
+      "decision": "HOME-008 measures, through a rendered template on a named Claude Code version, whether the session reads its CLAUDE.md and memory index from the template's CLAUDE_CONFIG_DIR or from HOME/.claude. On a no answer the config directory is HOME/.claude only, with source home, never the renderer's own CLAUDE_CONFIG_DIR, and a render appends a new custom type lys.given.v2 alongside lys.given whose config_dir carries the applied path and source and the template's value as given_not_applied; given and given-check read both types in file order, each by its own shape. On a yes answer the record's shape does not change. On a split the answer is recorded per document and per-document config directories are a new card; no single applied directory is guessed. Entries already written stand as written and the correction lives in PROOF-GIVEN.md and RECORD.md. Rejected: changing lys.given's config_dir in place (entries of that shape are held), appending corrections to old sessions (the record is append-only), and reading the renderer's own CLAUDE_CONFIG_DIR (the launching shell is not the renderer).",
+      "quote": "",
+      "consequences": [
+        "Supersedes HOME-003 R2's rule that the template's CLAUDE_CONFIG_DIR names the config directory, on a no answer, for the Claude Code version measured.",
+        "The decision is accepted with the measured answer and the Claude Code version it was measured on; a yes answer leaves lys.given as the record and lys.given.v2 unwritten.",
+        "The config-directory rule is re-measured on each Claude Code upgrade, as a resume path is (home P6)."
       ],
       "supersedes": [],
       "superseded_by": ""
