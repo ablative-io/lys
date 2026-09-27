@@ -25,13 +25,13 @@ identity_leg() {
     echo "identity_lint_failed: an identity target has a lint warning; no identity test was run"
     return 1
   fi
-  cargo test -p lys --all-features --test 'identity_*'
+  cargo test -p lys --all-features --no-fail-fast --test 'identity_*'
 }
 leg sh scripts/design/gate.sh
 leg cargo fmt --check
 leg cargo clippy --all-targets --all-features -- -D warnings
 leg cargo clippy --all-targets -- -D warnings
-leg cargo test --workspace --all-features
+leg cargo test --workspace --all-features --no-fail-fast
 leg cargo doc --no-deps --all-features
 leg cargo doc --no-deps
 leg identity_leg
