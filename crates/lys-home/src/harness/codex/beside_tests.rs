@@ -44,18 +44,30 @@ fn image() -> Value {
     json!({"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "iVBORw0KGgo="}})
 }
 
-/// One Claude Code record; a sidechain record carries `agent` when given.
-fn rec(uuid: &str, parent: Option<&str>, side: Option<Option<&str>>, message: &Value) -> Value {
+/// Which chain a record is on.
+#[derive(Clone, Copy)]
+enum Chain<'a> {
+    /// The main chain.
+    Main,
+    /// A sidechain whose records carry this agent id.
+    Agent(&'a str),
+    /// A sidechain whose records carry no agent id.
+    Unlabelled,
+}
+
+/// One Claude Code record on the chain named.
+fn rec(uuid: &str, parent: Option<&str>, chain: Chain<'_>, message: &Value) -> Value {
     let role = message["role"].as_str().map_or("user", |r| r);
-    let stamp = if side.is_some() && parent.is_none() {
+    let side = !matches!(chain, Chain::Main);
+    let stamp = if side && parent.is_none() {
         LABEL_STAMP
     } else {
         "2026-01-01T00:00:01.000Z"
     };
-    let mut record = json!({"parentUuid": parent, "isSidechain": side.is_some(), "userType": "external",
+    let mut record = json!({"parentUuid": parent, "isSidechain": side, "userType": "external",
         "cwd": "/w", "sessionId": "s", "version": "2.1.281", "uuid": uuid, "timestamp": stamp,
         "type": role, "message": message});
-    if let Some(Some(agent)) = side {
+    if let Chain::Agent(agent) = chain {
         record["agentId"] = json!(agent);
     }
     record
@@ -72,11 +84,11 @@ fn assistant(content: &Value) -> Value {
 
 fn main_chain() -> Vec<Value> {
     vec![
-        rec(U1, None, None, &user(&json!("fixture question"))),
+        rec(U1, None, Chain::Main, &user(&json!("fixture question"))),
         rec(
             A1,
             Some(U1),
-            None,
+            Chain::Main,
             &assistant(&json!([{"type": "text", "text": "fixture answer"}])),
         ),
     ]
@@ -144,13 +156,13 @@ fn sidechain_fixture() -> Vec<Value> {
     records.push(rec(
         S1,
         None,
-        Some(Some("a1")),
+        Chain::Agent("a1"),
         &user(&json!("fixture sub-question")),
     ));
     records.push(rec(
         S2,
         Some(S1),
-        Some(Some("a1")),
+        Chain::Agent("a1"),
         &assistant(&json!([{"type": "text", "text": "fixture sub-answer"}])),
     ));
     records
@@ -237,11 +249,11 @@ fn sidechain_descendants_and_unlabelled_branch_are_listed() -> Gate {
     records.push(rec(
         S1,
         None,
-        Some(Some("a1")),
+        Chain::Agent("a1"),
         &assistant(&json!([
         {"type": "tool_use", "id": "toolu_s", "name": "Bash", "input": {"command": "true"}}])),
     ));
-    records.push(rec(S2, Some(S1), Some(Some("a1")), &user(&json!([
+    records.push(rec(S2, Some(S1), Chain::Agent("a1"), &user(&json!([
         {"type": "tool_result", "tool_use_id": "toolu_s", "content": "fixture sub-output", "is_error": false}]))));
     records.push(
         json!({"type": "attachment", "uuid": S3, "parentUuid": S2, "isSidechain": true,
@@ -250,13 +262,13 @@ fn sidechain_descendants_and_unlabelled_branch_are_listed() -> Gate {
     records.push(rec(
         N1,
         None,
-        Some(None),
+        Chain::Unlabelled,
         &user(&json!("fixture stray question")),
     ));
     records.push(rec(
         N2,
         Some(N1),
-        Some(None),
+        Chain::Unlabelled,
         &assistant(&json!([{"type": "text", "text": "fixture stray answer"}])),
     ));
     let (dir, home) = import(&records)?;
@@ -364,7 +376,7 @@ fn off_path_label_compaction_branch_summary_and_model_change_are_lost() -> Gate 
 fn forked_child_opens_on_the_point() -> Gate {
     let mut records = main_chain();
     let parts = json!([{"type": "text", "text": "go"}, image()]);
-    records.push(rec(U2, Some(A1), None, &user(&parts)));
+    records.push(rec(U2, Some(A1), Chain::Main, &user(&parts)));
     let (dir, home) = import(&records)?;
     let root = home.root().to_path_buf();
     let lit = cli_run(Cli {
@@ -400,13 +412,13 @@ fn forked_child_opens_on_the_point() -> Gate {
         (entry.base.timestamp, s.context_path()?.len())
     };
     let (lines, account) = translated(&home, &child, &dir.path().join("o"))?;
-    let last = lines.last().ok_or("no lines")?;
-    assert_eq!(last["payload"]["role"], "user");
+    let prompt = lines.last().ok_or("no lines")?;
+    assert_eq!(prompt["payload"]["role"], "user");
     assert_eq!(
-        last["payload"]["content"],
+        prompt["payload"]["content"],
         json!([{"type": "input_text", "text": "go"}])
     );
-    assert_eq!(last["timestamp"], json!(forked_from));
+    assert_eq!(prompt["timestamp"], json!(forked_from));
     let users: Vec<usize> = lines
         .iter()
         .enumerate()
@@ -446,7 +458,7 @@ fn sidechain_image_is_lost_with_its_reason() -> Gate {
     records.push(rec(
         S1,
         None,
-        Some(Some("a1")),
+        Chain::Agent("a1"),
         &user(&json!([{"type": "text", "text": "look"}, image()])),
     ));
     let (dir, home) = import(&records)?;
@@ -485,7 +497,12 @@ fn sidechain_under_a_compacted_entry_is_lost() -> Gate {
         json!({"type": "system", "subtype": "compact_boundary", "uuid": SYS, "parentUuid": null,
         "isSidechain": false, "timestamp": "2026-01-01T00:00:05.000Z"}),
     );
-    records.push(rec(U3, Some(SYS), None, &user(&json!("fixture after"))));
+    records.push(rec(
+        U3,
+        Some(SYS),
+        Chain::Main,
+        &user(&json!("fixture after")),
+    ));
     let (dir, home) = import(&records)?;
     let label = agent_label(&home, "a1")?;
     let compaction = {
