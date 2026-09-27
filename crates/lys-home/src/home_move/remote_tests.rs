@@ -42,7 +42,10 @@ fn a_path_is_taken_as_an_absolute_path_on_this_machine() -> Result<(), Box<dyn E
         take_remote("/tmp/r.git", base)?,
         PathBuf::from("/tmp/r.git")
     );
-    assert_eq!(take_remote("r.git", base)?, PathBuf::from("/tmp/work/r.git"));
+    assert_eq!(
+        take_remote("r.git", base)?,
+        PathBuf::from("/tmp/work/r.git")
+    );
     assert_eq!(take_remote("./a:b", base)?, PathBuf::from("/tmp/work/a:b"));
     Ok(())
 }

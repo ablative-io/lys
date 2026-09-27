@@ -130,7 +130,10 @@ fn ship(dir: &Path, home: &Path, remote: &Path) -> Result<String, Box<dyn Error>
     )?;
     assert_eq!(output.status.code(), Some(0));
     let value: Value = serde_json::from_slice(&output.stdout)?;
-    Ok(value["report"]["commit"].as_str().ok_or("a commit")?.to_owned())
+    Ok(value["report"]["commit"]
+        .as_str()
+        .ok_or("a commit")?
+        .to_owned())
 }
 
 fn fetch(dir: &Path, remote: &str, target: &Path) -> Result<Output, Box<dyn Error>> {
@@ -255,8 +258,18 @@ fn the_fetched_commit_holds_every_tracked_file_of_the_source_byte_for_byte() -> 
     let tracked = tracked_set(&Home::read(&m.source)?)?;
     let mut compared = 0;
     for path in &tracked {
-        let blob = git_bytes(&["-C", target, "cat-file", "blob", &format!("{}:{path}", m.commit)])?;
-        assert_eq!(Hash::of(&blob).as_str(), sha256_of(&m.source.join(path))?, "{path}");
+        let blob = git_bytes(&[
+            "-C",
+            target,
+            "cat-file",
+            "blob",
+            &format!("{}:{path}", m.commit),
+        ])?;
+        assert_eq!(
+            Hash::of(&blob).as_str(),
+            sha256_of(&m.source.join(path))?,
+            "{path}"
+        );
         compared += 1;
     }
     assert_eq!(compared, tracked.len());
@@ -306,8 +319,15 @@ fn each_session_ends_with_one_arrival_beside_its_head() -> Gate {
     assert_eq!(data["detail"]["ref"], "refs/lys/home");
     let execution = data["detail"]["execution"].as_str().ok_or("an execution")?;
     assert_eq!(execution.len(), 32);
-    assert!(execution.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')));
-    assert_eq!(m.report["sessions"], json!([{"session": "fixture", "execution": execution}]));
+    assert!(
+        execution
+            .bytes()
+            .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+    );
+    assert_eq!(
+        m.report["sessions"],
+        json!([{"session": "fixture", "execution": execution}])
+    );
     let mut searched = 0;
     for (relative, _) in files_under(&m.source)? {
         let bytes = std::fs::read(m.source.join(&relative))?;
@@ -334,7 +354,13 @@ fn every_template_a_render_event_names_is_held_by_the_target() -> Gate {
             let hash = value["data"]["detail"]["template"]
                 .as_str()
                 .ok_or("a template hash")?;
-            assert!(m.target.join("templates").join(&hash[..2]).join(hash).is_file());
+            assert!(
+                m.target
+                    .join("templates")
+                    .join(&hash[..2])
+                    .join(hash)
+                    .is_file()
+            );
             named += 1;
         }
     }
@@ -351,7 +377,10 @@ fn the_arrival_is_one_commit_on_the_fetched_one_and_the_status_is_clean() -> Gat
     let head = git_text(&["-C", target, "rev-parse", "HEAD"])?;
     let parents = git_text(&["-C", target, "rev-list", "--parents", "-n", "1", "HEAD"])?;
     assert_eq!(parents, format!("{head} {}", m.commit));
-    assert_eq!(git_text(&["-C", target, "rev-parse", "refs/lys/home"])?, head);
+    assert_eq!(
+        git_text(&["-C", target, "rev-parse", "refs/lys/home"])?,
+        head
+    );
     let changed = git_text(&["-C", target, "diff", "--name-only", &m.commit, "HEAD"])?;
     assert_eq!(
         changed.lines().collect::<Vec<_>>(),
@@ -359,9 +388,17 @@ fn the_arrival_is_one_commit_on_the_fetched_one_and_the_status_is_clean() -> Gat
     );
     let mut files = 0;
     for path in ["sessions/fixture.jsonl", "sessions/fixture.index.jsonl"] {
-        let before = git_bytes(&["-C", target, "cat-file", "blob", &format!("{}:{path}", m.commit)])?;
+        let before = git_bytes(&[
+            "-C",
+            target,
+            "cat-file",
+            "blob",
+            &format!("{}:{path}", m.commit),
+        ])?;
         let after = git_bytes(&["-C", target, "cat-file", "blob", &format!("HEAD:{path}")])?;
-        let added = after.strip_prefix(before.as_slice()).ok_or("the old bytes first")?;
+        let added = after
+            .strip_prefix(before.as_slice())
+            .ok_or("the old bytes first")?;
         let (last, body) = added.split_last().ok_or("one added line")?;
         assert_eq!(*last, b'\n', "{path}");
         assert!(!body.contains(&b'\n'), "{path}");
@@ -385,7 +422,13 @@ fn a_ship_from_the_target_carries_the_arrival_onward() -> Gate {
     let onward = dir.path().join("onward.git");
     let output = lys_home(
         dir.path(),
-        &["ship", "--home", text(&m.target)?, "--remote", text(&onward)?],
+        &[
+            "ship",
+            "--home",
+            text(&m.target)?,
+            "--remote",
+            text(&onward)?,
+        ],
     )?;
     assert_eq!(output.status.code(), Some(0));
     let value: Value = serde_json::from_slice(&output.stdout)?;
@@ -435,11 +478,7 @@ fn a_failed_arrival_commit_removes_everything_fetch_created() -> Gate {
         ),
     )?;
     std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755))?;
-    let path = format!(
-        "{}:{}",
-        fake.display(),
-        std::env::var("PATH")?
-    );
+    let path = format!("{}:{}", fake.display(), std::env::var("PATH")?);
     let was_empty = dir.path().join("was-empty-2");
     std::fs::create_dir(&was_empty)?;
     let mut cases = 0;
@@ -447,7 +486,13 @@ fn a_failed_arrival_commit_removes_everything_fetch_created() -> Gate {
         let output = lys_home_with(
             dir.path(),
             Some(&path),
-            &["fetch", "--remote", text(&remote)?, "--home", text(&target)?],
+            &[
+                "fetch",
+                "--remote",
+                text(&remote)?,
+                "--home",
+                text(&target)?,
+            ],
         )?;
         let stderr = String::from_utf8(output.stderr)?;
         assert_eq!(output.status.code(), Some(1));
@@ -596,7 +641,14 @@ fn a_stale_index_pushed_with_plain_git_fails_verification_and_nothing_is_left() 
     add.extend(tracked.iter().map(String::as_str));
     git_bytes(&add)?;
     git_bytes(&["-C", copy_arg, "commit", "--quiet", "-m", "stale"])?;
-    git_bytes(&["-C", copy_arg, "push", "--quiet", text(&remote)?, "HEAD:refs/lys/home"])?;
+    git_bytes(&[
+        "-C",
+        copy_arg,
+        "push",
+        "--quiet",
+        text(&remote)?,
+        "HEAD:refs/lys/home",
+    ])?;
     let target = dir.path().join("stale");
     let output = fetch(dir.path(), text(&remote)?, &target)?;
     assert_eq!(output.status.code(), Some(1));

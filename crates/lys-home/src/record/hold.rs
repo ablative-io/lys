@@ -8,15 +8,14 @@
 //! is refused by name at once, without waiting, and the locks already taken
 //! are released as the partial set is dropped.
 
-use std::fs::File;
-
 use crate::error::HomeError;
-use crate::record::{Home, take_lock};
+use crate::record::Home;
+use crate::record::lock::SessionLock;
 
 /// The locks of every session of a home, released when dropped.
 #[derive(Debug)]
 pub struct Held {
-    locks: Vec<File>,
+    locks: Vec<SessionLock>,
 }
 
 impl Held {
@@ -39,7 +38,7 @@ pub fn hold_all(home: &Home, sessions: &[String]) -> Result<Held, HomeError> {
     let mut locks = Vec::with_capacity(sessions.len());
     for session in sessions {
         let file = home.session_path(session)?;
-        match take_lock(&file) {
+        match SessionLock::take(&file) {
             Ok(lock) => locks.push(lock),
             Err(HomeError::SessionHeld { .. }) => {
                 return Err(HomeError::HeldByOwner {

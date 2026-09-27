@@ -49,9 +49,7 @@ pub fn run_ship(args: &ShipArgs) -> Result<Outcome, HomeError> {
     let base = current_dir()?;
     let inherited: Vec<(OsString, OsString)> = std::env::vars_os().collect();
     match ship(&args.home, &args.remote, &base, &inherited)? {
-        Shipped::Pushed(report) => Ok(Outcome::done(
-            json!({"command": "ship", "report": report}),
-        )),
+        Shipped::Pushed(report) => Ok(Outcome::done(json!({"command": "ship", "report": report}))),
         Shipped::StaleIndex(sessions) => Ok(Outcome {
             report: json!({"command": "ship", "refused": "stale_index", "sessions": sessions}),
             status: STATUS_REFUSED,
@@ -64,9 +62,9 @@ pub fn run_fetch(args: &FetchArgs) -> Result<Outcome, HomeError> {
     let base = current_dir()?;
     let inherited: Vec<(OsString, OsString)> = std::env::vars_os().collect();
     match fetch(&args.remote, &args.home, &base, &inherited)? {
-        Fetched::Arrived(report) => Ok(Outcome::done(
-            json!({"command": "fetch", "report": report}),
-        )),
+        Fetched::Arrived(report) => {
+            Ok(Outcome::done(json!({"command": "fetch", "report": report})))
+        }
         Fetched::VerificationFailed(found) => Ok(Outcome {
             report: refusal_report(&found),
             status: STATUS_REFUSED,

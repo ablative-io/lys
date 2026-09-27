@@ -184,7 +184,12 @@ fn ship_report(dir: &Path, home: &Path, remote: &Path, code: i32) -> Result<Valu
 }
 
 /// Ship expecting a refusal on stderr and nothing on stdout; returns stderr.
-fn ship_refused(dir: &Path, cwd: &Path, home: &Path, remote: &str) -> Result<String, Box<dyn Error>> {
+fn ship_refused(
+    dir: &Path,
+    cwd: &Path,
+    home: &Path,
+    remote: &str,
+) -> Result<String, Box<dyn Error>> {
     let (output, compared) = ship_unchanged(dir, cwd, home, remote)?;
     assert!(compared >= 1);
     assert_eq!(output.status.code(), Some(1));
@@ -228,7 +233,11 @@ fn the_first_ship_makes_the_repository_and_the_remote_and_pushes_the_tracked_set
     assert_eq!(report["remote"], json!(remote));
     let commit = report["commit"].as_str().ok_or("a commit")?;
     assert_eq!(commit.len(), 40);
-    assert!(commit.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')));
+    assert!(
+        commit
+            .bytes()
+            .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+    );
     let at = git_text(&["--git-dir", text(&remote)?, "rev-parse", "refs/lys/home"])?;
     assert_eq!(at, commit);
     let listed = git_text(&[
@@ -241,8 +250,17 @@ fn the_first_ship_makes_the_repository_and_the_remote_and_pushes_the_tracked_set
     ])?;
     let listed: Vec<&str> = listed.lines().collect();
     let tracked = tracked_set(&Home::read(&home)?)?;
-    assert_eq!(listed, tracked.iter().map(String::as_str).collect::<Vec<_>>());
-    assert_eq!(listed.iter().filter(|p| p.starts_with("templates/")).count(), 1);
+    assert_eq!(
+        listed,
+        tracked.iter().map(String::as_str).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        listed
+            .iter()
+            .filter(|p| p.starts_with("templates/"))
+            .count(),
+        1
+    );
     assert!(listed.iter().any(|p| p.starts_with("blocks/")));
     Ok(())
 }
@@ -333,7 +351,10 @@ fn a_home_with_no_session_is_refused_as_empty() -> Gate {
     let stderr = ship_refused(dir.path(), dir.path(), &root, text(&remote)?)?;
     assert!(stderr.starts_with("empty_home"), "{stderr}");
     assert!(stderr.contains("holds no sessions"), "{stderr}");
-    assert!(stderr.contains("ship after a session has been captured"), "{stderr}");
+    assert!(
+        stderr.contains("ship after a session has been captured"),
+        "{stderr}"
+    );
     assert!(!remote.exists());
     assert!(!root.join(".git").exists());
     Ok(())
@@ -416,7 +437,14 @@ fn a_home_repository_tracking_a_foreign_file_is_refused() -> Gate {
     let git_dir = home.join(".git");
     let (git_arg, home_arg) = (text(&git_dir)?, text(&home)?);
     git_text(&["init", "--quiet", home_arg])?;
-    git_text(&["--git-dir", git_arg, "--work-tree", home_arg, "add", "notes.txt"])?;
+    git_text(&[
+        "--git-dir",
+        git_arg,
+        "--work-tree",
+        home_arg,
+        "add",
+        "notes.txt",
+    ])?;
     git_text(&[
         "--git-dir",
         git_arg,
@@ -441,7 +469,10 @@ fn an_unchanged_home_ships_the_same_commit_again_and_a_changed_one_builds_on_it(
     let home = fixture_home(dir.path(), "home")?;
     let remote = dir.path().join("remote.git");
     let first = ship_report(dir.path(), &home, &remote, 0)?;
-    let commit = first["report"]["commit"].as_str().ok_or("a commit")?.to_owned();
+    let commit = first["report"]["commit"]
+        .as_str()
+        .ok_or("a commit")?
+        .to_owned();
     let second = ship_report(dir.path(), &home, &remote, 0)?;
     assert_eq!(second["report"]["unchanged"], true);
     assert_eq!(second["report"]["initialised"], false);
@@ -452,7 +483,13 @@ fn an_unchanged_home_ships_the_same_commit_again_and_a_changed_one_builds_on_it(
     );
     let remote_arg = text(&remote)?;
     assert_eq!(
-        git_text(&["--git-dir", remote_arg, "rev-list", "--count", "refs/lys/home"])?,
+        git_text(&[
+            "--git-dir",
+            remote_arg,
+            "rev-list",
+            "--count",
+            "refs/lys/home"
+        ])?,
         "1"
     );
     assert_eq!(
@@ -470,7 +507,15 @@ fn an_unchanged_home_ships_the_same_commit_again_and_a_changed_one_builds_on_it(
     assert_eq!(third["report"]["unchanged"], false);
     let next = third["report"]["commit"].as_str().ok_or("a commit")?;
     assert_ne!(next, commit);
-    let parents = git_text(&["--git-dir", remote_arg, "rev-list", "--parents", "-n", "1", next])?;
+    let parents = git_text(&[
+        "--git-dir",
+        remote_arg,
+        "rev-list",
+        "--parents",
+        "-n",
+        "1",
+        next,
+    ])?;
     assert_eq!(parents, format!("{next} {commit}"));
     assert_eq!(
         git_text(&["--git-dir", remote_arg, "rev-parse", "refs/lys/home"])?,
@@ -486,10 +531,18 @@ fn a_second_home_shipped_to_the_same_remote_is_refused_as_diverged() -> Gate {
     let second_home = fixture_home(dir.path(), "second")?;
     let remote = dir.path().join("remote.git");
     let first = ship_report(dir.path(), &first_home, &remote, 0)?;
-    let commit = first["report"]["commit"].as_str().ok_or("a commit")?.to_owned();
+    let commit = first["report"]["commit"]
+        .as_str()
+        .ok_or("a commit")?
+        .to_owned();
     let stderr = ship_refused(dir.path(), dir.path(), &second_home, text(&remote)?)?;
     let second_git = second_home.join(".git");
-    let second_commit = git_text(&["--git-dir", text(&second_git)?, "rev-parse", "refs/lys/home"])?;
+    let second_commit = git_text(&[
+        "--git-dir",
+        text(&second_git)?,
+        "rev-parse",
+        "refs/lys/home",
+    ])?;
     assert!(stderr.starts_with("ref_diverged"), "{stderr}");
     assert!(stderr.contains("refs/lys/home"), "{stderr}");
     assert!(stderr.contains(&commit), "{stderr}");

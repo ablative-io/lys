@@ -29,7 +29,12 @@ fn fixture(root: &Path) -> Result<(Home, Vec<String>), Box<dyn Error>> {
     std::fs::write(root.join("blocks").join(".incoming.1.00.tmp"), b"tmp")?;
     std::fs::write(root.join("sessions").join("fixture.head.tmp"), b"tmp")?;
     std::fs::write(root.join("notes.txt"), b"notes")?;
-    for present in ["fixture.jsonl", "fixture.index.jsonl", "fixture.head", "fixture..lock"] {
+    for present in [
+        "fixture.jsonl",
+        "fixture.index.jsonl",
+        "fixture.head",
+        "fixture..lock",
+    ] {
         assert!(root.join("sessions").join(present).is_file(), "{present}");
     }
     let b = block.as_str();
@@ -60,14 +65,22 @@ fn a_hash_under_the_wrong_directory_or_in_uppercase_is_not_tracked() -> Gate {
     let (home, expected) = fixture(dir.path())?;
     let blocks = dir.path().join("blocks");
     std::fs::create_dir_all(blocks.join("ab"))?;
-    std::fs::write(blocks.join("ab").join(format!("cd{}", "0".repeat(62))), b"x")?;
+    std::fs::write(
+        blocks.join("ab").join(format!("cd{}", "0".repeat(62))),
+        b"x",
+    )?;
     // Another block's hash, so a filesystem that folds case cannot land the
     // uppercase name on the stored block's own file.
     let other = Hash::of(b"another fixture block");
     let shard = &other.as_str()[..2];
     std::fs::create_dir_all(blocks.join(shard))?;
     std::fs::write(blocks.join(shard).join(other.as_str().to_uppercase()), b"x")?;
-    assert!(blocks.join(shard).join(other.as_str().to_uppercase()).is_file());
+    assert!(
+        blocks
+            .join(shard)
+            .join(other.as_str().to_uppercase())
+            .is_file()
+    );
     let tracked = tracked_set(&home)?;
     assert_eq!(tracked.len(), 5);
     assert_eq!(tracked, expected);

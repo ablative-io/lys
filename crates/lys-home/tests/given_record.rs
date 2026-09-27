@@ -216,8 +216,8 @@ fn rendered(fixture: &mut Fixture) -> Fallible<(PathBuf, Value)> {
 }
 
 #[test]
-fn the_first_render_records_five_documents_in_the_request_s_order_under_the_render_event()
--> Outcome {
+fn the_first_render_records_five_documents_in_the_request_s_order_under_the_render_event() -> Outcome
+{
     let mut fixture = Fixture::new()?;
     let (out, report) = rendered(&mut fixture)?;
     let records = fixture.records()?;

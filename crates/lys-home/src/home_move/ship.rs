@@ -82,9 +82,7 @@ pub fn ship(
     let home = Home::read(&home_dir)?;
     let sessions = home.session_ids()?;
     if sessions.is_empty() {
-        return Err(HomeError::EmptyHome {
-            path: home_dir,
-        });
+        return Err(HomeError::EmptyHome { path: home_dir });
     }
     let remote_exists = check_remote(&remote)?;
     let held = hold_all(&home, &sessions)?;
@@ -224,10 +222,7 @@ fn descends(git: &Git, ancestor: &str, commit: &str) -> Result<bool, HomeError> 
     if git.commit_of(ancestor)?.is_none() {
         return Ok(false);
     }
-    let ran = git.run(
-        &[&"merge-base", &"--is-ancestor", &ancestor, &commit],
-        None,
-    )?;
+    let ran = git.run(&[&"merge-base", &"--is-ancestor", &ancestor, &commit], None)?;
     match ran.code {
         Some(0) => Ok(true),
         Some(1) => Ok(false),

@@ -568,7 +568,9 @@ pub enum HomeError {
     },
 
     /// A session ship would snapshot is held by a live owner.
-    #[error("session_held: session `{session}` is held by a live owner; ship after that seat stops")]
+    #[error(
+        "session_held: session `{session}` is held by a live owner; ship after that seat stops"
+    )]
     HeldByOwner {
         /// The session id.
         session: String,

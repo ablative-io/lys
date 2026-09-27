@@ -86,7 +86,9 @@ fn git_bytes(args: &[&str], input: Option<&[u8]>) -> Result<Vec<u8>, Box<dyn Err
 }
 
 fn git_text(args: &[&str], input: Option<&[u8]>) -> Result<String, Box<dyn Error>> {
-    Ok(String::from_utf8(git_bytes(args, input)?)?.trim().to_owned())
+    Ok(String::from_utf8(git_bytes(args, input)?)?
+        .trim()
+        .to_owned())
 }
 
 fn render(dir: &Path, home: &Path, out: &Path) -> Result<Value, Box<dyn Error>> {
@@ -169,9 +171,21 @@ fn moved(dir: &Path) -> Result<Moved, Box<dyn Error>> {
     render(dir, &source, &dir.join("first-out"))?;
     let before = tracked_hashes(&source)?;
     let remote = dir.join("remote.git");
-    report(dir, &["ship", "--home", text(&source)?, "--remote", text(&remote)?])?;
+    report(
+        dir,
+        &["ship", "--home", text(&source)?, "--remote", text(&remote)?],
+    )?;
     let target = dir.join("target");
-    report(dir, &["fetch", "--remote", text(&remote)?, "--home", text(&target)?])?;
+    report(
+        dir,
+        &[
+            "fetch",
+            "--remote",
+            text(&remote)?,
+            "--home",
+            text(&target)?,
+        ],
+    )?;
     Ok(Moved {
         source,
         remote,
@@ -215,13 +229,29 @@ fn the_same_search_finds_the_secret_once_where_it_was_planted() -> Gate {
         Some(b"token=fixture-secret-value-0001"),
     )?;
     let entry = format!("100644 blob {blob}\tplanted.txt\n");
-    let tree = git_text(&["--git-dir", scratch_arg, "mktree"], Some(entry.as_bytes()))?;
+    let tree = git_text(
+        &["--git-dir", scratch_arg, "mktree"],
+        Some(entry.as_bytes()),
+    )?;
     let commit = git_text(
-        &["--git-dir", scratch_arg, "commit-tree", &tree, "-m", "planted"],
+        &[
+            "--git-dir",
+            scratch_arg,
+            "commit-tree",
+            &tree,
+            "-m",
+            "planted",
+        ],
         None,
     )?;
     git_bytes(
-        &["--git-dir", scratch_arg, "update-ref", "refs/lys/home", &commit],
+        &[
+            "--git-dir",
+            scratch_arg,
+            "update-ref",
+            "refs/lys/home",
+            &commit,
+        ],
         None,
     )?;
     let found = search(&scratch, "refs/lys/home", SECRET_VALUE.as_bytes())?;
@@ -244,7 +274,9 @@ fn a_render_of_the_fetched_session_records_the_source_session_head() -> Gate {
     let target_out = dir.path().join("target-out");
     let from_target = render(dir.path(), &target, &target_out)?;
     let from_source = render(dir.path(), &source, &dir.path().join("source-out"))?;
-    let head = from_target["session_head"].as_str().ok_or("a session head")?;
+    let head = from_target["session_head"]
+        .as_str()
+        .ok_or("a session head")?;
     assert_eq!(head.len(), 64);
     assert_eq!(from_source["session_head"], head);
     let launch = from_target["launch"].as_str().ok_or("a launch line")?;

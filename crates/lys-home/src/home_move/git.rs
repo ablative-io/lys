@@ -92,7 +92,9 @@ impl Git {
             .env("GIT_COMMITTER_EMAIL", IDENTITY_EMAIL);
         match &self.work_tree {
             Some(work_tree) => {
-                command.env("GIT_WORK_TREE", work_tree).current_dir(work_tree);
+                command
+                    .env("GIT_WORK_TREE", work_tree)
+                    .current_dir(work_tree);
             }
             None => {
                 if self.repository.is_dir() {
@@ -262,10 +264,7 @@ impl Git {
 
     /// The paths a tree-ish holds, recursively, as git names them.
     pub fn tree_paths(&self, treeish: &str) -> Result<Vec<String>, HomeError> {
-        let stdout = self.output(
-            &[&"ls-tree", &"-r", &"-z", &"--name-only", &treeish],
-            None,
-        )?;
+        let stdout = self.output(&[&"ls-tree", &"-r", &"-z", &"--name-only", &treeish], None)?;
         Ok(nul_separated(&stdout))
     }
 
@@ -279,9 +278,9 @@ impl Git {
 /// The `git_failed` refusal for a command: its subcommand, the first
 /// argument, and its exit code.
 fn failed(args: &[&dyn AsRef<OsStr>], code: Option<i32>) -> HomeError {
-    let subcommand = args
-        .first()
-        .map_or_else(String::new, |arg| arg.as_ref().to_string_lossy().into_owned());
+    let subcommand = args.first().map_or_else(String::new, |arg| {
+        arg.as_ref().to_string_lossy().into_owned()
+    });
     let status = code.map_or_else(|| "a signal".to_owned(), |code| format!("exit code {code}"));
     HomeError::GitFailed { subcommand, status }
 }

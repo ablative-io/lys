@@ -26,7 +26,10 @@ pub fn tracked_set(home: &Home) -> Result<Vec<String>, HomeError> {
         let file = home.session_path(&id)?;
         let beside = [
             (file.clone(), format!("sessions/{id}.jsonl")),
-            (Index::index_path(&file), format!("sessions/{id}.index.jsonl")),
+            (
+                Index::index_path(&file),
+                format!("sessions/{id}.index.jsonl"),
+            ),
             (Index::head_path(&file), format!("sessions/{id}.head")),
         ];
         for (path, name) in beside {

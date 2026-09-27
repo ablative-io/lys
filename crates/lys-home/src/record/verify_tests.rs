@@ -65,6 +65,7 @@ fn fixture() -> Result<Fixture, Box<dyn Error>> {
         model: "claude-fixture".to_owned(),
         version: "2.1.283".to_owned(),
         out: out.path().to_path_buf(),
+        key: None,
     })?;
     let sessions = root.path().join("sessions");
     assert!(sessions.join("fixture.index.jsonl").is_file());
@@ -200,13 +201,22 @@ fn a_corrupted_block_and_a_corrupted_template_are_named_by_hash_only() -> Gate {
     for line in text.lines() {
         let value: Value = serde_json::from_str(line)?;
         if value["id"] == event && value["data"]["kind"] == "template_render" {
-            records.push(value["data"]["record"].as_str().ok_or("a record")?.to_owned());
+            records.push(
+                value["data"]["record"]
+                    .as_str()
+                    .ok_or("a record")?
+                    .to_owned(),
+            );
         }
     }
     assert_eq!(records.len(), 1);
     let manifest = records.remove(0);
     assert_eq!(report["manifest"], manifest.as_str());
-    let block = home.root().join("blocks").join(&manifest[..2]).join(&manifest);
+    let block = home
+        .root()
+        .join("blocks")
+        .join(&manifest[..2])
+        .join(&manifest);
     std::fs::write(&block, CORRUPTED)?;
     let found = verify_home(home)?;
     assert_eq!(found.bad_blocks, vec![manifest]);

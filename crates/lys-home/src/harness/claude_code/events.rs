@@ -117,12 +117,7 @@ pub fn template_render(
 /// The event for one session's arrival: the source commit, the remote,
 /// the ref and the session's fresh execution id, and no block.
 #[must_use]
-pub fn arrival(
-    source_commit: &str,
-    remote: &str,
-    git_ref: &str,
-    execution: &str,
-) -> HarnessEvent {
+pub fn arrival(source_commit: &str, remote: &str, git_ref: &str, execution: &str) -> HarnessEvent {
     let mut detail = Map::new();
     detail.insert("source_commit".to_owned(), json!(source_commit));
     detail.insert("remote".to_owned(), json!(remote));
