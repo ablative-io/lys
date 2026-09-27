@@ -4,7 +4,7 @@
 //! # The two absent-checks are tested SEPARATELY, on purpose
 //!
 //! [`FileLeafStore::put_leaf`] refuses a re-used index twice over: once against
-//! the cached `extent`, and once via `create_new` at the filesystem. Two checks
+//! the cached `extent`, and once via the no-replace link at the filesystem. Two checks
 //! guarding one rule is how a check rots unnoticed — remove either and the
 //! obvious test (append twice at index 0) still fails, because *the other one*
 //! catches it. A drift injection that leaves the suite red has proven nothing
@@ -14,8 +14,8 @@
 //!
 //! | injection | the only case that fails |
 //! |---|---|
-//! | remove the `index < extent` check | `extent_check_alone_refuses_a_deleted_leafs_index` — the file is *gone*, so `create_new` succeeds and would silently rewrite history |
-//! | remove `create_new` | `create_new_alone_refuses_a_leaf_this_store_never_saw` — the index *is* the next free one, so the extent check is satisfied and another writer's leaf would be clobbered |
+//! | remove the `index < extent` check | `extent_check_alone_refuses_a_deleted_leafs_index` — the file is *gone*, so the link succeeds and would silently rewrite history |
+//! | make the link replace an existing name | `no_replace_link_alone_refuses_a_leaf_this_store_never_saw` — the index *is* the next free one, so the extent check is satisfied and another writer's leaf would be clobbered |
 //!
 //! Both were injected before this landed; each failed exactly one case.
 //!
@@ -54,6 +54,7 @@
 //! an injection that moves a boundary inside a shared condition does not, and
 //! its two failures indict the probe rather than the tests.**
 
+use std::io::Write;
 use std::path::Path;
 
 use super::*;
@@ -152,7 +153,7 @@ fn an_empty_leaf_is_legal_and_distinct_from_an_absent_one() {
 #[test]
 fn extent_check_alone_refuses_a_deleted_leafs_index() {
     // Isolates the `index < extent` check: the leaf FILE is removed behind the
-    // store's back, so `create_new` would succeed. Only the extent check can
+    // store's back, so the link would succeed. Only the extent check can
     // refuse this, and it must — writing here would replace a leaf the tree
     // already covers, which is a second history for a settled position.
     let tmp = tempfile::tempdir().unwrap();
@@ -170,8 +171,8 @@ fn extent_check_alone_refuses_a_deleted_leafs_index() {
 }
 
 #[test]
-fn create_new_alone_refuses_a_leaf_this_store_never_saw() {
-    // Isolates the `create_new` check: index 1 IS the next free index as far as
+fn no_replace_link_alone_refuses_a_leaf_this_store_never_saw() {
+    // Isolates the no-replace link: index 1 IS the next free index as far as
     // this store knows, so the extent check passes. A file appearing there
     // after open is another writer, and clobbering it would destroy a leaf this
     // store never knew existed.
@@ -223,6 +224,178 @@ fn a_write_past_the_next_index_is_refused_and_leaves_no_file() {
     );
     assert!(!leaf_path(&dir, 2).exists(), "no file for a refused write");
     assert_eq!(store.extent(), 1);
+}
+
+/// Names in `leaves/`, sorted, so a test can say exactly what is there.
+fn leaves_entries(dir: &Path) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(dir.join("leaves"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect();
+    names.sort();
+    names
+}
+
+#[test]
+fn a_write_failing_before_the_link_leaves_no_leaf() {
+    // Half the bytes reach the file and then the write fails. Nothing may be
+    // left under a leaf name, because the next open would count it and a torn
+    // leaf would then be pinned as history.
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut store = create(&dir);
+    store.put_leaf(0, b"leaf-0").unwrap();
+    let err = store
+        .put_leaf_with(
+            1,
+            |file| {
+                file.write_all(b"torn")?;
+                Err(std::io::Error::other("injected write failure"))
+            },
+            &AFTER_LINK,
+        )
+        .unwrap_err();
+    assert!(matches!(err, StoreError::Io { .. }), "{err}");
+    assert!(!leaf_path(&dir, 1).exists(), "no leaf for a failed write");
+    assert_eq!(
+        leaves_entries(&dir),
+        vec![format!("{:020}", 0)],
+        "the temporary file was removed too"
+    );
+    assert_eq!(store.extent(), 1, "a failed write does not advance extent");
+    assert_eq!(FileLeafStore::open(&dir).unwrap().extent(), 1);
+    store.put_leaf(1, b"leaf-1").unwrap();
+    assert_eq!(std::fs::read(leaf_path(&dir, 1)).unwrap(), b"leaf-1");
+}
+
+#[test]
+fn a_leftover_temporary_file_is_ignored_at_open() {
+    // A crash between writing the temporary file and linking it leaves the
+    // file behind under its hidden name. It holds a full leaf's bytes, and it
+    // must still not count: only a linked name is a leaf.
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut store = create(&dir);
+    store.put_leaf(0, b"leaf-0").unwrap();
+    let leftover = dir
+        .join("leaves")
+        .join(format!(".{}-{:020}-0.tmp", std::process::id() + 1, 1));
+    std::fs::write(&leftover, b"leaf-1-never-linked").unwrap();
+    let mut reopened = FileLeafStore::open(&dir).unwrap();
+    assert_eq!(reopened.extent(), 1);
+    assert_eq!(reopened.leaf(1).unwrap(), None);
+    reopened.put_leaf(1, b"leaf-1").unwrap();
+    assert_eq!(std::fs::read(leaf_path(&dir, 1)).unwrap(), b"leaf-1");
+    assert!(
+        leftover.exists(),
+        "open ignores the leftover, it does not own it"
+    );
+}
+
+#[test]
+fn open_leaves_a_leftover_temporary_file_byte_identical() {
+    // Opening reads; it never deletes or changes anything, so a store opened
+    // read-only stays untouched. The leftover is skipped, not tidied away.
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut store = create(&dir);
+    store.put_leaf(0, b"leaf-0").unwrap();
+    let leftover = dir
+        .join("leaves")
+        .join(format!(".{}-{:020}-0.tmp", std::process::id() + 1, 1));
+    std::fs::write(&leftover, b"half a leaf").unwrap();
+    let before = leaves_entries(&dir);
+    assert_eq!(FileLeafStore::open(&dir).unwrap().extent(), 1);
+    assert_eq!(leaves_entries(&dir), before, "open changed no entry");
+    assert_eq!(std::fs::read(&leftover).unwrap(), b"half a leaf");
+}
+
+/// A post-link step that always fails, naming the path it was given.
+fn refuse(path: &Path) -> std::io::Result<()> {
+    Err(std::io::Error::other(format!(
+        "injected failure at {}",
+        path.display()
+    )))
+}
+
+#[test]
+fn a_temporary_name_that_cannot_be_removed_still_commits_the_leaf() {
+    // The link is the commit point. Failing to tidy the temporary name after
+    // it is not a failed append: the leaf is stored and the extent covers it.
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut store = create(&dir);
+    let keep_temp = AfterLink {
+        remove_temp: refuse,
+        flush_dir: sync_dir,
+    };
+    store
+        .put_leaf_with(0, |file| file.write_all(b"leaf-0"), &keep_temp)
+        .unwrap();
+    assert_eq!(store.extent(), 1);
+    assert_eq!(std::fs::read(leaf_path(&dir, 0)).unwrap(), b"leaf-0");
+    assert_eq!(leaves_entries(&dir).len(), 2, "the temporary name remains");
+    store.put_leaf(1, b"leaf-1").unwrap();
+    assert_eq!(FileLeafStore::open(&dir).unwrap().extent(), 2);
+}
+
+#[test]
+fn a_failed_directory_flush_is_named_and_halts_the_handle_until_reopen() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut store = create(&dir);
+    store.put_leaf(0, b"leaf-0").unwrap();
+    let no_flush = AfterLink {
+        remove_temp: remove_file,
+        flush_dir: refuse,
+    };
+    let err = store
+        .put_leaf_with(1, |file| file.write_all(b"leaf-1"), &no_flush)
+        .unwrap_err();
+    assert!(
+        matches!(err, StoreError::LeafDurabilityUncertain { index: 1, .. }),
+        "{err}"
+    );
+    assert_eq!(store.extent(), 2, "the link committed the leaf");
+    let err = store.put_leaf(2, b"leaf-2").unwrap_err();
+    assert!(
+        matches!(err, StoreError::ReopenRequired { index: 1 }),
+        "{err}"
+    );
+    assert!(
+        !leaf_path(&dir, 2).exists(),
+        "the halted handle wrote nothing"
+    );
+
+    let mut reopened = FileLeafStore::open(&dir).unwrap();
+    assert_eq!(reopened.extent(), 2, "reopening counts the uncertain leaf");
+    assert_eq!(reopened.leaf(1).unwrap().unwrap(), b"leaf-1");
+    reopened.put_leaf(2, b"leaf-2").unwrap();
+    assert_eq!(reopened.extent(), 3);
+}
+
+#[test]
+fn a_second_writer_on_the_same_index_is_refused() {
+    // Two stores opened on one directory both believe index 0 is free. The
+    // first to link takes it; the second is refused by name, the first leaf
+    // is untouched, and the loser leaves no temporary file behind.
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut first = create(&dir);
+    let mut second = FileLeafStore::open(&dir).unwrap();
+    first.put_leaf(0, b"first").unwrap();
+    let err = second.put_leaf(0, b"second").unwrap_err();
+    assert!(
+        matches!(err, StoreError::LeafAlreadyWritten { index: 0 }),
+        "{err}"
+    );
+    assert_eq!(std::fs::read(leaf_path(&dir, 0)).unwrap(), b"first");
+    assert_eq!(leaves_entries(&dir), vec![format!("{:020}", 0)]);
+    assert_eq!(
+        second.extent(),
+        0,
+        "a refused write does not advance extent"
+    );
 }
 
 /// A store with one leaf and the pin already at `(1, [7; 32])`.
