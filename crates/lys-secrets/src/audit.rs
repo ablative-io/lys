@@ -15,7 +15,7 @@ use crate::error::SecretsError;
 use crate::fsutil::{ensure_outside, io, write_atomic};
 use crate::keys::StoreKey;
 
-const LINE_DOMAIN: &str = "lys-secrets/audit-line/v1";
+const LINE_DOMAIN: &str = "lys-secrets/audit-line/v2";
 const SIGNED_DOMAIN: &str = "lys-secrets/audit-signed/v1";
 const ANCHOR_DOMAIN: &str = "lys-secrets/audit-anchor/v1";
 
@@ -78,6 +78,10 @@ pub struct AuditLine {
     pub secret: Option<String>,
     /// The call's operation id, in hex.
     pub operation: Option<String>,
+    /// A keyed mark of the request a use was for, in hex. Only the broker
+    /// can compute it, so it tells a reused operation id without saying
+    /// what the request was.
+    pub request: Option<String>,
     /// The lease's use count after this line.
     pub uses: Option<u64>,
     /// The outcome: `issued`, `admitted`, a refusal's name, `dropped`.
@@ -335,6 +339,7 @@ fn encode_line(line: &AuditLine) -> Result<Vec<u8>, SecretsError> {
     optional(&mut encoding, line.identity.as_deref())?;
     optional(&mut encoding, line.secret.as_deref())?;
     optional(&mut encoding, line.operation.as_deref())?;
+    optional(&mut encoding, line.request.as_deref())?;
     optional(
         &mut encoding,
         line.uses.map(|uses| uses.to_string()).as_deref(),
@@ -367,6 +372,7 @@ fn decode_signed(index: u64, bytes: &[u8], key: &[u8; 32]) -> Result<AuditLine, 
     let identity = read_optional(&mut reader)?;
     let secret = read_optional(&mut reader)?;
     let operation = read_optional(&mut reader)?;
+    let request = read_optional(&mut reader)?;
     let uses = read_optional(&mut reader)?
         .map(|text| {
             text.parse::<u64>()
@@ -382,6 +388,7 @@ fn decode_signed(index: u64, bytes: &[u8], key: &[u8; 32]) -> Result<AuditLine, 
         identity,
         secret,
         operation,
+        request,
         uses,
         outcome,
     })

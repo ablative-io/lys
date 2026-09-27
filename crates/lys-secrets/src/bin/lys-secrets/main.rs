@@ -14,7 +14,8 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 use lys_core::Ed25519Identity;
 use lys_secrets::{
-    Broker, HandleId, Holder, Presentation, Secret, SecretsError, new_operation_id, to_hex,
+    Broker, HandleId, Holder, Presentation, Secret, SecretsError, new_operation_id, request_digest,
+    to_hex,
 };
 
 use files::{FileGrants, Layout, Route, now_ms};
@@ -140,12 +141,21 @@ enum Command {
         #[arg(long)]
         handle_id: String,
     },
-    /// As the holder: sign a presentation for one call and print its headers.
+    /// As the holder: sign a presentation for one request and print its
+    /// headers. The presentation is good for that method, path and body only.
     Sign {
         #[arg(long)]
         key: PathBuf,
         #[arg(long)]
         handle_id: String,
+        #[arg(long, default_value = "GET")]
+        method: String,
+        /// The path with its query, as the proxy is called (`/<secret>/...`).
+        #[arg(long)]
+        path: String,
+        /// A file holding the request body; none means an empty body.
+        #[arg(long)]
+        body: Option<PathBuf>,
     },
     /// Print the audit log, every line's signature checked.
     Log(Where),
@@ -320,12 +330,26 @@ fn run(command: Command) -> Result<(), SecretsError> {
             let outcome = broker.drop_handle(&HandleId::from_text(&handle_id))?;
             println!("{handle_id}: {outcome:?}");
         }
-        Command::Sign { key, handle_id } => {
+        Command::Sign {
+            key,
+            handle_id,
+            method,
+            path,
+            body,
+        } => {
             let key = Ed25519Identity::load(&key)?;
+            let body = match body {
+                Some(file) => std::fs::read(&file).map_err(|error| SecretsError::Io {
+                    context: format!("reading {}", file.display()),
+                    source: error,
+                })?,
+                None => Vec::new(),
+            };
             let presentation = Presentation::sign(
                 &HandleId::from_text(&handle_id),
                 &new_operation_id()?,
                 now_ms(),
+                request_digest(&method, &path, &body)?,
                 &key,
             )?;
             let [id, operation, signed_at, signature] = presentation.to_wire();

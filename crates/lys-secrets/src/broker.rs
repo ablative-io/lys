@@ -99,8 +99,10 @@ struct HandleRecord {
     used: u64,
     #[serde(skip)]
     dropped: bool,
+    /// Each operation id this handle was used under: its first outcome and
+    /// the mark of the request it was for.
     #[serde(skip)]
-    operations: BTreeMap<String, String>,
+    operations: BTreeMap<String, (String, String)>,
 }
 
 /// The secrets broker.
@@ -196,8 +198,8 @@ impl<P: PermissionCheck> Broker<P> {
                 AuditKind::Drop => record.dropped = true,
                 AuditKind::Use if line.outcome == "admitted" => {
                     record.used = record.used.saturating_add(1);
-                    if let Some(operation) = line.operation {
-                        record.operations.insert(operation, line.outcome);
+                    if let (Some(operation), Some(mark)) = (line.operation, line.request) {
+                        record.operations.insert(operation, (line.outcome, mark));
                     }
                 }
                 _ => {}
@@ -330,7 +332,9 @@ impl<P: PermissionCheck> Broker<P> {
         forward: impl FnOnce(&Secret) -> R,
     ) -> Result<Used<R>, UseError> {
         let operation = hex(&presentation.operation_id);
-        match self.admit(token, presentation, &operation) {
+        let mark = self.request_mark(&presentation.request)?;
+        let call = Some((operation.as_str(), mark.as_str()));
+        match self.admit(token, presentation, &operation, &mark) {
             Ok(Admission::Retry(outcome)) => Ok(Used::Retried { outcome }),
             Ok(Admission::Fresh {
                 id,
@@ -345,7 +349,7 @@ impl<P: PermissionCheck> Broker<P> {
                         self.record(
                             AuditKind::Use,
                             (Some(&id), Some(&identity), Some(&secret)),
-                            Some(&operation),
+                            call,
                             None,
                             refusal.name(),
                         )?;
@@ -356,13 +360,15 @@ impl<P: PermissionCheck> Broker<P> {
                 self.record(
                     AuditKind::Use,
                     (Some(&id), Some(&identity), Some(&used_as)),
-                    Some(&operation),
+                    call,
                     Some(used),
                     "admitted",
                 )?;
                 if let Some(record) = self.handles.get_mut(&id) {
                     record.used = used;
-                    record.operations.insert(operation, "admitted".to_owned());
+                    record
+                        .operations
+                        .insert(operation.clone(), ("admitted".to_owned(), mark.clone()));
                 }
                 let credential =
                     self.store
@@ -389,7 +395,7 @@ impl<P: PermissionCheck> Broker<P> {
                 self.record(
                     AuditKind::Use,
                     (id, identity, secret),
-                    Some(&operation),
+                    call,
                     None,
                     refusal.name(),
                 )?;
@@ -429,7 +435,7 @@ impl<P: PermissionCheck> Broker<P> {
         &mut self,
         kind: AuditKind,
         (handle, identity, secret): Subject<'_>,
-        operation: Option<&str>,
+        call: Option<(&str, &str)>,
         uses: Option<u64>,
         outcome: &str,
     ) -> Result<u64, SecretsError> {
@@ -439,7 +445,8 @@ impl<P: PermissionCheck> Broker<P> {
             handle: handle.map(str::to_owned),
             identity: identity.map(str::to_owned),
             secret: secret.map(str::to_owned),
-            operation: operation.map(str::to_owned),
+            operation: call.map(|(operation, _mark)| operation.to_owned()),
+            request: call.map(|(_operation, mark)| mark.to_owned()),
             uses,
             outcome: outcome.to_owned(),
         };

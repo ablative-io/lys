@@ -25,7 +25,9 @@ pub mod store;
 pub use audit::{AuditKind, AuditLine, AuditLog, RecordedLine};
 pub use broker::{Broker, BrokerPaths, Clock, PRESENTATION_SKEW_MS, RevokeOutcome, UseError, Used};
 pub use error::SecretsError;
-pub use handle::{HandleId, HandleToken, Holder, IssuedHandle, Presentation, new_operation_id};
+pub use handle::{
+    HandleId, HandleToken, Holder, IssuedHandle, Presentation, new_operation_id, request_digest,
+};
 pub use keys::{KeyId, StoreKey};
 pub use local_grants::{LocalGrants, SecretRelation};
 pub use permission::{Denied, PermissionCheck, Permitted};

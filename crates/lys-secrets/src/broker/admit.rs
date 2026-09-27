@@ -1,7 +1,7 @@
 //! Admission: the checks a presented handle passes, in the one order that
 //! gives one named refusal per attack.
 
-use crate::encoding::{ct_eq, unhex};
+use crate::encoding::{Canonical, ct_eq, hex, sha256, unhex};
 use crate::error::SecretsError;
 use crate::handle::{HandleToken, Presentation, check_operation_id};
 use crate::permission::PermissionCheck;
@@ -19,7 +19,19 @@ pub(super) enum Admission {
     },
 }
 
+const MARK_DOMAIN: &str = "lys-secrets/request-mark/v1";
+
 impl<P: PermissionCheck> Broker<P> {
+    /// A keyed mark of a request digest: the store key's deterministic
+    /// signature over it, hashed. Only this broker can compute it, so the
+    /// log can carry it without telling what the request was.
+    pub(super) fn request_mark(&self, request: &[u8; 32]) -> Result<String, SecretsError> {
+        let mut encoding = Canonical::new(MARK_DOMAIN)?;
+        encoding.field(request)?;
+        let signature = self.store_key.identity().sign(&encoding.into_bytes());
+        Ok(hex(&sha256(&signature)))
+    }
+
     pub(super) fn find(&self, token: &HandleToken) -> Option<&HandleRecord> {
         let presented = token.digest();
         let mut found = None;
@@ -38,6 +50,7 @@ impl<P: PermissionCheck> Broker<P> {
         token: &HandleToken,
         presentation: &Presentation,
         operation: &str,
+        mark: &str,
     ) -> Result<Admission, SecretsError> {
         let record = self.find(token).ok_or(SecretsError::HandleUnknown)?;
         let key: [u8; 32] = unhex(&record.holder_key)
@@ -52,7 +65,12 @@ impl<P: PermissionCheck> Broker<P> {
         }
         presentation.verify(&key)?;
         check_operation_id(&presentation.operation_id)?;
-        if let Some(outcome) = record.operations.get(operation) {
+        if let Some((outcome, held)) = record.operations.get(operation) {
+            if held != mark {
+                return Err(SecretsError::OperationIdReused {
+                    operation: operation.to_owned(),
+                });
+            }
             return Ok(Admission::Retry(outcome.clone()));
         }
         let now = (self.clock)();

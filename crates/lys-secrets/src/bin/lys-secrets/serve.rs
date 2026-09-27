@@ -11,7 +11,9 @@ use axum::body::{Body, Bytes};
 use axum::extract::{Request, State};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
-use lys_secrets::{Broker, HandleToken, Presentation, Secret, SecretsError, Used, from_hex};
+use lys_secrets::{
+    Broker, HandleToken, Presentation, Secret, SecretsError, Used, from_hex, request_digest,
+};
 
 use crate::files::Layout;
 use crate::spice::Grants;
@@ -96,6 +98,23 @@ async fn forward(
             },
         )
     })?;
+    let body = axum::body::to_bytes(body, MAX_BODY)
+        .await
+        .map_err(|error| {
+            bad(SecretsError::Encoding {
+                context: "request body",
+                reason: error.to_string(),
+            })
+        })?;
+    let request = request_digest(
+        parts.method.as_str(),
+        parts
+            .uri
+            .path_and_query()
+            .map_or("/", |whole| whole.as_str()),
+        &body,
+    )
+    .map_err(bad)?;
     let unsigned = || SecretsError::PresentationInvalid {
         handle: String::new(),
     };
@@ -107,6 +126,7 @@ async fn forward(
         header(&parts.headers, "lys-operation").ok_or_else(|| bad(unsigned()))?,
         header(&parts.headers, "lys-signed-at").ok_or_else(|| bad(unsigned()))?,
         header(&parts.headers, "lys-presentation").ok_or_else(|| bad(unsigned()))?,
+        request,
     )
     .map_err(bad)?;
     let used = {
@@ -132,14 +152,6 @@ async fn forward(
                 .into_response());
         }
     };
-    let body = axum::body::to_bytes(body, MAX_BODY)
-        .await
-        .map_err(|error| {
-            bad(SecretsError::Encoding {
-                context: "request body",
-                reason: error.to_string(),
-            })
-        })?;
     let query = parts
         .uri
         .query()

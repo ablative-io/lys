@@ -23,6 +23,8 @@ struct World {
 }
 
 const START_MS: i64 = 1_800_000_000_000;
+const CALL: [u8; 32] = [7; 32];
+const OTHER_CALL: [u8; 32] = [9; 32];
 
 fn world() -> Result<World, Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
@@ -79,6 +81,7 @@ fn present(
         &issued.id,
         &new_operation_id()?,
         world.clock.load(Ordering::SeqCst),
+        CALL,
         key,
     )
 }
@@ -162,6 +165,7 @@ fn every_refusal_is_named() -> TestResult {
         &issued.id,
         &new_operation_id()?,
         START_MS - 31_000,
+        CALL,
         &world.agent,
     )?;
     assert_eq!(
@@ -173,6 +177,7 @@ fn every_refusal_is_named() -> TestResult {
             &issued.id,
             &[1u8; 8],
             START_MS,
+            CALL,
             &world.agent
         )),
         "OperationIdTooShort"
@@ -197,6 +202,36 @@ fn a_retry_is_answered_from_the_log_and_counts_no_use() -> TestResult {
     let retried = broker.use_handle(&issued.token, &presentation, |_credential| forwarded += 1)?;
     assert!(matches!(retried, Used::Retried { .. }));
     assert_eq!(forwarded, 1);
+    Ok(())
+}
+
+#[test]
+fn an_operation_id_signed_for_another_request_is_refused_before_and_after_a_restart() -> TestResult
+{
+    let world = world()?;
+    let mut broker = started(&world)?;
+    let issued = broker.issue(&world.holder, "token", 5, START_MS + 60_000)?;
+    let first = present(&world, &issued, &world.agent)?;
+    broker.use_handle(&issued.token, &first, Secret::len)?;
+    let other = Presentation::sign(
+        &issued.id,
+        &first.operation_id,
+        START_MS,
+        OTHER_CALL,
+        &world.agent,
+    )?;
+    assert_eq!(
+        refusal(broker.use_handle(&issued.token, &other, Secret::len)),
+        "OperationIdReused"
+    );
+    drop(broker);
+    let mut reopened = Broker::open(&world.paths, granted(), clock(&world))?;
+    assert_eq!(
+        refusal(reopened.use_handle(&issued.token, &other, Secret::len)),
+        "OperationIdReused"
+    );
+    let retried = reopened.use_handle(&issued.token, &first, Secret::len)?;
+    assert!(matches!(retried, Used::Retried { .. }));
     Ok(())
 }
 
