@@ -24,6 +24,8 @@
 pub mod cli;
 pub mod cli_fork;
 pub mod cli_lantern;
+#[cfg(test)]
+mod cli_translate_tests;
 pub mod error;
 pub mod harness;
 pub mod record;
