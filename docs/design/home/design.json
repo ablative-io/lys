@@ -180,7 +180,7 @@
     },
     {
       "path": "crates/lys-home/src/record/mod.rs",
-      "note": "the home record: Pi's session tree read and written, leaf pointer, root-to-leaf path",
+      "note": "the home record's module docs, its pub mod and mod lines, and the pub use lines that keep Home, Session and the shared helpers at lys_home::record",
       "brief": "HOME-001"
     },
     {
@@ -767,6 +767,31 @@
       "path": "docs/design/home/PROOF-TRANSLATE.md",
       "note": "the recording and the resume on Codex 0.156.0, hashes, counts and paths only",
       "brief": "HOME-009"
+    },
+    {
+      "path": "crates/lys-home/src/record/helpers.rs",
+      "note": "the helpers and constants the record files share: safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable, custom_type_of",
+      "brief": "HOME-013"
+    },
+    {
+      "path": "crates/lys-home/src/record/session.rs",
+      "note": "Session and its impl: create, open, append, move the head, read the path; with take_lock, load_checked and to_line",
+      "brief": "HOME-013"
+    },
+    {
+      "path": "crates/lys-home/src/record/home.rs",
+      "note": "Home and its impl: the home directory, its block and template stores, and opening, creating and reading its sessions",
+      "brief": "HOME-013"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-014.json",
+      "note": "the lit-in brief: LanternData's lit_in, recorded by the light act, reported by recall and read by the fork",
+      "brief": "HOME-014"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-014.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-014"
     }
   ],
   "inventory": [
@@ -817,6 +842,10 @@
     {
       "path": "$LANTERN/docs/02-SESSION-FORMATS.md",
       "note": "the lantern work's measurement of three session formats: section 3 records the Codex converter as a compaction, not a copy, and the in-band marker precedent"
+    },
+    {
+      "path": "crates/lys-home/src/record/mod.rs",
+      "note": "630 lines on main at 7b53625: module docs, 22 pub mod and mod lines, 5 private use lines, and the logic HOME-013 moves out: Home and Session with their impls, safe_component, write_durable, take_lock, load_checked, custom_type_of, to_line, now, fresh_id, json_len, MAX_NAME_BYTES and PI_FORMAT_VERSION"
     }
   ],
   "constraints": [

@@ -174,6 +174,23 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `surface/identity/src/generated/index.ts` | Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch | DIRECTORY-006 |
 | `docs/design/directory/briefs/DIRECTORY-008.json` | the grant brief residue after PR 6: DIRECTORY-005's verification line, three inventory rows and the intention sentence, as requirements on the documents | DIRECTORY-008 |
 | `docs/design/directory/briefs/DIRECTORY-008.md` | rendered markdown | DIRECTORY-008 |
+| `docs/design/directory/briefs/DIRECTORY-013.json` | certificate revocation as an appended leaf, the live set folded from the log, and the revoked certificate's history (DP26, ADR-039) | DIRECTORY-013 |
+| `docs/design/directory/briefs/DIRECTORY-013.md` | rendered markdown | DIRECTORY-013 |
+| `docs/design/identity/CERTIFICATE-REVOCATION.md` | the certificate revocation contract: leaf layouts, unit, signer, permanence, fold, N and tolerance, history, no-log forms, refusals | DIRECTORY-013 |
+| `crates/lys-identity/src/revocation/mod.rs` | declarations, re-exports and module docs only | DIRECTORY-013 |
+| `crates/lys-identity/src/revocation/leaf.rs` | the three certificate-log leaves and the revocation's signed bytes | DIRECTORY-013 |
+| `crates/lys-identity/src/revocation/error.rs` | the named revocation refusals, never carrying key material | DIRECTORY-013 |
+| `crates/lys-identity/src/revocation/fold.rs` | the live set folded from a LeafStore to its extent; reads only | DIRECTORY-013 |
+| `crates/lys-identity/src/revocation/append.rs` | issuance, revocation and attestation-entry leaves appended through Log::append | DIRECTORY-013 |
+| `crates/lys-identity/src/revocation/verify.rs` | revocation-aware certificate verification with N and the tolerance as inputs | DIRECTORY-013 |
+| `crates/lys-identity/src/revocation/history.rs` | an attestation by a certificate's key judged against the revocation leaf's position | DIRECTORY-013 |
+| `crates/lys-identity/tests/revocation_leaf.rs` | leaf encoding, malformed refusals and the revocation signer | DIRECTORY-013 |
+| `crates/lys-identity/tests/revocation_fold.rs` | the fold's live set, refusals and read-only pass | DIRECTORY-013 |
+| `crates/lys-identity/tests/revocation_append.rs` | append at the extent, reopen and write failure | DIRECTORY-013 |
+| `crates/lys-identity/tests/revocation_verify.rs` | revoked, stale, unreadable, not-in-log, expired and no-log legs | DIRECTORY-013 |
+| `crates/lys-identity/tests/revocation_history.rs` | attestations before and after revocation, proofs and issuance record | DIRECTORY-013 |
+| `crates/lys-identity/tests/revocation_support/mod.rs` | test authorities, certificates and file-backed logs; generated keys only | DIRECTORY-013 |
+| `crates/lys/src/cli_tests.rs` | the CLI's help tests; DIRECTORY-013 adds the no-log revocation sentence test | DIRECTORY-013 |
 
 ## Inventory
 
