@@ -8,6 +8,7 @@ members = [
     "crates/lys-identity",
     "crates/lys-identity-server",
     "crates/lys-log-store",
+    "crates/lys-secrets",
     "tests/identity_contract",
 ]
 resolver = "3"
