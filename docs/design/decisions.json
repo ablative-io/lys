@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-28",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,24 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-105",
+      "title": "Sign-in identities belong to people only; the harness login token is the one named exception",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "The identity line's lead, in the rulings on DIRECTORY-038's survey; the login exception is the standing ruling recorded at docs/design/identity/STATEMENT-2026-09-22.md:43",
+      "context": "Conformance row 1.2 says a sign-in identity is never lent to or held by an agent. IDENTITY-001 was to state it and never did, no ledger entry records it, and no brief tests it, while the directory holds sign-in identities beside people (DIRECTORY-004) and gives grants to agents (DIRECTORY-006). The seat's harness login token already reaches a seat's process (SECRETS-002 R5), so the rule has to say what it governs.",
+      "decision": "A sign-in identity, a provider account linked to a person in the directory, belongs to that person only: lys never links, delegates or issues from it to an agent, and refuses each such act of its own by name. An agent's own machine account, bound to no person, is a service account and stays allowed. An issuer and subject is bound to one holder, whichever came first. The harness login token recorded at docs/design/identity/STATEMENT-2026-09-22.md:43 and :167 and docs/design/identity/PROVISIONING-2026-09-22.md:18 is the one named exception; it never passes through anything lys issues, links or delegates, and it is not redefined. Rejected: letting a person lend a sign-in identity to their own agent, and redefining the login token so the rule could be claimed without an exception.",
+      "quote": "",
+      "consequences": [
+        "The directory refuses linking a person's provider account to an agent and delegating from a sign-in identity, each by name and writing nothing (DIRECTORY-038).",
+        "An agent's own machine account, bound to no person, stays allowed as its issuer-subject binding (conformance row 1.3), and a person's later link of that account is refused by name.",
+        "The broker refuses to issue an agent any credential derived from a person's sign-in session; this is carried by the broker's card against SECRETS-002, and row 1.2 is met in full only when it passes."
       ],
       "supersedes": [],
       "superseded_by": ""
