@@ -190,7 +190,7 @@ WHEN a person asks DIRECTORY-006 R5's explanation seam what they cannot give to 
 
 ### R7: Prove every refusal writes nothing and no agent record carries a sign-in identity
 
-WHEN any refusal of R3, R4 or R5 is returned, THE SYSTEM SHALL leave the directory's log length and its projection unchanged. After those refusals, one test over the store SHALL enumerate every agent record, from the projection and again from a replay of the log after reopen, and SHALL find that no agent's binding is classified by R1 as a current or former sign-in identity and that no grant an agent holds has a sign-in identity as its source. The test SHALL NOT pass over zero agents: it counts the agent records it inspected and the refusals it drove, and asserts both.
+WHEN any refusal of R3, R4 or R5 is returned, THE SYSTEM SHALL leave the directory's log length and its projection unchanged. After those refusals, one test over the store SHALL enumerate every agent record, from the projection and again from a replay of the log after reopen, and SHALL find that no agent's binding is classified by R1 as a current or former sign-in identity and that no grant an agent holds has a sign-in identity as its source. The test lives in the lys-identity-server crate, which depends on lys-identity, so it drives all seven refusals, R4's through the server with R4's gh-7 fixture; lys-identity gains no dependency on the server. The test SHALL NOT pass over zero agents: it counts the agent records it inspected and the refusals it drove, and asserts both.
 
 **Acceptance:**
 - Before and after each refusal case of R3, R4 and R5 the test records the log's length and a digest of the projection; for each of the seven refusal cases (the four of R3, R4's agent-bound refusal asked on behalf of P, and the two of R5) the two values are equal, and the test asserts it counted 7 refusals.
@@ -198,7 +198,7 @@ WHEN any refusal of R3, R4 or R5 is returned, THE SYSTEM SHALL leave the directo
 - After the store is closed and reopened, the same enumeration over the replayed log inspects 2 agent records and finds the same zero counts.
 
 **Files:**
-- create: crates/lys-identity/tests/sign_in_store.rs
+- create: crates/lys-identity-server/tests/sign_in_store.rs
 
 **Checklist:**
 - C36 — Every sign-in identity refusal leaves the log and projection unchanged, and one counted test over the store finds no agent record carrying a sign-in identity.
@@ -222,5 +222,5 @@ WHEN any refusal of R3, R4 or R5 is returned, THE SYSTEM SHALL leave the directo
 
 - From the repository root: sh scripts/design/gate.sh exits 0.
 - At implementation time, from the exact revision: cargo fmt --check; cargo clippy --all-targets --all-features -- -D warnings; cargo clippy --all-targets -- -D warnings; cargo test --workspace --all-features; cargo doc --no-deps --all-features; cargo doc --no-deps. Report each refusal case and each counted leg the tests exercised.
-- Drift injection, each failing exactly one test file, the one built for the check, and no other. First: make R2's redacted view carry an error code that varies with the sign-in identity's provider and subject without containing either; exactly one test file fails, crates/lys-identity/tests/sign_in_refusal_views.rs (its byte-identical case), because no other test compares redacted views across two sign-in identities, and R6's redacted-view case checks only that the body lacks the provider and subject. Second: make R4's redacted view name agent B, the agent that holds the binding; exactly one test file fails, crates/lys-identity-server/tests/sign_in_link_check.rs (its agent-bound case asked on behalf of P, and its second-store byte-identical case), because R7 records only the log's length and the projection's digest around R4's refusal, never its content. Revert both.
+- Drift injection, each failing exactly one test file, the one built for the check, and no other. First: make R2's redacted view carry an error code that varies with the sign-in identity's provider and subject without containing either; exactly one test file fails, crates/lys-identity/tests/sign_in_refusal_views.rs (its byte-identical case), because no other test compares redacted views across two sign-in identities, and R6's redacted-view case checks only that the body lacks the provider and subject. Second: make R4's redacted view name agent B, the agent that holds the binding; exactly one test file fails, crates/lys-identity-server/tests/sign_in_link_check.rs (its agent-bound case asked on behalf of P, and its second-store byte-identical case), because crates/lys-identity-server/tests/sign_in_store.rs, which drives R4's refusal with the same gh-7 fixture, records only the log's length and the projection's digest around it, never its content. Revert both.
 - Before reporting row 1.2 passed, confirm the broker's card carries finding 1's acceptance line and that it passes; until then row 1.2 is reported as met by the directory and awaiting the broker.

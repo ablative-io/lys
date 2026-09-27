@@ -183,7 +183,7 @@ DIRECTORY-009 carries conformance row 1.2, sign-in identities belong to people o
 | `crates/lys-identity-server/tests/sign_in_link_check.rs` | a person's link of an agent's service account refused by name | DIRECTORY-009 |
 | `crates/lys-identity/tests/grant_sign_in_identity.rs` | delegating a sign-in identity refused for agent and person recipients; a service-access grant on the same account admitted | DIRECTORY-009 |
 | `crates/lys-identity-server/tests/grant_cannot_give.rs` | the reason 'sign-in identity' on the cannot-give list, and the two views at the grant seam | DIRECTORY-009 |
-| `crates/lys-identity/tests/sign_in_store.rs` | every refusal writes nothing; no agent record carries a sign-in identity, counted over the store | DIRECTORY-009 |
+| `crates/lys-identity-server/tests/sign_in_store.rs` | every refusal writes nothing; no agent record carries a sign-in identity, counted over the store | DIRECTORY-009 |
 
 ## Inventory
 

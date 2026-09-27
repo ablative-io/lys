@@ -653,7 +653,7 @@
       "brief": "DIRECTORY-009"
     },
     {
-      "path": "crates/lys-identity/tests/sign_in_store.rs",
+      "path": "crates/lys-identity-server/tests/sign_in_store.rs",
       "note": "every refusal writes nothing; no agent record carries a sign-in identity, counted over the store",
       "brief": "DIRECTORY-009"
     }
