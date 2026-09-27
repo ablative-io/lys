@@ -95,13 +95,13 @@ async fn ask(
     path: &str,
     body: Bytes,
 ) -> Result<Value, ServerError> {
+    let person = person(state, headers)?;
     let broker = state
         .secrets
         .as_ref()
         .ok_or_else(|| ServerError::SecretsUnavailable {
             reason: "no secrets broker is configured for this service".to_owned(),
         })?;
-    let person = person(state, headers)?;
     let [service, on_behalf_of, operation, signed_at, signature] = crate::secrets_sign::headers(
         &crate::secrets_sign::Asked {
             service: &broker.service,

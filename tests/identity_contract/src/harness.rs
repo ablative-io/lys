@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use lys_core::Ed25519Identity;
 use lys_identity::Directory;
 use lys_identity_server::config::ConfiguredLogin;
+use lys_identity_server::secrets_api::SecretsSettings;
 use lys_identity_server::spicedb::SpiceDbSettings;
 use lys_identity_server::{Config, service};
 use lys_log_store::{FileLeafStore, LeafStore, PinnedRoot, StoreError, StoreResult};
@@ -222,6 +223,18 @@ impl Service {
         spicedb: Option<SpiceDbSettings>,
         prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
     ) -> Result<(Self, T), Box<dyn Error>> {
+        Self::start_asking(model, spicedb, None, prepare).await
+    }
+
+    /// Start the service as [`Service::start_judging`] does, asking the
+    /// secrets broker `secrets` names for the secrets screens, when it names
+    /// one.
+    pub async fn start_asking<T: Send>(
+        model: &str,
+        spicedb: Option<SpiceDbSettings>,
+        secrets: Option<SecretsSettings>,
+        prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
+    ) -> Result<(Self, T), Box<dyn Error>> {
         let dir = tempfile::TempDir::new()?;
         secret_file(&dir.path().join("issuer.key"), &[3; 32])?;
         secret_file(&dir.path().join("service.key"), &[9; 32])?;
@@ -251,7 +264,7 @@ impl Service {
             grant_log_origin: GRANT_ORIGIN.to_owned(),
             grant_model_file: dir.path().join("grant-model.json"),
             spicedb,
-            secrets: None,
+            secrets,
         };
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;
