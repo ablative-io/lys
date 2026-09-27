@@ -50,14 +50,16 @@
     "ADR-008",
     "ADR-009",
     "ADR-010",
-    "ADR-011"
+    "ADR-011",
+    "ADR-079"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
     "The grant path (create an agent under a person, grant it a project, the action is allowed, revoke or suspend, the same action is refused) is a requirement of the row that owns it, with acceptance criteria; where the sources do not settle the row, it is recorded open for Tom in DIRECTORY-003 with its criteria drafted.",
     "Every decision still open for Tom is recorded as open and decided nowhere in this cluster.",
     "The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6).",
-    "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record."
+    "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record.",
+    "DIRECTORY-026 draws the access graph (conformance 8.3) with grant edges and every reachability from Access's answers, and responsible people and resource parents as recorded, holding no permission rule of its own (ADR-079)."
   ],
   "non_goals": [
     {
@@ -103,6 +105,10 @@
     {
       "text": "A shared design-system package extracted for every product",
       "reason": "Tom left it as a thing to look at, not a row (ADR-010)."
+    },
+    {
+      "text": "The graph's rail entry and g h shortcut",
+      "reason": "The shell card AL4OyeKG registers every screen's route and key; DIRECTORY-026 adds only the graph's deep links and its Show in graph link."
     }
   ],
   "structure": [
@@ -585,6 +591,76 @@
       "path": "docs/design/directory/briefs/DIRECTORY-008.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-008"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grant_resources.rs",
+      "note": "The read-only route serving the permission model's resources with their parents, for the access graph (conformance 8.3); created on top of DIRECTORY-006, reconcile against its landed manifest before dispatch",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/grant_resources.rs",
+      "note": "The read-only route serving the permission model's resources with their parents, for the access graph (conformance 8.3); created on top of DIRECTORY-006, reconcile against its landed manifest before dispatch",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "surface/identity/src/features/graph/GraphScreen.tsx",
+      "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "surface/identity/src/features/graph/graphModel.ts",
+      "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "surface/identity/src/features/graph/recordEdges.ts",
+      "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "surface/identity/src/features/graph/graphQuestions.ts",
+      "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "surface/identity/src/features/graph/graphLayout.ts",
+      "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "surface/identity/src/features/graph/ShowInGraphLink.tsx",
+      "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "surface/identity/tests/graph_boundary.test.ts",
+      "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "surface/identity/tests/graph.test.tsx",
+      "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "surface/identity/tests/acceptance/graph.spec.ts",
+      "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "surface/identity/tests/fixtures/graph-directory.ts",
+      "note": "The access graph from Access's answers only (conformance 8.3); created on top of DIRECTORY-005 and DIRECTORY-006, reconcile against their landed manifests before dispatch",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-026.json",
+      "note": "the access graph brief (conformance 8.3)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-026.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-026"
     }
   ],
   "inventory": [
@@ -686,12 +762,19 @@
   "gate": [
     {
       "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
       "legs": [
         {
           "name": "fmt",
           "command": "cargo fmt --all",
           "requires": [
-            "place:here"
+            "tool:cargo",
+            "tool:rustfmt"
           ],
           "cadence": "round"
         },
@@ -699,7 +782,7 @@
           "name": "clippy-all-features",
           "command": "cargo clippy --all-targets --all-features -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -707,7 +790,7 @@
           "name": "clippy",
           "command": "cargo clippy --all-targets -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -715,7 +798,7 @@
           "name": "tests",
           "command": "cargo test --workspace --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -723,7 +806,7 @@
           "name": "doc-all-features",
           "command": "cargo doc --no-deps --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -731,36 +814,16 @@
           "name": "doc",
           "command": "cargo doc --no-deps",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        }
-      ]
-    },
-    {
-      "tree": "docs",
-      "legs": [
-        {
-          "name": "render",
-          "command": "python3 ../scripts/design/render-cluster.py design/directory",
-          "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
         {
-          "name": "validate",
-          "command": "python3 ../scripts/design/validate.py design/directory",
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        },
-        {
-          "name": "coverage",
-          "command": "python3 ../scripts/design/check-coverage.py design/directory",
-          "requires": [
-            "place:here"
+            "tool:sh",
+            "tool:python3"
           ],
           "cadence": "round"
         }

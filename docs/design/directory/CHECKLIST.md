@@ -47,3 +47,13 @@
 - [ ] **C28** — Observed grant usage names its source and time; not seen is not reported as never used.
 - [ ] **C29** — The You and delegation screens show real server authority, separate service accounts from sign-in identities, and preserve personal versus administrator visibility.
 - [ ] **C30** — The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success.
+
+## Row 8.3: the access graph (DIRECTORY-026)
+
+- [ ] **C193** — The graph module under surface/identity/src/features/graph/ imports only the generated Access client, React and its own files, declares none of the mock-up's rule functions and references no mutation, and a test that counts what it checked proves it (conformance 8.3).
+- [ ] **C194** — Every grant edge and every reachability the graph draws equals an Access answer from the real evaluator for the same question, over every identity, resource and declared action of a fixture directory: paths as returned, a no as Access's reason, a does not stand edge only for a grant a forward refusal names, with Access's reason, a grant Access no longer returns gone on the next draw, standing never inferred, and an outage shown as a named refusal.
+- [ ] **C195** — A read-only route in the identity server serves the permission model's resources with their parents and declared actions, recording nothing, and a caller sees a resource only where they hold or administer a grant on it or on an ancestor.
+- [ ] **C196** — Before any question the graph shows the people, agents and resources the person may see, with containment edges from the served parents and answers-to edges from the records and no grant edge, under three toggles: Grants, Containment and Who answers for whom, none of which asks Access again.
+- [ ] **C197** — Choosing a person or agent draws the forward answer for each resource and action its visible grants carry, choosing a resource draws the reverse answer, an administrator holding the reverse question's visibility permission sees the whole directory, a reverse question the person may not ask is refused by name, no hidden grant is drawn or hinted at, and an incomplete reverse answer is marked incomplete.
+- [ ] **C198** — Every edge shows the model version of the Access answer it came from, a draw of mixed versions names each above the graph, the draw time shows beside the version, and the graph asks Access again only on navigation, reload or its refresh control.
+- [ ] **C199** — The graph is reached by the deep links #/graph and #/graph/<id> and by the Show in graph link on the identity record screen, with no rail entry or g h shortcut of its own.
