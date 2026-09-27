@@ -1,0 +1,125 @@
+//! Permission from the Lys directory's grants, as `SpiceDB` holds them: an
+//! identity may use a secret when the directory gives it the chosen action
+//! on the resource `secret/<name>`. Every check asks the engine afresh.
+
+use std::path::Path;
+use std::str::FromStr;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use lys_identity::grants::{Action, Resource};
+use lys_identity::{AgentId, IdentityId, PersonId};
+use lys_identity_server::Config;
+use lys_identity_server::spicedb::SpiceDb;
+use lys_secrets::{Denied, PermissionCheck, Permitted, SecretsError};
+
+/// The resource kind a secret is granted under in the directory.
+pub const SECRET_KIND: &str = "secret";
+
+/// Permission read from the directory's permission engine.
+pub struct SpiceGrants {
+    engine: SpiceDb,
+    action: Action,
+}
+
+impl std::fmt::Debug for SpiceGrants {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SpiceGrants")
+            .field("engine", &self.engine)
+            .finish_non_exhaustive()
+    }
+}
+
+fn refused(reason: String) -> SecretsError {
+    SecretsError::Encoding {
+        context: "directory permission",
+        reason,
+    }
+}
+
+impl SpiceGrants {
+    /// Reaches the engine the directory's configuration names, asking for
+    /// `action` on each use.
+    ///
+    /// # Errors
+    ///
+    /// When the configuration does not read, names no engine, or the engine
+    /// cannot be reached.
+    pub fn from_directory(config: &Path, action: &str) -> Result<Self, SecretsError> {
+        let config = Config::load(config)
+            .map_err(|error| refused(format!("the directory configuration: {error}")))?;
+        let settings = config.spicedb.clone().ok_or_else(|| {
+            refused("the directory configuration names no permission engine".to_owned())
+        })?;
+        let model = config
+            .grant_model()
+            .map_err(|error| refused(error.to_string()))?;
+        let engine =
+            SpiceDb::open(&settings, &model).map_err(|error| refused(error.to_string()))?;
+        let action = Action::new(action).map_err(|error| refused(error.to_string()))?;
+        Ok(Self { engine, action })
+    }
+}
+
+fn identity(text: &str) -> Option<IdentityId> {
+    PersonId::from_str(text)
+        .map(IdentityId::Person)
+        .or_else(|_person| AgentId::from_str(text).map(IdentityId::Agent))
+        .ok()
+}
+
+impl PermissionCheck for SpiceGrants {
+    fn may_use(&self, holder: &str, secret: &str) -> Result<Permitted, Denied> {
+        let denied = |reason: String| Denied {
+            reason,
+            no_person_root: false,
+        };
+        let subject = identity(holder)
+            .ok_or_else(|| denied(format!("{holder} is not a directory identity id")))?;
+        let resource =
+            Resource::new(SECRET_KIND, secret).map_err(|error| denied(error.to_string()))?;
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |elapsed| elapsed.as_secs());
+        match self.engine.check(&resource, &self.action, subject, now) {
+            Ok(true) => Ok(Permitted {
+                person: "the directory's grant chain".to_owned(),
+            }),
+            Ok(false) => Err(denied(format!(
+                "the directory gives no {} on {SECRET_KIND}/{secret}",
+                self.action.as_str()
+            ))),
+            Err(error) => Err(denied(format!(
+                "the permission engine did not answer: {error}"
+            ))),
+        }
+    }
+}
+
+/// The permission source the broker runs with.
+#[derive(Debug)]
+pub enum Grants {
+    /// The broker's own grants file.
+    File(crate::files::FileGrants),
+    /// The Lys directory's grants, through its permission engine.
+    Directory(SpiceGrants),
+}
+
+impl Grants {
+    /// Every grant the broker can list, as (identity, secret, granted by).
+    /// Directory grants are listed by the directory itself.
+    pub fn list(&self) -> Result<Vec<(String, String, Option<String>)>, SecretsError> {
+        match self {
+            Self::File(file) => file.list(),
+            Self::Directory(_) => Ok(Vec::new()),
+        }
+    }
+}
+
+impl PermissionCheck for Grants {
+    fn may_use(&self, identity: &str, secret: &str) -> Result<Permitted, Denied> {
+        match self {
+            Self::File(file) => file.may_use(identity, secret),
+            Self::Directory(engine) => engine.may_use(identity, secret),
+        }
+    }
+}
