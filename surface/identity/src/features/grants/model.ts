@@ -1,9 +1,9 @@
 import { api } from '../../api';
 import type { LifecycleState, MeView, PeopleView } from '../../generated';
 import { resourceText } from '../../generated/grants';
-import type { Grant, GrantList, PassOn, ResourceRef } from '../../generated/grants';
+import type { Grant, GrantList, GrantModel, PassOn, ResourceRef } from '../../generated/grants';
 import { fileNo } from '../people/directory';
-import { day } from '../file/time';
+import { clock, day } from '../file/time';
 
 /** Who everyone is, as far as the caller may see: name and state by id. */
 export interface Who {
@@ -18,19 +18,21 @@ export interface GrantWorld {
   me: MeView;
   people: PeopleView;
   list: GrantList;
+  /** The permission model the service judges grants against: its version, and each relation's actions. */
+  model: GrantModel;
   byId: Map<string, Grant>;
   who: Map<string, Who>;
 }
 
 export async function readGrantWorld(): Promise<GrantWorld> {
-  const [me, people, list] = await Promise.all([api.me(), api.people(), api.grants()]);
+  const [me, people, list, model] = await Promise.all([api.me(), api.people(), api.grants(), api.model()]);
   const who = new Map<string, Who>();
   for (const p of people.people) {
     who.set(p.id, { name: p.display_name, state: p.state, kind: 'person', responsible: null });
     for (const a of p.agents) who.set(a.id, { name: a.display_name, state: a.state, kind: 'agent', responsible: p.id });
   }
   who.set(me.person.id, { name: me.person.display_name, state: me.person.state, kind: 'person', responsible: null });
-  return { me, people, list, byId: new Map(list.grants.map((g) => [g.id, g])), who };
+  return { me, people, list, model, byId: new Map(list.grants.map((g) => [g.id, g])), who };
 }
 
 export const nameOf = (w: GrantWorld, id: string): string => w.who.get(id)?.name ?? fileNo(id);
@@ -92,13 +94,19 @@ export function passText(p: PassOn): string {
 
 export const passesToAgents = (p: PassOn): boolean => p.kind === 'to' && p.recipients.includes('agent');
 
+/** When it was last seen exercised; a grant with no observed use reads `not seen`, never `never used` (conformance 8.4). */
+export const lastUsedText = (g: Grant): string => (g.last_use.seen ? clock(g.last_use.at) + ' · ' + g.last_use.route : 'not seen');
+
 export const lastsText = (g: Grant): string => (g.window.ends_at === null ? 'no end' : 'until ' + day(g.window.ends_at));
 
-/** Each relation the service has resolved in a grant the caller can see, with its actions. */
-export function relationsSeen(w: GrantWorld): Map<string, string[]> {
-  const out = new Map<string, string[]>();
-  for (const g of w.list.grants) if (!out.has(g.relation)) out.set(g.relation, [...g.actions].sort());
-  return out;
+/**
+ * Each relation the service's model defines, with the actions it carries, widest
+ * first as the mock-up lists them (owner, editor, viewer). The order is read from
+ * the actions each carries, never from a relation's name.
+ */
+export function relationsOf(w: GrantWorld): [string, string[]][] {
+  const out: [string, string[]][] = Object.entries(w.model.relations).map(([r, actions]) => [r, [...actions].sort()]);
+  return out.sort(([a, x], [b, y]) => y.length - x.length || a.localeCompare(b));
 }
 
 /**
@@ -107,9 +115,7 @@ export function relationsSeen(w: GrantWorld): Map<string, string[]> {
  * The relation of the grant exercised is always among them.
  */
 export function needsText(w: GrantWorld, action: string, held: string | null): string {
-  const carrying = [...relationsSeen(w)].filter(([, actions]) => actions.includes(action));
-  carrying.sort(([a, x], [b, y]) => x.length - y.length || a.localeCompare(b));
-  const names = carrying.map(([r]) => r);
+  const names = relationsOf(w).filter(([, actions]) => actions.includes(action)).map(([r]) => r).reverse();
   if (held !== null && !names.includes(held)) names.push(held);
   return `${action} needs ${names.map((r) => r + 's').join(' or ')}`;
 }
@@ -130,7 +136,7 @@ export function cannotGive(w: GrantWorld, source: Grant | null): [string, string
     else if (!g.pass_on.recipients.includes('agent')) out.push([`${g.relation} of ${onText(g)}`, `People only, never agents: ${grantNo(g.id)} passes on to people.`]);
   }
   if (source) {
-    for (const [relation, actions] of relationsSeen(w)) {
+    for (const [relation, actions] of relationsOf(w)) {
       if (!withinPassOn(source, actions)) out.push([`${relation} of ${onText(source)}`, 'More than you hold.']);
     }
   }

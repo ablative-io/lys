@@ -5,7 +5,7 @@ import { keyable } from '../../shell/keyable';
 import { useShell } from '../../shell/ShellContext';
 import { day } from '../file/time';
 import { CannotGive } from './CannotGive';
-import { grantNo, nameOf, onText, passText, relationsSeen, withinPassOn } from './model';
+import { grantNo, nameOf, onText, passText, relationsOf, withinPassOn } from './model';
 import type { GrantWorld } from './model';
 
 const DAY = 86400;
@@ -27,7 +27,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
   const shell = useShell();
   const me = w.me.person.id;
   const agents = [...w.who.entries()].filter(([, x]) => x.kind === 'agent' && x.responsible === me && x.state !== 'retired');
-  const relations = [...relationsSeen(w)];
+  const relations = relationsOf(w);
   const fits = relations.filter(([, actions]) => withinPassOn(source, actions));
   const [recipient, setRecipient] = useState(to ?? agents[0]?.[0] ?? '');
   const [relation, setRelation] = useState(fits.find(([r]) => r === 'viewer')?.[0] ?? fits.at(-1)?.[0] ?? '');

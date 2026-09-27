@@ -2,12 +2,8 @@ import { useRef, useState } from 'react';
 import { Refused, api, operationId } from '../../api';
 import type { Grant } from '../../generated/grants';
 import { useShell } from '../../shell/ShellContext';
-import { clock } from '../file/time';
 import { grantNo, nameOf, onText } from './model';
 import type { GrantWorld } from './model';
-
-/** Revocations made from this page, by grant: when, and the revision the service recorded. */
-export const REVOKED = new Map<string, { at: string; revision: number }>();
 
 /** Every grant the caller can see that derives from `g`, at any depth. */
 export function derivedFrom(w: GrantWorld, g: Grant): Grant[] {
@@ -45,8 +41,7 @@ export function Revoke({ w, g, done }: { w: GrantWorld; g: Grant; done: () => vo
   const revoke = async () => {
     setOutcome({ at: 'sending' });
     try {
-      const recorded = await api.revoke(g.id, { operation: op.current, route: 'browser', reason: why });
-      REVOKED.set(g.id, { at: clock(Math.floor(Date.now() / 1000)).split(' ').at(-1) ?? '', revision: recorded.receipt.revision });
+      await api.revoke(g.id, { operation: op.current, route: 'browser', reason: why });
       shell.closeAll();
       shell.toast(`Revoked ${grantNo(g.id)}. Everything derived from it goes with it.`);
       done();

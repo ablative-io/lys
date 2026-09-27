@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AgentView, MeView, PeopleView, ReceiptAnswer, Refusal, SignedIn } from './generated';
-import type { ActionBody, DelegateBody, Grant, GrantList, Permit, Recorded, RevokeBody, WhoAnswer, WhoBody } from './generated/grants';
+import type { ActionBody, DelegateBody, Grant, GrantList, GrantModel, Permit, Recorded, RevokeBody, WhoAnswer, WhoBody } from './generated/grants';
 
 /** The service is reached through the page's own origin, under /api. */
 export const API = '/api';
@@ -67,6 +67,7 @@ export const api = {
   agent: (id: string) => widest<AgentView>('/directory/agents/' + encodeURIComponent(id), '/agents/' + encodeURIComponent(id)),
   receipt: (index: number) => get<ReceiptAnswer>('/receipts/' + index),
   grants: () => get<GrantList>('/grants'),
+  model: () => get<GrantModel>('/grants/model'),
   grant: (id: string) => get<Grant>('/grants/' + encodeURIComponent(id)),
   delegate: (body: DelegateBody) => get<Recorded>('/grants', body),
   why: (body: ActionBody) => get<Permit>('/grants/why', body),

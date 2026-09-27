@@ -29,7 +29,7 @@ export function AnswerView({ w, a, land }: { w: GrantWorld; a: Answer; land: boo
         {a.ok ? (
           <span>model v{a.permit.model_version}</span>
         ) : (
-          <span>model <span className="open-q" title="The service names the model version on an answer that permits, and not yet on a refusal">not named in a refusal</span></span>
+          <span>model v{w.model.version}</span>
         )}
         {a.ok ? <span>change {a.permit.revision}</span> : a.revision !== null ? <span>change {a.revision}</span> : null}
         <span>checked {a.t}</span>

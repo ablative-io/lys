@@ -1,5 +1,5 @@
-// The grant routes' JSON, as crates/lys-identity-server/src/grant_contract.rs
-// writes and reads it. Every member of every request body is required.
+// The grant routes' JSON, as crates/lys-identity-server/src/grant_contract/
+// (requests.rs and views.rs) writes and reads it. Every member of every request body is required.
 
 import type { IdentityId } from './index';
 
@@ -20,7 +20,13 @@ export interface GrantWindow {
   ends_at: number | null;
 }
 
-/** `grant_json`. */
+/**
+ * `LastUseView`: when a grant was last seen exercised at an enforcement point.
+ * Not seen says only that no exercise was observed, never that it was never used.
+ */
+export type LastUse = { seen: false } | { seen: true; at: number; route: RouteWire; use_event: number };
+
+/** `GrantView`. */
 export interface Grant {
   id: string;
   issuer: IdentityId;
@@ -35,7 +41,13 @@ export interface Grant {
   window: GrantWindow;
   model_version: number;
   operation: string;
+  /** Whether it was revoked directly. */
   revoked: boolean;
+  /** When it was revoked directly, in seconds; null while it stands. */
+  revoked_at: number | null;
+  /** The grants' revision once its revocation was committed; null while it stands. */
+  revoked_revision: number | null;
+  last_use: LastUse;
 }
 
 /** GET /grants */
@@ -80,7 +92,7 @@ export interface WhoBody extends ActionBody {
   after: string | null;
 }
 
-/** `recorded_json`: a recorded change and its receipt. */
+/** `RecordedView`: a recorded change and its receipt. */
 export interface Recorded {
   operation: string;
   grant: string;
@@ -96,7 +108,14 @@ export interface Recorded {
   };
 }
 
-/** `permit_json`: a permitted decision and the authority path it rests on, root first. */
+/** `UseEventView`: whether a check's use was recorded, and why not when it was not. */
+export type UseEvent = { recorded: true; index: number } | { recorded: false; reason: string };
+
+/**
+ * `PermitView`: a permitted decision and the authority path it rests on. POST
+ * /grants/why answers it and records nothing; POST /grants/check answers it
+ * with `use_event` and records a use, so a question never calls it.
+ */
 export interface Permit {
   permitted: true;
   grant: string;
@@ -105,6 +124,13 @@ export interface Permit {
   scope: string[];
   model_version: number;
   revision: number;
+  use_event?: UseEvent;
+}
+
+/** GET /grants/model: `ModelView`, each relation with the actions it carries. */
+export interface GrantModel {
+  version: number;
+  relations: Record<string, string[]>;
 }
 
 /** POST /grants/who answers one page of holders, each with its permit. */
