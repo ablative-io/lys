@@ -58,7 +58,38 @@
       ],
       "stories": [
         "S13"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/home/proof-given/measure.py",
+            "change": "created",
+            "note": "PROOF-GIVEN's measure fixture. It is byte for byte the blob at 2f1baac9a0e11e643711ec8a49ee0f1357406e91:docs/design/home/proof-given/measure.py, taken with git show after fetching origin fixture/proof-given-measure. SHA-256 db17cccb008507eed1ca67ab197a353c6901d09a63d1c284bf8a1f7d49ac245d, mode 100644."
+          },
+          {
+            "path": "docs/design/home/PROOF-GIVEN.md",
+            "change": "modified",
+            "note": "Adds one section at line 211, after the old last line 209: 'The re-measurement of the request's order (HOME-011 R1), 27 September 2026'. It records the command, the copy's SHA-256, the version printed, a table for the three runs, the request's order, that the MCP server added no tool, the order the entry now records, and the old order named as superseded by the commit that lands HOME-011. No earlier line was changed."
+          }
+        ],
+        "how": "Row 1: `git show 2f1baac9…:docs/design/home/proof-given/measure.py | shasum -a 256` printed db17cccb… (met). The object only became present after `git fetch origin fixture/proof-given-measure`. The branch head equals that commit, per ls-remote.\nRow 2: cmp against the committed path reported the files equal (met).\nRow 3: NOT met at dev stage (I make no commit). Moreover the card branch already carries 8c6f5bb, the brief commit, on top of the merge-base 7b53625 with origin/main. The landing step will have to arrange this row (see deviation).\nRow 4: `shasum -a 256 docs/design/home/proof-given/measure.py` prints db17cccb… (met).\nRow 5: `git diff 7b53625 -- PROOF-GIVEN.md` has 0 removed lines, and every added line is at line 210 or later (the new section header is at line 211) (met).\nRow 6: the section's table records the SHA-256 of the copy run as db17cccb… (met).\nRow 7: the table records `2.1.283 (Claude Code)` as printed, names 2.1.283 as this measurement's version, and names 2.1.283 as the earlier measurement's version (met).\nRow 8: the per-run table has three rows. Each shows appended instructions in 'the `system` array, block 3 (`system[2]`)' and `user_claude_md` first in the first user message (met).\nRow 9: the section lists `appended_instructions`, `mcp_config`, `user_claude_md`, `claude_md_chain`, `memory_index` (met).\nRow 10: the section's last paragraph gives the old order beside 'is superseded by the commit that lands HOME-011' (met).\nRow 11: `grep -cE 'MARK[A-Z]+ZQ|markmcpserverzq'` prints 0 (met).\nMeasurement details: at 13:32–13:33 AEST, 27 Sep 2026, I copied the file to /tmp/home011-measure.* and confirmed the copy's hash. I ran `python3 measure.py` once there, and it made its three runs. Each run: exit 0, one request to /v1/messages?beta=true, 3 system blocks, 2 messages, 0 stderr bytes. The order was identical in all three runs and matched the brief's expected order. The scratch directory was deleted afterwards.",
+        "deviation": "Acceptance row 3 (the first commit on the branch touches only measure.py) cannot be met by this stage, because the instructions forbid committing. The branch also already has 8c6f5bb (the brief commit, 7 design files) on top of the merge-base 7b53625, so ordering measure.py first needs the landing step to reorder commits or read the row against a different base. The section also notes something the earlier run did not have: stderr was 0 bytes in every run, not one line of print-mode warning, and it records that as measured.",
+        "checklist": [
+          {
+            "id": "C86",
+            "done": true,
+            "note": "Earlier text unchanged; the re-measurement by the unchanged committed measure.py on 2.1.283 is appended, and the old order is named superseded. The commit-ordering row is left to the landing step."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S13",
+            "satisfied": true,
+            "note": "The order was re-measured on the named version 2.1.283 and written in PROOF-GIVEN.md."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -92,7 +123,33 @@
       ],
       "stories": [
         "S12"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/harness/claude_code/given.rs",
+            "change": "modified",
+            "note": "resolve_given now pushes appended_instructions and mcp_config first, then user_claude_md, then the chain (skipping a path equal to the user file), then the memory index. The module docs state the request's order, say it wins wherever it and the read order differ, give the MCP configuration's provisional place from the read order, name MEASURED_VERSION as the re-measured version, and word the D/.claude/CLAUDE.md rule as 'listed once, as user_claude_md'."
+          }
+        ],
+        "how": "Row 1 (5 documents, kinds appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index): given.rs lines 217-230 push instructions/mcp before user_claude_md. This is exercised by given_tests.rs a_config_claude_md_is_listed_after_the_appended_instructions_and_mcp_config at line 150 (met by code; not run by me).\nRow 2 (paths in that resolution): the same test asserts documents[2].path == c/CLAUDE.md. Paths 0 and 1 are the relative written names, as before (met).\nRow 3 (HOME h fallback returns 2 documents, user then chain): home_dot_claude_claude_md_is_listed_once_as_the_user_file_when_home_is_the_config, whose body is unchanged; with an empty out directory the new order gives the same two documents (met).\nRow 4: `grep -n 'once, first' given.rs` prints nothing (met).\nRow 5: module docs lines 9-17 list the five kinds in the new order, and lines 24 and 27 contain 'read order' (met).\nRow 6: `git diff 7b53625` on record/given.rs, record/entries.rs and launch.rs prints nothing (met).\nRow 7: the CHAIN_FILES line is unchanged (met).\nRow 8: MEASURED_VERSION stays \"2.1.283\", the version R1 recorded (met).\nRow 9: record/given_tests.rs already asserts harness_version \"2.1.283\" at line 113, so no change is needed. Its 7 tests are untouched (met by content; not run).\nRow 10: README line 72 names 'the documents Claude Code 2.1.283 loads', equal to MEASURED_VERSION (met).\nRow 11: `grep -c '2\\.1\\.283' README.md` counts 1 (met; line 72 is the only occurrence).\nRow 12: README is unchanged (met).",
+        "deviation": "crates/lys-home/src/record/given_tests.rs and crates/lys-home/README.md are listed for modification but were not changed. R1 measured 2.1.283, which both already name, so the brief's rule (set them to the measured version) needs no edit.",
+        "checklist": [
+          {
+            "id": "C83",
+            "done": true,
+            "note": "The request's order is in resolve_given. The within-directory order and D/.claude/CLAUDE.md-once are unchanged."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S12",
+            "satisfied": true,
+            "note": "The record lists documents in the order the request gives them."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -116,7 +173,33 @@
       ],
       "stories": [
         "S12"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/harness/claude_code/given_tests.rs",
+            "change": "modified",
+            "note": "a_config_claude_md_is_listed_first_as_user_claude_md is replaced by a_config_claude_md_is_listed_after_the_appended_instructions_and_mcp_config, which asserts len 5, the five kinds in order and documents[2].path == c/CLAUDE.md. The home_dot_claude test is renamed to drop 'first' and keeps its body."
+          }
+        ],
+        "how": "Row 1: the test at given_tests.rs:150 asserts documents.len() == 5 and then the kinds array [AppendedInstructions, McpConfig, UserClaudeMd, ClaudeMdChain, MemoryIndex] (met by code; not run).\nRow 2: the renamed test is at line 323, and `grep -c listed_once_first` prints 0 (met).\nRow 3: the one_directory_lists_… body is unchanged (met).\nRow 4: the file still has 15 #[test] functions (counted by grep) (met by count; not run).",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C84",
+            "done": true,
+            "note": "The unit test asserts appended_instructions and mcp_config precede user_claude_md."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S12",
+            "satisfied": true,
+            "note": "The unit test gates the request's order."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -143,7 +226,33 @@
       ],
       "stories": [
         "S12"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/tests/given_record.rs",
+            "change": "modified",
+            "note": "Fixture::new writes c/CLAUDE.md with a fixed line (USER_SENTENCE). KINDS holds the five kinds in the request's order. The first-render test is renamed the_first_render_records_five_documents_in_the_request_s_order_under_the_render_event and asserts 5 documents, the length and hash of each file on disk (c/CLAUDE.md at index 2) and harness_version \"2.1.283\". The two-renders test and the given listing assert 5 documents per record, and the changed hash is checked at index 3. The fallback test asserts the new kinds with h/.claude/CLAUDE.md at index 2 and the memory index at index 4. The count-of-0 user_claude_md assertion is removed."
+          }
+        ],
+        "how": "Row 1: grep for 'user_claude_md\").count(), 0' prints 0 (met).\nRow 2: the renamed test asserts report[\"given_documents\"] == 5 and documents.len() == 5 (met by code; not run).\nRow 3: it asserts documents[2].path == c/CLAUDE.md, plus its length and SHA-256 against USER_SENTENCE, the bytes written there. The zip over on_disk, with c/CLAUDE.md third and a length guard, checks the same against the file on disk (met).\nRow 4: the harness_version literal is \"2.1.283\" == MEASURED_VERSION (met).\nRow 5: the fallback test asserts the kinds in the new order and documents[2].path == h/.claude/CLAUDE.md (met by code; not run).\nRow 6: the two-renders test asserts 5 per record, differing == [\"claude_md_chain\"], documents[3] is claude_md_chain, and documents[3].sha256 equals the changed file's hash (met by code; not run).\nRow 7 (drift injection): NOT RUN. The instructions forbid me running any test command. Tracing the code under the old push order predicts that exactly three tests fail: a_config_claude_md_is_listed_after_the_appended_instructions_and_mcp_config (kinds array), the_first_render_records_five_documents_in_the_request_s_order_under_the_render_event (KINDS), and the_rendering_process_s_config_dir_is_never_read_and_home_dot_claude_is_the_fallback (kinds). Two tests pass under both orders: two_renders (index 3 is claude_md_chain in both orders, and it compares records to each other) and home_dot_claude_…listed_once… (empty out directory). The workflow's drift run must supply the failing names and the pass count.",
+        "deviation": "The drift-injection record this row asks for (failing test names and the count of passing tests) is a prediction from the code, not a measured run: this stage may not run tests. The measured record must come from the workflow's run.",
+        "checklist": [
+          {
+            "id": "C84",
+            "done": true,
+            "note": "The fixture test's config directory now holds a user CLAUDE.md, and the test asserts appended_instructions and mcp_config precede it."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S12",
+            "satisfied": true,
+            "note": "The end-to-end binary test gates the request's order by path, length and hash."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -169,7 +278,33 @@
       ],
       "stories": [
         "S12"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/home/RECORD.md",
+            "change": "modified",
+            "note": "The documents part of the lys.given paragraph now states one rule: the request's order wins over the read order. It gives the order appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index, the MCP configuration's place as provisional, the within-directory order unchanged and D/.claude/CLAUDE.md listed once, as user_claude_md. It names the old order as superseded by the commit that lands HOME-011, says entries written under it stand, and says harness_version (2.1.283 for both orders) does not tell the orders apart; an entry's recorded time against that commit's date does."
+          }
+        ],
+        "how": "Row 1: the paragraph lists the five kinds in the new order (met).\nRow 2: 'wherever the request's order and the read order, the order the harness reads the files in, differ, the request's order wins' contains both 'request' and 'read order' (met).\nRow 3: the paragraph contains 'superseded', 'HOME-011' and the old order (met).\nRow 4: it states 'the harness version does not tell the two orders apart' and 'a reader tells an entry's order by comparing its recorded time with the date of the commit that lands HOME-011' (met).\nRow 5: `grep -n 'listed once, first'` prints nothing (met).\nRow 6: the data list `{harness, harness_version, kinds, config_dir, documents, environment}` is unchanged (met).\nNo other paragraph changed.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C85",
+            "done": true,
+            "note": "One rule is stated, the old order is named superseded, and the reader is told to use recorded time, never harness_version."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S12",
+            "satisfied": true,
+            "note": "The record's documented order is the request's."
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -194,7 +329,58 @@
       ],
       "stories": [
         "S12"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/home/briefs/HOME-003.json",
+            "change": "modified",
+            "note": "Adds only an `amendments` member with one entry: date 2026-09-27, by HOME-011. Its ruling names R2's cross-kind order (user_claude_md first) as superseded by HOME-011 and ADR-031, gives the new order, and says the within-directory order is unchanged."
+          },
+          {
+            "path": "docs/design/home/briefs/HOME-003.md",
+            "change": "modified",
+            "note": "Re-rendered by render-cluster.py: carries the amendment and S12's new wording."
+          },
+          {
+            "path": "docs/design/home/USER-STORIES.md",
+            "change": "modified",
+            "note": "Re-rendered: S12 reads 'in the order the request gives them'."
+          },
+          {
+            "path": "docs/design/home/DESIGN.md",
+            "change": "modified",
+            "note": "Re-rendered from design.json as committed in 8c6f5bb: the ADR-031 line and three HOME-011 structure rows."
+          },
+          {
+            "path": "docs/design/home/CHECKLIST.md",
+            "change": "modified",
+            "note": "Re-rendered from checklist.json as committed in 8c6f5bb: C83 to C87."
+          },
+          {
+            "path": "docs/design/home/briefs/HOME-011.md",
+            "change": "created",
+            "note": "The rendered markdown of HOME-011.json (a path in the design's structure array)."
+          }
+        ],
+        "how": "Row 1: a Python check confirmed that HOME-003.json before and after, loaded as JSON, are equal in every key but `amendments`, and that `amendments` holds one entry (met).\nRow 2: the ruling contains 'HOME-011', 'ADR-031' and 'superseded' (met).\nRow 3: USER-STORIES.md now contains 'in the order the request gives them' and no longer the old wording (met).\nRow 4: gate.sh not run by me. render-cluster.py docs/design/home was run and all 10 rendered files are now its output, which is what gate.sh compares. The amendment carries exactly the schema's four required keys.",
+        "deviation": "The brief says the render would change only HOME-003.md, but the brief commit 8c6f5bb had left the cluster's rendered files stale. It changed stories.json, checklist.json and design.json and added HOME-011.json without re-rendering. So render-cluster.py also rewrote USER-STORIES.md, DESIGN.md and CHECKLIST.md and created briefs/HOME-011.md. All four are in the design's structure array. None was edited by hand, and gate.sh requires them to match their JSON.",
+        "checklist": [
+          {
+            "id": "C87",
+            "done": true,
+            "note": "S12's wording is updated, the HOME-003 amendment is recorded, and every rendered file is re-rendered."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S12",
+            "satisfied": true,
+            "note": "The rendered story reads 'in the order the request gives them'."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [

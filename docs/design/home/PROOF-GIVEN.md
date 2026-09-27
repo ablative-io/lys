@@ -207,3 +207,63 @@ entry lines.
   as unlisted and the rest are later cards on the same shape.
 - The real render's entry names hashes only; the search above finds no line
   of any document in this file.
+
+## The re-measurement of the request's order (HOME-011 R1), 27 September 2026
+
+Measured 27 September 2026, 13:32 to 13:33 AEST, on this Mac, with the
+Claude Code installed here. `measure.py` is committed at
+`docs/design/home/proof-given/measure.py`, taken byte for byte from commit
+`2f1baac9a0e11e643711ec8a49ee0f1357406e91` of the branch
+`fixture/proof-given-measure`. It was copied unchanged into a fresh scratch
+directory outside the repository, `<scratch>` below, and run there once;
+it makes its own three runs. No MCP server was added and no line of the
+script was changed. Nothing here quotes a line of any fixture document or
+request body: paths, counts, orders, versions and hashes only.
+
+| field | value |
+| --- | --- |
+| command | `python3 measure.py`, run in `<scratch>` |
+| SHA-256 of the copy run | `db17cccb008507eed1ca67ab197a353c6901d09a63d1c284bf8a1f7d49ac245d` |
+| `claude --version` printed | `2.1.283 (Claude Code)` |
+| this measurement's version | 2.1.283, the version `claude --version` printed above |
+| the earlier measurement's version | 2.1.283 (the sections above) |
+| `MEASURED_VERSION` | stays 2.1.283, the version this measurement ran on |
+
+| run | exit | requests | system blocks | messages | appended instructions | first in the first user message | seconds | stderr bytes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 0 | 1 (`POST /v1/messages?beta=true`) | 3 | 2 | the `system` array, block 3 (`system[2]`) | `user_claude_md` | 1.2 | 0 |
+| 2 | 0 | 1 (same) | 3 | 2 | the `system` array, block 3 (`system[2]`) | `user_claude_md` | 1.3 | 0 |
+| 3 | 0 | 1 (same) | 3 | 2 | the `system` array, block 3 (`system[2]`) | `user_claude_md` | 1.3 | 0 |
+
+Identical in all three runs, by the request: the appended instructions are
+in the `system` array, ahead of the first user message; inside the first
+text block of the first user message (`messages[0][0]`) the
+`CLAUDE.md`-family files and the memory index come in this order:
+
+1. `<config>/CLAUDE.md` (`user_claude_md`), first;
+2. `anc.dot/CLAUDE.md`, then `W/CLAUDE.md`, then `W/.claude/CLAUDE.md`,
+   then `W/CLAUDE.local.md` (`claude_md_chain`);
+3. `<config>/projects/<slug>/memory/MEMORY.md` under the shipped slug
+   (`memory_index`); the index under the `/`-only slug appears in no
+   request and was never read.
+
+The MCP server contributed no tool: its name appears nowhere in any of the
+three requests, so the MCP configuration's place is taken from the read
+order, straight after the appended instructions. The read order, by access
+time, was the same in all three runs as the earlier measurement's:
+`W/.claude/CLAUDE.md` first, then `<config>/CLAUDE.md`, `instr.md`,
+`mcp.json`, `anc.dot/CLAUDE.md`, `W/CLAUDE.md`, `W/CLAUDE.local.md`, the
+memory index. The fixture's nine files, hashed by the script after its
+third run, have the same lengths and SHA-256 as the table above.
+
+The order the entry now records, the request's:
+`appended_instructions`, `mcp_config`, `user_claude_md`, `claude_md_chain`,
+`memory_index`.
+
+The old order, `user_claude_md`, `appended_instructions`, `mcp_config`,
+`claude_md_chain`, `memory_index`, is superseded by the commit that lands
+HOME-011 and from that commit's date. Entries written before that commit
+stand as written; both orders are written under `harness_version` 2.1.283,
+so an entry's order is told by its recorded time against that commit's
+date, never by its harness version. The real render and the Pi-reader
+fixture session above were written under the old order and are not re-run.
