@@ -43,6 +43,10 @@ pub enum EntryClass {
     Key,
     /// A memory, read by those it is shared with.
     Memory,
+    /// An OAuth service grant, used only through the proxy, which refreshes
+    /// its access token itself.
+    #[serde(rename = "oauth")]
+    OAuth,
 }
 
 impl EntryClass {
@@ -51,6 +55,7 @@ impl EntryClass {
             Self::Credential => "credential",
             Self::Key => "key",
             Self::Memory => "memory",
+            Self::OAuth => "oauth",
         }
     }
 }

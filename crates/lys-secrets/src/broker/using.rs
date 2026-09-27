@@ -12,6 +12,7 @@ use crate::error::SecretsError;
 use crate::handle::{HandleToken, Presentation};
 use crate::permission::PermissionCheck;
 use crate::secret::Secret;
+use crate::store::EntryClass;
 
 use super::admit::Admission;
 use super::{Broker, UseError, Used};
@@ -32,6 +33,10 @@ pub struct Ticket {
     pub(super) operation: String,
     pub(super) mark: String,
     pub(super) reserved: Option<u64>,
+    /// The store entry opened: the secret's current account.
+    pub(super) entry: String,
+    /// The entry's class.
+    pub(super) class: EntryClass,
     pub(super) uses_left: u64,
     pub(super) credential: Secret,
 }
@@ -166,13 +171,16 @@ impl<P: PermissionCheck> Broker<P> {
             record.open.insert(operation.clone(), reserved.unwrap_or(0));
         }
         let opened = match self.store.entry(&entry).map(|view| view.class) {
-            Some(class) => self.store.open_for_use(&self.store_key, &entry, class),
+            Some(class) => self
+                .store
+                .open_for_use(&self.store_key, &entry, class)
+                .map(|credential| (credential, class)),
             None => Err(SecretsError::SecretUnknown {
                 name: entry.clone(),
             }),
         };
-        let credential = match opened {
-            Ok(credential) => credential,
+        let (credential, class) = match opened {
+            Ok(opened) => opened,
             Err(refusal) => {
                 let spend = reserved.map(|_reserved| 0);
                 self.close(
@@ -192,6 +200,8 @@ impl<P: PermissionCheck> Broker<P> {
             operation,
             mark,
             reserved,
+            entry,
+            class,
             uses_left,
             credential,
         }))

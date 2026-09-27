@@ -24,7 +24,7 @@ const REDACTED: &[u8] = b"[redacted]";
 pub(crate) struct Shared {
     pub(crate) broker: Mutex<Broker<Grants>>,
     pub(crate) layout: Layout,
-    client: reqwest::Client,
+    pub(crate) client: reqwest::Client,
 }
 
 pub fn serve(broker: Broker<Grants>, layout: Layout, listen: &str) -> Result<(), SecretsError> {
@@ -200,7 +200,39 @@ async fn forward(
     }
     .map_err(|error| (StatusCode::FORBIDDEN, error))?;
     let rest = rest.to_owned();
-    let called = call_upstream(shared, &route, parts, &rest, body, ticket.credential()).await;
+    let called = match ticket.oauth() {
+        Err(error) => Err((StatusCode::INTERNAL_SERVER_ERROR, error)),
+        Ok(None) => {
+            let credential = ticket.credential();
+            call_upstream(
+                shared,
+                &route,
+                parts,
+                &rest,
+                body,
+                credential,
+                &[credential],
+            )
+            .await
+        }
+        Ok(Some(grant)) => match crate::oauth_proxy::live(shared, &ticket, grant).await {
+            Err(error) => Err(error),
+            Ok((grant, retired)) => {
+                let mut tokens = grant.tokens();
+                tokens.extend(retired.iter());
+                call_upstream(
+                    shared,
+                    &route,
+                    parts,
+                    &rest,
+                    body,
+                    grant.access_token(),
+                    &tokens,
+                )
+                .await
+            }
+        },
+    };
     let reserved = ticket.reserved().unwrap_or(0);
     {
         let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
@@ -224,6 +256,7 @@ async fn call_upstream(
     rest: &str,
     body: Bytes,
     credential: &Secret,
+    hidden: &[&Secret],
 ) -> Result<(Response, Option<u64>), (StatusCode, SecretsError)> {
     let mut header_value = route.prefix.as_bytes().to_vec();
     header_value.extend_from_slice(credential.expose());
@@ -277,7 +310,7 @@ async fn call_upstream(
                 StatusCode::BAD_GATEWAY,
                 SecretsError::Encoding {
                     context: "upstream call",
-                    reason: redact_text(&error.to_string(), credential),
+                    reason: redact_text(&error.to_string(), hidden),
                 },
             )
         })?;
@@ -290,7 +323,10 @@ async fn call_upstream(
         .and_then(|text| text.trim().parse::<u64>().ok());
     let mut headers = HeaderMap::new();
     for (name, value) in upstream.headers() {
-        if contains(value.as_bytes(), credential.expose()) {
+        if hidden
+            .iter()
+            .any(|secret| contains(value.as_bytes(), secret.expose()))
+        {
             continue;
         }
         headers.insert(name.clone(), value.clone());
@@ -302,11 +338,13 @@ async fn call_upstream(
             StatusCode::BAD_GATEWAY,
             SecretsError::Encoding {
                 context: "upstream answer",
-                reason: redact_text(&error.to_string(), credential),
+                reason: redact_text(&error.to_string(), hidden),
             },
         )
     })?;
-    let answer = redact(&answer, credential.expose());
+    let answer = hidden.iter().fold(answer.to_vec(), |text, secret| {
+        redact(&text, secret.expose())
+    });
     let mut response = Response::new(Body::from(answer));
     *response.status_mut() = status;
     *response.headers_mut() = headers;
@@ -338,6 +376,11 @@ fn redact(haystack: &[u8], needle: &[u8]) -> Vec<u8> {
     out
 }
 
-fn redact_text(text: &str, credential: &Secret) -> String {
-    String::from_utf8_lossy(&redact(text.as_bytes(), credential.expose())).into_owned()
+fn redact_text(text: &str, hidden: &[&Secret]) -> String {
+    let redacted = hidden
+        .iter()
+        .fold(text.as_bytes().to_vec(), |text, secret| {
+            redact(&text, secret.expose())
+        });
+    String::from_utf8_lossy(&redacted).into_owned()
 }

@@ -38,6 +38,8 @@ pub enum AuditKind {
     Settlement,
     /// A sealed record was read, or a read refused.
     SealedRead,
+    /// An OAuth access token was refreshed, or a grant revoked upstream.
+    Refresh,
 }
 
 impl AuditKind {
@@ -52,6 +54,7 @@ impl AuditKind {
             Self::NextAccount => "next_account",
             Self::Settlement => "settlement",
             Self::SealedRead => "sealed_read",
+            Self::Refresh => "refresh",
         }
     }
 
@@ -65,6 +68,7 @@ impl AuditKind {
             b"next_account" => Some(Self::NextAccount),
             b"settlement" => Some(Self::Settlement),
             b"sealed_read" => Some(Self::SealedRead),
+            b"refresh" => Some(Self::Refresh),
             _ => None,
         }
     }

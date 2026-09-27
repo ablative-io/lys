@@ -23,6 +23,7 @@ use crate::store::{EntryClass, SecretStore};
 mod accounts;
 mod admit;
 mod inflight;
+mod oauth_grants;
 mod records;
 mod rotation;
 mod using;
@@ -341,7 +342,7 @@ impl<P: PermissionCheck> Broker<P> {
                     record: secret.to_owned(),
                 });
             }
-            Some(EntryClass::Credential | EntryClass::Key) => {}
+            Some(EntryClass::Credential | EntryClass::Key | EntryClass::OAuth) => {}
         }
         let now = (self.clock)();
         if not_after_ms <= now || max_uses == 0 {

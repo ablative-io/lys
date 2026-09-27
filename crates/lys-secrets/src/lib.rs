@@ -18,6 +18,7 @@ mod fsutil;
 pub mod handle;
 pub mod keys;
 pub mod local_grants;
+pub mod oauth;
 pub mod permission;
 pub mod secret;
 pub mod store;
@@ -33,6 +34,7 @@ pub use handle::{
 };
 pub use keys::{KeyId, StoreKey};
 pub use local_grants::{LocalGrants, SecretRelation};
+pub use oauth::{OAuthGrant, Provenance, REFRESH_MARGIN_MS};
 pub use permission::{Denied, PermissionCheck, Permitted, Relation};
 pub use secret::Secret;
 pub use store::{AccountView, EntryClass, EntryView, SecretStore};

@@ -3,208 +3,27 @@
 //! presentation as an agent, read the audit log, and serve the proxy.
 
 mod args;
+mod cli;
 mod files;
+mod oauth_proxy;
 mod serve;
 mod spice;
 mod view;
 
 use std::io::{Read, Write};
-use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use lys_core::Ed25519Identity;
 use lys_secrets::{
     Broker, EntryClass, HandleId, Holder, Presentation, Relation, Secret, SecretsError,
     new_operation_id, request_digest, to_hex,
 };
 
-use args::{PermissionSource, RecordClass, RelationArg};
+use args::RecordClass;
+use cli::{Cli, Command, Where};
 use files::{FileGrants, Layout, Route, now_ms};
 use spice::Grants;
-
-#[derive(Parser)]
-#[command(name = "lys-secrets", about = "The lys secrets broker")]
-struct Cli {
-    #[command(subcommand)]
-    command: Command,
-}
-
-#[derive(clap::Args)]
-struct Where {
-    /// The broker's folder: the sealed store, the audit log, routes and grants.
-    #[arg(long)]
-    root: PathBuf,
-    /// The key folder, outside the broker's folder.
-    #[arg(long)]
-    keys: PathBuf,
-}
-
-#[derive(Subcommand)]
-enum Command {
-    /// Make a new broker: store, audit log and both keys.
-    Init(Where),
-    /// Seal the credential read from standard input, bound to one upstream.
-    Seal {
-        #[command(flatten)]
-        at: Where,
-        #[arg(long)]
-        name: String,
-        #[arg(long)]
-        owner: String,
-        /// The only origin the credential is ever sent to.
-        #[arg(long)]
-        upstream: String,
-        /// The request header that carries it.
-        #[arg(long, default_value = "authorization")]
-        header: String,
-        /// Text written before the credential in that header.
-        #[arg(long, default_value = "Bearer ")]
-        prefix: String,
-        /// The upstream answer header that reports what a call spent.
-        #[arg(long)]
-        spend_header: Option<String>,
-    },
-    /// Grant an identity the use of a secret, in a person's name.
-    Grant {
-        #[arg(long)]
-        root: PathBuf,
-        #[arg(long)]
-        identity: String,
-        #[arg(long)]
-        secret: String,
-        #[arg(long)]
-        by: String,
-        #[arg(long, value_enum, default_value = "use")]
-        relation: RelationArg,
-    },
-    /// Revoke an identity's use of a secret; the next use is refused.
-    Revoke {
-        #[arg(long)]
-        root: PathBuf,
-        #[arg(long)]
-        identity: String,
-        #[arg(long)]
-        secret: String,
-        #[arg(long, value_enum, default_value = "use")]
-        relation: RelationArg,
-    },
-    /// Issue a handle to an identity whose key file is named.
-    Issue {
-        #[command(flatten)]
-        at: Where,
-        #[arg(long)]
-        identity: String,
-        /// The holder's key file; only its public half is registered.
-        #[arg(long)]
-        holder_key: PathBuf,
-        #[arg(long)]
-        secret: String,
-        #[arg(long, default_value_t = 10)]
-        uses: u64,
-        #[arg(long, default_value_t = 60)]
-        minutes: i64,
-        /// A hard cap on what the handle's calls may spend; each call then
-        /// sends `lys-reserve` with what it may spend.
-        #[arg(long)]
-        spend_cap: Option<u64>,
-        #[command(flatten)]
-        directory: PermissionSource,
-    },
-    /// Seal another account of a secret, read from standard input.
-    AddAccount {
-        #[command(flatten)]
-        at: Where,
-        #[arg(long)]
-        secret: String,
-        #[arg(long)]
-        account: String,
-    },
-    /// Rest the account in use and move every handle to the next one.
-    NextAccount {
-        #[command(flatten)]
-        at: Where,
-        #[arg(long)]
-        secret: String,
-    },
-    /// Return a resting account to service.
-    RestoreAccount {
-        #[command(flatten)]
-        at: Where,
-        #[arg(long)]
-        secret: String,
-        #[arg(long)]
-        account: String,
-    },
-    /// List a secret's accounts.
-    Accounts {
-        #[command(flatten)]
-        at: Where,
-        #[arg(long)]
-        secret: String,
-    },
-    /// Drop a handle.
-    Drop {
-        #[command(flatten)]
-        at: Where,
-        #[arg(long)]
-        handle_id: String,
-    },
-    /// As the holder: sign a presentation for one request and print its
-    /// headers. The presentation is good for that method, path and body only.
-    Sign {
-        #[arg(long)]
-        key: PathBuf,
-        #[arg(long)]
-        handle_id: String,
-        #[arg(long, default_value = "GET")]
-        method: String,
-        /// The path with its query, as the proxy is called (`/<secret>/...`).
-        #[arg(long)]
-        path: String,
-        /// A file holding the request body; none means an empty body.
-        #[arg(long)]
-        body: Option<PathBuf>,
-    },
-    /// Print the audit log, every line's signature checked.
-    Log(Where),
-    /// Serve the proxy on a local address.
-    Serve {
-        #[command(flatten)]
-        at: Where,
-        #[arg(long, default_value = "127.0.0.1:8472")]
-        listen: String,
-        #[command(flatten)]
-        directory: PermissionSource,
-    },
-    /// Seal a memory or key record, read from standard input.
-    SealRecord {
-        #[command(flatten)]
-        at: Where,
-        #[arg(long)]
-        name: String,
-        #[arg(long)]
-        owner: String,
-        #[arg(long, value_enum)]
-        class: RecordClass,
-    },
-    /// Read a memory record as an identity holding the read relation, and
-    /// write it to standard output; `--from` and `--len` read a piece.
-    ReadRecord {
-        #[command(flatten)]
-        at: Where,
-        #[arg(long)]
-        identity: String,
-        #[arg(long)]
-        name: String,
-        #[arg(long, default_value_t = 0)]
-        from: usize,
-        #[arg(long)]
-        len: Option<usize>,
-        #[command(flatten)]
-        directory: PermissionSource,
-    },
-}
 
 fn read_credential() -> Result<Secret, SecretsError> {
     let mut value = Vec::new();
@@ -369,10 +188,41 @@ fn run(command: Command) -> Result<(), SecretsError> {
                 println!("{:<16} {state}", view.account);
             }
         }
-        Command::Drop { at, handle_id } => {
+        Command::Drop {
+            at,
+            handle_id,
+            revoke_upstream,
+        } => {
             let mut broker = open(&at)?;
-            let outcome = broker.drop_handle(&HandleId::from_text(&handle_id))?;
+            let id = HandleId::from_text(&handle_id);
+            let outcome = broker.drop_handle(&id)?;
             println!("{handle_id}: {outcome:?}");
+            if revoke_upstream {
+                let confirmed = oauth_proxy::revoke_after_drop(&mut broker, &id)?;
+                let said = if confirmed {
+                    "confirmed"
+                } else {
+                    "not confirmed"
+                };
+                println!("upstream revocation {said}");
+            }
+        }
+        Command::SealOauth {
+            at,
+            name,
+            owner,
+            upstream,
+        } => {
+            let layout = Layout::new(&at.root, &at.keys);
+            let subject = oauth_proxy::seal(
+                &mut open(&at)?,
+                &layout,
+                &name,
+                &owner,
+                upstream,
+                &read_credential()?,
+            )?;
+            println!("sealed OAuth grant {name} for {subject} (tokens not shown)");
         }
         Command::Sign {
             key,
