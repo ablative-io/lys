@@ -22,6 +22,7 @@ use crate::store::{EntryClass, SecretStore};
 
 use admit::Admission;
 
+mod accounts;
 mod admit;
 mod rotation;
 
@@ -338,9 +339,23 @@ impl<P: PermissionCheck> Broker<P> {
                 uses_left,
                 used,
             }) => {
+                let (entry, account) = match self.store.current_entry(&secret) {
+                    Ok(current) => current,
+                    Err(refusal) => {
+                        self.record(
+                            AuditKind::Use,
+                            (Some(&id), Some(&identity), Some(&secret)),
+                            Some(&operation),
+                            None,
+                            refusal.name(),
+                        )?;
+                        return Err(refusal);
+                    }
+                };
+                let used_as = format!("{secret}@{account}");
                 self.record(
                     AuditKind::Use,
-                    (Some(&id), Some(&identity), Some(&secret)),
+                    (Some(&id), Some(&identity), Some(&used_as)),
                     Some(&operation),
                     Some(used),
                     "admitted",
@@ -351,7 +366,7 @@ impl<P: PermissionCheck> Broker<P> {
                 }
                 let credential =
                     self.store
-                        .open_for_use(&self.store_key, &secret, EntryClass::Credential)?;
+                        .open_for_use(&self.store_key, &entry, EntryClass::Credential)?;
                 let answer = forward(&credential);
                 Ok(Used::Forwarded { answer, uses_left })
             }

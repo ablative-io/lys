@@ -30,7 +30,7 @@ pub use keys::{KeyId, StoreKey};
 pub use local_grants::{LocalGrants, SecretRelation};
 pub use permission::{Denied, PermissionCheck, Permitted};
 pub use secret::Secret;
-pub use store::{EntryClass, EntryView, SecretStore};
+pub use store::{AccountView, EntryClass, EntryView, SecretStore};
 
 /// `bytes` as lowercase hex.
 pub fn to_hex(bytes: &[u8]) -> String {

@@ -32,6 +32,8 @@ pub enum AuditKind {
     Seal,
     /// The store key was rotated.
     Rotation,
+    /// A secret's use moved to its next account.
+    NextAccount,
 }
 
 impl AuditKind {
@@ -43,6 +45,7 @@ impl AuditKind {
             Self::Drop => "drop",
             Self::Seal => "seal",
             Self::Rotation => "rotation",
+            Self::NextAccount => "next_account",
         }
     }
 
@@ -53,6 +56,7 @@ impl AuditKind {
             b"drop" => Some(Self::Drop),
             b"seal" => Some(Self::Seal),
             b"rotation" => Some(Self::Rotation),
+            b"next_account" => Some(Self::NextAccount),
             _ => None,
         }
     }

@@ -101,6 +101,38 @@ enum Command {
         #[arg(long, default_value = "edit")]
         use_action: String,
     },
+    /// Seal another account of a secret, read from standard input.
+    AddAccount {
+        #[command(flatten)]
+        at: Where,
+        #[arg(long)]
+        secret: String,
+        #[arg(long)]
+        account: String,
+    },
+    /// Rest the account in use and move every handle to the next one.
+    NextAccount {
+        #[command(flatten)]
+        at: Where,
+        #[arg(long)]
+        secret: String,
+    },
+    /// Return a resting account to service.
+    RestoreAccount {
+        #[command(flatten)]
+        at: Where,
+        #[arg(long)]
+        secret: String,
+        #[arg(long)]
+        account: String,
+    },
+    /// List a secret's accounts.
+    Accounts {
+        #[command(flatten)]
+        at: Where,
+        #[arg(long)]
+        secret: String,
+    },
     /// Drop a handle.
     Drop {
         #[command(flatten)]
@@ -131,6 +163,20 @@ enum Command {
         #[arg(long, default_value = "edit")]
         use_action: String,
     },
+}
+
+fn read_credential() -> Result<Secret, SecretsError> {
+    let mut value = Vec::new();
+    std::io::stdin()
+        .read_to_end(&mut value)
+        .map_err(|source| SecretsError::Io {
+            context: "reading the credential from standard input".to_owned(),
+            source,
+        })?;
+    while value.last().is_some_and(u8::is_ascii_whitespace) {
+        value.pop();
+    }
+    Ok(Secret::new(value))
 }
 
 fn open(at: &Where) -> Result<Broker<Grants>, SecretsError> {
@@ -167,17 +213,7 @@ fn run(command: Command) -> Result<(), SecretsError> {
             header,
             prefix,
         } => {
-            let mut value = Vec::new();
-            std::io::stdin()
-                .read_to_end(&mut value)
-                .map_err(|source| SecretsError::Io {
-                    context: "reading the credential from standard input".to_owned(),
-                    source,
-                })?;
-            while value.last().is_some_and(u8::is_ascii_whitespace) {
-                value.pop();
-            }
-            let value = Secret::new(value);
+            let value = read_credential()?;
             let layout = Layout::new(&at.root, &at.keys);
             let mut broker = open(&at)?;
             broker.seal(&name, &owner, &value)?;
@@ -238,6 +274,46 @@ fn run(command: Command) -> Result<(), SecretsError> {
             )?;
             println!("handle_id {}", issued.id);
             println!("handle {}", to_hex(issued.token.expose()));
+        }
+        Command::AddAccount {
+            at,
+            secret,
+            account,
+        } => {
+            let value = read_credential()?;
+            let mut broker = open(&at)?;
+            broker.add_account(&secret, &account, &value)?;
+            println!(
+                "sealed account {account} of {secret} ({} bytes, not shown)",
+                value.len()
+            );
+        }
+        Command::NextAccount { at, secret } => {
+            let mut broker = open(&at)?;
+            let account = broker.next_account(&secret)?;
+            println!("{secret} now uses account {account}");
+        }
+        Command::RestoreAccount {
+            at,
+            secret,
+            account,
+        } => {
+            let mut broker = open(&at)?;
+            broker.restore_account(&secret, &account)?;
+            println!("account {account} of {secret} is back in service");
+        }
+        Command::Accounts { at, secret } => {
+            let broker = open(&at)?;
+            for view in broker.store().accounts(&secret) {
+                let state = if view.resting {
+                    "resting"
+                } else if view.current {
+                    "in use"
+                } else {
+                    "ready"
+                };
+                println!("{:<16} {state}", view.account);
+            }
         }
         Command::Drop { at, handle_id } => {
             let mut broker = open(&at)?;
