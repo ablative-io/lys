@@ -122,6 +122,10 @@
         {
           "id": "S25",
           "text": "As an agent whose home held entries before logging began, I want those entries covered by one signed checkpoint, so that my earlier history can be told apart from tampering."
+        },
+        {
+          "id": "S28",
+          "text": "As an agent, I want each sealed record I open through my home recorded as an entry with its own signed leaf, naming the envelope by hash and never its content, so that a stranger can see what I opened without learning what it said."
         }
       ]
     },

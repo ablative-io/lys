@@ -286,7 +286,7 @@
         },
         {
           "id": "C46",
-          "text": "Every lys.call and every lys.harness_event entry appended to a session appends exactly one leaf to the home's log at log/ under the home, signed with the agent identity's Ed25519 key through lys_core::attestation::sign_attestation, and no other entry kind appends a leaf.",
+          "text": "On a home that logs its entries, every lys.call, lys.harness_event and lys.open entry appended to a session appends exactly one leaf to the home's log at log/ under the home, signed with the agent identity's Ed25519 key through lys_core::attestation::sign_attestation, and no other entry kind appends a leaf.",
           "done": false
         },
         {
@@ -296,7 +296,7 @@
         },
         {
           "id": "C48",
-          "text": "The first leaf of a home's log is a checkpoint naming each session of the home with its entry count and the SHA-256 of its file as they stood when logging was first enabled.",
+          "text": "lys-home log-enable starts a home's log with one checkpoint leaf naming each session of the home with its entry count and the SHA-256 of its file as they stand, and a log never holds a second checkpoint.",
           "done": false
         },
         {
@@ -311,7 +311,7 @@
         },
         {
           "id": "C51",
-          "text": "lys-home verify --home --session checks every logged entry line against its one leaf under the agent identity's public key and the pre-log history against the checkpoint, prints one JSON report of counts and hashes, and otherwise exits 1 naming the first entry, or the session for the checkpoint, that fails.",
+          "text": "lys-home verify --home <dir> --session <id> checks every logged entry line against its one leaf under the agent identity's public key and the pre-log history against the checkpoint, prints one JSON report of counts and hashes, and otherwise exits 1 naming the first entry, or the session for the checkpoint, that fails.",
           "done": false
         },
         {
@@ -322,6 +322,21 @@
         {
           "id": "C53",
           "text": "The adversarial review of both leaf formats (forgery, cross-protocol confusion, replay, a leaf under another key, guessing a short line from its hash) is recorded in docs/design/identity/IDENTITY-EVENTS.md before any durable byte is signed under them.",
+          "done": false
+        },
+        {
+          "id": "C54",
+          "text": "A home that never ran log-enable appends every entry as before, with no leaf and no log, and log-enable is refused by name, creating nothing, unless the identity crate holds the key of the home's agent.",
+          "done": false
+        },
+        {
+          "id": "C55",
+          "text": "On a home that logs its entries and whose agent's key the identity crate does not hold, a lys.call, lys.harness_event or lys.open append is refused before its line is written, naming the home and the entry kind and the act that answers it, with nothing written.",
+          "done": false
+        },
+        {
+          "id": "C56",
+          "text": "lys-home open opens a sealed envelope with open_and_verify, writes the plaintext to --out and appends one lys.open entry (the envelope's SHA-256, the sender's public key and the --out path) to the named session with its leaf; an existing --out is refused by name, and a failed open gives lys open's one failure message and writes no plaintext, entry or leaf.",
           "done": false
         }
       ]
