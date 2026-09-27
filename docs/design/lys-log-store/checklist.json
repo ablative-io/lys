@@ -1,0 +1,120 @@
+{
+  "cluster": "lys-log-store",
+  "sections": [
+    {
+      "name": "Refusal at open",
+      "items": [
+        {
+          "id": "C8",
+          "text": "Log::open over a store whose leaf inside the pinned prefix is torn returns StoreError::PinMismatch stating the pin's tree size and root and the recomputed tree size and root, names no leaf, and leaves state.json unchanged.",
+          "done": false
+        },
+        {
+          "id": "C9",
+          "text": "Log::open over a store whose leaf inside the pinned prefix has one byte changed returns the same refusal, naming no leaf and leaving state.json unchanged.",
+          "done": false
+        },
+        {
+          "id": "C10",
+          "text": "Log::open over a store with a torn leaf at the index just past the pin repairs and pins it and reports the repair through recovered_to, exactly as before this change.",
+          "done": false
+        },
+        {
+          "id": "C11",
+          "text": "lys log status on a log whose pinned prefix holds a torn leaf exits 1 and prints the refusal on stderr.",
+          "done": false
+        },
+        {
+          "id": "C12",
+          "text": "lys-anchor status on an anchor whose pinned prefix holds a torn leaf exits 1 and prints the refusal on stderr.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Leaf store at open",
+      "items": [
+        {
+          "id": "C1",
+          "text": "FileLeafStore::open returns, sorted, the name of every entry in leaves/ that has the store's temporary-leaf form, does not count any of them as a leaf, and leaves each byte-identical.",
+          "done": false
+        },
+        {
+          "id": "C2",
+          "text": "Every lys log command that opens a store prints one stderr line naming the leftover temporary leaf files the store reported.",
+          "done": false
+        },
+        {
+          "id": "C3",
+          "text": "Every lys-anchor command that opens an anchor prints one stderr line naming the leftover temporary leaf files the store reported.",
+          "done": false
+        },
+        {
+          "id": "C4",
+          "text": "scripts/verify_inclusion.py exits 0 on an inclusion artifact and a leaf file from a store written after this change.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Witness",
+      "items": [
+        {
+          "id": "C5",
+          "text": "WitnessProjection records how many leaves it has folded and folds forward from that position only.",
+          "done": false
+        },
+        {
+          "id": "C6",
+          "text": "observe parses at most one leaf more than the number of leaves recorded since the previous observe through the same projection, counted on the parse path.",
+          "done": false
+        },
+        {
+          "id": "C7",
+          "text": "After every observe, the kept projection reports the same latest state for every origin as WitnessProjection::rebuild over the same anchor, including after a rollback.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Read-only open",
+      "items": [
+        {
+          "id": "C13",
+          "text": "StoreError has two new variants, ReadOnly and RepairPending, neither of which carries or prints a leaf index, and no existing variant's fields or message changes.",
+          "done": false
+        },
+        {
+          "id": "C14",
+          "text": "FileLeafStore::open_read_only is a documented inherent constructor that never flushes, creates, writes, renames, links or removes a file, leftover temporary files included, and the LeafStore trait has the same methods as on main.",
+          "done": false
+        },
+        {
+          "id": "C15",
+          "text": "put_leaf through a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and changes no byte of the store.",
+          "done": false
+        },
+        {
+          "id": "C16",
+          "text": "pin through a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly before any other pin check and changes no byte of the store.",
+          "done": false
+        },
+        {
+          "id": "C17",
+          "text": "FileLeafStore::open_read_only over a store whose leaf count is past its pinned tree size returns StoreError::RepairPending, reads no leaf byte and changes no byte of the store.",
+          "done": false
+        },
+        {
+          "id": "C18",
+          "text": "A store that FileLeafStore::open_read_only refused with StoreError::RepairPending, opened with FileLeafStore::open and Log::open, is repaired and the repair is reported through recovered_to, as on main.",
+          "done": false
+        },
+        {
+          "id": "C19",
+          "text": "The module doc of crates/lys-log-store/src/file.rs states what open and open_read_only do and never do, including that open never deletes a leftover temporary file.",
+          "done": false
+        }
+      ]
+    }
+  ]
+}
