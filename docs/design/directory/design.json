@@ -51,8 +51,8 @@
     "ADR-009",
     "ADR-010",
     "ADR-011",
-    "ADR-076",
-    "ADR-077"
+    "ADR-077",
+    "ADR-079"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",

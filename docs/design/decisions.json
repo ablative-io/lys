@@ -327,24 +327,6 @@
       "superseded_by": ""
     },
     {
-      "id": "ADR-076",
-      "title": "A role is a set of grant templates copied at grant time, not a live group",
-      "status": "proposed",
-      "scope": "directory",
-      "date": "",
-      "decided_by": "",
-      "context": "Conformance row 4.7 (docs/design/identity/CONFORMANCE.md) is open: role as live group or template copied at grant time. ADR-006's consequence says the same stays open, while ADR-006 itself forbids a holder changing version silently as a side effect of an edit. The roles card decides the row. Written by Apollo as author with the roles brief DIRECTORY-021, with Archie as second reader. Recorded as proposed: it becomes decided only when Tom rules on it or signs the card off. It answers the sentence ADR-006 left open and cites ADR-006; it does not supersede it.",
-      "decision": "A role is a template copied at grant time, not a live group. A holding names the role and the version it holds, the grants it carries are made from that version's templates when the holding is granted, and an edit to the role changes none of them. Who holds a role remains answerable as a query over holdings. Only the versioned grant templates make a version; a title edit is recorded and makes no version, and conformance 4.1's job and profile stay proposed and outside. Rejected: a live group, whose membership carries the role's current grants, because a live group would change every holder's permissions at the moment of the edit, which ADR-006 forbids.",
-      "quote": "",
-      "consequences": [
-        "A holding records its role, its version and the ids of the grants copied into it; nothing links a granted holding's grants to later versions.",
-        "Editing a role's templates makes the next version and changes no holding, grant or end date.",
-        "Who holds a role, and on which version, is answered from the holdings, never from a member list kept on the role."
-      ],
-      "supersedes": [],
-      "superseded_by": ""
-    },
-    {
       "id": "ADR-077",
       "title": "A holding with an end date moves at its next renewal by default; one without moves only by a deliberate act",
       "status": "proposed",
@@ -358,6 +340,24 @@
         "Each holding shows its policy; one with an end date under a move at the next renewal shows its end date as its move date, the words that its next renewal moves it to the current version, and who can stop the move.",
         "The role screen shows the role's default and marks each holding whose policy differs from it.",
         "Nothing renews a holding but the renewal act; a version change never extends an end date (ADR-006)."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-079",
+      "title": "A role is a set of grant templates copied at grant time, not a live group",
+      "status": "proposed",
+      "scope": "directory",
+      "date": "",
+      "decided_by": "",
+      "context": "Conformance row 4.7 (docs/design/identity/CONFORMANCE.md) is open: role as live group or template copied at grant time. ADR-006's consequence says the same stays open, while ADR-006 itself forbids a holder changing version silently as a side effect of an edit. The roles card decides the row. Written by Apollo as author with the roles brief DIRECTORY-021, with Archie as second reader. Recorded as proposed: it becomes decided only when Tom rules on it or signs the card off. It answers the sentence ADR-006 left open and cites ADR-006; it does not supersede it.",
+      "decision": "A role is a template copied at grant time, not a live group. A holding names the role and the version it holds, the grants it carries are made from that version's templates when the holding is granted, and an edit to the role changes none of them. Who holds a role remains answerable as a query over holdings. Only the versioned grant templates make a version; a title edit is recorded and makes no version, and conformance 4.1's job and profile stay proposed and outside. Rejected: a live group, whose membership carries the role's current grants, because a live group would change every holder's permissions at the moment of the edit, which ADR-006 forbids.",
+      "quote": "",
+      "consequences": [
+        "A holding records its role, its version and the ids of the grants copied into it; nothing links a granted holding's grants to later versions.",
+        "Editing a role's templates makes the next version and changes no holding, grant or end date.",
+        "Who holds a role, and on which version, is answered from the holdings, never from a member list kept on the role."
       ],
       "supersedes": [],
       "superseded_by": ""
