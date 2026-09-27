@@ -345,7 +345,7 @@
       "superseded_by": ""
     },
     {
-      "id": "ADR-079",
+      "id": "ADR-085",
       "title": "A role is a set of grant templates copied at grant time, not a live group",
       "status": "proposed",
       "scope": "directory",

@@ -52,4 +52,4 @@
 
 ## Owner of a project — Defines the roles of a project and assigns them
 
-**S80.** As an owner of a project, I want to make and edit its roles and assign them to agents without any existing holder changing so that a role can improve without silently changing what its holders may do.
+**S95.** As an owner of a project, I want to make and edit its roles and assign them to agents without any existing holder changing so that a role can improve without silently changing what its holders may do.
