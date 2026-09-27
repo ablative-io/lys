@@ -59,6 +59,10 @@ time (`pgrep` found no process on it). Read, hashed and never written.
 The light act on this tree records no `lit_in`, so both resolve by the
 older-record rule: one holder, `real1`, cuts.
 
+Note: from HOME-014 the light act records `lit_in`, the session it
+appends the lantern to. Lanterns lit before it, as those measured here
+were, carry no `lit_in` and still resolve by the older-record rule.
+
 ## Fork A: the assistant point
 
 `lys-home fork --home <scratch>/home --lantern c4cd8a075eb19455585814a3e29f0a59`, exit 0:
