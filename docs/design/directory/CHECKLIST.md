@@ -51,7 +51,7 @@
 ## Sign-in identities belong to people (conformance row 1.2)
 
 - [ ] **C31** — Binding to an agent a provider account that is, or once was, linked to a person is refused by name and writes nothing, while an agent's own machine account, linked to no person, is accepted as its issuer-subject binding.
-- [ ] **C32** — A person's link of a provider account already bound to an agent as its service account is refused by name at the lys-identity check the link path asks, naming the withdrawal that answers it, and no binding is withdrawn.
+- [ ] **C32** — A person's link of a provider account already bound to an agent as its service account is refused by name at the lys-identity check the link path asks, naming the withdrawal that answers it, naming the agent only to its responsible person and a directory administrator, and no binding is withdrawn.
 - [ ] **C33** — Delegating a sign-in identity is refused by name for an agent recipient and for a person recipient, while a service-access grant consented through the same provider account is admitted by the grant rules alone.
 - [ ] **C34** — The explanation seam lists each of a person's sign-in identities on the cannot-give list with the reason 'sign-in identity', whoever the recipient is.
 - [ ] **C35** — A sign-in identity refusal shows the provider and subject to the identity's owner and a directory administrator only; anyone else sees the act, the recipient and that a sign-in identity is involved.

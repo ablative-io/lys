@@ -191,7 +191,7 @@
         },
         {
           "id": "C32",
-          "text": "A person's link of a provider account already bound to an agent as its service account is refused by name at the lys-identity check the link path asks, naming the withdrawal that answers it, and no binding is withdrawn.",
+          "text": "A person's link of a provider account already bound to an agent as its service account is refused by name at the lys-identity check the link path asks, naming the withdrawal that answers it, naming the agent only to its responsible person and a directory administrator, and no binding is withdrawn.",
           "done": false
         },
         {
