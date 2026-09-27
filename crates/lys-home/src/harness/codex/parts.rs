@@ -13,10 +13,18 @@
 //! changed rather than kept, naming the field; so is a message holding a key
 //! beyond role and content. No item carries an `id`, no `input_image` a
 //! `detail`, and no thinking signature or redacted data is written anywhere.
+//!
+//! An item borrows every text, argument, output and image it carries from
+//! the entry and is serialised straight into the rollout; its keys are
+//! declared in the sorted order the rollout's lines hold.
 
-use serde_json::{Map, Value, json};
+use std::fmt;
 
-use crate::harness::codex::account::{Rows, part_hash};
+use serde::Serialize;
+use serde::ser::Serializer;
+use serde_json::{Map, Value};
+
+use crate::harness::codex::account::{Rows, json_hash, part_hash};
 
 /// Why a redacted thinking part is lost.
 pub const REDACTED: &str = "redacted thinking dropped: another provider";
@@ -63,16 +71,126 @@ pub(crate) fn named<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
 
 /// Each key of an object outside `carried`, sorted, as `<key> not carried`.
 pub(crate) fn not_carried(value: &Value, carried: &[&str]) -> Vec<String> {
-    let mut keys: Vec<&String> = value
+    let mut keys: Vec<&str> = value
         .as_object()
         .into_iter()
         .flat_map(Map::keys)
-        .filter(|key| !carried.contains(&key.as_str()))
+        .map(String::as_str)
+        .filter(|key| !carried.contains(key))
         .collect();
-    keys.sort();
+    keys.sort_unstable();
     keys.into_iter()
         .map(|key| format!("{key} not carried"))
         .collect()
+}
+
+/// One response item, borrowing what it carries.
+#[derive(Serialize)]
+#[serde(untagged)]
+pub(crate) enum Item<'a> {
+    /// A `message` of content parts.
+    Message {
+        /// The parts.
+        content: Vec<Part<'a>>,
+        /// The role.
+        role: &'a str,
+        /// `message`.
+        #[serde(rename = "type")]
+        kind: &'static str,
+    },
+    /// A `function_call`.
+    FunctionCall {
+        /// The arguments, written as their compact JSON in a string.
+        arguments: Compact<'a>,
+        /// The call's id.
+        call_id: &'a str,
+        /// The tool's name.
+        name: &'a str,
+        /// `function_call`.
+        #[serde(rename = "type")]
+        kind: &'static str,
+    },
+    /// A `function_call_output`.
+    FunctionCallOutput {
+        /// The call's id.
+        call_id: &'a str,
+        /// The output.
+        output: Output<'a>,
+        /// `function_call_output`.
+        #[serde(rename = "type")]
+        kind: &'static str,
+    },
+}
+
+impl<'a> Item<'a> {
+    /// A `message` item.
+    pub(crate) fn message(role: &'a str, content: Vec<Part<'a>>) -> Self {
+        Self::Message {
+            content,
+            role,
+            kind: "message",
+        }
+    }
+}
+
+/// One content part of a message or a tool output.
+#[derive(Serialize)]
+#[serde(untagged)]
+pub(crate) enum Part<'a> {
+    /// An `input_text` or `output_text` part.
+    Text {
+        /// The text.
+        text: &'a str,
+        /// `input_text` or `output_text`.
+        #[serde(rename = "type")]
+        kind: &'static str,
+    },
+    /// An `input_image` part.
+    Image {
+        /// The image as a data URL.
+        image_url: DataUrl<'a>,
+        /// `input_image`.
+        #[serde(rename = "type")]
+        kind: &'static str,
+    },
+}
+
+/// A tool output: one string, or a list of parts.
+#[derive(Serialize)]
+#[serde(untagged)]
+pub(crate) enum Output<'a> {
+    /// A string.
+    Text(&'a str),
+    /// A list of parts.
+    List(Vec<Part<'a>>),
+}
+
+/// A base64 image as a data URL, written without building the URL first.
+pub(crate) struct DataUrl<'a> {
+    media: &'a str,
+    data: &'a str,
+}
+
+impl fmt::Display for DataUrl<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "data:{};base64,{}", self.media, self.data)
+    }
+}
+
+impl Serialize for DataUrl<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self)
+    }
+}
+
+/// A JSON value written as a string of its compact JSON, without building
+/// the string first.
+pub(crate) struct Compact<'a>(&'a Value);
+
+impl Serialize for Compact<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self.0)
+    }
 }
 
 /// What a thinking part holds.
@@ -131,8 +249,19 @@ fn part_row(
     }
 }
 
-/// The items of one message entry, adding its rows to the account.
+/// The items of one message entry, adding its rows to the account, as JSON
+/// values. A borrowed item always converts; were one not to, it would stand
+/// as null.
 pub fn message_items(entry: &str, message: &Value, rows: &mut Rows) -> Vec<Value> {
+    items_of(entry, message, rows)
+        .iter()
+        .map(|item| serde_json::to_value(item).unwrap_or(Value::Null))
+        .collect()
+}
+
+/// The items of one message entry, borrowing from it, adding its rows to
+/// the account.
+pub(crate) fn items_of<'a>(entry: &str, message: &'a Value, rows: &mut Rows) -> Vec<Item<'a>> {
     let role = match role_of(message) {
         Ok(role) => role,
         Err(kind) => {
@@ -155,15 +284,13 @@ pub fn message_items(entry: &str, message: &Value, rows: &mut Rows) -> Vec<Value
     }
     match message.get("content") {
         Some(Value::String(text)) => {
-            let (part, after) = if role == "user" {
-                ("input_text", "input_text")
+            let kind = if role == "user" {
+                "input_text"
             } else {
-                ("output_text", "output_text")
+                "output_text"
             };
-            rows.kept(entry, Some(part_hash(&json!(text))), "text", after);
-            vec![
-                json!({"type": "message", "role": role, "content": [{"type": part, "text": text}]}),
-            ]
+            rows.kept(entry, Some(json_hash(text)), "text", kind);
+            vec![Item::message(role, vec![Part::Text { text, kind }])]
         }
         Some(Value::Array(parts)) if role == "user" => user_items(entry, parts, rows),
         Some(Value::Array(parts)) => assistant_items(entry, parts, rows),
@@ -175,19 +302,24 @@ pub fn message_items(entry: &str, message: &Value, rows: &mut Rows) -> Vec<Value
 }
 
 /// A text part as a `<kind>` part, or a lost row when it holds no text.
-fn text_part(entry: &str, part: &Value, kind: &str, rows: &mut Rows) -> Option<Value> {
+fn text_part<'a>(
+    entry: &str,
+    part: &'a Value,
+    kind: &'static str,
+    rows: &mut Rows,
+) -> Option<Part<'a>> {
     let Some(text) = part.get("text").and_then(Value::as_str) else {
         rows.lost(entry, Some(part_hash(part)), "text", NO_TEXT);
         return None;
     };
     part_row(rows, entry, part, ("text", kind), None, &["type", "text"]);
-    Some(json!({"type": kind, "text": text}))
+    Some(Part::Text { text, kind })
 }
 
 /// An image part as `input_image` when its source is base64, with no
 /// `detail` key; otherwise a lost row naming its source type and index, and
 /// no byte of the source written anywhere.
-fn image_part(entry: &str, index: usize, part: &Value, rows: &mut Rows) -> Option<Value> {
+fn image_part<'a>(entry: &str, index: usize, part: &'a Value, rows: &mut Rows) -> Option<Part<'a>> {
     let source = part.get("source");
     let source_type = source
         .and_then(|s| s.get("type"))
@@ -204,17 +336,19 @@ fn image_part(entry: &str, index: usize, part: &Value, rows: &mut Rows) -> Optio
             Some("source written as a data URL image_url"),
             &["type", "source"],
         );
-        return Some(
-            json!({"type": "input_image", "image_url": format!("data:{media};base64,{data}")}),
-        );
+        return Some(Part::Image {
+            image_url: DataUrl { media, data },
+            kind: "input_image",
+        });
     }
     let reason = format!("image source {source_type} not carried: part {index}, never fetched");
     rows.lost(entry, Some(part_hash(part)), "image", &reason);
     None
 }
 
-fn user_items(entry: &str, parts: &[Value], rows: &mut Rows) -> Vec<Value> {
-    let mut content = Vec::new();
+/// The content parts of a user message or a tool output list.
+fn input_parts<'a>(entry: &str, parts: &'a [Value], rows: &mut Rows) -> Vec<Part<'a>> {
+    let mut content = Vec::with_capacity(parts.len());
     for (index, part) in parts.iter().enumerate() {
         let item = match kind_of(part) {
             "text" => text_part(entry, part, "input_text", rows),
@@ -226,19 +360,23 @@ fn user_items(entry: &str, parts: &[Value], rows: &mut Rows) -> Vec<Value> {
         };
         content.extend(item);
     }
+    content
+}
+
+fn user_items<'a>(entry: &str, parts: &'a [Value], rows: &mut Rows) -> Vec<Item<'a>> {
+    let content = input_parts(entry, parts, rows);
     if content.is_empty() {
         return Vec::new();
     }
-    vec![json!({"type": "message", "role": "user", "content": content})]
+    vec![Item::message("user", content)]
 }
 
-fn assistant_items(entry: &str, parts: &[Value], rows: &mut Rows) -> Vec<Value> {
+fn assistant_items<'a>(entry: &str, parts: &'a [Value], rows: &mut Rows) -> Vec<Item<'a>> {
     let mut items = Vec::new();
-    let mut said: Vec<Value> = Vec::new();
-    let flush = |said: &mut Vec<Value>, items: &mut Vec<Value>| {
+    let mut said: Vec<Part<'a>> = Vec::new();
+    let flush = |said: &mut Vec<Part<'a>>, items: &mut Vec<Item<'a>>| {
         if !said.is_empty() {
-            let content = std::mem::take(said);
-            items.push(json!({"type": "message", "role": "assistant", "content": content}));
+            items.push(Item::message("assistant", std::mem::take(said)));
         }
     };
     for part in parts {
@@ -260,7 +398,10 @@ fn assistant_items(entry: &str, parts: &[Value], rows: &mut Rows) -> Vec<Value> 
                         Some(lead),
                         &carried,
                     );
-                    said.push(json!({"type": "output_text", "text": text}));
+                    said.push(Part::Text {
+                        text,
+                        kind: "output_text",
+                    });
                 }
                 Thinking::Redacted => {
                     rows.lost(entry, Some(part_hash(part)), "thinking", REDACTED);
@@ -276,7 +417,7 @@ fn assistant_items(entry: &str, parts: &[Value], rows: &mut Rows) -> Vec<Value> 
                         .ok_or(NO_ARGUMENTS)
                 });
                 match call {
-                    Ok((id, name, arguments)) => {
+                    Ok((call_id, name, arguments)) => {
                         let carried = ["type", "id", "name", "arguments"];
                         part_row(
                             rows,
@@ -287,8 +428,12 @@ fn assistant_items(entry: &str, parts: &[Value], rows: &mut Rows) -> Vec<Value> 
                             &carried,
                         );
                         flush(&mut said, &mut items);
-                        items.push(json!({"type": "function_call", "name": name,
-                            "arguments": arguments.to_string(), "call_id": id}));
+                        items.push(Item::FunctionCall {
+                            arguments: Compact(arguments),
+                            call_id,
+                            name,
+                            kind: "function_call",
+                        });
                     }
                     Err(reason) => rows.lost(entry, Some(part_hash(part)), "toolCall", reason),
                 }
@@ -302,38 +447,30 @@ fn assistant_items(entry: &str, parts: &[Value], rows: &mut Rows) -> Vec<Value> 
 
 /// A tool result as one `function_call_output`: its one text part's text as
 /// a string, otherwise a list of `input_text` and `input_image` items.
-fn tool_result(entry: &str, message: &Value, rows: &mut Rows) -> Option<Value> {
+fn tool_result<'a>(entry: &str, message: &'a Value, rows: &mut Rows) -> Option<Item<'a>> {
     let Some(call_id) = named(message, "toolCallId") else {
         rows.lost(entry, Some(part_hash(message)), "toolResult", NO_RESULT_ID);
         return None;
     };
     let mut how = Vec::new();
     let output = match message.get("content") {
-        Some(Value::String(text)) => json!(text),
-        Some(Value::Array(parts))
-            if parts.len() == 1
-                && kind_of(&parts[0]) == "text"
-                && parts[0].get("text").is_some_and(Value::is_string) =>
-        {
-            how.push("content: one-item text array written as a string".to_owned());
-            how.extend(not_carried(&parts[0], &["type", "text"]));
-            parts[0]["text"].clone()
-        }
+        Some(Value::String(text)) => Output::Text(text),
         Some(Value::Array(parts)) => {
-            how.push("content: written as a list of input items".to_owned());
-            let mut list = Vec::new();
-            for (index, part) in parts.iter().enumerate() {
-                let item = match kind_of(part) {
-                    "text" => text_part(entry, part, "input_text", rows),
-                    "image" => image_part(entry, index, part, rows),
-                    kind => {
-                        rows.lost(entry, Some(part_hash(part)), kind, &no_item(kind));
-                        None
-                    }
-                };
-                list.extend(item);
+            let one_text = match parts.as_slice() {
+                [part] if kind_of(part) == "text" => part
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .map(|text| (part, text)),
+                _ => None,
+            };
+            if let Some((part, text)) = one_text {
+                how.push("content: one-item text array written as a string".to_owned());
+                how.extend(not_carried(part, &["type", "text"]));
+                Output::Text(text)
+            } else {
+                how.push("content: written as a list of input items".to_owned());
+                Output::List(input_parts(entry, parts, rows))
             }
-            Value::Array(list)
         }
         _ => {
             rows.lost(entry, Some(part_hash(message)), "toolResult", NO_OUTPUT);
@@ -353,5 +490,9 @@ fn tool_result(entry: &str, message: &Value, rows: &mut Rows) -> Option<Value> {
             &how.join("; "),
         );
     }
-    Some(json!({"type": "function_call_output", "call_id": call_id, "output": output}))
+    Some(Item::FunctionCallOutput {
+        call_id,
+        output,
+        kind: "function_call_output",
+    })
 }

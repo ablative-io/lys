@@ -17,9 +17,10 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
 use crate::error::HomeError;
-use crate::record::blocks::{Hash, sync_dir};
+use crate::record::blocks::{hex_of, sync_dir};
 
 /// A part carried whole.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -150,12 +151,24 @@ pub struct Account {
 /// SHA-256 of its compact JSON, the bytes `serde_json::to_vec` writes.
 #[must_use]
 pub fn part_hash(part: &Value) -> String {
-    Hash::of(part.to_string().as_bytes()).to_string()
+    json_hash(part)
+}
+
+/// The SHA-256 of a value's compact JSON, serialised straight into the
+/// hasher. Neither half can fail for what the account hashes (a JSON value
+/// or a string, into a hasher that takes every write); were one to, the row
+/// would carry serde's error words where the hex belongs, never a hash of
+/// other bytes.
+pub(crate) fn json_hash<T: Serialize + ?Sized>(value: &T) -> String {
+    let mut hasher = Sha256::new();
+    serde_json::to_writer(&mut hasher, value)
+        .map_or_else(|e| e.to_string(), |()| hex_of(&hasher.finalize()))
 }
 
 /// Write bytes to a path that does not yet exist, then sync the file and
 /// its directory. A path already there is refused as the translation's
-/// target, naming it.
+/// target, naming it; a file this call created and could not fill is
+/// removed before the refusal returns.
 pub fn write_new(path: &Path, bytes: &[u8]) -> Result<(), HomeError> {
     let mut file = match std::fs::OpenOptions::new()
         .create_new(true)
@@ -170,12 +183,33 @@ pub fn write_new(path: &Path, bytes: &[u8]) -> Result<(), HomeError> {
         }
         Err(e) => return Err(HomeError::io("creating a translation file", path, e)),
     };
-    file.write_all(bytes)
-        .map_err(|e| HomeError::io("writing a translation file", path, e))?;
-    file.sync_all()
-        .map_err(|e| HomeError::io("syncing a translation file", path, e))?;
+    let filled = file
+        .write_all(bytes)
+        .map_err(|e| HomeError::io("writing a translation file", path, e))
+        .and_then(|()| {
+            file.sync_all()
+                .map_err(|e| HomeError::io("syncing a translation file", path, e))
+        });
+    if let Err(e) = filled {
+        drop(file);
+        remove_written(&[path]);
+        return Err(e);
+    }
     if let Some(dir) = path.parent() {
         sync_dir(dir)?;
     }
     Ok(())
+}
+
+/// Remove files a failed translation wrote, so the retry finds no target.
+/// A removal that fails leaves that file standing, and the retry's refusal
+/// names it; the failure that caused the removal is the one reported.
+pub(crate) fn remove_written(paths: &[&Path]) {
+    for path in paths {
+        if std::fs::remove_file(path).is_ok()
+            && let Some(dir) = path.parent()
+        {
+            sync_dir(dir).ok();
+        }
+    }
 }
