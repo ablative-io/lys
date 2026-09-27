@@ -49,6 +49,28 @@ Read from the Pi checkout at `3d5cbe98`
 new; a block already held is not written again; a block is never rewritten or
 deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
 
+## The home as a git repository
+
+`lys-home ship` (HOME-019) makes a home directory a git repository,
+`<home>/.git`, tracking exactly the home's tracked set, enumerated by name
+and never by a glob pattern or a `.gitignore`:
+
+- for each session the home lists, `sessions/<id>.jsonl`,
+  `sessions/<id>.index.jsonl` and `sessions/<id>.head`;
+- each `blocks/<hh>/<hash>` and each `templates/<hh>/<hash>` whose name is 64
+  lowercase hex digits under a directory named by its first two.
+
+Never tracked: a session's lock file `sessions/<id>..lock` (the doubled dot
+is the lock path's own spelling), a head or block temporary, any file at the
+home root, anything under `.git`. The one ref is fixed, `refs/lys/home`, in
+the home's own repository and on the remote; a ship pushes it without force
+to a bare repository at a path on this machine. `fetch` pulls that ref into a
+new, empty home, verifies every index, head, block and template strictly
+(never rebuilding an index), appends one `arrival` per session, and commits
+those appended lines as one commit whose only parent is the fetched commit,
+with `refs/lys/home` and HEAD set to it, so the target's status is clean and
+a later ship from the target carries the arrivals onward.
+
 ## The lys custom entries
 
 - `lys.call` (R6): `{provider, api, model, request:[hash], response:[hash],
@@ -65,7 +87,7 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   `raw_blocks` separately.
 - `lys.harness_event` (R8): `{kind, harness: "claude-code", source_uuid,
   record, detail}`. `kind` is `hook`, `attachment`, `system`,
-  `permission_mode`, `tool_completed` or `template_render`; `record` is the
+  `permission_mode`, `tool_completed`, `template_render` or `arrival`; `record` is the
   whole source record as a block, by hash; `detail` holds names, ids, exit
   codes and counts only, never output or a body, and the serialised data is
   at most 512 bytes. A record that carries a uuid (`attachment`, `system`)
@@ -85,6 +107,18 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   path as a side leaf under the head (`append_beside`): the head does not
   move, the render walker never sees it, and a second render of the same
   session records the same session head hash in a second event.
+- `arrival` (HOME-019 R4), the seventh kind: written by `fetch`, not
+  imported, one per arriving session. Its `source_uuid` and `record` are both
+  null (no block is stored for it), and its `detail` is exactly
+  `{source_commit, remote, ref, execution}`: `source_commit` the 40-digit
+  commit fetched, `remote` the absolute path of the bare repository it was
+  fetched from, `ref` `refs/lys/home`, and `execution` a fresh execution id of
+  that session's own, 32 lowercase hex digits (`record::fresh_id`), so each
+  arrived session is a distinct execution with its ancestry on the record.
+  It hangs beside the head as `template_render` does (`append_beside`): it
+  moves no head, and the arrived head file is byte-identical to the source's.
+  A remote whose path would carry the data over the 512-byte cap is refused
+  before fetch writes anything.
 - `lys.given` (HOME-003 R3): the context record, what a rendered session was
   given, as hashes only. Data is exactly `{harness, harness_version, kinds,
   config_dir, documents, environment}`. `harness` is `claude-code` and
@@ -101,18 +135,34 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   and `home` when it set none and the path is `HOME/.claude` from the
   rendering process's `HOME` (never that process's `CLAUDE_CONFIG_DIR`).
   `documents` is the ordered list, each `{kind, path, length, sha256}`, in
-  the measured order: `user_claude_md` (`<config>/CLAUDE.md`), then
-  `appended_instructions` and `mcp_config` (the two files the render wrote,
-  named by their path relative to the render's out directory, so two renders
-  that write no per-render bytes give equal lists), then `claude_md_chain`
-  for each directory from the outermost ancestor of the working directory
-  down to it, its `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md` in
-  that order, then `memory_index`
+  one order, the order the harness's request gives (HOME-011, ADR-031):
+  wherever the request's order and the read order, the order the harness
+  reads the files in, differ, the request's order wins, since it is what
+  reached the model. So the entry lists `appended_instructions`,
+  `mcp_config`, `user_claude_md`, `claude_md_chain`, `memory_index`:
+  first `appended_instructions` and `mcp_config` (the two files the render
+  wrote, named by their path relative to the render's out directory, so two
+  renders that write no per-render bytes give equal lists), both
+  harness-side inputs ahead of the first message; the MCP configuration sits
+  straight after the appended instructions, a place taken from the read
+  order until a real server's tools position is measured; then
+  `user_claude_md` (`<config>/CLAUDE.md`), then `claude_md_chain` for each
+  directory from the outermost ancestor of the working directory down to it,
+  its `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md` in that order
+  within one directory, then `memory_index`
   (`<config>/projects/<slug>/memory/MEMORY.md`, the slug being every
   character outside ASCII letters and digits replaced by `-`); every path
   but the two written files is absolute. A position whose file is absent is
   omitted; when the config directory is `D/.claude` for a `D` on the chain,
-  `D/.claude/CLAUDE.md` is listed once, first, as `user_claude_md`.
+  `D/.claude/CLAUDE.md` is listed once, as `user_claude_md`, in the user
+  file's place and not again on the chain. The old order, `user_claude_md`,
+  `appended_instructions`, `mcp_config`, `claude_md_chain`, `memory_index`,
+  is superseded by the commit that lands HOME-011 and from that commit's
+  date; entries written under it stand as written and are never rewritten.
+  The old order was written under `harness_version` 2.1.283, and the
+  harness version does not tell the two orders apart: a reader tells an
+  entry's order by comparing its recorded time with the date of the commit
+  that lands HOME-011, an entry written before it listing the old order.
   `environment` is the names of the variables the template set for the
   session, sorted, never a value or a handle. The
   entry hangs under the `template_render` event it follows, beside the

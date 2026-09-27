@@ -191,6 +191,9 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `crates/lys-identity/tests/revocation_history.rs` | attestations before and after revocation, proofs and issuance record | DIRECTORY-013 |
 | `crates/lys-identity/tests/revocation_support/mod.rs` | test authorities, certificates and file-backed logs; generated keys only | DIRECTORY-013 |
 | `crates/lys/src/cli_tests.rs` | the CLI's help tests; DIRECTORY-013 adds the no-log revocation sentence test | DIRECTORY-013 |
+| `crates/lys-identity/tests/agent_without_session.rs` | the proof that an agent registered with no session is listed under its responsible person and read with no session credential (R2) | DIRECTORY-011 |
+| `docs/design/directory/briefs/DIRECTORY-011.json` | the enduring agent kept apart from each session's credential: road adjustment 3 written into the directory contract, and the no-session agent proved (R1, R2) | DIRECTORY-011 |
+| `docs/design/directory/briefs/DIRECTORY-011.md` | rendered markdown | DIRECTORY-011 |
 
 ## Inventory
 

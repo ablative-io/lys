@@ -1,23 +1,31 @@
-//! The documents Claude Code gives a session at start (HOME-003 R2),
-//! resolved in the order measured on the harness version
-//! [`MEASURED_VERSION`], each as its kind, path, byte length and SHA-256 and
-//! never its content.
+//! The documents Claude Code gives a session at start (HOME-003 R2,
+//! HOME-011), resolved in the order the harness's request gives them, each
+//! as its kind, path, byte length and SHA-256 and never its content.
 //!
 //! The order, measured by pointing `claude -p` at a local listener and
-//! reading the request it sent (PROOF-GIVEN.md):
+//! reading the request it sent (PROOF-GIVEN.md), re-measured on
+//! [`MEASURED_VERSION`]:
 //!
-//! 1. the user CLAUDE.md at `<config>/CLAUDE.md` (`user_claude_md`);
-//! 2. the appended instructions file the render wrote (`appended_instructions`);
-//! 3. the MCP configuration the render wrote (`mcp_config`);
+//! 1. the appended instructions file the render wrote (`appended_instructions`);
+//! 2. the MCP configuration the render wrote (`mcp_config`);
+//! 3. the user CLAUDE.md at `<config>/CLAUDE.md` (`user_claude_md`);
 //! 4. the CLAUDE.md chain: for each directory from the outermost ancestor of
 //!    the working directory down to the working directory itself, its
 //!    `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md`, in that order
-//!    (`claude_md_chain`). That is the order the request gives them; the
-//!    harness reads one directory's three files concurrently, so the order
-//!    it happens to read them in changes from run to run and is not what is
-//!    recorded;
+//!    (`claude_md_chain`);
 //! 5. the memory index at `<config>/projects/<slug>/memory/MEMORY.md`
 //!    (`memory_index`), the slug being [`projects_slug`].
+//!
+//! The request places the appended instructions in its `system` array, ahead
+//! of the first user message that carries the user CLAUDE.md, the chain and
+//! the memory index in the order above. The harness reads the files in a
+//! different order (the user CLAUDE.md first, and one directory's three
+//! files concurrently, so their order changes from run to run); wherever the
+//! request's order and the read order differ, the request's order wins,
+//! since it is what reached the model. The MCP configuration contributes
+//! nothing to the request when its server offers no tool, so its place
+//! straight after the appended instructions comes from the read order until
+//! a real server's tools position is measured.
 //!
 //! The config directory is the `CLAUDE_CONFIG_DIR` the template sets for the
 //! session. When the template sets none it is `HOME/.claude`, with `HOME`
@@ -27,8 +35,8 @@
 //! session's, and a launch from another shell is the template's to settle by
 //! setting the variable. When the config directory is `D/.claude` for a
 //! directory `D` on the chain, the file `D/.claude/CLAUDE.md` is both the
-//! user CLAUDE.md and a chain position; the request gives it once, first, so
-//! it is listed once, as `user_claude_md`.
+//! user CLAUDE.md and a chain position; it is listed once, as
+//! `user_claude_md`, in the user file's place, and not again on the chain.
 //!
 //! A position whose file is absent is omitted. A file that exists and cannot
 //! be read fails the resolution by path and operation, since a document the
@@ -49,7 +57,8 @@ use crate::harness::claude_code::launch::{INSTRUCTIONS_FILE, MCP_FILE};
 use crate::harness::claude_code::projects_slug;
 use crate::record::blocks::Hash;
 
-/// The Claude Code version the load order and the slug rule were measured on.
+/// The Claude Code version the load order was re-measured on and the slug
+/// rule was measured on.
 pub const MEASURED_VERSION: &str = "2.1.283";
 /// The name of the config directory under a home directory.
 pub const CONFIG_DIR_NAME: &str = ".claude";
@@ -206,6 +215,12 @@ pub fn resolve_given(
         });
     }
     let mut documents = Vec::new();
+    for (kind, name) in [
+        (DocumentKind::AppendedInstructions, INSTRUCTIONS_FILE),
+        (DocumentKind::McpConfig, MCP_FILE),
+    ] {
+        document(kind, &out.join(name), Path::new(name), &mut documents)?;
+    }
     let user_claude_md = config_dir.path.join(CHAIN_FILES[0]);
     document(
         DocumentKind::UserClaudeMd,
@@ -213,12 +228,6 @@ pub fn resolve_given(
         &user_claude_md,
         &mut documents,
     )?;
-    for (kind, name) in [
-        (DocumentKind::AppendedInstructions, INSTRUCTIONS_FILE),
-        (DocumentKind::McpConfig, MCP_FILE),
-    ] {
-        document(kind, &out.join(name), Path::new(name), &mut documents)?;
-    }
     let mut chain: Vec<&Path> = working.ancestors().collect();
     chain.reverse();
     for dir in chain {

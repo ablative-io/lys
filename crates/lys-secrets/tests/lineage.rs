@@ -112,6 +112,7 @@ fn lending_needs_ownership_or_the_lend_relation_and_stays_inside_its_ancestry() 
     )?;
     broker.use_handle(&derived.token, &sign(&derived, &dana_bot)?, Secret::len)?;
     broker.use_handle(&derived.token, &sign(&derived, &dana_bot)?, Secret::len)?;
+    broker.use_handle(&dana_handle.token, &sign(&dana_handle, &dana)?, Secret::len)?;
     assert_eq!(
         refusal(broker.use_handle(&dana_handle.token, &sign(&dana_handle, &dana)?, Secret::len)),
         "LeaseExhausted"

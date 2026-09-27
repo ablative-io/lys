@@ -277,7 +277,8 @@ impl FileLeafStore {
         self.extent += 1;
         // The leaf is committed under its final name, and open skips a hidden
         // temporary name, so a name left behind here costs nothing but space.
-        let _ = (after_link.remove_temp)(&tmp_path);
+        let left_behind = (after_link.remove_temp)(&tmp_path);
+        drop(left_behind);
         (after_link.flush_dir)(&leaves_dir).map_err(|source| {
             self.durability_uncertain = Some(index);
             StoreError::LeafDurabilityUncertain { index, source }

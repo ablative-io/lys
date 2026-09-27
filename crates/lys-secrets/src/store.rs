@@ -9,7 +9,7 @@
 //! effect; a sealing the index does not name is swept when the store opens.
 
 use std::collections::BTreeMap;
-use std::fs::{self, File};
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use lys_core::seal::{SealedEnvelope, open, seal};
@@ -22,6 +22,7 @@ use crate::keys::StoreKey;
 use crate::secret::Secret;
 
 mod accounts;
+mod lock;
 mod policy;
 
 pub use accounts::AccountView;
@@ -29,7 +30,6 @@ pub use policy::Recipients;
 
 const INDEX: &str = "index.json";
 const ENTRIES: &str = "entries";
-const LOCK: &str = "broker.lock";
 const ENVELOPE_DOMAIN: &str = "lys-secrets/entry-envelope/v1";
 const PLAIN_DOMAIN: &str = "lys-secrets/entry/v1";
 const NONCE_LEN: usize = 12;
@@ -92,7 +92,7 @@ struct Index {
 pub struct SecretStore {
     dir: PathBuf,
     index: Index,
-    _lock: File,
+    _lock: lock::StoreLock,
 }
 
 impl SecretStore {
@@ -109,7 +109,7 @@ impl SecretStore {
                 path: dir.to_path_buf(),
             });
         }
-        let lock = take_lock(dir)?;
+        let lock = lock::StoreLock::take(dir)?;
         let store = Self {
             dir: dir.to_path_buf(),
             index: Index {
@@ -137,7 +137,7 @@ impl SecretStore {
                 path: dir.to_path_buf(),
             });
         }
-        let lock = take_lock(dir)?;
+        let lock = lock::StoreLock::take(dir)?;
         let bytes =
             fs::read(&index_path).map_err(io(format!("reading {}", index_path.display())))?;
         let index: Index =
@@ -395,31 +395,6 @@ impl SecretStore {
             })?;
         write_atomic(&self.dir.join(INDEX), &bytes)
     }
-}
-
-fn take_lock(dir: &Path) -> Result<File, SecretsError> {
-    let path = dir.join(LOCK);
-    let file = File::options()
-        .create(true)
-        .truncate(false)
-        .write(true)
-        .open(&path)
-        .map_err(io(format!("opening {}", path.display())))?;
-    match rustix::fs::fcntl_lock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
-        Ok(()) => {}
-        Err(rustix::io::Errno::AGAIN | rustix::io::Errno::ACCESS) => {
-            return Err(SecretsError::StoreLocked {
-                path: dir.to_path_buf(),
-            });
-        }
-        Err(errno) => {
-            return Err(SecretsError::Io {
-                context: format!("locking {}", path.display()),
-                source: std::io::Error::from(errno),
-            });
-        }
-    }
-    Ok(file)
 }
 
 fn decode_envelope(bytes: &[u8]) -> Result<SealedEnvelope, SecretsError> {

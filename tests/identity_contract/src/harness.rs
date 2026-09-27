@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use lys_core::Ed25519Identity;
 use lys_identity::Directory;
 use lys_identity_server::config::ConfiguredLogin;
+use lys_identity_server::spicedb::SpiceDbSettings;
 use lys_identity_server::{Config, service};
 use lys_log_store::{FileLeafStore, LeafStore, PinnedRoot, StoreError, StoreResult};
 
@@ -210,6 +211,17 @@ impl Service {
     pub async fn start_with<T: Send>(
         prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
     ) -> Result<(Self, T), Box<dyn Error>> {
+        Self::start_judging(GRANT_MODEL, None, prepare).await
+    }
+
+    /// Start the service as [`Service::start_with`] does, judging grants by
+    /// `model` and keeping their relationships in the permission database
+    /// `spicedb` names, or in the process when it names none.
+    pub async fn start_judging<T: Send>(
+        model: &str,
+        spicedb: Option<SpiceDbSettings>,
+        prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
+    ) -> Result<(Self, T), Box<dyn Error>> {
         let dir = tempfile::TempDir::new()?;
         secret_file(&dir.path().join("issuer.key"), &[3; 32])?;
         secret_file(&dir.path().join("service.key"), &[9; 32])?;
@@ -238,9 +250,9 @@ impl Service {
             grant_log_dir: dir.path().join("grant-log"),
             grant_log_origin: GRANT_ORIGIN.to_owned(),
             grant_model_file: dir.path().join("grant-model.json"),
-            spicedb: None,
+            spicedb,
         };
-        std::fs::write(&config.grant_model_file, GRANT_MODEL)?;
+        std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;
         let prepared = prepare(&config)?;
         let app = service(&config).await?;

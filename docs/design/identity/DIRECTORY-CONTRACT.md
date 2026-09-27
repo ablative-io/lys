@@ -58,3 +58,17 @@ Every change is answered with a receipt carrying the envelope version, the opera
 ## Refusals
 
 Every refusal is an `IdentityError` variant, named in its message's first word: `IdentifierMalformed`, `BindingMalformed`, `ProfileInvalid`, `ReasonRequired`, `TransitionRefused`, `ChangeMismatch`, `IdentityUnknown`, `AlreadyRegistered`, `BindingTaken`, `StateMismatch`, `OperationReused`, `LinkSourceSeen`, `AppendUncertain`, `AppendRefused`, `LogUnavailable`, and the envelope's own refusals in IDENTITY-EVENTS.md.
+
+## Enduring agents and session credentials
+
+This is road adjustment 3, from docs/design/identity/STATEMENT-2026-09-22.md:162-167, where the road and its adjustments live. The directory holds to these rules:
+
+1. The agent record is the enduring identity, and it holds no session credential.
+2. A session is a separate record that points at exactly one agent by that agent's enduring id.
+3. Starting a session never creates an agent.
+4. An agent may be registered before it ever runs, and while no session of it exists it holds no session credential.
+5. A second session of the same agent presents the same enduring agent id with a new session credential.
+6. A session credential is distinct from the agent's one lys certificate (ADR-008), and it never mints an agent.
+7. A started agent reports back to the directory (ADR-007), and the directory checks what it presents; the presentation step is built by the card of roadmap row RM-029, not by this contract.
+
+The form of the session credential is open for the road step 2 card. It has three readings: a per-session lys certificate, a SpeaksFor delegation and an ADR-001 handle. This contract chooses none of them. The proof of rule 5 is blocked on the road step 2 card that brings sessions, roadmap row RM-029. What this contract delivers is the written rules and a registered agent with no session credential, not a working second session.
