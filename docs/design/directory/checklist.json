@@ -191,7 +191,7 @@
         },
         {
           "id": "C187",
-          "text": "SpiceDB's schema is written only by the identity server at start-up, and its relationships only by projecting committed signed grant events; revoking a root refuses every grant derived from it and no unrelated grant; a delegation or a committed delegation event whose expiry passes its source grant's is refused by name, never clamped; a root revoke deletes the root's relationship first and the derived ones in writes within SpiceDB's configured update cap, resuming on replay after a crash.",
+          "text": "SpiceDB's schema is written only by the identity server at start-up, and its relationships only by projecting committed signed grant events; revoking a root refuses every grant derived from it and no unrelated grant; a delegation or a committed delegation event whose expiry passes its source grant's is refused by name, never clamped; every grant is its own grant object of 3 relationships, and two grants of one holder, action and resource stand apart; a root revoke deletes the revoked grant's standing relationship first and its remaining and derived relationships in writes within SpiceDB's configured update cap, resuming on replay after a crash.",
           "done": false
         },
         {
