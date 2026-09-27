@@ -7,7 +7,7 @@ describe("An agent's file", () => {
   it('shows its person, state and registration from the service', async () => {
     const { requests } = await mount('#/file/' + SCRIBE);
     expect(requests).toContain('/directory/agents/' + SCRIBE);
-    expect($('.file h1')?.textContent).toBe("Ada's scribe");
+    expect($('.file h1')?.textContent).toBe("Scribe");
     expect($('.file')?.dataset.tab).toBe('agent file · A/00000000');
     expect($('#state')?.textContent).toBe('active');
     expect($('.file .head .pill.human')?.getAttribute('href')).toBe('#/file/' + ADA);
@@ -78,7 +78,7 @@ describe("A person's file", () => {
     await mount('#/file/' + ADA);
     expect($('.file')?.dataset.tab).toBe('person file · P/00000000');
     const rows = $$('.card .row a').map((a) => a.textContent);
-    expect(rows).toEqual(["Ada's scribe", "Ada's courier", "Ada's archivist"]);
+    expect(rows).toEqual(["Scribe", "Courier", "Archivist"]);
     expect(unreachable()).toEqual([]);
   });
 });
