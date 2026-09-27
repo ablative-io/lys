@@ -372,6 +372,17 @@ pub enum SecretsError {
         /// The handle derived from.
         handle: String,
     },
+    /// A handle asked for on a secret whose recipient policy excludes the
+    /// recipient.
+    #[error(
+        "RecipientRefused: {secret} may be handed to people only and {recipient} is not a person (act: hand it to a person, or ask its owner to change the recipient policy)"
+    )]
+    RecipientRefused {
+        /// The recipient asked for.
+        recipient: String,
+        /// The secret's name.
+        secret: String,
+    },
     /// A read of a record that is not there to be read.
     #[error("NotFound: no record by that name (act: ask for a record by a name you can discover)")]
     NotFound,

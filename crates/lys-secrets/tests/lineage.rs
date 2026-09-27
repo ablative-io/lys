@@ -125,3 +125,54 @@ fn lending_needs_ownership_or_the_lend_relation_and_stays_inside_its_ancestry() 
     broker.use_handle(&sibling.token, &sign(&sibling, &tom_bot)?, Secret::len)?;
     Ok(())
 }
+
+#[test]
+fn a_people_only_secret_is_never_handed_to_an_agent() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let keys = root.path().join("keys");
+    std::fs::create_dir_all(&keys)?;
+    let paths = BrokerPaths {
+        store_dir: root.path().join("store"),
+        log_dir: root.path().join("log"),
+        store_key: keys.join("store.key"),
+        audit_key: keys.join("audit.key"),
+        anchor: keys.join("audit.anchor"),
+    };
+    let grants = LocalGrants::new();
+    for identity in ["person:dana", "agent:dana-bot"] {
+        grants.grant(relation(identity));
+    }
+    let mut broker = Broker::create(&paths, grants, Box::new(|| 1_000))?;
+    broker.seal("token", "person:dana", &Secret::from_slice(b"value"))?;
+    let dana = party(&keys, "person:dana")?;
+    let bot = party(&keys, "agent:dana-bot")?;
+    assert_eq!(
+        refusal(broker.set_recipients("person:tom", "token", lys_secrets::Recipients::PeopleOnly)),
+        "LendingNotPermitted"
+    );
+    broker.set_recipients("person:dana", "token", lys_secrets::Recipients::PeopleOnly)?;
+    assert_eq!(
+        refusal(broker.issue(&bot.holder, "token", 1, 50_000)),
+        "RecipientRefused"
+    );
+    let own = broker.issue(&dana.holder, "token", 3, 50_000)?;
+    assert_eq!(
+        refusal(broker.derive(
+            &own.token,
+            &sign(&own, &dana)?,
+            &bot.holder,
+            (1, 40_000),
+            None
+        )),
+        "RecipientRefused"
+    );
+    broker.set_recipients("person:dana", "token", lys_secrets::Recipients::Anyone)?;
+    broker.derive(
+        &own.token,
+        &sign(&own, &dana)?,
+        &bot.holder,
+        (1, 40_000),
+        None,
+    )?;
+    Ok(())
+}
