@@ -15,6 +15,13 @@ describe("An agent's file", () => {
     expect($$('.tabs a').map((a) => a.textContent)).toEqual(['Role', 'Access1', 'Provisioning', 'Memory and context', 'Credentials', 'Sessions', 'Certificate', 'Record2']);
   });
 
+  it('puts Start… after the lifecycle acts, just before Emergency stop', async () => {
+    await mount('#/file/' + SCRIBE);
+    const acts = $$('.file .head button').map((b) => b.dataset.act);
+    expect(acts.slice(-2)).toEqual(['start', 'stop']);
+    expect(acts.indexOf('suspend')).toBeLessThan(acts.indexOf('start'));
+  });
+
   it('shows role and version as not recorded, never a sample role', async () => {
     await mount('#/file/' + SCRIBE);
     const facts = $('.facts')?.textContent ?? '';
