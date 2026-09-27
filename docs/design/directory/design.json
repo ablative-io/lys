@@ -689,7 +689,7 @@
       "brief": "DIRECTORY-026"
     },
     {
-      "path": "crates/lys-identity-server/tests/agent_session_routes.rs",
+      "path": "tests/identity_contract/tests/agent_session_routes.rs",
       "note": "the session routes, the one proof_invalid body, and the stop and list routes' admission (R8, R9, R10)",
       "brief": "DIRECTORY-026"
     },

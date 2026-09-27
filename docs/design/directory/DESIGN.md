@@ -190,7 +190,7 @@ Brought forward as step-2 work under the lead's ruling of 27 September 2026: DIR
 | `crates/lys-identity/tests/agent_session_list.rs` | the session listing (R9) | DIRECTORY-026 |
 | `crates/lys-identity/tests/agent_session_revoked.rs` | the revoked certificate's refusal (R10) | DIRECTORY-026 |
 | `crates/lys-identity-server/src/agent_session_routes.rs` | the challenge, report-back, presentation, end, stop and list routes, admitting an agent only to its own session (R8, R9, R10) | DIRECTORY-026 |
-| `crates/lys-identity-server/tests/agent_session_routes.rs` | the session routes, the one proof_invalid body, and the stop and list routes' admission (R8, R9, R10) | DIRECTORY-026 |
+| `tests/identity_contract/tests/agent_session_routes.rs` | the session routes, the one proof_invalid body, and the stop and list routes' admission (R8, R9, R10) | DIRECTORY-026 |
 | `docs/design/directory/briefs/DIRECTORY-026.json` | each session its own directory record with its own credential, started when the agent reports back with a signed challenge (R1 to R10) | DIRECTORY-026 |
 | `docs/design/directory/briefs/DIRECTORY-026.md` | rendered markdown | DIRECTORY-026 |
 
