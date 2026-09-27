@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! The successor a handover makes: the letter copied whole into its home, the
 //! subcommand's report and refusals, and the successor rendered for its own
 //! model and for another.

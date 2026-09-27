@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! What resolving and cutting refuses: each refusal names the lantern and
 //! writes nothing, and a `lit_in` that holds no copy or is no session id is
 //! refused by name.

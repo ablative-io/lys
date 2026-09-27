@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Sidechain content that cannot be carried is listed lost with its reason: an
 //! image, and anything under a compacted entry.
 

@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! A complete call never hides a malformed, missing or partless response,
 //! from files or from bytes.
 
