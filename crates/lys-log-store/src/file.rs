@@ -249,11 +249,15 @@ impl FileLeafStore {
     /// for open to skip, and the append still succeeds. A directory that cannot
     /// be flushed is reported as [`StoreError::LeafDurabilityUncertain`] and
     /// halts this handle.
+    ///
+    /// `next_sequence` supplies the sequence numbers for temporary names, so
+    /// that a test can say which names a write will try.
     fn put_leaf_with(
         &mut self,
         index: u64,
         write_contents: impl FnOnce(&mut std::fs::File) -> std::io::Result<()>,
         after_link: &AfterLink,
+        next_sequence: &mut impl FnMut() -> u64,
     ) -> StoreResult<()> {
         if let Some(uncertain) = self.durability_uncertain {
             return Err(StoreError::ReopenRequired { index: uncertain });
@@ -268,7 +272,7 @@ impl FileLeafStore {
             });
         }
         let leaves_dir = self.dir.join("leaves");
-        let tmp_path = write_leaf_temp(&leaves_dir, index, write_contents)?;
+        let tmp_path = write_leaf_temp(&leaves_dir, index, write_contents, next_sequence)?;
         link_leaf(&tmp_path, &self.leaf_path(index), index)?;
         self.extent += 1;
         // The leaf is committed under its final name, and open skips a hidden
@@ -304,7 +308,12 @@ impl LeafStore for FileLeafStore {
     }
 
     fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
-        self.put_leaf_with(index, |file| file.write_all(bytes), &AFTER_LINK)
+        self.put_leaf_with(
+            index,
+            |file| file.write_all(bytes),
+            &AFTER_LINK,
+            &mut next_process_sequence,
+        )
     }
 
     fn pinned(&self) -> PinnedRoot {
@@ -410,6 +419,11 @@ fn write_durably(path: &Path, contents: &[u8]) -> StoreResult<()> {
 /// Distinguishes temporary leaf names made by one process.
 static LEAF_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
+/// Takes the next sequence number from [`LEAF_TEMP_SEQUENCE`].
+fn next_process_sequence() -> u64 {
+    LEAF_TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+}
+
 /// How many temporary names one leaf write tries before refusing.
 ///
 /// A name is taken only by a leftover from an earlier process that had the
@@ -434,7 +448,8 @@ fn leaf_temp_name(pid: u32, index: u64, sequence: u64) -> String {
 ///
 /// The file is named by [`leaf_temp_name`] and created only if the name is
 /// free. A name already taken is a leftover, which is never replaced: the
-/// write takes the next sequence number and tries again, up to
+/// write takes the next sequence number from `next_sequence` and tries
+/// again, up to
 /// [`LEAF_TEMP_ATTEMPTS`] names. On any failure the file is removed: a write
 /// that fails to flush can leave bytes in the page cache that read back as if
 /// they were durable, and nothing may be linked from them.
@@ -442,8 +457,9 @@ fn write_leaf_temp(
     leaves_dir: &Path,
     index: u64,
     write_contents: impl FnOnce(&mut std::fs::File) -> std::io::Result<()>,
+    next_sequence: &mut impl FnMut() -> u64,
 ) -> StoreResult<PathBuf> {
-    let (tmp_path, mut file) = create_leaf_temp(leaves_dir, index)?;
+    let (tmp_path, mut file) = create_leaf_temp(leaves_dir, index, next_sequence)?;
     let written = write_contents(&mut file)
         .map_err(|source| StoreError::Io {
             context: format!("failed to write temporary leaf file {}", tmp_path.display()),
@@ -466,11 +482,16 @@ fn write_leaf_temp(
 }
 
 /// Creates the temporary file for the leaf at `index` under the first free
-/// name, never opening a name that already exists.
-fn create_leaf_temp(leaves_dir: &Path, index: u64) -> StoreResult<(PathBuf, std::fs::File)> {
+/// name, never opening a name that already exists. Each name tried takes one
+/// number from `next_sequence`.
+fn create_leaf_temp(
+    leaves_dir: &Path,
+    index: u64,
+    next_sequence: &mut impl FnMut() -> u64,
+) -> StoreResult<(PathBuf, std::fs::File)> {
     let pid = std::process::id();
     for _ in 0..LEAF_TEMP_ATTEMPTS {
-        let sequence = LEAF_TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let sequence = next_sequence();
         let tmp_path = leaves_dir.join(leaf_temp_name(pid, index, sequence));
         match std::fs::OpenOptions::new()
             .write(true)
