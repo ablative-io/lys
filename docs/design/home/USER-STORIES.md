@@ -36,6 +36,8 @@
 
 **S23.** As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything.
 
+**S77.** As the owner of the platform, I want a render's report to say whether what the session was given was signed, so that an unsigned render is never taken for a signed one.
+
 ## Reviewer — Checks the proofs before anything relies on them
 
 **S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
@@ -51,3 +53,7 @@
 **S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
 
 **S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S76.** As a reviewer, I want to check what a session was given with lys verify offline, so that I can trust the record without trusting the home that wrote it.
+
+**S78.** As a reviewer, I want to see which key signed a given statement, so that a statement signed by any other key is not taken for the home's.
