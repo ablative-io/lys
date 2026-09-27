@@ -201,7 +201,7 @@
         },
         {
           "id": "C212",
-          "text": "`lys ca issuer-cert --key <path> --out <path>` writes the issuer's self-signed CA certificate as one PEM block carrying no key material.",
+          "text": "`lys ca issuer-cert --key <path> --out <path>` writes the issuer's self-signed CA certificate as one PEM block carrying no key material, with the same subject, serial, public key and extensions as the certificate `lys ca issue --issuer-out` writes.",
           "done": false
         },
         {
