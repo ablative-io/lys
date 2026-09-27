@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-28",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,32 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-066",
+      "title": "Open a leaf store read-only that never writes and never repairs",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "The leaf-store half of the flight recorder's log-integrity row: FileLeafStore::open_read_only refuses put_leaf and pin with StoreError::ReadOnly and refuses a store one leaf past its pin with StoreError::RepairPending, changing no byte; a writable open still repairs as today; FileLeafStore::leftover_temporaries names the temporary files an open skipped; Log::open's PinMismatch refusal of a torn pinned prefix is held under tests; and file.rs's module doc says what open does and never does, including that it never deletes a leftover temporary file and that a leaf is proven whole only through Log::open. The one-byte case is already met on main. The witness half is LYSLOGSTORE-002's.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T16:42:00+10:00",
+        "quote": "Conformance row 4.3 says the flight recorder's log refuses a leaf it cannot prove whole, and its witness reads only what is new. This card carries the leaf-store half of that row.\n\nlys main at a426b9a5 already names a leaf only after its bytes are flushed, links it under a name that is never replaced, takes temporary leaf sequences from a parameter, and isolates the no-replace link under a rename injection; those four commits are the first half of the earlier words, and this card does not redo them. The survey reads the tree as it stands and names each earlier requirement that main already meets, so the brief carries only what remains.\n\nWhat remains is this. A leaf store opened read only never writes and never repairs: open_read_only refuses put_leaf and pin by name with ReadOnly, and opening an interrupted append read only refuses by name with RepairPending instead of repairing it. A leaf changed by one byte after it was named is refused by name on open, checked against the tree the store already keeps, so a corrupted leaf is never served as whole. The module doc of the leaf store says what open does and never does, and says that open never deletes a leftover temporary file. The witness half of the row, reading only what is new, is carried by LYSLOGSTORE-002 on its own card and is not this card's.\n\nAcceptance: put_leaf and pin through a read-only handle each refuse with ReadOnly and change no byte of the store; a store with an interrupted append opened read only refuses with RepairPending and the store's bytes are unchanged; the same store opened for writing repairs as today; a leaf whose bytes are changed by one byte after naming is refused by name on open; and every test named in the brief runs by a command a stranger can run against lys main, with its expected output stated. The brief names row 4.3 as the row it passes in part, and names LYSLOGSTORE-002 as the other part.\n\nKeep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh), and commit the cluster's rendered markdown with the brief so the gate exits 0 on the branch. The brief id, roadmap row and any decision take the next free id past main and every open brief, draft and hand branch, checked with git ls-remote immediately before writing; the path docs/design/lys-log-store/briefs/LYSLOGSTORE-001.json is held by two open drafts, a1163a79 and e8440f97, on other subjects, so this brief takes the next free number and does not reuse LYSLOGSTORE-001. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie, lead for the identity line, on 28 September 2026, against lys main a426b9a5.",
+        "context": "The leaf-store card on the Lys board, filed by the identity line's lead against lys main a426b9a5 and surveyed against that tree; the lead's answers to the survey's six questions are written into LYSLOGSTORE-003 and ADR-106."
+      },
+      "links": {
+        "cluster": "lys-log-store",
+        "decisions": [
+          "ADR-004",
+          "ADR-106"
+        ],
+        "briefs": [
+          "LYSLOGSTORE-003"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Further units, by title, not written here: (1) Move Anchor::open_read_only and the lys log commands onto FileLeafStore::open_read_only, opening a log at its pin and reporting the repair as pending (the earlier LYSLOGSTORE-001 R10 to R12, with its R13 cluster render). Until it lands, crates/lys-anchor/src/anchor/read_only.rs and crates/lys/src/commands/log/store.rs still repair on a read path, so a person running status still gets a write, and the integrity row is not passed in full. (2) Record that DIRECTORY-003 waits on the leaf-store brief (the earlier LYSLOGSTORE-001 R9; DIRECTORY-003 is the brief that waits, on LYSLOGSTORE-003). (3) Print leftover temporary leaf files from the lys log and lys-anchor commands, and hold their refusal of a damaged log (LYSLOGSTORE-002's former R3 and R4, which leave that brief when it is cut back to the witness). (4) Witness reads only what is new (LYSLOGSTORE-002). Finding: docs/design/identity/CONFORMANCE.md carries no flight-recorder row (its row 4.3 is a roles row); the lead adds one, and LYSLOGSTORE-003 stands on the lys-log-store design's goal meanwhile. Superseded by LYSLOGSTORE-003 and closed at sign-off: brief/lys-log-store/0e2bb567 and draft/lys-log-store/9aee27d1. LYSLOGSTORE-001 is held on five refs across four cards (0e2bb567 brief and draft, 9aee27d1, and a1163a79 and e8440f97 on Log memory, which stay open). Ids read with git ls-remote over all refs immediately before writing, and read again each time a draft branch took the next number between reads (draft/directory/3e63b2d8 took RM-064 and ADR-104, then draft/directory/09884e04 took RM-065 and ADR-105): over 339 refs the highest are RM-065, ADR-105 and LYSLOGSTORE-002, so this row is RM-066, the decision ADR-106 and the brief LYSLOGSTORE-003."
     }
   ]
 }
