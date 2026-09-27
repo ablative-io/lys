@@ -88,6 +88,9 @@ fn a_personal_secret_is_closed_to_every_other_person_and_their_agents() -> TestR
             &owner,
             &Secret::from_slice(b"private"),
         )?;
+        let personal = Scope::parse(&format!("personal:{owner}"))?;
+        broker.set_scope(&owner, &format!("{person}-token"), personal.clone())?;
+        broker.set_scope(&owner, &format!("{person}-notes"), personal)?;
     }
     let grants = broker.permissions();
     for identity in [

@@ -1,6 +1,7 @@
-//! Whose a secret is: one person's, a team's or an organisation's. A secret
-//! sealed with no scope named is personal to its owner. The scope bounds
-//! who may discover, read, use or be lent it, whatever grants exist.
+//! Whose a secret is: one person's, a team's or an organisation's. A scope
+//! set by the secret's owner bounds who may discover, read, use or be lent
+//! it, whatever grants exist. A secret with no scope set is bounded by its
+//! grants alone.
 
 use serde::{Deserialize, Serialize};
 
@@ -55,21 +56,13 @@ impl Scope {
 }
 
 impl SecretStore {
-    /// The scope of `secret`: the one set on it, or personal to its owner.
-    /// An account sealed under a secret has that secret's scope. `None` when
-    /// no such secret is sealed.
+    /// The scope set on `secret`; an account sealed under a secret has that
+    /// secret's scope. `None` when no scope is set.
     pub fn scope(&self, secret: &str) -> Option<Scope> {
-        let entry = self.entry(secret)?;
-        if let Some(parent) = self.account_parent(secret) {
-            return self.scope(parent);
+        match self.account_parent(secret) {
+            Some(parent) => self.scope(parent),
+            None => self.index.scopes.get(secret).cloned(),
         }
-        Some(
-            self.index
-                .scopes
-                .get(secret)
-                .cloned()
-                .unwrap_or_else(|| Scope::Personal(entry.owner.clone())),
-        )
     }
 
     /// Sets the scope of `secret`.
