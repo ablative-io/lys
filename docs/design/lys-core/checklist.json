@@ -1,0 +1,65 @@
+{
+  "cluster": "lys-core",
+  "sections": [
+    {
+      "name": "The underscore-binding rule",
+      "items": [
+        {
+          "id": "C75",
+          "text": "rules/ast-grep/no-underscore-binding.yml holds one rule, id no-underscore-binding, at severity error with vendor/** ignored, whose message and note say it refuses because a leading underscore silences the unused warning instead of fixing its cause.",
+          "done": false
+        },
+        {
+          "id": "C76",
+          "text": "On an uncommitted scratch file with one underscore-prefixed binding in each of the 19 binding positions, the scan reports exactly 19 no-underscore-binding hits, and none on a bare `_`, a struct field declaration, a field initialiser or a field access.",
+          "done": false
+        },
+        {
+          "id": "C77",
+          "text": "`ast-grep scan --config sgconfig.yml` reports zero hits at the repository root of the landed tree.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Bindings cleared by what they do",
+      "items": [
+        {
+          "id": "C78",
+          "text": "Every guard binding (a TempDir holder or an EnvCleanup guard) has a name without a leading underscore and is ended by drop(name) at the end of its test.",
+          "done": false
+        },
+        {
+          "id": "C79",
+          "text": "Every discarded error in a closure or match arm is left unbound, map_err is rewritten as .ok().ok_or(…) or .ok().ok_or_else(…) under the rule R4 states, and each site returns the same error as before.",
+          "done": false
+        },
+        {
+          "id": "C80",
+          "text": "Every value with no use is not bound: a bare `_` inside its pattern, an expression statement for a whole let, and no `let _ =` statement introduced.",
+          "done": false
+        },
+        {
+          "id": "C81",
+          "text": "Every trait implementation that ignores a parameter takes it as a bare `_`, and no trait declaration changes.",
+          "done": false
+        },
+        {
+          "id": "C82",
+          "text": "The two cfg(not(unix)) stubs, fsync_dir and warn_if_loose_permissions, take their parameter as a bare `_`.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Behaviour held",
+      "items": [
+        {
+          "id": "C83",
+          "text": "cargo test --workspace --all-features exits 0 at the commit the build starts from and at its final commit, with the same number of tests passed at both.",
+          "done": false
+        }
+      ]
+    }
+  ]
+}
