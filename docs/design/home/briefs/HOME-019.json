@@ -64,7 +64,43 @@
       ],
       "stories": [
         "S71"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/record/tracked.rs",
+            "change": "created",
+            "note": "tracked_set(home): for each listed session its .jsonl, .index.jsonl and .head when each is a regular file; each blocks/<hh>/<hash> and templates/<hh>/<hash> regular file whose name is 64 lowercase hex digits and whose first two characters name its directory. Enumerated by name, never by pattern; sorted in byte order."
+          },
+          {
+            "path": "crates/lys-home/src/record/tracked_tests.rs",
+            "change": "created",
+            "note": "The five-path fixture (session with lock, one block, one template, the three stray files) and the wrong-directory and uppercase cases."
+          },
+          {
+            "path": "crates/lys-home/src/record/mod.rs",
+            "change": "modified",
+            "note": "Gains only `pub mod tracked`, `pub mod verify`, `pub mod hold` and the two `#[cfg(test)] mod` lines."
+          }
+        ],
+        "how": "Row 1: tracked_tests.rs:48 `the_tracked_set_is_exactly_the_five_files_in_byte_order`. It builds session `fixture` (open_session writes the index, the head and `fixture..lock`, and the test asserts all four exist at tracked_tests.rs:32), one block via BlockStore::put, one template via TemplateStore::put, `blocks/.incoming.1.00.tmp`, `sessions/fixture.head.tmp` and `notes.txt`, then asserts exactly the five paths in the spec's order. Row 2: tracked_tests.rs:58 writes `blocks/ab/cd…` (64 lowercase hex) and a block hash in uppercase under its own lowercase shard, and asserts the set is still those 5 paths. The uppercase name is a different block's hash so a case-folding filesystem cannot overwrite the stored block. Row 3: `grep -n 'glob\\|gitignore' crates/lys-home/src/record/tracked.rs` prints nothing (checked). Logic: tracked.rs:23 and by_hash at tracked.rs:48. File types come from DirEntry::file_type and symlink_metadata, so a symbolic link is never tracked.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C169",
+            "done": true,
+            "note": "tracked.rs:23. Exact enumeration with no glob; lock files, temporaries, root files and .git are never listed."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S71",
+            "satisfied": true,
+            "note": "The tracked set is what ship commits and what fetch reproduces; the byte-for-byte move is carried by R5 and R6."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -97,7 +133,53 @@
       "stories": [
         "S73",
         "S74"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/record/index.rs",
+            "change": "modified",
+            "note": "Adds pub(crate) Index::cached_only (index.rs:126): the cached index when from_cached accepts its rows, None when read_rows gives Malformed or from_cached refuses. It never scans the session file and writes nothing."
+          },
+          {
+            "path": "crates/lys-home/src/record/verify.rs",
+            "change": "created",
+            "note": "Reason, SessionReason, Verification; verify_sessions (the first reason per session: index_missing, index_not_this_file, head_missing, head_not_indexed) and verify_home (plus every tracked block and template whose bytes do not hash to its name, in byte order). Writes nothing and returns ids, reasons and hashes only."
+          },
+          {
+            "path": "crates/lys-home/src/record/verify_tests.rs",
+            "change": "created",
+            "note": "A fixture built by Home::open, a byte copy of the launch session, then one render_launch into a second tempdir; the preconditions are asserted, then one test per fault."
+          },
+          {
+            "path": "crates/lys-home/src/record/mod.rs",
+            "change": "modified",
+            "note": "`pub mod verify` and its test module line."
+          }
+        ],
+        "how": "Row 1 (fixture and clean result): verify_tests.rs fixture() builds the home in the stated order and asserts the index and head exist, templates/ holds exactly 1 file and blocks/ at least 1; verify_tests.rs:121 asserts no reason, no bad block and no bad template. Row 2: verify_tests.rs:133 appends a serialised Entry line to the session file directly, asserts `index_not_this_file`, and asserts the index SHA-256 is the same before and after. Row 3: verify_tests.rs:172 gives `index_missing` and no index exists afterwards. Row 4: verify_tests.rs:182 gives `head_missing` with no head afterwards, then `nope\\n` gives `head_not_indexed`. Row 5: verify_tests.rs:194 takes the manifest hash from the `record` of the template_render entry whose id is the render's event (cross-checked against report.manifest), corrupts that block and asserts bad_blocks == [hash] with no `corrupted-block-bytes` in the JSON; then does the same for the one template. Row 6: verify_tests.rs:161 writes `not json`, asserts `index_not_this_file` and an unchanged SHA-256. Row 7: `grep -nE 'Index::(read|load|scan)' crates/lys-home/src/record/verify.rs` prints nothing (checked); the strict read is named cached_only so it cannot match the grep's `Index::read` prefix. Row 8 (drift injections): NOT MET. It needs test runs, which this round forbids. Predicted from reading the code: (a) falling back to scan when from_cached refuses flips only the appended-line test among the unit tests, but the stale-index tests in tests/home_ship.rs and tests/home_fetch.rs go through the same check and would fail as well, so the suite-wide count would be 3, not 1; (b) falling back to scan when read_rows gives Malformed flips only verify_tests.rs:161 (`not json`), since no integration test writes a non-JSON index. The requirement is blocked on this row alone.",
+        "deviation": "The strict read is `Index::cached_only`, not a name starting with `read`, because the brief's own grep `Index::(read|load|scan)` would match `Index::read_strict`. The drift-injection row could not be recorded because running tests is forbidden in this round, and by reading the code the first injection would fail three tests suite-wide rather than exactly one (the two integration stale-index tests share the check).",
+        "checklist": [
+          {
+            "id": "C170",
+            "done": false,
+            "note": "All behaviour is implemented (verify.rs:85, 97, 127; index.rs:126), but the drift-injection acceptance row is unmeasured, so this cannot be claimed done."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S73",
+            "satisfied": true,
+            "note": "ship refuses stale sessions using verify_sessions (ship.rs), before anything is written."
+          },
+          {
+            "id": "S74",
+            "satisfied": true,
+            "note": "fetch names bad blocks and templates by hash via verify_home and removes what it created (R6)."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -129,7 +211,63 @@
       ],
       "stories": [
         "S73"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/home_move/mod.rs",
+            "change": "created",
+            "note": "Module docs and `pub mod` lines only (fetch, git, remote, ship, undo, plus the two test modules)."
+          },
+          {
+            "path": "crates/lys-home/src/home_move/git.rs",
+            "change": "created",
+            "note": "Git runner: env_clear, PATH only from the explicit inherited argument, GIT_CONFIG_NOSYSTEM=1, GIT_CONFIG_GLOBAL and hooksPath/attributesFile set to the null device, GIT_TERMINAL_PROMPT=0, explicit GIT_DIR and GIT_WORK_TREE, a lys-home author and committer, and the six pinned -c settings. Files enter a repository only through `hash-object -w --no-filters --stdin-paths`. A non-zero exit refuses as git_failed with the subcommand and exit code only; stderr is discarded and stdout is never put in an error. The only Command::new in src."
+          },
+          {
+            "path": "crates/lys-home/src/home_move/git_tests.rs",
+            "change": "created",
+            "note": "Runner test with a hostile inherited GIT_CONFIG_GLOBAL and HOME/.gitconfig."
+          },
+          {
+            "path": "crates/lys-home/src/home_move/remote.rs",
+            "change": "created",
+            "note": "take_remote: refuses `://` or a `:` before the first `/` as remote_not_local; otherwise std::path::absolute(base.join(remote))."
+          },
+          {
+            "path": "crates/lys-home/src/home_move/remote_tests.rs",
+            "change": "created",
+            "note": "The six refused remotes and the three taken paths."
+          },
+          {
+            "path": "crates/lys-home/src/lib.rs",
+            "change": "modified",
+            "note": "`pub mod home_move;` and `pub mod cli_move;`."
+          },
+          {
+            "path": "crates/lys-home/src/error.rs",
+            "change": "modified",
+            "note": "Adds RemoteNotLocal (the exact stage 3 text), GitFailed and the ship and fetch refusals, each text beginning with its name and `: `."
+          }
+        ],
+        "how": "Row 1: remote_tests.rs:14 asserts each of the six remotes is refused with text starting `remote_not_local`, containing the stage 3 words (error.rs:423) and the remote, and counts 6 cases. Row 2: remote_tests.rs:39 checks `/tmp/r.git`, `r.git` → `/tmp/work/r.git` and `./a:b` → `/tmp/work/a:b` (std::path::absolute drops `.`). Row 3: git_tests.rs:15 passes PATH, GIT_CONFIG_GLOBAL (a file setting user.name=someone and core.autocrlf=true) and HOME (whose .gitconfig sets the same), commits `a\\r\\nb\\n` through the runner, and asserts author and committer are `lys-home <lys-home@invalid>` and the blob bytes are `a\\r\\nb\\n`. It also asserts the process's cwd and full environment are unchanged. Row 4: `grep -rnE 'estate-hosts|\\.ssh|\"ssh\"' crates/lys-home/src` prints nothing (checked). Row 5: Cargo.toml [dependencies] is untouched: clap, rand, serde, serde_json, sha1, sha2, thiserror, time. Runner code: git.rs:79-150.",
+        "deviation": "GIT_WORK_TREE is set only when the repository has a work tree. For the bare remote (init --bare, rev-parse on the remote) only GIT_DIR is set, because a bare repository has no work tree to name.",
+        "checklist": [
+          {
+            "id": "C171",
+            "done": true,
+            "note": "git.rs and remote.rs as above; a refused remote is refused before any process starts or file is written."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S73",
+            "satisfied": true,
+            "note": "Every non-local remote is refused by name before anything is pushed."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -154,7 +292,38 @@
       ],
       "stories": [
         "S72"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/harness/claude_code/events.rs",
+            "change": "modified",
+            "note": "KIND_ARRIVAL = \"arrival\" (events.rs:55) and arrival(source_commit, remote, git_ref, execution) (events.rs:120): source_uuid and record None, detail exactly the four keys. The size cap goes through the existing HarnessEvent::data check. Module docs describe the seventh kind. The six kinds and MAX_DATA_BYTES are unchanged."
+          },
+          {
+            "path": "crates/lys-home/src/harness/claude_code/events_tests.rs",
+            "change": "modified",
+            "note": "Three tests appended; the existing tests are byte-for-byte unchanged."
+          }
+        ],
+        "how": "Row 1: events_tests.rs:118 compares the arrival data with the spec's JSON as serde_json::Value. Row 2: events_tests.rs:132, a remote of `/` plus 399 `x`, is refused with HomeError::EventTooLarge (226 + 400 bytes > 512). Row 3: events_tests.rs:145 asserts the six constants' values and MAX_DATA_BYTES == 512, counting 6 checks. Row 4: the diff to events_tests.rs is append-only; nothing above line 116 changed.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C172",
+            "done": true,
+            "note": "events.rs:55 and :120."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S72",
+            "satisfied": true,
+            "note": "fetch appends this event beside each head with a fresh execution id (R6)."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -199,7 +368,78 @@
       "stories": [
         "S71",
         "S73"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/home_move/ship.rs",
+            "change": "modified",
+            "note": "ship(): the checks in the brief's order (remote, Home::read, empty_home, remote_not_bare, hold every lock, index_missing/head_missing, strict session verification returning StaleIndex, foreign_tracked), then init, stage exactly the tracked set, commit or reuse on refs/lys/home, release the locks, init the remote bare if absent, ref_diverged check, non-force push, ShipReport. The home path is made absolute first."
+          },
+          {
+            "path": "crates/lys-home/src/record/hold.rs",
+            "change": "created",
+            "note": "hold_all: super::take_lock on every session in order, mapping SessionHeld to session_held (HeldByOwner); loads no index."
+          },
+          {
+            "path": "crates/lys-home/src/cli_move.rs",
+            "change": "created",
+            "note": "ShipArgs/FetchArgs and run_ship/run_fetch: the cwd as base, the process env as inherited; stale_index and verification_failed returned as stdout reports with status 1."
+          },
+          {
+            "path": "crates/lys-home/tests/home_ship.rs",
+            "change": "created",
+            "note": "Every R5 acceptance through the binary; every ship goes through ship_unchanged."
+          },
+          {
+            "path": "crates/lys-home/src/cli.rs",
+            "change": "modified",
+            "note": "Ship and Fetch enum arms, their dispatch in run_with_status and report, and module docs listing ship and fetch (code lines 440)."
+          },
+          {
+            "path": "crates/lys-home/src/error.rs",
+            "change": "modified",
+            "note": "EmptyHome, RemoteNotBare, HeldByOwner, IndexMissing, HeadMissing, ForeignTracked, RefDiverged with the brief's words."
+          },
+          {
+            "path": "crates/lys-home/src/lib.rs",
+            "change": "modified",
+            "note": "Module declarations."
+          },
+          {
+            "path": "crates/lys-home/src/record/mod.rs",
+            "change": "modified",
+            "note": "`pub mod hold;` only."
+          }
+        ],
+        "how": "Each row maps to a test in tests/home_ship.rs, all through ship_unchanged. That helper hashes every tracked file and lists sessions/, blocks/ and templates/ (skipping `..lock`) immediately before and after each ship, asserts both are equal, and returns the count; every caller asserts it is at least 1. Row 1: `the_first_ship_makes_the_repository_and_the_remote_and_pushes_the_tracked_set` checks initialised, remote_created, unchanged, note, ref, the absolute remote, and a 40-hex commit equal to rev-parse. Row 2: same test, ls-tree equals tracked_set, with 1 templates/ path and at least 1 blocks/ path. Row 3: `a_ship_to_a_bare_repository_made_beforehand_does_not_create_it`. Row 4: `a_remote_that_is_not_a_bare_repository_is_refused_naming_what_was_found` (a file, a non-bare repository, a plain directory; hashes and listings unchanged; no <home>/.git). Row 5: `a_remote_off_this_machine_is_refused_before_anything_is_written` (home and cwd listings unchanged). Row 6: `a_home_with_no_session_is_refused_as_empty` (tracked set is exactly one block; no remote, no .git). Row 7: `a_line_appended_past_the_index_is_reported_as_a_stale_index` (exact stdout JSON, exit 1, no remote, no .git, index hash unchanged). Rows 8-9: `a_missing_index_or_head_is_refused_naming_the_act_that_writes_it`. Row 10: `a_session_a_live_owner_holds_is_refused_without_waiting`. Row 11: `a_home_repository_tracking_a_foreign_file_is_refused` (plain git tracks notes.txt). Rows 12-13: `an_unchanged_home_ships_the_same_commit_again_and_a_changed_one_builds_on_it` (rev-list --count 1, the note text, then Session::append, a new commit whose parents are exactly the first). Row 14: `a_second_home_shipped_to_the_same_remote_is_refused_as_diverged` (the remote ref unchanged). Row 15: ship_unchanged at home_ship.rs, the only code that runs `ship`. Ship never calls Index::load or Session::open and writes only <home>/.git, lock files and the remote.",
+        "deviation": "ship makes --home absolute with std::path::absolute before anything else, because git runs with its current directory set to the home and a relative GIT_DIR would otherwise name another place. The refusal texts therefore name the absolute home path.",
+        "checklist": [
+          {
+            "id": "C173",
+            "done": true,
+            "note": "ship.rs:70; home_ship.rs tests for first ship, bare target, unchanged, changed, and the ship_unchanged byte-identity."
+          },
+          {
+            "id": "C174",
+            "done": true,
+            "note": "Every refusal has a test in home_ship.rs, and each asserts no remote or .git is left where the brief says."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S71",
+            "satisfied": true,
+            "note": "The ref carries the tracked set byte for byte (R6 checks the blobs against the source)."
+          },
+          {
+            "id": "S73",
+            "satisfied": true,
+            "note": "Every refusal is by name and pushes nothing."
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -246,7 +486,78 @@
         "S71",
         "S72",
         "S74"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/home_move/fetch.rs",
+            "change": "created",
+            "note": "fetch(): the remote rule, target_holds_home, target_not_empty and the arrival size check before writing anything; then, recording every path it creates: init, fetch refs/lys/home, read-tree plus checkout-index, detached HEAD, verify_home; on failure a verification_failed report and undo. On success: one arrival per session through append_beside with a fresh_id execution, then stage the two changed files per session, write-tree, commit-tree with the fetched parent and the message `arrival from <remote> <ref> at <commit>`, update refs/lys/home and HEAD, and write .git/info/exclude `/sessions/*..lock`. An append or git failure becomes arrival_failed after undo."
+          },
+          {
+            "path": "crates/lys-home/src/home_move/undo.rs",
+            "change": "created",
+            "note": "Created: records the created directories (missing ancestors included), the repository, the checkout files and dirs, and the lock files; undo removes them deepest first and checks the target is absent when fetch made it, and existing and empty when it stood before."
+          },
+          {
+            "path": "crates/lys-home/tests/home_fetch.rs",
+            "change": "created",
+            "note": "Every R6 acceptance through the binary."
+          },
+          {
+            "path": "crates/lys-home/src/cli_move.rs",
+            "change": "modified",
+            "note": "run_fetch and FetchArgs."
+          },
+          {
+            "path": "crates/lys-home/src/cli.rs",
+            "change": "modified",
+            "note": "The Fetch arm."
+          },
+          {
+            "path": "crates/lys-home/src/error.rs",
+            "change": "modified",
+            "note": "TargetHoldsHome, TargetNotEmpty, ArrivalFailed, FetchHalfWritten."
+          }
+        ],
+        "how": "Tests in tests/home_fetch.rs. Row 1: `a_fetch_into_an_absent_target_arrives_on_the_shipped_commit` (report commit and ref, HEAD^1). Row 2: `the_fetched_commit_holds_every_tracked_file_of_the_source_byte_for_byte` (cat-file blob hashes, ls-tree equal, a templates/ path present). Row 3: `the_head_blocks_and_templates_arrive_byte_identical`. Row 4: `each_session_ends_with_one_arrival_beside_its_head` (customType, parentId equals the head, the detail fields, a 32-hex execution found in no source file and equal to the report's, and verify_sessions empty on the target). Row 5: `every_template_a_render_event_names_is_held_by_the_target`. Rows 6-7: `the_arrival_is_one_commit_on_the_fetched_one_and_the_status_is_clean` (status --porcelain empty, one parent, refs/lys/home == HEAD, diff names exactly the two files, each blob is the old bytes plus exactly one line, the session line equals the file's last line, and the log message names the commit, remote and ref). Row 8: `a_ship_from_the_target_carries_the_arrival_onward`. Row 9: `a_failed_arrival_commit_removes_everything_fetch_created` (a fake git ahead on PATH exits 1 on commit-tree, execs the real git otherwise; absent and pre-existing-empty targets). Row 10: `two_sessions_arrive_with_execution_ids_of_their_own`. Row 11: `a_target_holding_a_home_or_anything_is_refused_and_left_as_it_was`. Row 12: `a_remote_off_this_machine_is_refused_and_the_empty_target_stays_empty`. Rows 13-14: `a_corrupted_block_fails_verification_by_hash_and_nothing_is_left` (absent and pre-existing-empty targets). Row 15: `a_stale_index_pushed_with_plain_git_fails_verification_and_nothing_is_left`. Row 16: `a_remote_whose_path_would_carry_the_arrival_over_the_cap_is_refused_first` (a 400-byte absolute bare path; `over the limit`). Row 17: `a_fetch_writes_nothing_to_the_source_or_the_remote`.",
+        "deviation": "When the target's parent directories are missing, fetch creates and records them as well and removes them on undo, so it never leaves behind a directory it made. If removing what it created fails, fetch refuses as FetchHalfWritten (text `fetch into … failed (…), and removing what it created failed too (…)`); this refusal is not in the brief's list and is there so that failure is never silent.",
+        "checklist": [
+          {
+            "id": "C175",
+            "done": true,
+            "note": "fetch.rs:80 checks before any write; the tree hash-match is tested in home_fetch.rs."
+          },
+          {
+            "id": "C176",
+            "done": true,
+            "note": "append_arrivals and commit_arrivals in fetch.rs; the onward-ship test."
+          },
+          {
+            "id": "C177",
+            "done": true,
+            "note": "undo.rs deepest-first removal and target check; verification_failed and arrival_failed tests on absent and pre-existing-empty targets."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S71",
+            "satisfied": true,
+            "note": "The fetched tree equals the source's tracked files byte for byte."
+          },
+          {
+            "id": "S72",
+            "satisfied": true,
+            "note": "One arrival per session with its own execution id; the head file is unchanged."
+          },
+          {
+            "id": "S74",
+            "satisfied": true,
+            "note": "Bad blocks and templates are named by hash; nothing fetch wrote remains."
+          }
+        ]
+      }
     },
     {
       "id": "R7",
@@ -269,7 +580,33 @@
       ],
       "stories": [
         "S75"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/tests/home_move.rs",
+            "change": "created",
+            "note": "Renders, ships and fetches with LYS_FIXTURE_TOKEN set for every lys-home process; the secret search over rev-list --objects with cat-file and a count of objects read; the planted control; and the render comparison after the byte-identity assertion."
+          }
+        ],
+        "how": "Row 1: home_move.rs `every_object_the_shipped_ref_reaches_is_read_and_none_holds_the_secret` asserts read == tracked paths + the distinct directories of those paths + 1 root tree + 1 commit, and matches == 0. Row 2: `the_same_search_finds_the_secret_once_where_it_was_planted` builds a scratch bare repository whose ref reaches one blob `token=fixture-secret-value-0001` (via hash-object, mktree, commit-tree, update-ref), and asserts read == 3 and matches == 1. Row 3: `a_render_of_the_fetched_session_records_the_source_session_head` first asserts the source's tracked hashes equal those taken before the ship, then renders the target and the source into separate empty out directories with the same uuid, cwd, model and version, asserts equal session_head, and checks the target launch line contains `--resume <target out>/<uuid>.jsonl`. The launch line is never run.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C178",
+            "done": true,
+            "note": "home_move.rs, three tests."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S75",
+            "satisfied": false,
+            "note": "The search and render halves are delivered here; the recorded resume on Claude Code is R9, which is blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R8",
@@ -301,7 +638,63 @@
       ],
       "stories": [
         "S72"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/home/RECORD.md",
+            "change": "modified",
+            "note": "`arrival` added to the kind list, plus a bullet on arrival with source_commit, remote, ref and execution, beside the head like template_render, moving no head, one per session with its own execution id. A new section `The home as a git repository` lists the tracked set, names `sessions/<id>..lock` as never tracked, fixes refs/lys/home, and says fetch commits the arrivals on the fetched commit so a later ship carries them. What it says of the six kinds, lys.given, lanterns and forks is untouched."
+          },
+          {
+            "path": "crates/lys-home/README.md",
+            "change": "modified",
+            "note": "ship and fetch paragraphs with arguments, report contents and all fourteen refusal names, a secrets paragraph, and HOME-019 added to the brief list."
+          },
+          {
+            "path": "crates/lys-home/src/cli.rs",
+            "change": "modified",
+            "note": "Module docs list ship and fetch."
+          },
+          {
+            "path": "docs/design/home/DESIGN.md",
+            "change": "modified",
+            "note": "Re-rendered by render-cluster.py."
+          },
+          {
+            "path": "docs/design/home/CHECKLIST.md",
+            "change": "modified",
+            "note": "Re-rendered by render-cluster.py."
+          },
+          {
+            "path": "docs/design/home/USER-STORIES.md",
+            "change": "modified",
+            "note": "Re-rendered by render-cluster.py."
+          },
+          {
+            "path": "docs/design/home/briefs/HOME-019.md",
+            "change": "created",
+            "note": "Rendered by render-cluster.py from briefs/HOME-019.json."
+          }
+        ],
+        "how": "Row 1: RECORD.md's arrival bullet names source_commit, remote, ref and execution. Row 2: the `The home as a git repository` section lists the five path forms and names `sessions/<id>..lock` as never tracked. Row 3: grep of the README finds each of the 14 refusal names (checked). Row 4: the README contains `no credential lys-home holds is ever written into the home`, `verbatim` and `free strings` (checked; `free strings` is kept on one line). Row 5: I did not run scripts/design/gate.sh (forbidden). I did run `python3 scripts/design/render-cluster.py docs/design/home`, the generation step the brief prescribes, which rendered DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/HOME-019.md. No rendered file was edited by hand, and no design JSON was changed.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C179",
+            "done": true,
+            "note": "RECORD.md and README.md as above."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S72",
+            "satisfied": true,
+            "note": "RECORD.md documents the arrival and its execution id."
+          }
+        ]
+      }
     },
     {
       "id": "R9",
@@ -327,7 +720,27 @@
       ],
       "stories": [
         "S75"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. PROOF-MOVE.md must record a real run: build lys-home, render, ship, fetch, render the target, run the printed launch line by hand with `claude -p`, then resume-check. This round forbids running any build command, so no binary could be produced, and I did not write the proof rather than write figures that were not measured. None of R9's six acceptance rows is met. Claude Code 2.1.283 is installed at /Users/deanwhiting/.local/bin/claude (`claude --version` prints `2.1.283 (Claude Code)`), so the proof can be run in a round where building is allowed.",
+        "deviation": "PROOF-MOVE.md was not created: no measurement was possible without building the binary, which this round forbids.",
+        "checklist": [
+          {
+            "id": "C180",
+            "done": false,
+            "note": "The proof run was not performed."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S75",
+            "satisfied": false,
+            "note": "The recorded resume on Claude Code 2.1.283 is outstanding."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [

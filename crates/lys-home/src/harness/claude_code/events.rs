@@ -22,6 +22,13 @@
 //! template hash, the session head hash and the count of files, never a path,
 //! a flag, an environment value, a handle or the instructions text, so the
 //! event stays under the cap whatever the paths are.
+//!
+//! The seventh kind, `arrival` (HOME-019 R4), is not imported either: fetch
+//! appends one beside each arriving session's head, so the head does not
+//! move. It stores no block, so `source_uuid` and `record` are both null;
+//! its `detail` holds exactly the source commit, the remote's absolute path,
+//! the ref and the session's fresh execution id. A remote long enough to
+//! carry the data over the cap is refused like any other event.
 
 use std::path::PathBuf;
 
@@ -44,6 +51,8 @@ pub const KIND_ATTACHMENT: &str = "attachment";
 pub const KIND_SYSTEM: &str = "system";
 /// A render of the session through a launch template (HOME-002 R5).
 pub const KIND_TEMPLATE_RENDER: &str = "template_render";
+/// A session's arrival in a home by fetch (HOME-019 R4).
+pub const KIND_ARRIVAL: &str = "arrival";
 /// The most an event's serialised data may be.
 pub const MAX_DATA_BYTES: usize = 512;
 
@@ -101,6 +110,28 @@ pub fn template_render(
         kind: KIND_TEMPLATE_RENDER.to_owned(),
         source_uuid: None,
         record: Some(manifest.as_str().to_owned()),
+        detail,
+    }
+}
+
+/// The event for one session's arrival: the source commit, the remote,
+/// the ref and the session's fresh execution id, and no block.
+#[must_use]
+pub fn arrival(
+    source_commit: &str,
+    remote: &str,
+    git_ref: &str,
+    execution: &str,
+) -> HarnessEvent {
+    let mut detail = Map::new();
+    detail.insert("source_commit".to_owned(), json!(source_commit));
+    detail.insert("remote".to_owned(), json!(remote));
+    detail.insert("ref".to_owned(), json!(git_ref));
+    detail.insert("execution".to_owned(), json!(execution));
+    HarnessEvent {
+        kind: KIND_ARRIVAL.to_owned(),
+        source_uuid: None,
+        record: None,
         detail,
     }
 }

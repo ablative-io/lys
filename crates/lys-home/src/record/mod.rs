@@ -44,6 +44,7 @@ pub(crate) mod fork_tests;
 pub mod given;
 #[cfg(test)]
 mod given_tests;
+pub mod hold;
 pub mod index;
 pub mod lantern;
 #[cfg(test)]
@@ -59,6 +60,12 @@ mod record_tests;
 pub mod templates;
 #[cfg(test)]
 mod templates_tests;
+pub mod tracked;
+#[cfg(test)]
+mod tracked_tests;
+pub mod verify;
+#[cfg(test)]
+mod verify_tests;
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
