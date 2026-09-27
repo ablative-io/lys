@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,27 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-039",
+      "title": "A certificate carrying one claim is revoked whole, by its issuing authority's key, permanently, by a leaf folded in lys-identity",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "The lead for the identity line, in answer to the certificate revocation card's survey rounds; recorded with DIRECTORY-013",
+      "context": "DP26 (docs/design/lys-anchor/DECISIONS.md:400-425) rules that revocation is an append and the live set a fold, that the revocable unit is the claim unit, and that the freshness tolerance is a verification input with no default and N in the answer; it is recorded only in the lys-anchor decisions and was never built (docs/design/identity/STATEMENT-2026-09-22.md records it as ruled, not built). Building it for certificates left open what is revoked when a certificate can carry several claims, who may sign a revocation, whether a revocation can be undone, which history must still verify after one, what a revocation of a certificate the log does not yet hold means, where the code lands while lys-core calls revocation a consumer concern, whether it discharges DIRECTORY-006 R4, and whether the published no-log verification changes meaning. This entry records that build in the project ledger; DP26 stays where it is and is the proposal this entry records.",
+      "decision": "A certificate carries one capability claim, so the revocable unit and the claim unit are the same; revoking a claim is revoking its certificate and issuing a new one without it, and the fold never treats a certificate carrying several claims as partially revoked. Only the issuing authority's key signs a revocation leaf; a person responsible for the agent under ADR-003, or an administrator, revokes by asking the directory, which asks the authority to append, and the fold refuses a revocation signed by any other key. A revocation is permanent: no leaf reinstates a certificate, the fold refuses a reinstatement leaf by name, a verbatim replay of an earlier issuance leaf included, and the way back is a new certificate. A revocation always names a certificate the log already holds: the fold refuses a revocation leaf with no earlier issuance leaf for its certificate as revocation_before_issuance, and a later issuance of that certificate is valid. A revoked certificate's inclusion and consistency proofs and its issuance record always verify, and an attestation by its key verifies if and only if its own log entry precedes the revocation leaf, the log order being the evidence of time; an attestation with no entry before the revocation leaf fails, naming the revocation leaf; an attestation by a certificate that is not revoked needs no log entry of its own. The fold and the revocation-aware verification live in lys-identity; lys-core keeps revocation a consumer-side non-goal, and its published verify_certificate_chain and the lys ca verify command keep their meaning and keep passing with no log, while a new library form taking the log, the size N and the tolerance as explicit inputs checks revocation; its command line is a later, separate unpublished binary, and the published lys binary does not depend on lys-identity. Certificate revocation and grant revocation are separate folds: this stands beside DIRECTORY-006 R4 and does not discharge it, and C25 stays open with DP26 as the proposal its review reads. Rejected: revoking claims one by one inside a certificate, letting any key but the issuing authority's sign a revocation, a later leaf reinstating a certificate, letting every attestation made before a revocation stand whatever its log position, a revocation standing for a certificate the log does not hold, building the fold in lys-core, and changing what the published no-log verification means.",
+      "quote": "",
+      "consequences": [
+        "DIRECTORY-013 builds the fold, the append, the verification and the history calls in crates/lys-identity/src/revocation/ and its code rows block on DIRECTORY-003 having landed, checked by the crate existing on main.",
+        "The certificate-log leaf formats are a new wire format, signed only in tests until the repository's constructed-attack review of them is recorded.",
+        "The typed-claim card issues one claim per certificate; no format revokes part of a certificate.",
+        "lys ca verify's help and lys-identity's documentation say that verification without a log does not check revocation; lys-core's published rustdoc of verify_certificate_chain does not, and the act that answers that gap is a documentation-only lys-core release, its own card.",
+        "A command line that revokes or verifies against a log is a later unit, a separate unpublished binary.",
+        "The directory design's step-2 non-goal and CN11 each gain one appended line naming DIRECTORY-013's revocation fold and history check as step-2 work brought forward; the rest of each stands as written."
       ],
       "supersedes": [],
       "superseded_by": ""
