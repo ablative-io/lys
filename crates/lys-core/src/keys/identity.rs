@@ -239,7 +239,15 @@ impl Ed25519Identity {
     /// Returns [`TrustError::KeyManagement`] if the variable is unset,
     /// contains invalid base64, or decodes to a length other than 32 bytes.
     pub fn from_env() -> TrustResult<Self> {
-        let raw = std::env::var(KEY_ENV_VAR).map_err(|_err| TrustError::KeyManagement {
+        Self::from_env_value(std::env::var(KEY_ENV_VAR))
+    }
+
+    /// Builds the identity from the result of reading `LYS_IDENTITY_KEY`.
+    ///
+    /// Holds every rule [`Self::from_env`] applies to the variable's value,
+    /// so tests reach those rules without writing the process environment.
+    fn from_env_value(read: Result<String, std::env::VarError>) -> TrustResult<Self> {
+        let raw = read.map_err(|_err| TrustError::KeyManagement {
             reason: format!("environment variable {KEY_ENV_VAR} not set"),
         })?;
         let trimmed = raw.trim();
