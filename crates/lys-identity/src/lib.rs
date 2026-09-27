@@ -11,6 +11,7 @@ pub mod directory;
 pub mod encoding;
 pub mod error;
 pub mod event;
+pub mod grants;
 pub mod id;
 pub mod lifecycle;
 pub mod link_audit;
