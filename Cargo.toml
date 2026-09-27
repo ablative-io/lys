@@ -34,6 +34,9 @@ ciborium = "0.2"
 ct-merkle = "0.2"
 ed25519-dalek = { version = "2", features = ["pkcs8", "serde"] }
 hkdf = "0.12"
+# Time zones from the database bundled in the build, never the system's, so one
+# zone name gives the same offsets on every machine.
+jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
 postcard = { version = "1", features = ["alloc"] }
 rand = "0.9"
 rcgen = "0.13"
