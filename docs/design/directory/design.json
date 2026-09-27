@@ -3,7 +3,7 @@
   "title": "The standalone identity directory, with every grant rooted in a person",
   "intention": "An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change. Cambium later uses this issuer, keeping its participant ids (rows 06 and 07); that direction is recorded here while rows 06 and 07 stay the non-goal recorded below, and this sentence promises neither row.",
   "problem": "IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands.",
-  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.",
+  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5. DIRECTORY-027 builds CONFORMANCE section 5, Starting an agent, as ADR-007 decides: the directory checks an agent, gives its start command and records it, and never runs it. A start request names the agent, the profile version and the machine (ADR-082), and its agent resolves to the enduring agent record DIRECTORY-011 keeps, which a start never creates or changes; the command given is the profile version's own executable with its recorded arguments in its recorded working directory, preceded by the ids-only assignments LYS_AGENT_ID, LYS_LAUNCH_RECORD and LYS_CREDENTIAL_IDS (ADR-084), and one start stands per agent at a time; five named checks each read their owner's record (the lifecycle state of DIRECTORY-003, the roles card Ink1H1Os's review record and role machines, SECRETS-002's handle record, and the network record of CONFORMANCE row 8.5) and refuse by name while that record does not exist. Every command given keeps one signed launch record (P4, ADR-081), whose id the agent's lys/session-start/v1 report names once the sessions brief (run d5055cc1, drafted as DIRECTORY-015) adds it to that signed message, so running is read from the sessions brief's record and never assumed (P5); a withdrawal records only that the request no longer stands (ADR-083). Giving a command is not a launch, so P6 stands. The launch record is the directory's own and is not the home's template render event (ADR-012).",
   "principles": [
     {
       "id": "P1",
@@ -50,14 +50,20 @@
     "ADR-008",
     "ADR-009",
     "ADR-010",
-    "ADR-011"
+    "ADR-011",
+    "ADR-001",
+    "ADR-081",
+    "ADR-082",
+    "ADR-083",
+    "ADR-084"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
     "The grant path (create an agent under a person, grant it a project, the action is allowed, revoke or suspend, the same action is refused) is a requirement of the row that owns it, with acceptance criteria; where the sources do not settle the row, it is recorded open for Tom in DIRECTORY-003 with its criteria drafted.",
     "Every decision still open for Tom is recorded as open and decided nowhere in this cluster.",
     "The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6).",
-    "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record."
+    "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record.",
+    "DIRECTORY-027 makes CONFORMANCE rows 5.1 to 5.6 true, each with at least one acceptance line that tests it, and no start path spawns a process."
   ],
   "non_goals": [
     {
@@ -89,7 +95,7 @@
       "reason": "Waffles' ruling of 15:36:25: if upstream has published no such release by the row 05 showing, Tom decides (docs/design/identity/briefs/IDENTITY-001.json:18; docs/design/identity/STATEMENT-2026-09-22.md:177); rows 02 to 05 run on v0.36.2 meanwhile."
     },
     {
-      "text": "Road step 2 onward: capability certificates, arbitrary grants and their enforcement, session launch and stop, credential handles, memory, context assembly, lanterns and anchoring in production",
+      "text": "Road step 2 onward: capability certificates, arbitrary grants and their enforcement, session launch and stop, credential handles, memory, context assembly, lanterns and anchoring in production\nBrought forward as step-2 work under the identity line lead's ruling: DIRECTORY-027's Start on the agent file, which checks, gives a command and keeps its launch record, and never launches, runs or stops a session.",
       "reason": "Revision 5 keeps them out of step 1 (docs/design/identity/briefs/IDENTITY-001.json:29-30); ADR-007 (the start command) and ADR-008 (the certificate on an agent's file) govern what the step-1 screens do not present as working."
     },
     {
@@ -103,6 +109,22 @@
     {
       "text": "A shared design-system package extracted for every product",
       "reason": "Tom left it as a thing to look at, not a row (ADR-010)."
+    },
+    {
+      "text": "CONFORMANCE row 5.7: a terminal view, sandbox, VM or container runner",
+      "reason": "Proposed as separate products; lys does not run agents (ADR-007)."
+    },
+    {
+      "text": "How a start command proves itself, such as a one-time code for one machine for a few minutes",
+      "reason": "It stays proposed until the launch design chooses it (CONFORMANCE 5.3)."
+    },
+    {
+      "text": "A grant to start an agent held by someone other than its responsible person or a directory administrator",
+      "reason": "A further unit; it needs DIRECTORY-006's grant contract."
+    },
+    {
+      "text": "The records the start checks read: the profile version and its review, the role's machines, the virtual credentials, the egress list, the sessions record and the provision record",
+      "reason": "Each belongs to its owner's card; DIRECTORY-027 reads them and keeps no copy."
     }
   ],
   "structure": [
@@ -585,6 +607,191 @@
       "path": "docs/design/directory/briefs/DIRECTORY-008.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-008"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-027.json",
+      "note": "the start-an-agent brief: CONFORMANCE rows 5.1 to 5.6",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-027.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/src/start/mod.rs",
+      "note": "declarations and re-exports of the start module only",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/src/start/request.rs",
+      "note": "the start request: agent, profile version and machine only, resolved to the enduring agent record DIRECTORY-011 keeps",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/src/start/error.rs",
+      "note": "the named start refusals and their words, never a credential value",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/tests/start_request.rs",
+      "note": "R1 test: define the start request, resolve the agent to its enduring record, and name every refusal",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/src/start/authority.rs",
+      "note": "who may start, give again and withdraw: the responsible person and a directory administrator",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/tests/start_authority.rs",
+      "note": "R2 test: admit a start, a start again and a withdrawal only from the agent's responsible person or a directory administrator",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/src/start/checks.rs",
+      "note": "the five named checks, run in order, each reading its owner's record",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/src/start/active.rs",
+      "note": "the agent is active, read from DIRECTORY-003's lifecycle state",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/tests/start_checks.rs",
+      "note": "R3 test: run the five named checks before any command, with the agent is active read live from the lifecycle record",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/src/start/profile_review.rs",
+      "note": "its profile version is reviewed, read from Ink1H1Os's review record",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/tests/start_profile_review.rs",
+      "note": "R4 test: check that the profile version is reviewed, from the roles card's review record",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/src/start/machine_role.rs",
+      "note": "the machine is allowed for the role, read from Ink1H1Os's role machines",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/tests/start_machine_role.rs",
+      "note": "R5 test: check that the machine is allowed for the role, from the role's machines in the roles card's record",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/src/start/credentials.rs",
+      "note": "its virtual credentials are valid, read from SECRETS-002's handle record; ids only",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/tests/start_credentials.rs",
+      "note": "R6 test: check that the agent's virtual credentials are valid, from the door's handle record",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/src/start/egress.rs",
+      "note": "the machine may reach what the profile needs, read from row 8.5's egress list",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/tests/start_egress.rs",
+      "note": "R7 test: check that the machine may reach what the profile needs, from its egress list",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/src/start/profile_command.rs",
+      "note": "the executable, its arguments and the working directory read from the reviewed profile version through Ink1H1Os's record type",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/tests/start_profile_command.rs",
+      "note": "R9 test: take the executable, its arguments and the working directory from the reviewed profile version",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/src/start/launch_record.rs",
+      "note": "the launch record and the withdrawal as signed directory events, appended and read by id",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/src/start/state.rs",
+      "note": "running, unconfirmed and withdrawn, derived from the sessions record, and whether a start for an agent stands unconfirmed",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/src/start/withdrawal.rs",
+      "note": "the withdrawal event: the request no longer stands, who and when",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/tests/start_state.rs",
+      "note": "R10 test: running only on a signed report, unconfirmed without one, a withdrawal that never claims not started, and whether a start stands",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/src/start/give.rs",
+      "note": "gives a start: runs the authority step and the checks, keeps a launch record, gives the command, gives a start again, and refuses a second start while one stands unconfirmed",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/src/start/command.rs",
+      "note": "builds the command from a launch record and the profile version it names: the executable with its recorded arguments in its working directory, with no credential value",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/tests/start_launch_record.rs",
+      "note": "R11 test: keep a launch record for every command given, render the command from it, give a start again, refuse a second start while one stands, and give a second start of a running agent without writing a session record",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity-server/src/start.rs",
+      "note": "the start route: give, give again, withdraw, state",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/start.rs",
+      "note": "R12 test: answer a start through the route and the CLI, and prove that no start path spawns a process",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys/src/identity/start.rs",
+      "note": "the lys identity start CLI answer",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys/tests/identity_start.rs",
+      "note": "R12 test: answer a start through the route and the CLI, and prove that no start path spawns a process",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "crates/lys-identity/tests/start_no_spawn.rs",
+      "note": "R12 test: answer a start through the route and the CLI, and prove that no start path spawns a process",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "surface/identity/src/features/start/StartDrawer.tsx",
+      "note": "the agent file's Start drawer",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "surface/identity/src/features/start/StartNotice.tsx",
+      "note": "the unconfirmed, withdrawn and running notice",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "surface/identity/tests/start.test.tsx",
+      "note": "R13 test: build the Start drawer and the unconfirmed notice on the agent file",
+      "brief": "DIRECTORY-027"
+    },
+    {
+      "path": "surface/identity/tests/acceptance/start.spec.ts",
+      "note": "R13 test: build the Start drawer and the unconfirmed notice on the agent file",
+      "brief": "DIRECTORY-027"
     }
   ],
   "inventory": [
@@ -686,12 +893,19 @@
   "gate": [
     {
       "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
       "legs": [
         {
           "name": "fmt",
           "command": "cargo fmt --all",
           "requires": [
-            "place:here"
+            "tool:cargo",
+            "tool:rustfmt"
           ],
           "cadence": "round"
         },
@@ -699,7 +913,7 @@
           "name": "clippy-all-features",
           "command": "cargo clippy --all-targets --all-features -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -707,7 +921,7 @@
           "name": "clippy",
           "command": "cargo clippy --all-targets -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -715,7 +929,7 @@
           "name": "tests",
           "command": "cargo test --workspace --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -723,7 +937,7 @@
           "name": "doc-all-features",
           "command": "cargo doc --no-deps --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -731,36 +945,16 @@
           "name": "doc",
           "command": "cargo doc --no-deps",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        }
-      ]
-    },
-    {
-      "tree": "docs",
-      "legs": [
-        {
-          "name": "render",
-          "command": "python3 ../scripts/design/render-cluster.py design/directory",
-          "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
         {
-          "name": "validate",
-          "command": "python3 ../scripts/design/validate.py design/directory",
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        },
-        {
-          "name": "coverage",
-          "command": "python3 ../scripts/design/check-coverage.py design/directory",
-          "requires": [
-            "place:here"
+            "tool:sh",
+            "tool:python3"
           ],
           "cadence": "round"
         }

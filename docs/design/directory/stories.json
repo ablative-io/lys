@@ -16,6 +16,34 @@
         {
           "id": "S5",
           "text": "As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email."
+        },
+        {
+          "id": "S84",
+          "text": "As the responsible person, I want my agent's start command given only after its checks pass, so that I never start an agent that is not active, reviewed, allowed on the machine, credentialed and able to reach what it needs."
+        },
+        {
+          "id": "S85",
+          "text": "As the responsible person, I want each failed check named in words, so that I know what to fix before a command can be given."
+        },
+        {
+          "id": "S86",
+          "text": "As the responsible person, I want my agent shown as running only when its own signed report names the command I was given, so that copying a command is never mistaken for a start."
+        },
+        {
+          "id": "S87",
+          "text": "As the responsible person, I want an unanswered start shown as unconfirmed with its request standing, so that I do not ask elsewhere and start the agent twice."
+        },
+        {
+          "id": "S88",
+          "text": "As the responsible person, I want to withdraw a start request I no longer want, so that the record says the request no longer stands without claiming the agent did not start."
+        },
+        {
+          "id": "S93",
+          "text": "As the responsible person, I want the command I am given to run the executable in the working directory that were reviewed, so that no start request can change what runs."
+        },
+        {
+          "id": "S94",
+          "text": "As the responsible person, I want starting my agent again while it runs to become a second session of the same agent, so that starting never makes another agent and never changes the one I registered."
         }
       ]
     },
@@ -26,6 +54,14 @@
         {
           "id": "S2",
           "text": "As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria."
+        },
+        {
+          "id": "S90",
+          "text": "As a reviewer, I want a test that reads the command line and the clipboard and finds no credential value, so that giving a command never discloses a secret."
+        },
+        {
+          "id": "S91",
+          "text": "As a reviewer, I want a test that fails if any start path spawns a process, so that lys stays a product that checks, gives and records and never runs an agent."
         }
       ]
     },
@@ -40,6 +76,10 @@
         {
           "id": "S6",
           "text": "As the operator, I want the directory's screens to show every refusal, pending audit and outage as it is, so that I never act on a completed state that did not happen."
+        },
+        {
+          "id": "S89",
+          "text": "As the operator, I want a kept launch record for every command given, so that I can give the same start again without looking inside a running process."
         }
       ]
     },
@@ -76,6 +116,16 @@
         {
           "id": "S12",
           "text": "As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect."
+        }
+      ]
+    },
+    {
+      "name": "Person without the right to start",
+      "role": "Opens an agent file that is not theirs to start",
+      "stories": [
+        {
+          "id": "S92",
+          "text": "As a person who is neither the agent's responsible person nor a directory administrator, I want a refusal naming the agent and the right I lack, so that I know why there is no working Start for me."
         }
       ]
     }
