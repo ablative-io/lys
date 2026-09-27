@@ -92,4 +92,8 @@ impl PermissionCheck for LocalGrants {
     fn may_read(&self, identity: &str, record: &str) -> Result<Permitted, Denied> {
         self.check(Relation::Read, identity, record)
     }
+
+    fn may_lend(&self, identity: &str, secret: &str) -> Result<Permitted, Denied> {
+        self.check(Relation::Lend, identity, secret)
+    }
 }

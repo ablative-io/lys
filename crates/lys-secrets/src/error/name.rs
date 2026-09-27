@@ -47,6 +47,8 @@ impl SecretsError {
             Self::RelationRemoved { .. } => "RelationRemoved",
             Self::KeyNotReadable { .. } => "KeyNotReadable",
             Self::NotFound => "NotFound",
+            Self::LendingNotPermitted { .. } => "LendingNotPermitted",
+            Self::BeyondAncestry { .. } => "BeyondAncestry",
             Self::MemoryNotUsable { .. } => "MemoryNotUsable",
             Self::ReservationMissing { .. } => "ReservationMissing",
             Self::StoreLocked { .. } => "StoreLocked",

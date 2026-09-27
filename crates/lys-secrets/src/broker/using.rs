@@ -163,13 +163,12 @@ impl<P: PermissionCheck> Broker<P> {
         let mut line = self.line(AuditKind::Use, subject, call, Some(used), "admitted");
         line.spend = reserved;
         self.append(&line)?;
-        if let Some(record) = self.handles.get_mut(&id) {
-            record.used = used;
-            record
-                .operations
-                .insert(operation.clone(), ("admitted".to_owned(), mark.clone()));
-            record.open.insert(operation.clone(), reserved.unwrap_or(0));
-        }
+        super::lineage::admitted(
+            &mut self.handles,
+            &id,
+            (&operation, &mark),
+            reserved.unwrap_or(0),
+        );
         let opened = match self.store.entry(&entry).map(|view| view.class) {
             Some(class) => self
                 .store
@@ -313,13 +312,13 @@ impl<P: PermissionCheck> Broker<P> {
         );
         line.spend = spend;
         self.append(&line)?;
-        if let Some(record) = self.handles.get_mut(handle) {
-            record.open.remove(operation);
-            record.settled = record.settled.saturating_add(spend.unwrap_or(0));
-            if let Some(entry) = record.operations.get_mut(operation) {
-                outcome.clone_into(&mut entry.0);
-            }
-        }
+        super::lineage::settled(
+            &mut self.handles,
+            handle,
+            operation,
+            outcome,
+            spend.unwrap_or(0),
+        );
         Ok(())
     }
 }

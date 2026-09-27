@@ -42,16 +42,12 @@ impl<P: PermissionCheck> Broker<P> {
             reserved.map(|_reserved| 0),
             CANCELLED_AT_BOUNDARY,
         )?;
-        if let Some(record) = self.handles.get_mut(&handle) {
-            record.used = record.used.saturating_sub(1);
-        }
         Err(SecretsError::HandleDropped { handle })
     }
 
     /// Whether the handle was dropped, or the access it was issued under
     /// revoked.
     pub(super) fn cut_off(&self, handle: &str, identity: &str, secret: &str) -> bool {
-        let dropped = self.handles.get(handle).is_none_or(|record| record.dropped);
-        dropped || self.permissions.may_use(identity, secret).is_err()
+        self.line_dropped(handle) || self.permissions.may_use(identity, secret).is_err()
     }
 }
