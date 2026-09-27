@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,42 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-073",
+      "title": "A home moves as one fast-forward git ref pushed to a path on this machine, tracking exactly its record stores",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's answers to the move survey; recorded with HOME-019",
+      "context": "Stage 3 of the context roadmap moves a home by a pushed ref the target fetches, never a hand copy, with encryption before any bytes leave the machine as its precondition. A home holds, beside its record, lock files and temporaries that must never travel; its blocks hold imported tool results verbatim and a template's env and mcp slots are free strings, so no scan can promise a home holds no secret; and git's own settings can change bytes on the way in or out.",
+      "decision": "A home directory is a git repository whose tracked files are exactly each session's file, index and head, each block and each template, enumerated by name and never by pattern; the first ship initialises it. ship holds every session's lock through its check and snapshot, commits that set, and pushes it without force as the one ref refs/lys/home to a bare repository at a path on this machine, creating it when the path does not exist; a remote ref the new commit does not descend from is refused as ref_diverged. Every other remote, ssh to any host, https, git or file URLs and hosted services, is refused as remote_not_local until stage 3's encryption exists. git runs as the binary with a pinned environment and no filters. Rejected: an allow-list of estate ssh hosts, scanning the home for secrets, a pure-Rust git crate, and force-pushing or overwriting a ref.",
+      "quote": "",
+      "consequences": [
+        "No byte of a home leaves this machine through ship until the secrets step's encryption lands; the second-machine block fetches this ref after that.",
+        "A home with no session, a stale or missing index or head, a session a live owner holds, a repository tracking other files and a remote path that is not a bare repository are each refused by name before anything is pushed.",
+        "The gate machine needs git on PATH."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-074",
+      "title": "An arrival is a seventh lys.harness_event kind, one per arriving session, hung beside the head",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's answers to the move survey, and the lead's answer that fetch commits the arrival; recorded with HOME-019",
+      "context": "Stage 3 gives the target a distinct execution id with its ancestry recorded, and the identity documents describe an execution per session or fork. The source is never written, so the ancestry can only be written on the target side, and the arrival is a fact about the record, not a turn.",
+      "decision": "fetch appends to each arriving session one lys.harness_event of kind arrival whose detail carries the source commit, the remote, the ref and a fresh execution id for that session's continuation. It hangs beside the head through append_beside, as template_render does (ADR-012), so the head file, the head hash and the next render's session_head on the target are the source's. fetch then commits the appended entries as one commit whose parent is the fetched commit, naming the source commit, the remote and the ref, so the target's git status is clean and a later ship from it carries the arrival onward; a failed append or commit removes what fetch created. There is no home-level id file and no block is stored for it. Rejected: an arrival that moves the head, arrival lines left uncommitted until the target's next ship, one execution id per home, and a block for the arrival's data.",
+      "quote": "",
+      "consequences": [
+        "A target's head file is byte-identical to the source's after fetch, and a render of the target records the source's session_head.",
+        "A remote whose arrival data would pass the 512-byte cap is refused before fetch writes anything.",
+        "The target's HEAD is one arrival commit on the fetched commit, and a ship from the target carries the arrival to the next home."
       ],
       "supersedes": [],
       "superseded_by": ""
