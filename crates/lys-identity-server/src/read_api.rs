@@ -11,8 +11,9 @@
 //!
 //! The directory records no service accounts, roles or role versions yet, so
 //! `service_accounts` answers an empty list and `role` and `version` answer
-//! null until it does.
+//! null until it does. Each route answers its type from `read_views`.
 
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -22,9 +23,11 @@ use axum::routing::get;
 use axum::{Json, Router};
 use lys_identity::projection::{Projection, Record};
 use lys_identity::{Actor, AgentId, IdentityId, LifecycleState, LoginBinding, PersonId};
-use serde_json::{Value, json};
 
 use crate::error::ServerError;
+use crate::read_views::{
+    AgentSummary, AgentView, Login, MeView, PeopleView, PersonSummary, PersonView, Provenance,
+};
 use crate::routes::{AppState, receipt_json, signed_in, with_directory};
 
 /// The read routes: the personal views and the administrator's wider view.
@@ -46,36 +49,52 @@ enum Scope {
     Directory,
 }
 
-fn login_json(binding: &LoginBinding) -> Value {
-    json!({ "provider": binding.issuer(), "subject": binding.subject() })
+fn login(binding: &LoginBinding) -> Login {
+    Login {
+        provider: binding.issuer().to_owned(),
+        subject: binding.subject().to_owned(),
+    }
 }
 
-fn person_summary(id: PersonId, record: &Record) -> Value {
-    json!({
-        "id": id.to_string(),
-        "display_name": record.profile().display_name(),
-        "state": record.state().to_string(),
-    })
+fn person_summary(id: PersonId, record: &Record) -> PersonSummary {
+    PersonSummary {
+        id: id.to_string(),
+        display_name: record.profile().display_name().to_owned(),
+        state: record.state().to_string(),
+    }
 }
 
-fn agents_of(projection: &Projection, person: PersonId) -> Vec<Value> {
-    projection
-        .records()
-        .filter_map(|(id, record)| match id {
-            IdentityId::Agent(agent) if record.responsible() == Some(person) => Some(json!({
-                "id": agent.to_string(),
-                "display_name": record.profile().display_name(),
-                "state": record.state().to_string(),
-            })),
-            IdentityId::Agent(_) | IdentityId::Person(_) => None,
-        })
-        .collect()
+/// Every agent in the directory, grouped by the person it answers to, in one pass.
+fn agents_by_person(projection: &Projection) -> HashMap<PersonId, Vec<AgentSummary>> {
+    let mut grouped: HashMap<PersonId, Vec<AgentSummary>> = HashMap::new();
+    for (id, record) in projection.records() {
+        if let (IdentityId::Agent(agent), Some(person)) = (id, record.responsible()) {
+            grouped.entry(person).or_default().push(AgentSummary {
+                id: agent.to_string(),
+                display_name: record.profile().display_name().to_owned(),
+                state: record.state().to_string(),
+            });
+        }
+    }
+    grouped
 }
 
-fn person_with_agents(projection: &Projection, id: PersonId, record: &Record) -> Value {
-    let mut person = person_summary(id, record);
-    person["agents"] = Value::Array(agents_of(projection, id));
-    person
+fn person_view(
+    grouped: &mut HashMap<PersonId, Vec<AgentSummary>>,
+    id: PersonId,
+    record: &Record,
+) -> PersonView {
+    let PersonSummary {
+        id: text,
+        display_name,
+        state,
+    } = person_summary(id, record);
+    PersonView {
+        id: text,
+        display_name,
+        state,
+        agents: grouped.remove(&id).unwrap_or_default(),
+    }
 }
 
 fn person_record(projection: &Projection, id: PersonId) -> Result<&Record, ServerError> {
@@ -96,53 +115,58 @@ fn own_person(projection: &Projection, actor: &Actor) -> Result<PersonId, Server
 async fn me(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<MeView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     with_directory(&state, |directory| {
         let projection = directory.projection()?;
         let person = own_person(projection, &actor)?;
         let record = person_record(projection, person)?;
-        Ok(Json(json!({
-            "person": person_summary(person, record),
-            "signed_in": login_json(actor.binding()),
-            "sign_in_identities": record.bindings().iter().map(login_json).collect::<Vec<_>>(),
-            "service_accounts": Vec::<Value>::new(),
-        })))
+        Ok(Json(MeView {
+            person: person_summary(person, record),
+            signed_in: login(actor.binding()),
+            sign_in_identities: record.bindings().iter().map(login).collect(),
+            service_accounts: Vec::new(),
+        }))
     })
 }
 
 async fn own_people(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<PeopleView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     with_directory(&state, |directory| {
         let projection = directory.projection()?;
         let person = own_person(projection, &actor)?;
         let record = person_record(projection, person)?;
-        Ok(Json(json!({
-            "scope": "personal",
-            "people": [person_with_agents(projection, person, record)],
-        })))
+        let mut grouped = agents_by_person(projection);
+        Ok(Json(PeopleView {
+            scope: "personal".to_owned(),
+            people: vec![person_view(&mut grouped, person, record)],
+        }))
     })
 }
 
 async fn every_person(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<PeopleView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
     with_directory(&state, |directory| {
         let projection = directory.projection()?;
+        let mut grouped = agents_by_person(projection);
         let people = projection
             .records()
             .filter_map(|(id, record)| match id {
-                IdentityId::Person(person) => Some(person_with_agents(projection, *person, record)),
+                IdentityId::Person(person) => Some(person_view(&mut grouped, *person, record)),
                 IdentityId::Agent(_) => None,
             })
-            .collect::<Vec<_>>();
-        Ok(Json(json!({ "scope": "directory", "people": people })))
+            .collect();
+        Ok(Json(PeopleView {
+            scope: "directory".to_owned(),
+            people,
+        }))
     })
 }
 
@@ -150,7 +174,7 @@ async fn own_agent(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(id): Path<String>,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<AgentView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     let agent = AgentId::from_str(&id)?;
     with_directory(&state, |directory| {
@@ -163,7 +187,7 @@ async fn any_agent(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(id): Path<String>,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<AgentView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
     let agent = AgentId::from_str(&id)?;
@@ -177,7 +201,7 @@ fn agent_view(
     directory: &mut lys_identity::Directory<lys_log_store::FileLeafStore>,
     agent: AgentId,
     scope: Scope,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<AgentView>, ServerError> {
     let projection = directory.projection()?;
     let record = projection
         .record(IdentityId::Agent(agent))
@@ -187,23 +211,25 @@ fn agent_view(
         return Err(ServerError::AgentNotVisible);
     }
     let person_record = person_record(projection, person)?;
-    let mut view = json!({
-        "id": agent.to_string(),
-        "display_name": record.profile().display_name(),
-        "person": person_summary(person, person_record),
-        "needs_new_person": person_record.state() == LifecycleState::Retired,
-        "role": Value::Null,
-        "version": Value::Null,
-        "state": record.state().to_string(),
-        "provenance": {
-            "registered_by": login_json(record.registered_by()),
-            "events": record.events(),
+    let mut view = AgentView {
+        id: agent.to_string(),
+        display_name: record.profile().display_name().to_owned(),
+        person: person_summary(person, person_record),
+        needs_new_person: person_record.state() == LifecycleState::Retired,
+        role: None,
+        version: None,
+        state: record.state().to_string(),
+        provenance: Provenance {
+            registered_by: login(record.registered_by()),
+            events: record.events().to_vec(),
+            registration: None,
         },
-    });
-    let registered_at = record.events().first().copied();
-    let registration = registered_at
-        .and_then(|index| directory.receipt_at(index))
-        .map_or(Value::Null, receipt_json);
-    view["provenance"]["registration"] = registration;
+    };
+    view.provenance.registration = view
+        .provenance
+        .events
+        .first()
+        .and_then(|index| directory.receipt_at(*index))
+        .map(receipt_json);
     Ok(Json(view))
 }
