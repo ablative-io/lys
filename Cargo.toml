@@ -73,8 +73,9 @@ rust_2018_idioms = { level = "warn", priority = -1 }
 # "warn" below is a hard merge gate, not advisory.
 pedantic = { level = "warn", priority = -1 }
 
-# Unwrap / Expect / Panic — forbidden in library code. Tests opt out per-module
-# with #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)].
+# Unwrap / Expect / Panic — forbidden in library code. Tests are exempt through
+# clippy.toml's allow-unwrap-in-tests, allow-expect-in-tests and
+# allow-panic-in-tests; a test file carries #![cfg(test)] as its first line.
 unwrap_used = "warn"
 expect_used = "warn"
 panic = "warn"
