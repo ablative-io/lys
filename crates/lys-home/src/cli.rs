@@ -17,6 +17,7 @@ use serde_json::{Value, json};
 use crate::cli::given::{GivenArgs, GivenCheckArgs, Outcome, STATUS_REFUSED};
 use crate::cli_fork::ForkArgs;
 use crate::cli_lantern::LanternAction;
+use crate::cli_translate::TranslateArgs;
 use crate::error::HomeError;
 use crate::harness::claude_code::AUTHORED;
 use crate::harness::claude_code::import::import_claude_code;
@@ -187,6 +188,8 @@ pub enum Command {
     },
     /// Fork a child session from a lantern's point, with its ancestry on both sides.
     Fork(ForkArgs),
+    /// Translate a session into a Codex rollout with a loss account beside it.
+    TranslateCodex(TranslateArgs),
 }
 
 impl Command {
@@ -360,6 +363,7 @@ fn report(command: Command) -> Result<Value, HomeError> {
         Command::GivenCheck(args) => given::check(&args).map(|outcome| outcome.report),
         Command::Lantern { action } => crate::cli_lantern::run(action),
         Command::Fork(args) => crate::cli_fork::run(&args),
+        Command::TranslateCodex(args) => crate::cli_translate::run(&args),
     }
 }
 
