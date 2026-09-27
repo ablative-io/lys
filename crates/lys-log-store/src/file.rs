@@ -7,7 +7,12 @@
 //! - `leaves/<20-digit zero-padded index>` — one file per leaf, raw bytes
 //!   verbatim. **The leaf file IS the RFC 6962 preimage**, so
 //!   `(printf '\x00'; cat leaf-file) | shasum -a 256` is the leaf hash. A
-//!   stranger with `shasum` can check a leaf without lys.
+//!   stranger with `shasum` can check a leaf without lys. A leaf is written
+//!   to a hidden temporary file (`leaves/.<pid>-<index>-<sequence>.tmp`),
+//!   flushed, and only then linked to its final name by an operation that
+//!   refuses to replace an existing leaf. A leaf name therefore never refers
+//!   to a torn or unflushed file, and a leftover temporary file from a crash
+//!   is never counted as a leaf.
 //! - `state.json` — the pinned `(tree_size, root)`, rewritten atomically after
 //!   every append.
 //!
@@ -49,6 +54,7 @@
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
@@ -96,7 +102,25 @@ pub struct FileLeafStore {
     origin: String,
     extent: u64,
     pinned: PinnedRoot,
+    /// The leaf whose directory flush failed on this handle, if any. While set,
+    /// every append is refused until the store is reopened.
+    durability_uncertain: Option<u64>,
 }
+
+/// The two steps after a leaf is linked, kept as functions so that a test can
+/// make either one fail.
+struct AfterLink {
+    /// Removes the temporary name the leaf was written under.
+    remove_temp: fn(&Path) -> std::io::Result<()>,
+    /// Flushes the leaves directory so the leaf's name is durable.
+    flush_dir: fn(&Path) -> std::io::Result<()>,
+}
+
+/// The real steps after a link.
+const AFTER_LINK: AfterLink = AfterLink {
+    remove_temp: remove_file,
+    flush_dir: sync_dir,
+};
 
 impl std::fmt::Debug for FileLeafStore {
     /// Summarizes the store without reading or dumping leaf content.
@@ -146,6 +170,7 @@ impl FileLeafStore {
             origin: config.origin,
             extent: 0,
             pinned,
+            durability_uncertain: None,
         })
     }
 
@@ -184,11 +209,15 @@ impl FileLeafStore {
             tree_size: state.tree_size,
             root: decode_pinned_root(dir, &state.root_hash)?,
         };
+        // A leaf name linked just before a crash may not yet be durable; the
+        // flush makes every name counted below one that survives.
+        fsync_dir(&dir.join("leaves"))?;
         Ok(Self {
             dir: dir.to_path_buf(),
             origin: config.origin,
             extent: contiguous_extent(dir)?,
             pinned,
+            durability_uncertain: None,
         })
     }
 
@@ -202,6 +231,57 @@ impl FileLeafStore {
         self.dir
             .join("leaves")
             .join(format!("{index:0LEAF_NAME_WIDTH$}"))
+    }
+
+    /// Writes the leaf at `index` with `write_contents` supplying its bytes.
+    ///
+    /// The bytes go to a hidden temporary file in `leaves/`, which is flushed
+    /// and only then linked to the leaf's final name, so no leaf name ever
+    /// refers to a partly written or unflushed file. The link refuses to
+    /// replace an existing leaf: that is the second, independent absent-check
+    /// below the in-memory extent, catching a leaf this store never saw —
+    /// another writer appending to the same directory — which the extent cached
+    /// at open cannot know about. The directory is flushed after the link so
+    /// the name itself is durable.
+    ///
+    /// The link is the commit point: once it succeeds the extent advances
+    /// whatever happens next. A temporary name that cannot be removed is left
+    /// for open to skip, and the append still succeeds. A directory that cannot
+    /// be flushed is reported as [`StoreError::LeafDurabilityUncertain`] and
+    /// halts this handle.
+    ///
+    /// `next_sequence` supplies the sequence numbers for temporary names, so
+    /// that a test can say which names a write will try.
+    fn put_leaf_with(
+        &mut self,
+        index: u64,
+        write_contents: impl FnOnce(&mut std::fs::File) -> std::io::Result<()>,
+        after_link: &AfterLink,
+        next_sequence: &mut impl FnMut() -> u64,
+    ) -> StoreResult<()> {
+        if let Some(uncertain) = self.durability_uncertain {
+            return Err(StoreError::ReopenRequired { index: uncertain });
+        }
+        if index < self.extent {
+            return Err(StoreError::LeafAlreadyWritten { index });
+        }
+        if index > self.extent {
+            return Err(StoreError::LeafWouldLeaveGap {
+                index,
+                next: self.extent,
+            });
+        }
+        let leaves_dir = self.dir.join("leaves");
+        let tmp_path = write_leaf_temp(&leaves_dir, index, write_contents, next_sequence)?;
+        link_leaf(&tmp_path, &self.leaf_path(index), index)?;
+        self.extent += 1;
+        // The leaf is committed under its final name, and open skips a hidden
+        // temporary name, so a name left behind here costs nothing but space.
+        let _ = (after_link.remove_temp)(&tmp_path);
+        (after_link.flush_dir)(&leaves_dir).map_err(|source| {
+            self.durability_uncertain = Some(index);
+            StoreError::LeafDurabilityUncertain { index, source }
+        })
     }
 }
 
@@ -228,47 +308,12 @@ impl LeafStore for FileLeafStore {
     }
 
     fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
-        if index < self.extent {
-            return Err(StoreError::LeafAlreadyWritten { index });
-        }
-        if index > self.extent {
-            return Err(StoreError::LeafWouldLeaveGap {
-                index,
-                next: self.extent,
-            });
-        }
-        let path = self.leaf_path(index);
-        // `create_new` is a SECOND, independent absent-check, below the
-        // in-memory extent: it catches a leaf file this store never saw —
-        // another process appending to the same directory — which the extent
-        // it cached at open cannot possibly know about.
-        let mut file = match std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path)
-        {
-            Ok(file) => file,
-            Err(source) if source.kind() == std::io::ErrorKind::AlreadyExists => {
-                return Err(StoreError::LeafAlreadyWritten { index });
-            }
-            Err(source) => {
-                return Err(StoreError::Io {
-                    context: format!("failed to create leaf file {}", path.display()),
-                    source,
-                });
-            }
-        };
-        file.write_all(bytes).map_err(|source| StoreError::Io {
-            context: format!("failed to write leaf file {}", path.display()),
-            source,
-        })?;
-        file.sync_all().map_err(|source| StoreError::Io {
-            context: format!("failed to flush leaf file {} to disk", path.display()),
-            source,
-        })?;
-        fsync_dir(&self.dir.join("leaves"))?;
-        self.extent += 1;
-        Ok(())
+        self.put_leaf_with(
+            index,
+            |file| file.write_all(bytes),
+            &AFTER_LINK,
+            &mut next_process_sequence,
+        )
     }
 
     fn pinned(&self) -> PinnedRoot {
@@ -371,6 +416,149 @@ fn write_durably(path: &Path, contents: &[u8]) -> StoreResult<()> {
     })
 }
 
+/// Distinguishes temporary leaf names made by one process.
+static LEAF_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+/// Takes the next sequence number from [`LEAF_TEMP_SEQUENCE`].
+fn next_process_sequence() -> u64 {
+    LEAF_TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+}
+
+/// How many temporary names one leaf write tries before refusing.
+///
+/// A name is taken only by a leftover from an earlier process that had the
+/// same process id and wrote the same index, so a write meets one such name
+/// rarely and several in a row almost never. Each taken name costs one
+/// sequence number and is left untouched. A write that finds every name in
+/// this bound taken is not meeting leftovers but something else creating
+/// names in `leaves/`, and refusing says so where trying further would hide it.
+const LEAF_TEMP_ATTEMPTS: u32 = 16;
+
+/// The hidden temporary name a leaf is written under before it is linked:
+/// `.<pid>-<index padded to LEAF_NAME_WIDTH>-<sequence>.tmp`.
+///
+/// It begins with `.` so that opening the store never counts it, and carries
+/// the process id, the leaf index and a per-process sequence number so that no
+/// two writers share one.
+fn leaf_temp_name(pid: u32, index: u64, sequence: u64) -> String {
+    format!(".{pid}-{index:0LEAF_NAME_WIDTH$}-{sequence}.tmp")
+}
+
+/// Writes a leaf's bytes to a fresh hidden file in `leaves_dir` and flushes it.
+///
+/// The file is named by [`leaf_temp_name`] and created only if the name is
+/// free. A name already taken is a leftover, which is never replaced: the
+/// write takes the next sequence number from `next_sequence` and tries
+/// again, up to
+/// [`LEAF_TEMP_ATTEMPTS`] names. On any failure the file is removed: a write
+/// that fails to flush can leave bytes in the page cache that read back as if
+/// they were durable, and nothing may be linked from them.
+fn write_leaf_temp(
+    leaves_dir: &Path,
+    index: u64,
+    write_contents: impl FnOnce(&mut std::fs::File) -> std::io::Result<()>,
+    next_sequence: &mut impl FnMut() -> u64,
+) -> StoreResult<PathBuf> {
+    let (tmp_path, mut file) = create_leaf_temp(leaves_dir, index, next_sequence)?;
+    let written = write_contents(&mut file)
+        .map_err(|source| StoreError::Io {
+            context: format!("failed to write temporary leaf file {}", tmp_path.display()),
+            source,
+        })
+        .and_then(|()| {
+            file.sync_all().map_err(|source| StoreError::Io {
+                context: format!(
+                    "failed to flush temporary leaf file {} to disk",
+                    tmp_path.display()
+                ),
+                source,
+            })
+        });
+    drop(file);
+    match written {
+        Ok(()) => Ok(tmp_path),
+        Err(err) => Err(discard_temp(&tmp_path, err)),
+    }
+}
+
+/// Creates the temporary file for the leaf at `index` under the first free
+/// name, never opening a name that already exists. Each name tried takes one
+/// number from `next_sequence`.
+fn create_leaf_temp(
+    leaves_dir: &Path,
+    index: u64,
+    next_sequence: &mut impl FnMut() -> u64,
+) -> StoreResult<(PathBuf, std::fs::File)> {
+    let pid = std::process::id();
+    for _ in 0..LEAF_TEMP_ATTEMPTS {
+        let sequence = next_sequence();
+        let tmp_path = leaves_dir.join(leaf_temp_name(pid, index, sequence));
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp_path)
+        {
+            Ok(file) => return Ok((tmp_path, file)),
+            Err(source) if source.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(source) => {
+                return Err(StoreError::Io {
+                    context: format!(
+                        "failed to create temporary leaf file {}",
+                        tmp_path.display()
+                    ),
+                    source,
+                });
+            }
+        }
+    }
+    Err(StoreError::LeafTempNamesTaken {
+        index,
+        attempts: LEAF_TEMP_ATTEMPTS,
+        path: leaves_dir.to_path_buf(),
+    })
+}
+
+/// Links a flushed temporary leaf file to its final name, never replacing one.
+///
+/// A hard link fails with `AlreadyExists` when the name is taken, which is the
+/// refusal a second writer on the same index receives. On any failure the
+/// temporary file is removed.
+fn link_leaf(tmp_path: &Path, leaf_path: &Path, index: u64) -> StoreResult<()> {
+    match std::fs::hard_link(tmp_path, leaf_path) {
+        Ok(()) => Ok(()),
+        Err(source) if source.kind() == std::io::ErrorKind::AlreadyExists => Err(discard_temp(
+            tmp_path,
+            StoreError::LeafAlreadyWritten { index },
+        )),
+        Err(source) => Err(discard_temp(
+            tmp_path,
+            StoreError::Io {
+                context: format!(
+                    "failed to link leaf file {} from {}",
+                    leaf_path.display(),
+                    tmp_path.display()
+                ),
+                source,
+            },
+        )),
+    }
+}
+
+/// Removes an abandoned temporary leaf file, keeping the error that abandoned
+/// it. A removal that also fails is reported alongside rather than dropped.
+fn discard_temp(tmp_path: &Path, err: StoreError) -> StoreError {
+    match std::fs::remove_file(tmp_path) {
+        Ok(()) => err,
+        Err(source) => StoreError::Io {
+            context: format!(
+                "{err}; the temporary leaf file {} could not be removed either",
+                tmp_path.display()
+            ),
+            source,
+        },
+    }
+}
+
 /// Fsyncs a directory so that entries created or renamed inside it are durable.
 ///
 /// Unix only: opening a directory as a file is not portable, and on platforms
@@ -378,19 +566,27 @@ fn write_durably(path: &Path, contents: &[u8]) -> StoreResult<()> {
 /// *directory entry* carries the platform's own weaker guarantee. Said plainly
 /// rather than papered over, because a durability claim that quietly does not
 /// hold on some target is worse than one scoped to where it does.
-#[cfg(unix)]
 fn fsync_dir(dir: &Path) -> StoreResult<()> {
-    std::fs::File::open(dir)
-        .and_then(|handle| handle.sync_all())
-        .map_err(|source| StoreError::Io {
-            context: format!("failed to flush directory {} to disk", dir.display()),
-            source,
-        })
+    sync_dir(dir).map_err(|source| StoreError::Io {
+        context: format!("failed to flush directory {} to disk", dir.display()),
+        source,
+    })
+}
+
+/// Opens a directory and flushes it; see [`fsync_dir`] for the platform scope.
+#[cfg(unix)]
+fn sync_dir(dir: &Path) -> std::io::Result<()> {
+    std::fs::File::open(dir).and_then(|handle| handle.sync_all())
 }
 
 #[cfg(not(unix))]
-fn fsync_dir(_dir: &Path) -> StoreResult<()> {
+fn sync_dir(_dir: &Path) -> std::io::Result<()> {
     Ok(())
+}
+
+/// Removes a file by path.
+fn remove_file(path: &Path) -> std::io::Result<()> {
+    std::fs::remove_file(path)
 }
 
 /// Enumerates `leaves/` and returns the contiguous extent.
