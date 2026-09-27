@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,43 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-044",
+      "title": "A certificate is self-signed when its subject key is the issuer key and its signature verifies under it, never by its names",
+      "status": "decided",
+      "scope": "lys-core",
+      "date": "2026-09-27",
+      "decided_by": "The lead for lys, answering the lys-core self-signed survey; recorded with LYSCORE-001",
+      "context": "verify_certificate_chain_at refused a certificate when its raw subject and issuer DN bytes were equal. The authority writes its issuer DN as the lowercase hex of its public key, so a certificate it legitimately issued to a subject named with that string was refused although its signature verified. A certificate whose subject key was the issuer's own key, issued over a request made with the authority's key, carried different names and verified. C23 ('Self-signed certificates are rejected') had been ticked on the name comparison.",
+      "decision": "Self-signed is judged by keys: a certificate is self-signed when its subject public key is the supplied issuer key, compared as decoded Ed25519 points, and its signature verifies under that key with verify_strict, and such a certificate is refused whatever its names. A certificate issued to a subject whose name equals the issuer's hex-key common name is judged on its real issuer and verifies. Rejected: keeping the DN-byte comparison as a heuristic screen; keeping truly self-signed certificates with differing names verifying.",
+      "quote": "",
+      "consequences": [
+        "lys ca verify and lys verify --cert exit 0 for a hex-common-name certificate the issuer signed, and exit 1 for a certificate self-signed by keys.",
+        "C23 is restated with the key-based definition and ticks again only on review.",
+        "A certificate issued by issue_certificate_for_request over a request made with the authority's own key is refused; CHANGELOG records it.",
+        "DIRECTORY-013's fold records certificate_chain_invalid for a leaf self-signed by keys and issues a legitimately issued hex-common-name leaf."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-045",
+      "title": "The self-signed fix and the verify_certificate_chain caveat land on main with no lys-core release, after DIRECTORY-013",
+      "status": "decided",
+      "scope": "lys-core",
+      "date": "2026-09-27",
+      "decided_by": "The lead for lys, answering the lys-core self-signed survey; recorded with LYSCORE-001",
+      "context": "The revocation brief's first round ruled the rustdoc caveat on verify_certificate_chain a documentation-only lys-core release of its own. Main carries unreleased lys-core commits including the unpublished lys/delegation/v1, which publishing would freeze before its ordering fold exists, there is no v0.2.0 tag to branch from, and a release carrying the self-signed fix is not documentation-only. DIRECTORY-013's draft forbids changing verify_certificate_chain(_at) and their documentation, and its fold calls verify_certificate_chain_at.",
+      "decision": "This card lands the key-based self-signed rule and the rustdoc caveat on main and cuts no crates.io release; a release is its own act after the ordering fold. DIRECTORY-013 lands first and is not amended; this card's build is blocked until DIRECTORY-013's roadmap row reads landed on origin/main. Rejected: a documentation-only release cut from main or from a 0.2.0 base in this card; landing this card first and amending DIRECTORY-013.",
+      "quote": "",
+      "consequences": [
+        "No lys-core version bump or publish in LYSCORE-001; the change waits under CHANGELOG's Unreleased section.",
+        "LYSCORE-001 carries DIRECTORY-013 in depends_on and a blocked_by command that reads its roadmap row on origin/main.",
+        "LYSCORE-001 adds a fold test to DIRECTORY-013's revocation_fold.rs and edits nothing else of that card."
       ],
       "supersedes": [],
       "superseded_by": ""

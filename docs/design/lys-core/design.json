@@ -1,0 +1,271 @@
+{
+  "cluster": "lys-core",
+  "title": "Lys Core — a certificate is self-signed by its keys, and the chain verifier says what it leaves to the caller",
+  "intention": "A stranger holding a lys certificate and an authority's public key should get the same answer from lys-core as from reading the certificate by hand: who really signed it, and whether it is one the authority issued. Whether a certificate is self-signed is a fact about keys and a signature, never about a name, so a subject that happens to carry the authority's hex-key common name is judged on the key that really signed it.\n\nThe verifier should also say plainly what it proves and what it does not. A caller reading the documentation of verify_certificate_chain should learn, without reading the code, which checks ran and which questions (revocation, trust in the issuer key, possession of the subject key, anything above one level, what extensions mean) are still theirs to answer.",
+  "problem": "verify_certificate_chain_at (crates/lys-core/src/ca/authority.rs) decides \"self-signed\" by comparing the raw subject and issuer distinguished-name bytes, before the algorithm and signature checks. The authority writes its issuer name as the lowercase hex of its public key, so a certificate the authority legitimately issues to a subject named with that same hex string has byte-identical names and is refused, even though its signature verifies under the authority's key. The rustdoc already records this as a known false positive of a heuristic. In the other direction, a certificate whose subject key is the issuer's own key and whose signature verifies under it (for example one issued by issue_certificate_for_request over a request made with the authority's own key) carries different names and verifies today, although it is self-signed by keys. The published lys CLI (lys ca verify, lys verify --cert), lys-anchor admission and the Norn runtime's MCP boundary all inherit both errors.\n\nSeparately, verify_certificate_chain's rustdoc is two lines that defer to the _at form and never says what is left to the caller. The revocation brief (DIRECTORY-013) records that gap as owned by its own card, and its fold calls verify_certificate_chain_at, so the order of the two cards matters.",
+  "solution": "One change in lys-core's ca/authority.rs, landed whole through the chain after DIRECTORY-013 has landed (ADR-045).\n\nThe distinguished-name comparison is removed. After the signature has verified strictly under the supplied issuer key, the verifier reads the certificate's subject public key and compares it with the supplied issuer key as decoded Ed25519 curve points; when they are the same point the certificate is self-signed and is refused with a CertificateVerification reason that says so (ADR-044). Placing the judgement after verify_strict makes it exactly the words' definition (same key and the signature verifies under that key), and comparing decoded points rather than raw bytes means a non-canonical encoding of the issuer's point is still the issuer's key. A subject key that is not a readable 32-byte Ed25519 key, or does not decode to a point, is not the issuer's key. The check order is otherwise unchanged: parse, Ed25519 algorithm, signature length, issuer-key decoding, strict signature, self-signed, validity window.\n\nThe rustdoc of the free verify_certificate_chain carries the caveat in full: what it checks, and what it leaves to the caller. verify_certificate_chain_at and CertificateAuthority::verify_certificate_chain describe the key-based rule, drop every mention of the name heuristic, and point to that caveat. The doc links only to items present in both feature shapes.\n\nConsumers see the change directly. lys ca verify and lys verify --cert exit 0 for the hex-common-name certificate and exit 1 for a certificate self-signed by keys; their failure message stays the one non-oracle line. lys-anchor's admission module doc keeps saying it rejects self-signed certificates, now defined by keys. DIRECTORY-013's fold issues a legitimately issued hex-common-name leaf and still records certificate_chain_invalid for a leaf self-signed by keys. CHANGELOG's Unreleased section records both changes. No crates.io release is cut (ADR-045). No wire format, domain tag or issuance field changes (CN1, CN4).",
+  "principles": [
+    {
+      "id": "P1",
+      "text": "A certificate's role is judged by keys and signatures, never by a name: no distinguished-name comparison decides whether a certificate is accepted or refused."
+    },
+    {
+      "id": "P2",
+      "text": "The self-signed judgement is only reached once the signature has verified under the supplied key, so it can never stand in for the signature check."
+    },
+    {
+      "id": "P3",
+      "text": "Documentation states what is proven and what is not; a caller must not have to read the code to learn what is still theirs to check."
+    },
+    {
+      "id": "P4",
+      "text": "The CLI's refusal stays non-oracle: one message for every failed check, the self-signed refusal included."
+    }
+  ],
+  "decisions": [
+    "ADR-003",
+    "ADR-008",
+    "ADR-044",
+    "ADR-045"
+  ],
+  "goals": [
+    "crates/lys-core/src/ca/authority.rs contains no call to .subject() or .issuer() on a parsed certificate.",
+    "A certificate the authority issues to the subject named by its own lowercase-hex public key verifies under the authority's key and is refused under any other key, in lys-core and through lys ca verify and lys verify --cert.",
+    "A certificate whose subject key is the supplied issuer key and whose signature verifies under it is refused with the reason 'self-signed certificate rejected (subject key is the issuer key)'.",
+    "The rustdoc of verify_certificate_chain names every check it makes and every question it leaves to the caller, and both cargo doc shapes build with no warning.",
+    "DIRECTORY-013's fold issues a legitimately issued hex-common-name leaf and records certificate_chain_invalid for a leaf self-signed by keys."
+  ],
+  "non_goals": [
+    {
+      "text": "Publishing a lys-core release to crates.io",
+      "reason": "Publishing lys-core freezes the unpublished lys/delegation/v1, which waits for the ordering fold; cutting a release is its own act afterwards (ADR-045)."
+    },
+    {
+      "text": "Amending DIRECTORY-013's brief",
+      "reason": "Its 'SHALL NOT change' lines bind that card's own build; it lands first and is not edited here (ADR-045)."
+    },
+    {
+      "text": "A revocation check in lys-core",
+      "reason": "Revocation stays consumer-side; the caveat names it as the caller's."
+    },
+    {
+      "text": "Walking a chain above one level, or checking the issuer's basic constraints or key usage",
+      "reason": "The function verifies one signature under one supplied key; the caveat names this as the caller's."
+    },
+    {
+      "text": "A distinct CLI message for the self-signed refusal",
+      "reason": "The CLI refusal is deliberately non-oracle (P4)."
+    }
+  ],
+  "structure": [
+    {
+      "path": "docs/design/lys-core/design.json",
+      "note": "this design",
+      "brief": "LYSCORE-001"
+    },
+    {
+      "path": "docs/design/lys-core/checklist.json",
+      "note": "the checklist rows LYSCORE-001 delivers",
+      "brief": "LYSCORE-001"
+    },
+    {
+      "path": "docs/design/lys-core/stories.json",
+      "note": "the stories LYSCORE-001 serves",
+      "brief": "LYSCORE-001"
+    },
+    {
+      "path": "docs/design/lys-core/briefs/LYSCORE-001.json",
+      "note": "the brief: self-signed by keys, the verifier's caveat, and their consumers",
+      "brief": "LYSCORE-001"
+    },
+    {
+      "path": "crates/lys-core/src/ca/authority.rs",
+      "note": "issuance and chain verification; the self-signed judgement and the verifier rustdoc",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/ca/authority_tests.rs",
+      "note": "unit tests of authority.rs",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/tests/certified_attestation_tests.rs",
+      "note": "CLI tests of lys verify --cert and the certificate it joins",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-anchor/src/admission/certificate.rs",
+      "note": "anchor admission by certificate; its module doc names what verify_certificate_chain rejects",
+      "brief": ""
+    },
+    {
+      "path": "CHANGELOG.md",
+      "note": "release record; the Unreleased section",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_fold.rs",
+      "note": "the fold's tests, created by DIRECTORY-013 in the directory cluster",
+      "brief": "DIRECTORY-013"
+    }
+  ],
+  "inventory": [
+    {
+      "path": "crates/lys-core/src/ca/authority.rs",
+      "note": "455 lines with docs. Lines 368-374 refuse a certificate whose raw subject and issuer DN bytes are equal, before the algorithm and signature checks; lines 316-357 document that as a heuristic with a known hex-common-name false positive; lines 303-314 are verify_certificate_chain's two-line rustdoc; lines 194-207 the method form; lines 219-235 write the issuer DN as the lowercase hex of the authority key."
+    },
+    {
+      "path": "crates/lys-core/src/ca/authority_tests.rs",
+      "note": "361 lines, 20 test functions; self_signed_certificate_is_rejected (line 163) checks an rcgen self-signed certificate under key [0u8; 32] and asserts only the error variant, so it passes through the signature branch; no test builds a hex-common-name certificate."
+    },
+    {
+      "path": "crates/lys-core/src/ca/certificate.rs",
+      "note": "certificate_subject_public_key (line 210) reads a certificate's 32-byte Ed25519 subject key: Ed25519 algorithm, no parameters, no unused bits, exactly 32 bytes."
+    },
+    {
+      "path": "crates/lys-core/src/ca/request_tests.rs",
+      "note": "a_request_is_not_accepted_as_a_certificate (line 489) passes a PKCS#10 request to verify_certificate_chain and expects CertificateParsing or CertificateVerification; a request does not parse as a certificate."
+    },
+    {
+      "path": "crates/lys/src/commands/ca.rs",
+      "note": "lys ca verify calls verify_certificate_chain_at (line 286) and maps every CertificateVerification to the one CertificateVerificationFailed message."
+    },
+    {
+      "path": "crates/lys/src/commands/verify.rs",
+      "note": "lys verify --cert calls verify_certificate_chain_at (line 139)."
+    },
+    {
+      "path": "crates/lys/src/commands/error_tests.rs",
+      "note": "line 47 asserts the CertificateVerificationFailed display does not contain 'self-signed'."
+    },
+    {
+      "path": "crates/lys/tests/certified_attestation_tests.rs",
+      "note": "380 lines; its Fixture generates a CA key, holders, presented-key certificates via lys ca request and lys ca issue --request, attestations, and runs lys verify --cert."
+    },
+    {
+      "path": "crates/lys-anchor/src/admission/certificate.rs",
+      "note": "module doc lines 55-56 say verify_certificate_chain 'rejects self-signed certificates'; line 222 calls it."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "note": "the [Unreleased] section (line 12) carries lys-log-store and unstable-anchor additions not yet released."
+    },
+    {
+      "path": "docs/design/lys-core/DESIGN.md",
+      "note": "the earlier markdown design of this cluster; line 67 says 'Self-signed certificates are rejected' with no definition."
+    },
+    {
+      "path": "docs/design/lys-core/CHECKLIST.md",
+      "note": "the earlier markdown checklist, C1 to C65; C23 'Self-signed certificates are rejected by verify_certificate_chain' is ticked on the DN behaviour."
+    },
+    {
+      "path": "docs/design/lys-core/USER-STORIES.md",
+      "note": "the earlier markdown stories, S1 to S23; S5 and S11 are the consumers of chain verification this change reaches."
+    }
+  ],
+  "constraints": [
+    {
+      "id": "CN1",
+      "text": "No published wire format or domain tag changes: lys/attestation/v2, lys/sealed-envelope/v1, lys/anchor-receipt/v1, lys/verification-bundle/v1 and lys/consistency-receipt/v1 stay byte-identical, and lys/delegation/v1 is untouched."
+    },
+    {
+      "id": "CN2",
+      "text": "Certificate signatures are verified only with ed25519-dalek verify_strict; x509-parser's verify_signature is never called."
+    },
+    {
+      "id": "CN3",
+      "text": "The signatures of verify_certificate_chain, verify_certificate_chain_at and CertificateAuthority::verify_certificate_chain do not change."
+    },
+    {
+      "id": "CN4",
+      "text": "Issuance does not change: the issuer DN stays the lowercase hex of the authority's public key and both issuance paths write the same fields."
+    },
+    {
+      "id": "CN5",
+      "text": "lys-core gains no revocation check."
+    },
+    {
+      "id": "CN6",
+      "text": "No unwrap, expect, panic, todo, unimplemented or unreachable in library code, and no #[allow], #[ignore], _-prefixed unused binding or #[cfg(any())] bypass."
+    },
+    {
+      "id": "CN7",
+      "text": "No lys-core version bump and no crates.io publish; lys/delegation/v1 is not frozen as a side effect."
+    },
+    {
+      "id": "CN8",
+      "text": "Rustdoc outside the unstable-anchor feature links no item gated by it, so cargo doc --no-deps builds with no warning in the default shape."
+    }
+  ],
+  "gate": [
+    {
+      "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
+      "legs": [
+        {
+          "name": "fmt",
+          "command": "cargo fmt --all",
+          "requires": [
+            "tool:cargo",
+            "tool:rustfmt"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy-all-features",
+          "command": "cargo clippy --all-targets --all-features -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy",
+          "command": "cargo clippy --all-targets -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "tests",
+          "command": "cargo test --workspace --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc-all-features",
+          "command": "cargo doc --no-deps --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc",
+          "command": "cargo doc --no-deps",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
+          "requires": [
+            "tool:sh",
+            "tool:python3"
+          ],
+          "cadence": "round"
+        }
+      ]
+    }
+  ]
+}

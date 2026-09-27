@@ -1,0 +1,25 @@
+{
+  "cluster": "lys-core",
+  "personas": [
+    {
+      "name": "Norn Agent Runtime",
+      "role": "Signing Session History (primary consumer)",
+      "stories": [
+        {
+          "id": "S5",
+          "text": "As the Norn runtime, I want to verify a counterparty's certificate chain at the MCP boundary — at the dispatch instant, via `verify_certificate_chain_at` — so that cross-agent tool calls are gated on legitimate, unexpired, capability-scoped identity."
+        }
+      ]
+    },
+    {
+      "name": "Lys CLI Operator and Auditor",
+      "role": "Checking certificates and certified statements",
+      "stories": [
+        {
+          "id": "S11",
+          "text": "As an auditor, I want `lys ca verify` with an explicit instant so that I can check whether a certificate was valid at the time a disputed action occurred, not just at the time of my audit."
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,34 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-030",
+      "title": "Judge a certificate self-signed by its keys, and say what verify_certificate_chain leaves to the caller",
+      "status": "idea",
+      "kind": "fix",
+      "summary": "lys-core's verify_certificate_chain_at decides self-signed by comparing distinguished-name bytes, so it refuses a certificate the authority legitimately issued to a subject named by the authority's hex public key, and accepts a certificate whose subject key is the issuer's own key when the names differ. LYSCORE-001 makes a certificate self-signed only when its subject key is the issuer key, compared as decoded Ed25519 points, and its signature verifies under that key (ADR-044); shows the change through lys ca verify, lys verify --cert and DIRECTORY-013's fold; writes the rustdoc caveat on verify_certificate_chain naming what it checks and what it leaves to the caller; corrects lys-anchor's admission doc; and records the change in CHANGELOG's Unreleased section. No wire format changes and no crates.io release is cut (ADR-045).",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T12:10:45+10:00",
+        "quote": "A certificate is judged self-signed by its keys and signature, never by a name that looks like the authority's key.\n\nIn lys-core's authority module, verify_certificate_chain_at treats a certificate whose subject equals the authority's hex public key common name as self-signed.\nA certificate issued by an authority to a subject that happens to carry that name is then taken as a root it is not.\nThe revocation brief 1e30a4cb recorded this as a finding in its third round.\n\nThe outcome is that a certificate counts as self-signed only when its issuer and subject keys are the same key and its signature verifies under that key.\nA name match alone never makes a certificate a root, and a test builds exactly that case and shows the chain is judged on its real issuer.\nNo published format changes, and every certificate that verifies today and is truly self-signed still verifies.\n\nThis card also ships the documentation caveat on verify_certificate_chain that the revocation brief's first round ruled is a documentation-only lys-core release of its own.\nThe caveat says in plain words what the function checks and what it leaves to the caller.\n\nThe review is adversarial, because this is cryptographic code.",
+        "context": "The lys-core self-signed card on the Lys board, through brief_card: surveyed against lys main 7b53625, and the lead for lys answered its four questions in round 1. The answers, carried as settled in LYSCORE-001, ADR-044 and ADR-045: the defect is the wrongful refusal of a legitimately issued hex-common-name certificate, which verifies after the fix; a certificate self-signed by keys is refused whatever its names, keeping C23; the card cuts no crates.io release, because publishing lys-core freezes lys/delegation/v1 before its ordering fold; and the revocation card DIRECTORY-013 lands first, unamended, with this card's build blocked until it has."
+      },
+      "links": {
+        "cluster": "lys-core",
+        "decisions": [
+          "ADR-003",
+          "ADR-008",
+          "ADR-044",
+          "ADR-045"
+        ],
+        "briefs": [
+          "LYSCORE-001"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Ids: RM-030, ADR-044 and ADR-045 follow the highest ids on main (RM-016, ADR-018 at 7b53625), on origin's brief/* branches (RM-026 and ADR-040 on brief/lys-anchor/6b1c7df6) and in the local brief clones' drafts (RM-029 and ADR-043), checked on 2026-09-27. LYSCORE-001 is the brief id this run was given; the local draft in brief clone a31929b9 (the estate-roots card, RM-019, not pushed) also writes a docs/design/lys-core/design.json and a LYSCORE-001, so whichever lands second renumbers its brief and merges the cluster files. Ordering: LYSCORE-001 depends on DIRECTORY-013 (RM-025 in its draft, not on main), so depends_on stays empty until that row is on main; the brief's blocked_by carries the command that reads DIRECTORY-013's roadmap row on origin/main as landed. Open for the lead: with design.json now in docs/design/lys-core, scripts/design/gate.sh renders the cluster and compares DESIGN.md, CHECKLIST.md and USER-STORIES.md, which hold the earlier hand-written design (C1 to C65, S1 to S23); re-rendering replaces them. Further units, not written: Publish a lys-core release carrying the verify_certificate_chain caveat and the self-signed fix; Amend DIRECTORY-013 (revocation brief 1e30a4cb) to stand on the changed verify_certificate_chain_at and its new documentation."
     }
   ]
 }
