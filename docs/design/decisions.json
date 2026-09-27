@@ -327,7 +327,7 @@
       "superseded_by": ""
     },
     {
-      "id": "ADR-089",
+      "id": "ADR-095",
       "title": "Ownership of a secret alone confers no revoke over the leases derived from it",
       "status": "proposed",
       "scope": "secrets",

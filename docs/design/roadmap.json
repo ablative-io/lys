@@ -337,7 +337,7 @@
       "title": "Say who may revoke a lease and filter the secrets list by scope (CONFORMANCE 7.6 and 7.8)",
       "status": "idea",
       "kind": "feature",
-      "summary": "SECRETS-004 amends SECRETS-002 for CONFORMANCE rows 7.6 and 7.8. The person acted for revokes a lease, stopping issuing at once with upstream pending until confirmed; the holder relinquishes, recorded as its own act with the same two facts; a revoke by the holder is refused and pointed at relinquish; every other caller, a secret's owner among them, gets the not-found refusal that names nothing; and a revoke or relinquish of an already ended lease is refused as already ended. The secrets list takes one scope from organisation, team and mine, applied at the server, with no scope meaning everything the caller may see, and refuses an agent by name. Whether a secret's owner may revoke every derived credential is proposed ADR-089, and nothing grants it. Every visibility and revoke check goes through one seam that answers from the record's fields until the step-2 SpiceDB evaluator lands.",
+      "summary": "SECRETS-004 amends SECRETS-002 for CONFORMANCE rows 7.6 and 7.8. The person acted for revokes a lease, stopping issuing at once with upstream pending until confirmed; the holder relinquishes, recorded as its own act with the same two facts; a revoke by the holder is refused and pointed at relinquish; every other caller, a secret's owner among them, gets the not-found refusal that names nothing; and a revoke or relinquish of an already ended lease is refused as already ended. The secrets list takes one scope from organisation, team and mine, applied at the server, with no scope meaning everything the caller may see, and refuses an agent by name. Whether a secret's owner may revoke every derived credential is proposed ADR-095, and nothing grants it. Every visibility and revoke check goes through one seam that answers from the record's fields until the step-2 SpiceDB evaluator lands.",
       "provenance": {
         "requested_by": "tom",
         "date": "2026-09-27T13:07:00+10:00",
@@ -352,7 +352,7 @@
           "ADR-003",
           "ADR-004",
           "ADR-009",
-          "ADR-089"
+          "ADR-095"
         ],
         "briefs": [
           "SECRETS-004"
@@ -362,7 +362,7 @@
       "depends_on": [
         "RM-002"
       ],
-      "notes": "Further units, not written: Build the scoped secrets list and the revoke, relinquish and lease answers in crates/lys-secrets; Make the visibility and revoke seam ask SpiceDB through the step-2 evaluator; Rule the proposed ADR on owner revocation; The secrets list screen and the lease screen with its Revoke control; Replace the group-claim team source with a directory team model; Rewrite DESIGN.md's Solution and Intention to the crates/lys-secrets host. Ids read at write time against main and every origin branch: SECRETS-004, C30 to C38 and S19 to S21 are claimed only by this card's own earlier draft and kept; ADR-089 is the next after ADR-088, the highest on any branch, since ADR-068, ADR-076 and ADR-085 to ADR-088 are also claimed by directory drafts; RM-047 is claimed only by this card's own earlier draft and kept."
+      "notes": "Further units, not written: Build the scoped secrets list and the revoke, relinquish and lease answers in crates/lys-secrets; Make the visibility and revoke seam ask SpiceDB through the step-2 evaluator; Rule the proposed ADR on owner revocation; The secrets list screen and the lease screen with its Revoke control; Replace the group-claim team source with a directory team model; Rewrite DESIGN.md's Solution and Intention to the crates/lys-secrets host. Ids read at write time against main and every origin branch: SECRETS-004, C30 to C38 and S19 to S21 are claimed only by this card's own earlier draft and kept; ADR-095 is the next after ADR-094, the highest on any branch, read from decisions.json on origin/main (a426b9a, ending at ADR-018) and on every one of the 262 heads `git ls-remote --heads origin` listed after a fetch: ADR-089 is claimed by origin/draft/directory/fb954264, ADR-090 is named by the directory drafts, ADR-091 by origin/brief/directory/8122eb55 and origin/draft/secrets/2d8c28b9, ADR-092 by origin/draft/directory/647a3946, origin/draft/directory/73184e72 and origin/draft/secrets/0e6892c4, and ADR-093 and ADR-094 by origin/brief/directory/8a60bd7a, so the directory-claimed ids now include ADR-089, ADR-090 and ADR-091 beside ADR-068, ADR-076 and ADR-085 to ADR-088; RM-047 is claimed only by this card's own earlier draft and kept."
     }
   ]
 }
