@@ -79,11 +79,22 @@ fn agents_by_person(projection: &Projection) -> HashMap<PersonId, Vec<AgentSumma
     grouped
 }
 
-fn person_view(
-    grouped: &mut HashMap<PersonId, Vec<AgentSummary>>,
-    id: PersonId,
-    record: &Record,
-) -> PersonView {
+/// The agents answering to one person, read from the records alone.
+fn agents_of(projection: &Projection, person: PersonId) -> Vec<AgentSummary> {
+    projection
+        .records()
+        .filter_map(|(id, record)| match (id, record.responsible()) {
+            (IdentityId::Agent(agent), Some(owner)) if owner == person => Some(AgentSummary {
+                id: agent.to_string(),
+                display_name: record.profile().display_name().to_owned(),
+                state: record.state().to_string(),
+            }),
+            _ => None,
+        })
+        .collect()
+}
+
+fn person_view(id: PersonId, record: &Record, agents: Vec<AgentSummary>) -> PersonView {
     let PersonSummary {
         id: text,
         display_name,
@@ -93,7 +104,7 @@ fn person_view(
         id: text,
         display_name,
         state,
-        agents: grouped.remove(&id).unwrap_or_default(),
+        agents,
     }
 }
 
@@ -139,10 +150,10 @@ async fn own_people(
         let projection = directory.projection()?;
         let person = own_person(projection, &actor)?;
         let record = person_record(projection, person)?;
-        let mut grouped = agents_by_person(projection);
+        let agents = agents_of(projection, person);
         Ok(Json(PeopleView {
             scope: "personal".to_owned(),
-            people: vec![person_view(&mut grouped, person, record)],
+            people: vec![person_view(person, record, agents)],
         }))
     })
 }
@@ -159,7 +170,10 @@ async fn every_person(
         let people = projection
             .records()
             .filter_map(|(id, record)| match id {
-                IdentityId::Person(person) => Some(person_view(&mut grouped, *person, record)),
+                IdentityId::Person(person) => {
+                    let agents = grouped.remove(person).unwrap_or_default();
+                    Some(person_view(*person, record, agents))
+                }
                 IdentityId::Agent(_) => None,
             })
             .collect();
@@ -178,8 +192,9 @@ async fn own_agent(
     let actor = signed_in(&state, &headers)?;
     let agent = AgentId::from_str(&id)?;
     with_directory(&state, |directory| {
-        let person = own_person(directory.projection()?, &actor)?;
-        agent_view(directory, agent, Scope::Person(person))
+        agent_json(directory, agent, |projection| {
+            Ok(Scope::Person(own_person(projection, &actor)?))
+        })
     })
 }
 
@@ -192,17 +207,35 @@ async fn any_agent(
     state.admission.administrator(&actor)?;
     let agent = AgentId::from_str(&id)?;
     with_directory(&state, |directory| {
-        agent_view(directory, agent, Scope::Directory)
+        agent_json(directory, agent, |_| Ok(Scope::Directory))
     })
+}
+
+/// One agent as JSON: the projection is settled once, the scope read from it,
+/// and the registration receipt looked up after the view is built.
+fn agent_json(
+    directory: &mut lys_identity::Directory<lys_log_store::FileLeafStore>,
+    agent: AgentId,
+    scope_of: impl FnOnce(&Projection) -> Result<Scope, ServerError>,
+) -> Result<Json<AgentView>, ServerError> {
+    let projection = directory.projection()?;
+    let scope = scope_of(projection)?;
+    let mut view = agent_view(projection, agent, scope)?;
+    view.provenance.registration = view
+        .provenance
+        .events
+        .first()
+        .and_then(|index| directory.receipt_at(*index))
+        .map(receipt_json);
+    Ok(Json(view))
 }
 
 /// One agent with its person, state and provenance, if `scope` may see it.
 fn agent_view(
-    directory: &mut lys_identity::Directory<lys_log_store::FileLeafStore>,
+    projection: &Projection,
     agent: AgentId,
     scope: Scope,
-) -> Result<Json<AgentView>, ServerError> {
-    let projection = directory.projection()?;
+) -> Result<AgentView, ServerError> {
     let record = projection
         .record(IdentityId::Agent(agent))
         .ok_or(ServerError::AgentNotVisible)?;
@@ -211,7 +244,7 @@ fn agent_view(
         return Err(ServerError::AgentNotVisible);
     }
     let person_record = person_record(projection, person)?;
-    let mut view = AgentView {
+    Ok(AgentView {
         id: agent.to_string(),
         display_name: record.profile().display_name().to_owned(),
         person: person_summary(person, person_record),
@@ -224,12 +257,5 @@ fn agent_view(
             events: record.events().to_vec(),
             registration: None,
         },
-    };
-    view.provenance.registration = view
-        .provenance
-        .events
-        .first()
-        .and_then(|index| directory.receipt_at(*index))
-        .map(receipt_json);
-    Ok(Json(view))
+    })
 }

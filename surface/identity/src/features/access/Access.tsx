@@ -8,14 +8,34 @@ import { grantNo, lastUsedText, lastsText, nameOf, onText, passText, readGrantWo
 import type { GrantWorld } from '../grants/model';
 import { Pill } from '../people/Pill';
 
-interface AccessData {
-  w: GrantWorld;
-  reach: Map<string, Map<string, string[]>>;
+type ReachMap = Map<string, Map<string, string[]>>;
+
+/** /grants/who is asked only for the segment on screen, once per world: every resource for "reach", one for "who". */
+const reachOfAll = new WeakMap<GrantWorld, Promise<ReachMap>>();
+const reachOfOne = new WeakMap<GrantWorld, Map<string, Promise<ReachMap>>>();
+
+function allReach(w: GrantWorld): Promise<ReachMap> {
+  let p = reachOfAll.get(w);
+  if (!p) {
+    p = reachMap([...resourcesSeen(w).values()]);
+    reachOfAll.set(w, p);
+  }
+  return p;
 }
 
-async function readAccess(): Promise<AccessData> {
-  const w = await readGrantWorld();
-  return { w, reach: await reachMap([...resourcesSeen(w).values()]) };
+function oneReach(w: GrantWorld, res: string): Promise<ReachMap> {
+  let byRes = reachOfOne.get(w);
+  if (!byRes) {
+    byRes = new Map();
+    reachOfOne.set(w, byRes);
+  }
+  let p = byRes.get(res);
+  if (!p) {
+    const seen = resourcesSeen(w).get(res);
+    p = reachMap(seen ? [seen] : []);
+    byRes.set(res, p);
+  }
+  return p;
 }
 
 const person = (w: GrantWorld, id: string) => {
@@ -23,24 +43,41 @@ const person = (w: GrantWorld, id: string) => {
   return { id, display_name: x?.name ?? nameOf(w, id), state: x?.state ?? 'active' } as const;
 };
 
-function Reach({ d, id }: { d: AccessData; id: string }) {
-  const rows = [...d.reach].map(([res, byHolder]) => [res, byHolder.get(id) ?? []] as const).filter(([, acts]) => acts.length);
-  return rows.length ? (
-    <table><tbody>
-      {rows.map(([res, acts]) => (
-        <tr key={res}><td>{res}</td><td><span className="svc built-in">built in</span></td><td className="mono">{acts.join(', ')}</td><td /></tr>
-      ))}
-    </tbody></table>
-  ) : <div className="dim">Nothing.</div>;
+function Reach({ w, id }: { w: GrantWorld; id: string }) {
+  const load = useLoad(() => allReach(w), 'reach');
+  return (
+    <Gate load={load} title="Access" ok={(reach) => {
+      const rows = [...reach].map(([res, byHolder]) => [res, byHolder.get(id) ?? []] as const).filter(([, acts]) => acts.length);
+      return rows.length ? (
+        <table><tbody>
+          {rows.map(([res, acts]) => (
+            <tr key={res}><td>{res}</td><td><span className="svc built-in">built in</span></td><td className="mono">{acts.join(', ')}</td><td /></tr>
+          ))}
+        </tbody></table>
+      ) : <div className="dim">Nothing.</div>;
+    }} />
+  );
 }
 
-function Body({ d, mode, arg }: { d: AccessData; mode: string; arg?: string }) {
+function WhoCan({ w, res }: { w: GrantWorld; res: string }) {
+  const load = useLoad(() => oneReach(w, res), 'who:' + res);
+  return (
+    <Gate load={load} title="Access" ok={(reach) => {
+      const holders = [...(reach.get(res) ?? new Map<string, string[]>())];
+      return holders.length ? holders.map(([h, acts]) => (
+        <div className="row" key={h}><span><Pill x={person(w, h)} /></span><span className="mono">{acts.join(', ')}</span></div>
+      )) : <div className="dim">Nobody.</div>;
+    }} />
+  );
+}
+
+function Body({ w, mode, arg }: { w: GrantWorld; mode: string; arg?: string }) {
   const navigate = useNavigate();
-  const { w } = d;
   const segs: [string, string][] = [['can', 'Can someone…'], ['reach', 'What can someone reach'], ['who', 'Who can reach something']];
   const ids = [...w.who.keys()];
-  const resources = [...d.reach.keys()];
-  const labels = new Map([...resourcesSeen(w)].map(([k, v]) => [k, resourceLabel(v.resource)]));
+  const seen = resourcesSeen(w);
+  const resources = [...seen.keys()];
+  const labels = new Map([...seen].map(([k, v]) => [k, resourceLabel(v.resource)]));
   let q = <CheckBox w={w} />;
   if (mode === 'reach') {
     const id = arg && w.who.has(arg) ? arg : w.me.person.id;
@@ -53,13 +90,12 @@ function Body({ d, mode, arg }: { d: AccessData; mode: string; arg?: string }) {
           </select>
           <span className="sec">reach?</span>
         </div>
-        <div className="card" style={{ marginTop: 12 }}><Reach d={d} id={id} /></div>
+        <div className="card" style={{ marginTop: 12 }}><Reach w={w} id={id} /></div>
       </>
     );
   }
   if (mode === 'who') {
-    const res = arg && d.reach.has(arg) ? arg : resources[0] ?? '';
-    const holders = [...(d.reach.get(res) ?? new Map<string, string[]>())];
+    const res = arg && seen.has(arg) ? arg : resources[0] ?? '';
     q = (
       <>
         <div className="q" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -69,11 +105,7 @@ function Body({ d, mode, arg }: { d: AccessData; mode: string; arg?: string }) {
           </select>
           <span className="sec">?</span>
         </div>
-        <div className="card" style={{ marginTop: 12 }} id="whoCan">
-          {holders.length ? holders.map(([h, acts]) => (
-            <div className="row" key={h}><span><Pill x={person(w, h)} /></span><span className="mono">{acts.join(', ')}</span></div>
-          )) : <div className="dim">Nobody.</div>}
-        </div>
+        <div className="card" style={{ marginTop: 12 }} id="whoCan"><WhoCan w={w} res={res} /></div>
       </>
     );
   }
@@ -118,6 +150,6 @@ function Body({ d, mode, arg }: { d: AccessData; mode: string; arg?: string }) {
 
 export function Access() {
   const { mode = 'can', arg } = useParams();
-  const load = useLoad(readAccess, 'access');
-  return <Gate load={load} title="Access" ok={(d) => <Body d={d} mode={mode} arg={arg} />} />;
+  const load = useLoad(readGrantWorld, 'access');
+  return <Gate load={load} title="Access" ok={(w) => <Body w={w} mode={mode} arg={arg} />} />;
 }
