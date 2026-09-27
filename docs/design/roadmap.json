@@ -539,6 +539,33 @@
         "RM-005"
       ],
       "notes": "Ids are the next free after main 7b53625's highest (HOME-007, RM-016, ADR-018) and every open brief/* and draft/* branch's, read by fetching every ref git ls-remote listed on origin: at first writing 111 refs held HOME-014, RM-034 and ADR-053 as the highest, and the re-check before the second round's amendment found 115 refs, with RM-035 and ADR-054 taken meanwhile by draft/directory/49cc20db, draft/lys-core/12da4769 and draft/secrets/107557cf, and RM-036 and ADR-057 by draft/directory/07794b8c, so the brief is HOME-015, this row RM-037 and the decision ADR-058. The earlier draft of this card on draft/home/4c46aabc carries HOME-012, RM-031 and ADR-046; RM-031 and ADR-046 are also held by brief/home/c265f6c9, so this draft does not reuse them. RM-005 (HOME-001) is the row whose R12 this builds. Further units, not written: A handover slot in the Claude Code launch template, and the seeded-against-plain card counts; Measure whether an inherited signed thinking block is sent to the model on resume, through R10's proxy; Elicit the letter at compaction or retirement automatically."
+    },
+    {
+      "id": "RM-040",
+      "title": "Give lys the ast-grep rule set and a gate leg that fails on a hit",
+      "status": "idea",
+      "kind": "fix",
+      "summary": "lys's rules against unwrap, expect and panic outside tests, lint bypasses, dropped Results and logic in mod.rs are caught only where clippy overlaps them, because the lys gate has no ast-grep leg. This item adds sgconfig.yml, four rules (three of Cambium's and lys's own unwrap/expect/panic rule, which recognises test code by structure the file carries), and the leg `ast-grep scan --config sgconfig.yml` in docs/design/project.json, .land/gates.sh and CI. It clears every existing hit at its cause in the same card, so the leg is green when it lands, and it keeps the hand-written lys-core documents as *-PRE-METHOD.md before rendering the cluster.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T11:03:00+10:00",
+        "quote": "The lys gate (docs/design/project.json, run by scripts/design/gate.sh) has no ast-grep leg, so the rules the estate holds (no unwrap, expect or panic outside tests, no #[allow], no _name renames, no #[ignore]) are only caught where clippy happens to overlap them. Cambium carries an sgconfig.yml and an ast-grep leg; lys has neither. Add sgconfig.yml and a rules directory to lys with the same rule set Cambium carries, and a gate leg `ast-grep scan --config sgconfig.yml` in docs/design/project.json requiring tool:ast-grep, so the leg fails the gate on a hit. Defect 5 of Waffles' 2026-09-25 22:35 audit.\n\nRulings of the lead, Archie, given on 27 September 2026 to the runs 04213a71 and 0d44242f in answer to their round 1. Both runs took the answers and then failed while writing, the second when its author session collided with state left by the first. They are settled here, and the author reopens none of them.\n\nNeither rewrite nor exemption list. The rule recognises test code by a marker in the file itself, and the two fixture files get that marker. Each fixture.rs gains the inner attribute #![cfg(test)] as its first line, which is the truth of the file already, since its only declaration is a #[cfg(test)] mod. The rule treats a file whose first item is the inner attribute #![cfg(test)], a #[cfg(test)] mod body, a #[test] fn body, or a path under tests/ as test code, and reports unwrap, expect and panic everywhere else. That is structure the file carries, not a list of names. The 22 calls then are not hits, and no call in either file is rewritten. The brief corrects the words' sentence. At this commit no such call exists in library code, so the rule's acceptance is zero hits over the tree with the two fixture files recognised by their own attribute, and one scratch file without the marker, never landed, that the rule reports, to prove the rule fires.\n\nThe no-std-mutex-in-async rule is recorded as not carried, beside the door-timer rules, for the same reason. The sentence was wrong on the tree. The lys tree has no async fn, no tokio and no std Mutex at this commit, so the rule could not fire and would only look like cover. The brief records it as not carried with that finding, and names the act that brings it back. The card that lands the first async code in lys carries no-std-mutex-in-async with it, and its brief names this ruling.\n\nThe hand-written lys-core documents are renamed to *-PRE-METHOD.md before this card renders the cluster, so the earlier design is kept and not replaced. This card is the one owner of docs/design/lys-core, and the lys-gate and roots cards keep out of it. Answered by Archie, lead for lys.",
+        "context": "Defect 5 of the audit of 25 September 2026. The lys-core brief card; its runs 04213a71, 0d44242f and 6747ce61 took the lead's rulings and then failed while writing, and the brief was written by hand from the words and every ruling, on origin/hand/lys-stack at 4dd1c33."
+      },
+      "links": {
+        "cluster": "lys-core",
+        "decisions": [
+          "ADR-063",
+          "ADR-064",
+          "ADR-065"
+        ],
+        "briefs": [
+          "LYSCORE-003"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Further units, not written: 'Carry no-std-mutex-in-async into lys with its first async code'; 'A _name-rename rule for lys and the existing _-prefixed bindings'; 'Tighten lys-core's unsafe_code attribute so test builds forbid it too'. RM-040 and ADR-063 to ADR-065 are the next ids after the highest on main and every open brief, draft and hand branch (RM-039, ADR-062), checked on 27 September 2026, and LYSCORE-003 is the next brief id after LYSCORE-001 (brief/lys-core/5f185fd4) and LYSCORE-002 (brief/lys-core/e604b7c3). Earlier drafts of this card used RM-017, RM-029 and ADR-043 to ADR-045, which open branches have since taken. Its checklist, story, principle and constraint ids (C85 to C94, S30 to S33, P10 to P13, CN19 to CN27) follow those two briefs' ids, so they rebase onto this cluster without renumbering. LYSCORE-003 is built on HOME-013's record/mod.rs split and needs a gate venue declaring tool:ast-grep."
     }
   ]
 }
