@@ -9,6 +9,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
+use super::admission::Route;
 use super::error::GrantError;
 use super::events::{GrantChange, GrantEvent};
 use super::lineage::{self, Lineage, check_hop};
@@ -27,12 +28,31 @@ pub struct Revocation {
     pub reason: String,
 }
 
+/// When a grant was last seen exercised, as the use events in the grant log
+/// record it. A grant with no use event is not seen: that says only that no
+/// exercise was observed, never that it was never used.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LastUse {
+    /// No exercise of the grant has been observed.
+    NotSeen,
+    /// The latest observed exercise.
+    Seen {
+        /// When it was exercised, in seconds since the Unix epoch.
+        at: u64,
+        /// How the exercise arrived.
+        route: Route,
+        /// The index of the use event.
+        index: u64,
+    },
+}
+
 /// One grant, as the book holds it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GrantRecord {
     grant: Grant,
     index: u64,
     revoked: Option<Revocation>,
+    last_use: LastUse,
 }
 
 impl GrantRecord {
@@ -44,6 +64,11 @@ impl GrantRecord {
     /// The index of the event that issued it.
     pub fn index(&self) -> u64 {
         self.index
+    }
+
+    /// When it was last seen exercised.
+    pub fn last_use(&self) -> LastUse {
+        self.last_use
     }
 
     /// Its own revocation, if it was revoked directly.
@@ -157,6 +182,21 @@ impl GrantBook {
                     None => Ok(()),
                 }
             }
+            GrantChange::Use { grant, .. } => {
+                let record = self
+                    .records
+                    .get(grant)
+                    .ok_or_else(|| GrantError::GrantUnknown {
+                        grant: grant.to_string(),
+                    })?;
+                if record.grant.holder() == event.caller() {
+                    Ok(())
+                } else {
+                    Err(GrantError::EventMismatch {
+                        reason: "a use is observed for the grant's own holder",
+                    })
+                }
+            }
         }
     }
 
@@ -175,6 +215,7 @@ impl GrantBook {
                         grant: grant.as_ref().clone(),
                         index,
                         revoked: None,
+                        last_use: LastUse::NotSeen,
                     },
                 );
             }
@@ -185,6 +226,15 @@ impl GrantBook {
                         index,
                         reason: reason.clone(),
                     });
+                }
+            }
+            GrantChange::Use { grant, route } => {
+                if let Some(record) = self.records.get_mut(grant) {
+                    record.last_use = LastUse::Seen {
+                        at: event.recorded_at(),
+                        route: *route,
+                        index,
+                    };
                 }
             }
         }

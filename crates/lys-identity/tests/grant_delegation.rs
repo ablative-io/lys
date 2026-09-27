@@ -359,7 +359,18 @@ fn grant_agent_parity_routes_decide_alike_and_pass_on_decides_who_delegates() ->
         None,
     )?;
     let passing = world.delegate(&passing)?.event.grant();
-    let decisions = ROUTES.map(|route| world.exercise(tom_agent, "read", route));
+    let decisions = ROUTES.map(|route| {
+        world.exercise(tom_agent, "read", route).map(|permit| {
+            assert!(permit.use_event.is_ok(), "{route:?}: the use is recorded");
+            (
+                permit.grant,
+                permit.path,
+                permit.root_person,
+                permit.actions,
+                permit.model_version,
+            )
+        })
+    });
     assert!(
         decisions.iter().all(|decision| decision == &decisions[0]),
         "{decisions:?}"

@@ -198,8 +198,8 @@ fn everyone(world: &FaultWorld) -> [IdentityId; 5] {
 
 /// Refuse unless the live grants equal a replay of their log into a fresh engine.
 fn equals_replay(world: &mut FaultWorld, live: &FaultEngine) -> TestResult {
-    let before = state(world)?;
     let decisions = everyone(world).map(|identity| world.exercise(identity, "read", Route::Api));
+    let before = state(world)?;
     world.reopen(FaultEngine::fresh())?;
     assert_eq!(
         state(world)?,
@@ -470,11 +470,11 @@ fn grant_durability_the_fault_free_path_equals_replay() -> TestResult {
     let root = world.root(world.dana, "kite", pass(&["read"], &BOTH)?, None)?;
     let request = world.request(dana, root, tom, "tern", PassOn::UseOnly, None)?;
     let recorded = world.delegate(&request)?;
+    let permit = world.exercise(tom, "read", Route::Browser)?;
     let before = (
         world.grants.book().clone(),
         world.grants.relationships().read()?,
     );
-    let permit = world.exercise(tom, "read", Route::Browser)?;
     world.reopen(MemoryRelationships::default())?;
     assert_eq!(
         (
@@ -483,7 +483,8 @@ fn grant_durability_the_fault_free_path_equals_replay() -> TestResult {
         ),
         before
     );
-    assert_eq!(world.exercise(tom, "read", Route::Browser)?, permit);
+    let again = world.exercise(tom, "read", Route::Browser)?;
+    assert_eq!((again.grant, again.path), (permit.grant, permit.path));
     assert_eq!(world.delegate(&request)?, recorded);
     Ok(())
 }

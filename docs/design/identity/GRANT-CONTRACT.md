@@ -50,7 +50,7 @@ A model is versioned, and resolves each relation to the actions it carries. A re
 
 ## Grant events
 
-A grant change is recorded only as one signed grant event, committed as one leaf of the grant log (lys-log-store) before it is answered. The event body is a canonical CBOR map: `1` version (`1`), `2` operation id (16 bytes), `3` caller (identity map), `4` recorded-at (seconds), `5` change kind (`1` issue, `2` revoke) and `6` the change: the grant's own map, or a map of `1` grant id and `2` reason (1 to 1024 bytes). The signed message is a `COSE_Sign1` (tag 18) whose protected header is `1: -8` (EdDSA), `3:` the grant envelope, `4:` the service's 32-byte Ed25519 key. A message naming another envelope is refused `EnvelopeMismatch`.
+A grant change is recorded only as one signed grant event, committed as one leaf of the grant log (lys-log-store) before it is answered. The event body is a canonical CBOR map: `1` version (`1`), `2` operation id (16 bytes), `3` caller (identity map), `4` recorded-at (seconds), `5` change kind (`1` issue, `2` revoke, `3` use) and `6` the change: the grant's own map; for a revocation a map of `1` grant id and `2` reason (1 to 1024 bytes); for a use a map of `1` grant id and `2` route (`1` browser, `2` api, `3` tool). The signed message is a `COSE_Sign1` (tag 18) whose protected header is `1: -8` (EdDSA), `3:` the grant envelope, `4:` the service's 32-byte Ed25519 key. A message naming another envelope is refused `EnvelopeMismatch`.
 
 The grant book and the permission relationships are both derived from these events and from nothing else. The same operation id with the same request answers the first receipt again; with a different request it is refused `OperationReused`. An append whose outcome is unknown is held and named `OperationUnresolved` until the log is read back; a committed event not yet in the relationships is named `ProjectionPending`. Neither is answered as success, and neither mints a fresh operation.
 
@@ -59,3 +59,7 @@ A receipt carries the event version, operation id, caller, grant, change kind, S
 ## Relationships
 
 Each issued grant is written as three `SpiceDB` relationships: `grant:<id>#holder@<person|agent>:<id>` with the `unexpired` caveat carrying its end; the source relation `grant:<id>#source@grant:<source>`, or `@person:<responsible>` for a root; and `<resource kind>:<resource id>#<relation>@grant:<id>#holder`. Revoking a grant deletes every relationship of that grant and of every grant derived from it. The store's revision is the number of grant events it reflects, and a decision requires the relationships to stand at or after every change on the authority it rests on. A committed event the book refuses, such as one ending later than its source, is kept as a named refusal and no relationship is written for it.
+
+## Observed use
+
+When a check permits an exercise, the grants append a use event naming the grant, its holder as the caller, the route and the time. A use changes no relationship. The book keeps each grant's latest use, rebuilt from the log on reopen. A grant with no use event reads as not seen: that no exercise was observed, never that it was never used. A refused check writes no use. A permitted check whose use could not be appended is still answered, and names why in its `use_event`.

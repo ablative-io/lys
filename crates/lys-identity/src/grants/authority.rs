@@ -75,6 +75,9 @@ pub struct Permit {
     pub model_version: u64,
     /// The revision of the permission relationships the decision was made at.
     pub revision: u64,
+    /// The index of the use event recording this exercise in the grant log,
+    /// or why it could not be recorded.
+    pub use_event: Result<u64, GrantError>,
 }
 
 /// A recorded grant change and where it stands.
@@ -342,10 +345,11 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             .uncertain()
             .and_then(|held| match held.event.change() {
                 GrantChange::Revoke { grant, .. } => Some((held.operation, *grant)),
-                GrantChange::Issue(_) => None,
+                GrantChange::Issue(_) | GrantChange::Use { .. } => None,
             });
         let held = self.relationships.read()?;
         let mut refusal = None;
+        let mut permitted = None;
         let candidates = self.book.held_by(request.caller).filter(|record| {
             record.grant().resource() == &request.resource
                 && record.grant().actions().contains(&request.action)
@@ -367,19 +371,25 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             });
             match decided {
                 Ok(lineage) => {
-                    return Ok(Permit {
+                    permitted = Some(Permit {
                         grant: grant.id(),
                         path: lineage.path,
                         root_person: lineage.root_person,
                         actions: grant.actions().clone(),
                         model_version: grant.parts().model_version,
                         revision: projected,
+                        use_event: Ok(0),
                     });
+                    break;
                 }
                 Err(error) => {
                     refusal.get_or_insert(error);
                 }
             }
+        }
+        if let Some(mut permit) = permitted {
+            permit.use_event = self.record_use(request.caller, permit.grant, request.route, at);
+            return Ok(permit);
         }
         Err(refusal.unwrap_or_else(|| GrantError::NotHeld {
             identity: request.caller.to_string(),

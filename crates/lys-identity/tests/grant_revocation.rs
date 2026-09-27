@@ -122,7 +122,11 @@ fn grant_revoke_withdraws_every_derived_grant_and_leaves_the_independent_one() -
         0,
         "and after a replay"
     );
-    assert_eq!(world.events(), 6);
+    assert_eq!(
+        world.events(),
+        9,
+        "six grant changes and three observed uses"
+    );
     Ok(())
 }
 
@@ -211,7 +215,7 @@ fn grant_freshness_a_stale_engine_never_permits_after_a_committed_revoke() -> Te
             .check(directory, &exercise, now, Some(required)),
         Err(GrantError::StaleDecision {
             required,
-            projected: index
+            projected: engine.revision()?
         }),
         "a caller presenting the required revision gets no permit from the old state"
     );
@@ -248,3 +252,4 @@ fn grant_freshness_a_stale_engine_never_permits_after_a_committed_revoke() -> Te
     assert_eq!(world.events(), required);
     Ok(())
 }
+

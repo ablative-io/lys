@@ -14,6 +14,7 @@ use std::collections::BTreeSet;
 use lys_core::merkle::{AppendOnlyTree, InclusionProof, RawLeaf, raw_leaf_hash};
 use lys_log_store::{LeafStore, Log, StoreError};
 
+use super::admission::Route;
 use super::authority::{Grants, Recorded};
 use super::error::GrantError;
 use super::events::{
@@ -22,6 +23,7 @@ use super::events::{
 use super::permission::{Relationship, RelationshipStore, naming, relationships_of};
 use super::receipt::GrantReceipt;
 use super::types::GrantId;
+use crate::id::IdentityId;
 use crate::log::{Coordinate, Reopen};
 use crate::operation::OperationId;
 
@@ -293,6 +295,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                 tree.insert(*grant);
                 Ok((Vec::new(), naming(&self.relationships.read()?, &tree)))
             }
+            GrantChange::Use { .. } => Ok((Vec::new(), Vec::new())),
         }
     }
 
@@ -354,6 +357,44 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                 grant: signed.event().grant().to_string(),
                 index,
             })
+        }
+    }
+
+    /// Record in the grant log that `holder` exercised `grant` through
+    /// `route` at `at`, answering the use event's index. The event needs no
+    /// projection: it changes no relationship.
+    pub(super) fn record_use(
+        &mut self,
+        holder: IdentityId,
+        grant: GrantId,
+        route: Route,
+        at: u64,
+    ) -> Result<u64, GrantError> {
+        let event = GrantEvent::new(
+            OperationId::generate()?,
+            holder,
+            at,
+            GrantChange::Use { grant, route },
+        )?;
+        self.book.check(&event)?;
+        let operation = event.operation();
+        let signed = sign_grant_event(event, &self.key)?;
+        match self.ledger.append(&signed) {
+            Ok(coordinate) => {
+                let index = coordinate.index;
+                self.record_committed(signed, coordinate)?;
+                Ok(index)
+            }
+            Err(failure) => {
+                if self.ledger.uncertain().is_some() {
+                    self.settle_for_change()?;
+                }
+                self.book
+                    .operation(operation)
+                    .ok_or_else(|| GrantError::AppendRefused {
+                        reason: failure.to_string(),
+                    })
+            }
         }
     }
 
