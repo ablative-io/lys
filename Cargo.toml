@@ -5,7 +5,9 @@ members = [
     "crates/lys-anchor-cli",
     "crates/lys-core",
     "crates/lys-home",
+    "crates/lys-identity",
     "crates/lys-log-store",
+    "tests/identity_contract",
 ]
 resolver = "3"
 
@@ -21,6 +23,7 @@ rust-version = "1.85"
 # Internal
 lys-core = { version = "0.2.0", path = "crates/lys-core" }
 lys-home = { version = "0.2.0", path = "crates/lys-home" }
+lys-identity = { version = "0.2.0", path = "crates/lys-identity" }
 lys-log-store = { version = "0.2.0", path = "crates/lys-log-store" }
 
 # Cryptographic primitives — pinned at the versions hardened in meridian-trust.

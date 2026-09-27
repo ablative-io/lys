@@ -730,6 +730,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "identity-contract"
+version = "0.2.0"
+dependencies = [
+ "lys-core",
+ "lys-identity",
+ "tempfile",
+]
+
+[[package]]
 name = "indexmap"
 version = "2.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -893,6 +902,18 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.19",
  "time",
+]
+
+[[package]]
+name = "lys-identity"
+version = "0.2.0"
+dependencies = [
+ "ciborium",
+ "lys-core",
+ "rand",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.19",
 ]
 
 [[package]]
