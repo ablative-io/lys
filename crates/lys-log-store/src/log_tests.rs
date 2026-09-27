@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the tree-over-storage layer.
 //!
 //! # A second implementation, so the trait is a seam and not a shape

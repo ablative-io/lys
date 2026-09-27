@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Byte-level tests for the shared canonical CBOR primitives.
 //!
 //! Every expectation here is a literal from RFC 8949 §4.2 (core deterministic
@@ -5,7 +6,6 @@
 //! computed, so a change to the writers fails against the specification and
 //! not against itself.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::*;
 

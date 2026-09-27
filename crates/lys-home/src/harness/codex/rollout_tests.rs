@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on the rollout (HOME-009 R4): Codex's own layout and file name,
 //! `session_meta` of five keys, the marker opening the thread, the thread id
 //! derived from the head, ordinals and stamps as the entries record them,

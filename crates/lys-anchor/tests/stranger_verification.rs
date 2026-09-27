@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! The stranger gate: an anchor's inclusion artifact, judged by a script that
 //! has never heard of this workspace.
 //!

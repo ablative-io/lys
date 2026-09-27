@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the Claude Code importer: the tree is kept, parts become blocks,
 //! tool results become their own messages, thinking keeps its signature, an
 //! authored turn is marked, an unknown parent is refused by uuid, and the

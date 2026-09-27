@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! End-to-end gates over the `lys-anchor` binary as an operator runs it.
 //!
 //! # Where the second party comes from
@@ -15,7 +16,6 @@
 //! code — and explicitly not *platform*: one machine, one toolchain, one
 //! dependency resolution.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::path::PathBuf;
 use std::process::{Command, Output};

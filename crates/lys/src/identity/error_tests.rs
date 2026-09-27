@@ -1,3 +1,4 @@
+#![cfg(test)]
 use std::path::Path;
 
 use super::super::credentials::{Credential, Shape};

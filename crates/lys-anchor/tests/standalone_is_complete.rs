@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! The DP19 gate: **a single anchor, zero witnesses, pinning to nobody, is
 //! fully functional** — and the functionality is exercised in the shape that
 //! has no federation in it.

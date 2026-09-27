@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! `ID001_SHARED_DB`: Rauthy and `SpiceDB` both write to and reopen the same
 //! `PostgreSQL` database; their migrations land in their own schemas without
 //! colliding; neither service role can read the other's schema; and a

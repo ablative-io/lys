@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! End-to-end integration tests for the `lys` binary.
 //!
 //! Each subcommand is exercised through a real process spawn of the compiled
@@ -5,7 +6,6 @@
 //! content, and on-disk side effects. The attest/verify tests additionally
 //! cross-check the CLI's `COSE_Sign1` artifact against `lys-core` directly.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::path::Path;
 use std::process::{Command, Output};

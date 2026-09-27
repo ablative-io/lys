@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! `ID001_DEPLOY` and `ID001_PIN_CLONE`, and R2's lines that need a running
 //! Rauthy, `PostgreSQL` and `SpiceDB`: health output holds no secret, configure
 //! run twice leaves exactly the two managed clients beside Rauthy's own and

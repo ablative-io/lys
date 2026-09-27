@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on the translation's checks (HOME-009 R1): the measured Codex
 //! version only, an IANA zone name resolved through the bundled database,
 //! and the refusals that name the act answering each.

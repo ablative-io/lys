@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! D6 conformance gate: round-trip the `lys` signed-note implementation
 //! against the Go `sumdb/note` reference implementation.
 //!
@@ -16,7 +17,6 @@
 //! Go-less environment never reduces byte-exact coverage (the primary
 //! copies of these vectors live in the always-run unit tests as well).
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::io::Write;
 use std::path::{Path, PathBuf};

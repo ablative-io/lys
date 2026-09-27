@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on the lantern entry (HOME-004 R1) and on lighting (R3): the data
 //! shapes, earlier bytes kept, the head on the lantern, the note byte for
 //! byte, and each refusal by name with nothing written; and on the lantern's

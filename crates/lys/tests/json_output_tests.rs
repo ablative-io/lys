@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! `--json` coverage across every subcommand.
 //!
 //! The flag is documented as global and honoured everywhere, and that claim is
@@ -11,7 +12,6 @@
 //! deliberately breadth-first rather than deep: the per-field shapes are
 //! pinned by unit tests, what needs pinning here is that nothing is missed.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::path::Path;
 use std::process::{Command, Output};

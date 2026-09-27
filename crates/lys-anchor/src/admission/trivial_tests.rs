@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on [`AcceptAll`] and [`MaxSize`].
 //!
 //! # Where the second party comes from

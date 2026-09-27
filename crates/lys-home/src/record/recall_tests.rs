@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on recall (HOME-004 R5): a phrase inside one text only, both
 //! lanterns on a point, epilogues in order, a held session still read, a
 //! broken session named and skipped, nothing written, and never a line of

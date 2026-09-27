@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! The fork run as the binary (HOME-006 R5 and R7): the report's exact
 //! keys, each refusal's exit code with nothing on stdout, clap's refusals,
 //! and the brief's fixture home forked five times and refused five times

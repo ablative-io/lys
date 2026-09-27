@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! `ID001_DEPLOY_REFUSAL`: a missing secret, an invalid issuer or redirect and
 //! an unavailable database each produce a named failure, never a substitute
 //! identity or development database; and a database on a network device is

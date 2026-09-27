@@ -1,3 +1,4 @@
+#![cfg(test)]
 use std::error::Error;
 use std::path::PathBuf;
 

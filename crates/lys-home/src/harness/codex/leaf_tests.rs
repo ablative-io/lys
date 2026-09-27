@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on the side leaf (HOME-009 R6): one `lys.translation` entry beside
 //! the context path naming the translation by hashes, the head and every
 //! earlier byte of the session unchanged, and a second translation listing

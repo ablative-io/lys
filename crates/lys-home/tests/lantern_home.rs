@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! A lantern lives in the home (HOME-004 R7): the rendered Claude Code file
 //! of a session holding lanterns and epilogues carries no lantern line, no
 //! note and no epilogue, and has exactly as many lines as the render of the

@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Bundle verification tests, built from real logs, real anchors and real
 //! receipts throughout — no synthetic artifacts.
 //!
@@ -7,7 +8,6 @@
 //! not a broken fixture. A chain test that only shows "invalid input rejected"
 //! proves nothing about whether the links are checked at all.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::*;
 use crate::bundle::artifact::BundleLink;

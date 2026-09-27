@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! `lys verify --cert` — the join between a certificate and an attestation.
 //!
 //! Verifying a certificate proves an authority issued it. Verifying an
@@ -6,7 +7,6 @@
 //! tests that matter here are the ones where each half is individually valid
 //! and the *pairing* is wrong.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};

@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Byte-exactness and structural-rejection tests for
 //! `lys/anchor-receipt/v1`.
 //!
@@ -8,7 +9,6 @@
 //! fail — which is the point, because the format is frozen the moment an anchor
 //! signs under it.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use ciborium::value::Value;
 

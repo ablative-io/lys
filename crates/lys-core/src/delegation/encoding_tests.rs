@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Byte-shape and structural-rejection tests for `lys/delegation/v1`.
 //!
 //! Expected bytes here are **hand-assembled from the specification tables**,
@@ -10,7 +11,6 @@
 //! the `go-cose` gate are what supply independence on the encoding and envelope
 //! axes; these tests supply the byte-level pin that makes any drift loud.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::*;
 

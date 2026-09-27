@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Interop gate for `lys/verification-bundle/v1`: an independent Go
 //! implementation must reach the **same verdict** as lys on every bundle, and
 //! derive the same values from the ones it accepts.
@@ -79,7 +80,6 @@
 // no `bundle` module to verify, and compiling the file out (rather than gating
 // items inside it) leaves no unused shared harness behind either.
 #![cfg(feature = "unstable-anchor")]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod harness;
 

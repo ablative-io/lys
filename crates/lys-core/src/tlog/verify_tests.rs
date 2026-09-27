@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;

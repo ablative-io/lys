@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on what hangs beside the path (HOME-009 R5): a labelled sidechain
 //! carried as marked text after its parent's items, every other entry off
 //! the path listed lost whatever its type, an unlabelled branch listed and
