@@ -372,7 +372,11 @@ fn every_subcommand_honours_the_global_json_flag() {
     assert_eq!(opened["opened"], Value::Bool(true));
     assert_eq!(opened["payload_bytes"], 13);
     assert_eq!(opened["sender_public_key"], signer_pub);
-    let _ = recipient_pub;
+    assert_eq!(
+        recipient_pub.len(),
+        64,
+        "key generate must report public_key_ed25519 as 64 hex characters"
+    );
 }
 
 /// A failure under `--json` must still be JSON on stdout.

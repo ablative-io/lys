@@ -586,7 +586,12 @@ fn load_or_generate_creates_file_when_missing() {
     let contents = std::fs::read(&path).unwrap();
     assert_eq!(contents.len(), 32, "file must be exactly 32 bytes");
 
-    let _ = id.public_key_bytes();
+    let reloaded = Ed25519Identity::load(&path).unwrap();
+    assert_eq!(
+        reloaded.public_key_bytes(),
+        id.public_key_bytes(),
+        "the generated file must load back as the same identity"
+    );
 
     #[cfg(unix)]
     {

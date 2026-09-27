@@ -280,10 +280,9 @@ const KDF_EXPECTED_NONCE: &str = "9676a253de3231538aa9c948";
 fn hex(bytes: &[u8]) -> String {
     use std::fmt::Write as _;
     bytes.iter().fold(String::new(), |mut acc, b| {
-        // Writing into a String is infallible; the Result is discarded rather
-        // than unwrapped so this helper cannot panic inside a failing test and
-        // obscure the assertion that was actually being made.
-        let _ = write!(acc, "{b:02x}");
+        // Writing into a String is infallible, so this expect never fires and
+        // cannot obscure the assertion that was actually being made.
+        write!(acc, "{b:02x}").expect("writing to a String cannot fail");
         acc
     })
 }

@@ -52,7 +52,7 @@ fn hex_of(bytes: &[u8]) -> String {
     use std::fmt::Write;
     let mut s = String::with_capacity(bytes.len() * 2);
     for b in bytes {
-        let _ = s.write_fmt(format_args!("{b:02x}"));
+        s.write_fmt(format_args!("{b:02x}")).expect("writing to a String cannot fail");
     }
     s
 }
