@@ -1,0 +1,121 @@
+# The standalone identity product's three dependency processes for development:
+# the maintained Rauthy (ADR-009), SpiceDB, and one PostgreSQL service with one
+# durable database (ADR-005). Cambium, Manifold, Argus and Aion are not here and
+# are not needed.
+#
+# Every value comes from the environment `lys identity prepare` renders into the
+# state directory; nothing here is a credential. A missing value is refused by
+# name, and no default database address is ever substituted.
+#
+#   docker compose -f deploy/identity/compose.yaml --env-file <state>/compose.env \
+#     --profile bundled-db up -d
+#
+# Leave out --profile bundled-db when the database lives on a network device.
+# Image references are pinned by digest in deploy/identity/versions.json.
+
+name: ${COMPOSE_PROJECT_NAME:?config_invalid COMPOSE_PROJECT_NAME is unset; run lys identity prepare}
+
+x-datastore-uri: &datastore-uri postgres://spicedb:${SPICEDB_DB_PASSWORD:?secret_missing SPICEDB_DB_PASSWORD}@${IDENTITY_DB_HOST:?database_address_missing IDENTITY_DB_HOST}:${IDENTITY_DB_PORT:?database_address_missing IDENTITY_DB_PORT}/${IDENTITY_DB_NAME:?database_address_missing IDENTITY_DB_NAME}?sslmode=${IDENTITY_DB_TLS:?database_address_missing IDENTITY_DB_TLS}
+
+services:
+  postgres:
+    image: docker.io/library/postgres:17.11@sha256:d74eeac9a635390a49bc21bd49fccd973de707e2a53a76ac49b552b8712ec46f
+    profiles: ["bundled-db"]
+    # SpiceDB's PostgreSQL datastore reads commit timestamps.
+    command: ["postgres", "-c", "track_commit_timestamp=on"]
+    environment:
+      POSTGRES_USER: identity_admin
+      POSTGRES_PASSWORD: ${IDENTITY_POSTGRES_SUPERUSER_PASSWORD:?secret_missing IDENTITY_POSTGRES_SUPERUSER_PASSWORD}
+      POSTGRES_DB: ${IDENTITY_DB_NAME:?database_address_missing IDENTITY_DB_NAME}
+      # Read by postgres-init.sql through psql's \getenv on first start only.
+      RAUTHY_DB_PASSWORD: ${RAUTHY_DB_PASSWORD:?secret_missing RAUTHY_DB_PASSWORD}
+      SPICEDB_DB_PASSWORD: ${SPICEDB_DB_PASSWORD:?secret_missing SPICEDB_DB_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/10-identity.sql:ro
+    ports:
+      - "127.0.0.1:${IDENTITY_DB_PUBLISH_PORT:-55432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U identity_admin -d \"$$POSTGRES_DB\""]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  # SpiceDB's schema migrations run first, as the spicedb role, into the spicedb
+  # schema its role's search_path names. Rauthy runs its own migrations, as the
+  # rauthy role, into the rauthy schema, when it starts.
+  spicedb-migrate:
+    image: docker.io/authzed/spicedb:v1.56.2@sha256:aa96009a0477f8a759149823407d47ad16d1a74390bae3102b3b0b7143502764
+    command: ["datastore", "migrate", "head"]
+    environment:
+      SPICEDB_DATASTORE_ENGINE: postgres
+      SPICEDB_DATASTORE_CONN_URI: *datastore-uri
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    restart: "no"
+
+  spicedb:
+    image: docker.io/authzed/spicedb:v1.56.2@sha256:aa96009a0477f8a759149823407d47ad16d1a74390bae3102b3b0b7143502764
+    # No telemetry leaves a development install.
+    command: ["serve", "--http-enabled", "--telemetry-endpoint="]
+    environment:
+      SPICEDB_GRPC_PRESHARED_KEY: ${SPICEDB_PRESHARED_KEY:?secret_missing SPICEDB_PRESHARED_KEY}
+      SPICEDB_DATASTORE_ENGINE: postgres
+      SPICEDB_DATASTORE_CONN_URI: *datastore-uri
+    ports:
+      - "127.0.0.1:${SPICEDB_GRPC_PORT:?config_invalid SPICEDB_GRPC_PORT}:50051"
+      - "127.0.0.1:${SPICEDB_HTTP_PORT:?config_invalid SPICEDB_HTTP_PORT}:8443"
+    depends_on:
+      spicedb-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  rauthy:
+    image: ghcr.io/sebadob/rauthy:0.36.2@sha256:f7d3c501402165e023edbd958b032b41c9cfdac5ea7f8ca7d62217327145577e
+    environment:
+      # PostgreSQL is Rauthy's only identity datastore. Hiqlite still runs as
+      # Rauthy's internal cache, whose files live in the rauthy-data volume.
+      HIQLITE: "false"
+      PG_HOST: ${IDENTITY_DB_HOST:?database_address_missing IDENTITY_DB_HOST}
+      PG_PORT: ${IDENTITY_DB_PORT:?database_address_missing IDENTITY_DB_PORT}
+      PG_DB_NAME: ${IDENTITY_DB_NAME:?database_address_missing IDENTITY_DB_NAME}
+      PG_USER: rauthy
+      PG_PASSWORD: ${RAUTHY_DB_PASSWORD:?secret_missing RAUTHY_DB_PASSWORD}
+      PG_TLS: ${IDENTITY_DB_TLS:?database_address_missing IDENTITY_DB_TLS}
+      PG_TLS_NO_VERIFY: "false"
+      # /auth/v1/health checks the database from the first request on.
+      HEALTH_CHECK_DELAY_SECS: "0"
+      HQL_NODE_ID: "1"
+      HQL_NODES: "1 localhost:8100 localhost:8200"
+      HQL_DATA_DIR: /app/data
+      HQL_SECRET_RAFT: ${RAUTHY_HQL_SECRET_RAFT:?secret_missing RAUTHY_HQL_SECRET_RAFT}
+      HQL_SECRET_API: ${RAUTHY_HQL_SECRET_API:?secret_missing RAUTHY_HQL_SECRET_API}
+      ENC_KEYS: ${RAUTHY_ENC_KEYS:?secret_missing RAUTHY_ENC_KEYS}
+      ENC_KEY_ACTIVE: ${RAUTHY_ENC_KEY_ACTIVE:?config_invalid RAUTHY_ENC_KEY_ACTIVE}
+      LISTEN_SCHEME: http
+      PUB_URL: ${RAUTHY_PUB_URL:?issuer_invalid RAUTHY_PUB_URL}
+      RP_ID: ${RAUTHY_RP_ID:?issuer_invalid RAUTHY_RP_ID}
+      RP_ORIGIN: ${RAUTHY_RP_ORIGIN:?issuer_invalid RAUTHY_RP_ORIGIN}
+      PROXY_MODE: ${RAUTHY_PROXY_MODE:?config_invalid RAUTHY_PROXY_MODE}
+      TRUSTED_PROXIES: ${RAUTHY_TRUSTED_PROXIES-}
+      BOOTSTRAP_ADMIN_EMAIL: ${RAUTHY_BOOTSTRAP_ADMIN_EMAIL:?config_invalid RAUTHY_BOOTSTRAP_ADMIN_EMAIL}
+      BOOTSTRAP_ADMIN_PASSWORD_PLAIN: ${RAUTHY_BOOTSTRAP_ADMIN_PASSWORD:?secret_missing RAUTHY_BOOTSTRAP_ADMIN_PASSWORD}
+      BOOTSTRAP_API_KEY: ${RAUTHY_BOOTSTRAP_API_KEY:?config_invalid RAUTHY_BOOTSTRAP_API_KEY}
+      BOOTSTRAP_API_KEY_SECRET: ${RAUTHY_BOOTSTRAP_API_KEY_SECRET:?secret_missing RAUTHY_BOOTSTRAP_API_KEY_SECRET}
+      LOG_LEVEL: info
+    volumes:
+      - rauthy-data:/app/data
+    ports:
+      - "127.0.0.1:${RAUTHY_LISTEN_PORT:?config_invalid RAUTHY_LISTEN_PORT}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  rauthy-data:
