@@ -47,6 +47,12 @@
           "command": "sh scripts/design/gate.sh",
           "requires": ["tool:sh", "tool:python3"],
           "cadence": "round"
+        },
+        {
+          "name": "identity-release",
+          "command": "sh scripts/identity-gates/release.sh",
+          "requires": ["tool:sh", "tool:git", "tool:cargo", "tool:rustfmt", "rust-build"],
+          "cadence": "demand"
         }
       ]
     }
