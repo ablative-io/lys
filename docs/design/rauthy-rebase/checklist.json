@@ -21,12 +21,12 @@
         },
         {
           "id": "C4",
-          "text": "The rebase report records, with the commands that measured it, that c44f7cac and 989f9ff9 add no account-status, redirect or logout test.",
+          "text": "The rebase report lists, for c44f7cac and 989f9ff9, every test name the recorded attribute command prints (each fn following an added #[test] or #[tokio::test]), and states against each name, test_validate_dyn_redirect_uri included, that it is not an account-status, redirect or logout guard test.",
           "done": false
         },
         {
           "id": "C5",
-          "text": "The v0.36.2 exception lines are exactly the output of the recorded command git show <lys start commit>:docs/design/identity/reports/IDENTITY-001-deployment.md | grep -n -F 'v0.36.2', copied whole with their line numbers into the rebase report.",
+          "text": "The v0.36.2 exception lines are exactly the output of the recorded command git show <lys start commit>:docs/design/identity/reports/IDENTITY-001-deployment.md | grep -n -F 'accepted v0.36.2 exception', which selects only the accepted-exception lines, copied whole with their line numbers into the rebase report.",
           "done": false
         }
       ]
@@ -101,7 +101,7 @@
       "items": [
         {
           "id": "C16",
-          "text": "The copied exception lines are gone from the deployment report, which names the new release, its tag commit and its advisory check; the rebase report records the upstream commit, the rebased diff, the regression results, the installed hash and the gate result as evidence for IDENTITY-001-UPSTREAM-AUTH-STATE, naming the separate decision to lift it and the later move of the kept development data as acts this card does not perform.",
+          "text": "The copied exception lines are gone from the deployment report, which names the new release, its tag commit and its advisory check; the rebase report records the upstream commit, the rebased diff, the regression results and the installed hash; the card's landing record, written after the lys gate passes, holds the gate result as evidence for IDENTITY-001-UPSTREAM-AUTH-STATE; the rebase report names the separate decision to lift it and the later move of the kept development data as acts this card does not perform.",
           "done": false
         }
       ]

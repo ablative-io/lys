@@ -5,8 +5,8 @@
 - [ ] **C1** — The pull request and the rebase report record every non-pre-release upstream tag above v0.36.2 read, each with its tag commit and its git merge-base --is-ancestor exit statuses for c44f7cac and 989f9ff9, the list of qualifying tags, and the newest qualifying tag chosen with its commit, prerelease flag and changelog entry.
 - [ ] **C2** — The three guard tests guard_account_status_rechecked_at_code_exchange, guard_code_bound_to_exact_redirect_uri and guard_logged_out_session_not_revived are one fork commit adding src/bin/tests/zzh_guard_auth_state.rs in the fork's rauthy member crate, pushed on the chosen tag commit to rauthy-rebase/<tag commit>-guards, which keeps it until the pin move has landed, and the fork gate's cargo test log for that commit names each as passed.
 - [ ] **C3** — A guard test that fails or is absent at a candidate tag stops the card at trigger-guards when no candidate qualifies, with ablative, the fork's main, every pre-rebase tag and the lys pin unmoved.
-- [ ] **C4** — The rebase report records, with the commands that measured it, that c44f7cac and 989f9ff9 add no account-status, redirect or logout test.
-- [ ] **C5** — The v0.36.2 exception lines are exactly the output of the recorded command git show <lys start commit>:docs/design/identity/reports/IDENTITY-001-deployment.md | grep -n -F 'v0.36.2', copied whole with their line numbers into the rebase report.
+- [ ] **C4** — The rebase report lists, for c44f7cac and 989f9ff9, every test name the recorded attribute command prints (each fn following an added #[test] or #[tokio::test]), and states against each name, test_validate_dyn_redirect_uri included, that it is not an account-status, redirect or logout guard test.
+- [ ] **C5** — The v0.36.2 exception lines are exactly the output of the recorded command git show <lys start commit>:docs/design/identity/reports/IDENTITY-001-deployment.md | grep -n -F 'accepted v0.36.2 exception', which selects only the accepted-exception lines, copied whole with their line numbers into the rebase report.
 
 ## Rebase
 
@@ -29,4 +29,4 @@
 
 ## Records
 
-- [ ] **C16** — The copied exception lines are gone from the deployment report, which names the new release, its tag commit and its advisory check; the rebase report records the upstream commit, the rebased diff, the regression results, the installed hash and the gate result as evidence for IDENTITY-001-UPSTREAM-AUTH-STATE, naming the separate decision to lift it and the later move of the kept development data as acts this card does not perform.
+- [ ] **C16** — The copied exception lines are gone from the deployment report, which names the new release, its tag commit and its advisory check; the rebase report records the upstream commit, the rebased diff, the regression results and the installed hash; the card's landing record, written after the lys gate passes, holds the gate result as evidence for IDENTITY-001-UPSTREAM-AUTH-STATE; the rebase report names the separate decision to lift it and the later move of the kept development data as acts this card does not perform.
