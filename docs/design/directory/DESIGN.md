@@ -165,6 +165,9 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `surface/identity/src/generated/index.ts` | Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch | DIRECTORY-006 |
 | `docs/design/directory/briefs/DIRECTORY-008.json` | the grant brief residue after PR 6: DIRECTORY-005's verification line, three inventory rows and the intention sentence, as requirements on the documents | DIRECTORY-008 |
 | `docs/design/directory/briefs/DIRECTORY-008.md` | rendered markdown | DIRECTORY-008 |
+| `crates/lys-identity/tests/agent_without_session.rs` | the proof that an agent registered with no session is listed under its responsible person and read with no session credential (R2) | DIRECTORY-011 |
+| `docs/design/directory/briefs/DIRECTORY-011.json` | the enduring agent kept apart from each session's credential: road adjustment 3 written into the directory contract, and the no-session agent proved (R1, R2) | DIRECTORY-011 |
+| `docs/design/directory/briefs/DIRECTORY-011.md` | rendered markdown | DIRECTORY-011 |
 
 ## Inventory
 
@@ -182,7 +185,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 
 ## Constraints
 
-- **CN1** — Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed.
+- **CN1** — Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed. CN1 binds only the planning brief, DIRECTORY-001.
 - **CN2** — Development isolation: rows 02 to 05 use only disposable test identities and test provider registrations; no production tokens, real business sign-in or live Cambium participant migration.
 - **CN3** — Every path written in a document of this cluster is relative to the repository root, whatever directory a session starts in; a command runs from its own tree and spells its paths from there.
 - **CN4** — No structure row or files entry carries a root token; a file in another repository is named in a requirement's spec with its owner.

@@ -47,3 +47,8 @@
 - [ ] **C28** — Observed grant usage names its source and time; not seen is not reported as never used.
 - [ ] **C29** — The You and delegation screens show real server authority, separate service accounts from sign-in identities, and preserve personal versus administrator visibility.
 - [ ] **C30** — The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success.
+
+## The enduring agent and its session credentials
+
+- [ ] **C49** — docs/design/identity/DIRECTORY-CONTRACT.md states road adjustment 3 as the directory's contract, citing docs/design/identity/STATEMENT-2026-09-22.md:162-167: the agent record holds no session credential, a session is a separate record that points at its agent, starting a session never creates an agent, and a second session of the same agent presents the same enduring identity with a new session credential.
+- [ ] **C50** — An agent registered with no session appears in the directory under its responsible person, and its read carries no session credential.
