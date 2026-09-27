@@ -221,7 +221,7 @@
         },
         {
           "id": "C176",
-          "text": "A move at the holder's next start leaves a running session on the version it started with, and a move now, taken only by the admitted operator, stops every open session of the agent first and names in the move's record each session it caused to end.",
+          "text": "A move at the holder's next start leaves a running session on the version it started with, and a move now, taken only by the admitted operator, stops every open session of the agent first and names in the move's record every session its listing showed, each with its outcome.",
           "done": false
         },
         {
