@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,35 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-056",
+      "title": "Remove the work lys-home repeats on every call as a session grows",
+      "status": "idea",
+      "kind": "fix",
+      "summary": "lys-home repeats work on every call that grows with the session's length, and one open hides a real I/O error as a stale cache. Looking up a call by id re-reads every lys.call entry on each ingest; an import syncs the line, the index and the head for every record; resume_check rescans every tool-use id once per distinct id; the canon walks every entry per new one; opening a session seeks and reads one byte per row and turns a failed read into a rebuild of the index; and context_path, customs, the render and the importer clone or read what they already own, with the uuid format written twice. The card removes each without changing a recorded byte: a call-id map built once per open, a staged import that syncs its line file, its index and its head once each and publishes by rename (ADR-093), one pass over the ids, the canon's kept id set, a bounded open that returns a real I/O error as that error, and one uuid formatter. Counters on the read and sync paths prove the bounds, a test that makes the read fail proves the error, and a hash of an import's line bytes with its fresh ids and header timestamp masked proves the record unchanged.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T22:43:00+10:00",
+        "quote": "A sweep of crates/lys-home found work repeated on every call that grows with the size of the session, and one place that hides a real I/O error as a stale cache. In crates/lys-home/src/record/call.rs, find_call (line 333 as main stands) reads and deserialises every lys.call entry in the file on every ingest, on all three ingest paths, so ingest cost grows with the square of the session's length. In crates/lys-home/src/harness/claude_code/import.rs line 195, every imported entry goes through append_entry, which syncs the line, syncs the index and writes the head through a temp file, a rename and a directory sync, about five syncs per record, though the import sets the head once at line 319. In crates/lys-home/src/cli.rs line 454, resume_check rescans every tool-use id in both transcripts once per distinct id. In crates/lys-home/src/record/canon.rs line 364, the duplicate check walks every existing entry for each new one, though load built the seen set at line 150 and threw it away. In crates/lys-home/src/record/index.rs line 128, from_cached does an unbuffered seek and a one-byte read for every row on every open, and its .ok()? turns a real I/O error into a stale-cache verdict that rebuilds and rewrites the index. In crates/lys-home/src/record/mod.rs, context_path clones every entry out of a path it already owns (lines 446 and 449) and customs() at line 455 reads the whole ancestry from disk to filter it although index rows already carry custom; render.rs line 160 and import.rs line 441 clone whole content arrays only to iterate them; and render.rs line 285 repeats the uuid formatting of cli.rs line 378.\n\nThis card removes the repeated work without changing what is recorded. Call lookup by id uses the index, or a map built once per open, so ingest reads no entry it does not need. An import appends its entries with one sync of the line file and one of the index at the end, and moves the head once, with a stated rule for what a crash in the middle leaves behind that the existing reconcile already repairs. resume_check counts ids in one pass. Canon keeps its seen set and uses it. from_cached reads the rows it checks through one buffered pass, and a real I/O error there is returned as that error, never as stale. The clones and the duplicated uuid formatting go, with one function for the format.\n\nAcceptance: a test over a session of a stated size proves ingest reads a bounded number of entries per call, measured by a counter on the read path and not by time; an import of a fixture with a stated number of records is proved to sync a bounded number of times, counted the same way; from_cached returning an I/O error is proved by a test that makes the read fail; every existing test in the crate still passes; and the recorded bytes of a session imported before and after this change are equal, proved by hash. Not in scope: the record format, the index layout and any new command.\n\nKeep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh). The brief id, roadmap row and any decision take the next free id past main and every open brief, draft and hand branch, checked with git ls-remote immediately before writing. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie, lead for the home line, on 27 September 2026, against lys main fa3dd5311e98d1a751c770319e1cfe2570718c76.",
+        "context": "Filed by the home line's lead from a sweep of crates/lys-home against lys main fa3dd53, and surveyed on that commit. The lead's answers to the survey settled what the words left open: the import-bytes proof compares line bytes with the fresh ids and the header timestamp masked, pinned at the parent commit; the sync bound counts the session's own syncs (line file, index, head and the sessions directory) and lists the block store's beside it; the call-lookup bound holds for an owner that keeps one Session open, while the CLI's ingest-call, which opens the session per call, still reads every lys.call entry once per open; a crash in the middle of an import is handled by staging the session under a name beside its final one and publishing once, the sentence about the existing reconcile repairing it being withdrawn; opening stays bounded under CN7, reading at most three rows by position; and the targets are cited at main's lines."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-012",
+          "ADR-014",
+          "ADR-016",
+          "ADR-017",
+          "ADR-093"
+        ],
+        "briefs": [
+          "HOME-020"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Ids taken past main and every brief, draft, hand, design and home branch, read with git ls-remote and the branches' own ledgers immediately before writing: the highest were HOME-019, RM-055 and ADR-092, so this row is RM-056, its brief HOME-020 and its decision ADR-093; HOME-008 is held by the lys-proxy drafts. Written against main at fa3dd53 with no roadmap dependency: HOME-013 (RM-028, open, not on main) moves Session and its helpers out of record/mod.rs, and whichever of the two lands second redoes its record/mod.rs edits on the other; HOME-013's no-code-changed proof is taken against its own parent. A finding for the lys-proxy card, not this one: index rows carry no call id, so an owner that opens a session per call reads every lys.call entry once per open. Further units, not written: Make the Claude Code import deterministic for the same transcript; Find a recorded call by id without reading entries on a fresh open; Batch the block store's syncs during an import; Recover a session whose last line was torn by a crash."
     }
   ]
 }

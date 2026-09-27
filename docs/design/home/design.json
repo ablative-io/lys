@@ -57,7 +57,8 @@
     "ADR-015",
     "ADR-016",
     "ADR-017",
-    "ADR-018"
+    "ADR-018",
+    "ADR-093"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -70,7 +71,8 @@
     "Every launch-template render records what the session was given: one lys.given entry after the render event naming each instruction document Claude Code will load, and each file the render wrote, by path, byte length and SHA-256 in the measured order, with the environment variable names the template set, and never a document's content; lys-home lists those records and checks a file on disk against one by hash.",
     "A lantern lit on purpose at a past entry of a session is recalled from the home by a word of its note and by its point, with its epilogues after it and never a line of the transcript around it.",
     "The same session head rendered twice with the same target and the same lys-home version gives files of equal SHA-256, a fixture holding a tool record with more than one result included, and the fixture's hash is pinned by a test and recorded in PROOF-RESUME.md.",
-    "A session forked from a lantern's point holds the parent's own lines up to the last assistant message before the point, carries its ancestry on both sides, adds nothing to the block store, and is rendered and launched on the installed Claude Code version, measured, with a user-message point carried as the child's first prompt."
+    "A session forked from a lantern's point holds the parent's own lines up to the last assistant message before the point, carries its ancestry on both sides, adds nothing to the block store, and is rendered and launched on the installed Claude Code version, measured, with a user-message point carried as the child's first prompt.",
+    "An ingest on a session kept open, an import and a session's open each read and sync what they need rather than work that grows with the session's length, proved by counters, and a session imported before and after the change is the same bytes once its fresh ids and header timestamp are masked."
   ],
   "non_goals": [
     {
@@ -108,6 +110,18 @@
     {
       "text": "Rendering tool parts from the stored block, and moving the render's default Claude Code version off 2.1.281.",
       "reason": "Both change what a rendered file holds; the deterministic render changes nothing a file holds beyond the determinism."
+    },
+    {
+      "text": "Finding a recorded call by id without reading entries on a fresh open: a call id in the index, or a call-id lookup persisted beside the file.",
+      "reason": "The index layout is out of scope of the repeated-work card; its call-id map is built once per open, so an owner that opens a session per call, as the CLI's ingest-call does, still reads every lys.call entry once per open."
+    },
+    {
+      "text": "Batching the block store's syncs during an import.",
+      "reason": "Each new block syncs its file and its directory under the block store's own contract (RECORD.md, Blocks); the repeated-work card counts those syncs beside the session's and leaves them as they are."
+    },
+    {
+      "text": "Recovering a session whose last line a crash tore, by extending reconcile or trimming an unsynced tail.",
+      "reason": "The original bytes are never rewritten (P1); a staged import (ADR-093) never leaves such a tail under a session's name, and recovering one is its own decision."
     }
   ],
   "structure": [
@@ -650,6 +664,51 @@
       "path": "docs/design/home/PROOF-FORK.md",
       "note": "the measured fork: Pi's parentSession read, a real session forked, rendered and launched, as hashes, counts and exit codes",
       "brief": "HOME-006"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-020.json",
+      "note": "the repeated-work brief: a call-id map per open, a staged import published once, a bounded open that returns a real I/O error, one pass over resume ids, the canon's kept id set, clones gone and one uuid formatter",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-020.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "crates/lys-home/src/record/io_counts.rs",
+      "note": "the entries a session read and the syncs its own writes made, counted for tests",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "crates/lys-home/src/record/staged.rs",
+      "note": "a new session built under a staging name with no per-entry sync and published once by rename; the remainder of a part-way import removed by name",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "crates/lys-home/src/record/staged_tests.rs",
+      "note": "gates on the staged import: five syncs for 6 and for 300 records, a part-way import leaving no session, the re-import and the removal",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "crates/lys-home/src/record/record_tests.rs",
+      "note": "gates on the session record: the counters, and the bounded open over an injected reader",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "crates/lys-home/src/record/call_tests.rs",
+      "note": "gates on call ingest: idempotency on all three paths and the entries read per ingest",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "crates/lys-home/tests/cached_index.rs",
+      "note": "the cached index is a cache: stale rows rebuild from the file",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "crates/lys-home/tests/import_bytes.rs",
+      "note": "an import's line bytes, fresh ids and header timestamp masked, hashed and pinned at the parent commit",
+      "brief": "HOME-020"
     }
   ],
   "inventory": [
