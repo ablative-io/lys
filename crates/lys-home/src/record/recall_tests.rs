@@ -1,7 +1,11 @@
 //! Gates on recall (HOME-004 R5): a phrase inside one text only, both
 //! lanterns on a point, epilogues in order, a held session still read, a
 //! broken session named and skipped, nothing written, and never a line of
-//! the transcript.
+//! the transcript. Gates on the row's `lit_in` (HOME-014 R3): the session
+//! the light act recorded, null for an older record listed as any other,
+//! and a recorded `lit_in` that is not a session id skipped and refused as
+//! `lit_in_not_a_session`. The lanterns appended by hand here stand for
+//! records the light act does not write.
 
 use std::error::Error;
 
@@ -10,13 +14,13 @@ use serde_json::Value;
 use serde_json::json;
 
 use crate::error::HomeError;
-use crate::record::Home;
-use crate::record::entries::{CUSTOM_LANTERN, EntryBody};
+use crate::record::entries::{CUSTOM_LANTERN, Entry, EntryBase, EntryBody};
 use crate::record::epilogue_tests::{WORDS_ONE, WORDS_TWO, lit_fixture};
 use crate::record::lantern::light;
 use crate::record::lantern_tests::LIGHTER;
-use crate::record::reader_tests::{FIXTURE, TRANSCRIPT_LINE, message, snapshot};
+use crate::record::reader_tests::{FIXTURE, TRANSCRIPT_LINE, fixture_home, message, snapshot};
 use crate::record::recall::{RecallReport, recall_by_note, recall_by_point};
+use crate::record::{Home, now};
 
 type Gate = Result<(), Box<dyn Error>>;
 
@@ -141,6 +145,7 @@ fn a_row_carries_exactly_its_fields() -> Gate {
                 "id",
                 "lit_at",
                 "lit_by",
+                "lit_in",
                 "note",
                 "point",
                 "session"
@@ -240,5 +245,124 @@ fn a_row_carries_the_id_the_home_lists_the_session_under() -> Gate {
         .collect();
     assert_eq!(found, [("fixture-copy", l3.as_str()), (OTHER, l3.as_str())]);
     assert!(report.skipped.is_empty());
+    Ok(())
+}
+
+/// A `lys.lantern` entry `id` under `parent`, carrying `data` as given.
+fn lantern_by_hand(id: &str, parent: &str, data: Value) -> Entry {
+    Entry {
+        base: EntryBase {
+            id: id.to_owned(),
+            parent_id: Some(parent.to_owned()),
+            timestamp: now(),
+        },
+        body: EntryBody::Custom {
+            custom_type: CUSTOM_LANTERN.to_owned(),
+            data: Some(data),
+        },
+    }
+}
+
+#[test]
+fn a_row_carries_the_session_the_light_act_recorded() -> Gate {
+    let (_dir, home, _) = recall_fixture()?;
+    let by_point = recall_by_point(&home, OTHER, "o1")?;
+    assert_eq!(by_point.lanterns.len(), 1);
+    let row = by_point.lanterns.first().ok_or("no row")?;
+    assert_eq!(row.lit_in, Some(OTHER.to_owned()));
+    let fold = recall_by_note(&home, "fold")?;
+    assert!(!fold.lanterns.is_empty());
+    for row in &fold.lanterns {
+        assert_eq!(row.lit_in, Some(row.session.clone()));
+    }
+    Ok(())
+}
+
+#[test]
+fn an_older_lantern_without_lit_in_is_listed_with_lit_in_null() -> Gate {
+    let (_dir, home) = fixture_home()?;
+    {
+        let mut owner = home.open_session(FIXTURE)?;
+        owner.append_entry(&lantern_by_hand(
+            "older",
+            "e5",
+            json!({"point": "e3", "note": "an older record kept", "lit_by": LIGHTER, "lit_at": now()}),
+        ))?;
+    }
+    let by_point = recall_by_point(&home, FIXTURE, "e3")?;
+    assert_eq!(ids(&by_point), ["older"]);
+    assert_eq!(by_point.lanterns.first().ok_or("no row")?.lit_in, None);
+    let row = serde_json::to_value(&by_point)?;
+    assert_eq!(row["lanterns"][0]["lit_in"], Value::Null);
+    assert!(
+        row["lanterns"][0]
+            .as_object()
+            .ok_or("an object")?
+            .contains_key("lit_in")
+    );
+    let by_note = recall_by_note(&home, "older record")?;
+    assert_eq!(ids(&by_note), ["older"]);
+    assert!(by_note.skipped.is_empty());
+    Ok(())
+}
+
+#[test]
+fn a_lit_in_that_is_not_a_session_id_is_skipped_and_refused_by_name() -> Gate {
+    let (_dir, home) = fixture_home()?;
+    let cases = [
+        ("bad-null", json!(null), "is null"),
+        ("bad-number", json!(5), "is not a string"),
+        (
+            "bad-unsafe",
+            json!("../elsewhere"),
+            "is not a safe session name",
+        ),
+        (
+            "bad-missing",
+            json!("no-such-session"),
+            "names no session of the home",
+        ),
+    ];
+    for (session, lit_in, _) in &cases {
+        let mut owner = home.create_session(session, "/fixture", None)?;
+        owner.append_entry(&message("p1", None, "fixture"))?;
+        owner.append_entry(&lantern_by_hand(
+            "n1",
+            "p1",
+            json!({"point": "p1", "note": "a stray record", "lit_by": LIGHTER, "lit_at": now(),
+                "lit_in": lit_in}),
+        ))?;
+    }
+    let by_note = recall_by_note(&home, "stray record")?;
+    assert!(by_note.lanterns.is_empty());
+    assert_eq!(by_note.skipped.len(), 4);
+    let mut skips = 0;
+    let mut refusals = 0;
+    for (session, _, what) in cases {
+        let skip = by_note
+            .skipped
+            .iter()
+            .find(|skip| skip.session == session)
+            .ok_or("a skip for the session")?;
+        assert!(
+            skip.reason.starts_with("lit_in_not_a_session"),
+            "{}",
+            skip.reason
+        );
+        assert!(skip.reason.contains(what), "{}", skip.reason);
+        assert!(!skip.reason.starts_with("entry_shape"));
+        skips += 1;
+        let refused = recall_by_point(&home, session, "p1");
+        assert!(
+            matches!(
+                &refused,
+                Err(HomeError::LitInNotASession { lantern, what: found })
+                    if lantern == "n1" && *found == what
+            ),
+            "{refused:?}"
+        );
+        refusals += 1;
+    }
+    assert_eq!((skips, refusals), (4, 4));
     Ok(())
 }
