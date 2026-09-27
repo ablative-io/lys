@@ -275,6 +275,21 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Clock-free write-once gates",
+      "items": [
+        {
+          "id": "C95",
+          "text": "The block store's gate proves a second put of the same bytes writes nothing without elapsed time: before the second put it pins the shard directory's and the block file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock.",
+          "done": false
+        },
+        {
+          "id": "C96",
+          "text": "The template store's gate proves a second put of the same template writes nothing without elapsed time: before the second put it pins the template shard directory's and the template file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock.",
+          "done": false
+        }
+      ]
     }
   ]
 }

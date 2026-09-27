@@ -142,6 +142,11 @@
       "brief": "HOME-001"
     },
     {
+      "path": "crates/lys-home/src/record/blocks_tests.rs",
+      "note": "gates on the block store: once by hash, a second put proven write-free by pinned modification times, never rewritten, verifiable",
+      "brief": "HOME-013"
+    },
+    {
       "path": "crates/lys-home/src/harness/claude_code/import.rs",
       "note": "Claude Code JSONL into SessionEvents plus blocks",
       "brief": "HOME-001"
@@ -650,6 +655,16 @@
       "path": "docs/design/home/PROOF-FORK.md",
       "note": "the measured fork: Pi's parentSession read, a real session forked, rendered and launched, as hashes, counts and exit codes",
       "brief": "HOME-006"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-013.json",
+      "note": "the clock-free write-once gates: the block and template tests pin modification times instead of sleeping",
+      "brief": "HOME-013"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-013.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-013"
     }
   ],
   "inventory": [
