@@ -8,12 +8,12 @@
 //! but whether it is ready.
 
 use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::path::Path;
 use std::time::Duration;
 
 use super::config::DeploymentConfig;
 use super::error::{ErrorKind, IdentityError, IdentityResult};
+use super::loopback_http::{self, Authority, Failure, Request};
 use super::rauthy::RauthyApi;
 use crate::commands::output::Emitter;
 
@@ -37,24 +37,12 @@ pub struct Check {
     pub failure: Option<(&'static str, String)>,
 }
 
-fn connect(target: &str) -> Result<TcpStream, String> {
-    let address: SocketAddr = target
-        .to_socket_addrs()
-        .map_err(|error| error.to_string())?
-        .next()
-        .ok_or_else(|| format!("{target} resolves to no address"))?;
-    let stream =
-        TcpStream::connect_timeout(&address, TIMEOUT).map_err(|error| error.to_string())?;
-    stream
-        .set_read_timeout(Some(TIMEOUT))
-        .and_then(|()| stream.set_write_timeout(Some(TIMEOUT)))
-        .map_err(|error| error.to_string())?;
-    Ok(stream)
-}
-
 /// Checks that `PostgreSQL` answers at `target`.
 pub fn check_postgres(target: &str) -> Check {
-    let failure = match connect(target) {
+    let connected = Authority::parse(target, None)
+        .map_err(str::to_string)
+        .and_then(|authority| authority.connect(TIMEOUT));
+    let failure = match connected {
         Err(detail) => Some(("database_unreachable", detail)),
         Ok(mut stream) => {
             let mut answer = [0_u8; 1];
@@ -104,32 +92,27 @@ pub fn check_rauthy(admin_url: &str) -> Check {
 
 /// Checks `SpiceDB`'s readiness endpoint on the loopback `port`.
 pub fn check_spicedb(port: u16) -> Check {
-    let target = format!("127.0.0.1:{port}");
-    let failure = match connect(&target) {
-        Err(detail) => Some(("spicedb_unreachable", detail)),
-        Ok(mut stream) => {
-            let request =
-                format!("GET /healthz HTTP/1.1\r\nHost: {target}\r\nConnection: close\r\n\r\n");
-            let mut raw = Vec::new();
-            match stream
-                .write_all(request.as_bytes())
-                .and_then(|()| stream.read_to_end(&mut raw))
-            {
-                Ok(_) if raw.starts_with(b"HTTP/1.1 200") || raw.starts_with(b"HTTP/1.0 200") => {
-                    None
-                }
-                Ok(_) => Some((
-                    "spicedb_unready",
-                    String::from_utf8_lossy(raw.split(|b| *b == b'\r').next().unwrap_or_default())
-                        .into_owned(),
-                )),
-                Err(error) => Some(("spicedb_unreachable", error.to_string())),
-            }
+    let authority = Authority {
+        host: "127.0.0.1".to_string(),
+        port,
+    };
+    let request = Request {
+        method: "GET",
+        path: "/healthz",
+        headers: &[],
+        body: &[],
+    };
+    let failure = match loopback_http::exchange(&authority, TIMEOUT, &request) {
+        Ok(response) if response.status == 200 => None,
+        Ok(response) => Some(("spicedb_unready", format!("status {}", response.status))),
+        Err(Failure::Unreachable(detail) | Failure::Uncertain(detail)) => {
+            Some(("spicedb_unreachable", detail))
         }
+        Err(Failure::Malformed(detail)) => Some(("spicedb_unready", detail.to_string())),
     };
     Check {
         service: "spicedb",
-        target: format!("http://{target}/healthz"),
+        target: format!("http://{authority}/healthz"),
         failure,
     }
 }

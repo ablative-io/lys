@@ -42,13 +42,45 @@ fn the_declared_mapping_is_valid() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn estate_hex_values_convert_to_the_declared_hsl() {
-    assert_eq!(hex_to_hsl("#E8EAEC"), Some([210, 10, 92]));
-    assert_eq!(hex_to_hsl("#0C0E10"), Some([210, 14, 5]));
-    assert_eq!(hex_to_hsl("#1E2226"), Some([210, 12, 13]));
-    assert_eq!(hex_to_hsl("#5E8C6A"), Some([136, 20, 46]));
-    assert_eq!(hex_to_hsl("#D4975A"), Some([30, 59, 59]));
-    assert_eq!(hex_to_hsl("#FFFFFF"), Some([0, 0, 100]));
-    assert_eq!(hex_to_hsl("E8EAEC"), None);
+    assert_eq!(hex_to_hsl("#E8EAEC"), Ok([210, 10, 92]));
+    assert_eq!(hex_to_hsl("#0C0E10"), Ok([210, 14, 5]));
+    assert_eq!(hex_to_hsl("#1E2226"), Ok([210, 12, 13]));
+    assert_eq!(hex_to_hsl("#5E8C6A"), Ok([136, 20, 46]));
+    assert_eq!(hex_to_hsl("#D4975A"), Ok([30, 59, 59]));
+    assert_eq!(hex_to_hsl("#FFFFFF"), Ok([0, 0, 100]));
+    assert_eq!(
+        hex_to_hsl("E8EAEC"),
+        Err("E8EAEC is not #RRGGBB".to_string())
+    );
+    assert_eq!(
+        hex_to_hsl("#GG0000"),
+        Err("#GG0000 is not #RRGGBB".to_string())
+    );
+}
+
+#[test]
+fn to_whole_rounds_within_its_range_and_refuses_outside_it() {
+    assert_eq!(to_whole("hue", 0.0, 360), Ok(0));
+    assert_eq!(to_whole("hue", 359.5, 360), Ok(360));
+    assert_eq!(to_whole("lightness", 91.6, 100), Ok(92));
+    assert_eq!(to_whole("lightness", 45.49, 100), Ok(45));
+    assert_eq!(to_whole("saturation", 100.4, 100), Ok(100));
+    assert_eq!(to_whole("saturation", -0.4, 100), Ok(0));
+    assert_eq!(
+        to_whole("saturation", 100.5, 100),
+        Err("saturation 100.5 is outside 0 to 100".to_string())
+    );
+    assert_eq!(
+        to_whole("hue", -1.0, 360),
+        Err("hue -1 is outside 0 to 360".to_string())
+    );
+    assert_eq!(
+        to_whole("lightness", f64::NAN, 100),
+        Err("lightness NaN is outside 0 to 100".to_string())
+    );
+    for whole in 0..=360_u16 {
+        assert_eq!(to_whole("hue", f64::from(whole), 360), Ok(whole));
+    }
 }
 
 #[test]
