@@ -410,11 +410,32 @@ fn write_durably(path: &Path, contents: &[u8]) -> StoreResult<()> {
 /// Distinguishes temporary leaf names made by one process.
 static LEAF_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
+/// How many temporary names one leaf write tries before refusing.
+///
+/// A name is taken only by a leftover from an earlier process that had the
+/// same process id and wrote the same index, so a write meets one such name
+/// rarely and several in a row almost never. Each taken name costs one
+/// sequence number and is left untouched. A write that finds every name in
+/// this bound taken is not meeting leftovers but something else creating
+/// names in `leaves/`, and refusing says so where trying further would hide it.
+const LEAF_TEMP_ATTEMPTS: u32 = 16;
+
+/// The hidden temporary name a leaf is written under before it is linked:
+/// `.<pid>-<index padded to LEAF_NAME_WIDTH>-<sequence>.tmp`.
+///
+/// It begins with `.` so that opening the store never counts it, and carries
+/// the process id, the leaf index and a per-process sequence number so that no
+/// two writers share one.
+fn leaf_temp_name(pid: u32, index: u64, sequence: u64) -> String {
+    format!(".{pid}-{index:0LEAF_NAME_WIDTH$}-{sequence}.tmp")
+}
+
 /// Writes a leaf's bytes to a fresh hidden file in `leaves_dir` and flushes it.
 ///
-/// The name begins with `.` so that opening the store never counts it, and
-/// carries the process id, the leaf index and a per-process sequence number so
-/// that no two writers share one. On any failure the file is removed: a write
+/// The file is named by [`leaf_temp_name`] and created only if the name is
+/// free. A name already taken is a leftover, which is never replaced: the
+/// write takes the next sequence number and tries again, up to
+/// [`LEAF_TEMP_ATTEMPTS`] names. On any failure the file is removed: a write
 /// that fails to flush can leave bytes in the page cache that read back as if
 /// they were durable, and nothing may be linked from them.
 fn write_leaf_temp(
@@ -422,22 +443,7 @@ fn write_leaf_temp(
     index: u64,
     write_contents: impl FnOnce(&mut std::fs::File) -> std::io::Result<()>,
 ) -> StoreResult<PathBuf> {
-    let sequence = LEAF_TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    let tmp_path = leaves_dir.join(format!(
-        ".{}-{index:0LEAF_NAME_WIDTH$}-{sequence}.tmp",
-        std::process::id()
-    ));
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&tmp_path)
-        .map_err(|source| StoreError::Io {
-            context: format!(
-                "failed to create temporary leaf file {}",
-                tmp_path.display()
-            ),
-            source,
-        })?;
+    let (tmp_path, mut file) = create_leaf_temp(leaves_dir, index)?;
     let written = write_contents(&mut file)
         .map_err(|source| StoreError::Io {
             context: format!("failed to write temporary leaf file {}", tmp_path.display()),
@@ -457,6 +463,38 @@ fn write_leaf_temp(
         Ok(()) => Ok(tmp_path),
         Err(err) => Err(discard_temp(&tmp_path, err)),
     }
+}
+
+/// Creates the temporary file for the leaf at `index` under the first free
+/// name, never opening a name that already exists.
+fn create_leaf_temp(leaves_dir: &Path, index: u64) -> StoreResult<(PathBuf, std::fs::File)> {
+    let pid = std::process::id();
+    for _ in 0..LEAF_TEMP_ATTEMPTS {
+        let sequence = LEAF_TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let tmp_path = leaves_dir.join(leaf_temp_name(pid, index, sequence));
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp_path)
+        {
+            Ok(file) => return Ok((tmp_path, file)),
+            Err(source) if source.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(source) => {
+                return Err(StoreError::Io {
+                    context: format!(
+                        "failed to create temporary leaf file {}",
+                        tmp_path.display()
+                    ),
+                    source,
+                });
+            }
+        }
+    }
+    Err(StoreError::LeafTempNamesTaken {
+        index,
+        attempts: LEAF_TEMP_ATTEMPTS,
+        path: leaves_dir.to_path_buf(),
+    })
 }
 
 /// Links a flushed temporary leaf file to its final name, never replacing one.
