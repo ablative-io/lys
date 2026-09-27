@@ -163,6 +163,19 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
 - `lys.fork` (HOME-006 R3): `{child}`, the child's session id. Appended at
   the parent's head, which advances to it, once per fork; the parent gains
   this one line and no earlier byte of it changes.
+- `lys.translation` (HOME-009 R6): `{harness, codex_version, thread, head,
+  head_hash, rollout, rollout_sha256, account_sha256}`. One per translation
+  into a Codex rollout, appended beside the context path as a child of the
+  head through `append_beside`, after the rollout and its loss account are
+  both written and synced; the head does not move and no earlier byte of the
+  file changes. `harness` is `codex`, `codex_version` the measured version
+  the rollout was rendered for, `thread` the Codex thread id (the rendered
+  uuid of the head), `head` the head entry's id, `head_hash` the session head
+  hash before the append, `rollout` the rollout's path relative to `--out`
+  (never absolute), and `rollout_sha256` and `account_sha256` the SHA-256 of
+  the two files' bytes. It is the durable link from the Codex fork back to
+  the session, which a Codex compaction cannot erase; a later translation of
+  the same head lists it lost. Written only by `translate-codex`.
 
 ## The rendered uuid
 

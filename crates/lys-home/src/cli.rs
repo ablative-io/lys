@@ -187,6 +187,8 @@ pub enum Command {
     },
     /// Fork a child session from a lantern's point, with its ancestry on both sides.
     Fork(ForkArgs),
+    /// Translate a session into a Codex 0.156.0 rollout with a loss account beside it.
+    TranslateCodex(crate::cli_translate::TranslateArgs),
 }
 
 impl Command {
@@ -360,6 +362,7 @@ fn report(command: Command) -> Result<Value, HomeError> {
         Command::GivenCheck(args) => given::check(&args).map(|outcome| outcome.report),
         Command::Lantern { action } => crate::cli_lantern::run(action),
         Command::Fork(args) => crate::cli_fork::run(&args),
+        Command::TranslateCodex(args) => crate::cli_translate::run(&args),
     }
 }
 

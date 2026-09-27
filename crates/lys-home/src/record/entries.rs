@@ -37,6 +37,12 @@ pub const CUSTOM_FORK: &str = "lys.fork";
 /// entry the fork writes after the copied chain, naming the parent session,
 /// the lantern, the point and the cut.
 pub const CUSTOM_FORKED_FROM: &str = "lys.forked_from";
+/// The custom type of a translation's side leaf (HOME-009): one entry
+/// appended beside the context path naming the Codex thread a translation
+/// wrote, the head and head hash it was written from, the rollout's path
+/// relative to the out directory, and the SHA-256 of the rollout and of its
+/// loss account. It never moves the head.
+pub const CUSTOM_TRANSLATION: &str = "lys.translation";
 
 /// What a `lys.lantern` entry carries in `custom.data`. `lit_by` is a
 /// self-declared name, as the canon's curator is, not a verified identity.

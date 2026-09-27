@@ -302,6 +302,44 @@ pub enum HomeError {
         path: PathBuf,
     },
 
+    /// A file translate-codex would write already exists.
+    #[error("translate-codex target already exists: {}; choose another --out", path.display())]
+    TranslationTargetExists {
+        /// The file.
+        path: PathBuf,
+    },
+
+    /// An entry's stamp does not parse as RFC 3339, so no Codex line can
+    /// carry it and no rollout can be named from it.
+    #[error("entry {id} has a stamp that is not RFC 3339: re-import the source file")]
+    StampNotRfc3339 {
+        /// The entry's id.
+        id: String,
+    },
+
+    /// A Codex version whose rollout shape was never measured.
+    #[error(
+        "Codex {version} has no measured rollout shape: render for 0.156.0 or card a measurement of the new version"
+    )]
+    UnmeasuredCodexVersion {
+        /// The version given.
+        version: String,
+    },
+
+    /// A time zone that is absent, empty or not an IANA-shaped name.
+    #[error("TZ {value} is not an IANA time zone name: set TZ to an IANA name")]
+    UnnamedTimeZone {
+        /// The value given, or `unset` when none was.
+        value: String,
+    },
+
+    /// An IANA-shaped time zone the bundled database does not hold.
+    #[error("time zone {zone} is not in the time zone database: set TZ to an IANA name")]
+    UnknownTimeZone {
+        /// The zone given.
+        zone: String,
+    },
+
     /// The session's config directory has no name: the template's env slot
     /// sets no `CLAUDE_CONFIG_DIR` and the rendering process has no `HOME`.
     #[error(

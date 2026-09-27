@@ -25,6 +25,7 @@ lys adds nothing to Pi's grammar. Its own data rides in Pi's `custom` entries:
 | `lys.lantern_epilogue` | further words on a lantern of this session (`lantern`, `words`, `added_by`, `added_at`), appended after it |
 | `lys.forked_from`   | the child's ancestry after a fork (`parent_session`, `lantern`, `point`, `cut_at`, `coordinate_carried`, `carried`, `seed_left_out`), the first entry the fork writes after the copied chain |
 | `lys.fork`          | one fork taken from this session (`child`), appended at the head |
+| `lys.translation`   | one translation into a Codex rollout (`harness`, `codex_version`, `thread`, `head`, `head_hash`, `rollout`, `rollout_sha256`, `account_sha256`), beside the context path |
 
 One owner at a time: a session file is opened under an exclusive lock on
 `<id>.lock` beside it, held while the `Session` lives, so a second opener in
@@ -112,6 +113,30 @@ first prompt and lists the seed in its manifest, and `render` prints no
 launch line.
 A lantern before any assistant message is refused `nothing_to_fork`.
 
+`translate-codex --home <dir> --session <id> --out <dir> --codex-version <version> [--zone <iana name>]`
+translates a session imported from Claude Code into a rollout in the shape
+Codex 0.156.0 writes for its own threads (`harness/codex`), the one
+translated pair the home admits. `--out` is a Codex home directory: the
+rollout goes to `sessions/YYYY/MM/DD/rollout-<local date and time>-<thread
+id>.jsonl` under it, named from the head entry's stamp in `--zone` (read from
+`TZ` when absent; an unnamed or unknown zone is refused, and the time zone
+database is the one bundled into the build), and the loss account beside it
+as `.loss.json`. Only a measured Codex version is rendered; any other,
+`0.156` included, is refused by name. The thread id is the rendered uuid of
+the session head, so the same head writes the same bytes and each head makes
+a new thread. The thread is a fork of the session and not the same session:
+its first item is a developer message naming the source session, its head
+hash and the Codex version, and the durable link back is the account and a
+`lys.translation` side leaf that never moves the head. Every text part, tool
+call and tool result on the context path is carried whole as Codex's own
+item; readable thinking becomes text and opaque thinking is dropped; a base64
+image becomes an `input_image`, any other image is listed lost and never
+fetched; a labelled sidechain is carried as marked developer text; and the
+account names by entry id and hash what was kept, what changed and how, and
+what was lost and why, never content. The report is the two paths and the
+entry, block, kept, changed and lost counts. Codex is never run, its
+importer is never called, and its thread index is never written.
+
 What the crate does not do: interpret, print or log transcript contents (errors
 and reports carry ids, hashes, offsets and counts only; a lantern's note and
 its epilogues are the one text the crate prints, and only `lantern recall`
@@ -120,6 +145,6 @@ log or anchor; encrypt; move a home between devices; run or supervise an
 agent; talk to Norn.
 
 Design and briefs: `docs/design/home/` (HOME-001, HOME-002, HOME-003,
-HOME-004, HOME-006). Pi
+HOME-004, HOME-006, HOME-009). Pi
 reference: the checkout
 at `3d5cbe98`, `packages/coding-agent/src/core/session-manager.ts`.
