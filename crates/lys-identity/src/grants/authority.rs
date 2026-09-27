@@ -15,7 +15,7 @@ use lys_core::Ed25519Identity;
 use lys_log_store::LeafStore;
 
 use super::admission::{
-    DelegateRequest, RootRequest, Route, effective, judge_delegation, judge_revoke, judge_root,
+    DelegateRequest, RootRequest, Route, effective, judge_delegation, judge_root,
 };
 use super::error::GrantError;
 use super::events::SignedGrantEvent;
@@ -25,6 +25,7 @@ use super::permission::{RelationshipStore, confirm};
 use super::projection::GrantBook;
 use super::receipt::GrantReceipt;
 use super::recovery::GrantLedger;
+use super::revocation::judge_revoke;
 use super::types::{Action, Grant, GrantId, Resource, Source};
 use crate::id::{IdentityId, PersonId};
 use crate::log::Reopen;

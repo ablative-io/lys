@@ -285,3 +285,18 @@ impl<S: LeafStore, R: RelationshipStore> World<S, R> {
         self.grants.revision()
     }
 }
+
+impl<S: LeafStore, R: RelationshipStore> std::fmt::Debug for World<S, R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("World")
+            .field("admin", &self.admin)
+            .field("dana", &self.dana)
+            .field("tom", &self.tom)
+            .field("lee", &self.lee)
+            .field("tom_agent", &self.tom_agent)
+            .field("dana_agent", &self.dana_agent)
+            .field("now", &self.now)
+            .field("dir", &self.dir.path())
+            .finish_non_exhaustive()
+    }
+}

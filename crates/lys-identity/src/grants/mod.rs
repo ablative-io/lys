@@ -7,12 +7,14 @@ pub mod authority;
 pub mod codec;
 pub mod error;
 pub mod events;
+pub mod expiry;
 pub mod lineage;
 pub mod model;
 pub mod permission;
 pub mod projection;
 pub mod receipt;
 pub mod recovery;
+pub mod revocation;
 pub mod types;
 
 pub use admission::{DelegateRequest, RootRequest, Route};
@@ -25,7 +27,7 @@ pub use events::{
 };
 pub use lineage::Lineage;
 pub use model::{Model, Within};
-pub use permission::{MemoryRelationships, ObjectRef, Relationship, RelationshipStore};
+pub use permission::{MemoryRelationships, ObjectRef, Relationship, RelationshipStore, SCHEMA};
 pub use projection::{GrantBook, GrantRecord, Revocation};
 pub use receipt::{GrantReceipt, verify_grant_receipt};
 pub use recovery::{GrantLedger, Uncertain};
