@@ -99,6 +99,12 @@ impl<P: PermissionCheck> Broker<P> {
 
     /// Whether the handle's identity still holds the use relation.
     pub(super) fn permitted(&self, record: &HandleRecord) -> Result<(), SecretsError> {
+        self.within_scope(&record.identity, &record.secret)
+            .map_err(|reason| SecretsError::PermissionDenied {
+                holder: record.identity.clone(),
+                secret: record.secret.clone(),
+                reason,
+            })?;
         self.permissions
             .may_use(&record.identity, &record.secret)
             .map(|_permit| ())

@@ -21,6 +21,7 @@ pub struct SpiceGrants {
     action: Action,
     read_action: Action,
     lend_action: Action,
+    member_action: Action,
 }
 
 impl std::fmt::Debug for SpiceGrants {
@@ -50,7 +51,7 @@ impl SpiceGrants {
         config: &Path,
         action: &str,
         read_action: &str,
-        lend_action: &str,
+        [lend_action, member_action]: [&str; 2],
     ) -> Result<Self, SecretsError> {
         let config = Config::load(config)
             .map_err(|error| refused(format!("the directory configuration: {error}")))?;
@@ -65,11 +66,14 @@ impl SpiceGrants {
         let action = Action::new(action).map_err(|error| refused(error.to_string()))?;
         let read_action = Action::new(read_action).map_err(|error| refused(error.to_string()))?;
         let lend_action = Action::new(lend_action).map_err(|error| refused(error.to_string()))?;
+        let member_action =
+            Action::new(member_action).map_err(|error| refused(error.to_string()))?;
         Ok(Self {
             engine,
             action,
             read_action,
             lend_action,
+            member_action,
         })
     }
 }
@@ -93,18 +97,37 @@ impl PermissionCheck for SpiceGrants {
     fn may_lend(&self, identity: &str, secret: &str) -> Result<Permitted, Denied> {
         self.check(&self.lend_action, identity, secret)
     }
+
+    fn member_of(&self, identity: &str, target: &str) -> Result<Permitted, Denied> {
+        let Some((kind, name)) = target.split_once('/') else {
+            return Err(Denied {
+                reason: format!("{target} is not a scope"),
+                no_person_root: false,
+            });
+        };
+        self.check_on(&self.member_action, identity, kind, name)
+    }
 }
 
 impl SpiceGrants {
     fn check(&self, action: &Action, holder: &str, secret: &str) -> Result<Permitted, Denied> {
+        self.check_on(action, holder, SECRET_KIND, secret)
+    }
+
+    fn check_on(
+        &self,
+        action: &Action,
+        holder: &str,
+        kind: &str,
+        secret: &str,
+    ) -> Result<Permitted, Denied> {
         let denied = |reason: String| Denied {
             reason,
             no_person_root: false,
         };
         let subject = identity(holder)
             .ok_or_else(|| denied(format!("{holder} is not a directory identity id")))?;
-        let resource =
-            Resource::new(SECRET_KIND, secret).map_err(|error| denied(error.to_string()))?;
+        let resource = Resource::new(kind, secret).map_err(|error| denied(error.to_string()))?;
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_or(0, |elapsed| elapsed.as_secs());
@@ -113,7 +136,7 @@ impl SpiceGrants {
                 person: "the directory's grant chain".to_owned(),
             }),
             Ok(false) => Err(denied(format!(
-                "the directory gives no {} on {SECRET_KIND}/{secret}",
+                "the directory gives no {} on {kind}/{secret}",
                 action.as_str()
             ))),
             Err(error) => Err(denied(format!(
@@ -162,6 +185,13 @@ impl PermissionCheck for Grants {
         match self {
             Self::File(file) => file.may_lend(identity, secret),
             Self::Directory(engine) => engine.may_lend(identity, secret),
+        }
+    }
+
+    fn member_of(&self, identity: &str, target: &str) -> Result<Permitted, Denied> {
+        match self {
+            Self::File(file) => file.member_of(identity, target),
+            Self::Directory(engine) => engine.member_of(identity, target),
         }
     }
 }

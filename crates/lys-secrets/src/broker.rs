@@ -27,6 +27,7 @@ mod lineage;
 mod oauth_grants;
 mod records;
 mod rotation;
+mod scope;
 mod spawn;
 mod using;
 
@@ -340,6 +341,7 @@ impl<P: PermissionCheck> Broker<P> {
         not_after_ms: i64,
         spend_cap: Option<u64>,
     ) -> Result<IssuedHandle, SecretsError> {
+        self.discoverable(&holder.identity, secret)?;
         match self.store.entry(secret).map(|entry| entry.class) {
             None => {
                 return Err(SecretsError::SecretUnknown {

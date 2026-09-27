@@ -226,6 +226,13 @@ impl<P: PermissionCheck> Broker<P> {
             });
         }
         self.recipient_admitted(&child.identity, &parent.secret)?;
+        if let Err(reason) = self.within_scope(&child.identity, &parent.secret) {
+            return Err(SecretsError::PermissionDenied {
+                holder: child.identity.clone(),
+                secret: parent.secret.clone(),
+                reason,
+            });
+        }
         if let Err(denied) = self.permissions.may_use(&child.identity, &parent.secret) {
             return Err(SecretsError::PermissionDenied {
                 holder: child.identity.clone(),

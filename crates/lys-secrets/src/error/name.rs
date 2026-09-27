@@ -48,6 +48,7 @@ impl SecretsError {
             Self::KeyNotReadable { .. } => "KeyNotReadable",
             Self::NotFound => "NotFound",
             Self::RecipientRefused { .. } => "RecipientRefused",
+            Self::InvalidScope { .. } => "InvalidScope",
             Self::LendingNotPermitted { .. } => "LendingNotPermitted",
             Self::BeyondAncestry { .. } => "BeyondAncestry",
             Self::MemoryNotUsable { .. } => "MemoryNotUsable",

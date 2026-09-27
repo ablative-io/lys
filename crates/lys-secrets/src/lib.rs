@@ -37,7 +37,7 @@ pub use local_grants::{LocalGrants, SecretRelation};
 pub use oauth::{OAuthGrant, Provenance, REFRESH_MARGIN_MS};
 pub use permission::{Denied, PermissionCheck, Permitted, Relation};
 pub use secret::Secret;
-pub use store::{AccountView, EntryClass, EntryView, Recipients, SecretStore};
+pub use store::{AccountView, EntryClass, EntryView, Recipients, Scope, SecretStore};
 
 /// `bytes` as lowercase hex.
 pub fn to_hex(bytes: &[u8]) -> String {
