@@ -187,9 +187,6 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - `vendor/rauthy` — the maintained Rauthy fork (ADR-009), the git submodule pinned at dd61ac3c84d6b238108dc8438b53043b5177a662, the upstream v0.36.2 commit the ablative branch was created from; DIRECTORY-004 moves the pin (structure row); read here, never changed by a document row
 - `crates/lys` — the lys CLI crate: Cargo.toml, src/main.rs, src/cli.rs and src/commands/ (attest, ca, key, log, inspect, files); DIRECTORY-002 adds src/identity/ and the identity subcommand to it (structure rows)
 - `docs/design/decisions.json` — the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row
-- `docs/design/project.json` — the project's gate trees: one tree '.', seven legs, every one cadence 'round'; the schema admits 'round' and 'demand'
-- `CLAUDE.md` — the repository's standing instructions; 'Gates before any commit' lists six commands and sh scripts/design/gate.sh is not among them
-- `.land/gates.sh` — the land gate: runs sh scripts/design/gate.sh and the six lys legs on every land, with no cadence; read, never changed by DIRECTORY-025
 
 ## Constraints
 

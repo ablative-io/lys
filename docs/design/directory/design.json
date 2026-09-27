@@ -667,18 +667,6 @@
     {
       "path": "docs/design/decisions.json",
       "note": "the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row"
-    },
-    {
-      "path": "docs/design/project.json",
-      "note": "the project's gate trees: one tree '.', seven legs, every one cadence 'round'; the schema admits 'round' and 'demand'"
-    },
-    {
-      "path": "CLAUDE.md",
-      "note": "the repository's standing instructions; 'Gates before any commit' lists six commands and sh scripts/design/gate.sh is not among them"
-    },
-    {
-      "path": ".land/gates.sh",
-      "note": "the land gate: runs sh scripts/design/gate.sh and the six lys legs on every land, with no cadence; read, never changed by DIRECTORY-025"
     }
   ],
   "constraints": [
