@@ -91,4 +91,90 @@ pub enum IdentityError {
     /// An event's signature does not verify.
     #[error("SignatureInvalid: the event's signature does not verify")]
     SignatureInvalid,
+    /// The log could not be opened, read or written.
+    #[error("LogUnavailable: {reason}")]
+    LogUnavailable {
+        /// What the log store reported.
+        reason: String,
+    },
+    /// A leaf of the log is not an event signed by this directory's service key.
+    #[error(
+        "LeafNotAnEvent: leaf {index} is not an identity event this directory signed: {reason}"
+    )]
+    LeafNotAnEvent {
+        /// The leaf's index.
+        index: u64,
+        /// Why it was refused.
+        reason: String,
+    },
+    /// An append failed and whether its leaf reached the log is not yet known.
+    #[error(
+        "AppendUncertain: whether leaf {index} was committed is not yet known, and nothing is answered as current until it is"
+    )]
+    AppendUncertain {
+        /// The index the uncertain leaf was written at.
+        index: u64,
+    },
+    /// An append failed and its leaf is known not to be in the log.
+    #[error("AppendRefused: the change was not recorded: {reason}")]
+    AppendRefused {
+        /// What the log store reported.
+        reason: String,
+    },
+    /// A change names an identity the directory does not hold.
+    #[error("IdentityUnknown: the directory holds no identity {identity}")]
+    IdentityUnknown {
+        /// The identity named.
+        identity: String,
+    },
+    /// A registration names an identity the directory already holds.
+    #[error("AlreadyRegistered: {identity} is already registered")]
+    AlreadyRegistered {
+        /// The identity named.
+        identity: String,
+    },
+    /// A login is already bound to a person.
+    #[error("BindingTaken: the login {subject} at {issuer} is already bound to {person}")]
+    BindingTaken {
+        /// The login's issuer.
+        issuer: String,
+        /// The login's subject.
+        subject: String,
+        /// The person it is bound to.
+        person: String,
+    },
+    /// A transition names a from-state the identity is not in.
+    #[error("StateMismatch: {identity} is {recorded}, not {from}")]
+    StateMismatch {
+        /// The identity named.
+        identity: String,
+        /// The state the directory records.
+        recorded: LifecycleState,
+        /// The state the transition named.
+        from: LifecycleState,
+    },
+    /// An operation id was already used for a different change.
+    #[error("OperationReused: {operation} already names a different change")]
+    OperationReused {
+        /// The operation id.
+        operation: String,
+    },
+    /// A link-audit source operation id was already accepted.
+    #[error("LinkSourceSeen: source operation {source_operation_id} was already accepted")]
+    LinkSourceSeen {
+        /// The source's operation id.
+        source_operation_id: String,
+    },
+    /// A receipt does not match the signed event and log position it is checked against.
+    #[error("ReceiptInvalid: {reason}")]
+    ReceiptInvalid {
+        /// The first thing that did not match.
+        reason: &'static str,
+    },
+    /// The service key file could not be loaded.
+    #[error("KeyUnavailable: {reason}")]
+    KeyUnavailable {
+        /// What loading the key reported.
+        reason: String,
+    },
 }

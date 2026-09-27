@@ -192,3 +192,13 @@ fn decode_kid(protected: &[u8]) -> Result<Vec<u8>, IdentityError> {
         .find(|(key, _)| matches!(as_uint(key, SHAPE), Ok(4)))
         .map_or_else(|| Err(malformed(SHAPE)), |(_, kid)| as_bytes(kid, SHAPE))
 }
+
+/// Load the service's event signing key from the key file the operator supplies.
+///
+/// The key is held by lys-core's `Ed25519Identity`, in zeroizing memory, and
+/// never printed: its debug form is redacted.
+pub fn load_service_key(path: &std::path::Path) -> Result<Ed25519Identity, IdentityError> {
+    Ed25519Identity::load(path).map_err(|error| IdentityError::KeyUnavailable {
+        reason: error.to_string(),
+    })
+}
