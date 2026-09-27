@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on genesis-as-delegation.
 //!
 //! # What is deliberately NOT tested here

@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the template store: named by hash, written once, never rewritten,
 //! and absent until the first template is stored.
 

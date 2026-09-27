@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on the fork's names and refusals (HOME-006 R1) and on resolving
 //! and cutting (R2): the two custom types are named as the record states,
 //! each refusal names itself and its ids, the cut is the chain to the last

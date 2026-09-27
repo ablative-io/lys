@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the `template_render` event: under the 512-byte cap with long
 //! paths riding in the manifest block, the five earlier kinds and the cap
 //! unchanged, and RECORD.md naming the kind and the manifest's fields.

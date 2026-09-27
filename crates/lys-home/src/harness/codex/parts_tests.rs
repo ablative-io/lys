@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on one message entry into Codex 0.156.0 response items (HOME-009
 //! R3): each part carried whole as Codex's own item, thinking as text, a
 //! base64 image as `input_image`, opaque and unplaceable parts lost with their

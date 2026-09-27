@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! End-to-end integration tests for the `lys log` command family.
 //!
 //! Every test drives the compiled binary through real process spawns
@@ -7,7 +8,6 @@
 //! The tamper matrices assert the non-oracle discipline: every tamper class
 //! within one artifact class produces the identical exit code AND stderr.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};

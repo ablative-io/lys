@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on newer-root derivation from a consistency path.
 //!
 //! # The sweep is the reason this walk can be trusted at all

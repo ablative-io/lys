@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Shared Go-toolchain harness for the conformance gates.
 //!
 //! Both `cose_conformance` and `bundle_conformance` shell out to the same
@@ -15,7 +16,6 @@
 //! CI. A toolchain that is present but *broken* is always a hard failure —
 //! [`build_go_tool`] panics rather than treating it as absent.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::ffi::OsStr;
 use std::io::Write;

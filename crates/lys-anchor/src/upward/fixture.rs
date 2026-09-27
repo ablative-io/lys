@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Scaffolding shared by the cascade gates: anchors that can be pinned to one
 //! another.
 //!

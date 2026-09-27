@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on [`Anchor::status`], [`AnchorStatus`] and [`WitnessPosture`].
 //!
 //! # Which assertion here is evidence and which is not, said before either

@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on the read-only reader (HOME-004 R2): it reads a held session,
 //! writes nothing beside the file, leaves the lock alone, and lists every
 //! session of a home and nothing else. The fixture home here is the one the

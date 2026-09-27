@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the file-backed store.
 //!
 //! # The two absent-checks are tested SEPARATELY, on purpose

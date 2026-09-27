@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on the lys.given entry: read back equal, the data's exact keys, the
 //! config directory's two sources, the fixed kinds, names and never values,
 //! the entry line's exact top-level keys, parented on the render event with

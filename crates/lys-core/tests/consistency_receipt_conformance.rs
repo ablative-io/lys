@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! D6 conformance gate for `lys/consistency-receipt/v1`: round-trip the
 //! artifact against the vendored Go `veraison/go-cose`.
 //!
@@ -46,7 +47,6 @@
 //! skip when `LYS_REQUIRE_GO` is set.
 
 #![cfg(feature = "unstable-anchor")]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod harness;
 

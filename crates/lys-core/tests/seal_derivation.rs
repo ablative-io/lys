@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Second-party pin on the `lys/sealed-envelope/v1` key derivation (D6/C45):
 //! an independent re-derivation of the HKDF output, written from the
 //! specification rather than from the implementation.
@@ -59,7 +60,6 @@
 //! plaintext is the original payload. That is the assertion which proves the
 //! derivation here is genuinely correct rather than merely self-consistent.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use aes_gcm::aead::{Aead, KeyInit, Payload};
 use aes_gcm::{Aes256Gcm, Key, Nonce};

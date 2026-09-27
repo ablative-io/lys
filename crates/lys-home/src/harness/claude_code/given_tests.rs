@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on the resolution: the measured order, absent positions omitted,
 //! one directory's three files in the request's order, the config directory
 //! from the template or from HOME, the user CLAUDE.md listed once, the slug

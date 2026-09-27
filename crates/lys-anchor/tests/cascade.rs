@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! The cascade gate: a real two- and three-anchor cascade, packaged, and handed
 //! to a judge that has never heard of this crate.
 //!
@@ -59,7 +60,6 @@
 //! is recorded here rather than rediscovered.
 
 #![cfg(feature = "federation")]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::path::Path;
 

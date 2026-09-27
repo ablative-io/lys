@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on [`observe`] — one rule per case, and **every negative case opens
 //! with a positive control as its first assertion**.
 //!

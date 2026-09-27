@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on the fork (HOME-006 R3): the child's lines hash-equal the
 //! parent's, `lys.forked_from` is the child's head with the ancestry as
 //! data, the header names the parent file relative to the home, a carried

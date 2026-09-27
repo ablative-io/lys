@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the canon: examples copied whole with their signatures behind a
 //! `lys.inherited` entry, no example twice, no authored thinking, and a render
 //! that places the canon first and applies the thinking rule to it.

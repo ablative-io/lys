@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! `ID001_DEPLOY`'s restart line: a restart, and a full stop and start of the
 //! compose project, preserve the issuer's identity (its issuer URL and
 //! signing keys) and the database's contents. Container-backed: runs only on

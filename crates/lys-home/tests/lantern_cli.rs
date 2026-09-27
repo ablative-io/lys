@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! The lantern subcommands run as the binary (HOME-004 R6): each report's
 //! exact keys, each refusal's exit code with nothing on stdout, clap's
 //! refusals, and no transcript line anywhere in the output.
