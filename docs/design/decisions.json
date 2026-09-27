@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,42 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-076",
+      "title": "A role is a set of grant templates copied at grant time, not a live group",
+      "status": "proposed",
+      "scope": "directory",
+      "date": "",
+      "decided_by": "",
+      "context": "Conformance row 4.7 (docs/design/identity/CONFORMANCE.md) is open: role as live group or template copied at grant time. ADR-006's consequence says the same stays open, while ADR-006 itself forbids a holder changing version silently as a side effect of an edit. The roles card decides the row. Written by Apollo as author with the roles brief DIRECTORY-021, with Archie as second reader. Recorded as proposed: it becomes decided only when Tom rules on it or signs the card off. It answers the sentence ADR-006 left open and cites ADR-006; it does not supersede it.",
+      "decision": "A role is a template copied at grant time, not a live group. A holding names the role and the version it holds, the grants it carries are made from that version's templates when the holding is granted, and an edit to the role changes none of them. Who holds a role remains answerable as a query over holdings. Only the versioned grant templates make a version; a title edit is recorded and makes no version, and conformance 4.1's job and profile stay proposed and outside. Rejected: a live group, whose membership carries the role's current grants, because a live group would change every holder's permissions at the moment of the edit, which ADR-006 forbids.",
+      "quote": "",
+      "consequences": [
+        "A holding records its role, its version and the ids of the grants copied into it; nothing links a granted holding's grants to later versions.",
+        "Editing a role's templates makes the next version and changes no holding, grant or end date.",
+        "Who holds a role, and on which version, is answered from the holdings, never from a member list kept on the role."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-077",
+      "title": "A holding with an end date moves at its next renewal by default; one without moves only by a deliberate act",
+      "status": "proposed",
+      "scope": "directory",
+      "date": "",
+      "decided_by": "",
+      "context": "Conformance row 4.6 (docs/design/identity/CONFORMANCE.md) is open: which policy is the default. ADR-006 says a holder moves by a deliberate recorded act or by an explicit rule shown in advance, such as a move at the next renewal, and that which of the two is the default is open. No brief on the main branch defines a renewal, so the roles brief introduces it as a recorded act. Written by Apollo as author with the roles brief DIRECTORY-021, with Archie as second reader. Recorded as proposed: it becomes decided only when Tom rules on it or signs the card off. It answers the sentence ADR-006 left open and cites ADR-006; it does not supersede it.",
+      "decision": "A move at the next renewal is the default for a holding with an end date, shown on the holder as the date it will move, which is the holding's end date, with the words that its next renewal moves it to the current version and who can stop the move. A renewal, which the roles brief introduces, is a deliberate recorded act by the person the holder answers to (the responsible person of ADR-011) or by an owner of the role's project: a new grant of the holding with a new end date, recorded naming the actor, the holding it renews and the version it lands on. So the move rides on a deliberate recorded act and no holder ever moves without one; unrenewed, the holding lapses at its end date under ADR-006 and does not move. A holding with no end date has no renewal, so whatever the role's default it moves only by a deliberate act, and the screen says so on that holder. A role carries a default policy, and a newly made role's default is a move at the next renewal; a holding with an end date takes that default at grant time, and the person the holder answers to or an owner of the role's project may change the policy of one holding afterwards, recorded with who did it and in which capacity. The holding's own policy governs it. Under a move only by a deliberate act a renewal is made at the version the holding holds; under a move at the next renewal it is made at the role's current version. Changing a role's default applies to holdings granted after the change and moves nothing that exists. Rejected: holders staying on their version until moved as the default for a holding with an end date, because the renewal is a deliberate recorded act the move can ride on; and a policy set only per role, because one holding could not then be kept apart.",
+      "quote": "",
+      "consequences": [
+        "Each holding shows its policy; one with an end date under a move at the next renewal shows its end date as its move date, the words that its next renewal moves it to the current version, and who can stop the move.",
+        "The role screen shows the role's default and marks each holding whose policy differs from it.",
+        "Nothing renews a holding but the renewal act; a version change never extends an end date (ADR-006)."
       ],
       "supersedes": [],
       "superseded_by": ""

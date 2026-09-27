@@ -47,3 +47,18 @@
 - [ ] **C28** — Observed grant usage names its source and time; not seen is not reported as never used.
 - [ ] **C29** — The You and delegation screens show real server authority, separate service accounts from sign-in identities, and preserve personal versus administrator visibility.
 - [ ] **C30** — The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success.
+
+## Roles and their versions
+
+- [ ] **C169** — Roles, versions and holdings are typed records whose every act is one signed directory event naming the authenticated actor and its capacity, and a committed version never changes.
+- [ ] **C170** — Project ownership is the explicit owner relation on the project in the directory's authorization model, given only by the directory's configured administrator or an existing owner of that project, and never inferred from a name, label or rank.
+- [ ] **C171** — Every role-version check is answered through one server-side seam, SpiceDB's evaluator once it is on the main branch, and no request body supplies an actor, a capacity or a permission.
+- [ ] **C172** — Assigning a role, by the person the agent answers to or an owner of the role's project, makes a holding that names its role and version with grants copied from that version's templates, each admitted under DIRECTORY-006 for the assigning actor (conformance 4.7, ADR-076).
+- [ ] **C173** — Editing a role's grant templates makes the next version and leaves every holder on the version it held with its grants unchanged; editing its title is recorded and makes no version; a newly made role's default is move at the next renewal (conformance 4.2).
+- [ ] **C174** — Who holds a role, and on which version, is answered as a query over holdings.
+- [ ] **C175** — A move by hand shows what it adds and removes before it is taken, is admitted only for the person the holder answers to or an owner of the role's project, and is one signed record naming the actor, its capacity and the timing chosen (conformance 4.3).
+- [ ] **C176** — A move at the holder's next start leaves a running session on the version it started with, and a move now, taken only by the admitted operator, stops every open session of the agent first and names each in the move's record.
+- [ ] **C177** — A renewal is a new grant of the holding with a new end date by the person the holder answers to or an owner of the role's project, at the role's current version under a move at the next renewal and at the held version otherwise, recorded naming the actor, the holding and the version; an unrenewed holding lapses and does not move (conformance 4.4).
+- [ ] **C178** — Each holding shows its policy; one with an end date under a move at the next renewal shows its end date, that its next renewal moves it to the current version, and who can stop the move; one with no end date shows it moves only by a deliberate act; a holding's policy and a role's default change only by recorded acts that move no holder (conformance 4.4, ADR-077).
+- [ ] **C179** — A provisional holding's end date is on its grants and is the same after a role edit and after a move (the roles half of conformance 4.5).
+- [ ] **C180** — The role screen shows versions, holders on each version, move dates, policies and the move preview from the server's answers, shows Assign only to the person the holder answers to and the owners of the role's project, and offers an act only where the server says it is permitted.

@@ -33,3 +33,23 @@
 **S11.** As a person granting temporary access, I want its end date and ancestor restrictions enforced, so role changes or reinstatement cannot silently extend it.
 
 **S12.** As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
+
+## Person a role holder answers to — Keeps each holding of a role on a version they chose
+
+**S71.** As the person an agent answers to, I want an edit to its role to leave the agent on the version it holds so that its permissions never change without an act I can see.
+
+**S73.** As the person a holder answers to or an owner of its role's project, I want to see the date each holding will move and who can stop it, and to change one holding's policy, so that no move surprises me.
+
+**S74.** As the person a provisional holder answers to or an owner of its role's project, I want renewing its holding to be a recorded act of one of us so that it is never renewed quietly and lapses when nobody renews it.
+
+## Mover of a holder — Moves a holder to a newer version of its role
+
+**S72.** As the person a holder answers to or an owner of the project its role is defined in, I want to see what a move adds and removes, and choose when it takes effect, before I take it so that I move a holder knowing what it gains and loses.
+
+## Reviewer of a role's history — Checks how each holder came to its version
+
+**S75.** As a reviewer, I want every role act recorded with who made it and in which capacity so that I can verify how a holder came to the version it is on.
+
+## Owner of a project — Defines the roles of a project and assigns them
+
+**S76.** As an owner of a project, I want to make and edit its roles and assign them to agents without any existing holder changing so that a role can improve without silently changing what its holders may do.

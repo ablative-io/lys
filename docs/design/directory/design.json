@@ -50,7 +50,9 @@
     "ADR-008",
     "ADR-009",
     "ADR-010",
-    "ADR-011"
+    "ADR-011",
+    "ADR-076",
+    "ADR-077"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -585,6 +587,181 @@
       "path": "docs/design/directory/briefs/DIRECTORY-008.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-008"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-021.json",
+      "note": "the roles and their versions brief, conformance 4.2 to 4.5 (roles half)",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-021.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/src/roles/mod.rs",
+      "note": "R1: Define the role, version and holding records and their signed events",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/src/roles/types.rs",
+      "note": "R1: Define the role, version and holding records and their signed events",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/src/roles/events.rs",
+      "note": "R1: Define the role, version and holding records and their signed events",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/src/roles/error.rs",
+      "note": "R1: Define the role, version and holding records and their signed events",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/tests/roles_records.rs",
+      "note": "R1: Define the role, version and holding records and their signed events",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/src/roles/check.rs",
+      "note": "R2: Test project ownership by the explicit owner relation, and answer every role-version check through one seam",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/src/roles/ownership.rs",
+      "note": "R2: Test project ownership by the explicit owner relation, and answer every role-version check through one seam",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/tests/roles_check.rs",
+      "note": "R2: Test project ownership by the explicit owner relation, and answer every role-version check through one seam",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/src/roles/holding.rs",
+      "note": "R3: Assign a holding at the role's current version, its grants copied from that version's templates",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/tests/roles_assign.rs",
+      "note": "R3: Assign a holding at the role's current version, its grants copied from that version's templates",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/src/roles/edit.rs",
+      "note": "R4: Make a role and a new version when its templates are edited, record a title edit, and move no holder",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/tests/roles_edit.rs",
+      "note": "R4: Make a role and a new version when its templates are edited, record a title edit, and move no holder",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/src/roles/holders.rs",
+      "note": "R5: Answer who holds a role, and on which version, as a query over holdings",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/tests/roles_holders.rs",
+      "note": "R5: Answer who holds a role, and on which version, as a query over holdings",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/src/roles/move_holder.rs",
+      "note": "R6: Move a holder to a newer version by a deliberate act that shows what changes first",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/tests/roles_move.rs",
+      "note": "R6: Move a holder to a newer version by a deliberate act that shows what changes first",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/src/roles/timing.rs",
+      "note": "R7: Keep a running session on the version it started with, and stop every open session first for a move now",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/tests/roles_move_timing.rs",
+      "note": "R7: Keep a running session on the version it started with, and stop every open session first for a move now",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/src/roles/renewal.rs",
+      "note": "R8: Renew a holding as a new recorded grant, at the version its policy names",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/tests/roles_renewal.rs",
+      "note": "R8: Renew a holding as a new recorded grant, at the version its policy names",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/src/roles/policy.rs",
+      "note": "R9: Show each holding's policy, move date and who can stop the move, and change a holding's policy or a role's default by a recorded act",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/tests/roles_policy.rs",
+      "note": "R9: Show each holding's policy, move date and who can stop the move, and change a holding's policy or a role's default by a recorded act",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity-server/src/roles.rs",
+      "note": "R10: Expose the role acts through the identity server, which alone decides them, and carry the owner relation into SpiceDB",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/roles.rs",
+      "note": "R10: Expose the role acts through the identity server, which alone decides them, and carry the owner relation into SpiceDB",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "crates/lys-identity/tests/roles_owner_relationship.rs",
+      "note": "R10: Expose the role acts through the identity server, which alone decides them, and carry the owner relation into SpiceDB",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "surface/identity/src/features/roles/RoleVersions.tsx",
+      "note": "R11: Show versions, holders, move dates and the move preview on the role screen from the server's answers",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "surface/identity/src/features/roles/RoleHolders.tsx",
+      "note": "R11: Show versions, holders, move dates and the move preview on the role screen from the server's answers",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "surface/identity/src/features/roles/MoveHolder.tsx",
+      "note": "R11: Show versions, holders, move dates and the move preview on the role screen from the server's answers",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "surface/identity/src/features/roles/HoldingPolicy.tsx",
+      "note": "R11: Show versions, holders, move dates and the move preview on the role screen from the server's answers",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "surface/identity/src/features/roles/RoleBuilder.tsx",
+      "note": "R11: Show versions, holders, move dates and the move preview on the role screen from the server's answers",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "surface/identity/src/features/roles/AssignRole.tsx",
+      "note": "R11: Show versions, holders, move dates and the move preview on the role screen from the server's answers",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "surface/identity/tests/roles.test.tsx",
+      "note": "R11: Show versions, holders, move dates and the move preview on the role screen from the server's answers",
+      "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "surface/identity/tests/acceptance/roles.spec.ts",
+      "note": "R11: Show versions, holders, move dates and the move preview on the role screen from the server's answers",
+      "brief": "DIRECTORY-021"
     }
   ],
   "inventory": [
@@ -686,12 +863,19 @@
   "gate": [
     {
       "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
       "legs": [
         {
           "name": "fmt",
           "command": "cargo fmt --all",
           "requires": [
-            "place:here"
+            "tool:cargo",
+            "tool:rustfmt"
           ],
           "cadence": "round"
         },
@@ -699,7 +883,7 @@
           "name": "clippy-all-features",
           "command": "cargo clippy --all-targets --all-features -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -707,7 +891,7 @@
           "name": "clippy",
           "command": "cargo clippy --all-targets -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -715,7 +899,7 @@
           "name": "tests",
           "command": "cargo test --workspace --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -723,7 +907,7 @@
           "name": "doc-all-features",
           "command": "cargo doc --no-deps --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -731,36 +915,16 @@
           "name": "doc",
           "command": "cargo doc --no-deps",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        }
-      ]
-    },
-    {
-      "tree": "docs",
-      "legs": [
-        {
-          "name": "render",
-          "command": "python3 ../scripts/design/render-cluster.py design/directory",
-          "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
         {
-          "name": "validate",
-          "command": "python3 ../scripts/design/validate.py design/directory",
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        },
-        {
-          "name": "coverage",
-          "command": "python3 ../scripts/design/check-coverage.py design/directory",
-          "requires": [
-            "place:here"
+            "tool:sh",
+            "tool:python3"
           ],
           "cadence": "round"
         }
