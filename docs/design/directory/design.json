@@ -2,8 +2,8 @@
   "cluster": "directory",
   "title": "The standalone identity directory, with every grant rooted in a person",
   "intention": "An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change. Cambium later uses this issuer, keeping its participant ids (rows 06 and 07); that direction is recorded here while rows 06 and 07 stay the non-goal recorded below, and this sentence promises neither row.",
-  "problem": "IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands.",
-  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.",
+  "problem": "IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands. DIRECTORY-002 will install the maintained Rauthy, SpiceDB and one PostgreSQL database, but no gate leg starts the Rauthy container and checks it, and the release row holds that gap as a blocker. A leg declared only in docs/design/project.json would not reach a directory round either, because a round reads this cluster's gate.",
+  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.\n\nThe Rauthy readiness leg (DIRECTORY-009) closes the release row's missing Rauthy check without touching landing. It is one demand-cadence leg, rauthy-ready, declared in docs/design/project.json and in this cluster's gate, and a round never runs it unless asked. Until the method can request a demand leg, a person runs its command at the venue. Its command is one standard-library Python script under scripts/identity-gates/. The script reads the vendor/rauthy pin from git and the two image digests from DIRECTORY-002's deploy/identity/versions.json, so no digest is duplicated. It accepts only a Rauthy image whose OCI revision label equals the pin (ADR-009). That makes a pin move refuse until an image of the new pin exists, instead of passing while checking other software. It starts that image against its own scratch PostgreSQL container (ADR-005), so nothing is configured and no other service is needed (ADR-004). Every object carries a per-run name and label, and only that run's objects are removed. Rauthy's port is read from its own container, never assumed. Secrets are generated per run and reach the runtime only through private env files. The leg is a check, not a provisioning engine: it leaves nothing behind. A Rust test run by the tests leg drives the script against a stub runtime, keying its secret search on what the runtime received.",
   "principles": [
     {
       "id": "P1",
@@ -57,7 +57,8 @@
     "The grant path (create an agent under a person, grant it a project, the action is allowed, revoke or suspend, the same action is refused) is a requirement of the row that owns it, with acceptance criteria; where the sources do not settle the row, it is recorded open for Tom in DIRECTORY-003 with its criteria drafted.",
     "Every decision still open for Tom is recorded as open and decided nowhere in this cluster.",
     "The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6).",
-    "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record."
+    "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record.",
+    "The rauthy-ready leg is declared with cadence demand in docs/design/project.json and in this cluster's gate, both files validate, and the leg exits 0 at the venue only on Rauthy's ready answer (DIRECTORY-009)."
   ],
   "non_goals": [
     {
@@ -103,6 +104,22 @@
     {
       "text": "A shared design-system package extracted for every product",
       "reason": "Tom left it as a thing to look at, not a row (ADR-010)."
+    },
+    {
+      "text": "A demand leg for SpiceDB readiness on the shared database",
+      "reason": "DIRECTORY-002 also installs SpiceDB, but the readiness leg's words name only Rauthy and its scratch database."
+    },
+    {
+      "text": "Building a Rauthy image from the vendor/rauthy pin",
+      "reason": "It is needed only once the pin moves off the upstream v0.36.2 commit, it is a heavy build of its own, and it is the rebase card's work."
+    },
+    {
+      "text": "A way for the method to request a demand leg and record its outcome",
+      "reason": "It lives in the design-system repository and changes the ledger for every project; design-system card 9jJgCzeG carries it."
+    },
+    {
+      "text": "Adding the readiness leg to .land/gates.sh",
+      "reason": "The land gate script is not changed; a demand leg never enters landing."
     }
   ],
   "structure": [
@@ -585,6 +602,31 @@
       "path": "docs/design/directory/briefs/DIRECTORY-008.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-008"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-009.json",
+      "note": "the Rauthy readiness leg brief",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-009.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "docs/design/project.json",
+      "note": "the lys design project file; gains the rauthy-ready demand leg",
+      "brief": ""
+    },
+    {
+      "path": "scripts/identity-gates/rauthy_ready.py",
+      "note": "the rauthy-ready leg's command: start the pinned Rauthy against a scratch PostgreSQL, pass on its ready answer, remove what it made",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "crates/lys/tests/rauthy_ready_leg.rs",
+      "note": "runs the rauthy-ready script against a stub runtime; counts refusals, cleanup and searched secrets",
+      "brief": "DIRECTORY-009"
     }
   ],
   "inventory": [
@@ -631,6 +673,22 @@
     {
       "path": "docs/design/decisions.json",
       "note": "the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row"
+    },
+    {
+      "path": "docs/design/project.json",
+      "note": "the lys design project file at main 7b53625: one tree, the rust-build shorthand, seven legs all cadence round, and the roots map"
+    },
+    {
+      "path": "scripts/design/schemas/project.schema.json",
+      "note": "the project schema: a leg is name, command, requires (at least one) and cadence (round or demand), the command run with no shell"
+    },
+    {
+      "path": "scripts/design/gate.sh",
+      "note": "the design leg: validates docs/design/project.json and every cluster, checks coverage and the rendered markdown"
+    },
+    {
+      "path": ".land/gates.sh",
+      "note": "the land gate script: the design leg and the six cargo gates; not changed by DIRECTORY-009"
     }
   ],
   "constraints": [
@@ -686,12 +744,19 @@
   "gate": [
     {
       "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
       "legs": [
         {
           "name": "fmt",
           "command": "cargo fmt --all",
           "requires": [
-            "place:here"
+            "tool:cargo",
+            "tool:rustfmt"
           ],
           "cadence": "round"
         },
@@ -699,7 +764,7 @@
           "name": "clippy-all-features",
           "command": "cargo clippy --all-targets --all-features -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -707,7 +772,7 @@
           "name": "clippy",
           "command": "cargo clippy --all-targets -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -715,7 +780,7 @@
           "name": "tests",
           "command": "cargo test --workspace --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -723,7 +788,7 @@
           "name": "doc-all-features",
           "command": "cargo doc --no-deps --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -731,36 +796,16 @@
           "name": "doc",
           "command": "cargo doc --no-deps",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        }
-      ]
-    },
-    {
-      "tree": "docs",
-      "legs": [
-        {
-          "name": "render",
-          "command": "python3 ../scripts/design/render-cluster.py design/directory",
-          "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
         {
-          "name": "validate",
-          "command": "python3 ../scripts/design/validate.py design/directory",
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        },
-        {
-          "name": "coverage",
-          "command": "python3 ../scripts/design/check-coverage.py design/directory",
-          "requires": [
-            "place:here"
+            "tool:sh",
+            "tool:python3"
           ],
           "cadence": "round"
         }

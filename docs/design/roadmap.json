@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,35 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-017",
+      "title": "Start and check the pinned Rauthy in a demand gate leg",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "One gate leg, cadence demand, declared in docs/design/project.json and in the directory cluster's gate. It starts the Rauthy image whose revision label equals the vendor/rauthy pin against a scratch PostgreSQL container, both named by digest in DIRECTORY-002's deploy/identity/versions.json. It passes only when Rauthy answers ready and removes everything it made. It refuses by name when the runtime or an image is missing, and it lets no secret into its output, which a round-leg test proves. It closes the release row's missing Rauthy check; .land/gates.sh is not changed.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T13:26:00+10:00",
+        "quote": "The Rauthy container that DIRECTORY-002 installs is started and checked by a gate leg declared in the lys design project file, and the leg runs on demand.\n\nDIRECTORY-002 installs the maintained Rauthy, SpiceDB and one PostgreSQL database, but no gate leg starts the Rauthy container and checks it.\nThe release card holds that gap as a blocker.\nThis card adds one leg to the lys design project file on main 7b536253, with its cadence set to demand, so it runs when it is asked for and never in every round.\nThe land gate script is not changed.\n\nThe leg starts the Rauthy pinned in the vendor submodule in a container against a scratch PostgreSQL database, waits for its readiness answer, then stops it and removes everything it made.\nIt passes only when Rauthy answers ready.\nWhen the container runtime or the image is missing, the leg refuses by name and says which one, and it never passes by skipping.\nIts requirements name the tools it needs, the way the other legs do.\nNo secret reaches the leg's output, and a test searches that output for key and token material.\n\nThe acceptance lines are that the project file validates against the project schema with the new leg, that the leg passes on a machine with the runtime, and that it refuses by name on a machine without one.",
+        "context": "The Rauthy readiness card on the Lys board, written through the brief method at main 7b53625 after its survey; the lead for the identity line answered the survey's six questions: the image is the one whose OCI revision label equals the pin, the card waits for DIRECTORY-002 and reads its versions.json, a person runs the stated command until the method can request a demand leg, both refusals are acceptance lines, PostgreSQL runs from its own pinned image and nothing is pulled, and the directory gate carries the leg too."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-004",
+          "ADR-005",
+          "ADR-009"
+        ],
+        "briefs": [
+          "DIRECTORY-009"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-001"
+      ],
+      "notes": "Further units, not written: Give the method a way to request a demand leg and record its outcome (design-system card 9jJgCzeG); Build the Rauthy image from the vendor/rauthy pin at the venue; A demand leg for SpiceDB readiness on the shared database. Ids are the next free after main's RM-016 and DIRECTORY-008 and the open DIRECTORY-007. No new ADR: the survey's conditional new decision (how a demand leg is requested and recorded) belongs to design-system card 9jJgCzeG, not to this card. Open for the lead: the upstream ghcr.io/sebadob/rauthy:0.36.2 image carries no org.opencontainers.image.revision label, so under the revision-label rule the leg refuses it and cannot pass until an image labelled with the pin exists."
     }
   ]
 }

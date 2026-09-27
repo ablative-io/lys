@@ -180,6 +180,46 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The Rauthy readiness gate leg (DIRECTORY-009)",
+      "items": [
+        {
+          "id": "C31",
+          "text": "docs/design/project.json declares the rauthy-ready leg with cadence demand and a requires list naming tool:python3, tool:docker and tool:git, its seven existing legs unchanged, and the file validates against the project schema.",
+          "done": false
+        },
+        {
+          "id": "C32",
+          "text": "The directory cluster's design.json gate carries the same rauthy-ready leg with cadence demand, and the directory documents validate with it present.",
+          "done": false
+        },
+        {
+          "id": "C33",
+          "text": "The rauthy-ready leg starts the Rauthy image named by digest in deploy/identity/versions.json, whose revision label equals the vendor/rauthy pin, against a scratch PostgreSQL container from the digest there, and exits 0 only when Rauthy answers ready.",
+          "done": false
+        },
+        {
+          "id": "C34",
+          "text": "A missing container runtime, a missing Rauthy image, a missing PostgreSQL image and a Rauthy revision label other than the pin each make the leg refuse by name with a non-zero exit; the leg never pulls an image and never passes by skipping.",
+          "done": false
+        },
+        {
+          "id": "C35",
+          "text": "After every run, passing or not, no container, network or volume the leg created remains, and no object it did not create was touched.",
+          "done": false
+        },
+        {
+          "id": "C36",
+          "text": "A test run by a round leg searches the leg's complete output for every secret value the runtime received, asserts how many it searched for, and finds none.",
+          "done": false
+        },
+        {
+          "id": "C37",
+          "text": ".land/gates.sh is unchanged and no round-cadence leg is added.",
+          "done": false
+        }
+      ]
     }
   ]
 }
