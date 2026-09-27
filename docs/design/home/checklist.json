@@ -291,7 +291,7 @@
         },
         {
           "id": "C85",
-          "text": "On a no answer a render resolves the config directory as HOME/.claude with source home and never takes the template's CLAUDE_CONFIG_DIR as the path. A template CLAUDE_CONFIG_DIR that is not absolute is refused by name before any file is written or entry appended.",
+          "text": "On a no answer a render resolves the config directory as HOME/.claude with source home and never takes the template's CLAUDE_CONFIG_DIR as the path. A template CLAUDE_CONFIG_DIR that is not absolute is refused by name before any file is written or entry appended. With no HOME the render is refused with HomeError::NoConfigDir, whose text names the no answer and HOME and does not tell the person to set the template's env slot.",
           "done": false
         },
         {
