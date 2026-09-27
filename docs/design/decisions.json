@@ -358,6 +358,7 @@
         "The certificate-log leaf formats are a new wire format, signed only in tests until the repository's constructed-attack review of them is recorded.",
         "The typed-claim card issues one claim per certificate; no format revokes part of a certificate.",
         "lys ca verify's help and lys-identity's documentation say that verification without a log does not check revocation; lys-core's published rustdoc of verify_certificate_chain does not, and the act that answers that gap is a documentation-only lys-core release, its own card.",
+        "The revocation request path, through which a person responsible under ADR-003 or an administrator asks the directory server and the issuing authority signs and appends, is a later unit blocked on DIRECTORY-006 R4 and on the directory server; until it lands the only way to revoke is a caller that holds the issuing authority identity.",
         "A command line that revokes or verifies against a log is a later unit, a separate unpublished binary.",
         "The directory design's step-2 non-goal and CN11 each gain one appended line naming DIRECTORY-013's revocation fold and history check as step-2 work brought forward; the rest of each stands as written."
       ],

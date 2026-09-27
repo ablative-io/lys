@@ -671,7 +671,7 @@
     {
       "path": "crates/lys/src/cli_tests.rs",
       "note": "the CLI's help tests; DIRECTORY-013 adds the no-log revocation sentence test",
-      "brief": ""
+      "brief": "DIRECTORY-013"
     }
   ],
   "inventory": [
