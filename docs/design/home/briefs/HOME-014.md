@@ -22,7 +22,7 @@ title: LanternData carries lit_in, the light act records it, recall reports it a
 > - C104 — The fork's fixtures light L2 with the light act and write by hand only the lanterns the light act cannot produce (O2, M2, N3, the copy N2 and N1 to N4), each named in its test as standing for such a record.
 > - C105 — RECORD.md and the lys-home README document lit_in, and PROOF-FORK.md keeps its measured older-record sentence with a note that the light act now records lit_in.
 > **Stories:**
-> - S41 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent that lights a lantern, I want it to record the session I lit it in and recall to show that session beside the point and the note, so that I know which session the lantern leads back to.
+> - S41 (Agent, Continues a session imported from Claude Code on Codex) — As an agent that lights a lantern, I want it to record the session I lit it in and recall to show that session beside the point and the note, so that I know which session the lantern leads back to.
 > - S42 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a lantern lit before lit_in was recorded to stay readable and forkable by its holders, and a lit_in that is not a session id refused by name, so that no lantern is ever read as a session it does not name.
 > - S43 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the fork's tests to light their lanterns with the light act wherever it can produce them, so that the fork is proved on the record the light act really writes.
 
@@ -70,7 +70,7 @@ Structural. `LanternData` in `record/entries.rs` gains a documented fifth field 
 - C100 — LanternData carries an optional lit_in, the session that held the point when the lantern was lit, keeping a present null and a present non-string value distinct from an absent key, and still refuses an unknown key.
 
 **Stories:**
-- S41 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent that lights a lantern, I want it to record the session I lit it in and recall to show that session beside the point and the note, so that I know which session the lantern leads back to.
+- S41 (Agent, Continues a session imported from Claude Code on Codex) — As an agent that lights a lantern, I want it to record the session I lit it in and recall to show that session beside the point and the note, so that I know which session the lantern leads back to.
 
 ### R2: Record lit_in in the light act, print it in the light report, and check a recorded lit_in in one place
 
@@ -91,7 +91,7 @@ WHEN `light(home, session, point, note, by)` appends a lantern, THE SYSTEM SHALL
 - C101 — The light act writes lit_in as the id of the session at whose head it appends the lantern, and its report carries lit_in beside id, session, point and lit_at.
 
 **Stories:**
-- S41 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent that lights a lantern, I want it to record the session I lit it in and recall to show that session beside the point and the note, so that I know which session the lantern leads back to.
+- S41 (Agent, Continues a session imported from Claude Code on Codex) — As an agent that lights a lantern, I want it to record the session I lit it in and recall to show that session beside the point and the note, so that I know which session the lantern leads back to.
 
 ### R3: Report lit_in in recall's rows, null for a lantern without it, and refuse a lit_in that is not a session id by name
 
@@ -113,7 +113,7 @@ WHEN `light(home, session, point, note, by)` appends a lantern, THE SYSTEM SHALL
 - C102 — Recall rows carry lit_in beside point, note and lit_by, the lighting session for a lantern the light act lit and null for a lantern whose data has no lit_in, and a lantern whose lit_in is present and not a session id is never listed as a row but skipped by note and refused by point as lit_in_not_a_session with the fork's reason text.
 
 **Stories:**
-- S41 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent that lights a lantern, I want it to record the session I lit it in and recall to show that session beside the point and the note, so that I know which session the lantern leads back to.
+- S41 (Agent, Continues a session imported from Claude Code on Codex) — As an agent that lights a lantern, I want it to record the session I lit it in and recall to show that session beside the point and the note, so that I know which session the lantern leads back to.
 - S42 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a lantern lit before lit_in was recorded to stay readable and forkable by its holders, and a lit_in that is not a session id refused by name, so that no lantern is ever read as a session it does not name.
 
 ### R4: Read lit_in in the fork through a narrower typed view, keeping the holder rule and the named refusals
