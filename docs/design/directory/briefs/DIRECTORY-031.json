@@ -1,5 +1,5 @@
 {
-  "id": "DIRECTORY-029",
+  "id": "DIRECTORY-031",
   "cluster": "directory",
   "title": "Carry a typed capability claim in an agent's certificate and read it with a named verifier",
   "depends_on": [
@@ -20,19 +20,19 @@
     "The claim's scope member and a refusal on scope: blocked on Tom's grant representation (design non-goal, the grant representation; C5). v1 carries no scope member and no requirement here invents one."
   ],
   "checklist": [
-    "C58",
-    "C59",
-    "C229",
-    "C60",
-    "C61",
-    "C62",
-    "C63",
-    "C64"
+    "C249",
+    "C250",
+    "C251",
+    "C252",
+    "C253",
+    "C254",
+    "C255",
+    "C256"
   ],
   "stories": [
-    "S28",
-    "S29",
-    "S30"
+    "S113",
+    "S114",
+    "S115"
   ],
   "design_anchor": [
     "ADR-003",
@@ -41,11 +41,11 @@
     "ADR-007",
     "ADR-008",
     "ADR-011",
-    "ADR-089",
-    "ADR-090"
+    "ADR-093",
+    "ADR-094"
   ],
-  "purpose": "Road step 2's certificate half (docs/design/identity/STATEMENT-2026-09-22.md, The road; in this cluster under ADR-089): today an agent's lys certificate can carry only opaque bytes under the shipped capability-claims extension, which nothing interprets, and a signed field nothing checks is worse than none. This brief runs the design round for a new format with its own version, lys/agent-capability/v1, carried under its own proposed OID 1.3.6.1.4.1.66364.2.1, the first sub-arc of the .2 family arc of agent-certificate extensions, alongside the shipped .1 transport and never a mutation of it, records .2.1 in the register's .2 row, and makes both of WIRE-FORMATS.md's ratification sentences name the owning lead with a second reader (R1), has it attacked by a second party before ratification is asked for (R2), writes the recorded ratification into the decision log and the register's .2 row (R3), and, once that record is on main, defines the typed claim in lys-identity, naming its holder and every grant the agent holds at issuance with each grant's window as it stood then (R4), has the operator enrol one Ed25519 public key per agent beside its agent record (R5), has the directory issue an enduring agent its one certificate carrying one claim when the operator calls its issuance route, under an issuer key in the directory service's custody that the certificate names in X.509's Authority Key Identifier, for a configured validity window, appending the certificate to the certificate log as DIRECTORY-013's issuance leaf so that its revocation fold can revoke it (R6), lets the operator replace an enrolled key by an audited act that is never an overwrite (R7), and names verify_agent_capability as the verifier that checks the chain against a set of trusted issuer keys, parses the claim, refuses what the claim does not cover and refuses the certificate past its own expiry (R8). Done when a certificate states what an agent was granted and a verifier reads it. lys-core's published formats and cryptography do not change (DIRECTORY-006 R1).",
-  "task": "Implement R1 to R8 in order. R1 and R2 are documents and go ahead after sign-off; R3 is a documents row that goes ahead once the ratification is recorded on the card; R1 and R3 are the only rows that edit docs/PEN-REGISTRATION.md and docs/design/WIRE-FORMATS.md, R1 proposing and R3 recording the ratification, and no other card rewrites the register's .2 row. R4 to R8 wait for DIRECTORY-003 and DIRECTORY-006 R1 on main; R4, R6 and R8 also wait for R3 on main; R5 waits for DIRECTORY-003's agent record; R6 waits for R4, R5, DIRECTORY-013 and deploy/identity/config.example.toml on main; R7 waits for R5 and R6; R8 waits for R4 and R6 (blocked_by). Estimate, as a new increment outside IDENTITY-001's 48-hour ceiling, which stays as CN7 states: R1 2h, R2 3h, R3 1h, R4 2h, R5 3h, R6 6h, R7 3h, R8 3h, total 23 hours; estimates are proposals for review. The first vocabulary is narrow: one claim per certificate, naming its holder by the agent's directory id and listing every grant the agent holds at issuance, each by its directory id with its time window as it stood at issuance, and nothing else; an agent holding no grant at issuance is issued a certificate whose claim lists no grant, since the certificate proves who the agent is and what it may do is always asked of the access check, and a listed grant whose window has no end is encoded with its end absent, its start always present, following DIRECTORY-006's grant window, whose end may be null. The list is what held at issuance (conformance 6.2): it is never presented as live grants, a listed grant's window is a record and not a live check, and whether a grant still stands is always asked of the access check, never of the list; the operator chooses nothing about the list on the issuance call, and a grant given later needs a new certificate, while whether a grant change reissues a certificate stays open under conformance 6.3. The claim carries no validity window of its own: the certificate's notBefore and notAfter govern its life, and lys-core's certificate-expired check, run by the verifier against the instant it is given, refuses a certificate past expiry. The claim carries no member for revocation: the revocation fold of DIRECTORY-013 (card zP1P2HLD, this card's named revocation) names a certificate by the SHA-256 of its DER, computed by whoever checks it and never from anything the issuer chose, so the certificate's identity in the log is the hash of the certificate itself and the fold needs no field in the claim; R6 appends every certificate it issues to the certificate log as DIRECTORY-013's issuance leaf, so that the fold can revoke it. The claim carries no issuer member either: the certificate names the issuer key that signed it in X.509's Authority Key Identifier extension (OID 2.5.29.35, non-critical), whose keyIdentifier is the issuer-key fingerprint, a new fingerprint defined here as the first 20 bytes of the SHA-256 of the issuer key's DER SubjectPublicKeyInfo (RFC 7093 section 2, method 1), which is the keyid rcgen writes as the SubjectKeyIdentifier of lys-core's issuer certificate; it is not lys's existing certificate fingerprint, the SHA-256 of a certificate's DER; the extension is added through lys-core's existing extensions parameter with lys-core's issuance and its leaf parameters untouched, it matches the SubjectKeyIdentifier of lys-core's issuer certificate so that `openssl verify -CAfile` keeps finding the issuer, the issuer DN stays as lys-core writes it, and a stranger reads the identifier with `openssl x509 -text`. The scope member is blocked on the grant representation (C5) and is not invented. The .1 transport and `lys ca issue --claims` stay exactly as shipped, neither deprecated nor removed; `lys ca verify`, `lys verify --cert` and `lys inspect cert` keep showing only .1, and showing the typed claim in the lys CLI is its own later card. The certificate is per enduring agent: issued when the agent is provisioned, presented from its first spawn on, and its subject is the agent's directory id, which must also be the common name of the agent's certificate-signing request, since lys-core refuses a request whose common name differs from the subject. Issuance is invoked only by the operator calling the directory's issuance route with the agent's certificate-signing request (R6), never automatically when a grant is given. The issuer key's custody: its 32-byte seed lives in a restricted private file on the directory service's host, named by the service's configuration, loaded only by crates/lys-identity-server/src/issuer_key.rs and held in Zeroizing buffers; it is reached only by the issuance route and never by lys (the CLI), Cambium or any other process. The same configuration holds the agent certificate's default validity window and its maximum, shipped as 30 days and 90 days (ADR-090), and the path of the certificate log; the operator may ask for a shorter window, never a longer one, and the certificate records the window it was given as its own notBefore and notAfter. The configuration's example, deploy/identity/config.example.toml, and the restricted-file helper crates/lys/src/identity/private_files.rs are DIRECTORY-002's; R6 modifies the example file only once it exists on main (blocked_by), and it does not reuse or change private_files.rs, because no file under crates/lys changes. The verifier authenticates the certificate under a key of its set before it reads the claim, and checks the instant against the certificate's own window last, so that every claim refusal fires by name on a certificate inside its window. Issuance refuses an agent holding a current certificate and only that: a certificate that has expired, whose key has been replaced (R7), or that DIRECTORY-013's fold holds revoked is not current, and each issuance is its own audited event naming the certificate it follows. The directory's events are written in DIRECTORY-003's signed event envelope under the kinds agent_key_enrolled (R5), agent_certificate_issued (R6) and agent_key_replaced (R7); if that envelope's register, docs/design/identity/IDENTITY-EVENTS.md, must list them, the row stops and names that file under CN9, because DIRECTORY-003's files are not edited here. In scope: the draft and its WIRE-FORMATS.md entry, the adversarial review, the ratification's record in the decision log and the register, the typed claim, the enrolled key and its audited replacement, issuance through the directory's route with the issuer key's custody, its Authority Key Identifier and its issuance leaf, and the verifier with its expiry leg. Out, each a later unit: presenting the certificate at spawn (the step-2 session card, 6AWx1-JR, which also owns per-execution credentials), showing the certificate on the agent's file (ADR-008, DIRECTORY-005), showing the typed claim in the lys CLI, the scope member, the revocation fold itself and its request path (DIRECTORY-013), the live per-call check at the door and in SpiceDB (QZD2uagw and the Cambium side), the production anchor, and any change to lys-core, the lys CLI or lys/delegation/v1. This brief writes no rotation requirement for the directory's issuer key: rotation waits on the anchor that key chains to, which is open, and is its own card, which must keep every agent certificate issued under the current issuer key verifiable across a rotation. This brief adds checklist items C58 to C64 and C229 and stories S28 to S30 and splits none.",
+  "purpose": "Road step 2's certificate half (docs/design/identity/STATEMENT-2026-09-22.md, The road; in this cluster under ADR-093): today an agent's lys certificate can carry only opaque bytes under the shipped capability-claims extension, which nothing interprets, and a signed field nothing checks is worse than none. This brief runs the design round for a new format with its own version, lys/agent-capability/v1, carried under its own proposed OID 1.3.6.1.4.1.66364.2.1, the first sub-arc of the .2 family arc of agent-certificate extensions, alongside the shipped .1 transport and never a mutation of it, records .2.1 in the register's .2 row, and makes both of WIRE-FORMATS.md's ratification sentences name the owning lead with a second reader (R1), has it attacked by a second party before ratification is asked for (R2), writes the recorded ratification into the decision log and the register's .2 row (R3), and, once that record is on main, defines the typed claim in lys-identity, naming its holder and every grant the agent holds at issuance with each grant's window as it stood then (R4), has the operator enrol one Ed25519 public key per agent beside its agent record (R5), has the directory issue an enduring agent its one certificate carrying one claim when the operator calls its issuance route, under an issuer key in the directory service's custody that the certificate names in X.509's Authority Key Identifier, for a configured validity window, appending the certificate to the certificate log as DIRECTORY-013's issuance leaf so that its revocation fold can revoke it (R6), lets the operator replace an enrolled key by an audited act that is never an overwrite (R7), and names verify_agent_capability as the verifier that checks the chain against a set of trusted issuer keys, parses the claim, refuses what the claim does not cover and refuses the certificate past its own expiry (R8). Done when a certificate states what an agent was granted and a verifier reads it. lys-core's published formats and cryptography do not change (DIRECTORY-006 R1).",
+  "task": "Implement R1 to R8 in order. R1 and R2 are documents and go ahead after sign-off; R3 is a documents row that goes ahead once the ratification is recorded on the card; R1 and R3 are the only rows that edit docs/PEN-REGISTRATION.md and docs/design/WIRE-FORMATS.md, R1 proposing and R3 recording the ratification, and no other card rewrites the register's .2 row. R4 to R8 wait for DIRECTORY-003 and DIRECTORY-006 R1 on main; R4, R6 and R8 also wait for R3 on main; R5 waits for DIRECTORY-003's agent record; R6 waits for R4, R5, DIRECTORY-013 and deploy/identity/config.example.toml on main; R7 waits for R5 and R6; R8 waits for R4 and R6 (blocked_by). Estimate, as a new increment outside IDENTITY-001's 48-hour ceiling, which stays as CN7 states: R1 2h, R2 3h, R3 1h, R4 2h, R5 3h, R6 6h, R7 3h, R8 3h, total 23 hours; estimates are proposals for review. The first vocabulary is narrow: one claim per certificate, naming its holder by the agent's directory id and listing every grant the agent holds at issuance, each by its directory id with its time window as it stood at issuance, and nothing else; an agent holding no grant at issuance is issued a certificate whose claim lists no grant, since the certificate proves who the agent is and what it may do is always asked of the access check, and a listed grant whose window has no end is encoded with its end absent, its start always present, following DIRECTORY-006's grant window, whose end may be null. The list is what held at issuance (conformance 6.2): it is never presented as live grants, a listed grant's window is a record and not a live check, and whether a grant still stands is always asked of the access check, never of the list; the operator chooses nothing about the list on the issuance call, and a grant given later needs a new certificate, while whether a grant change reissues a certificate stays open under conformance 6.3. The claim carries no validity window of its own: the certificate's notBefore and notAfter govern its life, and lys-core's certificate-expired check, run by the verifier against the instant it is given, refuses a certificate past expiry. The claim carries no member for revocation: the revocation fold of DIRECTORY-013 (card zP1P2HLD, this card's named revocation) names a certificate by the SHA-256 of its DER, computed by whoever checks it and never from anything the issuer chose, so the certificate's identity in the log is the hash of the certificate itself and the fold needs no field in the claim; R6 appends every certificate it issues to the certificate log as DIRECTORY-013's issuance leaf, so that the fold can revoke it. The claim carries no issuer member either: the certificate names the issuer key that signed it in X.509's Authority Key Identifier extension (OID 2.5.29.35, non-critical), whose keyIdentifier is the issuer-key fingerprint, a new fingerprint defined here as the first 20 bytes of the SHA-256 of the issuer key's DER SubjectPublicKeyInfo (RFC 7093 section 2, method 1), which is the keyid rcgen writes as the SubjectKeyIdentifier of lys-core's issuer certificate; it is not lys's existing certificate fingerprint, the SHA-256 of a certificate's DER; the extension is added through lys-core's existing extensions parameter with lys-core's issuance and its leaf parameters untouched, it matches the SubjectKeyIdentifier of lys-core's issuer certificate so that `openssl verify -CAfile` keeps finding the issuer, the issuer DN stays as lys-core writes it, and a stranger reads the identifier with `openssl x509 -text`. The scope member is blocked on the grant representation (C5) and is not invented. The .1 transport and `lys ca issue --claims` stay exactly as shipped, neither deprecated nor removed; `lys ca verify`, `lys verify --cert` and `lys inspect cert` keep showing only .1, and showing the typed claim in the lys CLI is its own later card. The certificate is per enduring agent: issued when the agent is provisioned, presented from its first spawn on, and its subject is the agent's directory id, which must also be the common name of the agent's certificate-signing request, since lys-core refuses a request whose common name differs from the subject. Issuance is invoked only by the operator calling the directory's issuance route with the agent's certificate-signing request (R6), never automatically when a grant is given. The issuer key's custody: its 32-byte seed lives in a restricted private file on the directory service's host, named by the service's configuration, loaded only by crates/lys-identity-server/src/issuer_key.rs and held in Zeroizing buffers; it is reached only by the issuance route and never by lys (the CLI), Cambium or any other process. The same configuration holds the agent certificate's default validity window and its maximum, shipped as 30 days and 90 days (ADR-094), and the path of the certificate log; the operator may ask for a shorter window, never a longer one, and the certificate records the window it was given as its own notBefore and notAfter. The configuration's example, deploy/identity/config.example.toml, and the restricted-file helper crates/lys/src/identity/private_files.rs are DIRECTORY-002's; R6 modifies the example file only once it exists on main (blocked_by), and it does not reuse or change private_files.rs, because no file under crates/lys changes. The verifier authenticates the certificate under a key of its set before it reads the claim, and checks the instant against the certificate's own window last, so that every claim refusal fires by name on a certificate inside its window. Issuance refuses an agent holding a current certificate and only that: a certificate that has expired, whose key has been replaced (R7), or that DIRECTORY-013's fold holds revoked is not current, and each issuance is its own audited event naming the certificate it follows. The directory's events are written in DIRECTORY-003's signed event envelope under the kinds agent_key_enrolled (R5), agent_certificate_issued (R6) and agent_key_replaced (R7); if that envelope's register, docs/design/identity/IDENTITY-EVENTS.md, must list them, the row stops and names that file under CN9, because DIRECTORY-003's files are not edited here. In scope: the draft and its WIRE-FORMATS.md entry, the adversarial review, the ratification's record in the decision log and the register, the typed claim, the enrolled key and its audited replacement, issuance through the directory's route with the issuer key's custody, its Authority Key Identifier and its issuance leaf, and the verifier with its expiry leg. Out, each a later unit: presenting the certificate at spawn (the step-2 session card, 6AWx1-JR, which also owns per-execution credentials), showing the certificate on the agent's file (ADR-008, DIRECTORY-005), showing the typed claim in the lys CLI, the scope member, the revocation fold itself and its request path (DIRECTORY-013), the live per-call check at the door and in SpiceDB (QZD2uagw and the Cambium side), the production anchor, and any change to lys-core, the lys CLI or lys/delegation/v1. This brief writes no rotation requirement for the directory's issuer key: rotation waits on the anchor that key chains to, which is open, and is its own card, which must keep every agent certificate issued under the current issuer key verifiable across a rotation. This brief adds checklist items C249 to C256 and C251 and stories S113 to S115 and splits none.",
   "boundaries": [
     "No file under crates/lys-core changes: LYS_OID_ARC, encode_extension, decode_extension, the certificate authority, its leaf parameters, its issuer certificate, verify_certificate_chain_at, the certificate request functions and every published wire vector stay byte-identical, and rcgen's own Authority Key Identifier is not switched on.",
     "The .1 transport and `lys ca issue --claims` stay exactly as shipped, neither deprecated nor removed; no file under crates/lys changes, so `lys ca verify`, `lys verify --cert` and `lys inspect cert` keep showing only .1.",
@@ -99,10 +99,10 @@
         "delete": []
       },
       "checklist": [
-        "C58"
+        "C249"
       ],
       "stories": [
-        "S29"
+        "S114"
       ]
     },
     {
@@ -124,10 +124,10 @@
         "delete": []
       },
       "checklist": [
-        "C59"
+        "C250"
       ],
       "stories": [
-        "S29"
+        "S114"
       ]
     },
     {
@@ -151,10 +151,10 @@
         "delete": []
       },
       "checklist": [
-        "C229"
+        "C251"
       ],
       "stories": [
-        "S29"
+        "S114"
       ]
     },
     {
@@ -185,10 +185,10 @@
         "delete": []
       },
       "checklist": [
-        "C60"
+        "C252"
       ],
       "stories": [
-        "S28"
+        "S113"
       ]
     },
     {
@@ -218,16 +218,16 @@
         "delete": []
       },
       "checklist": [
-        "C61"
+        "C253"
       ],
       "stories": [
-        "S30"
+        "S115"
       ]
     },
     {
       "id": "R6",
       "title": "Issue an enduring agent its certificate through the directory's issuance route, under an issuer key in the service's custody, and log it as an issuance leaf",
-      "spec": "THE SYSTEM SHALL hold the directory's issuer key only inside the directory service: read at start by crates/lys-identity-server/src/issuer_key.rs from the private file the service's configuration names, its 32-byte Ed25519 seed held in Zeroizing buffers, and used only to construct the lys-core certificate authority this route issues with and the issuing identity DIRECTORY-013's append takes; the same configuration holds the agent certificate's default validity window and its maximum, shipped as 2592000 seconds (30 days) and 7776000 seconds (90 days) (ADR-090), and the path of the certificate log, and its example, deploy/identity/config.example.toml, gains the four entries without any secret value. IF the seed file is missing, is not exactly 32 bytes, or has any group or other permission bit set, THEN THE SYSTEM SHALL refuse to start issuing with issuer_key_missing, issuer_key_length or issuer_key_permissions respectively, naming the path and never the bytes. WHEN the admitted operator calls POST /identity/agents/{agent_id}/certificate with the agent's certificate-signing request and optionally a lifetime in seconds, THE SYSTEM SHALL take the call's instant from its injected clock; take the lifetime asked for, or the configured default when none is asked for; build the claim (the agent's directory id as holder, and every grant the directory records the agent as holding at the call's instant, each with its grant id and its time window as it stands then, the window's end omitted when the grant has none; an empty list when the agent holds no grant, the issuance proceeding); encode it with R4; place it with encode_extension under 1.3.6.1.4.1.66364.2.1; build the Authority Key Identifier extension value, the DER of an AuthorityKeyIdentifier holding only a keyIdentifier of the directory issuer key's issuer-key fingerprint (the first 20 bytes of the SHA-256 of its DER SubjectPublicKeyInfo), and place it with encode_extension under 2.5.29.35, non-critical; issue the certificate with lys-core's issue_certificate_for_request from that request, with the agent's directory id as subject, the lifetime as its ttl and those two extensions; append the certificate's DER to the certificate log as DIRECTORY-013's issuance leaf with DIRECTORY-013's append; and record the issuance as one signed directory event of kind agent_certificate_issued naming the agent, the SHA-256 of the new certificate's DER, its notAfter and the SHA-256 of the certificate it follows when there is one, committed before the certificate's DER is returned (P4, P5). A certificate is current while its notAfter is at or after the call's instant, its subject public key is the agent's enrolled key and DIRECTORY-013's fold over the certificate log does not hold it revoked. IF the caller is not admitted, the agent is not active (registered, suspended or retired, ADR-011), the agent has no enrolled key, the request's common name is not the agent's directory id, the request's public key does not equal the agent's enrolled key, the lifetime is zero, the lifetime exceeds the configured maximum, the agent holds a current certificate, the issuance leaf is not appended, or the issuance event is not committed, THEN THE SYSTEM SHALL refuse with not_admitted, agent_not_active, agent_key_not_enrolled (whose message tells the operator to enrol the agent's key first), request_subject_mismatch, key_mismatch, lifetime_invalid, lifetime_above_maximum (whose message names the configured maximum in seconds), agent_certificate_current (whose message names the current certificate's SHA-256 and its notAfter), issuance_leaf_not_appended or issuance_not_recorded respectively, and return no certificate; every refusal before the append leaves no issuance leaf and no issuance event, a refusal at the append leaves no issuance event, and a refusal at the event's commit leaves the appended issuance leaf in the log, since the log is append-only, with no certificate returned. THE SYSTEM SHALL NOT issue a certificate automatically when a grant is given, SHALL NOT take a grant, a list of grants or a window of a grant from the issuance call, SHALL NOT issue a window longer than the configured maximum, SHALL NOT take the default or the maximum from the issuance call, SHALL NOT take the key it compares against from the issuance call, SHALL NOT refuse an agent because it holds no grant, SHALL NOT take an execution id, SHALL NOT put more than one claim, a scope member, a credential value, a secret handle or any extension under 1.3.6.1.4.1.66364.1 in the certificate, SHALL NOT return a certificate whose issuance leaf is not in the log, SHALL NOT remove or rewrite a leaf of the certificate log, SHALL NOT switch on rcgen's own Authority Key Identifier or change any file under crates/lys-core, SHALL NOT let the seed appear in Debug output, logs, errors, events, certificates, responses, start commands or the configuration example, SHALL NOT ship a test anchor in the service's configuration, and SHALL NOT expose an issuing path to lys (the CLI) or Cambium.",
+      "spec": "THE SYSTEM SHALL hold the directory's issuer key only inside the directory service: read at start by crates/lys-identity-server/src/issuer_key.rs from the private file the service's configuration names, its 32-byte Ed25519 seed held in Zeroizing buffers, and used only to construct the lys-core certificate authority this route issues with and the issuing identity DIRECTORY-013's append takes; the same configuration holds the agent certificate's default validity window and its maximum, shipped as 2592000 seconds (30 days) and 7776000 seconds (90 days) (ADR-094), and the path of the certificate log, and its example, deploy/identity/config.example.toml, gains the four entries without any secret value. IF the seed file is missing, is not exactly 32 bytes, or has any group or other permission bit set, THEN THE SYSTEM SHALL refuse to start issuing with issuer_key_missing, issuer_key_length or issuer_key_permissions respectively, naming the path and never the bytes. WHEN the admitted operator calls POST /identity/agents/{agent_id}/certificate with the agent's certificate-signing request and optionally a lifetime in seconds, THE SYSTEM SHALL take the call's instant from its injected clock; take the lifetime asked for, or the configured default when none is asked for; build the claim (the agent's directory id as holder, and every grant the directory records the agent as holding at the call's instant, each with its grant id and its time window as it stands then, the window's end omitted when the grant has none; an empty list when the agent holds no grant, the issuance proceeding); encode it with R4; place it with encode_extension under 1.3.6.1.4.1.66364.2.1; build the Authority Key Identifier extension value, the DER of an AuthorityKeyIdentifier holding only a keyIdentifier of the directory issuer key's issuer-key fingerprint (the first 20 bytes of the SHA-256 of its DER SubjectPublicKeyInfo), and place it with encode_extension under 2.5.29.35, non-critical; issue the certificate with lys-core's issue_certificate_for_request from that request, with the agent's directory id as subject, the lifetime as its ttl and those two extensions; append the certificate's DER to the certificate log as DIRECTORY-013's issuance leaf with DIRECTORY-013's append; and record the issuance as one signed directory event of kind agent_certificate_issued naming the agent, the SHA-256 of the new certificate's DER, its notAfter and the SHA-256 of the certificate it follows when there is one, committed before the certificate's DER is returned (P4, P5). A certificate is current while its notAfter is at or after the call's instant, its subject public key is the agent's enrolled key and DIRECTORY-013's fold over the certificate log does not hold it revoked. IF the caller is not admitted, the agent is not active (registered, suspended or retired, ADR-011), the agent has no enrolled key, the request's common name is not the agent's directory id, the request's public key does not equal the agent's enrolled key, the lifetime is zero, the lifetime exceeds the configured maximum, the agent holds a current certificate, the issuance leaf is not appended, or the issuance event is not committed, THEN THE SYSTEM SHALL refuse with not_admitted, agent_not_active, agent_key_not_enrolled (whose message tells the operator to enrol the agent's key first), request_subject_mismatch, key_mismatch, lifetime_invalid, lifetime_above_maximum (whose message names the configured maximum in seconds), agent_certificate_current (whose message names the current certificate's SHA-256 and its notAfter), issuance_leaf_not_appended or issuance_not_recorded respectively, and return no certificate; every refusal before the append leaves no issuance leaf and no issuance event, a refusal at the append leaves no issuance event, and a refusal at the event's commit leaves the appended issuance leaf in the log, since the log is append-only, with no certificate returned. THE SYSTEM SHALL NOT issue a certificate automatically when a grant is given, SHALL NOT take a grant, a list of grants or a window of a grant from the issuance call, SHALL NOT issue a window longer than the configured maximum, SHALL NOT take the default or the maximum from the issuance call, SHALL NOT take the key it compares against from the issuance call, SHALL NOT refuse an agent because it holds no grant, SHALL NOT take an execution id, SHALL NOT put more than one claim, a scope member, a credential value, a secret handle or any extension under 1.3.6.1.4.1.66364.1 in the certificate, SHALL NOT return a certificate whose issuance leaf is not in the log, SHALL NOT remove or rewrite a leaf of the certificate log, SHALL NOT switch on rcgen's own Authority Key Identifier or change any file under crates/lys-core, SHALL NOT let the seed appear in Debug output, logs, errors, events, certificates, responses, start commands or the configuration example, SHALL NOT ship a test anchor in the service's configuration, and SHALL NOT expose an issuing path to lys (the CLI) or Cambium.",
       "acceptance": [
         "Reading a 32-byte seed file with mode 0600 yields an issuer whose public key equals the Ed25519 public key the test derives from those 32 bytes itself.",
         "A file with mode 0640 refuses with issuer_key_permissions, a file with mode 0604 refuses with issuer_key_permissions, a 31-byte file with mode 0600 refuses with issuer_key_length, and a missing path refuses with issuer_key_missing; each message contains the path and not the seed's hex, and the test asserts four refusal cases ran.",
@@ -270,10 +270,10 @@
         "delete": []
       },
       "checklist": [
-        "C62"
+        "C254"
       ],
       "stories": [
-        "S30"
+        "S115"
       ]
     },
     {
@@ -303,10 +303,10 @@
         "delete": []
       },
       "checklist": [
-        "C63"
+        "C255"
       ],
       "stories": [
-        "S30"
+        "S115"
       ]
     },
     {
@@ -343,10 +343,10 @@
         "delete": []
       },
       "checklist": [
-        "C64"
+        "C256"
       ],
       "stories": [
-        "S28"
+        "S113"
       ]
     }
   ]
