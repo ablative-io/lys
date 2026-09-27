@@ -11,12 +11,23 @@ export const REVOKED = new Map<string, { at: string; revision: number }>();
 
 /** Every grant the caller can see that derives from `g`, at any depth. */
 export function derivedFrom(w: GrantWorld, g: Grant): Grant[] {
+  const bySource = new Map<string, Grant[]>();
+  for (const x of w.list.grants) {
+    if (x.source === null) continue;
+    const children = bySource.get(x.source);
+    if (children) children.push(x);
+    else bySource.set(x.source, [x]);
+  }
   const out: Grant[] = [];
-  let frontier = [g.id];
-  while (frontier.length && out.length < 1000) {
-    const next = w.list.grants.filter((x) => x.source !== null && frontier.includes(x.source));
-    out.push(...next);
-    frontier = next.map((x) => x.id);
+  const seen = new Set([g.id]);
+  const frontier = [g.id];
+  for (let id = frontier.pop(); id !== undefined; id = frontier.pop()) {
+    for (const x of bySource.get(id) ?? []) {
+      if (seen.has(x.id)) continue;
+      seen.add(x.id);
+      out.push(x);
+      frontier.push(x.id);
+    }
   }
   return out;
 }
