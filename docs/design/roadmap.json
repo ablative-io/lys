@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,65 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-019",
+      "title": "Keep the enduring agent apart from each session's credential",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "Road adjustment 3 (docs/design/identity/STATEMENT-2026-09-22.md:162-167) as a directory contract brief, DIRECTORY-011: the directory contract gains the rules that the agent record holds no session credential, a session is a separate record that points at its agent, starting a session never creates an agent, an agent may be registered before it ever runs, and a second session of the same agent presents the same enduring identity with a new session credential; and one lys-identity test proves an agent registered with no session appears in the directory under its responsible person with no session credential. The brief lands as documents; its build waits on DIRECTORY-003. The second-session proof waits on RM-029; the design's 'Road step 2 onward' non-goal and P6 stand.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T12:08:00+10:00",
+        "quote": "Write the brief for this card in the directory cluster (docs/design/directory/briefs, next free id), as Chippy's third adjustment to the road in docs/design/directory/DESIGN.md: the enduring agent and each session's credential are kept apart; starting another session never creates another agent, and an agent can be provisioned before it ever runs. Done when a second session for the same agent presents the same enduring identity with a new session credential, and an agent provisioned with no session yet appears in the directory with no credential. Hold to DIRECTORY-003 (each agent under its responsible person, every identity change a signed event). Keep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh). If a sentence of DESIGN.md or CHECKLIST.md is open or contradicted by the repository as it stands, quote it as a question for the lead rather than rewriting the design around it. The card is built from this brief only after Tom or the lead signs it off on the card.",
+        "context": "The adjustment-3 card on the Lys board, surveyed against lys main 7b53625, with the rulings of the identity line's lead given in the words and in answer to the survey's questions: the brief cites the statement as where the road lives and DESIGN.md does not gain it; it is a contract brief keeping the step-2 non-goal and P6, proving the no-session agent by its build once DIRECTORY-003 has landed and naming the second-session proof as blocked on RM-029; the form of the session credential stays open for that card; the brief says registered, not provisioned; the started agent reports back to the directory, which checks it; one appended line narrows CN1 to DIRECTORY-001; and this brief is the earlier run e5171dbd's draft (fe72451), adopted."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-001",
+          "ADR-003",
+          "ADR-007",
+          "ADR-008",
+          "ADR-011"
+        ],
+        "briefs": [
+          "DIRECTORY-011"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-001"
+      ],
+      "notes": "Ids: DIRECTORY-011 and RM-019 are kept by the lead's ruling because the earlier run's draft on draft/directory/e5171dbd (fe72451) held them first; this branch supersedes that draft. Measured against all 119 remote branches of ablative-io/lys: RM-019 is also appended on other branches for other work (HOME-011, HOME-008, LYSGATE-001, LYSCORE-001), and S22 and S23 on draft/directory/c7d95bf6 for other stories, so whichever lands second renumbers. RM-029 is appended beside this row as the step-2 session row the second-session proof waits on, the highest RM id on any branch being RM-028. No new ADR: the form of the session credential stays open, so the decision the survey proposed waits for it. Further units, not written: Road step 2: the session record, its credential and the presentation step (carried as RM-029, with no card yet); Decide the session credential's form: per-session lys certificate, SpeaksFor delegation or ADR-001 handle."
+    },
+    {
+      "id": "RM-029",
+      "title": "A session is its own record, issued at session start and pointing at its agent",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "Road step 2: sessions under an enduring agent. A session is its own record, issued at session start and pointing at its agent, with a session credential of its own that is distinct from the agent's one certificate (ADR-008) and never mints an agent; the started agent presents it when it reports back (ADR-007) and the directory checks it. It proves that a second session of the same agent presents the same enduring identity with a new session credential, the criterion DIRECTORY-011 writes as a contract and names as blocked here. Session start is Chippy's release 3 (docs/design/identity/STATEMENT-2026-09-22.md:156). The form of the session credential (a per-session lys certificate, a SpeaksFor delegation or an ADR-001 handle) is decided by this row's card.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T12:08:00+10:00",
+        "quote": "Write the brief for this card in the directory cluster (docs/design/directory/briefs, next free id), as Chippy's third adjustment to the road in docs/design/directory/DESIGN.md: the enduring agent and each session's credential are kept apart; starting another session never creates another agent, and an agent can be provisioned before it ever runs. Done when a second session for the same agent presents the same enduring identity with a new session credential, and an agent provisioned with no session yet appears in the directory with no credential. Hold to DIRECTORY-003 (each agent under its responsible person, every identity change a signed event). Keep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh). If a sentence of DESIGN.md or CHECKLIST.md is open or contradicted by the repository as it stands, quote it as a question for the lead rather than rewriting the design around it. The card is built from this brief only after Tom or the lead signs it off on the card.",
+        "context": "Named by the identity line's lead in answer to the adjustment-3 card's survey, which found no card or roadmap row for the step-2 card that brings sessions: a new row at the next free RM id, placed in road step 2, on which DIRECTORY-011's second-session proof is blocked."
+      },
+      "links": {
+        "cluster": "",
+        "decisions": [
+          "ADR-001",
+          "ADR-004",
+          "ADR-007",
+          "ADR-008"
+        ],
+        "briefs": [],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-019"
+      ],
+      "notes": "This row carries no card yet; DIRECTORY-011 records that finding so the lead cards it. It is outside the directory cluster's step 1 (the design's 'Road step 2 onward' non-goal), so it names no cluster until one is designed for it."
     }
   ]
 }
