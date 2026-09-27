@@ -50,6 +50,7 @@ export function useShellKeys(): void {
       }
       if (e.key === 'Escape') return s.closeAll();
       if (s.paletteOpen || s.explaining) return;
+      if (s.drawer !== null && e.target instanceof HTMLElement && e.target.closest('#drawer')) return;
       if (typing(e.target)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'Enter' && e.target instanceof HTMLElement && e.target.closest('button,a')) return;
@@ -66,6 +67,10 @@ export function useShellKeys(): void {
       }
       if (e.key === '[') return s.toggleLabels();
       if (e.key === '\\') return s.toggleDockSide();
+      if (e.key === 'c') {
+        document.querySelector<HTMLElement>('[data-act="check"]')?.click();
+        return;
+      }
       const [, view, id] = path.split('/');
       if (view === 'file' && id && /^[1-7]$/.test(e.key)) return go(`/file/${id}/${TABS[Number(e.key) - 1][0]}`);
       if (s.rows.length && (e.key === 'j' || e.key === 'k')) {

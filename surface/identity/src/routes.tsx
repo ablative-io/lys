@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router';
+import { Access } from './features/access/Access';
 import { IdentityFile } from './features/file/IdentityFile';
 import { You } from './features/me/You';
 import { NotYet, SCREENS } from './features/notyet/NotYet';
@@ -13,6 +14,7 @@ export function AppRoutes() {
       <Route path="/file/:id/:tab?" element={<IdentityFile />} />
       <Route path="/me" element={<You />} />
       <Route path="/settings/:sec?" element={<Settings />} />
+      <Route path="/access/:mode?/:arg?" element={<Access />} />
       {[...Object.keys(SCREENS), 'vault'].map((view) => (
         <Route key={view} path={`/${view}/*`} element={<NotYet />} />
       ))}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AgentView, MeView, PeopleView, ReceiptAnswer, Refusal, SignedIn } from './generated';
+import type { ActionBody, DelegateBody, Grant, GrantList, Permit, Recorded, WhoAnswer, WhoBody } from './generated/grants';
 
 /** The service is reached through the page's own origin, under /api. */
 export const API = '/api';
@@ -30,10 +31,14 @@ async function refusalOf(response: Response): Promise<Refused> {
   });
 }
 
-async function get<T>(path: string): Promise<T> {
+async function get<T>(path: string, body?: unknown): Promise<T> {
   let response: Response;
+  const init: RequestInit =
+    body === undefined
+      ? { credentials: 'same-origin', headers: { accept: 'application/json' } }
+      : { method: 'POST', credentials: 'same-origin', headers: { accept: 'application/json', 'content-type': 'application/json' }, body: JSON.stringify(body) };
   try {
-    response = await fetch(API + path, { credentials: 'same-origin', headers: { accept: 'application/json' } });
+    response = await fetch(API + path, init);
   } catch (error) {
     throw new Refused(0, { refusal: 'ServiceUnreachable', reason: `the identity service could not be reached: ${String(error)}` });
   }
@@ -61,6 +66,11 @@ export const api = {
   ownPeople: () => get<PeopleView>('/people'),
   agent: (id: string) => widest<AgentView>('/directory/agents/' + encodeURIComponent(id), '/agents/' + encodeURIComponent(id)),
   receipt: (index: number) => get<ReceiptAnswer>('/receipts/' + index),
+  grants: () => get<GrantList>('/grants'),
+  grant: (id: string) => get<Grant>('/grants/' + encodeURIComponent(id)),
+  delegate: (body: DelegateBody) => get<Recorded>('/grants', body),
+  why: (body: ActionBody) => get<Permit>('/grants/why', body),
+  who: (body: WhoBody) => get<WhoAnswer>('/grants/who', body),
   callback: (search: string) => get<SignedIn>('/callback' + search),
   authority: async (): Promise<string> => {
     const response = await fetch(API + '/authority', { credentials: 'same-origin' });
@@ -68,6 +78,13 @@ export const api = {
     return response.text();
   },
 };
+
+/** A new operation id, `op-` and 32 hex digits, kept across retries of one change. */
+export function operationId(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return 'op-' + [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 export type Load<T> = { status: 'loading' } | { status: 'ok'; data: T } | { status: 'refused'; refused: Refused };
 

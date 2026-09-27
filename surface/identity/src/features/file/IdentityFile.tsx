@@ -10,6 +10,8 @@ import { Pill } from '../people/Pill';
 import { TabBody } from './sections';
 import { ACTIONS, TABS } from './tabs';
 import { day } from './time';
+import { readGrantWorld } from '../grants/model';
+import type { GrantWorld } from '../grants/model';
 
 /** Everything a file shows, all of it read from the service. */
 export interface FileData {
@@ -20,23 +22,25 @@ export interface FileData {
   agents: AgentSummary[];
   /** The receipt of every event about an agent, oldest first. */
   receipts: ReceiptAnswer[];
+  /** The grants the caller can see, and whom they name. */
+  grants: GrantWorld | null;
 }
 
 async function readAgent(id: string): Promise<FileData> {
   const agent = await api.agent(id);
-  const receipts = await Promise.all(agent.provenance.events.map((index) => api.receipt(index)));
+  const [receipts, grants] = await Promise.all([Promise.all(agent.provenance.events.map((index) => api.receipt(index))), readGrantWorld()]);
   const x: Entry = { id: agent.id, display_name: agent.display_name, state: agent.state, kind: 'agent', person: agent.person };
-  return { x, agent, agents: [], receipts };
+  return { x, agent, agents: [], receipts, grants };
 }
 
 async function readPerson(id: string): Promise<FileData> {
-  const view = await api.people();
+  const [view, grants] = await Promise.all([api.people(), readGrantWorld()]);
   const person = view.people.find((p) => p.id === id);
   if (!person) {
     throw new Refused(404, { refusal: 'PersonNotVisible', reason: 'this person is not among the records you may see' });
   }
   const x: Entry = { id: person.id, display_name: person.display_name, state: person.state, kind: 'person', person: null };
-  return { x, agent: null, agents: person.agents, receipts: [] };
+  return { x, agent: null, agents: person.agents, receipts: [], grants };
 }
 
 const readFile = (id: string): Promise<FileData> => (kindOf(id) === 'agent' ? readAgent(id) : readPerson(id));
@@ -48,7 +52,10 @@ function File({ data, tab }: { data: FileData; tab: string }) {
   const person = x.person;
   const since = agent?.provenance.registration?.actor.authenticated_at;
   const notBuilt = (what: string) => () => shell.toast(`${what} is not built on this screen yet`);
-  const counts: Record<string, number | undefined> = { record: agent ? agent.provenance.events.length : undefined };
+  const counts: Record<string, number | undefined> = {
+    record: agent ? agent.provenance.events.length : undefined,
+    access: data.grants ? data.grants.list.grants.filter((g) => g.holder === x.id).length : undefined,
+  };
   return (
     <div className="page">
       <div className="eyebrow">

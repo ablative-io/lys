@@ -4,7 +4,7 @@ import type { Root } from 'react-dom/client';
 import { vi } from 'vitest';
 import { App } from '../src/App';
 import { SERVICE } from './fixtures';
-import type { Answer } from './fixtures';
+import type { Route } from './fixtures';
 
 const roots: Root[] = [];
 
@@ -16,15 +16,23 @@ export function unmountAll(): void {
 export interface Mounted {
   container: HTMLElement;
   requests: string[];
+  posted: { path: string; body: unknown }[];
 }
 
-/** Stub the service: each /api path answers from `routes`, anything else 404 with no refusal. */
-export function serve(routes: Record<string, Answer>): string[] {
+/**
+ * Stub the service: each /api path answers from `routes`, a POST under
+ * "POST /path"; anything else 404 with no refusal.
+ */
+export function serve(routes: Record<string, Route>, posted: { path: string; body: unknown }[] = []): string[] {
   const requests: string[] = [];
-  vi.stubGlobal('fetch', async (input: string) => {
+  vi.stubGlobal('fetch', async (input: string, init?: RequestInit) => {
     const path = String(input).replace(/^\/api/, '');
-    requests.push(path);
-    const answer = routes[path];
+    const post = init?.method === 'POST';
+    const body: unknown = post ? JSON.parse(String(init?.body)) : undefined;
+    requests.push(post ? 'POST ' + path : path);
+    if (post) posted.push({ path, body });
+    const route = routes[post ? 'POST ' + path : path];
+    const answer = typeof route === 'function' ? route(body) : route;
     if (!answer) return new Response('', { status: 404 });
     const text = typeof answer.body === 'string' ? answer.body : JSON.stringify(answer.body);
     return new Response(text, { status: answer.status, headers: { 'content-type': 'application/json' } });
@@ -40,8 +48,9 @@ export async function settle(): Promise<void> {
   }
 }
 
-export async function mount(hash: string, routes: Record<string, Answer> = SERVICE): Promise<Mounted> {
-  const requests = serve(routes);
+export async function mount(hash: string, routes: Record<string, Route> = SERVICE): Promise<Mounted> {
+  const posted: { path: string; body: unknown }[] = [];
+  const requests = serve(routes, posted);
   location.hash = hash;
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -51,13 +60,24 @@ export async function mount(hash: string, routes: Record<string, Answer> = SERVI
     root.render(<App />);
   });
   await settle();
-  return { container, requests };
+  return { container, requests, posted };
 }
 
 export async function press(key: string, init: KeyboardEventInit = {}, target?: Element | null): Promise<void> {
   const on = target ?? document.activeElement ?? document.body;
   await act(async () => {
     on.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init }));
+  });
+  await settle();
+}
+
+/** Choose `value` in a select, as a person would. */
+export async function choose(select: Element | null, value: string): Promise<void> {
+  if (!(select instanceof HTMLSelectElement)) throw new Error('no select');
+  await act(async () => {
+    const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    set?.call(select, value);
+    select.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await settle();
 }
@@ -80,7 +100,7 @@ export const text = (): string => document.body.textContent ?? '';
  * focusable with a button role.
  */
 export function unreachable(): string[] {
-  const acting = '[data-href], [data-help], .concept, [data-pick], [data-share], [data-gnode]';
+  const acting = '[data-href], [data-help], .concept, [data-pick], [data-share], [data-gnode], [data-pickrel]';
   const controls = '[data-act], [data-kind], [data-dock], [data-labels], [data-dockbtn], [data-dockbtn-close], [data-nav], [data-xm], [data-xoff]';
   const bad: string[] = [];
   for (const el of $$(acting)) {

@@ -11,7 +11,6 @@ interface Screen {
 export const SCREENS: Record<string, Screen> = {
   roles: { eyebrow: 'Directory', title: 'Roles', sub: 'A role is a job and a starting point: what the holder is for, the profile an agent starts from, and the grants it usually needs.', why: 'Roles wait on their ADR (conformance 4.1 to 4.7).' },
   resources: { eyebrow: 'Access', title: 'Resources', sub: "Everything access can be granted on. This service's own types need nothing else installed; other products add theirs when they connect.", why: 'Resources come with the grant model in DIRECTORY-006 R1 to R5.' },
-  access: { eyebrow: 'Access', title: 'Access', sub: 'Ask it any way round. Every answer traces to a person, or says why not.', why: 'The explanation seam is DIRECTORY-006 R5 (conformance 8.1, 8.2).' },
   graph: { eyebrow: 'Access', title: 'Graph', sub: 'Every person, agent and resource, and the relations between them.', why: 'The graph draws the answers Access gives (conformance 8.3), which arrive with DIRECTORY-006 R5.' },
   requests: { eyebrow: 'Access', title: 'Requests', sub: 'Asked by people and agents alike, through the screen or through their tools.', why: 'Requests wait for grants (DIRECTORY-006).' },
   reviews: { eyebrow: 'Access', title: 'Reviews', sub: 'Each person confirms, now and then, what the agents they answer for still need.', why: 'Reviews wait for grants (DIRECTORY-006).' },
