@@ -78,7 +78,7 @@ impl Deployment {
             .replace("50051", &ports.grpc.to_string())
             .replace("58443", &ports.http.to_string());
         let text = edit(text);
-        let bundled = text.contains("bundled = true");
+        let bundled = database_bundled(&text)?;
         let config = dir.path().join("identity.toml");
         std::fs::write(&config, text)?;
         let state = dir.path().join("state");
@@ -151,6 +151,17 @@ impl Drop for Deployment {
             eprintln!("teardown of {} failed: {error}", self.project);
         }
     }
+}
+
+/// The `[database]` table's `bundled` value, read as TOML so a comment that
+/// mentions the setting is never taken for it.
+fn database_bundled(text: &str) -> TestResult<bool> {
+    let config: toml::Table = toml::from_str(text)?;
+    config
+        .get("database")
+        .and_then(|database| database.get("bundled"))
+        .and_then(toml::Value::as_bool)
+        .ok_or_else(|| "config_invalid: no boolean database.bundled".into())
 }
 
 /// Stdout and stderr of a process, as text.
