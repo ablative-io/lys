@@ -76,7 +76,8 @@ assumes the operator's machine: an unset address is refused as
 
 ## Readiness and migration order
 
-1. PostgreSQL answers `pg_isready`; on first start its init directory runs
+1. PostgreSQL answers `pg_isready` over TCP, never only on its local socket, which its
+   first-start init server alone listens on; on first start its init directory runs
    `postgres-init.sql`: roles `rauthy` and `spicedb`, each owning one schema of the
    same name with only that schema on its `search_path`, neither with usage on the
    other's, and nothing for `PUBLIC`.

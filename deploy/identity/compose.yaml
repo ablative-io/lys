@@ -35,8 +35,11 @@ services:
       - ./postgres-init.sql:/docker-entrypoint-initdb.d/10-identity.sql:ro
     ports:
       - "127.0.0.1:${IDENTITY_DB_PUBLISH_PORT:-55432}:5432"
+    # Healthy only once PostgreSQL answers over TCP: the image's first-start init
+    # server listens on the local socket alone and is stopped when init finishes,
+    # so a socket check passes while the other services still cannot connect.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U identity_admin -d \"$$POSTGRES_DB\""]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U identity_admin -d \"$$POSTGRES_DB\""]
       interval: 2s
       timeout: 3s
       retries: 30
