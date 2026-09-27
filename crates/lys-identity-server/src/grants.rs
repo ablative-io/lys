@@ -1,7 +1,7 @@
 //! The grant routes: list, read, issue, pass on, revoke, and the two
 //! questions, why this caller may act and who can.
 //!
-//! Every route calls the grants' one authority owner through [`with_grants`],
+//! Every route calls the grants' one authority owner through `with_grants`,
 //! which takes the directory lock first and the grants' second, so every
 //! decision reads one directory projection and one grant revision. Browser,
 //! API and tool requests reach the same owner and the same checks; the route a
