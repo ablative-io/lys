@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,37 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-032",
+      "title": "Flag an agent whose person is retired as needing a new person, and keep the four identity states authority only",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "Makes CONFORMANCE rows 3.1 and 3.2 true on the lifecycle record the lifecycle-hand brief DIRECTORY-009 (RM-017) defines, reading its fold and typed read and keeping no copy: an agent recorded with no person is refused by name; an agent's read carries needs_a_new_person, worked out on read from its registration and its person's retire record, true on every one of a retired person's agents, never for a suspended person, with nothing appended and each agent's own state unchanged; every change of state is walked, six admitted and fourteen refused by name; and a test shows the state starts and stops no process and says nothing about running. One brief, DIRECTORY-019, of five rows.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T13:26:00+10:00",
+        "quote": "An agent whose person is retired shows as needing a new person, and the four identity states are recorded as authority only.\n\nThis card covers the first two rows of section 3 of the identity CONFORMANCE document on lys main 7b536253, Lifecycle, and each row gets at least one acceptance line that tests it on the lifecycle record.\nNo brief on main makes either row true, and the lifecycle-hand brief on its own branch cites neither row.\nThis brief reads that brief's lifecycle record rather than keeping its own copy.\n\nThe first row is that every agent answers to a person.\nWhen that person is retired, each of their agents is flagged in its lifecycle record as needing a new person, and a test retires a person and reads the flag on every one of their agents.\nAn agent with no person is refused by name when it is recorded, and a test shows that refusal.\n\nThe second row is that the identity states are registered, active, suspended and retired.\nA test walks each allowed change of state in the lifecycle record and shows every other change refused by name.\nThe state is authority only.\nA test shows that changing an agent's state starts and stops no process, and that the record says nothing about whether the agent is running.\n\nGiving an agent a new person is out of scope and is its own card.",
+        "context": "The lifecycle conformance card on Cambium's board, run through the brief_card chain at lys main 7b53625. The survey's five questions were answered by the lead for the identity line and are written into DIRECTORY-019 as settled: the flag stands and ADR-011's responsible person for life stays in force until the reassignment card revises it; the flag is worked out on read with nothing appended (the new decision ADR-056); a flagged agent's own state is unchanged; the flag shows in the lifecycle read and the typed read, the screen being a later card; and only a retired person's agents are flagged, never a suspended person's."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-003",
+          "ADR-004",
+          "ADR-007",
+          "ADR-011",
+          "ADR-056"
+        ],
+        "briefs": [
+          "DIRECTORY-019"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-001"
+      ],
+      "notes": "Its own row rather than riding RM-001, which carries IDENTITY-001's rows; it depends on RM-001 for DIRECTORY-003. Ids under the ruling that a brief's ids are the next after main's highest and every open branch's: ADR-056, C123 to C127 and S52 to S53 (the open branches reach ADR-055, C122 and S51 in this cluster); RM-032 is kept as the draft's row. The brief id DIRECTORY-019 is the next after main's highest and every open branch's (the open branches reach DIRECTORY-018; the lifecycle-hand brief holds DIRECTORY-009 on brief/directory/lifecycle-hand). DIRECTORY-019 depends on DIRECTORY-009, which creates the lifecycle contract, module and typed read its rows modify; RM-017 is named in its blocked_by rather than in this row's depends_on because RM-017 is not yet on main. The flag stands against ADR-011's responsible person for life and DIRECTORY-003 R1's rule that no request changes it; this card revises neither, and clearing the flag needs the reassignment card, which is the one that revises that rule. Further units, not written: Give an agent whose person is retired a new responsible person; Show the needs-a-new-person flag on the people list and the agent file; CONFORMANCE 3.4: emergency stop revokes tokens and asks sessions to end."
     }
   ]
 }

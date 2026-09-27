@@ -42,6 +42,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
 - ADR-010 — Every product shares one design and keeps its own accent; the identity product's is orange — The identity screens follow Aion's structure, typography, spacing and interaction, and Rauthy's client themes take the same colours, with no build dependency on Cambium or Aion. Each product keeps its own accent within the estate colour family: Cambium green, Aion blue and black, Argus light blue, Haematite mustard. The identity product's accent is orange (accent #D4975A, deep #A86B2E, wash #3D2A17 in the estate colour tokens), set apart from Manifold's copper. No product is silently made Aion-blue, and purple is not used.
 - ADR-011 — An identity is registered, active, suspended or retired — An identity is in one of four states: registered (exists in the directory, no grants, no credential handle, may not act), active (may act within its grants), suspended (kept whole, grants kept but not effective) and retired (permanent, history kept, never reactivated; a new identity is made instead). Register, activate, suspend, reinstate and retire are the only transitions, each one signed audit record naming the authenticated actor and their provenance, the identity, from, to, when and reason. Having a grant or a credential is a fact beside the state, not a state. A person is registered by first sign-in; an agent is registered by a signed-in person, who carries it as its responsible person for life and may cause every transition of their own agents. Source: docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:71-95.
+- ADR-056 — Needs a new person is a view worked out on read from an agent's registration and its person's retire record, never stored or appended — An agent's needs-a-new-person flag is worked out each time its lifecycle record is read, from the responsible person its registration names and that person's retire record: it is true when that person's folded state is retired and false otherwise, a suspended person included. Nothing is appended to any agent's history, no transition is made on the agent, the agent keeps its own state, and no responsible person changes. The flag records a fact, that the agent's person is retired; clearing it needs the reassignment card, which is the one that revises ADR-011's responsible person for life. Rejected: a signed flag record appended on each agent when its person is retired; moving the agent to another state with its person.
 
 ## Goals
 
@@ -50,6 +51,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - Every decision still open for Tom is recorded as open and decided nowhere in this cluster.
 - The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6).
 - DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record.
+- CONFORMANCE rows 3.1 and 3.2 are true on the lifecycle record, each tested by at least one acceptance line of DIRECTORY-019, reading the lifecycle-hand brief DIRECTORY-009's record and keeping no copy of it.
 
 ## Non-Goals
 
@@ -64,6 +66,8 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - The examples in AGENT-PARITY-2026-09-23 (abilities with an assignment or project, seat provisioning within a budget, private and shared notes) — Tom gave them as not yet decided (docs/design/identity/AGENT-PARITY-2026-09-23.md:11-15); they are never turned into requirements.
 - A production Cambium auth cutover, and any upstream Rauthy contribution as a prerequisite — Revision 5 forbids both before scratch acceptance, review and Gypsy's coordinated install (docs/design/identity/briefs/IDENTITY-001.json:31).
 - A shared design-system package extracted for every product — Tom left it as a thing to look at, not a row (ADR-010).
+- Giving an agent a new person — It is its own card, the one that revises ADR-011's responsible person for life and clears the flag; DIRECTORY-019 only flags that an agent's person is retired (ADR-056).
+- A screen that shows the needs-a-new-person flag on the people list and the agent file — It belongs to a later card; DIRECTORY-019 shows the flag in the lifecycle read and the lifecycle-hand brief's typed read (RM-017), which that screen consumes.
 
 ## Structure
 
@@ -165,6 +169,17 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `surface/identity/src/generated/index.ts` | Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch | DIRECTORY-006 |
 | `docs/design/directory/briefs/DIRECTORY-008.json` | the grant brief residue after PR 6: DIRECTORY-005's verification line, three inventory rows and the intention sentence, as requirements on the documents | DIRECTORY-008 |
 | `docs/design/directory/briefs/DIRECTORY-008.md` | rendered markdown | DIRECTORY-008 |
+| `docs/design/identity/LIFECYCLE-CONTRACT.md` | the lifecycle contract, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R1 adds its conformance section for rows 3.1 and 3.2 | DIRECTORY-019 |
+| `crates/lys-identity/src/lifecycle/mod.rs` | the lifecycle module list, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds the responsible module | DIRECTORY-019 |
+| `crates/lys-identity/src/lifecycle/error.rs` | the lifecycle refusal names, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds lifecycle_agent_without_person | DIRECTORY-019 |
+| `crates/lys-identity/src/lifecycle/causes.rs` | who may cause each transition, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds one line calling the no-person check | DIRECTORY-019 |
+| `crates/lys-identity/tests/lifecycle_support/mod.rs` | the lifecycle test support, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 adds persons with agents to its fixtures | DIRECTORY-019 |
+| `crates/lys-identity-server/src/lifecycle_read.rs` | the typed lifecycle read, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R3 adds the needs_a_new_person field | DIRECTORY-019 |
+| `crates/lys-identity/src/lifecycle/responsible.rs` | the no-person refusal and the needs-a-new-person flag worked out on read (DIRECTORY-019 R2, R3) | DIRECTORY-019 |
+| `crates/lys-identity/tests/lifecycle_no_person.rs` | CONFORMANCE 3.1: an agent recorded with no person is refused by name (DIRECTORY-019 R2) | DIRECTORY-019 |
+| `crates/lys-identity/tests/lifecycle_needs_new_person.rs` | CONFORMANCE 3.1: retiring a person flags every one of their agents as needing a new person, and suspending one flags none (DIRECTORY-019 R3) | DIRECTORY-019 |
+| `crates/lys-identity/tests/lifecycle_walk.rs` | CONFORMANCE 3.2: the walk of all 20 changes of state (DIRECTORY-019 R4) | DIRECTORY-019 |
+| `crates/lys-identity-server/tests/lifecycle_authority.rs` | CONFORMANCE 3.2: the state is authority only and the read says nothing about running (DIRECTORY-019 R5) | DIRECTORY-019 |
 
 ## Inventory
 

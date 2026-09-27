@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,25 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-056",
+      "title": "Needs a new person is a view worked out on read from an agent's registration and its person's retire record, never stored or appended",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "The lead for the identity line, answering the survey of the lifecycle conformance card; recorded with DIRECTORY-019 (RM-032)",
+      "context": "CONFORMANCE row 3.1 flags an agent whose person is retired as needing a new person. The lifecycle-hand brief DIRECTORY-009 (RM-017) says no policy causes a transition and that the only automatic effect a suspension or retirement has on other identities is the grant check, and ADR-011 keeps an agent's responsible person for life. A flag appended as a signed record on each agent, or one that moved the agent's state, would contradict both.",
+      "decision": "An agent's needs-a-new-person flag is worked out each time its lifecycle record is read, from the responsible person its registration names and that person's retire record: it is true when that person's folded state is retired and false otherwise, a suspended person included. Nothing is appended to any agent's history, no transition is made on the agent, the agent keeps its own state, and no responsible person changes. The flag records a fact, that the agent's person is retired; clearing it needs the reassignment card, which is the one that revises ADR-011's responsible person for life. Rejected: a signed flag record appended on each agent when its person is retired; moving the agent to another state with its person.",
+      "quote": "",
+      "consequences": [
+        "Each agent's history stays as it is, and the lifecycle-hand brief's rule that retiring someone has no automatic effect on other identities except the grant check holds.",
+        "The agent's own state is unchanged by its person's retirement, and its derived grants refuse at the check as they already do.",
+        "ADR-011 and DIRECTORY-003 R1 are not revised: the responsible person stays for life until the reassignment card revises that rule.",
+        "A suspended person's agents are not flagged; what a suspension stops stays open."
       ],
       "supersedes": [],
       "superseded_by": ""

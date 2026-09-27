@@ -47,3 +47,11 @@
 - [ ] **C28** — Observed grant usage names its source and time; not seen is not reported as never used.
 - [ ] **C29** — The You and delegation screens show real server authority, separate service accounts from sign-in identities, and preserve personal versus administrator visibility.
 - [ ] **C30** — The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success.
+
+## Lifecycle conformance rows 3.1 and 3.2 (DIRECTORY-019)
+
+- [ ] **C123** — docs/design/identity/LIFECYCLE-CONTRACT.md maps CONFORMANCE rows 3.1 and 3.2 to named tests and states the needs-a-new-person rule, that ADR-011 is not revised, and that the state is authority only.
+- [ ] **C124** — Registering an agent whose register request names no responsible person is refused lifecycle_agent_without_person and appends nothing.
+- [ ] **C125** — An agent's lifecycle read carries needs_a_new_person, worked out on read, true on every one of a person's agents once that person is retired and false while the person is suspended, with no record appended and each agent's state unchanged.
+- [ ] **C126** — A walk of all 20 origin-by-target changes of state admits exactly the 6 in the table and refuses the other 14 by name with nothing appended.
+- [ ] **C127** — A change of state starts and stops no process, and no key of the typed lifecycle read says anything about running.
