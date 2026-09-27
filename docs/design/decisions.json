@@ -557,6 +557,25 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-066",
+      "title": "The given statement is a lys/attestation/v2 over the RFC 8785 bytes of lys.given's data, written only when render-launch is given a key",
+      "status": "proposed",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's rulings on the given-statement card; the canonical form chosen by HOME-016's author and proposed with that brief",
+      "context": "CONFORMANCE row 6.5 asks that what an agent was given be a signed statement checked with lys verify --attestation. The lys.given entry records the hashes of the documents a session was given and no hash of itself, lys-core's attestation signs SHA-256 of a payload, and a signed form is frozen from its first signature, so the bytes signed have to be named so a stranger can rebuild them with standard tooling.",
+      "decision": "The given statement is lys-core's existing lys/attestation/v2 over the RFC 8785 (JSON Canonicalization Scheme) bytes of the lys.given entry's data, so its signed payload hash is the given hash render-launch reports as given_sha256. It is written only when render-launch is given a key: kept as a block named by a lys.given_statement entry hung under the lys.given entry, and as given-statement.cose and given-data.json under --out for lys verify. Rejected: serialising the record in struct field order, which a stranger cannot rebuild without the Rust type; signing the 64-hex hash string, whose attested hash would be SHA-256 of the hex and not the given hash; adding the given hash to the template_render event, which HOME-003 keeps unaltered; and changing lys verify's one failure message to name the file, which would change the published lys for every user.",
+      "quote": "",
+      "consequences": [
+        "The RFC 8785 form of lys.given's data is a wire contract from the first signature; changing it means a new statement type alongside, never a mutation.",
+        "A render with no key writes the lys.given entry as HOME-003 records it and no statement, and says unsigned.",
+        "The statement is checked with the unchanged lys verify; which key signed is checked by comparing its signer public key with an expected key until row 6.1's --cert checks it against a certificate.",
+        "The start statement and the role-move statement are later statements over the START launch record and the ROLES version record, written when those records land."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

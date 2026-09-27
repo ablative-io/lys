@@ -119,3 +119,13 @@
 - [ ] **C68** — The home design admits exactly one translated pair, Claude Code to Codex, as roadmap stage 4b, and the cluster's rendered markdown is what its JSON renders to.
 - [ ] **C69** — A sidechain is carried as marked text under the entry it hangs from, opening with a line naming its entry id and its agent id, and counted changed, with the agent label that names it counted changed, before label and after marker line, and a part marked text cannot hold, a base64 image included, listed lost with its reason; a branch summary or custom message on the context path is carried as marked developer text under its own marker and counted changed; lanterns, harness events and every other lys entry, render records included, are listed lost by entry id; a child forked at a user message carries that message's text after the walked history as the thread's next user prompt, counted changed with its how, and each of its parts that is not text is listed lost.
 - [ ] **C70** — A base64 image part, in a user message or inside a tool result, is carried as Codex's input_image item with no detail key and counted changed, and Codex 0.156.0 is measured resuming a thread that holds one, with any detail value it needs taken from a rollout 0.156.0 wrote itself and named; an image of any other source is listed lost with its source type and part index and is never fetched.
+
+## The given statement
+
+- [ ] **C118** — render-launch with no key records the lys.given entry with the same data as before, writes no statement, and its report's signing is unsigned.
+- [ ] **C119** — render-launch reports given_sha256, the SHA-256 of the RFC 8785 bytes of the lys.given entry's data, and the template_render event does not carry it.
+- [ ] **C120** — render-launch with a key signs those bytes as a lys/attestation/v2 statement kept as a block named by a lys.given_statement entry under the lys.given entry and as given-statement.cose and given-data.json under --out, and its report's signing is signed.
+- [ ] **C121** — lys verify --attestation accepts the given statement with given-data.json, and refuses a copy with one byte altered with its one message and exit status 1, under a stated command that names the refused file.
+- [ ] **C122** — A stated command compares the verified statement's signer public key with the test key's and exits 0, and exits 1 for a statement signed by a second test key.
+- [ ] **C123** — A byte search of the fixture's statement, payload file, statement block and statement entry finds no fixture secret value and no fixture transcript text.
+- [ ] **C124** — The statement's signed payload hash equals the report's given_sha256 and the SHA-256 recomputed from the lys.given entry in the session file for the same render.
