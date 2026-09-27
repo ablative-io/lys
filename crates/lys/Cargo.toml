@@ -21,15 +21,48 @@ lys-log-store.workspace = true
 base64.workspace = true
 chrono.workspace = true
 clap.workspace = true
+rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 thiserror.workspace = true
+# Typed deployment configuration for `lys identity`, read from TOML.
+toml.workspace = true
 # Read-only X.509 field extraction for `lys inspect cert`; verification stays
 # in lys-core, which speaks DER and owns every trust decision.
 x509-parser.workspace = true
+# Generated deployment credentials are wiped from memory when dropped.
+zeroize.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+# The container-backed identity targets run only on the identity leg of
+# .land/gates.sh, never under `cargo test --workspace --all-features`.
+[[test]]
+name = "identity_deploy"
+path = "tests/identity_deploy.rs"
+test = false
+
+[[test]]
+name = "identity_refusals"
+path = "tests/identity_refusals.rs"
+test = false
+
+[[test]]
+name = "identity_shared_db"
+path = "tests/identity_shared_db.rs"
+test = false
+
+[[test]]
+name = "identity_restart"
+path = "tests/identity_restart.rs"
+test = false
+
+[[test]]
+name = "identity_theme"
+path = "tests/identity_theme.rs"
+test = false
 
 [lints]
 workspace = true
