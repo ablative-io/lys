@@ -2,20 +2,23 @@
 //! directory under its responsible person, and its record carries no session
 //! credential.
 
+#![cfg(unix)]
+
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 
 use lys_core::Ed25519Identity;
 use lys_identity::{
-    Actor, AuthMethod, Directory, IdentityId, LoginBinding, OperationId, Profile, Provenance,
+    Actor, AgentId, AuthMethod, Directory, IdentityId, LoginBinding, OperationId, PersonId,
+    Profile, Provenance,
 };
 use lys_log_store::FileLeafStore;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-/// The contract's list of an agent record's members, the Reading table's
-/// `Record::…` row at docs/design/identity/DIRECTORY-CONTRACT.md:36.
+/// The contract's list of an agent record's members: the `Record::…` row of the
+/// Reading table in docs/design/identity/DIRECTORY-CONTRACT.md.
 const CONTRACT: &str = include_str!("../../../docs/design/identity/DIRECTORY-CONTRACT.md");
 
 fn contract_members() -> Result<Vec<String>, Box<dyn Error>> {
@@ -49,8 +52,20 @@ fn record_members(rendered: &str) -> Result<Vec<String>, Box<dyn Error>> {
     let mut members = Vec::new();
     let mut depth = 0_i32;
     let mut start = 0;
+    let mut quoted = false;
+    let mut escaped = false;
     for (index, ch) in body.char_indices() {
+        if quoted {
+            match ch {
+                _ if escaped => escaped = false,
+                '\\' => escaped = true,
+                '"' => quoted = false,
+                _ => {}
+            }
+            continue;
+        }
         match ch {
+            '"' => quoted = true,
             '{' | '[' | '(' => depth += 1,
             '}' | ']' | ')' => depth -= 1,
             ',' if depth == 0 => {
@@ -73,12 +88,16 @@ fn record_members(rendered: &str) -> Result<Vec<String>, Box<dyn Error>> {
         .collect()
 }
 
-struct Fixture {
-    _dir: tempfile::TempDir,
+/// A directory on a temporary log, holding one person and one agent
+/// registered under them, with no session of the agent started.
+struct Registered {
+    dir: tempfile::TempDir,
     directory: Directory<FileLeafStore>,
+    person: PersonId,
+    agent: AgentId,
 }
 
-fn fixture() -> Result<Fixture, Box<dyn Error>> {
+fn registered() -> Result<Registered, Box<dyn Error>> {
     let dir = tempfile::TempDir::new()?;
     let log: PathBuf = dir.path().join("log");
     FileLeafStore::create(&log, "example.test/lys/directory")?;
@@ -86,66 +105,57 @@ fn fixture() -> Result<Fixture, Box<dyn Error>> {
     std::fs::write(&key, [11_u8; 32])?;
     std::fs::set_permissions(&key, std::fs::Permissions::from_mode(0o600))?;
     let reopen = Box::new(move || FileLeafStore::open(&log));
-    let directory = Directory::open(reopen, Ed25519Identity::load(&key)?)?;
-    Ok(Fixture {
-        _dir: dir,
-        directory,
-    })
-}
-
-fn administrator() -> Result<Actor, Box<dyn Error>> {
-    Ok(Actor::new(
+    let mut directory = Directory::open(reopen, Ed25519Identity::load(&key)?)?;
+    let administrator = Actor::new(
         LoginBinding::new("https://issuer.test", "administrator")?,
         Provenance::new(AuthMethod::Oidc, 1_790_000_000),
-    ))
-}
-
-#[test]
-fn d011_r2_ac1() -> TestResult {
-    let mut fixture = fixture()?;
-    let directory = &mut fixture.directory;
+    );
     let (person, _) = directory.register_person(
-        administrator()?,
+        administrator.clone(),
         OperationId::from_bytes([1; 16]),
         Profile::new("Ada")?,
         10,
     )?;
     let (agent, _) = directory.register_agent(
-        administrator()?,
+        administrator,
         OperationId::from_bytes([2; 16]),
         person,
         Profile::new("Unstarted")?,
         11,
     )?;
-    let agents: Vec<_> = directory
+    Ok(Registered {
+        dir,
+        directory,
+        person,
+        agent,
+    })
+}
+
+#[test]
+fn d011_r2_ac1() -> TestResult {
+    let mut fixture = registered()?;
+    assert!(fixture.dir.path().join("log").exists());
+    let agents: Vec<_> = fixture
+        .directory
         .projection()?
         .records()
         .filter(|(id, _)| matches!(id, IdentityId::Agent(_)))
         .map(|(id, record)| (*id, record.responsible()))
         .collect();
-    assert_eq!(agents, vec![(IdentityId::Agent(agent), Some(person))]);
+    assert_eq!(
+        agents,
+        vec![(IdentityId::Agent(fixture.agent), Some(fixture.person))]
+    );
     Ok(())
 }
 
 #[test]
 fn d011_r2_ac2() -> TestResult {
-    let mut fixture = fixture()?;
-    let directory = &mut fixture.directory;
-    let (person, _) = directory.register_person(
-        administrator()?,
-        OperationId::from_bytes([1; 16]),
-        Profile::new("Ada")?,
-        10,
-    )?;
-    let (agent, _) = directory.register_agent(
-        administrator()?,
-        OperationId::from_bytes([2; 16]),
-        person,
-        Profile::new("Unstarted")?,
-        11,
-    )?;
-    let record = directory
-        .record(IdentityId::Agent(agent))?
+    let mut fixture = registered()?;
+    assert!(fixture.dir.path().join("log").exists());
+    let record = fixture
+        .directory
+        .record(IdentityId::Agent(fixture.agent))?
         .ok_or("the registered agent cannot be read")?;
     let expected = contract_members()?;
     assert!(!expected.is_empty());
