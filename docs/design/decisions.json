@@ -338,7 +338,7 @@
       "quote": "",
       "consequences": [
         "Each holding shows its policy; one with an end date under a move at the next renewal shows its end date as its move date, the words that its next renewal moves it to the current version, and who can stop the move.",
-        "The role screen shows the role's default and marks each holding whose policy differs from it.",
+        "The role screen shows the role's default and marks each holding with an end date whose policy differs from it; a holding with no end date is unmarked and shows only the words Moves only by a deliberate act.",
         "Nothing renews a holding but the renewal act; a version change never extends an end date (ADR-006)."
       ],
       "supersedes": [],
