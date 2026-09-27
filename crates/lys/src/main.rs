@@ -11,6 +11,7 @@
 
 mod cli;
 mod commands;
+mod identity;
 
 use std::process::ExitCode;
 
@@ -42,6 +43,14 @@ fn main() -> ExitCode {
                 json,
             ),
         },
+        Command::Identity(identity_command) => match identity_command {
+            identity::IdentityCommand::Prepare { config } => identity::prepare::run(&config, json),
+            identity::IdentityCommand::Configure { config } => {
+                identity::configure::run(&config, json)
+            }
+            identity::IdentityCommand::Health { config } => identity::health::run(&config, json),
+        }
+        .map_err(commands::error::CliError::from),
         Command::Log(log_command) => match log_command {
             LogCommand::Init { dir, origin } => commands::log::init::run(&dir, &origin, json),
             LogCommand::Status { dir } => commands::log::status::run(&dir, json),

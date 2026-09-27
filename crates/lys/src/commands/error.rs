@@ -33,6 +33,11 @@ pub enum CliError {
         source: std::io::Error,
     },
 
+    /// A `lys identity` operation failed. The error names its kind,
+    /// operation, resource and path, and never carries secret bytes.
+    #[error(transparent)]
+    Identity(#[from] crate::identity::IdentityError),
+
     /// A `lys-core` trust operation failed.
     #[error(transparent)]
     Trust(#[from] lys_core::TrustError),
