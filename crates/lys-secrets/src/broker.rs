@@ -361,6 +361,7 @@ impl<P: PermissionCheck> Broker<P> {
                 max_ms: u128::from(u32::MAX),
             });
         }
+        self.recipient_admitted(&holder.identity, secret)?;
         match self.permissions.may_use(&holder.identity, secret) {
             Ok(_permit) => {}
             Err(denied) if denied.no_person_root => {

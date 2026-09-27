@@ -130,6 +130,55 @@ impl<P: PermissionCheck> Broker<P> {
         Ok(())
     }
 
+    /// Whether the recipient policy of `secret` admits `recipient`.
+    pub(super) fn recipient_admitted(
+        &self,
+        recipient: &str,
+        secret: &str,
+    ) -> Result<(), SecretsError> {
+        if self.store.recipients(secret).admits(recipient) {
+            return Ok(());
+        }
+        Err(SecretsError::RecipientRefused {
+            recipient: recipient.to_owned(),
+            secret: secret.to_owned(),
+        })
+    }
+
+    /// Sets the recipient policy of `secret`, as its owner.
+    ///
+    /// # Errors
+    ///
+    /// `LendingNotPermitted` when `owner` is not the secret's owner,
+    /// `SecretUnknown`, and the store's and audit log's refusals.
+    pub fn set_recipients(
+        &mut self,
+        owner: &str,
+        secret: &str,
+        policy: crate::store::Recipients,
+    ) -> Result<(), SecretsError> {
+        let owns = self
+            .store
+            .entry(secret)
+            .is_some_and(|entry| entry.owner == owner);
+        if !owns {
+            return Err(SecretsError::LendingNotPermitted {
+                holder: owner.to_owned(),
+                secret: secret.to_owned(),
+            });
+        }
+        self.store.set_recipients(secret, policy)?;
+        let outcome = format!("recipients {}", policy.label());
+        self.record(
+            AuditKind::Seal,
+            (None, Some(owner), Some(secret)),
+            None,
+            None,
+            &outcome,
+        )?;
+        Ok(())
+    }
+
     /// Whether `handle` or any handle above it was dropped.
     pub(super) fn line_dropped(&self, handle: &str) -> bool {
         let line = chain(&self.handles, handle);
@@ -176,6 +225,7 @@ impl<P: PermissionCheck> Broker<P> {
                 secret: parent.secret.clone(),
             });
         }
+        self.recipient_admitted(&child.identity, &parent.secret)?;
         if let Err(denied) = self.permissions.may_use(&child.identity, &parent.secret) {
             return Err(SecretsError::PermissionDenied {
                 holder: child.identity.clone(),
