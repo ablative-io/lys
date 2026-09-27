@@ -265,3 +265,88 @@ fn an_event_the_table_forbids_cannot_be_made() -> TestResult {
     );
     Ok(())
 }
+
+mod directory_events {
+    use std::error::Error;
+
+    use identity_contract::fixtures::{administrator, op, shown};
+    use identity_contract::harness::{Fault, Harness};
+    use lys_identity::IdentityError;
+    use lys_identity::receipt::verify_receipt;
+
+    type TestResult = Result<(), Box<dyn Error>>;
+
+    #[test]
+    fn a_receipt_verifies_and_a_changed_one_does_not() -> TestResult {
+        let harness = Harness::new(9)?;
+        let mut directory = harness.open()?;
+        let (_, receipt) = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        directory.register_person(administrator()?, op(2), shown("Grace")?, 11)?;
+        let index = receipt.coordinate().index;
+        let leaf = directory.log().leaf(index).ok_or("leaf missing")?.to_vec();
+        let checkpoint = directory.log().head();
+        let proof = directory.log().inclusion_proof(index)?;
+        let key = directory.service_key();
+        verify_receipt(&receipt, &leaf, &key, checkpoint, &proof)?;
+        let other = directory.log().leaf(1).ok_or("leaf missing")?.to_vec();
+        assert!(verify_receipt(&receipt, &other, &key, checkpoint, &proof).is_err());
+        let mut signature_flipped = leaf.clone();
+        let last = signature_flipped.len() - 1;
+        signature_flipped[last] ^= 1;
+        assert!(verify_receipt(&receipt, &signature_flipped, &key, checkpoint, &proof).is_err());
+        let moved = (checkpoint.0, [0; 32]);
+        assert!(verify_receipt(&receipt, &leaf, &key, moved, &proof).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn an_append_whose_leaf_landed_is_found_committed_once() -> TestResult {
+        let harness = Harness::new(9)?;
+        let mut directory = harness.open()?;
+        harness.fail(Fault::AfterLeaf);
+        let (person, receipt) =
+            directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        assert_eq!(receipt.coordinate().index, 0);
+        assert_eq!(directory.log().len(), 1);
+        let again = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        assert_eq!(again.0, person, "the retry finds the one committed event");
+        assert_eq!(directory.log().len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn an_append_whose_leaf_never_landed_is_refused_and_records_nothing() -> TestResult {
+        let harness = Harness::new(9)?;
+        let mut directory = harness.open()?;
+        harness.fail(Fault::BeforeLeaf);
+        let refused = directory.register_person(administrator()?, op(1), shown("Ada")?, 10);
+        assert!(matches!(refused, Err(IdentityError::AppendRefused { .. })));
+        assert_eq!(directory.log().len(), 0);
+        directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        assert_eq!(directory.log().len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn an_uncertain_append_holds_every_read_until_it_is_resolved() -> TestResult {
+        let harness = Harness::new(9)?;
+        let mut directory = harness.open()?;
+        harness.fail(Fault::AfterLeafUnreadable);
+        let held = directory.register_person(administrator()?, op(1), shown("Ada")?, 10);
+        assert!(matches!(held, Err(IdentityError::LogUnavailable { .. })));
+        assert!(
+            directory.projection().is_err(),
+            "no read answers while the append is uncertain"
+        );
+        harness.fail(Fault::None);
+        assert_eq!(
+            directory.projection()?.records().count(),
+            1,
+            "resolved as committed, applied once"
+        );
+        let live = directory.projection()?.clone();
+        drop(directory);
+        assert_eq!(harness.open()?.projection()?, &live);
+        Ok(())
+    }
+}
