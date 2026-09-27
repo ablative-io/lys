@@ -4,7 +4,10 @@
   "title": "Sign each call, harness event and home-recorded open of a home into a lys log under the agent's identity, and verify a session against it",
   "depends_on": [
     "HOME-001",
-    "HOME-002"
+    "HOME-002",
+    "HOME-003",
+    "HOME-004",
+    "HOME-006"
   ],
   "blocked_by": [
     "DIRECTORY-003 R2 landed, with the home-entry, home-entry-copy and home checkpoint payloads reviewed with its envelope before any durable byte is signed: checked by `git cat-file -e main:docs/design/identity/IDENTITY-EVENTS.md` and `git cat-file -e main:crates/lys-identity/src/lib.rs` both succeeding on lys main.",
@@ -299,7 +302,7 @@
         "On R4's home forked from `early`, with the parent's files in place, verify of the child returns a passing result whose leaves is 1, whose logged is 1 and whose checkpoint entries is 0.",
         "On that home, with the `m` of the model in the lys.call line of sessions/early.jsonl changed to `n` in place, verify of the child refuses with a message beginning `verify refused: entry ` and naming the copied lys.call's entry id.",
         "On that home, with sessions/early.jsonl, sessions/early.index.jsonl and sessions/early.head removed, verify of the child refuses with a message beginning `verify refused: entry ` and naming the copied lys.call's entry id.",
-        "A unit test on a home holding session `edge` of exactly three entry lines, a lys.call, a user message and a lys.call, written before log-enable, runs log-enable, then copies the first and the third entry lines into a new session `edge-child` through Session::append_copied: the log grows by 2 home-entry-copy leaves with parent_leaf 0 and parent_position 1 and 3, and verify of `edge-child` returns a passing result whose leaves is 2.",
+        "A unit test on a home holding session `edge` of exactly three entry lines, a lys.call, a user message and a lys.call, written before log-enable, runs log-enable, then copies all three entry lines, in file order, into a new session `edge-child` through Session::append_copied, so that each copied line's parent is already in `edge-child` and no copy is refused with UnknownParent: the copied user message adds no leaf, and the log grows by exactly 2 home-entry-copy leaves with parent_leaf 0 and parent_position 1 and 3, and verify of `edge-child` returns a passing result whose leaves is 2.",
         "On that home, with the copy leaf of the third line re-signed to name parent_position 4, verify of `edge-child` refuses with a message beginning `verify refused: entry ` and naming that copied entry's id.",
         "On that home, with the copy leaf of the first line re-signed to name parent_position 0, verify of `edge-child` refuses with a message beginning `verify refused: entry ` and naming that copied entry's id."
       ],
