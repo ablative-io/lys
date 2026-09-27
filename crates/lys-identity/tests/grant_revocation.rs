@@ -9,6 +9,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use lys_identity::grants::admission::effective;
+use lys_identity::grants::test_support::FailingRelationships;
 use lys_identity::grants::{
     ExerciseRequest, GrantError, GrantId, MemoryRelationships, PassOn, RecipientKind, Relationship,
     RelationshipStore, RevokeRequest, Route,
@@ -253,3 +254,45 @@ fn grant_freshness_a_stale_engine_never_permits_after_a_committed_revoke() -> Te
     Ok(())
 }
 
+#[test]
+fn grant_engine_outage_refuses_by_name_and_writes_nothing() -> TestResult {
+    let engine = FailingRelationships::default();
+    let mut world = World::with(
+        Box::new(|path: &Path| -> Reopen<FileLeafStore> {
+            let path = path.to_owned();
+            Box::new(move || FileLeafStore::open(&path))
+        }),
+        engine.clone(),
+    )?;
+    let (dana, tom) = (
+        IdentityId::Person(world.dana),
+        IdentityId::Person(world.tom),
+    );
+    let root = world.root(world.dana, "kite", pass(&["read"], &BOTH)?, None)?;
+    let lent = world.request(dana, root, tom, "tern", PassOn::UseOnly, None)?;
+    world.delegate(&lent)?;
+    let relationships = engine.read()?;
+    let events = world.events();
+    engine.set_down(true);
+    for route in [Route::Browser, Route::Api, Route::Tool] {
+        assert_eq!(
+            world.exercise(tom, "read", route),
+            Err(GrantError::PermissionEngineUnavailable {
+                reason: "the permission engine is down".to_owned()
+            }),
+            "{route:?}: an outage is a named refusal, never a permit"
+        );
+    }
+    assert_eq!(world.events(), events, "a refused check writes no use");
+    engine.set_down(false);
+    assert_eq!(
+        engine.read()?,
+        relationships,
+        "nothing was written during the outage"
+    );
+    assert!(
+        world.exercise(tom, "read", Route::Api).is_ok(),
+        "the engine back, the same check permits"
+    );
+    Ok(())
+}

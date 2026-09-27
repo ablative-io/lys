@@ -17,7 +17,12 @@ rand.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 
+[features]
+# The failing permission engine the grant tests drive an outage with.
+test-support = []
+
 [dev-dependencies]
+lys-identity = { path = ".", features = ["test-support"] }
 tempfile.workspace = true
 
 [lints]

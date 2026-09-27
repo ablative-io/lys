@@ -15,6 +15,8 @@ pub mod projection;
 pub mod receipt;
 pub mod recovery;
 pub mod revocation;
+#[cfg(any(test, feature = "test-support"))]
+pub mod test_support;
 pub mod types;
 
 pub use admission::{DelegateRequest, RootRequest, Route};
