@@ -588,12 +588,12 @@
     },
     {
       "path": "crates/lys-identity-server/src/grant_contract/views.rs",
-      "note": "the grant view the screens read; DIRECTORY-032 adds each grant's effective standing and effective end",
+      "note": "the grant view the screens read; DIRECTORY-035 adds each grant's effective standing and effective end",
       "brief": ""
     },
     {
       "path": "crates/lys-identity/tests/grant_last_used.rs",
-      "note": "the last-used tests of conformance 8.4, named by their row under DIRECTORY-032",
+      "note": "the last-used tests of conformance 8.4, named by their row under DIRECTORY-035",
       "brief": ""
     },
     {
@@ -648,12 +648,12 @@
     },
     {
       "path": "docs/design/project.json",
-      "note": "the project's trees and legs; DIRECTORY-032 registers the surface leg",
+      "note": "the project's trees and legs; DIRECTORY-035 registers the surface leg",
       "brief": ""
     },
     {
       "path": "docs/design/identity/CONFORMANCE.md",
-      "note": "the identity conformance table; DIRECTORY-032 amends the Brief cell of rows 1.4, 1.5, 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4",
+      "note": "the identity conformance table; DIRECTORY-035 amends the Brief cell of rows 1.4, 1.5, 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4",
       "brief": ""
     }
   ],

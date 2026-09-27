@@ -333,11 +333,11 @@
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
     },
     {
-      "id": "RM-057",
+      "id": "RM-061",
       "title": "Name the test that passes each grant conformance row of the directory",
       "status": "idea",
       "kind": "feature",
-      "summary": "Tie each grant row of the identity conformance table (1.4, 1.5 for its agents and grants clauses, 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4) to the test that passes it and the command that runs it, over the grant contract and seam DIRECTORY-006 landed on PR 34 and the screens that landed on PR 35: the server's grant view carries each grant's effective standing and end so the screens render the service's judgement, the crates/lys-identity tests carry their row in their name, one vitest per screen row reads the row's words from the service's answer, five drift injections each fail exactly their row's test, a surface leg runs the vitests on every land, and the eight Brief cells name the tests.",
+      "summary": "Tie each grant row of the identity conformance table (1.4, 1.5 for its agents and grants clauses, 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4) to the test that passes it and the command that runs it, over the grant contract and seam DIRECTORY-006 landed on PR 34 and the screens that landed on PR 35: the server's grant view carries each grant's effective standing and end so the screens render the service's judgement, the crates/lys-identity tests carry their row in their name, one vitest per screen row reads the row's words from the service's answer, four drift injections each fail exactly their row's test, a surface leg runs the vitests on every land and joins the directory design's gate, DIRECTORY-006 R6 names the screen files that exist, and the eight Brief cells name the tests.",
       "provenance": {
         "requested_by": "tom",
         "date": "2026-09-27T11:28:31Z",
@@ -353,14 +353,14 @@
           "ADR-011"
         ],
         "briefs": [
-          "DIRECTORY-032"
+          "DIRECTORY-035"
         ],
         "commits": []
       },
       "depends_on": [
         "RM-001"
       ],
-      "notes": "Ids are the next free past main a426b9a and every open brief, draft, hand, card, design and conformance branch, read with git ls-remote origin immediately before writing (222 heads, every one read): DIRECTORY-031, RM-056, C256 and S115 were the highest held, so this brief is DIRECTORY-032 under RM-057 with checklist C257 to C263 and stories S116 to S118. DIRECTORY-009 is held on open branches (among them brief/directory/9c512bc3 and draft/directory/031db72d). No new decision: the lead chose DIRECTORY-019's Brief-cell form, so the conditional new decision the survey named is not needed. PRs 34 and 35 were not on main at writing. Further units, not written: Show a person's personal secrets on You once the secrets store lands (row 1.5, secrets clause); Judge the conformance table by a demand leg (DIRECTORY-019)."
+      "notes": "Ids are the next free past main a426b9a and every open brief, draft, hand, card, design and conformance branch, read with git ls-remote origin immediately before writing (233 such heads beside main, every one read from this clone after a fetch): DIRECTORY-034, RM-060, C278, S123 and ADR-099 were the highest held, DIRECTORY-032, RM-057 and C257 to C263 being taken on draft/directory/73184e72 and RM-057 also on draft/home/d948c6a9 and draft/secrets/0e6892c4, so this brief, first drafted as DIRECTORY-032 under RM-057, is renumbered DIRECTORY-035 under RM-061 with checklist C279 to C285 and stories S124 to S126. No new decision: the lead chose DIRECTORY-019's Brief-cell form, so the conditional new decision the survey named is not needed. PRs 34 (334ec0e) and 35 (6f57bf7) were not on main a426b9a at writing. The drift of a derived grant surviving its source's end (row 2.6) is not in the brief: admission's check_end, the hop check the grant book runs at commit, and the window check at exercise each guard it, so the lead's per-check injections fail no test as ruled, and the question is open for the lead. Further units, not written: Show a person's personal secrets on You once the secrets store lands (row 1.5, secrets clause); Judge the conformance table by a demand leg (DIRECTORY-019)."
     }
   ]
 }

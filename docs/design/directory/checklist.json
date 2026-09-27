@@ -185,38 +185,38 @@
       "name": "Grant conformance rows named by their tests",
       "items": [
         {
-          "id": "C257",
+          "id": "C279",
           "text": "Each of conformance rows 1.4, 1.5 (its agents and grants clauses), 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4 names the test that passes it with a stated command that runs that test alone, and every crates/lys-identity test of the relation bound, affirmative pass-on, inherited expiry, cascading revocation and last used carries its row in its name.",
           "done": false
         },
         {
-          "id": "C258",
+          "id": "C280",
           "text": "The grant view the service answers carries each grant's effective standing and effective end, judged over its chain on the server, and the screens render those two fields and walk no chain of their own.",
           "done": false
         },
         {
-          "id": "C259",
-          "text": "The screens meet the rows' words from the service's answer and from nothing else: What you hold shows each grant's source and whether it may be passed on and drops the grants derived from a revoked one; an agent's Access tab keeps them marked void; the delegation form shows the source grant, its actions, may-pass-on and the effective end it ends no later than; a grant card shows last used, its source and its window, and not seen is never shown as never used.",
+          "id": "C281",
+          "text": "The screens meet the rows' words from the service's answer and from nothing else: What you hold shows each grant's source and whether it may be passed on and drops the grants derived from a revoked one, as does each agent's holdings on You; an agent's Access tab keeps them marked void; the delegation form shows the source grant, its actions, may-pass-on and the effective end it ends no later than; a grant card shows last used, its source and its window, and not seen is never shown as never used.",
           "done": false
         },
         {
-          "id": "C260",
+          "id": "C282",
           "text": "An administrator's People screen shows other people while You shows only the signed-in person's own agents and grants; row 1.5's personal-secrets clause stays unmet and You keeps its not-built panel naming SECRETS-002.",
           "done": false
         },
         {
-          "id": "C261",
-          "text": "Each of the five drift injections (a grant shown without its source, may-pass-on read from a missing prohibition, a derived grant surviving its source's revocation, a derived grant surviving its source's end, not seen rendered as never used) makes exactly one test fail, and it is the named test of that row.",
+          "id": "C283",
+          "text": "Each of the four drift injections (a grant shown without its source, may-pass-on read from a missing prohibition, a derived grant surviving its source's revocation, not seen rendered as never used) makes exactly one test fail, and it is the named test of that row.",
           "done": false
         },
         {
-          "id": "C262",
+          "id": "C284",
           "text": "A surface leg registered in docs/design/project.json installs surface/identity's dependencies from its lockfile and runs its vitests, so every land runs the screen tests.",
           "done": false
         },
         {
-          "id": "C263",
-          "text": "CONFORMANCE.md's Brief cell on each of the eight rows names this brief's tests in the '<brief id> <leg> <test name>' entry form after the kept planning text, and DIRECTORY-006 R6 names the screen files that exist in place of the four it names that do not.",
+          "id": "C285",
+          "text": "CONFORMANCE.md's Brief cell on each of the eight rows names this brief's tests in the '<brief id> <leg> <test name>' entry form after the kept planning text, and DIRECTORY-006 R6 names the screen files that exist in place of the four it names that do not, with no structure path of the directory design named twice.",
           "done": false
         }
       ]
