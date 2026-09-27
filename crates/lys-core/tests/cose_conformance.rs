@@ -23,7 +23,6 @@
 //! Go-less environment never reduces byte-exact coverage (the primary
 //! copies of these vectors live in the always-run unit tests as well).
 
-
 mod harness;
 
 use harness::{build_go_tool, go_or_skip, run_built_tool};

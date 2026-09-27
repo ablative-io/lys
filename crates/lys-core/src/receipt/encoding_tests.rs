@@ -9,7 +9,6 @@
 //! fail — which is the point, because the format is frozen the moment an anchor
 //! signs under it.
 
-
 use ciborium::value::Value;
 
 use super::*;

@@ -8,7 +8,6 @@
 //! confusion and malleability each get a case that would pass if the
 //! corresponding check were removed.
 
-
 use super::*;
 use crate::attestation;
 use crate::error::TrustError;

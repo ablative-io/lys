@@ -8,7 +8,6 @@
 //! identity, and every downstream comparison (bundle dedup, a log of issued
 //! receipts, a cache key) then depends on which encoding you happened to see.
 
-
 use super::*;
 
 const ANCHOR_KEY: [u8; 32] = [0xa1; 32];

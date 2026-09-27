@@ -8,7 +8,6 @@
 //! The tamper matrices assert the non-oracle discipline: every tamper class
 //! within one artifact class produces the identical exit code AND stderr.
 
-
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -78,7 +77,8 @@ fn hex_lower(bytes: &[u8]) -> String {
     use std::fmt::Write;
     let mut s = String::with_capacity(bytes.len() * 2);
     for b in bytes {
-        s.write_fmt(format_args!("{b:02x}")).expect("writing to a String cannot fail");
+        s.write_fmt(format_args!("{b:02x}"))
+            .expect("writing to a String cannot fail");
     }
     s
 }

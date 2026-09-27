@@ -14,7 +14,6 @@
 //!
 //! Pure Rust, no toolchain requirement, runs unconditionally — no skip path.
 
-
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use lys_core::Ed25519Identity;
@@ -52,7 +51,8 @@ fn hex_of(bytes: &[u8]) -> String {
     use std::fmt::Write;
     let mut s = String::with_capacity(bytes.len() * 2);
     for b in bytes {
-        s.write_fmt(format_args!("{b:02x}")).expect("writing to a String cannot fail");
+        s.write_fmt(format_args!("{b:02x}"))
+            .expect("writing to a String cannot fail");
     }
     s
 }
