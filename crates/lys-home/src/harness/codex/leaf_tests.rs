@@ -10,6 +10,7 @@ use sha2::{Digest, Sha256};
 
 use crate::harness::codex::rollout_tests::{entry, home_with, read_json, run, said};
 use crate::record::Home;
+use crate::record::blocks::hex_of;
 use crate::record::entries::{CUSTOM_TRANSLATION, Entry, EntryBody};
 
 type Gate = Result<(), Box<dyn Error>>;
@@ -27,10 +28,7 @@ fn two_entries() -> Result<(tempfile::TempDir, Home), Box<dyn Error>> {
 }
 
 fn sha256(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
+    hex_of(&Sha256::digest(bytes))
 }
 
 fn leaves(home: &Home) -> Result<Vec<Entry>, Box<dyn Error>> {
