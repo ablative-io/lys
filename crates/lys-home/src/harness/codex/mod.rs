@@ -7,6 +7,8 @@
 pub mod account;
 #[cfg(test)]
 mod account_tests;
+#[cfg(test)]
+mod parts_tests;
 pub mod zone;
 #[cfg(test)]
 mod zone_tests;
