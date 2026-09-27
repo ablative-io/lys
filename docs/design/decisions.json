@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,24 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-019",
+      "title": "A forward failure is answered by the pass-through example, never by the shared forward.rs",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's answers to the pass-through survey; recorded with HOME-008",
+      "context": "The pass-through example shares R10's forward.rs. A failure before any upstream response must reach the example's client as something, and a break after the status has gone cannot change the status. R10 says the proxy alters no byte and records such calls as partial or unrecorded; a synthesised 502 inside forward.rs would give every lys-proxy client a 502 it would not otherwise get, on a card that is not R10's.",
+      "decision": "forward.rs stays byte-faithful: when it fails before any upstream response it returns an error to its caller naming the kind (refused, reset, or broken before the status line) and synthesises nothing. The pass-through example maps that error to 502 Bad Gateway with an empty body and writes 502 in its call line; when the upstream breaks after its status and headers have gone to the client, the example closes the client connection and its call line records that status and the duration up to the break. No error text, header value or body byte is written anywhere on either path. Rejected: the 502 inside forward.rs, which would change lys-proxy's observable behaviour.",
+      "quote": "",
+      "consequences": [
+        "lys-proxy keeps R10's own behaviour and records partial or unrecorded as its spec says.",
+        "A test on forward.rs asserts the error kind on a refused connection and that no response bytes are invented; a test on the example asserts the 502.",
+        "If the rule is ever wanted for lys-proxy too, it is a change to R10's contract, stated there, not a change made under the example."
       ],
       "supersedes": [],
       "superseded_by": ""

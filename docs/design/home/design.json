@@ -57,7 +57,8 @@
     "ADR-015",
     "ADR-016",
     "ADR-017",
-    "ADR-018"
+    "ADR-018",
+    "ADR-019"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -650,6 +651,26 @@
       "path": "docs/design/home/PROOF-FORK.md",
       "note": "the measured fork: Pi's parentSession read, a real session forked, rendered and launched, as hashes, counts and exit codes",
       "brief": "HOME-006"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.json",
+      "note": "the pass-through brief: HOME-001 R7 on R10's forward.rs, the loopback gate tests and the live subscription run",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/examples/passthrough_tests.rs",
+      "note": "the pass-through example's test module against loopback fakes: 418 in three chunks, headers, the call line, 502, a mid-stream reset",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/checklist.json",
+      "note": "the checklist, the source CHECKLIST.md is rendered from",
+      "brief": ""
     }
   ],
   "inventory": [
@@ -713,7 +734,7 @@
     },
     {
       "id": "CN5",
-      "text": "The pass-through proxy forwards every header and the streamed body unchanged and stores nothing but the measurement; it is an example binary, never a service."
+      "text": "The pass-through proxy forwards every header and the streamed body unchanged and stores nothing but the measurement; it is an example binary, never a service. Unchanged is defined as exactly this: the Host header is rewritten to the upstream's authority and TLS SNI names the same host; the hop-by-hop headers HTTP forbids forwarding are dropped, namely Connection and every header Connection names, Keep-Alive, Proxy-Authenticate, Proxy-Authorization, TE, Trailer, Transfer-Encoding and Upgrade; every other request header, and the body, pass byte for byte. The dropped names are a fixed list in the code, never read from a request (HOME-008)."
     },
     {
       "id": "CN6",

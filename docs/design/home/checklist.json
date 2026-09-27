@@ -53,6 +53,36 @@
           "id": "C7",
           "text": "One seat with a subscription login completes a call through a pass-through proxy; the measurement is written down.",
           "done": false
+        },
+        {
+          "id": "C45",
+          "text": "forward.rs returns a named error (refused, reset, or broken before the status line) to its caller when the upstream fails before any response, and synthesises no status, header or body byte.",
+          "done": false
+        },
+        {
+          "id": "C46",
+          "text": "Against a loopback upstream answering GET / with 418 and three streamed chunks, the pass-through example answers 418 with the same three chunks in order, with no provider.",
+          "done": false
+        },
+        {
+          "id": "C47",
+          "text": "When forwarding fails before any upstream response, the pass-through example answers 502 with an empty body and its call line's status is 502.",
+          "done": false
+        },
+        {
+          "id": "C48",
+          "text": "When the upstream breaks after its status and headers were sent, the pass-through example closes the client connection and its call line records that status and the duration up to the break.",
+          "done": false
+        },
+        {
+          "id": "C49",
+          "text": "The pass-through example rewrites Host to the upstream's authority, drops the fixed hop-by-hop list, and passes every other request header and the body byte for byte.",
+          "done": false
+        },
+        {
+          "id": "C50",
+          "text": "The pass-through example writes one four-field line per call (method, path, status, duration_ms) and no header value, body byte or error text anywhere.",
+          "done": false
         }
       ]
     },
