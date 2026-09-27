@@ -7,12 +7,11 @@
 
 /// Lowercase hex encoding of a byte slice.
 pub fn hex_lower(bytes: &[u8]) -> String {
-    use std::fmt::Write;
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
     let mut s = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        // Deliberate discard: `fmt::Write` for `String` is infallible —
-        // writing to an in-memory String can never return an error.
-        let _ = s.write_fmt(format_args!("{b:02x}"));
+    for &b in bytes {
+        s.push(char::from(DIGITS[usize::from(b >> 4)]));
+        s.push(char::from(DIGITS[usize::from(b & 0x0f)]));
     }
     s
 }

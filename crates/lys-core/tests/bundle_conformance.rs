@@ -670,7 +670,7 @@ fn lys_verdict(case: &Case) -> Option<VerifiedBundle> {
 
 fn to_hex(bytes: &[u8]) -> String {
     bytes.iter().fold(String::new(), |mut acc, b| {
-        let _ = write!(acc, "{b:02x}");
+        write!(acc, "{b:02x}").expect("writing to a String cannot fail");
         acc
     })
 }
@@ -689,13 +689,14 @@ fn expected_report(verified: &VerifiedBundle) -> String {
         to_hex(&checkpoint.root_hash()),
     );
     for notarization in verified.notarizations() {
-        let _ = writeln!(
+        writeln!(
             report,
             "{} {} {}",
             to_hex(&notarization.anchor_root()),
             notarization.anchor_tree_size(),
             notarization.leaf_index(),
-        );
+        )
+        .expect("writing to a String cannot fail");
     }
     report
 }

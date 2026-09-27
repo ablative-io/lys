@@ -613,7 +613,7 @@ d238d484c65bbd7f2620b55820f478bbf6a2754ed8318b19dc4e8b2bba070772b014c7662c153c45
 fn to_hex(bytes: &[u8]) -> String {
     use std::fmt::Write;
     bytes.iter().fold(String::new(), |mut acc, byte| {
-        let _ = write!(acc, "{byte:02x}");
+        write!(acc, "{byte:02x}").expect("writing to a String cannot fail");
         acc
     })
 }
