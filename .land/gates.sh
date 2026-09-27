@@ -1,6 +1,6 @@
 #!/bin/sh
-# The gates lys runs before any commit, exactly as CLAUDE.md "Gates before any commit"
-# lists them. repo_land runs this file as the whole gate when it stands here. Every leg
+# The gates lys runs before any commit: CLAUDE.md's "Gates before any commit" list,
+# and the ast-grep scan of sgconfig.yml's rules. repo_land runs this file as the whole gate when it stands here. Every leg
 # runs even after a red one, so the log covers all of them; the exit status is red if
 # any leg was.
 set -u
@@ -39,5 +39,6 @@ leg cargo clippy --all-targets -- -D warnings
 leg cargo test --workspace --all-features
 leg cargo doc --no-deps --all-features
 leg cargo doc --no-deps
+leg ast-grep scan --config sgconfig.yml
 leg identity_leg
 exit "$status"

@@ -47,6 +47,12 @@
           "command": "sh scripts/design/gate.sh",
           "requires": ["tool:sh", "tool:python3"],
           "cadence": "round"
+        },
+        {
+          "name": "ast-grep",
+          "command": "ast-grep scan --config sgconfig.yml",
+          "requires": ["tool:ast-grep"],
+          "cadence": "round"
         }
       ]
     }
