@@ -120,7 +120,7 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   unencrypted and carries no document content; a render given a key signs
   its data as a separate `lys.given_statement`, and encryption at rest
   (stage 3) can be added later without changing what is recorded.
-- `lys.given_statement` (HOME-016 R2, R3): `{given, statement}`. `given` is
+- `lys.given_statement` (HOME-018 R2, R3): `{given, statement}`. `given` is
   the id of the `lys.given` entry it signs, and it hangs under that entry,
   beside the context path, so the head does not move. `statement` is the
   hash of a block holding a `lys/attestation/v2` `COSE_Sign1`, lys-core's
