@@ -30,7 +30,6 @@
           "DIRECTORY-001",
           "DIRECTORY-002",
           "DIRECTORY-003",
-          "DIRECTORY-004",
           "DIRECTORY-005"
         ],
         "commits": []
@@ -331,6 +330,36 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-020",
+      "title": "Link two upstream providers to one Rauthy person",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "The lys side of IDENTITY-001 revision 5 row 03, carried as DIRECTORY-004: move the vendor/rauthy pin to the gated commit on the fork's ablative branch that links Google and GitHub to one Rauthy person and refuses a collision rather than merging it (R1), and write the fork-side record of the receiver's link-audit contract and the row's links report (R2). R1 waits on a gated fork commit from the fork's own card; R2 waits on DIRECTORY-003's receiver and contract. The row ends in the ID001_LINK_LIVE demonstration, which holds DIRECTORY-005.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T10:27:00+10:00",
+        "quote": "The brief for this card already stands in the cluster: docs/design/directory/briefs/DIRECTORY-004.json and DIRECTORY-004.md, \"Link two upstream providers to one Rauthy person\", Row 03 of IDENTITY-001 revision 5, landed with lys PR 6. This card is the one that carries it; its twin PLMigKDB on board 2 was archived into this card. Read DIRECTORY-004 in full and carry it as this card's brief. Keep its two requirements exactly. R1 moves the pin to the gated fork commit that links two providers (Google and GitHub) to one person, with a collision refused rather than merged. R2 writes the provider-link contract and the links report. Keep its boundaries and verification as written, and change nothing the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh) does not require.\n\nFacts the brief already settles, which the survey must not reopen, follow. The link lives in the maintained Rauthy fork (ADR-009), never in an upstream contribution. This row is built after DIRECTORY-003 (the directory contract and its link-audit receiver, Row 04) and after DIRECTORY-002 (the install). Every link is recorded through that receiver. The row ends in a live demonstration to Tom (ID001_LINK_LIVE), and a venue test or a screenshot does not replace it. Test identities only; no production key; Tom's acts stay Tom's.\n\nIf the survey finds a sentence of DIRECTORY-004 open or contradicted by the repository as it stands, quote that sentence as a question for the lead rather than rewriting the brief around it.",
+        "context": "The card on the Lys board that carries DIRECTORY-004; its twin PLMigKDB on board 2 was archived into it. Surveyed on lys main 7b53625: the ablative branch of ablative-io/rauthy is still at dd61ac3 (v0.36.2) with no linking commit, the fork's workspace compiles only members under src/, and DIRECTORY-002 and DIRECTORY-003 are not built. The lead for the identity line answered three survey questions: the typed link-audit contract and its fixtures are authored in lys by the DIRECTORY-003 receiver and R2's PROVIDER-LINK-CONTRACT.md records it, with DIRECTORY-003's landing as R2's precondition; no card carries the fork-owned brief yet, so R1 names the fork board's card as its blocker and a gated ablative commit found by git ls-remote as its precondition; and the ID001_LINK_* tests move from the root tests/identity_links/ into a compiled crate under src/, verified by rg together with the fork gate's cargo test log, a wall revision approved under CN9."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-003",
+          "ADR-005",
+          "ADR-009",
+          "ADR-011"
+        ],
+        "briefs": [
+          "DIRECTORY-004"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-001"
+      ],
+      "notes": "Id under the ruling that a brief's ids are the next after main's highest and every open brief branch's: RM-019 is the highest on brief/home/06103633 at 7b53625, so this row is RM-020. The brief is DIRECTORY-004, already on main and carried by this card, amended in place with the lead's three answers; this row owns it, so RM-001's links.briefs no longer names it (one row owns a brief), and RM-001 keeps DIRECTORY-001, 002, 003 and 005. Further units, not written: Fork-owned brief and build: link two providers to one person in ablative-io/rauthy; ID001_LINK_LIVE: install the gated fork and demonstrate two linked providers to Tom; RM-003 / IDENTITY-002: rebase the fork onto the next hardened upstream release."
     }
   ]
 }
