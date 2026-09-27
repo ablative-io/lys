@@ -484,6 +484,60 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-063",
+      "title": "lys enforces its code rules with ast-grep, recognising test code by structure the file carries",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for lys, in the rulings to the ast-grep card's runs 04213a71, 0d44242f and 6747ce61; recorded with LYSCORE-003",
+      "context": "The lys gate had no ast-grep leg, so its rules against unwrap, expect and panic outside tests, against lint bypasses, against dropped Results and against logic in mod.rs held only where clippy overlapped them. Cambium's rule set carries no unwrap rule and forbids every #[allow], while lys CLAUDE.md sanctioned a per-module #![allow] opt-out for tests. An unwrap rule has to tell test code from library code, and 224 calls at 4dd1c33 sat in fixture.rs files and in helper fns of *_tests.rs files, none of which carried an in-file test marker.",
+      "decision": "Carry Cambium's mod-rs-declarations-only, no-let-underscore-on-results and no-lint-bypass-attributes, and add lys's own no-unwrap-expect-panic-outside-tests. That rule treats as test code a file whose first item is #![cfg(test)], a #[cfg(test)] mod body, a #[test] fn body, and a path under tests/. Every *_tests.rs file, both fixture.rs files, every integration test root and both tests/harness/mod.rs files gain #![cfg(test)] as their first line. The per-module #![allow] opt-outs are replaced by clippy.toml's allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests. Every existing hit is fixed at its cause in the same card, so the leg is green when it lands. The leg `ast-grep scan --config sgconfig.yml` runs in docs/design/project.json, .land/gates.sh and CI. Rejected: an exemption list of file names; rewriting the calls in test files; narrowing no-lint-bypass-attributes to spare the test opt-outs; carrying only the rules that were clean at the time.",
+      "quote": "",
+      "consequences": [
+        "A new sibling *_tests.rs, fixture file or integration test root begins with #![cfg(test)], or the unwrap rule reports its helper calls and clippy refuses them.",
+        "No #[allow] remains in the tree; an #[allow] outside tests is fixed at its cause, and one that cannot be is brought to the lead as a question with its line.",
+        "CLAUDE.md and Cargo.toml name clippy.toml in place of the per-module #![allow].",
+        "Every carried rule is at severity error, and the leg fails the gate on any hit.",
+        "The leg needs a gate venue that declares tool:ast-grep."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-064",
+      "title": "A rule that cannot fire on the lys tree is not carried",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for lys, in the rulings to the ast-grep card's runs 04213a71, 0d44242f and 6747ce61; recorded with LYSCORE-003",
+      "context": "Cambium's set includes no-std-mutex-in-async and two door-timer rules. At 4dd1c33 lys has no async fn, no tokio and no std Mutex, and the door-timer rules are limited to Cambium door-handler paths. Rules that cannot fire would report zero hits forever and look like cover, and a control that never fires cannot be told from one that passed.",
+      "decision": "no-std-mutex-in-async, no-timer-in-door-handlers and no-timer-import-in-door-handlers are recorded as not carried, with that finding. The card that lands the first async code in lys carries no-std-mutex-in-async with it, and its brief names this decision. Rejected: carrying all six of Cambium's rules because the words said the same rule set.",
+      "quote": "",
+      "consequences": [
+        "The first card to add an async fn or tokio to lys adds rules/ast-grep/no-std-mutex-in-async.yml in the same card and cites ADR-064.",
+        "The door-timer rules stay out of lys while it has no door handlers."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-065",
+      "title": "The hand-written lys-core documents are kept as *-PRE-METHOD.md, not replaced by the method's render",
+      "status": "decided",
+      "scope": "lys-core",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for lys, in the rulings to the ast-grep card's runs 04213a71, 0d44242f and 6747ce61; recorded with LYSCORE-003",
+      "context": "docs/design/lys-core held a hand-written DESIGN.md, CHECKLIST.md and USER-STORIES.md from before the design method. Once the cluster gains a design.json, the method renders markdown under those same names and the design gate compares it byte for byte, so the render would overwrite the earlier design.",
+      "decision": "Before this cluster is rendered, the three documents are renamed to DESIGN-PRE-METHOD.md, CHECKLIST-PRE-METHOD.md and USER-STORIES-PRE-METHOD.md with their bytes unchanged, and the method's render takes the old names. The live citations of the old paths are re-pointed to the new ones. LYSCORE-003's card is the one owner of docs/design/lys-core. Rejected: overwriting the documents with the render, and deleting them.",
+      "quote": "",
+      "consequences": [
+        "The pre-method documents are read, never edited.",
+        "Other cards write nothing under docs/design/lys-core."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
