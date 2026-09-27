@@ -4,4 +4,9 @@
 //! the one translation from Claude Code to Codex.
 
 pub mod claude_code;
+/// The Codex profile: a home session translated into a rollout in the shape
+/// Codex 0.156.0 writes and reads for its own threads, with a loss account
+/// beside it (HOME-009). The translation is a fork of the session, never the
+/// same session: the rollout opens with an in-band marker saying so, and the
+/// durable link back is the account and a `lys.translation` side leaf.
 pub mod codex;
