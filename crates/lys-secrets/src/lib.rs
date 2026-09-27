@@ -31,3 +31,13 @@ pub use local_grants::{LocalGrants, SecretRelation};
 pub use permission::{Denied, PermissionCheck, Permitted};
 pub use secret::Secret;
 pub use store::{EntryClass, EntryView, SecretStore};
+
+/// `bytes` as lowercase hex.
+pub fn to_hex(bytes: &[u8]) -> String {
+    encoding::hex(bytes)
+}
+
+/// The bytes of a hex string, or `None` when it is not hex.
+pub fn from_hex(text: &str) -> Option<Vec<u8>> {
+    encoding::unhex(text)
+}

@@ -7,7 +7,7 @@ use std::fmt;
 use lys_core::Ed25519Identity;
 use lys_core::attestation::{Attestation, sign_attestation, verify_attestation_by_signer};
 
-use crate::encoding::{Canonical, hex, random_bytes, sha256};
+use crate::encoding::{Canonical, hex, random_bytes, sha256, unhex};
 use crate::error::SecretsError;
 use crate::secret::Secret;
 
@@ -24,6 +24,11 @@ pub struct HandleId(pub(crate) String);
 impl HandleId {
     pub(crate) fn generate() -> Result<Self, SecretsError> {
         Ok(Self(hex(&random_bytes::<16>()?)))
+    }
+
+    /// A handle id as a person or a file writes it.
+    pub fn from_text(text: &str) -> Self {
+        Self(text.to_owned())
     }
 
     /// The id as text.
@@ -97,6 +102,44 @@ pub struct Presentation {
 }
 
 impl Presentation {
+    /// The presentation as the four text values it travels in: handle id,
+    /// operation id in hex, signing time, and the signature in hex.
+    pub fn to_wire(&self) -> [String; 4] {
+        [
+            self.handle_id.as_str().to_owned(),
+            hex(&self.operation_id),
+            self.signed_at_ms.to_string(),
+            hex(&self.attestation.to_cose_bytes()),
+        ]
+    }
+
+    /// Reads a presentation from its four text values. A value that does
+    /// not read is the one `PresentationInvalid`.
+    ///
+    /// # Errors
+    ///
+    /// `PresentationInvalid`.
+    pub fn from_wire(
+        handle_id: &str,
+        operation: &str,
+        signed_at: &str,
+        signature: &str,
+    ) -> Result<Self, SecretsError> {
+        let invalid = || SecretsError::PresentationInvalid {
+            handle: handle_id.to_owned(),
+        };
+        let operation_id = unhex(operation).ok_or_else(invalid)?;
+        let signed_at_ms = signed_at.parse::<i64>().map_err(|_number| invalid())?;
+        let cose = unhex(signature).ok_or_else(invalid)?;
+        let attestation = Attestation::from_cose_bytes(&cose).map_err(|_cose| invalid())?;
+        Ok(Self {
+            handle_id: HandleId(handle_id.to_owned()),
+            operation_id,
+            signed_at_ms,
+            attestation,
+        })
+    }
+
     /// Signs a presentation of `handle_id` for `operation_id` at
     /// `signed_at_ms` with `key`.
     ///

@@ -14,16 +14,20 @@ name = "lys-secrets-demo"
 path = "src/bin/lys-secrets-demo.rs"
 
 [dependencies]
+axum.workspace = true
+clap.workspace = true
 lys-core.workspace = true
 lys-identity.workspace = true
 lys-log-store.workspace = true
 rand.workspace = true
 rustix.workspace = true
 serde.workspace = true
+reqwest = { workspace = true, features = ["rustls-tls"] }
 serde_json.workspace = true
 sha2.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
+tokio.workspace = true
 zeroize.workspace = true
 
 [lints]

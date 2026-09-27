@@ -1557,16 +1557,20 @@ dependencies = [
 name = "lys-secrets"
 version = "0.2.0"
 dependencies = [
+ "axum",
+ "clap",
  "lys-core",
  "lys-identity",
  "lys-log-store",
  "rand 0.9.5",
+ "reqwest",
  "rustix",
  "serde",
  "serde_json",
  "sha2",
  "tempfile",
  "thiserror 2.0.19",
+ "tokio",
  "zeroize",
 ]
 
