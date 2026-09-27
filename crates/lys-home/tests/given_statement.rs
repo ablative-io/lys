@@ -4,6 +4,7 @@
 //! here in temporary directories, and with keys that must be refused. No
 //! seed is committed; every loop asserts how many cases it ran.
 
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -43,7 +44,10 @@ type Outcome = Result<(), Box<dyn std::error::Error>>;
 type Fallible<T> = Result<T, Box<dyn std::error::Error>>;
 
 fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+    bytes.iter().fold(String::new(), |mut s, b| {
+        write!(s, "{b:02x}").expect("a String takes every write");
+        s
+    })
 }
 
 fn text(path: &Path) -> Fallible<&str> {
