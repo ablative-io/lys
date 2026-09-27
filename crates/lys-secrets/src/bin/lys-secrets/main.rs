@@ -59,6 +59,9 @@ enum Command {
         /// Text written before the credential in that header.
         #[arg(long, default_value = "Bearer ")]
         prefix: String,
+        /// The upstream answer header that reports what a call spent.
+        #[arg(long)]
+        spend_header: Option<String>,
     },
     /// Grant an identity the use of a secret, in a person's name.
     Grant {
@@ -95,6 +98,10 @@ enum Command {
         uses: u64,
         #[arg(long, default_value_t = 60)]
         minutes: i64,
+        /// A hard cap on what the handle's calls may spend; each call then
+        /// sends `lys-reserve` with what it may spend.
+        #[arg(long)]
+        spend_cap: Option<u64>,
         /// The Lys directory's configuration; when named, the issue is
         /// judged by the directory's grants.
         #[arg(long)]
@@ -222,6 +229,7 @@ fn run(command: Command) -> Result<(), SecretsError> {
             upstream,
             header,
             prefix,
+            spend_header,
         } => {
             let value = read_credential()?;
             let layout = Layout::new(&at.root, &at.keys);
@@ -233,6 +241,7 @@ fn run(command: Command) -> Result<(), SecretsError> {
                     upstream,
                     header,
                     prefix,
+                    spend_header,
                 },
             )?;
             println!("sealed {name} ({} bytes, not shown)", value.len());
@@ -261,6 +270,7 @@ fn run(command: Command) -> Result<(), SecretsError> {
             secret,
             uses,
             minutes,
+            spend_cap,
             directory_config,
             use_action,
         } => {
@@ -276,11 +286,12 @@ fn run(command: Command) -> Result<(), SecretsError> {
                 )?,
                 None => open(&at)?,
             };
-            let issued = broker.issue(
+            let issued = broker.issue_capped(
                 &holder,
                 &secret,
                 uses,
                 now_ms().saturating_add(minutes.saturating_mul(60_000)),
+                spend_cap,
             )?;
             println!("handle_id {}", issued.id);
             println!("handle {}", to_hex(issued.token.expose()));

@@ -23,7 +23,10 @@ pub mod secret;
 pub mod store;
 
 pub use audit::{AuditKind, AuditLine, AuditLog, RecordedLine};
-pub use broker::{Broker, BrokerPaths, Clock, PRESENTATION_SKEW_MS, RevokeOutcome, UseError, Used};
+pub use broker::{
+    Admitted, Broker, BrokerPaths, Clock, PRESENTATION_SKEW_MS, RevokeOutcome, Ticket, UseError,
+    Used,
+};
 pub use error::SecretsError;
 pub use handle::{
     HandleId, HandleToken, Holder, IssuedHandle, Presentation, new_operation_id, request_digest,

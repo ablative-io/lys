@@ -16,6 +16,8 @@ pub(super) enum Admission {
         secret: String,
         uses_left: u64,
         used: u64,
+        /// The reservation, on a capped lease.
+        reserved: Option<u64>,
     },
 }
 
@@ -49,8 +51,8 @@ impl<P: PermissionCheck> Broker<P> {
         &self,
         token: &HandleToken,
         presentation: &Presentation,
-        operation: &str,
-        mark: &str,
+        (operation, mark): (&str, &str),
+        reserve: u64,
     ) -> Result<Admission, SecretsError> {
         let record = self.find(token).ok_or(SecretsError::HandleUnknown)?;
         let key: [u8; 32] = unhex(&record.holder_key)
@@ -103,6 +105,30 @@ impl<P: PermissionCheck> Broker<P> {
                 reason: denied.reason,
             });
         }
+        let reserved = match record.spend_cap {
+            None => None,
+            Some(_cap) if reserve == 0 => {
+                return Err(SecretsError::ReservationMissing {
+                    handle: record.id.clone(),
+                });
+            }
+            Some(cap) => {
+                let held = record
+                    .open
+                    .values()
+                    .fold(record.settled, |sum, open| sum.saturating_add(*open));
+                let left = cap.saturating_sub(held);
+                if reserve > left {
+                    return Err(SecretsError::SpendCapReached {
+                        handle: record.id.clone(),
+                        cap,
+                        left,
+                        asked: reserve,
+                    });
+                }
+                Some(reserve)
+            }
+        };
         let used = record.used.saturating_add(1);
         Ok(Admission::Fresh {
             id: record.id.clone(),
@@ -110,6 +136,7 @@ impl<P: PermissionCheck> Broker<P> {
             secret: record.secret.clone(),
             uses_left: record.max_uses.saturating_sub(used),
             used,
+            reserved,
         })
     }
 }

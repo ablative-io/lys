@@ -34,6 +34,8 @@ pub enum AuditKind {
     Rotation,
     /// A secret's use moved to its next account.
     NextAccount,
+    /// An admitted call's outcome, with what it spent.
+    Settlement,
 }
 
 impl AuditKind {
@@ -46,6 +48,7 @@ impl AuditKind {
             Self::Seal => "seal",
             Self::Rotation => "rotation",
             Self::NextAccount => "next_account",
+            Self::Settlement => "settlement",
         }
     }
 
@@ -57,6 +60,7 @@ impl AuditKind {
             b"seal" => Some(Self::Seal),
             b"rotation" => Some(Self::Rotation),
             b"next_account" => Some(Self::NextAccount),
+            b"settlement" => Some(Self::Settlement),
             _ => None,
         }
     }
@@ -84,6 +88,9 @@ pub struct AuditLine {
     pub request: Option<String>,
     /// The lease's use count after this line.
     pub uses: Option<u64>,
+    /// The spend reserved (on a use) or settled (on a settlement), for a
+    /// lease with a spend cap.
+    pub spend: Option<u64>,
     /// The outcome: `issued`, `admitted`, a refusal's name, `dropped`.
     pub outcome: String,
 }
@@ -344,6 +351,10 @@ fn encode_line(line: &AuditLine) -> Result<Vec<u8>, SecretsError> {
         &mut encoding,
         line.uses.map(|uses| uses.to_string()).as_deref(),
     )?;
+    optional(
+        &mut encoding,
+        line.spend.map(|spend| spend.to_string()).as_deref(),
+    )?;
     encoding.field(line.outcome.as_bytes())?;
     Ok(encoding.into_bytes())
 }
@@ -379,6 +390,12 @@ fn decode_signed(index: u64, bytes: &[u8], key: &[u8; 32]) -> Result<AuditLine, 
                 .map_err(|_number| unreadable("the use count is not a number".to_owned()))
         })
         .transpose()?;
+    let spend = read_optional(&mut reader)?
+        .map(|text| {
+            text.parse::<u64>()
+                .map_err(|_number| unreadable("the spend is not a number".to_owned()))
+        })
+        .transpose()?;
     let outcome = String::from_utf8(reader.field()?.to_vec())
         .map_err(|_utf8| unreadable("the outcome is not UTF-8".to_owned()))?;
     Ok(AuditLine {
@@ -390,6 +407,7 @@ fn decode_signed(index: u64, bytes: &[u8], key: &[u8; 32]) -> Result<AuditLine, 
         operation,
         request,
         uses,
+        spend,
         outcome,
     })
 }

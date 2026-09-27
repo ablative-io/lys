@@ -14,17 +14,18 @@ use crate::audit::{AuditKind, AuditLine, AuditLog};
 use crate::encoding::hex;
 use crate::error::SecretsError;
 use crate::fsutil::{io, write_atomic};
-use crate::handle::{HandleId, HandleToken, Holder, IssuedHandle, Presentation};
+use crate::handle::{HandleId, HandleToken, Holder, IssuedHandle};
 use crate::keys::StoreKey;
 use crate::permission::PermissionCheck;
 use crate::secret::Secret;
 use crate::store::{EntryClass, SecretStore};
 
-use admit::Admission;
-
 mod accounts;
 mod admit;
 mod rotation;
+mod using;
+
+pub use using::{Admitted, Ticket};
 
 const ROTATING: &str = "rotating ";
 const HANDLES: &str = "handles.json";
@@ -104,6 +105,15 @@ struct HandleRecord {
     /// the mark of the request it was for.
     #[serde(skip)]
     operations: BTreeMap<String, (String, String)>,
+    /// The most the lease may spend, when it is capped.
+    #[serde(default)]
+    spend_cap: Option<u64>,
+    /// Spend settled so far.
+    #[serde(skip)]
+    settled: u64,
+    /// Reservations admitted and not yet settled, by operation id.
+    #[serde(skip)]
+    open: BTreeMap<String, u64>,
 }
 
 /// The secrets broker.
@@ -205,8 +215,20 @@ impl<P: PermissionCheck> Broker<P> {
                 AuditKind::Use if line.outcome == "admitted" => {
                     record.used = record.used.saturating_add(1);
                     if let (Some(operation), Some(mark)) = (line.operation, line.request) {
+                        record
+                            .open
+                            .insert(operation.clone(), line.spend.unwrap_or(0));
                         record.operations.insert(operation, (line.outcome, mark));
                     }
+                }
+                AuditKind::Settlement => {
+                    if let Some(operation) = line.operation {
+                        record.open.remove(&operation);
+                        if let Some(entry) = record.operations.get_mut(&operation) {
+                            entry.0 = line.outcome;
+                        }
+                    }
+                    record.settled = record.settled.saturating_add(line.spend.unwrap_or(0));
                 }
                 _ => {}
             }
@@ -223,6 +245,7 @@ impl<P: PermissionCheck> Broker<P> {
             paths: paths.clone(),
         };
         broker.settle_rotation(rotating.as_deref())?;
+        broker.settle_unknown_outcomes()?;
         Ok(broker)
     }
 
@@ -264,13 +287,31 @@ impl<P: PermissionCheck> Broker<P> {
     ///
     /// # Errors
     ///
-    /// `SecretUnknown`, `NoPersonRoot`, `PermissionDenied`, `InvalidLifetime`.
+    /// As [`Broker::issue_capped`].
     pub fn issue(
         &mut self,
         holder: &Holder,
         secret: &str,
         max_uses: u64,
         not_after_ms: i64,
+    ) -> Result<IssuedHandle, SecretsError> {
+        self.issue_capped(holder, secret, max_uses, not_after_ms, None)
+    }
+
+    /// Issues a handle as [`Broker::issue`] does, with a hard cap on what
+    /// its calls may spend when `spend_cap` is given: each call reserves
+    /// before it is forwarded and settles after.
+    ///
+    /// # Errors
+    ///
+    /// `SecretUnknown`, `NoPersonRoot`, `PermissionDenied`, `InvalidLifetime`.
+    pub fn issue_capped(
+        &mut self,
+        holder: &Holder,
+        secret: &str,
+        max_uses: u64,
+        not_after_ms: i64,
+        spend_cap: Option<u64>,
     ) -> Result<IssuedHandle, SecretsError> {
         if self.store.entry(secret).is_none() {
             return Err(SecretsError::SecretUnknown {
@@ -313,6 +354,9 @@ impl<P: PermissionCheck> Broker<P> {
             used: 0,
             dropped: false,
             operations: BTreeMap::new(),
+            spend_cap,
+            settled: 0,
+            open: BTreeMap::new(),
         };
         self.record(
             AuditKind::Issue,
@@ -324,92 +368,6 @@ impl<P: PermissionCheck> Broker<P> {
         self.handles.insert(record.id.clone(), record);
         self.write_handles()?;
         Ok(IssuedHandle { id, token })
-    }
-
-    /// Swaps `token` for its credential inside `forward`, after checking the
-    /// handle, the presentation, the lease and the permission, in that order.
-    /// The credential is never returned; only `forward`'s answer is.
-    ///
-    /// # Errors
-    ///
-    /// One named refusal per attempt, each recorded in the audit log.
-    pub fn use_handle<R>(
-        &mut self,
-        token: &HandleToken,
-        presentation: &Presentation,
-        forward: impl FnOnce(&Secret) -> R,
-    ) -> Result<Used<R>, UseError> {
-        let operation = hex(&presentation.operation_id);
-        let mark = self.request_mark(&presentation.request)?;
-        let call = Some((operation.as_str(), mark.as_str()));
-        match self.admit(token, presentation, &operation, &mark) {
-            Ok(Admission::Retry(outcome)) => Ok(Used::Retried { outcome }),
-            Ok(Admission::Fresh {
-                id,
-                identity,
-                secret,
-                uses_left,
-                used,
-            }) => {
-                let (entry, account) = match self.store.current_entry(&secret) {
-                    Ok(current) => current,
-                    Err(refusal) => {
-                        self.record(
-                            AuditKind::Use,
-                            (Some(&id), Some(&identity), Some(&secret)),
-                            call,
-                            None,
-                            refusal.name(),
-                        )?;
-                        return Err(refusal);
-                    }
-                };
-                let used_as = format!("{secret}@{account}");
-                self.record(
-                    AuditKind::Use,
-                    (Some(&id), Some(&identity), Some(&used_as)),
-                    call,
-                    Some(used),
-                    "admitted",
-                )?;
-                if let Some(record) = self.handles.get_mut(&id) {
-                    record.used = used;
-                    record
-                        .operations
-                        .insert(operation.clone(), ("admitted".to_owned(), mark.clone()));
-                }
-                let credential =
-                    self.store
-                        .open_for_use(&self.store_key, &entry, EntryClass::Credential)?;
-                let answer = forward(&credential);
-                Ok(Used::Forwarded { answer, uses_left })
-            }
-            Err(refusal) => {
-                let handle = self.find(token).map(|record| {
-                    (
-                        record.id.clone(),
-                        record.identity.clone(),
-                        record.secret.clone(),
-                    )
-                });
-                let (id, identity, secret) = match &handle {
-                    Some((id, identity, secret)) => (
-                        Some(id.as_str()),
-                        Some(identity.as_str()),
-                        Some(secret.as_str()),
-                    ),
-                    None => (None, None, None),
-                };
-                self.record(
-                    AuditKind::Use,
-                    (id, identity, secret),
-                    call,
-                    None,
-                    refusal.name(),
-                )?;
-                Err(refusal)
-            }
-        }
     }
 
     /// Drops the handle `id`; its next presentation is refused.
@@ -442,12 +400,28 @@ impl<P: PermissionCheck> Broker<P> {
     fn record(
         &mut self,
         kind: AuditKind,
-        (handle, identity, secret): Subject<'_>,
+        subject: Subject<'_>,
         call: Option<(&str, &str)>,
         uses: Option<u64>,
         outcome: &str,
     ) -> Result<u64, SecretsError> {
-        let line = AuditLine {
+        let line = self.line(kind, subject, call, uses, outcome);
+        self.append(&line)
+    }
+
+    fn append(&mut self, line: &AuditLine) -> Result<u64, SecretsError> {
+        self.audit.append(line, self.audit_key.identity())
+    }
+
+    fn line(
+        &self,
+        kind: AuditKind,
+        (handle, identity, secret): Subject<'_>,
+        call: Option<(&str, &str)>,
+        uses: Option<u64>,
+        outcome: &str,
+    ) -> AuditLine {
+        AuditLine {
             kind,
             at_ms: (self.clock)(),
             handle: handle.map(str::to_owned),
@@ -456,9 +430,9 @@ impl<P: PermissionCheck> Broker<P> {
             operation: call.map(|(operation, _mark)| operation.to_owned()),
             request: call.map(|(_operation, mark)| mark.to_owned()),
             uses,
+            spend: None,
             outcome: outcome.to_owned(),
-        };
-        self.audit.append(&line, self.audit_key.identity())
+        }
     }
 
     fn write_handles(&self) -> Result<(), SecretsError> {

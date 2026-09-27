@@ -38,6 +38,10 @@ pub struct Route {
     pub header: String,
     /// Text before the credential in that header.
     pub prefix: String,
+    /// The upstream answer header that reports what a call spent, for a
+    /// lease with a spend cap. With none, a call settles at its reservation.
+    #[serde(default)]
+    pub spend_header: Option<String>,
 }
 
 /// The broker's folders.

@@ -315,6 +315,28 @@ pub enum SecretsError {
         /// The operation id.
         operation: String,
     },
+    /// A reservation would take a capped lease past its cap.
+    #[error(
+        "SpendCapReached: handle {handle} has {left} of its spend cap {cap} left and asked to reserve {asked} (act: ask the grant's owner to raise the spend cap)"
+    )]
+    SpendCapReached {
+        /// The handle id.
+        handle: String,
+        /// The lease's cap.
+        cap: u64,
+        /// What is left after settled spend and open reservations.
+        left: u64,
+        /// The reservation asked for.
+        asked: u64,
+    },
+    /// A use of a capped lease named no amount to reserve.
+    #[error(
+        "ReservationMissing: handle {handle} has a spend cap and the call reserved nothing (act: send the amount the call may spend)"
+    )]
+    ReservationMissing {
+        /// The handle id.
+        handle: String,
+    },
     /// Another broker holds the store.
     #[error("StoreLocked: another broker holds the store at {path} (act: stop the other broker)")]
     StoreLocked {
@@ -428,6 +450,8 @@ impl SecretsError {
             Self::LeaseWindowClosed { .. } => "LeaseWindowClosed",
             Self::NoPersonRoot { .. } => "NoPersonRoot",
             Self::OperationIdReused { .. } => "OperationIdReused",
+            Self::SpendCapReached { .. } => "SpendCapReached",
+            Self::ReservationMissing { .. } => "ReservationMissing",
             Self::StoreLocked { .. } => "StoreLocked",
             Self::StatePoisoned => "StatePoisoned",
             Self::Grants(_) => "Grants",

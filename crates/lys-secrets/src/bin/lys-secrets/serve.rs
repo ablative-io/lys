@@ -12,10 +12,10 @@ use axum::extract::{Request, State};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use lys_secrets::{
-    Broker, HandleToken, Presentation, Secret, SecretsError, Used, from_hex, request_digest,
+    Admitted, Broker, HandleToken, Presentation, Secret, SecretsError, from_hex, request_digest,
 };
 
-use crate::files::Layout;
+use crate::files::{Layout, Route};
 use crate::spice::Grants;
 
 const MAX_BODY: usize = 16 * 1024 * 1024;
@@ -129,22 +129,23 @@ async fn forward(
         request,
     )
     .map_err(bad)?;
-    let used = {
+    let reserve = match header(&parts.headers, "lys-reserve") {
+        None => 0,
+        Some(text) => text.parse::<u64>().map_err(|_number| {
+            bad(SecretsError::Encoding {
+                context: "lys-reserve",
+                reason: "not a whole number".to_owned(),
+            })
+        })?,
+    };
+    let admitted = {
         let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
-        broker.use_handle(
-            &HandleToken::from_bytes(&token),
-            &presentation,
-            |credential| {
-                let mut value = route.prefix.as_bytes().to_vec();
-                value.extend_from_slice(credential.expose());
-                (Secret::new(value), Secret::from_slice(credential.expose()))
-            },
-        )
+        broker.admit_use(&HandleToken::from_bytes(&token), &presentation, reserve)
     }
     .map_err(|error| (StatusCode::FORBIDDEN, error))?;
-    let (header_value, credential) = match used {
-        Used::Forwarded { answer, .. } => answer,
-        Used::Retried { outcome } => {
+    let ticket = match admitted {
+        Admitted::Fresh(ticket) => ticket,
+        Admitted::Retried { outcome } => {
             return Ok((
                 StatusCode::CONFLICT,
                 format!("already presented; first outcome: {outcome}\n"),
@@ -152,6 +153,35 @@ async fn forward(
                 .into_response());
         }
     };
+    let rest = rest.to_owned();
+    let called = call_upstream(shared, &route, parts, &rest, body, ticket.credential()).await;
+    let reserved = ticket.reserved().unwrap_or(0);
+    {
+        let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
+        match &called {
+            Ok((_, Some(reported))) => broker.settle(ticket, *reported),
+            Ok((_, None)) => broker.settle(ticket, reserved),
+            Err(_) => broker.settle_failed(ticket, reserved),
+        }
+    }
+    .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error))?;
+    called.map(|(response, _reported)| response)
+}
+
+/// Sends the request upstream with the credential in the route's header,
+/// and answers the redacted response and the spend the upstream reported in
+/// the route's spend header, when it names one.
+async fn call_upstream(
+    shared: &Shared,
+    route: &Route,
+    parts: axum::http::request::Parts,
+    rest: &str,
+    body: Bytes,
+    credential: &Secret,
+) -> Result<(Response, Option<u64>), (StatusCode, SecretsError)> {
+    let mut header_value = route.prefix.as_bytes().to_vec();
+    header_value.extend_from_slice(credential.expose());
+    let header_value = Secret::new(header_value);
     let query = parts
         .uri
         .query()
@@ -201,11 +231,17 @@ async fn forward(
                 StatusCode::BAD_GATEWAY,
                 SecretsError::Encoding {
                     context: "upstream call",
-                    reason: redact_text(&error.to_string(), &credential),
+                    reason: redact_text(&error.to_string(), credential),
                 },
             )
         })?;
     let status = upstream.status();
+    let reported = route
+        .spend_header
+        .as_deref()
+        .and_then(|name| upstream.headers().get(name))
+        .and_then(|value| value.to_str().ok())
+        .and_then(|text| text.trim().parse::<u64>().ok());
     let mut headers = HeaderMap::new();
     for (name, value) in upstream.headers() {
         if contains(value.as_bytes(), credential.expose()) {
@@ -220,7 +256,7 @@ async fn forward(
             StatusCode::BAD_GATEWAY,
             SecretsError::Encoding {
                 context: "upstream answer",
-                reason: redact_text(&error.to_string(), &credential),
+                reason: redact_text(&error.to_string(), credential),
             },
         )
     })?;
@@ -228,7 +264,7 @@ async fn forward(
     let mut response = Response::new(Body::from(answer));
     *response.status_mut() = status;
     *response.headers_mut() = headers;
-    Ok(response)
+    Ok((response, reported))
 }
 
 fn contains(haystack: &[u8], needle: &[u8]) -> bool {
