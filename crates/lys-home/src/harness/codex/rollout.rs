@@ -11,7 +11,9 @@
 //! same path ending `.loss.json`. Line 0 is `session_meta` of five keys, line
 //! 1 the marker saying the thread is a fork of the session and not that
 //! session, then each context-path entry in order. Every line's outer
-//! `timestamp` is an entry's stamp exactly as that entry records it. No clock,
+//! `timestamp` is an entry's stamp exactly as that entry records it. When
+//! both files are written and synced, the `lys.translation` side leaf is
+//! appended beside the context path ([`super::leaf`]). No clock,
 //! random source or network is read, nothing is written outside `--out`, and
 //! Codex's thread index is never written.
 
@@ -24,9 +26,11 @@ use crate::error::HomeError;
 use crate::harness::claude_code::render::record_uuid;
 use crate::harness::codex::account::{Account, Rows, part_hash, write_new};
 use crate::harness::codex::beside::{Beside, carried_prompt};
+use crate::harness::codex::leaf::{HARNESS, TranslationData, append_leaf};
 use crate::harness::codex::parts::{NO_TEXT, kind_of, message_items, not_carried};
 use crate::harness::codex::zone::{check_version, local_time, parse_stamp, zone_of};
 use crate::record::Session;
+use crate::record::blocks::Hash;
 use crate::record::entries::{Entry, EntryBody};
 
 /// Why an on-path entry of no conversation kind is lost.
@@ -153,12 +157,10 @@ pub fn translate(
         local.strftime("%Y-%m-%dT%H-%M-%S"),
         thread
     );
-    let rollout = out
-        .join("sessions")
-        .join(local.strftime("%Y").to_string())
-        .join(local.strftime("%m").to_string())
-        .join(local.strftime("%d").to_string())
-        .join(name);
+    let relative = format!("sessions/{}/{name}", local.strftime("%Y/%m/%d"));
+    let rollout = relative
+        .split('/')
+        .fold(out.to_path_buf(), |at, part| at.join(part));
     let account_path = rollout.with_extension("loss.json");
     for target in [&rollout, &account_path] {
         if target.exists() {
@@ -219,6 +221,17 @@ pub fn translate(
     }
     write_new(&rollout, lines.text.as_bytes())?;
     write_new(&account_path, &account_bytes)?;
+    let leaf = TranslationData {
+        harness: HARNESS.to_owned(),
+        codex_version: codex_version.to_owned(),
+        thread: thread.clone(),
+        head: account.head.clone(),
+        head_hash: account.head_hash.clone(),
+        rollout: relative,
+        rollout_sha256: Hash::of(lines.text.as_bytes()).to_string(),
+        account_sha256: Hash::of(&account_bytes).to_string(),
+    };
+    append_leaf(session, &leaf)?;
     Ok(Translation {
         rollout,
         account: account_path,

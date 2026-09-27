@@ -38,6 +38,11 @@ pub const CUSTOM_FORK: &str = "lys.fork";
 /// the lantern, the point and the cut.
 pub const CUSTOM_FORKED_FROM: &str = "lys.forked_from";
 
+/// The custom type of a translation's side leaf (HOME-009 R6): one entry
+/// beside the context path naming a rollout written for another harness by
+/// its thread, the head and the hashes of the rollout and its loss account.
+pub const CUSTOM_TRANSLATION: &str = "lys.translation";
+
 /// What a `lys.lantern` entry carries in `custom.data`. `lit_by` is a
 /// self-declared name, as the canon's curator is, not a verified identity.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
