@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 
 use crate::audit::AuditKind;
 use crate::encoding::hex;
-use crate::error::SecretsError;
+use crate::error::{LendingRefusal, SecretsError};
 use crate::handle::{HandleId, HandleToken, Holder, IssuedHandle, Presentation};
 use crate::permission::PermissionCheck;
 
@@ -139,10 +139,10 @@ impl<P: PermissionCheck> Broker<P> {
         if self.store.recipients(secret).admits(recipient) {
             return Ok(());
         }
-        Err(SecretsError::RecipientRefused {
+        Err(SecretsError::from(LendingRefusal::RecipientRefused {
             recipient: recipient.to_owned(),
             secret: secret.to_owned(),
-        })
+        }))
     }
 
     /// Sets the recipient policy of `secret`, as its owner.
@@ -162,10 +162,10 @@ impl<P: PermissionCheck> Broker<P> {
             .entry(secret)
             .is_some_and(|entry| entry.owner == owner);
         if !owns {
-            return Err(SecretsError::LendingNotPermitted {
+            return Err(SecretsError::from(LendingRefusal::NotPermitted {
                 holder: owner.to_owned(),
                 secret: secret.to_owned(),
-            });
+            }));
         }
         self.store.set_recipients(secret, policy)?;
         let outcome = format!("recipients {}", policy.label());
@@ -197,7 +197,8 @@ impl<P: PermissionCheck> Broker<P> {
     /// The presentation and lease refusals of a use, `LendingNotPermitted`
     /// when the holder neither owns the secret nor holds the right to lend
     /// it, `PermissionDenied` when `child` may not use it, and
-    /// `BeyondAncestry` when a bound reaches past the handle above.
+    /// `BeyondAncestry` when a bound reaches past the handle above, and
+    /// `LendingTooDeep` below the deepest line the broker counts.
     pub fn derive(
         &mut self,
         token: &HandleToken,
@@ -210,6 +211,13 @@ impl<P: PermissionCheck> Broker<P> {
         self.live(parent, presentation)?;
         self.permitted(parent)?;
         self.ancestry_admits(parent, None)?;
+        let depth = chain(&self.handles, &parent.id).len();
+        if depth >= MAX_DEPTH {
+            return Err(SecretsError::from(LendingRefusal::TooDeep {
+                handle: parent.id.clone(),
+                depth,
+            }));
+        }
         let owner = self
             .store
             .entry(&parent.secret)
@@ -220,10 +228,10 @@ impl<P: PermissionCheck> Broker<P> {
                 .may_lend(&parent.identity, &parent.secret)
                 .is_err()
         {
-            return Err(SecretsError::LendingNotPermitted {
+            return Err(SecretsError::from(LendingRefusal::NotPermitted {
                 holder: parent.identity.clone(),
                 secret: parent.secret.clone(),
-            });
+            }));
         }
         self.recipient_admitted(&child.identity, &parent.secret)?;
         if let Err(reason) = self.within_scope(&child.identity, &parent.secret) {
@@ -260,9 +268,9 @@ impl<P: PermissionCheck> Broker<P> {
             || not_after_ms <= (self.clock)()
             || !within_spend
         {
-            return Err(SecretsError::BeyondAncestry {
+            return Err(SecretsError::from(LendingRefusal::BeyondAncestry {
                 handle: parent.id.clone(),
-            });
+            }));
         }
         let (parent_id, secret) = (parent.id.clone(), parent.secret.clone());
         let id = HandleId::generate()?;
