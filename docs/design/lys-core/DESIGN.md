@@ -1,255 +1,126 @@
 ---
 type: design
 cluster: lys-core
-title: "Lys Core — Trust Primitives and CLI Surface"
+title: Lys Core — no underscore-prefixed bindings
 ---
 
-# Lys Core — Trust Primitives and CLI Surface
+# Lys Core — no underscore-prefixed bindings
+
+> **Cluster:** lys-core
 
 ## Intention
 
-When this cluster is done, the hardened trust primitives live in this repository as `lys-core` — a standalone, domain-agnostic library with zero Meridian lineage — and the `lys` binary gives operators and auditors a command-line face over every primitive. An agent runtime signs session events with it. An auditor verifies a challenged log with it, offline, from nothing but a signed proof artifact, the leaf in question, and the log's verifier key. A future anchoring service consumes its roots and attestations. Nothing in the crate knows what an agent, session, or workspace is; domain meaning is applied by consumers.
+No name in lys starts with an underscore to quiet the compiler. Where a binding would go unused, the code says what the value is for. A guard that has to live is named and dropped by name where its life ends, and a test fixture that holds a temporary directory names that field and closes it where the test ends, so the directory's removal is checked. A value with no use is not bound at all. A trait parameter one implementation has no use for is written as a bare `_`, and only where another implementation needs it or the trait is published. The gate refuses a new underscore-prefixed binding, and the rule's message says why, so nobody has to remember it.
 
-The crate arrives only in its hardened form. Phase 0 (the adversarial review and fix pass on `meridian-trust`) is done; this cluster is the extraction (phase 1) plus the CLI surface (phase 2). Behaviour is ported unchanged except for three deliberate breaks made at the last free moment: the wire-format tags are renamed to lys-owned strings, the legacy pre-domain-separation attestation fallback is stripped, and the identity env var and OID constant take lys names.
+Nothing a caller, a verifier or a test sees changes. Every rewritten site returns the same value and the same error as before, every verification failure still collapses to the one error it collapses to today, and the full suite runs the same tests before and after.
 
 ## Problem
 
-The primitives exist today as `crates/meridian-trust` inside the Meridian workspace — hardened, adversarially reviewed, ~137 tests, with a live consumer. But they are unusable as the foundation of an open trust project in that shape:
-
-- The wire-format tags (`meridian-trust/attestation/v1`, `meridian-trust-sealed-envelope/v1`) are baked into every signature produced. Once anything durable is signed under a tag, that tag is frozen forever. The extraction is the last moment these strings can change.
-- The attestation verifier carries a dual-verify legacy fallback that exists only so Meridian's already-persisted attestations keep verifying. Lys must not inherit that caveat: v1 is domain-separated only.
-- The custom-extension OID constant, the identity env var, and the crate naming all carry Meridian identity into what must be a vendor-neutral library.
-- There is no operator or auditor surface. The library's defining promise — third parties verify without the operator's cooperation — has no tool a third party can actually run.
-
-Consumers are waiting on the extracted form: the Norn agent runtime (the primary consumer — signing persistence sink, cert-at-spawn, MCP-boundary verification), the future `lys-anchor` transparency service, and haematite commit attestation.
+CLAUDE.md calls a _-prefixed unused variable a bypass, not a fix, but nothing enforces that. clippy's used_underscore_binding catches only uses of an underscored binding, never the declaration. Measured with this card's rule at 7b53625, the tree holds 303 underscore-prefixed bindings in 70 files. The words count 272; the rule counts 303, and the rule's count is the one this card clears. Of the 303, 59 are guards whose directory or state the test still uses (TempDir holders and four EnvCleanup guards), whose names hide the fact that they exist to hold a lifetime. 68 are discarded errors: 64 map_err closures written |_err|, |_refusal| or |_source| because the workspace's clippy::map_err_ignore refuses map_err(|_| …), plus one or_else closure and three match arms. 164 are values nobody reads, 105 of them TempDirs a fixture returns beside an identity or authority it has already loaded into memory, so the directory keeps nothing alive. 10 are trait parameters an implementation ignores, and 2 are parameters of cfg(not(unix)) stubs. Eight test fixture structs also hold a TempDir in an underscore-prefixed field only to keep its directory alive, where the underscore silences a dead_code warning; a struct field is not a binding, so the rule does not report them, and the words' guard sentence covers them. The ast-grep rule set that LYSCORE-001 (brief 6747ce61) brings to lys left this rule out for a card of its own.
 
 ## Solution
 
-### D1: Domain-agnostic boundary
+One rule file joins the rule directory LYSCORE-001 lands. rules/ast-grep/no-underscore-binding.yml runs at severity error with vendor/** ignored. The existing leg `ast-grep scan --config sgconfig.yml` picks it up through sgconfig.yml's ruleDirs, so docs/design/project.json, .land/gates.sh and CI run it with the other ast-grep rules and none of the three changes (CN16). The rule reports an identifier that starts with an underscore and has at least one more character, wherever it binds: a let pattern, a function or closure parameter, a match arm, a for pattern, an if-let or while-let pattern, and the tuple, tuple-struct, struct (field and shorthand), slice, or, ref, mut, reference and @ patterns inside them. It never reports a bare `_`, which binds nothing (ADR-048), a struct field declaration, a field initialiser or a field access. Its message and note say why it refuses (ADR-047).
 
-The founding rule carries over unchanged: `lys-core` knows no domain concepts. No agents, sessions, workspaces, peers, contracts, or members — and no Meridian references of any kind. It provides:
+Each binding is cleared by what it does. A holder is classified by what happens after the binding, not by its name. A guard whose directory or state the test still uses is renamed without the underscore and ended with drop(name) after its last use; where a function's tail expression is its result, the result is bound, the guard dropped, and the binding returned. It is never made a bare `_`, which would drop it at the end of its statement and delete the directory under the test. Each of the eight fixture structs that holds a TempDir in an underscore-prefixed field names the field temp_dir and gains a close method returning TempDir::close's error, and every test closes each fixture value it builds after the value's last use, so the directory's removal is checked rather than silent. PhantomData's `_marker` in merkle/tree.rs is a type marker, not a held value, and stays. A discarded error is left unbound. A map_err becomes .ok().ok_or(E) when E is already built, and .ok().ok_or_else(…) when building E calls a function or a macro. No enabled clippy lint checks that split, so the brief measures it with an inline ast-grep rule. An or_else closure or a match arm writes the bare `_`. clippy::map_err_ignore stays (CN14). On the verification paths the single error is the design: a verifier must not say which check failed (P7). A value with no use becomes a bare `_` inside its pattern, including a TempDir a fixture returns beside a value it has already loaded into memory. A whole `let _x = expr;` becomes the expression statement `expr;`, never `let _ = expr;` (CN13). A trait parameter an implementation ignores becomes a bare `_` when another implementation of the same trait needs it or the trait is published, and no trait declaration changes (ADR-048, CN11). The two non-unix stubs take a bare `_`.
 
-- Ed25519 key management with X25519 derivation
-- A Certificate Authority that issues X.509 certificates for any subject
-- An RFC 6962 Merkle transparency log over any serializable leaf, or over raw leaf bytes
-- Signed tree heads as C2SP checkpoints in the signed-note envelope, and self-contained JSON proof artifacts a third party can verify unaided
-- Domain-separated signed attestations over any byte payload
-- Sealed envelopes for any byte payload, standalone or sender-authenticated
+The card lands after LYSCORE-001 (brief 6747ce61), which lands sgconfig.yml, rules/ast-grep and the leg. It carries no second copy of any of them. The rule is shown to fire on a scratch file, with one hit for each binding position and none for the non-binding forms, before its zero hits on the tree are trusted (P9).
 
-Consumers compose meaning on top: Norn defines what an "agent certificate" or "session event leaf" is; the trust crate doesn't know or care. If a type references a domain concept, it does not belong in this crate.
+## Principles
 
-### D2: Key management (`lys_core::keys`)
+- **P5** — Clear a binding by what it does: a guard is named and dropped by name, a value with no use is not bound at all, and an ignored trait parameter is a bare `_` only where the trait cannot drop it.
+- **P6** — Behaviour is held: each rewritten site returns the same value and the same error as before, and the suite runs the same tests before and after.
+- **P7** — A verifier never says which check failed. The one uniform error on a verification path is the design, so its discarded errors are not carried.
+- **P8** — A bare `_` binds nothing and is admitted; an underscore-prefixed name is a binding and is refused.
+- **P9** — Count what fired: the rule is shown to fire once for each binding position before zero hits on the tree is trusted.
 
-`Ed25519Identity` is the single long-term key type. Ported hardened behaviour:
+## Decisions
 
-- `load_or_generate(path)` — loads a 32-byte seed file or generates one. Generation is race-free: the seed is written to a unique temp file (pid + per-process counter in the name) and published with a no-clobber `hard_link` — the first generator to publish wins permanently; a loser detects `AlreadyExists`, discards its candidate seed, and loads the persisted key. The key file on disk never changes once created.
-- Unix key files are created mode `0o600`; loading a file with loose permissions warns but does not fail.
-- `from_env()` — loads a base64-encoded 32-byte seed from **`LYS_IDENTITY_KEY`** (renamed from the Meridian variable). Missing or malformed values are `KeyManagement` errors, never panics.
-- All seed material — generated, file-read, or base64-decoded — lives in `Zeroizing` buffers.
-- `sign(message)` → `[u8; 64]`; `verify(public_key, message, signature)` uses `verify_strict` (malleability/torsion-safe) everywhere. No non-strict verification exists anywhere in the crate.
-- `Debug` output redacts the signing key; redaction is tested, not assumed.
-- `x25519_static_secret()` / `x25519_public_key()` derive the Montgomery-form X25519 keys from the Ed25519 identity via the standard clamped-scalar conversion, so one long-term key serves both signing and credential unsealing.
-
-### D3: Certificate Authority (`lys_core::ca`)
-
-Ed25519-rooted X.509 issuance and verification:
-
-- `CertificateAuthority` wraps an `Ed25519Identity`; `issue_certificate(subject, ttl, extensions)` produces an `IssuedCertificate` (DER bytes, subject keypair, SHA-256 fingerprint, expiry, issuer public key; Debug-redacted).
-- **Proof of possession.** `issue_certificate` generates the subject keypair itself, so its certificate binds a key the *authority* minted — it is evidence about the authority, not about any holder, and anything layered on it (transparent issuance logging, a cert-gated write path) inherits that emptiness. `issue_certificate_for_request(request_der, subject, ttl, extensions)` is the path with a real binding: the holder presents a PKCS#10 request self-signed by a key they already control, and the certificate is signed over that key. It returns a `CertifiedKey`, which deliberately carries no private material — a separate type rather than an optional signing key, so the two outcomes cannot be confused. `create_certificate_request(identity, subject)` builds the holder's side.
-  - PKCS#10 rather than a lys-native tag: RFC 2986 already specifies this exchange and its self-signature *is* the canonical proof of possession, so `openssl req` interoperates in both directions and no permanent wire contract is invented.
-  - A request influences **exactly one** certificate field: the subject public key. Both issuance paths build their `CertificateParams` from the authority's inputs through a shared `leaf_params`, and requested extensions are refused rather than stripped. `subject` must equal the request's common name, so a holder cannot name themselves and an authority cannot certify them under a name they never asked for.
-  - `verify_certificate_request` parses with `x509-parser` but verifies with `ed25519-dalek::verify_strict`. x509-parser's own `verify_signature` routes Ed25519 to ring's non-strict verification, which accepts small-order and torsion keys — for which signatures verify with no private key known, reducing proof of possession to a formality anyone could satisfy for a key nobody controls.
-  - Unlike artifact verification elsewhere in the crate, request verification is **not** non-oracle: no authority secret participates and the requester already knows their own key, so precise diagnostics leak nothing and the operator needs them.
-  - **What proof of possession prevents is misattribution by key binding, and it protects the authority, not the verifier.** The tempting misreading — "a verifier who checks a signature against the certified key has already observed key control, so the issuance-time check is ceremony" — is how an authority talks itself into dropping it. The real attack: Mallory presents *Noor's* public key under the name `agent-mallory`; without the check the certificate issues, and every statement Noor legitimately signs then verifies against a certificate naming Mallory. No forgery, a genuinely valid certificate, and the `lys verify --cert` join reports success on a false statement. Requiring a signature over the request — which covers the subject name — means a presented key can only be certified by its holder, under the name they asked for.
-  - **A certificate does not record how it was issued.** X.509 has no marker for "issued over a proven key" and this crate adds none, so a relying party cannot tell from the artifact whether the certified key is holder-controlled; that rests on issuer policy. Narrower than it looks — a certificate over a discarded generated key binds a key nobody can sign with, so it fails closed rather than dangerously — but it is the argument for making issuance policy auditable by logging issuance transparently (DP3), not for a certificate field.
-  - **Requests are replayable, deliberately.** The signature covers the subject key and requested name and nothing tying it to one issuance, authority, or moment. That is sound: proof of possession is a claim about key control, not an authorisation of a particular issuance, and a replay yields a certificate over a key its holder already proved they hold. An authority that needs issuance *authorised* needs an access-control decision about the requester, which must not be built on the request's signature.
-- rcgen signing goes through a `RemoteKeyPair` adapter so the CA's private seed is never serialised into rcgen's key-pair representation, and a presented key reaches rcgen through a `PublicKeyData` adapter that cannot sign. `PKCS_ED25519` throughout.
-- `verify_certificate_chain(cert_der, issuer_public_key)` extracts the TBS bytes with `x509-parser` and verifies the signature with `ed25519-dalek::verify_strict` (x509-parser cannot verify Ed25519). The validity window is enforced in-crate: expired and not-yet-valid certificates are rejected, and `verify_certificate_chain_at(cert_der, issuer_public_key, instant)` verifies at an explicit instant for auditing historical records. Self-signed certificates are rejected.
-- `certificate_subject_public_key(cert_der)` recovers the 32-byte Ed25519 key a certificate vouches for. Parsing only — a key read from an *unverified* certificate is an attacker-chosen value, and the rustdoc says so. It exists to close the join: verifying a certificate proves an authority issued it and verifying an attestation proves a key signed a payload, but neither says the two concern one identity. Comparing this against an attestation's signer key is the check that connects them, and `lys verify --cert` is where that composition currently lives — deliberately in the CLI rather than the library, because the library's composed verifier is the one the anchor's verification bundle will need and designing it before that format settles would freeze a guess.
-- Capability claims travel as opaque DER in custom extensions under **`LYS_OID_ARC`** (`1.3.6.1.4.1.66364`). The payload is opaque to the crate; the consumer defines claim semantics — the cert *is* the permission object. The final component is IANA Private Enterprise Number 66364, assigned to lys; the arc is permanent and sub-arcs beneath it are ours to allocate (see [PEN-REGISTRATION.md](../../PEN-REGISTRATION.md)).
-
-Revocation tracking is deliberately absent (never built in the source crate; a first-class revocation story is an open product question — see repo DESIGN.md §Open questions).
-
-### D4: Merkle transparency log (`lys_core::merkle`, `lys_core::checkpoint`, `lys_core::tlog`)
-
-`AppendOnlyTree<L: Serialize>` provides RFC 6962 semantics over SHA-256, backed by `ct-merkle` behind a deliberately backing-agnostic API:
-
-- `append(leaf)` is the only mutation — the API exposes no delete or modify. Every argument is pre-checked so the underlying library cannot panic; out-of-range indices and invalid size pairs return `MerkleTree` errors.
-- Inclusion proofs (`prove_inclusion` / `verify_inclusion`) and consistency proofs (`prove_consistency` / `verify_consistency`), with byte round-tripping (`as_bytes` / `try_from_bytes`) on both proof types.
-- `RootHash::from_parts(root_hash, num_leaves)` / `to_parts()` — the external-verifier constructor. A third party holding only a published root and proof bytes can verify inclusion and consistency with no access to the tree. The external-verifier round trip is the defining test of the layer.
-- `reconstruct_from_leaves(leaves)` rebuilds an identical tree from a persisted leaf sequence — the crash-recovery path for consumers persisting leaves externally.
-- Leaf serialization is a **frozen wire contract**: leaves are canonical bytes; schema evolution means a new versioned leaf type, never a mutated one. This rule is documented at the module level. Two encodings are frozen and never mix within one tree — the typed postcard path, and the raw path (`RawLeaf`: leaf file bytes verbatim, no framing) that every `lys log` artifact uses.
-
-Two layers ratified after this cluster was first written — decisions **D1** and **D2** in [WIRE-FORMATS.md](../WIRE-FORMATS.md) §2–§3 — ship on top of `merkle` and are part of the crate as built:
-
-- **`lys_core::checkpoint`** — the signed tree head: a C2SP tlog-checkpoint body wrapped in the C2SP signed-note envelope, Ed25519-signed, byte-compatible with the Go `sumdb/note` reference. `verify_checkpoint` **enforces** `checkpoint origin == verifier-key name`, so a key that signs two logs can never have one log's checkpoint accepted by a verifier configured for the other. Every failure mode — size, UTF-8, structure, unknown key, bad signature — collapses to the single `TrustError::NoteVerification`.
-- **`lys_core::tlog`** — self-contained JSON proof artifacts: an RFC 6962 proof plus the relevant signed checkpoint(s) embedded verbatim, identified by frozen `format` strings, with unknown fields rejected. Redundancy is checked, not trusted: every size an artifact declares is compared against the size inside its signature-verified checkpoint, and roots are recomputed rather than believed. Builders self-verify before returning, tree sizes at or beyond 2^53 are refused on both emit and verify, and every failure collapses to the single `TrustError::LogArtifactVerification`.
-
-### D5: Signed attestations (`lys_core::attestation`) — COSE_Sign1 v2, canonical-strict
-
-> **Superseded in part by decision D4 in [WIRE-FORMATS.md](../WIRE-FORMATS.md) §4.2**: the v1 JSON/preimage form this section originally specified was deleted unshipped; the byte-exact contract now lives there. As-built summary:
-
-Signed statements binding a key to a payload. The artifact is a tagged COSE_Sign1 (`lys/attestation/v2`); the signed preimage is the RFC 9052 §4.4 `Sig_structure`:
-
-```
-Sig_structure = ["Signature1", protected, h'', claims]
-protected     = {1: -8 (EdDSA), 3: "application/vnd.lys.attestation.v2+cbor", 4: signer key}
-claims        = {1: SHA-256(payload), 2: unix-ms timestamp}
-```
-
-- The timestamp, payload hash, and signer key are all authenticated — inside the signature, not alongside it. Tampering with any of them fails verification.
-- The `Sig_structure` framing plus the signature-covered content type make attestation signatures structurally non-interchangeable with any other lys signing context (sealed-envelope binding, raw CA certificate signing, signed notes) — byte-0 disjoint, per WIRE-FORMATS §4.2.
-- **No fallback paths.** `verify_attestation` accepts the v2 `Sig_structure` and nothing else: the deleted v1 preimage (`b"lys/attestation/v1" || timestamp_le || hash`) and pre-domain-separation bare-hash signatures both fail (tests exist).
-- `Attestation { payload_hash: [u8; 32], signature: [u8; 64], signer_public_key: [u8; 32], timestamp: i64 }` carries **no serde**; the only durable form is `to_cose_bytes()`, and `from_cose_bytes` is canonical-encoding-strict.
-
-### D6: Sealed envelopes (`lys_core::seal`)
-
-X25519 ephemeral key agreement + HKDF-SHA256 + AES-256-GCM, the standard sealed-box construction with the keys bound into the KDF:
-
-- `seal(payload, recipient_public_key)` → `SealedEnvelope { ephemeral_public_key, ciphertext, nonce }`. Fresh ephemeral keypair per seal — forward secrecy per envelope.
-- HKDF info binds the domain tag and both public keys: `b"lys-sealed-envelope/v1" || ephemeral_public_key || recipient_public_key` (tag renamed from the Meridian string). **The HKDF info tag is the hyphen form** `lys-sealed-envelope/v1`; the format name and the authenticated composition's attestation context tag (`SEALED_ENVELOPE_CONTEXT_V1`) are the slash form `lys/sealed-envelope/v1`. They are deliberately different strings — separate domains, separately versioned — and they are not interchangeable: an implementer who feeds the slash form to HKDF derives a different key and cannot decrypt. WIRE-FORMATS.md §1 carries both.
-- Contributory-behaviour enforcement on **both** seal and open: a low-order public key producing a non-contributory shared secret is rejected before any key material is derived.
-- Every unseal failure — wrong key, tampered ciphertext, tampered nonce — collapses to the single undifferentiated `TrustError::UnsealFailed` through one failure arbiter (AES-GCM tag verification). No oracle, no timing split, no early return.
-- `sign_and_seal(payload, sender_identity, recipient_x25519_public_key)` / `open_and_verify(...)` compose attestation over the sealed bytes for sender-identity binding. The attestation covers every wire byte of the envelope (`attestation_bytes()`), and verification gates **before** the cipher is ever touched — a forged sender is rejected without decrypting anything.
-
-### D7: Wire formats are forever
-
-The domain tags (`lys/attestation/v2`, `lys/sealed-envelope/v1`, and the distinct HKDF info tag `lys-sealed-envelope/v1`), the attestation `Sig_structure` layout, the HKDF info layout, both leaf encodings, the checkpoint and signed-note encodings, and the proof-artifact `format` strings are versioned wire contracts, frozen the moment anything durable is signed under them. [WIRE-FORMATS.md](../WIRE-FORMATS.md) §1 is the authoritative table. Evolving one means a new versioned constant and code path, never a mutation of the shipped one. The extraction renames the Meridian tags precisely because it is the last moment nothing has been signed under the lys names.
-
-### D8: CLI surface (`lys` binary)
-
-> **Superseded in part by decisions D1 and D2 in [WIRE-FORMATS.md](../WIRE-FORMATS.md) §2–§3**: the log subcommands emit C2SP signed-note checkpoints and self-contained JSON proof artifacts, and third-party verification takes the artifact, the leaf, and the verifier key rather than raw root parts plus proof bytes. As-built summary:
-
-The auditor's and operator's tool — a thin clap surface over `lys-core`. Logic lives in the library; the binary parses arguments, dispatches, and maps results to exit codes (`0` success, `1` operational or verification failure, `2` clap argument errors). As built it carries its own `thiserror` error type with deliberately non-oracle failure messages, and no `anyhow`. Subcommands:
-
-- `lys key generate` / `lys key inspect` — generate and inspect identities (Ed25519 and derived X25519 public keys, and with `--note-name` the signed-note verifier-key string). **Never prints private key material** under any flag or format.
-- `lys ca issue` — issue a certificate with a capability-claim extension payload, signed by an issuer identity.
-- `lys ca verify` — verify a certificate chain against an issuer public key, with an optional explicit verification instant (the `verify_certificate_chain_at` path).
-- `lys attest` / `lys verify` — sign and verify `lys/attestation/v2` COSE_Sign1 artifacts over a payload file. (File paths only as built; there is no stdin path.)
-- `lys seal` / `lys open` — sealed-envelope transport of a payload file, authenticated composition only: `seal` writes the JSON envelope and the sender's COSE attestation, and `open` requires both, verifying before it decrypts.
-- `lys inspect attestation` / `lys inspect cert` — read-only viewers that print what a file says **without verifying any of it**, every output opening with an UNVERIFIED banner naming the command that does verify. Local files only.
-- `lys log init` / `append` / `checkpoint` / `prove` / `verify` — transparency-log operations over a persisted leaf sequence: `init` pins the log's origin exactly once and refuses re-initialization, `append` hashes a leaf file's raw bytes per RFC 6962, `checkpoint` signs a C2SP signed-note checkpoint over the current root, `prove` emits a self-contained JSON proof artifact with the relevant signed checkpoint(s) embedded, and `verify` checks an inclusion or consistency claim from **only** the artifact, the leaf, and the verifier key — no access to the store or the tree.
-
-The phase proof: a log produced by one process is verified end-to-end by the CLI in another process that never sees the original tree.
+- ADR-047 — lys refuses an underscore-prefixed binding with an ast-grep rule at severity error — lys carries its own ast-grep rule, no-underscore-binding, at severity error beside the rule set LYSCORE-001 lands. It refuses an underscore-prefixed identifier in every binding position, admits the bare `_`, and its message says why it refuses. Each existing binding is cleared by what it does rather than renamed. Rejected: relying on used_underscore_binding and review, which never see the declaration, and clearing hits by renaming, #[allow] or an ignores entry.
+- ADR-048 — A trait parameter one implementation ignores is a bare `_` where the trait cannot drop it — An implementation that has no use for a parameter which another implementation of the same trait needs, or which a published trait asks for, writes the bare `_` pattern. The bare `_` binds nothing, so it is the words' 'not bound at all', and it is not the underscore-prefixed name the rule refuses. The trait is not changed. Rejected: changing AdmissionPolicy or LeafStore, adding a use to a parameter the implementation does not need, and keeping an underscore-prefixed name.
 
 ## Goals
 
-1. `lys-core` compiles standalone in this repository with zero Meridian dependencies and zero Meridian references, behaviour-identical to the hardened source crate except the deliberate breaks (D5 legacy strip, D7 tag renames, `LYS_IDENTITY_KEY`, `LYS_OID_ARC`).
-2. All hardening commitments hold in the ported code: `verify_strict` everywhere, validity-window enforcement with an `_at` variant, `RootHash::from_parts` external verification, authenticated timestamps with domain separation, contributory-DH rejection, seed zeroization, single-arbiter unsealing, race-free key generation.
-3. Attestation verification is v2-only (WIRE-FORMATS.md D4): no legacy code path exists in the crate — neither the Meridian preimage nor the deleted-unshipped `lys/attestation/v1` form verifies.
-4. An external verifier round-trips: inclusion and consistency proofs verify from published root parts and proof bytes alone.
-5. The `lys` CLI covers every primitive, and a log produced in one process verifies end-to-end via the CLI in another with no access to the original tree.
-6. `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and `cargo test --workspace` all pass clean.
+- `ast-grep scan --config sgconfig.yml` reports 0 no-underscore-binding hits at the repository root of the landed tree.
+- An uncommitted scratch file holding one underscore-prefixed binding in each of the 19 binding positions gets exactly 19 no-underscore-binding hits. An uncommitted file holding `fn scratch(_: u8, _unused: u8) {}` gets exactly one hit, at `_unused`.
+- In each of the eight fixture files, the TempDir field reads `temp_dir`, and every test that builds one of those fixtures calls its close method.
+- `cargo test --workspace --all-features` exits 0 at the commit the build starts from and at its final commit, and reports the same number of tests passed at both.
+- The trait declarations of AdmissionPolicy, LeafStore, Signer and AnchorTask are byte-identical before and after the card.
+- Both clippy legs pass with -D warnings while Cargo.toml still sets map_err_ignore = "warn".
 
 ## Non-Goals
 
-- **Domain-specific semantics.** No agent, session, or claim vocabulary in the crate. Canonical agent claim schemas are phase 5.
-- **Storage traits.** In-memory operations only; persistence is the consumer's concern. The CLI persists leaf sequences as files, using `reconstruct_from_leaves` — that is CLI policy, not a library trait.
-- **Network operations.** `lys-core` is a pure library; the CLI is local-only. Transport belongs to `lys-anchor` (phase 4).
-- **Anchoring, receipts, SCITT/COSE.** The notary layer is `lys-anchor`; nothing in this cluster emits or verifies COSE receipts.
-- **Revocation infrastructure.** No CRLs, no OCSP, no revocation flag. Consumer-side today; a first-class answer is an open product question.
-- **MCP surface.** `lys-mcp` is a later phase.
-- **Zero-knowledge proofs.** Selective disclosure via salted-hash leaves + inclusion proofs is the v1 privacy story; ZK is a research direction.
+- Offering the no-underscore-binding rule to Cambium's rule set — Cambium's tree is read only to this card; adopting the rule there is Cambium's own gated change.
+- Retiring or relaxing clippy::map_err_ignore — The lint stays; a discarded error is left unbound by .ok().ok_or(…) and .ok().ok_or_else(…) instead.
+- Renaming PhantomData's `_marker` field in merkle/tree.rs — It is a type marker, not a held value, and a struct field declaration is not a binding the rule refuses.
+- Changing the AdmissionPolicy, LeafStore, Signer or AnchorTask trait — Each parameter is needed by some implementation, and LeafStore is in the published lys-log-store 0.2.0 (ADR-048).
+- Carrying sgconfig.yml, the rule directory or the ast-grep leg — LYSCORE-001 (brief 6747ce61) lands them; this card adds one rule to them.
+- Changing how a verification path collapses its failures — The single error is the design (P7); this card keeps it exactly.
 
 ## Structure
 
-```
-crates/lys-core/
-├── Cargo.toml
-├── tests/                        — cross-implementation conformance suites
-│   ├── cose_conformance.rs       — round-trip against veraison/go-cose
-│   ├── go_conformance.rs         — round-trip against Go sumdb/note
-│   └── signed_note_crosscheck.rs — crosscheck against Cloudflare signed_note
-└── src/
-    ├── lib.rs                    — pub mod + re-exports, hex_lower helper (D1)
-    ├── error.rs                  — TrustError enum, TrustResult<T> (D1)
-    ├── keys/
-    │   ├── mod.rs                — pub mod / pub use only
-    │   ├── identity.rs           — Ed25519Identity: load_or_generate, from_env, sign,
-    │   │                           verify_strict, X25519 derivation, redaction (D2)
-    │   └── identity_tests.rs
-    ├── ca/
-    │   ├── mod.rs                — pub mod / pub use only
-    │   ├── authority.rs          — CertificateAuthority: issue, verify chain, _at variant (D3)
-    │   ├── certificate.rs        — IssuedCertificate, Debug redaction (D3)
-    │   ├── extensions.rs         — LYS_OID_ARC, encode/decode extension (D3)
-    │   └── *_tests.rs
-    ├── merkle/
-    │   ├── mod.rs                — pub mod / pub use only
-    │   ├── tree.rs               — AppendOnlyTree<L>: append, root, proofs, reconstruct (D4)
-    │   ├── proof.rs              — RootHash from_parts/to_parts, Inclusion/ConsistencyProof,
-    │   │                           verify_inclusion, verify_consistency, raw-leaf path (D4)
-    │   ├── leaf.rs               — leaf hashing, RawLeaf, frozen-wire-contract docs (D4)
-    │   └── *_tests.rs
-    ├── checkpoint/               — WIRE-FORMATS D1: signed tree heads
-    │   ├── mod.rs                — pub mod / pub use only
-    │   ├── body.rs               — CheckpointBody encode/parse (C2SP tlog-checkpoint)
-    │   ├── note.rs               — sign_note / verify_note / verify_checkpoint
-    │   │                           (C2SP signed-note; origin == key-name enforced)
-    │   ├── verifier_key.rs       — verifier-key strings and RFC 6962-style key IDs
-    │   └── *_tests.rs
-    ├── tlog/                     — WIRE-FORMATS D2: self-contained proof artifacts
-    │   ├── mod.rs                — pub mod / pub use only
-    │   ├── artifact.rs           — frozen JSON artifact shapes and format strings
-    │   ├── build.rs              — self-verifying inclusion/consistency builders
-    │   ├── verify.rs             — third-party verification, single non-oracle error
-    │   └── *_tests.rs
-    ├── attestation/
-    │   ├── mod.rs                — pub mod / pub use, invariant docs
-    │   ├── artifact.rs           — Attestation type; to_cose_bytes / canonical-strict
-    │   │                           from_cose_bytes (D5)
-    │   ├── encoding.rs           — private byte-exact COSE_Sign1 encode + shape-pinned
-    │   │                           decode, Sig_structure assembly (D5)
-    │   ├── sign.rs               — sign_attestation, verify_attestation,
-    │   │                           verify_attestation_bytes over the v2 Sig_structure (D5)
-    │   └── *_tests.rs            — sibling tests incl. golden vectors and mutants A–F
-    └── seal/
-        ├── mod.rs                — pub mod / pub use only
-        ├── sealed_envelope.rs    — seal/open, HKDF binding, contributory checks,
-        │                           single failure arbiter (D6)
-        └── authenticated.rs      — sign_and_seal / open_and_verify (D6)
+| Path | Note | Brief |
+|------|------|-------|
+| `rules/ast-grep/no-underscore-binding.yml` | lys's rule refusing an underscore-prefixed binding, severity error, vendor/** ignored | LYSCORE-002 |
+| `sgconfig.yml` | ast-grep root config naming rules/ast-grep; landed by LYSCORE-001 (brief 6747ce61), unchanged here |  |
+| `rules/ast-grep` | lys's ast-grep rule directory; landed by LYSCORE-001 (brief 6747ce61) |  |
+| `docs/design/lys-core/design.json` | this design | LYSCORE-002 |
+| `docs/design/lys-core/checklist.json` | the rows LYSCORE-002 delivers | LYSCORE-002 |
+| `docs/design/lys-core/stories.json` | the stories LYSCORE-002 serves | LYSCORE-002 |
+| `docs/design/lys-core/briefs/LYSCORE-002.json` | the brief | LYSCORE-002 |
+| `docs/design/lys-core/DESIGN.md` | rendered from design.json | LYSCORE-002 |
+| `docs/design/lys-core/CHECKLIST.md` | rendered from checklist.json | LYSCORE-002 |
+| `docs/design/lys-core/USER-STORIES.md` | rendered from stories.json | LYSCORE-002 |
+| `docs/design/lys-core/briefs/LYSCORE-002.md` | rendered from the brief | LYSCORE-002 |
+| `docs/design/lys-core/DESIGN-PRE-METHOD.md` | the hand-written pre-method design, renamed by LYSCORE-001 (brief 6747ce61, ADR-045), content unchanged |  |
+| `docs/design/lys-core/CHECKLIST-PRE-METHOD.md` | the hand-written pre-method checklist, renamed by LYSCORE-001 (brief 6747ce61, ADR-045), content unchanged |  |
+| `docs/design/lys-core/USER-STORIES-PRE-METHOD.md` | the hand-written pre-method stories, renamed by LYSCORE-001 (brief 6747ce61, ADR-045), content unchanged |  |
+| `Cargo.toml` | workspace lint table; map_err_ignore and used_underscore_binding at warn, unchanged |  |
+| `crates/lys-core/src` | lys-core library and sibling *_tests.rs files |  |
+| `crates/lys-core/tests` | lys-core integration and conformance tests |  |
+| `crates/lys-anchor/src` | lys-anchor library and sibling *_tests.rs files |  |
+| `crates/lys-anchor/tests` | lys-anchor integration and conformance tests |  |
+| `crates/lys-anchor-cli/src` | the anchor CLI and its sibling *_tests.rs files |  |
+| `crates/lys-anchor-cli/tests` | the anchor CLI's integration tests |  |
+| `crates/lys-home/src` | lys-home library and sibling *_tests.rs files |  |
+| `crates/lys-home/tests` | lys-home integration tests |  |
+| `crates/lys-log-store/src` | lys-log-store library, its published LeafStore trait and sibling *_tests.rs files |  |
+| `crates/lys/src` | the lys CLI |  |
+| `crates/lys/tests` | the lys CLI's integration tests |  |
 
-crates/lys/
-├── Cargo.toml
-├── tests/
-│   ├── cli_tests.rs              — key / attest / verify / ca / seal / open / inspect
-│   └── log_tests.rs              — log lifecycle incl. the cross-process third-party path
-└── src/
-    ├── main.rs                   — thin entry: parse args, dispatch, exit codes (D8)
-    ├── cli.rs                    — clap definitions and help text only (D8)
-    └── commands/
-        ├── mod.rs                — pub mod only
-        ├── key.rs                — lys key generate / inspect (D8)
-        ├── ca.rs                 — lys ca issue / verify (D8)
-        ├── attest.rs             — lys attest (D8)
-        ├── verify.rs             — lys verify (D8)
-        ├── inspect.rs            — lys inspect attestation / cert (D8)
-        ├── seal.rs               — lys seal / open (D8)
-        ├── error.rs              — CLI error type, non-oracle failure messages (D8)
-        ├── files.rs              — file I/O incl. owner-only plaintext writes (D8)
-        ├── hex.rs                — hex parsing/formatting helpers (D8)
-        ├── pem.rs                — PEM encode/decode helpers (D8)
-        └── log/
-            ├── mod.rs            — pub mod only
-            ├── init.rs           — lys log init (origin pinned once) (D8)
-            ├── append.rs         — lys log append (D8)
-            ├── checkpoint.rs     — lys log checkpoint (D8)
-            ├── prove.rs          — lys log prove inclusion / consistency (D8)
-            ├── verify.rs         — lys log verify inclusion / consistency (D8)
-            └── store.rs          — leaf-sequence store: O_EXCL leaf writes,
-                                    atomic tmp+rename state, rebuild on open (D8)
-```
+## Inventory
 
-Tests live in sibling `*_tests.rs` files throughout `merkle`, `ca`, `keys`, `attestation`, `checkpoint`, and `tlog`; `merkle/leaf.rs`, both `seal/` files, and several CLI modules currently carry inline `mod tests` instead (see [REVIEW-23-07.md](../../REVIEW-23-07.md) F12).
+- `crates` — At 7b53625 this card's rule reports 303 underscore-prefixed bindings in 70 files: 59 guards whose directory or state is still used, in 11 files (55 TempDir holders and four EnvCleanup guards in lys-core keys/identity_tests.rs), 68 discarded errors in 28 files (64 map_err closures, one or_else closure, three match arms), 164 unused values in 34 files (105 of them TempDirs returned beside an identity or authority already loaded into memory, 57 from golden_identity), 10 ignored trait parameters in 5 files and 2 cfg(not(unix)) stub parameters. Every underscore-prefixed identifier in the tree that is not a struct field is one of the 303; nine underscore-prefixed struct fields are not, the eight fixture TempDir fields and PhantomData's _marker.
+- `Cargo.toml` — [workspace.lints.clippy]: pedantic at warn, map_err_ignore = "warn" (line 87), used_underscore_binding = "warn" (line 108), all failing under -D warnings.
+- `crates/lys-core/src/tlog/verify.rs` — Eight map_err(|_err| TrustError::LogArtifactVerification) closures; every failure is that one error.
+- `crates/lys-core/src/bundle/verify.rs` — Six map_err(|_err| reject()) closures; reject() builds the file's one error.
+- `crates/lys-core/src/checkpoint/note.rs` — Three map_err(|_err| TrustError::NoteVerification) closures; every structural failure is that one error.
+- `crates/lys-core/src/seal/sealed_envelope.rs` — Line 235 binds (key_bytes, _derived_nonce) from derive_key_and_nonce; the comment after it says why the derived nonce is not compared. A cryptographic file.
+- `crates/lys-anchor/src/admission/policy.rs` — AdmissionPolicy::admit(&self, submission, context); AcceptAll ignores both parameters, MaxSize ignores context, the certificate policy ignores submission.
+- `crates/lys-log-store/src/store.rs` — LeafStore, public in the published lys-log-store 0.2.0; the LyingStore fake in log_tests.rs ignores index, bytes and pin.
+- `crates/lys-anchor/src/keys/signer.rs` — Signer::sign(&self, message); DecliningSigner in anchor/genesis_tests.rs ignores message.
+- `crates/lys-anchor-cli/src/commands/anchor/policy.rs` — AnchorTask::run(self, policy); RecordPolicy in policy_tests.rs ignores policy.
+- `crates/lys-log-store/src/file.rs` — Line 392: #[cfg(not(unix))] fn fsync_dir(_dir: &Path); no gate host compiles it.
+- `crates/lys-core/src/keys/identity.rs` — Line 431: #[cfg(not(unix))] fn warn_if_loose_permissions(_path: &Path) {}; no gate host compiles it. Also seven discarded-error sites.
+- `crates/lys-core/src/keys/identity_tests.rs` — Four `let _guard = EnvCleanup;` guards over the from_env tests; LYSCORE-001 plans to remove the environment mutation they guard.
+- `crates (test fixture structs)` — Eight test fixture structs hold a TempDir in an underscore-prefixed field only to keep the directory alive: OpensslRequest (lys-core tests/openssl_csr_interop.rs:166), Party (lys-core tests/bundle_conformance.rs:107), Party (lys-core src/bundle/verify_tests.rs:27), ProvenLog (lys tests/log_tests.rs:96), Party (lys-anchor tests/cascade.rs:100), Fixture (lys-anchor-cli tests/anchor_cli.rs:35), Case (lys-anchor tests/stranger_verification.rs:228) and Node (lys-anchor src/upward/fixture.rs:48, used by upward/pin_tests.rs and upward/bundle_tests.rs). None has a close method.
+- `crates/lys-core/src/merkle/tree.rs` — Line 68: the struct field _marker: PhantomData, not a binding.
+- `sgconfig.yml` — Absent at 7b53625; LYSCORE-001 (brief 6747ce61) creates it.
+- `rules` — Absent at 7b53625; LYSCORE-001 (brief 6747ce61) creates rules/ast-grep.
+- `docs/design/project.json` — Seven legs; no ast-grep leg at 7b53625. LYSCORE-001 adds `ast-grep scan --config sgconfig.yml` here, in .land/gates.sh and in CI.
+- `CLAUDE.md` — Coding standards: silencing a lint with #[allow], an #[ignore]d test, a _-prefixed unused variable or #[cfg(any())] is a bypass, not a fix.
+- `docs/design/lys-core` — Hand-written pre-method DESIGN.md, CHECKLIST.md (C1 to C65) and USER-STORIES.md (S1 to S23), renamed *-PRE-METHOD.md with their content unchanged as LYSCORE-001 (ADR-045) does, so this cluster's rendered DESIGN.md, CHECKLIST.md and USER-STORIES.md take the plain names.
+- `$cambium/rules/ast-grep` — Six rules, none refusing underscore-prefixed bindings. Read only.
 
 ## Constraints
 
-- **No domain types and no Meridian references.** If it names an agent, session, workspace, peer, contract, or anything Meridian, it doesn't belong here.
-- **No storage traits, no network.** Pure library crate; CLI is local file I/O only.
-- **`unsafe_code` forbidden.** All dependencies pure Rust.
-- **No `unwrap` / `expect` / `panic` / `todo` in library code.** Tests opt out per-module.
-- **Private key material never in `Debug`, logs, error messages, or CLI output.** Redaction tested, not assumed. Seed buffers are `Zeroizing`.
-- **Wire formats are frozen.** Tags, preimage layouts, and leaf encodings version forward (`v2`), never mutate.
-- **No file over 500 lines of code.** `mod.rs` carries only `pub mod` / `pub use` / module docs; tests live in sibling `*_tests.rs` files.
-- **Every public item documented**; module-level `//!` docs state invariants.
-- **Cryptographic changes require an adversarial review before landing.** This cluster ports hardened behaviour unchanged; any deviation beyond the four deliberate breaks (tag renames, legacy strip, env var, OID constant) is out of bounds.
+- **CN9** — Every rewritten site returns the same value and the same error (variant, fields and message) as before; every failure in tlog/verify.rs, bundle/verify.rs and checkpoint/note.rs still returns the one error it returns today.
+- **CN10** — No wire format, domain-separation tag, test vector or signed fixture changes.
+- **CN11** — The public API of lys-core, lys and lys-log-store does not change, and the AdmissionPolicy, LeafStore, Signer and AnchorTask declarations are byte-identical.
+- **CN12** — No hit is cleared by #[allow], #[expect], #[ignore], #[cfg(any())], a rename to another underscore-prefixed name, or an ignores or files entry beyond vendor/**.
+- **CN13** — No `let _ =` statement is introduced under crates/.
+- **CN14** — Cargo.toml keeps map_err_ignore = "warn" and used_underscore_binding = "warn".
+- **CN15** — Cambium's tree is not changed.
+- **CN16** — docs/design/project.json, .land/gates.sh, .github/workflows/ci.yml and sgconfig.yml are not changed.
+- **CN17** — The hand-written pre-method lys-core documents are not edited.
+- **CN18** — The rule is at severity error.

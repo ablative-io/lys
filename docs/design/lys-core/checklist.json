@@ -26,17 +26,22 @@
       "items": [
         {
           "id": "C78",
-          "text": "Every guard binding (a TempDir holder or an EnvCleanup guard) has a name without a leading underscore and is ended by drop(name) at the end of its test.",
+          "text": "Every guard whose directory or state the test still uses after the binding (a TempDir holder or an EnvCleanup guard) has a name without a leading underscore and is ended by drop(name) after its last use, with a tail result bound, the guard dropped and the binding returned.",
+          "done": false
+        },
+        {
+          "id": "C84",
+          "text": "Each of the eight test fixture structs that holds a TempDir guard names the field temp_dir and has a close method returning TempDir::close's error, and every test that builds one calls its close after the value's last use.",
           "done": false
         },
         {
           "id": "C79",
-          "text": "Every discarded error in a closure or match arm is left unbound, map_err is rewritten as .ok().ok_or(…) or .ok().ok_or_else(…) under the rule R4 states, and each site returns the same error as before.",
+          "text": "Every discarded error in a closure or match arm is left unbound, map_err is rewritten as .ok().ok_or(…) when the error is already built and .ok().ok_or_else(…) when building it calls a function or a macro, and each site returns the same error as before.",
           "done": false
         },
         {
           "id": "C80",
-          "text": "Every value with no use is not bound: a bare `_` inside its pattern, an expression statement for a whole let, and no `let _ =` statement introduced.",
+          "text": "Every value with no use is not bound: a bare `_` inside its pattern, including a TempDir a fixture returns beside a value it has already loaded into memory, an expression statement for a whole let, and no `let _ =` statement introduced.",
           "done": false
         },
         {
