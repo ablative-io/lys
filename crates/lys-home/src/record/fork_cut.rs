@@ -27,7 +27,7 @@
 //! it and an optional `lit_in` and requires neither the note nor the time,
 //! so an older record whose data is exactly `{point, note, lit_by}` reads
 //! as it always has; data that is not that view refuses `entry_shape`, and a
-//! present `lit_in` is checked by [`lit_in_session`], never looked up in raw
+//! present `lit_in` is checked by `lit_in_session`, never looked up in raw
 //! JSON. Every refusal comes before any file is created or written, and
 //! none carries a note or an entry's data.
 

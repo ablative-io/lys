@@ -9,7 +9,7 @@
 //! record's own path, so the line is durable before its index row and the
 //! head; every refusal happens before the append, and nothing of the session
 //! file changes on one. No error carries the note. A recorded `lit_in` is
-//! checked against the home in one place, [`lit_in_session`], which the
+//! checked against the home in one place, `lit_in_session`, which the
 //! fork and recall both call.
 
 use std::path::PathBuf;

@@ -17,7 +17,7 @@
 //! text the crate prints (ADR-015), and never a line of the transcript.
 //! Each row carries the lantern's `lit_in`: null for a lantern lit before
 //! the light act recorded it, which is listed as any other, and otherwise
-//! the session the check in [`lit_in_session`] returns; a recorded `lit_in`
+//! the session the check in `lit_in_session` returns; a recorded `lit_in`
 //! that is not a session id is skipped by note and refused by point as
 //! `lit_in_not_a_session`, and never listed as a row.
 

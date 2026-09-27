@@ -88,7 +88,7 @@ impl SignedEvent {
         &self.event
     }
 
-    /// SHA-256 over the body bytes, named by [`PAYLOAD_COMMITMENT_HASH`].
+    /// SHA-256 over the body bytes, named by [`crate::encoding::PAYLOAD_COMMITMENT_HASH`].
     pub fn payload_commitment(&self) -> [u8; 32] {
         self.commitment
     }
