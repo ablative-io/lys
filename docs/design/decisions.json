@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,24 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-031",
+      "title": "A carded row built before the chain is done only when the chain has judged its code at a named commit and no open finding touches its files",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's rulings to the chain-judgement survey; recorded with HOME-008",
+      "context": "HOME-001's built rows reached main by hand before every carded row had to go through its board's chain, and the seven step 5 cards that carry them sit in review with nothing on main saying the chain judged that code. Setting them done on the merge alone would make done mean merged; setting them all done on a green landing of a proof would make done mean the proof landed, whatever it found.",
+      "decision": "A carded row built before the chain is set done only when the chain's whole judgement has been run over its code at a named commit and no finding still true on current main touches that row's files; a row with an open finding stays in review, pointing at each finding card, until they close. Green means the landing passed src_pr and src_land, never that the code is clean. Rejected: setting the cards done on the merge alone, and setting every card done when the proof lands green regardless of its findings.",
+      "quote": "",
+      "consequences": [
+        "The judgement is measured on a checkout of the named commit and recorded against its sha, apart from the landing's own gate and its sha.",
+        "Each finding is its own line; one answered on main names the fixing commit and gets no card, one still true becomes its own card.",
+        "A row whose files are not on main at the named commit is not judged and its card is not set done."
       ],
       "supersedes": [],
       "superseded_by": ""

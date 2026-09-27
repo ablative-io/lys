@@ -108,6 +108,24 @@
         {
           "id": "S22",
           "text": "As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone."
+        },
+        {
+          "id": "S35",
+          "text": "As a reviewer, I want each check of the chain's judgement recorded with the commit and toolchain it was measured on, so that I can rerun the deterministic checks at that commit and see the same outcome."
+        },
+        {
+          "id": "S36",
+          "text": "As a reviewer, I want every finding recorded as its own line marked still true or answered by a named commit, so that only what is still wrong on main becomes a card."
+        }
+      ]
+    },
+    {
+      "name": "Lead",
+      "role": "Owns the cards of a board and sets them done",
+      "stories": [
+        {
+          "id": "S37",
+          "text": "As the lead who owns the step 5 board, I want a card set done only when the chain has judged its rows' files and no open finding touches them, so that done means judged by the chain and never just merged."
         }
       ]
     }

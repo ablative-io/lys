@@ -57,7 +57,8 @@
     "ADR-015",
     "ADR-016",
     "ADR-017",
-    "ADR-018"
+    "ADR-018",
+    "ADR-031"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -650,6 +651,21 @@
       "path": "docs/design/home/PROOF-FORK.md",
       "note": "the measured fork: Pi's parentSession read, a real session forked, rendered and launched, as hashes, counts and exit codes",
       "brief": "HOME-006"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.json",
+      "note": "the chain's judgement of HOME-001's hand-built code at 0073b966: Jev per file, the gate's legs, findings and card verdicts",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/PROOF-CHAIN.md",
+      "note": "the measured judgement of crates/lys-home at 0073b966: commit and toolchain, row and card maps, Jev lines, leg outcomes, findings and each card's verdict",
+      "brief": "HOME-008"
     }
   ],
   "inventory": [
