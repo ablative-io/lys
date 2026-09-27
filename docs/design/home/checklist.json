@@ -315,6 +315,41 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The lit-in session",
+      "items": [
+        {
+          "id": "C100",
+          "text": "LanternData carries an optional lit_in, the session that held the point when the lantern was lit, keeping a present null and a present non-string value distinct from an absent key, and still refuses an unknown key.",
+          "done": false
+        },
+        {
+          "id": "C101",
+          "text": "The light act writes lit_in as the id of the session at whose head it appends the lantern, and its report carries lit_in beside id, session, point and lit_at.",
+          "done": false
+        },
+        {
+          "id": "C102",
+          "text": "Recall rows carry lit_in beside point, note and lit_by, the lighting session for a lantern the light act lit and null for a lantern whose data has no lit_in, and a lantern whose lit_in is present and not a session id is never listed as a row but skipped by note and refused by point as lit_in_not_a_session with the fork's reason text.",
+          "done": false
+        },
+        {
+          "id": "C103",
+          "text": "The fork reads lit_in through a typed view that does not require lit_at or note and never from a raw JSON key: a lantern with no lit_in resolves by its holders, and a present lit_in that is null, not a string, not a safe session name, or names no session of the home refuses lit_in_not_a_session naming which.",
+          "done": false
+        },
+        {
+          "id": "C104",
+          "text": "The fork's fixtures light L2 with the light act and write by hand only the lanterns the light act cannot produce (O2, M2, N3, the copy N2 and N1 to N4), each named in its test as standing for such a record.",
+          "done": false
+        },
+        {
+          "id": "C105",
+          "text": "RECORD.md and the lys-home README document lit_in, and PROOF-FORK.md keeps its measured older-record sentence with a note that the light act now records lit_in.",
+          "done": false
+        }
+      ]
     }
   ]
 }
