@@ -281,7 +281,7 @@
       "items": [
         {
           "id": "C45",
-          "text": "lys-home depends on lys-core, lys-log-store and lys-identity, and the home-entry leaf (session id, entry id, kind, SHA-256 of the entry line, tag lys/home-entry/v1), the home-entry-copy leaf (those four, the parent session id and the parent leaf's index, tag lys/home-entry-copy/v1) and the home checkpoint leaf (tag lys/home-checkpoint/v1) are typed payloads of the identity event envelope, written in docs/design/identity/IDENTITY-EVENTS.md.",
+          "text": "lys-home depends on lys-core, lys-log-store and lys-identity, and the home-entry leaf (session id, entry id, kind, SHA-256 of the entry line, tag lys/home-entry/v1), the home-entry-copy leaf (those four, the parent session id, the parent leaf's index and the parent entry's position, tag lys/home-entry-copy/v1) and the home checkpoint leaf (tag lys/home-checkpoint/v1) are typed payloads of the identity event envelope, written in docs/design/identity/IDENTITY-EVENTS.md.",
           "done": false
         },
         {
@@ -316,12 +316,12 @@
         },
         {
           "id": "C52",
-          "text": "docs/design/home/RECORD.md records both leaf formats, their tags, the log's place in the home, the pending marker and the order of line against leaf.",
+          "text": "docs/design/home/RECORD.md records the three leaf formats (home-entry, home-entry-copy and checkpoint), their tags, the log's place in the home, the pending marker and the order of line against leaf.",
           "done": false
         },
         {
           "id": "C53",
-          "text": "The adversarial review of both leaf formats (forgery, cross-protocol confusion, replay, a leaf under another key, guessing a short line from its hash) is recorded in docs/design/identity/IDENTITY-EVENTS.md before any durable byte is signed under them.",
+          "text": "The adversarial review of the three leaf formats (forgery, cross-protocol confusion, replay, a leaf under another key, guessing a short line from its hash) is recorded in docs/design/identity/IDENTITY-EVENTS.md before any durable byte is signed under them.",
           "done": false
         },
         {
@@ -341,7 +341,7 @@
         },
         {
           "id": "C57",
-          "text": "A fork on a logging home gives each lys.call, lys.harness_event and lys.open line it copies its own leaf under the child session id, tagged as a copy and naming the parent session id and the parent leaf's index; the child verifies without the parent's files, and verify refuses a copy whose parent leaf is absent or differs.",
+          "text": "A fork on a logging home gives each lys.call, lys.harness_event and lys.open line it copies its own leaf under the child session id, tagged as a copy and naming the parent session id, the parent entry's position and the parent leaf's index, or the checkpoint leaf's index when the parent entry predates the checkpoint, and is never refused for such a line; the child whose copies name parent leaves verifies without the parent's files, and verify refuses a copy whose parent leaf is absent or differs, and a copy naming the checkpoint whose parent line is absent or differs.",
           "done": false
         }
       ]
