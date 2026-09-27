@@ -44,11 +44,14 @@ use lys_core::ca::{
     CertificateAuthority, LYS_OID_ARC, create_certificate_request, decode_extension,
     encode_extension, verify_certificate_chain_at,
 };
+use lys_core::tlog::build_inclusion_artifact;
 
 use crate::commands::error::{CliError, CliResult};
 use crate::commands::files::{read_file, write_file};
 use crate::commands::hex::{hex_lower, parse_hex_32};
 use crate::commands::key::load_identity;
+use crate::commands::log::prove::write_artifact;
+use crate::commands::log::store;
 use crate::commands::output::Emitter;
 use crate::commands::pem;
 
@@ -133,8 +136,50 @@ pub fn request(key: &Path, subject: &str, out: &Path, json: bool) -> CliResult<(
     Ok(())
 }
 
+/// Where an issuance writes what it produces.
+#[derive(Debug)]
+pub struct IssueOutputs<'a> {
+    /// The PEM certificate.
+    pub certificate: &'a Path,
+    /// The issuer's self-signed PEM certificate, for standard X.509 tooling.
+    pub issuer_certificate: Option<&'a Path>,
+    /// The transparency log the certificate is entered in before it is written.
+    pub log: Option<LogEntry<'a>>,
+}
+
+/// A transparency log an issued certificate is entered in, and where the
+/// evidence of that entry is written.
+#[derive(Debug)]
+pub struct LogEntry<'a> {
+    /// An initialized `lys log` directory.
+    pub dir: &'a Path,
+    /// The log operator's identity key, which signs the proof's checkpoint.
+    pub key: &'a Path,
+    /// Where the leaf is written: the certificate's DER bytes, exactly.
+    pub leaf_out: &'a Path,
+    /// Where the `lys/log-inclusion-proof/v1` artifact is written.
+    pub artifact_out: &'a Path,
+}
+
+/// What entering a certificate in a log produced.
+struct Entered {
+    leaf_index: u64,
+    tree_size: u64,
+    root: [u8; 32],
+}
+
 /// `lys ca issue --key <path> --subject <name> [--request <file>]
-/// [--claims <file>] (--validity <window> | --validity-days <n>) --out <file>`.
+/// [--claims <file>] (--validity <window> | --validity-days <n>) --out <file>
+/// [--issuer-out <file>] [--log <dir> --log-key <path> --leaf-out <file>
+/// --artifact-out <file>]`.
+///
+/// With `--log`, the certificate is entered in that transparency log as one
+/// leaf whose bytes are its DER, and nothing else, before anything is written.
+/// The leaf file and the inclusion-proof artifact are written beside it, so a
+/// third party verifies the entry with `scripts/verify_inclusion.py` and the
+/// certificate with `openssl verify` against `--issuer-out`. A log that cannot
+/// be opened, or refuses the entry, stops the issuance before the certificate
+/// is written, so no certificate this command writes is missing from its log.
 ///
 /// `ttl` is the already-resolved validity window; the two flags are reconciled
 /// in [`crate::commands::duration::validity_window`] so this function has one
@@ -159,11 +204,15 @@ pub fn issue(
     subject: &str,
     claims: Option<&Path>,
     ttl: Duration,
-    out: &Path,
+    outputs: &IssueOutputs<'_>,
     request_path: Option<&Path>,
     json: bool,
 ) -> CliResult<()> {
     let identity = load_identity(key)?;
+    let opened = match &outputs.log {
+        Some(entry) => Some((store::open(entry.dir)?, load_identity(entry.key)?, entry)),
+        None => None,
+    };
 
     let extensions = match claims {
         Some(claims_path) => {
@@ -211,8 +260,40 @@ pub fn issue(
         }
     };
 
+    let issuer_pem = match outputs.issuer_certificate {
+        Some(_) => Some(pem::encode_certificate(
+            &authority.issuer_certificate_der()?,
+        )),
+        None => None,
+    };
+
+    let entered = match opened {
+        Some((mut log, log_identity, entry)) => {
+            let (leaf_index, _) = log.append(&issued.der_bytes)?;
+            let artifact = build_inclusion_artifact(
+                log.tree(),
+                &issued.der_bytes,
+                log.origin(),
+                &log_identity,
+                leaf_index,
+            )?;
+            write_file(entry.leaf_out, &issued.der_bytes, "leaf file")?;
+            write_artifact(entry.artifact_out, &artifact, "inclusion proof artifact")?;
+            let (root, tree_size) = log.tree().root().to_parts();
+            Some(Entered {
+                leaf_index,
+                tree_size,
+                root,
+            })
+        }
+        None => None,
+    };
+
     let pem_text = pem::encode_certificate(&issued.der_bytes);
-    write_file(out, pem_text.as_bytes(), "certificate file")?;
+    write_file(outputs.certificate, pem_text.as_bytes(), "certificate file")?;
+    if let (Some(path), Some(text)) = (outputs.issuer_certificate, &issuer_pem) {
+        write_file(path, text.as_bytes(), "issuer certificate file")?;
+    }
 
     let mut emit = Emitter::new(json);
     emit.field("issued certificate for subject", "subject", subject);
@@ -252,8 +333,34 @@ pub fn issue(
     emit.field(
         "certificate written",
         "certificate_path",
-        out.display().to_string(),
+        outputs.certificate.display().to_string(),
     );
+    if let Some(path) = outputs.issuer_certificate {
+        emit.field(
+            "issuer certificate written",
+            "issuer_certificate_path",
+            path.display().to_string(),
+        );
+    }
+    match (&outputs.log, &entered) {
+        (Some(entry), Some(entered)) => {
+            emit.field("entered in log", "log_dir", entry.dir.display().to_string());
+            emit.field("leaf index", "leaf_index", entered.leaf_index);
+            emit.field("tree size", "tree_size", entered.tree_size);
+            emit.field("root hash (sha256)", "root_hash", hex_lower(&entered.root));
+            emit.field(
+                "leaf written",
+                "leaf_path",
+                entry.leaf_out.display().to_string(),
+            );
+            emit.field(
+                "artifact written",
+                "artifact_path",
+                entry.artifact_out.display().to_string(),
+            );
+        }
+        _ => emit.field("transparency log", "log", "none"),
+    }
     emit.finish();
     Ok(())
 }

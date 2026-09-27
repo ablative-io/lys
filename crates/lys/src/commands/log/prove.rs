@@ -119,7 +119,11 @@ pub fn consistency(dir: &Path, key: &Path, old_size: u64, out: &Path, json: bool
 
 /// Writes an artifact as pretty JSON with a trailing newline (the emit-side
 /// convention shared with `lys attest`).
-fn write_artifact<T: Serialize>(out: &Path, artifact: &T, what: &'static str) -> CliResult<()> {
+pub(crate) fn write_artifact<T: Serialize>(
+    out: &Path,
+    artifact: &T,
+    what: &'static str,
+) -> CliResult<()> {
     let mut json = serde_json::to_string_pretty(artifact)
         .map_err(|source| CliError::JsonSerialize { what, source })?;
     json.push('\n');

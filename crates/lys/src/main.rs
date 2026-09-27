@@ -87,14 +87,35 @@ fn main() -> ExitCode {
                 validity,
                 validity_days,
                 out,
+                issuer_out,
+                log,
+                log_key,
+                leaf_out,
+                artifact_out,
             } => commands::duration::validity_window(validity_days, validity.as_deref()).and_then(
                 |ttl| {
+                    let entry = match (&log, &log_key, &leaf_out, &artifact_out) {
+                        (Some(dir), Some(key), Some(leaf_out), Some(artifact_out)) => {
+                            Some(commands::ca::LogEntry {
+                                dir,
+                                key,
+                                leaf_out,
+                                artifact_out,
+                            })
+                        }
+                        _ => None,
+                    };
+                    let outputs = commands::ca::IssueOutputs {
+                        certificate: &out,
+                        issuer_certificate: issuer_out.as_deref(),
+                        log: entry,
+                    };
                     commands::ca::issue(
                         &key,
                         &subject,
                         claims.as_deref(),
                         ttl,
-                        &out,
+                        &outputs,
                         request.as_deref(),
                         json,
                     )

@@ -206,6 +206,23 @@ impl CertificateAuthority {
         verify_certificate_chain(cert_der, &self.identity.public_key_bytes())
     }
 
+    /// The DER of this authority's self-signed issuer certificate, whose
+    /// subject is the issuer name every certificate it issues carries.
+    ///
+    /// It lets a third party check an issued certificate with standard X.509
+    /// tooling, such as `openssl verify -CAfile`, holding nothing from lys.
+    /// It is public: it carries the issuer's public key and a signature, never
+    /// the seed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TrustError::CertificateGeneration`] if the issuer
+    /// certificate cannot be built or signed.
+    pub fn issuer_certificate_der(&self) -> TrustResult<Vec<u8>> {
+        let issuer_key = self.issuer_key_pair()?;
+        Ok(self.issuer_certificate(&issuer_key)?.der().to_vec())
+    }
+
     /// Builds an rcgen [`KeyPair`] backed by this authority's identity through
     /// a [`RemoteKeyPair`](rcgen::RemoteKeyPair) adapter, so the private seed
     /// is never serialised.

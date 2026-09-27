@@ -30,7 +30,11 @@ fn a_sub_day_validity_window_reaches_the_certificate() {
         "agent-short-lived",
         None,
         Duration::from_secs(30 * 60),
-        &cert_path,
+        &IssueOutputs {
+            certificate: &cert_path,
+            issuer_certificate: None,
+            log: None,
+        },
         None,
         true,
     )
