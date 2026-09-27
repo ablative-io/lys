@@ -78,6 +78,38 @@
           "text": "As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect."
         }
       ]
+    },
+    {
+      "name": "Person who signs in",
+      "role": "Keeps their sign-in identities to themselves",
+      "stories": [
+        {
+          "id": "S13",
+          "text": "As a person who signs in with a provider account, I want the directory to refuse every act that would give that account to an agent, so that no agent can ever hold my sign-in."
+        },
+        {
+          "id": "S14",
+          "text": "As a person delegating to an agent or another person, I want my sign-in identities listed as things I cannot give with the reason 'sign-in identity', so that I know why they are never offered."
+        },
+        {
+          "id": "S15",
+          "text": "As the responsible person, I want my agent's own machine account accepted as its binding, so that the agent can have its own service account without holding anyone's sign-in."
+        },
+        {
+          "id": "S16",
+          "text": "As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request."
+        }
+      ]
+    },
+    {
+      "name": "Directory administrator",
+      "role": "Resolves a refused act",
+      "stories": [
+        {
+          "id": "S17",
+          "text": "As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched."
+        }
+      ]
     }
   ]
 }

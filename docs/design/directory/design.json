@@ -3,7 +3,7 @@
   "title": "The standalone identity directory, with every grant rooted in a person",
   "intention": "An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change. Cambium later uses this issuer, keeping its participant ids (rows 06 and 07); that direction is recorded here while rows 06 and 07 stay the non-goal recorded below, and this sentence promises neither row.",
   "problem": "IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands.",
-  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.",
+  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.\n\nDIRECTORY-009 carries conformance row 1.2, sign-in identities belong to people only (ADR-019). A sign-in identity is a provider account (P1) linked to a person; the directory classifies every issuer-subject pair from its signed history as a current or former sign-in identity, an agent's service account, or unbound, so an account once linked to a person stays refused for agents after an unlink. The refusals sit in seams other rows already own: the DIRECTORY-003 R1 binding API, a check beside the DIRECTORY-003 R4 receiver that the link path asks by issuer-subject pair before the fork links (DIRECTORY-004), and DIRECTORY-006 admission and explanation. One refusal value carries two views: the identity's owner and a directory administrator see the provider and subject, everyone else only that a sign-in identity is involved. The harness login token (SECRETS-002 R5) is the one named exception and never passes through anything lys issues, links or delegates.",
   "principles": [
     {
       "id": "P1",
@@ -43,6 +43,7 @@
     }
   ],
   "decisions": [
+    "ADR-001",
     "ADR-003",
     "ADR-004",
     "ADR-005",
@@ -50,14 +51,16 @@
     "ADR-008",
     "ADR-009",
     "ADR-010",
-    "ADR-011"
+    "ADR-011",
+    "ADR-019"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
     "The grant path (create an agent under a person, grant it a project, the action is allowed, revoke or suspend, the same action is refused) is a requirement of the row that owns it, with acceptance criteria; where the sources do not settle the row, it is recorded open for Tom in DIRECTORY-003 with its criteria drafted.",
     "Every decision still open for Tom is recorded as open and decided nowhere in this cluster.",
     "The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6).",
-    "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record."
+    "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record.",
+    "DIRECTORY-009 states and tests conformance row 1.2: linking a provider account linked to a person to an agent, and delegating a sign-in identity, are each refused by name and write nothing; one counted test over the store finds no agent record carrying a sign-in identity; the broker's refusal is recorded as a finding against SECRETS-002, on which row 1.2's full pass waits."
   ],
   "non_goals": [
     {
@@ -103,6 +106,14 @@
     {
       "text": "A shared design-system package extracted for every product",
       "reason": "Tom left it as a thing to look at, not a row (ADR-010)."
+    },
+    {
+      "text": "The broker's refusal to issue an agent any credential derived from a person's sign-in session",
+      "reason": "Issuance is the broker's (ADR-001); DIRECTORY-009 records it as a finding against SECRETS-002, carried by the broker's card."
+    },
+    {
+      "text": "The cannot-give list on the delegation screen",
+      "reason": "The screen is row 2.4's, carried by Cambium card jAfmblAP; DIRECTORY-009 supplies only the server's reason 'sign-in identity'."
     }
   ],
   "structure": [
@@ -585,6 +596,66 @@
       "path": "docs/design/directory/briefs/DIRECTORY-008.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-008"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-009.json",
+      "note": "conformance row 1.2: sign-in identities belong to people only, refused by name at every directory act that would give one to an agent",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-009.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "crates/lys-identity/src/sign_in_identity.rs",
+      "note": "classifies an issuer-subject pair as a current or former sign-in identity, an agent's service account, or unbound, from the signed history",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "crates/lys-identity/src/sign_in_refusal.rs",
+      "note": "the sign-in identity refusal and its owner-and-administrator and redacted views",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "crates/lys-identity/tests/sign_in_classification.rs",
+      "note": "the four classes of an issuer-subject pair, through unlink and reopen",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "crates/lys-identity/tests/sign_in_refusal_views.rs",
+      "note": "the two views of the refusal, and the redacted view's absence of provider and subject",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "crates/lys-identity/tests/sign_in_agent_binding.rs",
+      "note": "a sign-in identity refused as an agent's binding, an agent's own machine account accepted",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "crates/lys-identity-server/src/sign_in_link_check.rs",
+      "note": "the check the link path asks by issuer-subject pair before a person links a provider account",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/sign_in_link_check.rs",
+      "note": "a person's link of an agent's service account refused by name",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "crates/lys-identity/tests/grant_sign_in_identity.rs",
+      "note": "delegating a sign-in identity refused for agent and person recipients; a service-access grant on the same account admitted",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/grant_cannot_give.rs",
+      "note": "the reason 'sign-in identity' on the cannot-give list, and the two views at the grant seam",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "crates/lys-identity/tests/sign_in_store.rs",
+      "note": "every refusal writes nothing; no agent record carries a sign-in identity, counted over the store",
+      "brief": "DIRECTORY-009"
     }
   ],
   "inventory": [
@@ -631,6 +702,10 @@
     {
       "path": "docs/design/decisions.json",
       "note": "the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row"
+    },
+    {
+      "path": "docs/design/secrets/briefs/SECRETS-002.json",
+      "note": "the broker brief: R4 keeps a sign-in identity and an OAuth service-access grant as distinct records, R5 puts the seat's login token into its environment at spawn; DIRECTORY-009 records a finding against it and changes nothing in it"
     }
   ],
   "constraints": [
@@ -686,12 +761,19 @@
   "gate": [
     {
       "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
       "legs": [
         {
           "name": "fmt",
           "command": "cargo fmt --all",
           "requires": [
-            "place:here"
+            "tool:cargo",
+            "tool:rustfmt"
           ],
           "cadence": "round"
         },
@@ -699,7 +781,7 @@
           "name": "clippy-all-features",
           "command": "cargo clippy --all-targets --all-features -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -707,7 +789,7 @@
           "name": "clippy",
           "command": "cargo clippy --all-targets -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -715,7 +797,7 @@
           "name": "tests",
           "command": "cargo test --workspace --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -723,7 +805,7 @@
           "name": "doc-all-features",
           "command": "cargo doc --no-deps --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -731,36 +813,16 @@
           "name": "doc",
           "command": "cargo doc --no-deps",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        }
-      ]
-    },
-    {
-      "tree": "docs",
-      "legs": [
-        {
-          "name": "render",
-          "command": "python3 ../scripts/design/render-cluster.py design/directory",
-          "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
         {
-          "name": "validate",
-          "command": "python3 ../scripts/design/validate.py design/directory",
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        },
-        {
-          "name": "coverage",
-          "command": "python3 ../scripts/design/check-coverage.py design/directory",
-          "requires": [
-            "place:here"
+            "tool:sh",
+            "tool:python3"
           ],
           "cadence": "round"
         }

@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,36 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-032",
+      "title": "Refuse by name every act that would give a sign-in identity to an agent (conformance row 1.2)",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "States and tests conformance row 1.2: a sign-in identity, a provider account linked to a person, is never lent to or held by an agent. The directory refuses by name linking such an account to an agent and delegating a sign-in identity, each refusal writing nothing, and one counted test over the store finds no agent record carrying a sign-in identity. The broker's refusal of credentials derived from a person's sign-in session is recorded as a finding against SECRETS-002; row 1.2 is met in full only when it passes.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T14:22:00+10:00",
+        "quote": "Conformance row 1.2 says a sign-in identity is never lent to or held by an agent. A sign-in identity is a person's link to a provider, such as a Google or GitHub account, through which that person signs in. IDENTITY-001 was to state this and never did, and no brief tests it. The directory holds sign-in identities beside people (DIRECTORY-004 links two providers to one person) and gives grants to agents (DIRECTORY-006), so the refusal belongs at the point where anything would attach a sign-in identity to an agent.\n\nThe directory refuses, by name, every act that would give an agent a sign-in identity: linking a provider account to an agent, delegating a grant whose source is a sign-in identity, and issuing any credential to an agent that is derived from a person's sign-in session. The refusal names the act, the agent and the sign-in identity, and states that sign-in identities belong to people only. Nothing an agent holds or presents is ever a person's sign-in session or token. The \"cannot give\" list of row 2.4 shows sign-in identities with the reason \"sign-in identity\".\n\nAcceptance is that linking a provider account to an agent is refused by name; that delegating from a sign-in identity to an agent is refused by name; that a credential request for an agent that presents a person's sign-in token is refused by name; that each refusal writes nothing to the directory; and that no agent record in the directory ever carries a sign-in identity, checked by one test over the store after all three refusals. This brief names row 1.2 as the row it passes.\n\nIt waits for DIRECTORY-004 and DIRECTORY-006 to land, each checked by a command a stranger can run against lys main. Filed by Archie, lead for the identity line, on 27 September 2026, against lys main 7b536253.\n\nRulings of the lead, Archie, given on 27 September 2026 to the run ea580795-f9fa-4284-99e5-1f7cce6b37c4 in answer to its rounds. That run took every answer and then failed before writing, when the account pool refused every session. They are settled here, and the author reopens none of them.\n\nThe exception stays, because it is Tom's ruling and this brief does not overturn it. The brief states it as the one named exception, citing STATEMENT-2026-09-22.md:43 and :167 and PROVISIONING-2026-09-22.md:18. The harness login token reaches a seat's process under that ruling, and it never passes through anything lys issues, links or delegates. The rule governs everything lys itself gives an agent. The token is not redefined, and the brief does not pretend it is something other than what it is. Answered by Archie, lead for the identity line.\n\nNo seam that exists only to refuse. The directory enforces the two acts it owns, linking a provider account to an agent and delegating a grant whose source is a sign-in identity, each refused by name with an acceptance line. Issuing credentials is the broker's, so the third refusal is a rule the broker enforces. This brief states it and names it as a finding against SECRETS-002, with the acceptance line that the broker refuses to issue an agent any credential derived from a person's sign-in session, to be carried by the broker's card. The brief says that row 1.2 is met in full only when that line passes. Answered by Archie.\n\nOnly that one exists. A refusal returned to anyone other than the identity's owner or a directory administrator names the act, the agent and the fact that a sign-in identity is involved, and states that sign-in identities belong to people only. It never shows the provider or the subject, as DIRECTORY-006 R5 requires. The owner and administrators see the provider and subject. Acceptance lines cover both views. Answered by Archie.\n\nOnly a person's account. A sign-in identity is a provider account linked to a person in the directory, and only that is refused. An agent's own machine account, bound to the agent and to no person, is a service account under row 1.3's separate list, and registering it as the agent's issuer-subject binding under DIRECTORY-003 R1 is allowed. A provider account already linked to a person is refused for an agent by name. Acceptance lines cover an agent's own account accepted and a person's linked account refused. Answered by Archie.\n\nThe server's reason is this brief's, and the screen is row 2.4's. Apollo's card jAfmblAP carries the cannot-give list with its four reasons, sign-in identity among them, on the delegation screen. This brief asserts that the server returns the reason 'sign-in identity' for such an entry, and names jAfmblAP as where a person sees it. No screen work is duplicated here. Answered by Archie.",
+        "context": "The identity line's card for conformance row 1.2, filed against lys main 7b536253; the lead's rulings of 27 September to run ea580795-f9fa-4284-99e5-1f7cce6b37c4 and the answers to this run's survey are carried into DIRECTORY-009 as settled."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-001",
+          "ADR-003",
+          "ADR-009",
+          "ADR-019"
+        ],
+        "briefs": [
+          "DIRECTORY-009"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-001"
+      ],
+      "notes": "Ids: the brief is DIRECTORY-009, the id this run was given; this row is RM-032, the next after RM-031, the highest the survey read on open brief branches (18 of 36 brief heads were not readable, so a collision there is possible), and ADR-019 is the next after main's ADR-018. DIRECTORY-006, which DIRECTORY-009 also waits on, has no roadmap row on main. Findings recorded in DIRECTORY-009's task: against SECRETS-002, the broker refuses to issue an agent any credential derived from a person's sign-in session (row 1.2 is met in full only when that line passes); against DIRECTORY-004, its link path asks lys-identity by issuer-subject pair before the fork links. Further units, not written: SECRETS-002: the broker refuses to issue an agent any credential derived from a person's sign-in session; jAfmblAP: the cannot-give list shows 'sign-in identity' from the server's reason; The fork-owned brief for DIRECTORY-004's linking change in ablative-io/rauthy; CONFORMANCE.md row 1.2 Brief column repointed from 'IDENTITY-001 (amend: state it)' to this brief."
     }
   ]
 }
