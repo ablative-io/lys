@@ -111,12 +111,22 @@
         },
         {
           "id": "C17",
-          "text": "Log::open_at_pin opens a store found one leaf ahead of its pin at the pinned head without pinning, reports the pending repair, and refuses to append while it is pending; Log::open alone repairs.",
+          "text": "Log::open_at_pin opens a store found one leaf ahead of its pin at the pinned head without pinning, reports the pending repair, and refuses every append by name while it is pending, never as Poisoned; Log::open alone repairs.",
           "done": false
         },
         {
           "id": "C18",
           "text": "Anchor::open_read_only never repairs a store found one leaf ahead of its pin: it opens at the pinned head, and its status says in words that one leaf stands ahead of the pin and that a writable open repairs it.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Rendered documents",
+      "items": [
+        {
+          "id": "C19",
+          "text": "The lys-log-store cluster's DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSLOGSTORE-001.md are what render-cluster.py renders from its JSON documents, and the design gate passes with them present.",
           "done": false
         }
       ]
