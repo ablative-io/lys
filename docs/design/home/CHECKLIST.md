@@ -76,3 +76,12 @@
 - [ ] **C42** — A fork writes no block, rewrites no earlier byte of the parent, and copies nothing from the parent but its cwd: no credential, handle or launch setting enters the child.
 - [ ] **C43** — lys-home fork --home --lantern [--session] prints one JSON report on success, exits 1 with the refusal on stderr and nothing on stdout, and takes no point or entry id.
 - [ ] **C44** — Rendering a child whose coordinate was carried writes the carried message's text parts as a seed prompt beside the rendered file under an in-band marker line, the render report names it, the template's launch line (printed by render-launch only) passes it as the first prompt and is never run, and PROOF-FORK.md records a fork launched on the installed Claude Code version as hashes, counts, paths, commands, versions and exit codes only.
+
+## The lit-in session
+
+- [ ] **C100** — LanternData carries an optional lit_in, the session that held the point when the lantern was lit, keeping a present null and a present non-string value distinct from an absent key, and still refuses an unknown key.
+- [ ] **C101** — The light act writes lit_in as the id of the session at whose head it appends the lantern, and its report carries lit_in beside id, session, point and lit_at.
+- [ ] **C102** — Recall rows carry lit_in beside point, note and lit_by, the lighting session for a lantern the light act lit and null for a lantern whose data has no lit_in, and a lantern whose lit_in is present and not a session id is never listed as a row but skipped by note and refused by point as lit_in_not_a_session with the fork's reason text.
+- [ ] **C103** — The fork reads lit_in through a typed view that does not require lit_at or note and never from a raw JSON key: a lantern with no lit_in resolves by its holders, and a present lit_in that is null, not a string, not a safe session name, or names no session of the home refuses lit_in_not_a_session naming which.
+- [ ] **C104** — The fork's fixtures light L2 with the light act and write by hand only the lanterns the light act cannot produce (O2, M2, N3, the copy N2 and N1 to N4), each named in its test as standing for such a record.
+- [ ] **C105** — RECORD.md and the lys-home README document lit_in, and PROOF-FORK.md keeps its measured older-record sentence with a note that the light act now records lit_in.
