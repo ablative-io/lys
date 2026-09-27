@@ -622,6 +622,91 @@
       "path": "docs/design/directory/briefs/DIRECTORY-008.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-008"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-013.json",
+      "note": "certificate revocation as an appended leaf, the live set folded from the log, and the revoked certificate's history (DP26, ADR-039)",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-013.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "docs/design/identity/CERTIFICATE-REVOCATION.md",
+      "note": "the certificate revocation contract: leaf layouts, unit, signer, permanence, fold, N and tolerance, history, no-log forms, refusals",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/src/revocation/mod.rs",
+      "note": "declarations, re-exports and module docs only",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/src/revocation/leaf.rs",
+      "note": "the three certificate-log leaves and the revocation's signed bytes",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/src/revocation/error.rs",
+      "note": "the named revocation refusals, never carrying key material",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/src/revocation/fold.rs",
+      "note": "the live set folded from a LeafStore to its extent; reads only",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/src/revocation/append.rs",
+      "note": "issuance, revocation and attestation-entry leaves appended through Log::append",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/src/revocation/verify.rs",
+      "note": "revocation-aware certificate verification with N and the tolerance as inputs",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/src/revocation/history.rs",
+      "note": "an attestation by a certificate's key judged against the revocation leaf's position",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_leaf.rs",
+      "note": "leaf encoding, malformed refusals and the revocation signer",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_fold.rs",
+      "note": "the fold's live set, refusals and read-only pass",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_append.rs",
+      "note": "append at the extent, reopen and write failure",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_verify.rs",
+      "note": "revoked, stale, unreadable, not-in-log, expired and no-log legs",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_history.rs",
+      "note": "attestations before and after revocation, proofs and issuance record",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_support/mod.rs",
+      "note": "test authorities, certificates and file-backed logs; generated keys only",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys/src/cli_tests.rs",
+      "note": "the CLI's help tests; DIRECTORY-013 adds the no-log revocation sentence test",
+      "brief": "DIRECTORY-013"
     }
   ],
   "inventory": [

@@ -93,7 +93,7 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `crates/lys-home/src/cli.rs` | import, render, resume-check subcommands | HOME-001 |
 | `crates/lys-home/examples/passthrough.rs` | a pass-through HTTP proxy that forwards to the provider unchanged, for the proof only | HOME-001 |
 | `crates/lys-home/tests/claude_code_round_trip.rs` | import then render equals the model-visible content; opaque blocks kept whole | HOME-001 |
-| `crates/lys-home/src/record/mod.rs` | the home record: Pi's session tree read and written, leaf pointer, root-to-leaf path | HOME-001 |
+| `crates/lys-home/src/record/mod.rs` | the home record's module docs, its pub mod and mod lines, and the pub use lines that keep Home, Session and the shared helpers at lys_home::record | HOME-001 |
 | `crates/lys-home/src/record/entries.rs` | Pi's entry types as Rust types, plus the lys custom entries lys.harness_event and lys.call | HOME-001 |
 | `crates/lys-home/src/record/call.rs` | a proxy call record: request and response block hashes, provider, api, model, timing | HOME-001 |
 | `crates/lys-home/src/harness/claude_code/events.rs` | Claude Code's harness-local records (hooks, permission mode, tool completion) as lys.harness_event entries | HOME-001 |
@@ -211,6 +211,11 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `crates/lys-home/tests/fixtures/codex/claude_code.jsonl` | the Claude Code file mirroring the recorded fixture rollout | HOME-009 |
 | `crates/lys-home/tests/fixtures/codex/claude_code_image.jsonl` | a synthetic Claude Code file whose one user record holds a generated base64 image, resumed to measure input_image without detail | HOME-009 |
 | `docs/design/home/PROOF-TRANSLATE.md` | the recording and the resume on Codex 0.156.0, hashes, counts and paths only | HOME-009 |
+| `crates/lys-home/src/record/helpers.rs` | the helpers and constants the record files share: safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable, custom_type_of | HOME-013 |
+| `crates/lys-home/src/record/session.rs` | Session and its impl: create, open, append, move the head, read the path; with take_lock, load_checked and to_line | HOME-013 |
+| `crates/lys-home/src/record/home.rs` | Home and its impl: the home directory, its block and template stores, and opening, creating and reading its sessions | HOME-013 |
+| `docs/design/home/briefs/HOME-014.json` | the lit-in brief: LanternData's lit_in, recorded by the light act, reported by recall and read by the fork | HOME-014 |
+| `docs/design/home/briefs/HOME-014.md` | its rendered markdown | HOME-014 |
 
 ## Inventory
 
@@ -226,6 +231,7 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 - `crates/lys-home/src/harness/claude_code/import.rs` — a user record's tool results each become an entry with id `<uuid>-r<i>`; only the last keeps the record's uuid, and only when the record has no parts of its own; unchanged by this cluster's determinism work
 - `$CODEX/codex-rs/external-agent-sessions/src/records.rs` — Codex's importer of Claude Code files at d667082322 (19 June 2026, older than 0.156.0): the recorded baseline only, never the shape; drops thinking, sidechains and isMeta records, clips a tool call note to 2,000 and a tool result to 4,000 characters
 - `$LANTERN/docs/02-SESSION-FORMATS.md` — the lantern work's measurement of three session formats: section 3 records the Codex converter as a compaction, not a copy, and the in-band marker precedent
+- `crates/lys-home/src/record/mod.rs` — 630 lines on main at 7b53625: module docs, 22 pub mod and mod lines, 5 private use lines, and the logic HOME-013 moves out: Home and Session with their impls, safe_component, write_durable, take_lock, load_checked, custom_type_of, to_line, now, fresh_id, json_len, MAX_NAME_BYTES and PI_FORMAT_VERSION
 
 ## Constraints
 
