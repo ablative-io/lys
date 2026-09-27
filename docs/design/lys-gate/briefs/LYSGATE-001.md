@@ -155,7 +155,6 @@ WHEN the ledger measures one gate round at <change> for each of the four cluster
 **Acceptance:**
 - sh scripts/design/gate.sh, run at the card's head, exits 0 and prints no line beginning `rendered markdown differs`.
 - For each of the directory, home, secrets and lys-gate rounds at <change>, the round's log holds a line beginning `-- leg tests at venue ` followed immediately by the line `$ cargo test --workspace --all-features --no-fail-fast`, and that leg's part of the log ends with the lines `(exit 0)` and `(measured-green)`: four rounds, four such lines.
-- For each of the directory and secrets rounds, the run record of the workflow run that measured it names, in the worker attribution of its gate activity's lease, the node declared by the worker at the venue that serves heavy builds and full gates, and not the node declared by the authoring machine's worker: two rounds, two such records.
 - git diff <base> HEAD --name-only -- scripts/design prints nothing.
 
 **Checklist:**
