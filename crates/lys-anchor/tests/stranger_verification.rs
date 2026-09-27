@@ -95,7 +95,7 @@
 //!
 //! A missing `python3` is a developer-machine skip. A missing `python3` with
 //! `LYS_REQUIRE_PYTHON` set is a hard failure — the same contract
-//! `lys-core/tests/harness/mod.rs` holds for Go, and for the same reason: this
+//! `lys-core/tests/harness/go.rs` holds for Go, and for the same reason: this
 //! gate must never quietly degrade to "passed", which is how the instrument
 //! vanished the first time.
 //!
