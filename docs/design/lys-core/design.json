@@ -49,7 +49,7 @@
     },
     {
       "text": "Renaming PhantomData's `_marker` field in merkle/tree.rs",
-      "reason": "It is a type marker, not a held value, and a struct field declaration is not a binding the rule refuses."
+      "reason": "It is a type marker, not a held value, and a struct field declaration is not a binding the rule refuses. The marker field is kept as it is; nothing else in tree.rs is promised unchanged, and its two map_err closures are rewritten with the other discarded errors."
     },
     {
       "text": "Changing the AdmissionPolicy, LeafStore, Signer or AnchorTask trait",
