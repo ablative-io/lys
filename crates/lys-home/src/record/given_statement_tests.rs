@@ -2,7 +2,6 @@
 //! it names verifying over the record's canonical bytes, the head and the
 //! given entry's line unchanged, and statements read back in file order.
 
-use std::fmt::Write as _;
 use std::path::Path;
 
 use lys_core::Ed25519Identity;
@@ -10,7 +9,7 @@ use lys_core::attestation::{Attestation, verify_attestation_bytes};
 use serde_json::Value;
 
 use crate::harness::claude_code::given::ConfigSource;
-use crate::record::blocks::{BlockStore, Hash};
+use crate::record::blocks::{BlockStore, Hash, hex_of};
 use crate::record::entries::{CUSTOM_GIVEN_STATEMENT, EntryBody};
 use crate::record::given::GivenRecord;
 use crate::record::given_statement::GivenStatement;
@@ -32,13 +31,6 @@ fn line_of(session: &Session, id: &str) -> Result<String, Box<dyn std::error::Er
     let line = lines.next().ok_or("the entry's line")?.to_owned();
     assert!(lines.next().is_none(), "one line per id");
     Ok(line)
-}
-
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().fold(String::new(), |mut s, b| {
-        write!(s, "{b:02x}").expect("a String takes every write");
-        s
-    })
 }
 
 #[test]
@@ -75,7 +67,7 @@ fn a_signed_record_hangs_one_statement_under_its_given_entry() -> Outcome {
     assert_eq!(block, signed.cose);
     let attestation = Attestation::from_cose_bytes(&block)?;
     assert_eq!(
-        hex(&attestation.payload_hash),
+        hex_of(&attestation.payload_hash),
         record.given_hash()?.as_str()
     );
     verify_attestation_bytes(&block, canonical.as_bytes())?;
