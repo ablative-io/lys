@@ -358,7 +358,7 @@
       "consequences": [
         "HOME-001 R3's self-pointing summary mapping is replaced; the round-trip test that every message entry's parent equals its source parentUuid stands unchanged.",
         "A home imported before this mapping is reported unaccounted by the listing; the act it names is re-importing the source file into a new home.",
-        "The rendered compact_boundary record's uuid is derived under ADR-016's scheme with the role compact_boundary beside record; no derived value of the role record changes.",
+        "The rendered compact_boundary record's uuid is derived under render-uuid/v2, a new version alongside ADR-016's v1 that carries v1's derivation of the role record byte for byte and adds the role compact_boundary; v1's closed role list is not amended, a render with no compaction stays v1, and the render report names the version used.",
         "The resume of the rendered pair is a per-version measurement (P6), recorded in PROOF-COMPACTION.md on Claude Code 2.1.283.",
         "A boundary with no summary under it is counted by the listing by entry id, never turned into a compaction."
       ],
