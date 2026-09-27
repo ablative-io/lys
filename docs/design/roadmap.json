@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-28",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,36 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-064",
+      "title": "Build the identity surface's shell to the mock-up and pass conformance rows 9.1 to 9.3",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "The identity surface's shell as the mock-up defines it: the rail with its kept open state, the dock on either side, the keys, the palette, hash deep links for every screen and tab in one route table, and the numbered help overlay; the mock-up's two gaps (focus return from the overlay, and click actions the keyboard cannot reach or press) closed in the built shell and in index.v6.html beside v5; every clause proved by the surface's test command, run as a leg of .land/gates.sh. Builds after pull request 35 lands on lys main.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T22:50:00+10:00",
+        "quote": "Conformance rows 9.1, 9.2 and 9.3 in docs/design/identity/CONFORMANCE.md (lines 103 to 105) are the shell rows: a thin expandable rail, dock left or right, keyboard navigation and deep links for every screen and tab; a help overlay that numbers what is on screen, whose dismissal never presses what is underneath, and which Escape exits with focus returning; and every clickable element reachable and usable by keyboard. Their brief column says SHELL (new), so no brief names them. No surface app is on lys main today; the surface with its screens comes with the DIRECTORY-006 R6 screens change, and this card builds after that lands. The shell exists only in Tom's mock-up, docs/design/identity/mockup/index.v5.html, and that mock-up is the definition the built shell does not deviate from: the rail at line 261 with its open state kept as a preference (lines 42, 52, 285, 457), the dock side at lines 39, 41, 456, 908 and 1070, the shortcuts at lines 1113 to 1133 (bracket toggles the rail, backslash switches the dock side, g starts a two-key go-to, j and k and Enter move through rows) and the palette at 1097, hash routes at lines 923 and 932 with a route for each screen at 263 to 278 and for some tabs at 759, 760, 868, 996 and 1537, the help overlay's numbered marks at 1439 to 1447, its dismiss layer at 1453 to 1455 and its Escape at 1463. The mock-up itself falls short of the rows in two places: explainOff at line 1449 focuses the Help button or the main screen, not the element that had focus, so opening with the question mark at 1466 does not return focus; and clickable rows at lines 1065, 1072 and 1367 are plain table rows and divs with a mouse handler and no tabindex or key handler, so only j and k reach them and row 9.3 fails as written.\n\nThis card builds the shell of the surface as the mock-up has it and closes those two gaps in both the built shell and the mock-up, so the two stay the same. Every screen and every tab has a route, listed in one table that the tests read, and a screen or tab with no route is a test failure by name. The help overlay returns focus to the element that had it. Every element that acts on a click is a button or a link, or carries a tabindex and acts on Enter and Space, and the keyboard cursor moves focus rather than re-rendering. Nothing about the screens' contents changes.\n\nAcceptance: the surface's test command runs in the gate and proves each clause: the rail opens and closes by its button and by the bracket key and the choice is kept across a reload; the dock side switches by its control and by the backslash key and the layout flips; the route table names every screen and every tab, and following each route renders that screen or tab; the palette and the go-to keys reach every screen; the help overlay places one numbered mark per explained element and states the count; a click on the dismiss layer reaches nothing underneath, proved by a handler that would record it; Escape closes the overlay and focus is on the element that had it before; and a walk with Tab over every screen reaches every element with a click action and activates it with Enter or Space, with none left out. This brief names rows 9.1, 9.2 and 9.3 as the rows it passes. It waits for the DIRECTORY-006 R6 screens change to land, checked by a command a stranger can run against lys main.\n\nKeep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh). The brief id, roadmap row and any decision take the next free id past main and every open brief, draft and hand branch, checked with git ls-remote immediately before writing. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie, lead for the identity line, on 27 September 2026, against lys main fa3dd5311e98d1a751c770319e1cfe2570718c76.",
+        "context": "Filed as a card on the identity line against lys main fa3dd531. Its survey asked seven questions and the lead answered all seven: the card waits for pull request 35 (hand/identity-surface-land at 6f57bf7), which carries DIRECTORY-005's surface and DIRECTORY-006's grant wire and screens, checked by finding surface/identity/src/shell/Rail.tsx and surface/identity/src/features/me/You.tsx on main; the second gap is the network node at 1362, any data-act element KEYABLE misses, the palette rows, Enter at 1133 and j and k at 1132, and the first is explainOff at 1449 selecting [data-act=explain]; the route table holds every route the mock-up has with a built column, and a not-yet row is not a failure; segmented filters are not tabs; the assistant composer is not this shell and its place holds a not-yet note; the dock side switches by \\ and by the palette act at 1092, with Configuration marked not yet; and the corrected mock-up is index.v6.html beside v5, with CONFORMANCE.md line 3 and DIRECTORY-006's pin moved to it."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-004",
+          "ADR-007",
+          "ADR-010",
+          "ADR-104"
+        ],
+        "briefs": [
+          "DIRECTORY-037"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-001"
+      ],
+      "notes": "Ids under the rule in the words: the next free past main and every open brief, draft and hand branch, read from git ls-remote at write time over 285 heads, all fetched: the highest in use were DIRECTORY-036, RM-063, ADR-103, C302 and S131, so this row is RM-064, its brief DIRECTORY-037, its decision ADR-104, its checklist items C303 to C312 and its stories S132 to S135. Left for later, by title: Build the rail's screens that no brief builds yet (roles, resources, access, graph, requests, reviews, secrets, connections, network, sessions, model, configuration); Wire the assistant dock (conformance 9.4); Point CONFORMANCE.md rows 9.1 to 9.3 at the new brief id; Give the eighth file tab a keyboard shortcut."
     }
   ]
 }
