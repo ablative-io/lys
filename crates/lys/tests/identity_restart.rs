@@ -5,18 +5,19 @@
 
 pub mod identity_support;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use identity_support::compose::{self, require_runtime};
 use identity_support::fixtures::{Deployment, TestResult, succeeded};
 use identity_support::server::{rauthy_json, request};
 
-/// What must survive a restart: the issuer, its key ids, and every client.
+/// What must survive a restart: the issuer, its key ids, and every client,
+/// keyed by client id because Rauthy lists clients in no stated order.
 #[derive(Debug, PartialEq)]
 struct Identity {
     issuer: String,
     key_ids: BTreeSet<String>,
-    clients: serde_json::Value,
+    clients: BTreeMap<String, serde_json::Value>,
 }
 
 fn observe(deployment: &Deployment) -> TestResult<Identity> {
@@ -40,7 +41,17 @@ fn observe(deployment: &Deployment) -> TestResult<Identity> {
         .iter()
         .filter_map(|key| key["kid"].as_str().map(str::to_string))
         .collect();
-    let clients = rauthy_json(deployment, "GET", "/auth/v1/clients")?;
+    let mut clients = BTreeMap::new();
+    for client in rauthy_json(deployment, "GET", "/auth/v1/clients")?
+        .as_array()
+        .ok_or("the client list is not an array")?
+    {
+        let id = client["id"].as_str().ok_or("a client has no id")?;
+        assert!(
+            clients.insert(id.to_string(), client.clone()).is_none(),
+            "client {id} is listed twice"
+        );
+    }
     Ok(Identity {
         issuer,
         key_ids,
