@@ -420,6 +420,46 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The given statement",
+      "items": [
+        {
+          "id": "C118",
+          "text": "render-launch with no key records the lys.given entry with the same data as before, writes no statement, and its report's signing is unsigned.",
+          "done": false
+        },
+        {
+          "id": "C119",
+          "text": "render-launch reports given_sha256, the SHA-256 of the RFC 8785 bytes of the lys.given entry's data, and the template_render event does not carry it.",
+          "done": false
+        },
+        {
+          "id": "C120",
+          "text": "render-launch with a key signs those bytes as a lys/attestation/v2 statement kept as a block named by a lys.given_statement entry under the lys.given entry and as given-statement.cose and given-data.json under --out, and its report's signing is signed.",
+          "done": false
+        },
+        {
+          "id": "C121",
+          "text": "lys verify --attestation accepts the given statement with given-data.json, and refuses a copy with one byte altered with its one message and exit status 1, under a stated command that names the refused file.",
+          "done": false
+        },
+        {
+          "id": "C122",
+          "text": "A stated command compares the verified statement's signer public key with the test key's and exits 0, and exits 1 for a statement signed by a second test key.",
+          "done": false
+        },
+        {
+          "id": "C123",
+          "text": "A byte search of the fixture's statement, payload file, statement block and statement entry finds no fixture secret value and no fixture transcript text.",
+          "done": false
+        },
+        {
+          "id": "C124",
+          "text": "The statement's signed payload hash equals the report's given_sha256 and the SHA-256 recomputed from the lys.given entry in the session file for the same render.",
+          "done": false
+        }
+      ]
     }
   ]
 }
