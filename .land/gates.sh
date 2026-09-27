@@ -16,7 +16,7 @@ leg sh scripts/design/gate.sh
 leg cargo fmt --check
 leg cargo clippy --all-targets --all-features -- -D warnings
 leg cargo clippy --all-targets -- -D warnings
-leg cargo test --workspace --all-features
+leg cargo test --workspace --all-features --no-fail-fast
 leg cargo doc --no-deps --all-features
 leg cargo doc --no-deps
 exit "$status"

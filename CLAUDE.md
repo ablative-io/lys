@@ -96,7 +96,7 @@ Tom's rules, in his words, with the date and time each was given.
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo clippy --all-targets -- -D warnings
-cargo test --workspace --all-features
+cargo test --workspace --all-features --no-fail-fast
 cargo doc --no-deps --all-features
 cargo doc --no-deps
 ```
