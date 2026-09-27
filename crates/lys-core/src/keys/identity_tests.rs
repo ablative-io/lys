@@ -2,8 +2,8 @@
 
 use super::*;
 
-/// The single environment variable read by [`Ed25519Identity::from_env`].
-/// Every env-backed test mutates this and so must run serially.
+/// The name of the environment variable read by [`Ed25519Identity::from_env`],
+/// which its error messages are checked against.
 const TEST_ENV_VAR: &str = "LYS_IDENTITY_KEY";
 
 fn identity_from_seed(seed: [u8; 32]) -> Ed25519Identity {
@@ -845,16 +845,10 @@ fn generate_and_persist_lost_race_surfaces_invalid_winner_file() {
 // ─── from_env ─────────────────────────────────────────────────────
 
 #[test]
-#[serial_test::serial]
-#[allow(unsafe_code)]
 fn from_env_loads_valid_base64_standard() {
     let seed = [9u8; 32];
     let encoded = STANDARD.encode(seed);
-    // SAFETY: env mutation serialised via #[serial]; cleaned up by the guard.
-    unsafe { std::env::set_var(TEST_ENV_VAR, &encoded) };
-    let _guard = EnvCleanup;
-
-    let id = Ed25519Identity::from_env().unwrap();
+    let id = Ed25519Identity::from_env_value(Ok(encoded)).unwrap();
     let expected_pk = ed25519_dalek::SigningKey::from_bytes(&seed)
         .verifying_key()
         .to_bytes();
@@ -865,16 +859,10 @@ fn from_env_loads_valid_base64_standard() {
 }
 
 #[test]
-#[serial_test::serial]
-#[allow(unsafe_code)]
 fn from_env_loads_valid_base64_urlsafe() {
     let seed = [3u8; 32];
     let encoded = URL_SAFE_NO_PAD.encode(seed);
-    // SAFETY: env mutation serialised via #[serial]; cleaned up by the guard.
-    unsafe { std::env::set_var(TEST_ENV_VAR, &encoded) };
-    let _guard = EnvCleanup;
-
-    let id = Ed25519Identity::from_env().unwrap();
+    let id = Ed25519Identity::from_env_value(Ok(encoded)).unwrap();
     let expected_pk = ed25519_dalek::SigningKey::from_bytes(&seed)
         .verifying_key()
         .to_bytes();
@@ -882,13 +870,8 @@ fn from_env_loads_valid_base64_urlsafe() {
 }
 
 #[test]
-#[serial_test::serial]
-#[allow(unsafe_code)]
 fn from_env_missing_var_returns_key_management_error() {
-    // SAFETY: env mutation serialised via #[serial].
-    unsafe { std::env::remove_var(TEST_ENV_VAR) };
-
-    let err = Ed25519Identity::from_env().unwrap_err();
+    let err = Ed25519Identity::from_env_value(Err(std::env::VarError::NotPresent)).unwrap_err();
     assert!(matches!(err, TrustError::KeyManagement { .. }));
     let msg = err.to_string();
     assert!(msg.contains(TEST_ENV_VAR), "got: {msg}");
@@ -896,29 +879,17 @@ fn from_env_missing_var_returns_key_management_error() {
 }
 
 #[test]
-#[serial_test::serial]
-#[allow(unsafe_code)]
 fn from_env_invalid_base64_returns_key_management_error() {
-    // SAFETY: env mutation serialised via #[serial]; cleaned up by the guard.
-    unsafe { std::env::set_var(TEST_ENV_VAR, "not-base64!!!@@") };
-    let _guard = EnvCleanup;
-
-    let err = Ed25519Identity::from_env().unwrap_err();
+    let err = Ed25519Identity::from_env_value(Ok("not-base64!!!@@".to_owned())).unwrap_err();
     assert!(matches!(err, TrustError::KeyManagement { .. }));
     let msg = err.to_string();
     assert!(msg.contains("invalid base64"), "got: {msg}");
 }
 
 #[test]
-#[serial_test::serial]
-#[allow(unsafe_code)]
 fn from_env_wrong_length_decoded_returns_key_management_error() {
     let encoded = STANDARD.encode([1u8; 16]);
-    // SAFETY: env mutation serialised via #[serial]; cleaned up by the guard.
-    unsafe { std::env::set_var(TEST_ENV_VAR, &encoded) };
-    let _guard = EnvCleanup;
-
-    let err = Ed25519Identity::from_env().unwrap_err();
+    let err = Ed25519Identity::from_env_value(Ok(encoded)).unwrap_err();
     assert!(matches!(err, TrustError::KeyManagement { .. }));
     let msg = err.to_string();
     assert!(
@@ -1055,16 +1026,4 @@ fn chmod(path: &Path, mode: u32) {
     let mut perms = std::fs::metadata(path).unwrap().permissions();
     perms.set_mode(mode);
     std::fs::set_permissions(path, perms).unwrap();
-}
-
-/// Removes [`TEST_ENV_VAR`] on drop so env-backed tests leave no residue.
-#[allow(unsafe_code)]
-struct EnvCleanup;
-
-#[allow(unsafe_code)]
-impl Drop for EnvCleanup {
-    fn drop(&mut self) {
-        // SAFETY: env mutation serialised via #[serial].
-        unsafe { std::env::remove_var(TEST_ENV_VAR) };
-    }
 }

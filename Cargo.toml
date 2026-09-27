@@ -60,7 +60,6 @@ clap = { version = "4", features = ["derive", "env"] }
 
 # Dev
 coset = "0.4"
-serial_test = "3"
 tempfile = "3"
 
 [workspace.lints.rust]
