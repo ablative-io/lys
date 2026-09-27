@@ -121,10 +121,12 @@ pub enum HomeError {
     },
 
     /// The session file is held open by another owner, in this process or another.
-    #[error("session {} is held by another owner; one owner at a time", path.display())]
+    #[error("session {} is held by {}; one owner at a time", path.display(), held_by(*holder))]
     SessionHeld {
         /// The session file.
         path: PathBuf,
+        /// The process holding it, when the lock names one.
+        holder: Option<u32>,
     },
 
     /// An entry id is already on record in this session.
@@ -453,6 +455,15 @@ pub enum HomeError {
         /// The path given.
         path: PathBuf,
     },
+}
+
+/// Who holds a session, as a refusal names them.
+fn held_by(holder: Option<u32>) -> String {
+    match holder {
+        Some(pid) if pid == std::process::id() => format!("another owner in this process ({pid})"),
+        Some(pid) => format!("process {pid}"),
+        None => "another owner".to_owned(),
+    }
 }
 
 impl HomeError {

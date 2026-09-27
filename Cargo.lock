@@ -977,6 +977,7 @@ dependencies = [
  "clap",
  "jiff",
  "rand",
+ "rustix",
  "serde",
  "serde_json",
  "sha1",

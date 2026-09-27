@@ -21,6 +21,9 @@ sha2.workspace = true
 thiserror.workspace = true
 time = { workspace = true, features = ["formatting", "parsing"] }
 
+[target.'cfg(unix)'.dependencies]
+rustix.workspace = true
+
 [[bin]]
 name = "lys-home"
 path = "src/main.rs"

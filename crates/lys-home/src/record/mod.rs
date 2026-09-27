@@ -8,9 +8,11 @@
 //!
 //! One owner at a time: opening or creating a session takes an exclusive lock
 //! on `<id>.lock` beside the file (held by the process for as long as the
-//! [`Session`] lives), so two owners in one process or two processes cannot
-//! both append with their own idea of where the file ends. A second opener is
-//! refused by name ([`HomeError::SessionHeld`](crate::error::HomeError::SessionHeld)).
+//! [`Session`] lives, and never by a child it spawns), so two owners in one
+//! process or two processes cannot both append with their own idea of where
+//! the file ends. A second opener is refused by name, with the holding
+//! process when the lock names it
+//! ([`HomeError::SessionHeld`](crate::error::HomeError::SessionHeld)).
 //!
 //! An append is durable in three steps: the entry line, then its index row,
 //! then the head. When a later step fails after the line is durable, the
@@ -50,6 +52,9 @@ pub mod index;
 pub mod lantern;
 #[cfg(test)]
 mod lantern_tests;
+mod lock;
+#[cfg(test)]
+mod lock_tests;
 pub mod reader;
 #[cfg(test)]
 pub(crate) mod reader_tests;
