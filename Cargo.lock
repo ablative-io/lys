@@ -1440,6 +1440,7 @@ version = "0.2.0"
 dependencies = [
  "ciborium",
  "lys-core",
+ "lys-identity",
  "lys-log-store",
  "rand 0.9.5",
  "sha2",

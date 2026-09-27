@@ -1,8 +1,8 @@
 //! The grant event: one grant change and its audit record at once.
 //!
 //! An event names the caller's operation id, the identity that made the
-//! request, when the service recorded it, and the change: a grant issued, or
-//! a grant revoked. A grant change is recorded only as one of these events,
+//! request, when the service recorded it, and the change: a grant issued, a
+//! grant revoked, or a grant's use observed where it was exercised. A grant change is recorded only as one of these events,
 //! and both the grant book and the permission relationships are derived from
 //! it, never written beside it.
 //!
@@ -10,14 +10,17 @@
 //! `lys/identity-event/v1`, with its own content type, [`GRANT_ENVELOPE`], in
 //! the protected header. The body is a canonical CBOR map: `1` version, `2`
 //! operation id, `3` caller, `4` recorded-at, `5` change kind (`1` issue, `2`
-//! revoke) and `6` the change: the grant's own map, or `1` grant id and `2`
-//! reason. Reading is strict: a message naming another envelope is refused
+//! revoke, `3` use) and `6` the change: the grant's own map; for a revocation
+//! `1` grant id and `2` reason; for a use `1` grant id and `2` route (`1`
+//! browser, `2` api, `3` tool). A use's caller is the holder who exercised the
+//! grant and its recorded-at is when. Reading is strict: a message naming another envelope is refused
 //! `EnvelopeMismatch`, and bytes that are not the exact canonical message are
 //! refused.
 
 use ciborium::Value;
 use lys_core::Ed25519Identity;
 
+use super::admission::Route;
 use super::codec::{
     GRANT_ENVELOPE, as_id, as_text, as_uint, fields, read_grant, read_identity, write_grant,
     write_identity,
@@ -54,6 +57,13 @@ pub enum GrantChange {
         grant: GrantId,
         /// Why it was revoked.
         reason: String,
+    },
+    /// A grant was exercised by its holder, as the check that permitted it observed.
+    Use {
+        /// The grant exercised.
+        grant: GrantId,
+        /// How the exercise arrived.
+        route: Route,
     },
 }
 
@@ -98,6 +108,7 @@ impl GrantEvent {
                     });
                 }
             }
+            GrantChange::Use { .. } => {}
         }
         Ok(Self {
             operation,
@@ -131,7 +142,7 @@ impl GrantEvent {
     pub fn grant(&self) -> GrantId {
         match &self.change {
             GrantChange::Issue(grant) => grant.id(),
-            GrantChange::Revoke { grant, .. } => *grant,
+            GrantChange::Revoke { grant, .. } | GrantChange::Use { grant, .. } => *grant,
         }
     }
 }
@@ -141,6 +152,7 @@ pub fn change_kind(change: &GrantChange) -> u64 {
     match change {
         GrantChange::Issue(_) => 1,
         GrantChange::Revoke { .. } => 2,
+        GrantChange::Use { .. } => 3,
     }
 }
 
@@ -168,8 +180,23 @@ pub fn encode_event_body(event: &GrantEvent) -> Vec<u8> {
             uint(&mut out, 2);
             text(&mut out, reason);
         }
+        GrantChange::Use { grant, route } => {
+            map(&mut out, 2);
+            uint(&mut out, 1);
+            bytes(&mut out, grant.as_bytes());
+            uint(&mut out, 2);
+            uint(&mut out, route_code(*route));
+        }
     }
     out
+}
+
+fn route_code(route: Route) -> u64 {
+    match route {
+        Route::Browser => 1,
+        Route::Api => 2,
+        Route::Tool => 3,
+    }
 }
 
 fn malformed(reason: &'static str) -> GrantError {
@@ -204,7 +231,19 @@ pub fn decode_event_body(body: &[u8]) -> Result<GrantEvent, GrantError> {
                 reason: as_text(reason, "a reason is text")?,
             }
         }
-        _ => return Err(malformed("a grant change kind is 1 or 2")),
+        3 => {
+            let [grant, route] = fields::<2>(change, "a use is a map of keys 1 and 2")?;
+            GrantChange::Use {
+                grant: GrantId::from_bytes(as_id(grant, "a grant id is 16 bytes")?),
+                route: match as_uint(&route, "a route is a code")? {
+                    1 => Route::Browser,
+                    2 => Route::Api,
+                    3 => Route::Tool,
+                    _ => return Err(malformed("a route code is 1 to 3")),
+                },
+            }
+        }
+        _ => return Err(malformed("a grant change kind is 1 to 3")),
     };
     let event = GrantEvent::new(
         OperationId::from_bytes(as_id(operation, "an operation id is 16 bytes")?),

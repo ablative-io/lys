@@ -15,6 +15,8 @@ pub mod projection;
 pub mod receipt;
 pub mod recovery;
 pub mod revocation;
+#[cfg(any(test, feature = "test-support"))]
+pub mod test_support;
 pub mod types;
 
 pub use admission::{DelegateRequest, RootRequest, Route};
@@ -28,7 +30,7 @@ pub use events::{
 pub use lineage::Lineage;
 pub use model::{Model, Within};
 pub use permission::{MemoryRelationships, ObjectRef, Relationship, RelationshipStore, SCHEMA};
-pub use projection::{GrantBook, GrantRecord, Revocation};
+pub use projection::{GrantBook, GrantRecord, LastUse, Revocation};
 pub use receipt::{GrantReceipt, verify_grant_receipt};
 pub use recovery::{GrantLedger, Uncertain};
 pub use types::{
