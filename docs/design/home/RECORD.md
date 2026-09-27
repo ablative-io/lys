@@ -130,13 +130,17 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   The canon is appended only, through the repository's review, and rendered
   first (before a session's own entries) when a render is given `--canon`;
   R4's thinking rule applies to every inherited thinking block.
-- `lys.lantern` (HOME-004 R1, R3): `{point, note, lit_by, lit_at}`. `point` is
+- `lys.lantern` (HOME-004 R1, R3; HOME-014): `{point, note, lit_by, lit_at, lit_in}`. `point` is
   the entry id of an entry of the same session that is neither a lantern nor
   an epilogue (the head or any entry the head has moved past); `note` is the
   note byte for byte as written; `lit_by` is a self-declared name, as the
   canon's `curated_by` is, not a verified identity; `lit_at` is when, as the
-  record's clock writes it. Lit only by `lantern light`, appended as a child
-  of the head, and the head advances to it.
+  record's clock writes it; `lit_in` is the id of the session the light act
+  appended the lantern to. `lit_in` is absent from a lantern lit before
+  HOME-014, which is read as it stands and which recall shows with `lit_in`
+  null; a present `lit_in` that is null or not a string is kept as it is,
+  never read as absent. Lit only by `lantern light`, appended as a child of
+  the head, and the head advances to it.
 - `lys.lantern_epilogue` (HOME-004 R1, R4): `{lantern, words, added_by,
   added_at}`. `lantern` is the entry id of a `lys.lantern` entry of the same
   session; `words` are the further words byte for byte as written; `added_by`
@@ -190,9 +194,13 @@ A fork (HOME-006) cuts from the session a lantern was lit in, read from
 the `lys.lantern` data key `lit_in`; a lantern whose data carries no
 `lit_in` is an older record and resolves by the sessions holding it (one
 holder cuts, several refuse `lantern_ambiguous` until one is named with
-`--session`). A copy of a lantern's line in a child (copied lines keep
-their ids) is a copy, not a second lantern: with `lit_in` recorded it is
-never cut from. The chain is read through the index, never by loading the
+`--session`). A present `lit_in` that is not a session id (null, not a
+string, not a safe session name, or no session of the home) is refused
+`lit_in_not_a_session` by the fork and by recall, and is never read as
+any session. A fork's child lists, in recall, a copy of each lantern on
+the copied chain, and that copy's `lit_in` names the parent. A copy of a lantern's line in a
+child (copied lines keep their ids) is a copy, not a second lantern: with
+`lit_in` recorded it is never cut from. The chain is read through the index, never by loading the
 file, and the cut ends at the last assistant message at or before the
 point; a point before any assistant message is refused `nothing_to_fork`.
 

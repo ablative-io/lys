@@ -21,7 +21,7 @@ lys adds nothing to Pi's grammar. Its own data rides in Pi's `custom` entries:
 | `lys.authored`      | this session is a hand-written demonstration, not history         |
 | `lys.inherited`     | this entry came from the canon or another session, and says so    |
 | `lys.given`         | what a rendered session was given: each instruction document Claude Code loads and each file the render wrote, by kind, path, length and SHA-256 in the measured order, with the config directory and the environment names; never a document's content |
-| `lys.lantern`       | a lantern: a note on a point of this session (`point`, `note`, `lit_by`, `lit_at`), lit on purpose at the head |
+| `lys.lantern`       | a lantern: a note on a point of this session (`point`, `note`, `lit_by`, `lit_at`, `lit_in`), lit on purpose at the head |
 | `lys.lantern_epilogue` | further words on a lantern of this session (`lantern`, `words`, `added_by`, `added_at`), appended after it |
 | `lys.forked_from`   | the child's ancestry after a fork (`parent_session`, `lantern`, `point`, `cut_at`, `coordinate_carried`, `carried`, `seed_left_out`), the first entry the fork writes after the copied chain |
 | `lys.fork`          | one fork taken from this session (`child`), appended at the head |
