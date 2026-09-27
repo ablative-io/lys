@@ -1,0 +1,28 @@
+/* Taken verbatim from docs/design/identity/mockup/index.v5.html; split only. */
+/* Aion ops console tokens (apps/aion-ops-console/src/index.css), with the identity
+   product's own accent in place of Aion's blue: #D4975A, deep #A86B2E, wash #3D2A17. */
+:root {
+  --radius-sm: .375rem; --radius-md: .5rem; --radius-lg: .625rem;
+  --background: #121218;
+  --surface-base: #0f0f14; --surface-default: #18181f; --surface-card: #1a1a22;
+  --surface-hover: #252530; --surface-code: #0d0d12;
+  --border-subtle: rgba(255,255,255,.04); --border-default: rgba(255,255,255,.08);
+  --text-primary: #f4f4f5; --text-secondary: #a1a1aa; --text-muted: #71717a;
+  --accent: #D4975A; --accent-deep: #A86B2E; --accent-wash: #3D2A17;
+  --accent-glow: rgba(212,151,90,.12); --focus: rgba(212,151,90,.5);
+  --ok: #74b584; --ok-glow: rgba(116,181,132,.12);
+  --warn: #fbbf24; --warn-glow: rgba(251,191,36,.12);
+  --danger: #f87171;
+  --muted-dot: #71717a;
+  --shadow-lg: 0 4px 8px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.35);
+  --glass-bg: rgba(24,24,31,.9);
+  --spring: cubic-bezier(.2,.9,.25,1.05);
+  --rail: 48px; --rail-open: 196px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--background); color: var(--text-primary); font: 13px/1.6 "DM Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
+.mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
