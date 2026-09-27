@@ -355,6 +355,25 @@ mod directory_events {
         Ok(())
     }
 
+    #[test]
+    fn a_leaf_stored_behind_a_failed_write_is_found_committed_once() -> TestResult {
+        let harness = Harness::new(9)?;
+        let mut directory = harness.open()?;
+        harness.fail(Fault::LeafStoredWriteFailed);
+        let (person, receipt) =
+            directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        assert_eq!(
+            receipt.coordinate().index,
+            0,
+            "the stored leaf is the answer"
+        );
+        let again = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        assert_eq!(again.0, person, "the retry finds the one committed event");
+        drop(directory);
+        assert_eq!(harness.open()?.log()?.len()?, 1);
+        Ok(())
+    }
+
     fn leaf_file(harness: &Harness, index: u64) -> std::path::PathBuf {
         harness
             .log_path()

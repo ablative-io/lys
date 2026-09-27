@@ -22,6 +22,9 @@ pub enum Fault {
     None,
     /// The leaf write fails before any byte is stored.
     BeforeLeaf,
+    /// The leaf is stored and the store still answers the write failed, as a
+    /// store does when the leaf is named but its durability is uncertain.
+    LeafStoredWriteFailed,
     /// The leaf is stored and the pin write fails.
     AfterLeaf,
     /// The leaf is stored, the pin write fails, and the store cannot be opened again until cleared.
@@ -63,11 +66,20 @@ impl LeafStore for FaultStore {
         self.inner.leaf(index)
     }
     fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
-        if fault(&self.plan) == Fault::BeforeLeaf {
-            set(&self.plan, Fault::None);
-            return Err(injected("leaf write"));
+        match fault(&self.plan) {
+            Fault::BeforeLeaf => {
+                set(&self.plan, Fault::None);
+                Err(injected("leaf write"))
+            }
+            Fault::LeafStoredWriteFailed => {
+                set(&self.plan, Fault::None);
+                self.inner.put_leaf(index, bytes)?;
+                Err(injected("leaf durability"))
+            }
+            Fault::None | Fault::AfterLeaf | Fault::AfterLeafUnreadable => {
+                self.inner.put_leaf(index, bytes)
+            }
         }
-        self.inner.put_leaf(index, bytes)
     }
     fn pinned(&self) -> PinnedRoot {
         self.inner.pinned()
@@ -79,7 +91,7 @@ impl LeafStore for FaultStore {
                 Err(injected("pin write"))
             }
             Fault::AfterLeafUnreadable => Err(injected("pin write")),
-            Fault::None | Fault::BeforeLeaf => self.inner.pin(pin),
+            Fault::None | Fault::BeforeLeaf | Fault::LeafStoredWriteFailed => self.inner.pin(pin),
         }
     }
 }
