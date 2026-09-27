@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the Claude Code renderer: the chain, the same-model thinking rule,
 //! the loss account, the refusal of an existing path, and the round trip.
 

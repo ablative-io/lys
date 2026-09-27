@@ -50,14 +50,16 @@
     "ADR-008",
     "ADR-009",
     "ADR-010",
-    "ADR-011"
+    "ADR-011",
+    "ADR-021"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
     "The grant path (create an agent under a person, grant it a project, the action is allowed, revoke or suspend, the same action is refused) is a requirement of the row that owns it, with acceptance criteria; where the sources do not settle the row, it is recorded open for Tom in DIRECTORY-003 with its criteria drafted.",
     "Every decision still open for Tom is recorded as open and decided nowhere in this cluster.",
     "The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6).",
-    "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record."
+    "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record.",
+    "A revoked certificate fails verification against the certificate log while its history still verifies, with revocation an appended leaf and the live set folded from the log (DIRECTORY-013, ADR-039)."
   ],
   "non_goals": [
     {
@@ -89,7 +91,7 @@
       "reason": "Waffles' ruling of 15:36:25: if upstream has published no such release by the row 05 showing, Tom decides (docs/design/identity/briefs/IDENTITY-001.json:18; docs/design/identity/STATEMENT-2026-09-22.md:177); rows 02 to 05 run on v0.36.2 meanwhile."
     },
     {
-      "text": "Road step 2 onward: capability certificates, arbitrary grants and their enforcement, session launch and stop, credential handles, memory, context assembly, lanterns and anchoring in production",
+      "text": "Road step 2 onward: capability certificates, arbitrary grants and their enforcement, session launch and stop, credential handles, memory, context assembly, lanterns and anchoring in production. Brought forward as step-2 work under the lead's ruling of 27 September 2026: DIRECTORY-013's certificate revocation fold and its history check.",
       "reason": "Revision 5 keeps them out of step 1 (docs/design/identity/briefs/IDENTITY-001.json:29-30); ADR-007 (the start command) and ADR-008 (the certificate on an agent's file) govern what the step-1 screens do not present as working."
     },
     {
@@ -193,7 +195,7 @@
     },
     {
       "path": "crates/lys/Cargo.toml",
-      "note": "the CLI crate's manifest; gains the identity subcommand's dependencies",
+      "note": "the CLI crate's manifest; gains the identity subcommand's dependencies and the test = false [[test]] entries of the identity targets",
       "brief": "DIRECTORY-002"
     },
     {
@@ -209,6 +211,16 @@
     {
       "path": "crates/lys/src/commands/error.rs",
       "note": "the CLI error type; carries the identity errors",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": ".land/gates.sh",
+      "note": "the landing gate; gains the identity leg: container_runtime_missing when no runtime answers, then clippy and the test = false identity targets",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "CLAUDE.md",
+      "note": "gates before any commit; gains one line naming both acts of the identity leg",
       "brief": "DIRECTORY-002"
     },
     {
@@ -264,6 +276,31 @@
     {
       "path": "crates/lys/src/identity/error.rs",
       "note": "typed errors carrying operation, resource and path, never secret bytes",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/config_tests.rs",
+      "note": "unit tests of config.rs",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/credentials_tests.rs",
+      "note": "unit tests of credentials.rs, the Debug and Display redaction included",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/error_tests.rs",
+      "note": "unit tests of error.rs, the Debug and Display redaction included",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/prepare_tests.rs",
+      "note": "unit tests of prepare.rs, the private files' modes included",
+      "brief": "DIRECTORY-002"
+    },
+    {
+      "path": "crates/lys/src/identity/themes_tests.rs",
+      "note": "unit tests of themes.rs",
       "brief": "DIRECTORY-002"
     },
     {
@@ -585,6 +622,91 @@
       "path": "docs/design/directory/briefs/DIRECTORY-008.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-008"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-013.json",
+      "note": "certificate revocation as an appended leaf, the live set folded from the log, and the revoked certificate's history (DP26, ADR-039)",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-013.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "docs/design/identity/CERTIFICATE-REVOCATION.md",
+      "note": "the certificate revocation contract: leaf layouts, unit, signer, permanence, fold, N and tolerance, history, no-log forms, refusals",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/src/revocation/mod.rs",
+      "note": "declarations, re-exports and module docs only",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/src/revocation/leaf.rs",
+      "note": "the three certificate-log leaves and the revocation's signed bytes",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/src/revocation/error.rs",
+      "note": "the named revocation refusals, never carrying key material",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/src/revocation/fold.rs",
+      "note": "the live set folded from a LeafStore to its extent; reads only",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/src/revocation/append.rs",
+      "note": "issuance, revocation and attestation-entry leaves appended through Log::append",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/src/revocation/verify.rs",
+      "note": "revocation-aware certificate verification with N and the tolerance as inputs",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/src/revocation/history.rs",
+      "note": "an attestation by a certificate's key judged against the revocation leaf's position",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_leaf.rs",
+      "note": "leaf encoding, malformed refusals and the revocation signer",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_fold.rs",
+      "note": "the fold's live set, refusals and read-only pass",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_append.rs",
+      "note": "append at the extent, reopen and write failure",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_verify.rs",
+      "note": "revoked, stale, unreadable, not-in-log, expired and no-log legs",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_history.rs",
+      "note": "attestations before and after revocation, proofs and issuance record",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_support/mod.rs",
+      "note": "test authorities, certificates and file-backed logs; generated keys only",
+      "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys/src/cli_tests.rs",
+      "note": "the CLI's help tests; DIRECTORY-013 adds the no-log revocation sentence test",
+      "brief": "DIRECTORY-013"
     }
   ],
   "inventory": [
@@ -630,13 +752,13 @@
     },
     {
       "path": "docs/design/decisions.json",
-      "note": "the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row"
+      "note": "the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row\nADR-039 was added to the ledger by DIRECTORY-013, a brief recording a decision through the ledger and not a document row."
     }
   ],
   "constraints": [
     {
       "id": "CN1",
-      "text": "Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed."
+      "text": "Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed. The ledger entries the method keeps for a brief, its roadmap row in docs/design/roadmap.json and its decision in docs/design/decisions.json, stand outside this wall."
     },
     {
       "id": "CN2",
@@ -676,7 +798,7 @@
     },
     {
       "id": "CN11",
-      "text": "Step 1 is directory records, sign-in and the minimum signed identity audit. SpiceDB is installed and checked in row 02 and enforces nothing in step 1; live capability policy and its enforcement are step 2's, and running SpiceDB is not permission enforcement (docs/design/identity/briefs/IDENTITY-001.json:29-30)."
+      "text": "Step 1 is directory records, sign-in and the minimum signed identity audit. SpiceDB is installed and checked in row 02 and enforces nothing in step 1; live capability policy and its enforcement are step 2's, and running SpiceDB is not permission enforcement (docs/design/identity/briefs/IDENTITY-001.json:29-30).\nBrought forward as step-2 work under the lead's ruling of 27 September 2026: DIRECTORY-013's certificate revocation fold and its history check."
     },
     {
       "id": "CN12",
@@ -686,12 +808,19 @@
   "gate": [
     {
       "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
       "legs": [
         {
           "name": "fmt",
           "command": "cargo fmt --all",
           "requires": [
-            "place:here"
+            "tool:cargo",
+            "tool:rustfmt"
           ],
           "cadence": "round"
         },
@@ -699,7 +828,7 @@
           "name": "clippy-all-features",
           "command": "cargo clippy --all-targets --all-features -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -707,15 +836,15 @@
           "name": "clippy",
           "command": "cargo clippy --all-targets -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
         {
           "name": "tests",
-          "command": "cargo test --workspace --all-features",
+          "command": "cargo test --workspace --all-features --no-fail-fast",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -723,7 +852,7 @@
           "name": "doc-all-features",
           "command": "cargo doc --no-deps --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -731,36 +860,16 @@
           "name": "doc",
           "command": "cargo doc --no-deps",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        }
-      ]
-    },
-    {
-      "tree": "docs",
-      "legs": [
-        {
-          "name": "render",
-          "command": "python3 ../scripts/design/render-cluster.py design/directory",
-          "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
         {
-          "name": "validate",
-          "command": "python3 ../scripts/design/validate.py design/directory",
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        },
-        {
-          "name": "coverage",
-          "command": "python3 ../scripts/design/check-coverage.py design/directory",
-          "requires": [
-            "place:here"
+            "tool:sh",
+            "tool:python3"
           ],
           "cadence": "round"
         }

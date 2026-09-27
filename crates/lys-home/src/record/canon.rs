@@ -54,8 +54,10 @@ pub struct Inherited {
     pub curated_at: String,
     /// Who told the tool to add it.
     pub curated_by: String,
-    /// The rule this example shows, stated short.
-    pub rule: String,
+    /// The rule this example shows, stated short. Every canon example has
+    /// one; a handover's entry in a session of a home has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rule: Option<String>,
 }
 
 /// The canon as loaded: its header and every entry in file order.
@@ -128,7 +130,10 @@ pub fn create(path: &Path) -> Result<(), HomeError> {
 }
 
 /// Load the canon: the header, then every entry, each parent on record
-/// before its child and no id twice, as Pi's reader expects.
+/// before its child and no id twice, as Pi's reader expects. A
+/// `lys.inherited` entry whose data carries no `rule` is refused by name
+/// ([`HomeError::CanonExampleWithoutRule`]), so `canon add` and a render
+/// with a canon both refuse it before writing anything.
 pub fn load(path: &Path) -> Result<Canon, HomeError> {
     let text =
         std::fs::read_to_string(path).map_err(|e| HomeError::io("reading the canon", path, e))?;
@@ -175,10 +180,26 @@ pub fn load(path: &Path) -> Result<Canon, HomeError> {
                 reason: "its parent is not on record before it".to_owned(),
             });
         }
+        // Every lys.inherited entry in the canon file is a canon example, so
+        // each must state its rule.
+        if entry.is_custom(CUSTOM_INHERITED) && !states_rule(&entry) {
+            return Err(HomeError::CanonExampleWithoutRule {
+                id: entry.id().to_owned(),
+            });
+        }
         seen.insert(entry.id().to_owned());
         entries.push(entry);
     }
     Ok(Canon { header, entries })
+}
+
+/// Whether a `lys.inherited` entry's data carries a `rule` that is not null.
+fn states_rule(entry: &Entry) -> bool {
+    matches!(
+        &entry.body,
+        EntryBody::Custom { data: Some(data), .. }
+            if data.get("rule").is_some_and(|rule| !rule.is_null())
+    )
 }
 
 /// Copy entries of a session into the canon, whole, after a `lys.inherited`
@@ -228,7 +249,7 @@ pub fn add_from(
         model,
         curated_at: now(),
         curated_by: by.to_owned(),
-        rule: rule.to_owned(),
+        rule: Some(rule.to_owned()),
     };
     append_example(canon_path, &inherited, copied)
 }
@@ -277,7 +298,7 @@ pub fn add_authored(
         model: AUTHORED.to_owned(),
         curated_at: now(),
         curated_by: by.to_owned(),
-        rule: rule.to_owned(),
+        rule: Some(rule.to_owned()),
     };
     append_example(canon_path, &inherited, entries)
 }
@@ -352,6 +373,7 @@ fn append_example(
         Err(std::fs::TryLockError::WouldBlock) => {
             return Err(HomeError::SessionHeld {
                 path: canon_path.to_path_buf(),
+                holder: None,
             });
         }
         Err(std::fs::TryLockError::Error(e)) => {

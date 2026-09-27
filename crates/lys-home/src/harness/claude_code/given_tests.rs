@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on the resolution: the measured order, absent positions omitted,
 //! one directory's three files in the request's order, the config directory
 //! from the template or from HOME, the user CLAUDE.md listed once, the slug
@@ -26,7 +27,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()
         .fold(String::new(), |mut s, b| {
-            let _ = write!(s, "{b:02x}");
+            write!(s, "{b:02x}").expect("writing to a String cannot fail");
             s
         })
 }

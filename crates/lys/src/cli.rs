@@ -46,6 +46,12 @@ pub enum Command {
     #[command(subcommand)]
     Ca(CaCommand),
 
+    /// The standalone identity product's dependencies: prepare the private
+    /// deployment artifacts, configure Rauthy's clients and themes, and
+    /// check readiness.
+    #[command(subcommand)]
+    Identity(crate::identity::IdentityCommand),
+
     /// Transparency-log operations: append-only logs with C2SP signed-note
     /// checkpoints and self-contained RFC 6962 proof artifacts.
     ///
@@ -272,6 +278,34 @@ pub enum CaCommand {
         /// Path to write the PEM-encoded certificate to.
         #[arg(long)]
         out: PathBuf,
+
+        /// Path to write the issuer's self-signed PEM certificate to
+        /// (optional). With it, `openssl verify -CAfile <this> <cert>` checks
+        /// the issued certificate with nothing from lys.
+        #[arg(long)]
+        issuer_out: Option<PathBuf>,
+
+        /// Transparency log directory to enter the certificate in before it is
+        /// written (optional), as one leaf whose bytes are the certificate's
+        /// DER. If the log cannot take it, no certificate is written.
+        #[arg(long, requires_all = ["log_key", "leaf_out", "artifact_out"])]
+        log: Option<PathBuf>,
+
+        /// The log operator's identity key file, which signs the checkpoint
+        /// in the inclusion proof. Only with --log.
+        #[arg(long, requires = "log")]
+        log_key: Option<PathBuf>,
+
+        /// Path to write the leaf to: the certificate's DER bytes exactly.
+        /// Only with --log.
+        #[arg(long, requires = "log")]
+        leaf_out: Option<PathBuf>,
+
+        /// Path to write the `lys/log-inclusion-proof/v1` artifact to, which
+        /// `lys log verify inclusion` and `scripts/verify_inclusion.py` check.
+        /// Only with --log.
+        #[arg(long, requires = "log")]
+        artifact_out: Option<PathBuf>,
     },
 
     /// Verify a PEM certificate against a trusted issuer public key at a

@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on [`bundle_for`] — the **producer's** two refusals and the shape of
 //! what it emits.
 //!

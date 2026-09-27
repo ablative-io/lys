@@ -1,11 +1,12 @@
+#![cfg(test)]
 //! Second-party pin on the `lys/sealed-envelope/v1` key derivation (D6/C45):
 //! an independent re-derivation of the HKDF output, written from the
 //! specification rather than from the implementation.
 //!
 //! # Why this file hardcodes the tag instead of importing it
 //!
-//! The construction is documented in `docs/design/lys-core/DESIGN.md` (D6)
-//! and `docs/design/lys-core/CHECKLIST.md` (C45) as
+//! The construction is documented in `docs/design/lys-core/DESIGN-PRE-METHOD.md` (D6)
+//! and `docs/design/lys-core/CHECKLIST-PRE-METHOD.md` (C45) as
 //!
 //! ```text
 //! HKDF-SHA256 info = b"lys-sealed-envelope/v1"
@@ -58,8 +59,6 @@
 //! `okm[0..32]` under `envelope.nonce` with an empty AAD and asserts the
 //! plaintext is the original payload. That is the assertion which proves the
 //! derivation here is genuinely correct rather than merely self-consistent.
-
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use aes_gcm::aead::{Aead, KeyInit, Payload};
 use aes_gcm::{Aes256Gcm, Key, Nonce};

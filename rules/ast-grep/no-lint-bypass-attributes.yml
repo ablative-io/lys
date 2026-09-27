@@ -1,0 +1,13 @@
+id: no-lint-bypass-attributes
+language: rust
+severity: error
+message: "Lint bypass attribute. Fix the code; a bypass is a review finding (CLAUDE.md). Workspace lint policy changes go through an ADR."
+ignores:
+  - "vendor/**"
+rule:
+  any:
+    - pattern: "#[allow($$$)]"
+    - pattern: "#[expect($$$)]"
+    - pattern: "#![allow($$$)]"
+    - pattern: "#[ignore]"
+    - pattern: "#[ignore = $_]"

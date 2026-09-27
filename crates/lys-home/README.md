@@ -21,7 +21,8 @@ lys adds nothing to Pi's grammar. Its own data rides in Pi's `custom` entries:
 | `lys.authored`      | this session is a hand-written demonstration, not history         |
 | `lys.inherited`     | this entry came from the canon or another session, and says so    |
 | `lys.given`         | what a rendered session was given: each instruction document Claude Code loads and each file the render wrote, by kind, path, length and SHA-256 in the measured order, with the config directory and the environment names; never a document's content |
-| `lys.lantern`       | a lantern: a note on a point of this session (`point`, `note`, `lit_by`, `lit_at`), lit on purpose at the head |
+| `lys.given_statement` | a render's signed given statement (`given`, `statement`): the `lys.given` entry it hangs under and the block holding a `lys/attestation/v2` over the RFC 8785 bytes of that entry's data; written only with `--key` |
+| `lys.lantern`       | a lantern: a note on a point of this session (`point`, `note`, `lit_by`, `lit_at`, `lit_in`), lit on purpose at the head |
 | `lys.lantern_epilogue` | further words on a lantern of this session (`lantern`, `words`, `added_by`, `added_at`), appended after it |
 | `lys.forked_from`   | the child's ancestry after a fork (`parent_session`, `lantern`, `point`, `cut_at`, `coordinate_carried`, `carried`, `seed_left_out`), the first entry the fork writes after the copied chain |
 | `lys.fork`          | one fork taken from this session (`child`), appended at the head |
@@ -51,7 +52,8 @@ run), and `resume-check` counts tool_use ids a fork repeats and the tool
 actions in the fork's own records.
 
 `render-launch --home <dir> --session <id> --template <file> --uuid <uuid>
---cwd <dir> --model <id> --version <claude code version> --out <dir>` turns a
+--cwd <dir> --model <id> --version <claude code version> --out <dir>
+[--key <file>]` turns a
 session into the files a Claude Code launch needs, from a launch template
 (schema: `docs/design/home/launch-template.schema.json`; `harness`, `flags`
 and the five slots `transcript`, `mcp`, `env`, `secrets`, `instructions`; a
@@ -78,6 +80,16 @@ with the config directory (the template's `CLAUDE_CONFIG_DIR`, or
 `HOME/.claude` from the rendering process's `HOME`) and the names the
 environment file sets. Nothing of a document is kept, and a document the
 harness would read that cannot be read fails the render by path.
+The report carries `given_sha256`, the SHA-256 of the RFC 8785 bytes of
+that entry's data, and `signing`, `signed` or `unsigned`. With `--key <file>`,
+a raw 32-byte Ed25519 seed file such as `lys key generate` writes, the render
+also signs those bytes as a `lys/attestation/v2` statement, keeps it as a
+block named by one `lys.given_statement` entry under the `lys.given` entry,
+writes `given-statement.cose` and `given-data.json` into `--out` for `lys
+verify --attestation given-statement.cose --payload given-data.json`, and
+reports `statement`, `statement_file` and `payload_file`. The key is loaded,
+and the two files refused if they exist, before anything is written; an
+unreadable key fails by its path and never prints a key byte.
 
 `given --home <dir> --session <id>` reports every `lys.given` entry of the
 session in file order, each with its entry id, harness and version, config
@@ -112,6 +124,28 @@ first prompt and lists the seed in its manifest, and `render` prints no
 launch line.
 A lantern before any assistant message is refused `nothing_to_fork`.
 
+`translate-codex --home <dir> --session <id> --out <dir> --codex-version <version> [--zone <iana name>]`
+translates a session into a rollout in the shape Codex 0.156.0 writes for
+its own threads, the one pair Claude Code to Codex. `--out` is a Codex home
+directory: the rollout goes to
+`sessions/YYYY/MM/DD/rollout-<local date and time>-<thread>.jsonl` under it,
+the date and time the head entry's stamp in `--zone` (read from `TZ` when
+the flag is absent, resolved through the time zone database bundled in the
+build), with the loss account beside it as `<same stem>.loss.json`. The
+thread id is the head's record uuid, so each head makes a new thread; the
+thread is a fork of the session and says so in its first message. Every
+text part, tool call and tool result on the context path is carried whole,
+readable thinking as text, a base64 image as `input_image`; a compaction,
+branch summary or custom message on the path becomes marked developer
+text, and an `agent` sidechain beside the path one marked developer message.
+The account names by entry id and hash what was kept, what changed and how,
+and what was lost and why, and holds no content. Once both files are
+written, one `lys.translation` side leaf records the translation beside the
+context path; the head does not move. Only `0.156.0` is accepted, an
+existing target is refused, and a stamp that is not RFC 3339 is refused
+naming the entry. The report is the two paths and the counts; Codex is
+never run.
+
 What the crate does not do: interpret, print or log transcript contents (errors
 and reports carry ids, hashes, offsets and counts only; a lantern's note and
 its epilogues are the one text the crate prints, and only `lantern recall`
@@ -120,6 +154,6 @@ log or anchor; encrypt; move a home between devices; run or supervise an
 agent; talk to Norn.
 
 Design and briefs: `docs/design/home/` (HOME-001, HOME-002, HOME-003,
-HOME-004, HOME-006). Pi
+HOME-004, HOME-006, HOME-009). Pi
 reference: the checkout
 at `3d5cbe98`, `packages/coding-agent/src/core/session-manager.ts`.

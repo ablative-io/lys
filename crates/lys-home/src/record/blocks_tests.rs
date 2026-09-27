@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the block store: once by hash, never rewritten, verifiable.
 
 use crate::record::blocks::{BlockStore, Hash};

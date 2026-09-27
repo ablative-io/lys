@@ -1,11 +1,10 @@
+#![cfg(test)]
 //! End-to-end integration tests for the `lys` binary.
 //!
 //! Each subcommand is exercised through a real process spawn of the compiled
 //! binary (`CARGO_BIN_EXE_lys`), asserting on exit codes, stdout/stderr
 //! content, and on-disk side effects. The attest/verify tests additionally
 //! cross-check the CLI's `COSE_Sign1` artifact against `lys-core` directly.
-
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::path::Path;
 use std::process::{Command, Output};
@@ -49,7 +48,8 @@ fn hex_lower(bytes: &[u8]) -> String {
     use std::fmt::Write;
     let mut s = String::with_capacity(bytes.len() * 2);
     for b in bytes {
-        let _ = s.write_fmt(format_args!("{b:02x}"));
+        s.write_fmt(format_args!("{b:02x}"))
+            .expect("writing to a String cannot fail");
     }
     s
 }

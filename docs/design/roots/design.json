@@ -1,0 +1,290 @@
+{
+  "cluster": "roots",
+  "title": "A root is a repository and a pinned commit, never a folder on one machine",
+  "intention": "A survey on any worker reads the same estate. Each other project in lys's project.json is named by where anyone can fetch it and by the exact commit the design was checked against, and a worker reaches it through its own checkout of that repository. When the checkout does not hold the commit, the worker is told by name what is missing and what answers it; nothing is fetched or cloned behind anyone's back. A pin that has fallen behind is a fact anyone can print, not a drift nobody sees.",
+  "problem": "The roots map in docs/design/project.json names aion, argus, cambium, haematite and the method by absolute directories on one machine. A worker on any other machine resolves none of them, and the carded-row rule is that workflow inputs name a repository, a commit, a card and a brief, never a folder. The shape cannot simply be rewritten today: the method's reader (workers/ds2_ledger/project.py, _roots) requires every root to be a string naming an absolute directory and refuses anything else, so a project.json in the new shape would stop every survey on lys. lys's own copy of project.schema.json types roots only as an object, so validate.py and the design gate would not catch that change before it landed.",
+  "solution": "The work is one brief, ROOTS-001, in two requirements. R1 is documents only on lys: this cluster records the baseline (the five absolute roots, in the inventory, exactly as project.json spells them) and the contract below, and its rendered markdown lands so scripts/design/gate.sh measures it. R2 changes lys's project.json to the new shape and is blocked until a design-system commit, landed through that board's own chain from this contract, makes workers/ds2_ledger/project.py accept the shape and carry the resolver. R2's first act is to refresh lys's copies of the method from that commit and name it in scripts/design/SOURCE.md; only then does it rewrite the roots.\n\nThe root contract. Each value of the roots map is an object with exactly two fields: repository, the remote URL the project is fetched from, and commit, the full 40-character hexadecimal hash of the commit the design was checked against. The method's project.schema.json types each roots value that way, with both fields required and no other field allowed. There is one pin per root, in project.json, and no pin per design. The repositories map (project name to remote URL) that the method reads beside roots is retired, so a root's repository has one home: the root object's own repository is the only source, the method's card moves every existing repositories entry into its root in the same change, and the method's validator then refuses a project.json that still carries a repositories map, by name, naming the move to root.repository as the act that answers it. The pins R2 writes are the origin heads this design was checked against: aion: repository https://github.com/ablative-io/aion.git, commit 5594f7fa0081f9cec2c84ef9a30ad36599bfbdd9; argus: repository https://github.com/ablative-io/argus.git, commit dc2397c92ecf03e420aaa5a72b10cad673386e49; cambium: repository https://github.com/ablative-io/cambium.git, commit 105c03ded311b0ea5de9463eaab27320b2649004; haematite: repository https://github.com/ablative-io/haematite.git, commit 36536826f4d04fc10037be49c1c2c9f1d073d459; method: repository https://github.com/ablative-io/design-system.git, commit 25827d8d5d747b13039901e8d9deed755735c6fb.\n\nThe resolver lives in the method, in workers/ds2_ledger/project.py, as resolve_root. A worker names one launch setting, DS2_CHECKOUTS, a directory holding one checkout per repository. The checkout for a root is the directory under DS2_CHECKOUTS named by the last path segment of the root's repository URL with a trailing .git removed, so https://github.com/ablative-io/design-system.git is DS2_CHECKOUTS/design-system. The resolver requires `git -C <checkout> cat-file -e <commit>` to exit 0 and returns the checkout. Otherwise it refuses by name with RootUnresolved, naming the checkout path it looked in, the repository and the commit, and saying the act that answers it: fetch that commit into the worker's checkout of that repository. When DS2_CHECKOUTS is unset it refuses by name, as documents.py refuses an unset root token. It never fetches and never clones. It is not documents.py and does not read the $NAME/ tokens.\n\nThe pin check lives in the method as scripts/check-root-pins.py. It reads project.json, and for each root in name order reads origin's head from the same checkout (refs/remotes/origin/HEAD, as last fetched; the check fetches nothing) and prints one line: `<name> <repository> pin <commit> origin <head> distance <n>`, where n is `git rev-list --count <commit>..refs/remotes/origin/HEAD` in that checkout. When every root's checkout holds its pin and has refs/remotes/origin/HEAD, it exits 0 whatever the distance. A root whose checkout does not hold its pin is not a distance: its line is `<name> <repository> pin <commit> pin_absent act: git -C <checkout> fetch origin`, naming the refusal pin_absent and the act that answers it, fetching that root's remote. A root whose checkout holds its pin but has no refs/remotes/origin/HEAD is not a distance either: its line is `<name> <repository> pin <commit> origin_head_unset act: git -C <checkout> remote set-head origin --auto`. Either refusal makes the check exit 1, and only after it has printed a line for every root, so one bad root hides nothing. It moves nothing: a root's commit moves by hand, in a gated row whose commit says the design was re-checked against the newer tree (ADR-009's discipline, ADR-042).\n\nlys holds copies only (CN5), and a copy must run where it lands. At 25827d8 the method's workers/ds2_ledger/project.py imports aion_worker, the worker SDK, for TerminalError, and imports venues, which itself imports aion_worker and spawn; lys carries none of them, so a copy of that file would not import in lys. The contract therefore bounds what the resolver and the pin check depend on. At the method commit R2 refreshes from, workers/ds2_ledger/project.py imports only the Python standard library and, within ds2_ledger, legs.py and roots.py. legs.py is a new method module holding the leg-entry reading project.py takes from venues today (LEG_ENTRY_FIELDS, declares_legs, legs_of_entry and LegRefused), and imports only the standard library. Neither module imports aion_worker or any package outside the standard library. ProjectRefused and RootUnresolved derive from a standard-library exception, and the worker turns them into its TerminalError where it calls the reader, outside project.py. scripts/check-root-pins.py imports only the standard library and ds2_ledger.project, and finds workers/ by the line check-coverage.py uses, `sys.path.insert(0, str(Path(__file__).resolve().parent.parent / \"workers\"))`. After R2 refreshes them, lys's scripts/design/workers/ds2_ledger/project.py and legs.py are byte-identical copies of the method's files at the named commit, and scripts/design/check-root-pins.py differs from the method's in that one line only, reading `.parent / \"workers\"` because lys keeps workers/ beside its scripts, as it already does for check-coverage.py; SOURCE.md names that line beside the two it names today. So `python3 -I` from a fresh clone of lys, with no worker SDK installed, resolves a root and runs the pin check through the worker's own checkout. Before R2 lands, a person runs the method's reader from that commit against lys's project.json, which is R2's check.\n\nTwo meanings of root, recorded open. The $NAME/ tokens a structure path or gate tree is spelled under are launch settings, DS2_<NAME>, never read from a file in the tree (documents.py, roots.py). The roots map in project.json is the estate's other projects, read by a survey. Reading one: they stay two things, as this card leaves them. Reading two: one map serves both, so a $NAME/ token resolves through the pinned checkout of the root of that name. The second changes how every brief path outside the repository resolves; a later card decides it, and this card changes neither the tokens nor roots.py (CN3).",
+  "principles": [
+    {
+      "id": "P1",
+      "text": "A root names where anyone can fetch the project and the commit the design was checked against; never a folder on one machine."
+    },
+    {
+      "id": "P2",
+      "text": "What a worker lacks is refused by name, with the path, the repository, the commit and the act that answers it; nothing is fetched, cloned or guessed."
+    },
+    {
+      "id": "P3",
+      "text": "A pin moves by hand in a gated row and never automatically; a survey reads the pin, never the moving head, so staleness is visible rather than silent."
+    },
+    {
+      "id": "P4",
+      "text": "The resolver is the method's; lys receives it only by refreshing its copies from a named method commit."
+    },
+    {
+      "id": "P5",
+      "text": "The document never runs ahead of its reader: the shape changes only after the reader that must accept it has landed."
+    }
+  ],
+  "decisions": [
+    "ADR-004",
+    "ADR-009",
+    "ADR-042"
+  ],
+  "goals": [
+    "docs/design/roots renders, validates and passes check-coverage under scripts/design/gate.sh, with docs/design/project.json unchanged by R1.",
+    "The design records all five baseline roots, byte for byte as project.json spells them before this card.",
+    "After R2, the method's reader at the named method commit reads lys's docs/design/project.json and exits 0, every roots value is an object carrying a repository URL and a 40-character commit, and lys's own copies of the resolver and the pin check run under python3 -I from a fresh clone with no worker SDK installed.",
+    "After R2, lys's copy of the pin check prints one line per root with its pin, origin's head and the distance, and exits 0 when every pin and origin head is present; a root whose checkout lacks its pin is named pin_absent, a root with no origin head is named origin_head_unset, and either makes it exit 1 after every root is reported."
+  ],
+  "non_goals": [
+    {
+      "text": "Changing the project.json of aion, cambium, haematite or the design system",
+      "reason": "Each is its own lead's card on its own board, fired once the method accepts the new shape."
+    },
+    {
+      "text": "Unifying the $NAME/ launch tokens with the roots map",
+      "reason": "It would change how every brief path outside the repository resolves; recorded as an open point for a later card."
+    },
+    {
+      "text": "An automatic mover for a root's commit, or a pin per design",
+      "reason": "A pin moves by hand in a gated row; one pin per root in project.json."
+    },
+    {
+      "text": "A lys-local resolver script",
+      "reason": "The resolver is written in the method and lys receives it by refreshing its copies (CN5)."
+    },
+    {
+      "text": "Fetching or cloning a missing repository or commit",
+      "reason": "A worker is told what to fetch; it is never done for it, so no survey quietly clones five repositories."
+    },
+    {
+      "text": "Writing the method's change",
+      "reason": "It is its own card on the design-system board, written from this contract."
+    }
+  ],
+  "structure": [
+    {
+      "path": "docs/design/roots/design.json",
+      "note": "this design: the baseline, the root contract, the resolver and the pin check",
+      "brief": "ROOTS-001"
+    },
+    {
+      "path": "docs/design/roots/DESIGN.md",
+      "note": "rendered design",
+      "brief": "ROOTS-001"
+    },
+    {
+      "path": "docs/design/roots/checklist.json",
+      "note": "checklist",
+      "brief": "ROOTS-001"
+    },
+    {
+      "path": "docs/design/roots/CHECKLIST.md",
+      "note": "rendered checklist",
+      "brief": "ROOTS-001"
+    },
+    {
+      "path": "docs/design/roots/stories.json",
+      "note": "stories",
+      "brief": "ROOTS-001"
+    },
+    {
+      "path": "docs/design/roots/USER-STORIES.md",
+      "note": "rendered stories",
+      "brief": "ROOTS-001"
+    },
+    {
+      "path": "docs/design/roots/briefs/ROOTS-001.json",
+      "note": "the brief: R1 records the contract, R2 moves lys's roots once the method accepts them",
+      "brief": "ROOTS-001"
+    },
+    {
+      "path": "docs/design/roots/briefs/ROOTS-001.md",
+      "note": "rendered brief",
+      "brief": "ROOTS-001"
+    },
+    {
+      "path": "docs/design/project.json",
+      "note": "lys's setup; R2 rewrites its roots map to the object shape and changes nothing else in it",
+      "brief": ""
+    },
+    {
+      "path": "scripts/design/SOURCE.md",
+      "note": "names the method commit the copies come from and the lines that differ; R2 names the new commit and the pin check's workers/ line",
+      "brief": ""
+    },
+    {
+      "path": "scripts/design/validate.py",
+      "note": "copy of the method's scripts/validate.py; refreshed by R2",
+      "brief": ""
+    },
+    {
+      "path": "scripts/design/check-coverage.py",
+      "note": "copy of the method's scripts/check-coverage.py; refreshed by R2",
+      "brief": ""
+    },
+    {
+      "path": "scripts/design/render-cluster.py",
+      "note": "copy of the method's scripts/render-cluster.py; refreshed by R2",
+      "brief": ""
+    },
+    {
+      "path": "scripts/design/render-brief.py",
+      "note": "copy of the method's scripts/render-brief.py; refreshed by R2",
+      "brief": ""
+    },
+    {
+      "path": "scripts/design/schemas",
+      "note": "copies of the method's schemas, project.schema.json among them; refreshed by R2",
+      "brief": ""
+    },
+    {
+      "path": "scripts/design/workers/ds2_ledger/roots.py",
+      "note": "copy of the method's $NAME/ token parser; unchanged by this card (CN3)",
+      "brief": ""
+    },
+    {
+      "path": "scripts/design/workers/ds2_ledger/project.py",
+      "note": "copy of the method's project reader carrying resolve_root, byte-identical at the named commit; imports only the standard library, legs.py and roots.py; added by R2's refresh",
+      "brief": "ROOTS-001"
+    },
+    {
+      "path": "scripts/design/workers/ds2_ledger/legs.py",
+      "note": "copy of the method's SDK-free leg-entry reader that project.py imports in place of venues; byte-identical at the named commit; added by R2's refresh",
+      "brief": "ROOTS-001"
+    },
+    {
+      "path": "scripts/design/check-root-pins.py",
+      "note": "copy of the method's pin check; differs from it only in the line that finds workers/ beside the script, which SOURCE.md names; added by R2's refresh",
+      "brief": "ROOTS-001"
+    }
+  ],
+  "inventory": [
+    {
+      "path": "docs/design/project.json",
+      "note": "The baseline, lines 54 to 59 at main 7b53625 (the map's closing brace is line 60): \"roots\": {\"aion\": \"/Users/tom/Developer/ablative/stack/aion\", \"argus\": \"/Users/tom/Developer/ablative/tools/argus\", \"cambium\": \"/Users/tom/Developer/ablative/apps/cambium\", \"haematite\": \"/Users/tom/Developer/ablative/stack/haematite\", \"method\": \"/Users/tom/Developer/ablative/tools/design-system\"}. Five string values, each an absolute directory on one machine."
+    },
+    {
+      "path": "scripts/design/schemas/project.schema.json",
+      "note": "Types roots as \"type\": \"object\" with no value schema; each value is described as an absolute directory checked by the ledger, so validate.py accepts either shape."
+    },
+    {
+      "path": "scripts/design/SOURCE.md",
+      "note": "The copies are the method at commit 3c3bac7, with two stated line differences. The method's origin main is 25827d8, where workers/ds2_ledger/project.py _roots (lines 126 to 141) still requires each root to be a non-empty string naming an absolute directory, and refuses an object with 'is not a non-empty string'. At 25827d8 the method also reads an optional repositories map, name to remote URL, beside roots, which the contract retires; lys's project.json carries none. DS2_CHECKOUTS occurs nowhere in the method. At 25827d8 project.py imports aion_worker (TerminalError) and venues, and venues imports aion_worker and spawn; none of the three is in lys. Against 25827d8 the copies have drifted beyond the two stated lines, measured with `git -C <method> show 25827d8:scripts/validate.py | diff - scripts/design/validate.py` and `git -C <method> archive 25827d8 schemas | tar -x -C <empty directory>` followed by `diff -r <empty directory>/schemas scripts/design/schemas`: validate.py differs in the stated SCHEMA_DIR line and in four further hunks, the minimum check at 25827d8 lines 143 to 149, the docstring at lines 244 to 245, and the requirements and files handling at lines 259 to 263 and 265 to 268; brief.schema.json at 25827d8 carries shared_rows, and project.schema.json at 25827d8 carries repositories, gate_host and gate_needs, none of which lys's copies carry. Only check-coverage.py, render-cluster.py, render-brief.py and workers/ds2_ledger/__init__.py match 25827d8 apart from the stated line: check-coverage.py differs only in its stated sys.path line, and the other three are byte-identical."
+    },
+    {
+      "path": "scripts/design/workers/ds2_ledger/roots.py",
+      "note": "44 lines, identical to the method's: the $NAME/ root-token parser. Tokens resolve only from DS2_<NAME> launch settings (the method's documents.py), refused by name when unset."
+    },
+    {
+      "path": "scripts/design/gate.sh",
+      "note": "The design leg: validates decisions.json and project.json, and for every cluster with a design.json runs validate.py, check-coverage.py and a render comparison against the committed markdown."
+    },
+    {
+      "path": "docs/design/lys-core",
+      "note": "CHECKLIST.md, DESIGN.md and USER-STORIES.md with no design.json; owned by the ast-grep leg card and untouched here (CN2)."
+    }
+  ],
+  "constraints": [
+    {
+      "id": "CN1",
+      "text": "docs/design/project.json does not change shape while the method's reader refuses the new shape: R1 leaves it byte-identical, and R2 changes it only after its copies are refreshed from a method commit whose reader accepts it."
+    },
+    {
+      "id": "CN2",
+      "text": "docs/design/lys-core is left exactly as it is: no file there is renamed, rendered or added."
+    },
+    {
+      "id": "CN3",
+      "text": "The $NAME/ root tokens and the roots map stay apart: scripts/design/workers/ds2_ledger/roots.py and the token resolution are unchanged."
+    },
+    {
+      "id": "CN4",
+      "text": "Only lys's project.json changes; the project.json of aion, cambium, haematite and the design system do not change under this card."
+    },
+    {
+      "id": "CN5",
+      "text": "lys's scripts under scripts/design stay verbatim copies of the method as scripts/design/SOURCE.md says; no lys-local resolver script is written."
+    },
+    {
+      "id": "CN6",
+      "text": "No automatic mover for a root's commit and no per-design pin: one pin per root, moved by hand in a gated row."
+    },
+    {
+      "id": "CN7",
+      "text": "No Rust crate and no wire format changes."
+    }
+  ],
+  "gate": [
+    {
+      "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
+      "legs": [
+        {
+          "name": "fmt",
+          "command": "cargo fmt --all",
+          "requires": [
+            "tool:cargo",
+            "tool:rustfmt"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy-all-features",
+          "command": "cargo clippy --all-targets --all-features -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy",
+          "command": "cargo clippy --all-targets -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "tests",
+          "command": "cargo test --workspace --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc-all-features",
+          "command": "cargo doc --no-deps --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc",
+          "command": "cargo doc --no-deps",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
+          "requires": [
+            "tool:sh",
+            "tool:python3"
+          ],
+          "cadence": "round"
+        }
+      ]
+    }
+  ]
+}

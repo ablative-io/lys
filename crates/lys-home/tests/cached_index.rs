@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! The cached index is a cache: a session opens from it only when its rows
 //! are this file's, row by row, and rebuilds from the session file otherwise.
 //! A cache whose final offset and length still match the file but whose rows

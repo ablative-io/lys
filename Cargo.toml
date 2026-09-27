@@ -39,15 +39,22 @@ ciborium = "0.2"
 ct-merkle = "0.2"
 ed25519-dalek = { version = "2", features = ["pkcs8", "serde"] }
 hkdf = "0.12"
+# Time zones from the database bundled in the build, never the system's, so one
+# zone name gives the same offsets on every machine.
+jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
 postcard = { version = "1", features = ["alloc"] }
 rand = "0.9"
 rcgen = "0.13"
+# POSIX record locks through a safe interface: a lock the process owns, never
+# shared with a child through a duplicated descriptor.
+rustix = { version = "1.1", features = ["fs", "process"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha1 = "0.10"
 sha2 = "0.10"
 thiserror = "2"
 time = "0.3"
+toml = { version = "0.9", default-features = false, features = ["parse", "serde", "std"] }
 tracing = "0.1"
 x25519-dalek = { version = "2", features = ["serde", "static_secrets"] }
 x509-parser = "0.16"
@@ -61,11 +68,10 @@ tokio = { version = "=1.53.1", features = ["macros", "net", "rt-multi-thread", "
 reqwest = { version = "=0.12.28", default-features = false }
 
 # CLI
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive", "env"] }
 
 # Dev
 coset = "0.4"
-serial_test = "3"
 tempfile = "3"
 
 [workspace.lints.rust]
@@ -78,8 +84,9 @@ rust_2018_idioms = { level = "warn", priority = -1 }
 # "warn" below is a hard merge gate, not advisory.
 pedantic = { level = "warn", priority = -1 }
 
-# Unwrap / Expect / Panic — forbidden in library code. Tests opt out per-module
-# with #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)].
+# Unwrap / Expect / Panic — forbidden in library code. Tests are exempt through
+# clippy.toml's allow-unwrap-in-tests, allow-expect-in-tests and
+# allow-panic-in-tests; a test file carries #![cfg(test)] as its first line.
 unwrap_used = "warn"
 expect_used = "warn"
 panic = "warn"

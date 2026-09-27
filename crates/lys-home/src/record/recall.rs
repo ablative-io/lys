@@ -15,6 +15,11 @@
 //! shape, is skipped and named with its reason, and every other session is
 //! still listed; recall by point refuses such an entry by name. A row carries the lantern's note and epilogues, the one
 //! text the crate prints (ADR-015), and never a line of the transcript.
+//! Each row carries the lantern's `lit_in`: null for a lantern lit before
+//! the light act recorded it, which is listed as any other, and otherwise
+//! the session the check in [`lit_in_session`] returns; a recorded `lit_in`
+//! that is not a session id is skipped by note and refused by point as
+//! `lit_in_not_a_session`, and never listed as a row.
 
 use serde::Serialize;
 
@@ -22,7 +27,7 @@ use crate::error::HomeError;
 use crate::record::Home;
 use crate::record::entries::{CUSTOM_LANTERN, CUSTOM_LANTERN_EPILOGUE};
 use crate::record::epilogue::epilogue_of;
-use crate::record::lantern::{lantern_of, require_words, session_file};
+use crate::record::lantern::{lantern_of, lit_in_session, require_words, session_file};
 use crate::record::reader::SessionReader;
 
 /// One epilogue of a lantern, as recall lists it.
@@ -49,6 +54,9 @@ pub struct LanternRow {
     pub lit_by: String,
     /// When.
     pub lit_at: String,
+    /// The session its data records it was lit in; `None`, printed as
+    /// null, for a lantern whose data records none.
+    pub lit_in: Option<String>,
     /// The note, as written.
     pub note: String,
     /// Its epilogues, in file order.
@@ -76,8 +84,13 @@ pub struct RecallReport {
 /// Every lantern of one session with its epilogues, in file order, read by
 /// seeking to the lantern and epilogue rows only. `session` is the id the
 /// home lists the file under, and is what every row carries. A lantern or
-/// epilogue entry whose data is not its shape refuses by name.
-fn rows_of(reader: &SessionReader, session: &str) -> Result<Vec<LanternRow>, HomeError> {
+/// epilogue entry whose data is not its shape refuses by name, as does a
+/// lantern whose recorded `lit_in` is not a session of `home`.
+fn rows_of(
+    home: &Home,
+    reader: &SessionReader,
+    session: &str,
+) -> Result<Vec<LanternRow>, HomeError> {
     let epilogues = reader
         .customs_everywhere(CUSTOM_LANTERN_EPILOGUE)?
         .iter()
@@ -86,6 +99,10 @@ fn rows_of(reader: &SessionReader, session: &str) -> Result<Vec<LanternRow>, Hom
     let mut rows = Vec::new();
     for entry in reader.customs_everywhere(CUSTOM_LANTERN)? {
         let data = lantern_of(session, &entry)?;
+        let lit_in = data
+            .lit_in
+            .map(|lit_in| lit_in_session(home, entry.id(), &lit_in))
+            .transpose()?;
         let own: Vec<Epilogue> = epilogues
             .iter()
             .filter(|e| e.lantern == entry.id())
@@ -101,6 +118,7 @@ fn rows_of(reader: &SessionReader, session: &str) -> Result<Vec<LanternRow>, Hom
             point: data.point,
             lit_by: data.lit_by,
             lit_at: data.lit_at,
+            lit_in,
             note: data.note,
             epilogues: own,
         });
@@ -128,7 +146,7 @@ pub fn recall_by_note(home: &Home, words: &str) -> Result<RecallReport, HomeErro
     for session in home.session_ids()? {
         let rows = home
             .read_session(&session)
-            .and_then(|reader| rows_of(&reader, &session));
+            .and_then(|reader| rows_of(home, &reader, &session));
         match rows {
             Ok(rows) => lanterns.extend(rows.into_iter().filter(|row| mentions(row, &folded))),
             Err(e) => skipped.push(Skipped {
@@ -151,7 +169,7 @@ pub fn recall_by_point(home: &Home, session: &str, point: &str) -> Result<Recall
             id: point.to_owned(),
         });
     }
-    let lanterns = rows_of(&reader, session)?
+    let lanterns = rows_of(home, &reader, session)?
         .into_iter()
         .filter(|row| row.point == point)
         .collect();

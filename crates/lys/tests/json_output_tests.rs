@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! `--json` coverage across every subcommand.
 //!
 //! The flag is documented as global and honoured everywhere, and that claim is
@@ -10,8 +11,6 @@
 //! stdout is exactly one parseable JSON object carrying `ok`. It is
 //! deliberately breadth-first rather than deep: the per-field shapes are
 //! pinned by unit tests, what needs pinning here is that nothing is missed.
-
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::path::Path;
 use std::process::{Command, Output};
@@ -372,7 +371,11 @@ fn every_subcommand_honours_the_global_json_flag() {
     assert_eq!(opened["opened"], Value::Bool(true));
     assert_eq!(opened["payload_bytes"], 13);
     assert_eq!(opened["sender_public_key"], signer_pub);
-    let _ = recipient_pub;
+    assert_eq!(
+        recipient_pub.len(),
+        64,
+        "key generate must report public_key_ed25519 as 64 hex characters"
+    );
 }
 
 /// A failure under `--json` must still be JSON on stdout.

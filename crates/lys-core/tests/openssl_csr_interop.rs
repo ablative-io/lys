@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Third-party interoperability gate for PKCS#10 proof of possession: a
 //! certificate-signing request produced by the real `openssl` binary is driven
 //! through lys's issuance path.
@@ -42,8 +43,6 @@
 //! ed25519` — so discovery *probes* each candidate by actually generating an
 //! Ed25519 key, and a binary that cannot is passed over rather than used to
 //! produce a request this gate would then have to interpret.
-
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::path::{Path, PathBuf};
 use std::process::Command;

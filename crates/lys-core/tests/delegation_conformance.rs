@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! `lys/delegation/v1`, judged by `veraison/go-cose` — and, more to the
 //! point, by the bytes go-cose says it signed over.
 //!
@@ -136,7 +137,6 @@
 //! [`cose.Verifier`]: https://pkg.go.dev/github.com/veraison/go-cose#Verifier
 
 #![cfg(feature = "unstable-anchor")]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod harness;
 
@@ -185,7 +185,7 @@ fn identity(seed: &[u8; 32]) -> (tempfile::TempDir, Ed25519Identity) {
 fn to_hex(bytes: &[u8]) -> String {
     use std::fmt::Write;
     bytes.iter().fold(String::new(), |mut acc, byte| {
-        let _ = write!(acc, "{byte:02x}");
+        write!(acc, "{byte:02x}").expect("writing to a String cannot fail");
         acc
     })
 }

@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! The context record end to end through the built binary (HOME-003 R6):
 //! the fixture template rendered for a fixture working directory holding a
 //! CLAUDE.md and a memory index under the fixture config directory, with
@@ -44,7 +45,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()
         .fold(String::new(), |mut s, b| {
-            let _ = write!(s, "{b:02x}");
+            write!(s, "{b:02x}").expect("writing to a String cannot fail");
             s
         })
 }

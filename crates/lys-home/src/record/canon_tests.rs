@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the canon: examples copied whole with their signatures behind a
 //! `lys.inherited` entry, no example twice, no authored thinking, and a render
 //! that places the canon first and applies the thinking rule to it.
@@ -79,7 +79,7 @@ fn an_example_is_copied_whole_behind_an_inherited_entry_and_never_twice() {
             &inherited.from_entries,
             inherited.model.as_str(),
             inherited.curated_by.as_str(),
-            inherited.rule.as_str()
+            inherited.rule.as_deref()
         ),
         (
             false,
@@ -87,7 +87,7 @@ fn an_example_is_copied_whole_behind_an_inherited_entry_and_never_twice() {
             &ids,
             "claude-opus-5-5",
             "tom",
-            "verify before claiming"
+            Some("verify before claiming")
         )
     );
     // The copies keep their ids and bodies; only the parent links chain onto the canon.

@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! `render-launch` end to end through the built binary (HOME-002 R7): the
 //! five files with their recorded hashes, twice identical, the launch line,
 //! the handle and never the value, the event beside the head, the kept

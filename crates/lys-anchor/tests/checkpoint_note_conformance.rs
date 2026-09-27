@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! The anchor's checkpoints, judged by `golang.org/x/mod/sumdb/note`.
 //!
 //! # Which axis of independence this is, and which it is not

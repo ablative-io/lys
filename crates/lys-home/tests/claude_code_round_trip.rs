@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! The Claude Code round trip through the public crate (HOME-001 R5): a
 //! transcript imported, rendered for the same model, and imported again keeps
 //! every message part by hash; a rendered file resumed by Claude Code must not

@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on the fork's names and refusals (HOME-006 R1) and on resolving
 //! and cutting (R2): the two custom types are named as the record states,
 //! each refusal names itself and its ids, the cut is the chain to the last
@@ -8,10 +9,13 @@
 //! every refusal writes nothing. The fixture home built here is
 //! the one the fork and report gates build on.
 //!
-//! The lantern `L2` is written by hand carrying `lit_in`, the key the
-//! lantern card records in a later round: the light act on this tree writes
-//! none, so every lantern it lights (`L5`, `L6`, `L1`, `C5`) resolves by the
-//! older-record rule, as `O2` does. No test name carries a content sentinel.
+//! The lantern `L2` is lit with the light act, as `L5`, `L6`, `L1` and `C5`
+//! are, so each carries the `lit_in` the light act records. The lanterns
+//! written by hand stand for records the light act does not write: `O2`, an
+//! older record with no `lit_in`, which resolves by its holders; `N2`, a
+//! copy whose `lit_in` names a session other than the one it stands in; and
+//! `N1` to `N4`, whose `lit_in` is not a session id. No test name carries a
+//! content sentinel.
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -116,8 +120,8 @@ fn event(id: &str, parent: &str, kind: &str, record: &Hash) -> Result<Entry, Box
 }
 
 /// A `lys.lantern` entry written by hand at `point`: with `lit_in`, the
-/// light act's data plus that key; without, the older record's `point`,
-/// `note` and `lit_by` exactly.
+/// light act's data shape naming that session; without, the older record's
+/// `point`, `note` and `lit_by` exactly.
 pub(crate) fn lantern_entry(id: &str, parent: &str, point: &str, lit_in: Option<&str>) -> Entry {
     let data = match lit_in {
         Some(session) => {
@@ -158,10 +162,11 @@ pub(crate) fn fixture_home() -> Result<(TempDir, Home, Lanterns), Box<dyn Error>
         session.append_entry(&event("s2", "e2", KIND_PERMISSION_MODE, &s2_record)?)?;
         session.move_head(Some("e2"))?;
     }
+    let l2 = light(&home, PARENT, "e2", NOTE, LIGHTER)?.id;
     {
         let mut session = home.open_session(PARENT)?;
-        session.append_entry(&lantern_entry("L2", "e2", "e2", Some(PARENT)))?;
-        session.append_entry(&lantern_entry("O2", "L2", "e2", None))?;
+        // An older record with no `lit_in`: the light act cannot produce it.
+        session.append_entry(&lantern_entry("O2", &l2, "e2", None))?;
         session.append_entry(&event("e3", "O2", KIND_ATTACHMENT, &e3_record)?)?;
         session.append_entry(&user("e4", Some("e3"), &[text(4)]))?;
         session.append_entry(&assistant("e5", Some("e4"), &[text(5)]))?;
@@ -195,7 +200,7 @@ pub(crate) fn fixture_home() -> Result<(TempDir, Home, Lanterns), Box<dyn Error>
     }
     let c5 = light(&home, COMPACTED, "e5", NOTE, LIGHTER)?.id;
     let lanterns = Lanterns {
-        l2: "L2".to_owned(),
+        l2,
         o2: "O2".to_owned(),
         l5,
         l6,
@@ -281,7 +286,10 @@ fn the_cut_is_the_chain_to_the_last_assistant_message_with_no_side_leaf() -> Gat
     let mut cuts = Vec::new();
 
     let l5 = cut(&home, &lanterns.l5, None)?;
-    assert_eq!(l5.ids(), ["e1", "e2", "L2", "O2", "e3", "e4", "e5"]);
+    assert_eq!(
+        l5.ids(),
+        ["e1", "e2", lanterns.l2.as_str(), "O2", "e3", "e4", "e5"]
+    );
     assert_eq!(l5.cut_at, "e5");
     assert!(!l5.coordinate_carried());
     assert!(l5.carried.is_none());
@@ -290,7 +298,10 @@ fn the_cut_is_the_chain_to_the_last_assistant_message_with_no_side_leaf() -> Gat
     cuts.push(l5);
 
     let l6 = cut(&home, &lanterns.l6, None)?;
-    assert_eq!(l6.ids(), ["e1", "e2", "L2", "O2", "e3", "e4", "e5"]);
+    assert_eq!(
+        l6.ids(),
+        ["e1", "e2", lanterns.l2.as_str(), "O2", "e3", "e4", "e5"]
+    );
     assert_eq!(l6.cut_at, "e5");
     assert!(l6.coordinate_carried());
     assert_eq!(l6.carried.as_ref().map(Entry::id), Some("e6"));
@@ -330,7 +341,7 @@ fn resolving_and_cutting_reads_the_lantern_row_and_the_ancestry_only() -> Gate {
         lanterns.l5.as_str(),
         "e1",
         "e2",
-        "L2",
+        lanterns.l2.as_str(),
         "O2",
         "e3",
         "e4",
@@ -350,7 +361,7 @@ fn a_lit_in_lantern_cuts_from_its_session_and_an_older_record_needs_one_named() 
     {
         let reader = home.read_session(PARENT)?;
         let mut copy = home.create_session("A", "/fixture", None)?;
-        for id in ["e1", "e2", "L2", "O2"] {
+        for id in ["e1", "e2", lanterns.l2.as_str(), "O2"] {
             copy.append_entry(&reader.entry(id)?)?;
         }
         assert_eq!(copy.len()?, 4);
@@ -364,7 +375,7 @@ fn a_lit_in_lantern_cuts_from_its_session_and_an_older_record_needs_one_named() 
         matches!(
             &elsewhere,
             Err(HomeError::LanternNotLitHere { lantern, session, lit_in })
-                if lantern == "L2" && session == "A" && lit_in == PARENT
+                if *lantern == lanterns.l2 && session == "A" && lit_in == PARENT
         ),
         "{elsewhere:?}"
     );
@@ -455,6 +466,8 @@ fn a_lit_in_session_that_holds_no_copy_refuses_naming_the_holder_read() -> Gate 
         let mut copy = home.create_session("A", "/fixture", None)?;
         copy.append_entry(&reader.entry("e1")?)?;
         copy.append_entry(&reader.entry("e2")?)?;
+        // A copy whose `lit_in` names a session other than the one it
+        // stands in: the light act cannot produce it.
         copy.append_entry(&lantern_entry("N2", "e2", "e2", Some("elsewhere")))?;
         // A session of the home that holds no copy of the lantern.
         home.create_session("elsewhere", "/fixture", None)?;
@@ -490,6 +503,7 @@ fn a_lit_in_that_is_not_a_session_id_is_refused_by_name() -> Gate {
             ("N3", json!("../elsewhere")),
             ("N4", json!("no-such-session")),
         ] {
+            // A `lit_in` that is not a session id: the light act cannot produce it.
             let mut entry = lantern_entry(id, "e2", "e2", Some("placeholder"));
             let EntryBody::Custom {
                 data: Some(data), ..

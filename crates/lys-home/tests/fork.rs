@@ -1,12 +1,14 @@
+#![cfg(test)]
 //! The fork run as the binary (HOME-006 R5 and R7): the report's exact
 //! keys, each refusal's exit code with nothing on stdout, clap's refusals,
 //! and the brief's fixture home forked five times and refused five times
 //! with the block store unchanged, the children's lines hash-equal, and
-//! both ancestry sides on the parent. The lanterns `L5`, `L6`, `L1` and
-//! `C5` are lit with `lys-home lantern light`; `L2` is written with
-//! `Session::append_entry` carrying `lit_in`, the key the lantern card
-//! records in a later round and the light act on this tree does not, and
-//! `O2` the same way without it. No test name carries a content sentinel.
+//! both ancestry sides on the parent. The lanterns `L2`, `L5`, `L6`, `L1`
+//! and `C5` are lit with `lys-home lantern light`, so each carries the
+//! `lit_in` the light act records; `O2` is written with
+//! `Session::append_entry` as an older record without it, the one record
+//! here the light act does not write. No test name carries a content
+//! sentinel.
 
 use std::collections::BTreeSet;
 use std::error::Error;
@@ -105,18 +107,14 @@ fn event(id: &str, parent: &str, kind: &str, record: &Hash) -> Result<Entry, Box
     })
 }
 
-fn lantern_entry(id: &str, parent: &str, point: &str, lit_in: Option<&str>) -> Entry {
-    let data = match lit_in {
-        Some(session) => {
-            json!({"point": point, "note": NOTE, "lit_by": LIGHTER, "lit_at": STAMP, "lit_in": session})
-        }
-        None => json!({"point": point, "note": NOTE, "lit_by": LIGHTER}),
-    };
+/// A `lys.lantern` entry written by hand at `point` as an older record:
+/// its `point`, `note` and `lit_by` exactly, with no `lit_at` or `lit_in`.
+fn lantern_entry(id: &str, parent: &str, point: &str) -> Entry {
     Entry {
         base: base(id, Some(parent)),
         body: EntryBody::Custom {
             custom_type: "lys.lantern".to_owned(),
-            data: Some(data),
+            data: Some(json!({"point": point, "note": NOTE, "lit_by": LIGHTER})),
         },
     }
 }
@@ -198,10 +196,12 @@ fn fixture_home(dir: &Path) -> Result<(PathBuf, Lanterns), Box<dyn Error>> {
         session.append_entry(&event("s2", "e2", KIND_PERMISSION_MODE, &s2_record)?)?;
         session.move_head(Some("e2"))?;
     }
+    let home_arg = root.to_str().ok_or("a UTF-8 path")?;
+    let l2 = light(home_arg, PARENT, "e2")?;
     {
         let mut session = home.open_session(PARENT)?;
-        session.append_entry(&lantern_entry("L2", "e2", "e2", Some(PARENT)))?;
-        session.append_entry(&lantern_entry("O2", "L2", "e2", None))?;
+        // An older record with no `lit_in`: the light act cannot produce it.
+        session.append_entry(&lantern_entry("O2", &l2, "e2"))?;
         session.append_entry(&event("e3", "O2", KIND_ATTACHMENT, &e3_record)?)?;
         session.append_entry(&user("e4", Some("e3"), &[text_part(4)]))?;
         session.append_entry(&assistant("e5", Some("e4"), &[text_part(5)]))?;
@@ -230,7 +230,6 @@ fn fixture_home(dir: &Path) -> Result<(PathBuf, Lanterns), Box<dyn Error>> {
         session.append_entry(&user("e4", Some("c3"), &[text_part(4)]))?;
         session.append_entry(&assistant("e5", Some("e4"), &[text_part(5)]))?;
     }
-    let home_arg = root.to_str().ok_or("a UTF-8 path")?;
     let l5 = light(home_arg, PARENT, "e5")?;
     let l6 = light(home_arg, PARENT, "e6")?;
     let l1 = light(home_arg, PARENT, "e1")?;
@@ -238,7 +237,7 @@ fn fixture_home(dir: &Path) -> Result<(PathBuf, Lanterns), Box<dyn Error>> {
     Ok((
         root,
         Lanterns {
-            l2: "L2".to_owned(),
+            l2,
             o2: "O2".to_owned(),
             l5,
             l6,

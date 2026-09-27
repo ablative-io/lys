@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Round-trip and canonical-encoding-strictness tests for
 //! [`Delegation`].
 //!
@@ -27,8 +28,6 @@
 //! "exactly four artifacts flip to accepted" when the check is removed; that
 //! was the set the suite happened to cover, stated as though it were the set
 //! that exists.
-
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::*;
 use crate::delegation::artifact::DelegationSubjectKind;

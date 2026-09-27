@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Byte-exactness and structural-rejection tests for
 //! `lys/anchor-receipt/v1`.
 //!
@@ -7,8 +8,6 @@
 //! agrees with RFC 9052, RFC 8949 and RFC 9942. If the encoder changes, these
 //! fail — which is the point, because the format is frozen the moment an anchor
 //! signs under it.
-
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use ciborium::value::Value;
 

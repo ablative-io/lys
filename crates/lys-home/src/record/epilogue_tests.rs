@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on epilogues (HOME-004 R4): appended after the lantern at the head,
 //! ordinal from 1, earlier lines unchanged, and each refusal by name with
 //! nothing written.

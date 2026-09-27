@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 
 use super::bytes_eq_no_early_exit as bytes_eq;
 

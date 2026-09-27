@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the side-leaf append and the session head hash: the head does not
 //! move, the head file is untouched, the path is unchanged, the leaf survives
 //! a reopen, and the hash is of the head line's bytes, newline included.

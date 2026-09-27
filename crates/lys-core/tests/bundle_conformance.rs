@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Interop gate for `lys/verification-bundle/v1`: an independent Go
 //! implementation must reach the **same verdict** as lys on every bundle, and
 //! derive the same values from the ones it accepts.
@@ -79,7 +80,6 @@
 // no `bundle` module to verify, and compiling the file out (rather than gating
 // items inside it) leaves no unused shared harness behind either.
 #![cfg(feature = "unstable-anchor")]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod harness;
 
@@ -670,7 +670,7 @@ fn lys_verdict(case: &Case) -> Option<VerifiedBundle> {
 
 fn to_hex(bytes: &[u8]) -> String {
     bytes.iter().fold(String::new(), |mut acc, b| {
-        let _ = write!(acc, "{b:02x}");
+        write!(acc, "{b:02x}").expect("writing to a String cannot fail");
         acc
     })
 }
@@ -689,13 +689,14 @@ fn expected_report(verified: &VerifiedBundle) -> String {
         to_hex(&checkpoint.root_hash()),
     );
     for notarization in verified.notarizations() {
-        let _ = writeln!(
+        writeln!(
             report,
             "{} {} {}",
             to_hex(&notarization.anchor_root()),
             notarization.anchor_tree_size(),
             notarization.leaf_index(),
-        );
+        )
+        .expect("writing to a String cannot fail");
     }
     report
 }

@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! End-to-end integration tests for the `lys log` command family.
 //!
 //! Every test drives the compiled binary through real process spawns
@@ -6,8 +7,6 @@
 //! artifacts, the proven leaf, and the verifier key string — never the log.
 //! The tamper matrices assert the non-oracle discipline: every tamper class
 //! within one artifact class produces the identical exit code AND stderr.
-
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -78,7 +77,8 @@ fn hex_lower(bytes: &[u8]) -> String {
     use std::fmt::Write;
     let mut s = String::with_capacity(bytes.len() * 2);
     for b in bytes {
-        let _ = s.write_fmt(format_args!("{b:02x}"));
+        s.write_fmt(format_args!("{b:02x}"))
+            .expect("writing to a String cannot fail");
     }
     s
 }

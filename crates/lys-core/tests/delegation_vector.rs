@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! The `lys/delegation/v1` fixed vectors, pinned as literal hex.
 //!
 //! Five vectors are frozen here — **A** (domain), **B** (seat), **C** (wide
@@ -220,7 +221,6 @@
 //! `delegation` module and this file compiles to nothing.
 
 #![cfg(feature = "unstable-anchor")]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use lys_core::Ed25519Identity;
 use lys_core::delegation::{
@@ -613,7 +613,7 @@ d238d484c65bbd7f2620b55820f478bbf6a2754ed8318b19dc4e8b2bba070772b014c7662c153c45
 fn to_hex(bytes: &[u8]) -> String {
     use std::fmt::Write;
     bytes.iter().fold(String::new(), |mut acc, byte| {
-        let _ = write!(acc, "{byte:02x}");
+        write!(acc, "{byte:02x}").expect("writing to a String cannot fail");
         acc
     })
 }

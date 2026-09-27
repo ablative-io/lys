@@ -1,6 +1,9 @@
+#![cfg(test)]
 //! Gates on the lantern entry (HOME-004 R1) and on lighting (R3): the data
 //! shapes, earlier bytes kept, the head on the lantern, the note byte for
-//! byte, and each refusal by name with nothing written.
+//! byte, and each refusal by name with nothing written; and on the lantern's
+//! `lit_in` (HOME-014 R1, R2): absent, null, not a string and a string kept
+//! distinct, and the light act recording the session it appends to.
 
 use std::error::Error;
 
@@ -8,7 +11,7 @@ use serde_json::{Value, json};
 
 use crate::error::HomeError;
 use crate::record::entries::{
-    CUSTOM_LANTERN, CUSTOM_LANTERN_EPILOGUE, EntryBody, EpilogueData, LanternData,
+    CUSTOM_LANTERN, CUSTOM_LANTERN_EPILOGUE, EntryBody, EpilogueData, LanternData, LitIn,
 };
 use crate::record::lantern::light;
 use crate::record::reader_tests::{FIXTURE, TRANSCRIPT_LINE, fixture_home};
@@ -46,19 +49,58 @@ fn the_custom_types_are_named_as_the_record_states() {
 }
 
 #[test]
-fn lantern_data_round_trips_with_exactly_its_four_keys() -> Gate {
+fn lantern_data_round_trips_with_exactly_its_five_keys() -> Gate {
     let data = LanternData {
         point: "e2".to_owned(),
         note: NOTE.to_owned(),
         lit_by: LIGHTER.to_owned(),
         lit_at: now(),
+        lit_in: Some(LitIn::Session(FIXTURE.to_owned())),
     };
     let value = serde_json::to_value(&data)?;
     let mut names = keys(&value);
     names.sort_unstable();
-    assert_eq!(names, ["lit_at", "lit_by", "note", "point"]);
+    assert_eq!(names, ["lit_at", "lit_by", "lit_in", "note", "point"]);
     let back: LanternData = serde_json::from_value(value)?;
     assert_eq!(back, data);
+    Ok(())
+}
+
+#[test]
+fn lantern_data_with_no_lit_in_serialises_without_the_key() -> Gate {
+    let data = LanternData {
+        point: "e2".to_owned(),
+        note: NOTE.to_owned(),
+        lit_by: LIGHTER.to_owned(),
+        lit_at: now(),
+        lit_in: None,
+    };
+    let mut names = keys(&serde_json::to_value(&data)?);
+    names.sort_unstable();
+    assert_eq!(names, ["lit_at", "lit_by", "note", "point"]);
+    Ok(())
+}
+
+#[test]
+fn an_absent_a_null_a_number_and_a_string_lit_in_stay_distinct() -> Gate {
+    let base = json!({"point": "e2", "note": NOTE, "lit_by": LIGHTER, "lit_at": now()});
+    let with = |lit_in: Value| -> Result<LanternData, serde_json::Error> {
+        let mut value = base.clone();
+        if let Some(object) = value.as_object_mut() {
+            object.insert("lit_in".to_owned(), lit_in);
+        }
+        serde_json::from_value(value)
+    };
+    assert_eq!(
+        serde_json::from_value::<LanternData>(base.clone())?.lit_in,
+        None
+    );
+    assert_eq!(with(Value::Null)?.lit_in, Some(LitIn::Other(Value::Null)));
+    assert_eq!(with(json!(5))?.lit_in, Some(LitIn::Other(json!(5))));
+    assert_eq!(
+        with(json!("parent"))?.lit_in,
+        Some(LitIn::Session("parent".to_owned()))
+    );
     Ok(())
 }
 
@@ -111,6 +153,18 @@ fn lighting_appends_one_line_under_the_head_and_moves_the_head_onto_it() -> Gate
     assert_eq!(lantern_data(&home, &second.id)?.point, "e2");
     let again = std::fs::read(&file)?;
     assert_eq!(&again[..after.len()], &after[..]);
+    Ok(())
+}
+
+#[test]
+fn the_light_act_records_and_reports_the_session_it_appends_to() -> Gate {
+    let (_dir, home) = fixture_home()?;
+    let lit = light(&home, FIXTURE, "e2", NOTE, LIGHTER)?;
+    assert_eq!(lit.lit_in, FIXTURE);
+    assert_eq!(
+        lantern_data(&home, &lit.id)?.lit_in,
+        Some(LitIn::Session(FIXTURE.to_owned()))
+    );
     Ok(())
 }
 

@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Scaffolding shared by the witness gates: a witness anchor, and a *child*
 //! log whose checkpoints it records.
 //!

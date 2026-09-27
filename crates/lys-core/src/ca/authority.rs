@@ -39,7 +39,8 @@ use std::time::Duration;
 use chrono::{DateTime, Timelike, Utc};
 use ed25519_dalek::{Signature, VerifyingKey};
 use rcgen::{
-    BasicConstraints, Certificate, CertificateParams, CustomExtension, IsCa, KeyPair, PKCS_ED25519,
+    BasicConstraints, Certificate, CertificateParams, CustomExtension, IsCa, KeyPair,
+    KeyUsagePurpose, PKCS_ED25519,
 };
 use time::OffsetDateTime;
 use x509_parser::oid_registry::OID_SIG_ED25519;
@@ -206,6 +207,23 @@ impl CertificateAuthority {
         verify_certificate_chain(cert_der, &self.identity.public_key_bytes())
     }
 
+    /// The DER of this authority's self-signed issuer certificate, whose
+    /// subject is the issuer name every certificate it issues carries.
+    ///
+    /// It lets a third party check an issued certificate with standard X.509
+    /// tooling, such as `openssl verify -CAfile`, holding nothing from lys.
+    /// It is public: it carries the issuer's public key and a signature, never
+    /// the seed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TrustError::CertificateGeneration`] if the issuer
+    /// certificate cannot be built or signed.
+    pub fn issuer_certificate_der(&self) -> TrustResult<Vec<u8>> {
+        let issuer_key = self.issuer_key_pair()?;
+        Ok(self.issuer_certificate(&issuer_key)?.der().to_vec())
+    }
+
     /// Builds an rcgen [`KeyPair`] backed by this authority's identity through
     /// a [`RemoteKeyPair`](rcgen::RemoteKeyPair) adapter, so the private seed
     /// is never serialised.
@@ -216,8 +234,20 @@ impl CertificateAuthority {
         })
     }
 
-    /// Builds the self-signed in-memory issuer certificate whose subject DN is
-    /// derived from this authority's public key.
+    /// Builds the self-signed issuer certificate whose subject DN is derived
+    /// from this authority's public key.
+    ///
+    /// It is the trust anchor [`Self::issuer_certificate_der`] hands out, so
+    /// every field that matters to a relying party is set explicitly rather
+    /// than left to rcgen's defaults:
+    ///
+    /// - basic constraints: a CA with path length 0, so it can sign end-entity
+    ///   certificates and nothing that could itself sign;
+    /// - key usage, marked critical: `keyCertSign` and `cRLSign` only;
+    /// - validity: from the moment it is built until [`ISSUER_NOT_AFTER`].
+    ///
+    /// None of this reaches the certificates it signs: rcgen takes only the
+    /// issuer's distinguished name and key identifier method from it.
     fn issuer_certificate(&self, issuer_key: &KeyPair) -> TrustResult<Certificate> {
         let mut params = CertificateParams::new(Vec::<String>::new()).map_err(|e| {
             TrustError::CertificateGeneration {
@@ -226,7 +256,14 @@ impl CertificateAuthority {
         })?;
         let common_name = hex_lower(&self.identity.public_key_bytes());
         params.distinguished_name = distinguished_name(&common_name);
-        params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+        params.is_ca = IsCa::Ca(BasicConstraints::Constrained(0));
+        params.key_usages = vec![KeyUsagePurpose::KeyCertSign, KeyUsagePurpose::CrlSign];
+        params.not_before = to_offset_date_time(Utc::now())?;
+        params.not_after = OffsetDateTime::from_unix_timestamp(ISSUER_NOT_AFTER).map_err(|e| {
+            TrustError::CertificateGeneration {
+                reason: format!("issuer certificate notAfter is out of range: {e}"),
+            }
+        })?;
         params
             .self_signed(issuer_key)
             .map_err(|e| TrustError::CertificateGeneration {
@@ -234,6 +271,19 @@ impl CertificateAuthority {
             })
     }
 }
+
+/// The issuer certificate's `notAfter`, in seconds since the Unix epoch:
+/// `99991231235959Z`, the value RFC 5280 section 4.1.2.5 gives a certificate
+/// with no well-defined expiration date.
+///
+/// `lys ca issue` puts no ceiling on a certificate's window of its own; the
+/// only ceiling is the encoding, since `GeneralizedTime` carries a four-digit
+/// year, so no certificate this authority signs can be valid past this
+/// instant. An issuer that expired first would make `openssl verify` refuse
+/// certificates that are still inside their own windows. The issuer stays
+/// bounded in practice by the certificates it signs, each of which carries
+/// its own window.
+const ISSUER_NOT_AFTER: i64 = 253_402_300_799;
 
 /// Validates the issuance inputs and computes the certificate's validity
 /// window as `(notBefore, notAfter)`.

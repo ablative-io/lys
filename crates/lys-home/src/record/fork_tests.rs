@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on the fork (HOME-006 R3): the child's lines hash-equal the
 //! parent's, `lys.forked_from` is the child's head with the ancestry as
 //! data, the header names the parent file relative to the home, a carried
@@ -83,7 +84,7 @@ fn the_child_holds_the_parent_lines_then_forked_from_as_its_head() -> Gate {
     let child_file = home.session_path(&report.child)?;
     let child_lines = line_hashes(&child_file)?;
     assert_eq!(child_lines.len(), 8);
-    let copied = ["e1", "e2", "L2", "O2", "e3", "e4", "e5"];
+    let copied = ["e1", "e2", lanterns.l2.as_str(), "O2", "e3", "e4", "e5"];
     for (n, id) in copied.iter().enumerate() {
         assert_eq!(child_lines[n], line_hash_of(&parent_file, id)?, "{id}");
     }
@@ -259,6 +260,7 @@ fn an_inline_part_whose_source_form_is_the_stored_block_counts_as_unstored() -> 
         let mut session = home.create_session("mixed", "/fixture", None)?;
         session.append_entry(&user("m1", None, &[m1_part]))?;
         session.append_entry(&assistant("m2", Some("m1"), &[thinking, call]))?;
+        // An older record with no `lit_in` or `lit_at`: the light act cannot produce it.
         session.append_entry(&lantern_entry("M2", "m2", "m2", None))?;
     }
     let report = fork(&home, "M2", None)?;
@@ -336,6 +338,7 @@ fn session_with_carried(home: &Home, id: &str, content: &Value) -> Result<String
             message: json!({"role": "user", "content": content, "timestamp": 0}),
         },
     })?;
+    // An older record with no `lit_in` or `lit_at`: the light act cannot produce it.
     session.append_entry(&lantern_entry("N3", "e3", "e3", None))?;
     Ok("N3".to_owned())
 }

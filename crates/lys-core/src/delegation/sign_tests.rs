@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Adversarial and end-to-end tests for delegation issuance and verification.
 //!
 //! Every mutant below is signed **for real** by a real key over its own bytes,
@@ -9,8 +10,6 @@
 //! Each rule from the specification gets its own case, so a drift that disables
 //! one rule fails one test. Where a case could be caught by two rules at once,
 //! it is constructed so only the intended one can fire.
-
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::*;
 use crate::delegation::artifact::{DelegationRole, DelegationSubjectKind};

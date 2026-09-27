@@ -121,10 +121,12 @@ pub enum HomeError {
     },
 
     /// The session file is held open by another owner, in this process or another.
-    #[error("session {} is held by another owner; one owner at a time", path.display())]
+    #[error("session {} is held by {}; one owner at a time", path.display(), held_by(*holder))]
     SessionHeld {
         /// The session file.
         path: PathBuf,
+        /// The process holding it, when the lock names one.
+        holder: Option<u32>,
     },
 
     /// An entry id is already on record in this session.
@@ -302,6 +304,54 @@ pub enum HomeError {
         path: PathBuf,
     },
 
+    /// The signing key file given to render-launch could not be loaded.
+    #[error("render-launch signing key could not be loaded from {}: {reason}", path.display())]
+    SigningKey {
+        /// The key file.
+        path: PathBuf,
+        /// lys-core's reason, which names a length or an I/O error, never a key byte.
+        reason: String,
+    },
+
+    /// A file translate-codex would write already exists.
+    #[error("translate-codex target already exists: {}; choose another --out", path.display())]
+    TranslationTargetExists {
+        /// The file.
+        path: PathBuf,
+    },
+
+    /// An entry's stamp does not parse as RFC 3339, so the translation cannot
+    /// place it in time.
+    #[error("entry {entry} has a stamp that is not RFC 3339: re-import the source file")]
+    StampNotRfc3339 {
+        /// The entry's id.
+        entry: String,
+    },
+
+    /// A Codex version was named whose rollout shape was never measured.
+    #[error(
+        "Codex {version} has no measured rollout shape: render for 0.156.0 or card a measurement of the new version"
+    )]
+    UnmeasuredCodexVersion {
+        /// The version given.
+        version: String,
+    },
+
+    /// The time zone given is absent or not shaped as an IANA name.
+    #[error("TZ {value} is not an IANA time zone name: set TZ to an IANA name")]
+    UnnamedTimeZone {
+        /// The value given, or `unset` when none was.
+        value: String,
+    },
+
+    /// The time zone given is shaped as an IANA name and the bundled time
+    /// zone database does not hold it.
+    #[error("time zone {zone} is not in the time zone database: set TZ to an IANA name")]
+    UnknownTimeZone {
+        /// The zone given.
+        zone: String,
+    },
+
     /// The session's config directory has no name: the template's env slot
     /// sets no `CLAUDE_CONFIG_DIR` and the rendering process has no `HOME`.
     #[error(
@@ -414,6 +464,78 @@ pub enum HomeError {
         /// The path given.
         path: PathBuf,
     },
+
+    /// A letter entry is not an assistant message.
+    #[error(
+        "letter_not_assistant: entry `{id}` of session {session} is not an assistant message; a letter is the outgoing session's own assistant turn"
+    )]
+    LetterNotAssistant {
+        /// The outgoing session id.
+        session: String,
+        /// The letter entry named.
+        id: String,
+    },
+
+    /// A letter entry does not stand, on the outgoing session's root-to-head
+    /// path, as the child of the letter entry named before it.
+    #[error(
+        "letter_not_contiguous: letter entry `{id}` of session {session} does not follow the entry before it on the root-to-head path; name the letter's entries in path order, each the child of the one before"
+    )]
+    LetterNotContiguous {
+        /// The outgoing session id.
+        session: String,
+        /// The first letter entry out of place.
+        id: String,
+    },
+
+    /// A letter entry's message carries provider `authored`.
+    #[error(
+        "letter_authored: entry `{id}` of session {session} carries provider `authored`; a letter is the session's own turn, never one written by hand"
+    )]
+    LetterAuthored {
+        /// The outgoing session id.
+        session: String,
+        /// The first authored letter entry.
+        id: String,
+    },
+
+    /// No letter entry holds a thinking block.
+    #[error(
+        "letter_without_thinking: the letter [{}] of session {session} holds no thinking block; a letter carries the session's own thinking", ids.join(", ")
+    )]
+    LetterWithoutThinking {
+        /// The outgoing session id.
+        session: String,
+        /// Every letter entry, in the order given.
+        ids: Vec<String>,
+    },
+
+    /// The successor path exists and is not an empty directory.
+    #[error(
+        "successor_not_empty: {} exists and is not an empty directory; name an absent path or an empty directory for the successor home", path.display()
+    )]
+    SuccessorNotEmpty {
+        /// The successor path given.
+        path: PathBuf,
+    },
+
+    /// A canon example's `lys.inherited` entry carries no rule.
+    #[error(
+        "canon_example_without_rule: canon example `{id}` has no `rule` in its lys.inherited data; every canon example states the rule it shows"
+    )]
+    CanonExampleWithoutRule {
+        /// The example's `lys.inherited` entry id.
+        id: String,
+    },
+}
+
+/// Who holds a session, as a refusal names them.
+fn held_by(holder: Option<u32>) -> String {
+    match holder {
+        Some(pid) if pid == std::process::id() => format!("another owner in this process ({pid})"),
+        Some(pid) => format!("process {pid}"),
+        None => "another owner".to_owned(),
+    }
 }
 
 impl HomeError {

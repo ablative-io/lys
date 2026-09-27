@@ -207,3 +207,102 @@ entry lines.
   as unlisted and the rest are later cards on the same shape.
 - The real render's entry names hashes only; the search above finds no line
   of any document in this file.
+
+## The given statement, checked by a stranger (HOME-018 R6)
+
+Run on Dean's laptop with the `lys` and `lys-home` debug binaries built by
+`cargo +1.97.1 build -p lys -p lys-home` from the branch hand/HOME-016 at ff6da53 (the
+code commit; the commit carrying this section changes documents only). The
+scratch directory is fresh: `home/sessions/fixture.jsonl` is a copy of
+`crates/lys-home/tests/fixtures/launch/session.jsonl`; `template.json` is
+`crates/lys-home/tests/fixtures/launch/template.json` with `CLAUDE_CONFIG_DIR`
+set to the scratch `c` directory and one fixture secret value added to its
+env slot; `h` and `w` are empty directories. The two keys are test keys made
+here by `lys key generate`; no seed is printed or committed, and no
+production key is used. Each command is shown after `$`, with its stdout and
+stderr together and its exit status in brackets.
+
+```text
+$ lys key generate --out keys/a.key
+generated new identity key: keys/a.key
+public key (ed25519): f914435cdd9fd9a367eb94e3e0648698dd45e89dd3ccedaf4fa27670d7d3446d
+[exit 0]
+
+$ lys key generate --out keys/b.key
+generated new identity key: keys/b.key
+public key (ed25519): 4090b17234daffcd203b2a4036a2749af03c0c25ff1631246b99c7a2b721a72c
+[exit 0]
+
+$ env -u CLAUDE_CONFIG_DIR HOME=$PWD/h lys-home render-launch --home home --session fixture --template template.json --uuid 00000000-0000-4000-8000-000000000016 --cwd $PWD/w --model claude-fixture --version 2.1.283 --out out-a --key keys/a.key > report-a.json; python3 -c 'import json; r=json.load(open("report-a.json")); print(r["signing"], r["given_sha256"])'
+signed 1969e8aff5e4e3eee2b78623078cea50c2006cd313dbfbee65c07fe3045b09bb
+[exit 0]
+
+$ env -u CLAUDE_CONFIG_DIR HOME=$PWD/h lys-home render-launch --home home --session fixture --template template.json --uuid 00000000-0000-4000-8000-000000000016 --cwd $PWD/w --model claude-fixture --version 2.1.283 --out out-b --key keys/b.key > report-b.json; python3 -c 'import json; r=json.load(open("report-b.json")); print(r["signing"], r["given_sha256"])'
+signed 1969e8aff5e4e3eee2b78623078cea50c2006cd313dbfbee65c07fe3045b09bb
+[exit 0]
+
+$ lys verify --attestation out-a/given-statement.cose --payload out-a/given-data.json
+attestation verified
+signer public key (ed25519): f914435cdd9fd9a367eb94e3e0648698dd45e89dd3ccedaf4fa27670d7d3446d
+payload hash (sha256): 1969e8aff5e4e3eee2b78623078cea50c2006cd313dbfbee65c07fe3045b09bb
+signed at (unix ms): 1790491857188
+this proves a key signed this payload, not who holds that key — pass --cert with --issuer-public-key to check the certificate that vouches for it
+[exit 0]
+
+$ cp out-a/given-statement.cose altered.cose && python3 -c "import sys; b=bytearray(open(\"altered.cose\",\"rb\").read()); b[100]^=1; open(\"altered.cose\",\"wb\").write(b)"
+[exit 0]
+
+$ if lys verify --attestation altered.cose --payload out-a/given-data.json; then echo "accepted: altered.cose"; else echo "refused: altered.cose"; fi
+error: attestation verification failed: malformed or non-canonical artifact, payload mismatch, or invalid signature
+refused: altered.cose
+[exit 0]
+
+$ lys verify --attestation altered.cose --payload out-a/given-data.json
+error: attestation verification failed: malformed or non-canonical artifact, payload mismatch, or invalid signature
+[exit 1]
+
+$ test "$(lys --json verify --attestation out-a/given-statement.cose --payload out-a/given-data.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["signer_public_key"])')" = "$(lys --json key inspect --key keys/a.key | python3 -c 'import json,sys; print(json.load(sys.stdin)["public_key_ed25519"])')"
+[exit 0]
+
+$ test "$(lys --json verify --attestation out-b/given-statement.cose --payload out-b/given-data.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["signer_public_key"])')" = "$(lys --json key inspect --key keys/a.key | python3 -c 'import json,sys; print(json.load(sys.stdin)["public_key_ed25519"])')"
+[exit 1]
+
+$ python3 -c 'import json,hashlib; e=[json.loads(l) for l in open("home/sessions/fixture.jsonl")]; d=[x["data"] for x in e if x.get("customType")=="lys.given"][0]; print(hashlib.sha256(json.dumps(d, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest())'
+1969e8aff5e4e3eee2b78623078cea50c2006cd313dbfbee65c07fe3045b09bb
+[exit 0]
+
+$ python3 -c 'import json; print(json.load(open("report-a.json"))["given_sha256"])'
+1969e8aff5e4e3eee2b78623078cea50c2006cd313dbfbee65c07fe3045b09bb
+[exit 0]
+
+$ lys --json verify --attestation out-a/given-statement.cose --payload out-a/given-data.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["payload_hash"])'
+1969e8aff5e4e3eee2b78623078cea50c2006cd313dbfbee65c07fe3045b09bb
+[exit 0]
+
+$ wc -c < out-a/given-statement.cose
+     199
+[exit 0]
+```
+
+What the transcript shows:
+
+- `lys verify --attestation out-a/given-statement.cose --payload
+  out-a/given-data.json` exits 0.
+- A copy of the statement with the byte at offset 100 altered is refused by
+  name: the stated `if` command prints `refused: altered.cose`, and `lys
+  verify` on it exits 1 with its one message, which names no field or byte.
+- The signer comparison exits 0 for the statement signed with key A and 1
+  for the one signed with key B. Without `--cert`, `lys verify` proves only
+  that some key signed; this line is what ties the statement to the test
+  key.
+- The given hash recomputed from the session file with python3 (the first
+  `lys.given` entry, the one render A wrote), the report's `given_sha256`
+  and the `payload_hash` `lys --json verify` prints are the same value. The
+  two renders record equal `lys.given` data, so both carry the same hash.
+- The statement is 199 bytes.
+
+CONFORMANCE row 6.5 is passed partially by this: the given statement is
+signed and checked offline. The start statement (the START card 98qkhhCb)
+and the role-move statement (the ROLES card Ink1H1Os) are further units,
+written when the records they sign over land, and checking the signer
+against a trusted certificate comes with row 6.1's `--cert`.

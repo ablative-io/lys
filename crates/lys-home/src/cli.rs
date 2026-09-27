@@ -1,5 +1,5 @@
 //! The `lys-home` command line: import, render, fewshot, ingest-call,
-//! resume-check, render-launch, given, given-check, lantern, fork. Every command prints one
+//! resume-check, render-launch, given, given-check, lantern, fork, handover. Every command prints one
 //! JSON report of paths, hashes and counts, never transcript, block or body
 //! content. A missing required argument is refused by clap with exit code 2,
 //! naming the argument. A command that refuses exits 1, except `given-check`,
@@ -11,12 +11,13 @@ pub mod given;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use serde_json::{Value, json};
 
 use crate::cli::given::{GivenArgs, GivenCheckArgs, Outcome, STATUS_REFUSED};
 use crate::cli_fork::ForkArgs;
 use crate::cli_lantern::LanternAction;
+use crate::cli_translate::TranslateArgs;
 use crate::error::HomeError;
 use crate::harness::claude_code::AUTHORED;
 use crate::harness::claude_code::import::import_claude_code;
@@ -24,6 +25,7 @@ use crate::harness::claude_code::launch::{LaunchArgs, render_launch};
 use crate::harness::claude_code::render::{RenderTarget, render_claude_code};
 use crate::record::call::{Api, CallMeta, ingest_call_files};
 use crate::record::canon::Role;
+use crate::record::handover::handover;
 use crate::record::{Home, fresh_id, now};
 
 /// The home: sessions held under an identity, in Pi's session tree.
@@ -68,6 +70,25 @@ pub enum CanonAction {
         #[arg(long)]
         by: String,
     },
+}
+
+/// The arguments of `handover`: the outgoing home and session, the letter's
+/// entry ids in path order, and the successor home to write. No rule is
+/// taken, since a letter is not a rule.
+#[derive(Clone, Debug, PartialEq, Eq, Args)]
+pub struct HandoverArgs {
+    /// The outgoing home, read and never written.
+    #[arg(long)]
+    pub home: PathBuf,
+    /// The outgoing session id.
+    #[arg(long)]
+    pub from: String,
+    /// The letter's entry ids, in path order.
+    #[arg(long, required = true, num_args = 1..)]
+    pub letter: Vec<String>,
+    /// The successor home: an absent path or an empty directory.
+    #[arg(long)]
+    pub successor: PathBuf,
 }
 
 /// The commands.
@@ -187,6 +208,10 @@ pub enum Command {
     },
     /// Fork a child session from a lantern's point, with its ancestry on both sides.
     Fork(ForkArgs),
+    /// Translate a session into a Codex rollout with a loss account beside it.
+    TranslateCodex(TranslateArgs),
+    /// Hand an outgoing session's letter to a new successor home as inherited memory.
+    Handover(HandoverArgs),
 }
 
 impl Command {
@@ -360,6 +385,15 @@ fn report(command: Command) -> Result<Value, HomeError> {
         Command::GivenCheck(args) => given::check(&args).map(|outcome| outcome.report),
         Command::Lantern { action } => crate::cli_lantern::run(action),
         Command::Fork(args) => crate::cli_fork::run(&args),
+        Command::TranslateCodex(args) => crate::cli_translate::run(&args),
+        Command::Handover(args) => {
+            let report = handover(&args.home, &args.from, &args.letter, &args.successor)?;
+            let report = serde_json::to_value(&report).map_err(|source| HomeError::Json {
+                context: "the handover report could not be serialised",
+                source,
+            })?;
+            Ok(json!({"command": "handover", "report": report}))
+        }
     }
 }
 
