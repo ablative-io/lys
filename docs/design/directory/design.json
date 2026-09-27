@@ -707,6 +707,21 @@
       "path": "crates/lys/src/cli_tests.rs",
       "note": "the CLI's help tests; DIRECTORY-013 adds the no-log revocation sentence test",
       "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "crates/lys-identity/tests/agent_without_session.rs",
+      "note": "the proof that an agent registered with no session is listed under its responsible person and read with no session credential (R2)",
+      "brief": "DIRECTORY-011"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-011.json",
+      "note": "the enduring agent kept apart from each session's credential: road adjustment 3 written into the directory contract, and the no-session agent proved (R1, R2)",
+      "brief": "DIRECTORY-011"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-011.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-011"
     }
   ],
   "inventory": [
@@ -843,6 +858,75 @@
         {
           "name": "tests",
           "command": "cargo test --workspace --all-features --no-fail-fast",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc-all-features",
+          "command": "cargo doc --no-deps --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc",
+          "command": "cargo doc --no-deps",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
+          "requires": [
+            "tool:sh",
+            "tool:python3"
+          ],
+          "cadence": "round"
+        }
+      ]
+    },
+    {
+      "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
+      "legs": [
+        {
+          "name": "fmt",
+          "command": "cargo fmt --all",
+          "requires": [
+            "tool:cargo",
+            "tool:rustfmt"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy-all-features",
+          "command": "cargo clippy --all-targets --all-features -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy",
+          "command": "cargo clippy --all-targets -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "tests",
+          "command": "cargo test --workspace --all-features",
           "requires": [
             "rust-build"
           ],

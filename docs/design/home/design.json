@@ -60,7 +60,10 @@
     "ADR-018",
     "ADR-022",
     "ADR-023",
-    "ADR-072"
+    "ADR-072",
+    "ADR-031",
+    "ADR-073",
+    "ADR-074"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -75,7 +78,8 @@
     "The same session head rendered twice with the same target and the same lys-home version gives files of equal SHA-256, a fixture holding a tool record with more than one result included, and the fixture's hash is pinned by a test and recorded in PROOF-RESUME.md.",
     "A session forked from a lantern's point holds the parent's own lines up to the last assistant message before the point, carries its ancestry on both sides, adds nothing to the block store, and is rendered and launched on the installed Claude Code version, measured, with a user-message point carried as the child's first prompt.",
     "One session imported from Claude Code is translated into a Codex 0.156.0 rollout carrying every text part, tool call and tool result whole, with a loss account of what was kept, changed and lost by entry id and hash, and Codex 0.156.0 resumes it in a scratch Codex home and answers from its content, measured, with the Claude Code render of the session unchanged by hash.",
-    "A render given a test key signs what the session was given as one lys/attestation/v2 statement over the SHA-256 of the lys.given entry's canonical data, which `lys verify --attestation` accepts offline, refuses when one byte is altered, and attributes to the test key's public key by a stated comparison; a render with no key is unchanged and reports unsigned."
+    "A render given a test key signs what the session was given as one lys/attestation/v2 statement over the SHA-256 of the lys.given entry's canonical data, which `lys verify --attestation` accepts offline, refuses when one byte is altered, and attributes to the test key's public key by a stated comparison; a render with no key is unchanged and reports unsigned.",
+    "A fixture home ships as one git ref to a bare repository at a path on this machine and is fetched into a second, empty home whose fetched tree hash-matches the source's sessions, index and head files, blocks and templates, with the source byte-identical, one arrival beside each session's head carrying a fresh execution id, committed in the target on the fetched commit, and the target rendered and resumed through the launch template on Claude Code 2.1.283, measured."
   ],
   "non_goals": [
     {
@@ -839,6 +843,121 @@
       "path": "docs/design/home/briefs/HOME-018.md",
       "note": "its rendered markdown",
       "brief": "HOME-018"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-011.json",
+      "note": "the brief of the request's order: the context record's documents in the request's order, re-measured, with the old order named as superseded",
+      "brief": "HOME-011"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-011.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-011"
+    },
+    {
+      "path": "docs/design/home/proof-given/measure.py",
+      "note": "PROOF-GIVEN's measure fixture, committed byte for byte (SHA-256 db17cccb008507eed1ca67ab197a353c6901d09a63d1c284bf8a1f7d49ac245d): Claude Code pointed at a local listener, printing the read order and the request's order as orders, counts and hashes only",
+      "brief": "HOME-011"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-019.json",
+      "note": "the brief: ship a home as one git ref to a path on this machine, fetch it with an arrival per session, resume it",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-019.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "crates/lys-home/src/record/tracked.rs",
+      "note": "a home's tracked set, enumerated exactly by name",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "crates/lys-home/src/record/tracked_tests.rs",
+      "note": "gates on the tracked set: locks, temporaries and root files never enter it",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "crates/lys-home/src/record/verify.rs",
+      "note": "strict verification of a home: indexes, heads, blocks and templates, never rebuilt",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "crates/lys-home/src/record/verify_tests.rs",
+      "note": "gates on the strict verification, each reason made to fire",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "crates/lys-home/src/record/hold.rs",
+      "note": "every session's lock held through ship's check and snapshot",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "crates/lys-home/src/home_move/mod.rs",
+      "note": "moving a home: declarations only",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "crates/lys-home/src/home_move/git.rs",
+      "note": "the git binary run with a pinned environment and no filters",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "crates/lys-home/src/home_move/git_tests.rs",
+      "note": "gates on the runner: host configuration changes no byte and no identity",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "crates/lys-home/src/home_move/remote.rs",
+      "note": "a remote taken only when it is a path on this machine; remote_not_local otherwise",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "crates/lys-home/src/home_move/remote_tests.rs",
+      "note": "gates on the remote rule",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "crates/lys-home/src/home_move/ship.rs",
+      "note": "ship: check, commit the tracked set, push refs/lys/home without force",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "crates/lys-home/src/home_move/fetch.rs",
+      "note": "fetch: into an empty target, verify, hang one arrival beside each head and commit the arrivals on the fetched commit",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "crates/lys-home/src/home_move/undo.rs",
+      "note": "the paths fetch created, removed deepest first when it fails",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "crates/lys-home/src/cli_move.rs",
+      "note": "the ship and fetch subcommands' arguments and run functions",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "crates/lys-home/tests/home_ship.rs",
+      "note": "ship through the binary: reports and every named refusal",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "crates/lys-home/tests/home_fetch.rs",
+      "note": "fetch through the binary: hash-match, arrival, refusals and cleanup",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "crates/lys-home/tests/home_move.rs",
+      "note": "the shipped ref searched for the fixture secret, and the target rendered",
+      "brief": "HOME-019"
+    },
+    {
+      "path": "docs/design/home/PROOF-MOVE.md",
+      "note": "measured: a fixture home shipped, fetched, rendered and resumed on Claude Code 2.1.283",
+      "brief": "HOME-019"
     }
   ],
   "inventory": [

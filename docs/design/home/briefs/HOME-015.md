@@ -25,9 +25,9 @@ title: Hand an outgoing session's letter to a new successor home as inherited me
 > - C51 — Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass.
 > - C52 — PROOF-HANDOVER.md records the handover of an elicited letter by ids, hashes and the signature comparison, whether the inherited signed block appears in a resumed continuation's own file on the installed Claude Code beside 2.1.281, and the seeded and plain card counts as not run.
 > **Stories:**
-> - S2 (Agent, Continues a session imported from Claude Code on Codex) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
+> - S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
 > - S5 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
-> - S8 (Agent, Continues a session imported from Claude Code on Codex) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+> - S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
 
 ## Purpose
 
@@ -61,7 +61,7 @@ Structural. `error.rs` gains six named refusals. Each message begins with its na
 - C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs.
 
 **Stories:**
-- S8 (Agent, Continues a session imported from Claude Code on Codex) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+- S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
 
 #### R1 — Execution record
 
@@ -76,7 +76,7 @@ Structural. `error.rs` gains six named refusals. Each message begins with its na
 - Checklist delivery:
   - [x] C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs. — met; see how
 - Story delivery:
-  - [x] S8 (Agent, Continues a session imported from Claude Code on Codex) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
+  - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
 ### R2: Let a handover's lys.inherited entry carry no rule, and make the canon refuse an example without one
 
@@ -106,7 +106,7 @@ Structural, then behaviour. In `record/canon.rs`, `Inherited.rule` becomes `Opti
 - C45 — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs.
 
 **Stories:**
-- S8 (Agent, Continues a session imported from Claude Code on Codex) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+- S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
 
 #### R2 — Execution record
 
@@ -124,7 +124,7 @@ Structural, then behaviour. In `record/canon.rs`, `Inherited.rule` becomes `Opti
 - Checklist delivery:
   - [x] C45 — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs. — met; see how
 - Story delivery:
-  - [x] S8 (Agent, Continues a session imported from Claude Code on Codex) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
+  - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
 ### R3: Take a letter from the outgoing session and refuse by name before anything is written
 
@@ -149,7 +149,7 @@ WHEN a handover is asked for with an outgoing home, a from session id, a list of
 - C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs.
 
 **Stories:**
-- S8 (Agent, Continues a session imported from Claude Code on Codex) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+- S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
 
 #### R3 — Execution record
 
@@ -164,7 +164,7 @@ WHEN a handover is asked for with an outgoing home, a from session id, a list of
 - Checklist delivery:
   - [x] C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs. — met; see how
 - Story delivery:
-  - [x] S8 (Agent, Continues a session imported from Claude Code on Codex) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
+  - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
 ### R4: Write the successor home: the lys.inherited entry, the letter copied whole, then the session_info name
 
@@ -190,7 +190,7 @@ WHEN every check of R3 passes, THE SYSTEM SHALL open the successor path as a new
 - C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it.
 
 **Stories:**
-- S8 (Agent, Continues a session imported from Claude Code on Codex) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+- S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
 
 #### R4 — Execution record
 
@@ -207,7 +207,7 @@ WHEN every check of R3 passes, THE SYSTEM SHALL open the successor path as a new
   - [x] C48 — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line. — met; see how
   - [x] C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it. — met; see how
 - Story delivery:
-  - [x] S8 (Agent, Continues a session imported from Claude Code on Codex) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
+  - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
 ### R5: Give lys-home the handover subcommand
 
@@ -227,7 +227,7 @@ WHEN `lys-home handover --home <dir> --from <session> --letter <entry id>... --s
 - C50 — Every public path lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolves as before the move, and no crate outside lys-home changes.
 
 **Stories:**
-- S8 (Agent, Continues a session imported from Claude Code on Codex) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+- S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
 
 #### R5 — Execution record
 
@@ -241,7 +241,7 @@ WHEN `lys-home handover --home <dir> --from <session> --letter <entry id>... --s
 - Checklist delivery:
   - [x] C50 — Every public path lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolves as before the move, and no crate outside lys-home changes. — met; see how
 - Story delivery:
-  - [x] S8 (Agent, Continues a session imported from Claude Code on Codex) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
+  - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
 ### R6: Render the successor for its own model and for another
 
@@ -261,7 +261,7 @@ WHILE rendering a successor for Claude Code, THE SYSTEM SHALL apply R4's rule as
 - C51 — Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass.
 
 **Stories:**
-- S2 (Agent, Continues a session imported from Claude Code on Codex) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
+- S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
 
 #### R6 — Execution record
 
@@ -275,7 +275,7 @@ WHILE rendering a successor for Claude Code, THE SYSTEM SHALL apply R4's rule as
 - Checklist delivery:
   - [x] C51 — Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass. — met; see how
 - Story delivery:
-  - [x] S2 (Agent, Continues a session imported from Claude Code on Codex) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it. — served for the handover
+  - [x] S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it. — served for the handover
 
 ### R7: Write the handover into the record document and render the cluster
 
@@ -299,7 +299,7 @@ Structural. RECORD.md's `lys.inherited` item gains the handover form: the data `
 - C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it.
 
 **Stories:**
-- S8 (Agent, Continues a session imported from Claude Code on Codex) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+- S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
 
 #### R7 — Execution record
 
@@ -318,7 +318,7 @@ Structural. RECORD.md's `lys.inherited` item gains the handover form: the data `
   - [x] C48 — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line. — met; see how
   - [x] C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it. — met; see how
 - Story delivery:
-  - [x] S8 (Agent, Continues a session imported from Claude Code on Codex) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
+  - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
 ### R8: Prove the handover on an elicited letter and measure the carry-over of its signed thinking
 
@@ -339,7 +339,7 @@ WHEN the build is complete, THE SYSTEM SHALL write PROOF-HANDOVER.md from runs o
 
 **Stories:**
 - S5 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
-- S2 (Agent, Continues a session imported from Claude Code on Codex) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
+- S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
 
 #### R8 — Execution record
 
@@ -354,7 +354,7 @@ WHEN the build is complete, THE SYSTEM SHALL write PROOF-HANDOVER.md from runs o
   - [x] C52 — PROOF-HANDOVER.md records the handover of an elicited letter by ids, hashes and the signature comparison, whether the inherited signed block appears in a resumed continuation's own file on the installed Claude Code beside 2.1.281, and the seeded and plain card counts as not run. — met; see how
 - Story delivery:
   - [x] S5 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught. — served for the handover
-  - [x] S2 (Agent, Continues a session imported from Claude Code on Codex) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it. — served for the handover
+  - [x] S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it. — served for the handover
 
 ## Boundaries
 

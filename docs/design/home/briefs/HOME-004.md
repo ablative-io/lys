@@ -23,9 +23,9 @@ title: Light a lantern at an entry of a session, grow its note by epilogues, and
 > - C29 — Three lys-home subcommands light a lantern, add an epilogue and recall, each printing one JSON report that carries no transcript line.
 > - C30 — A lantern lives in the home: the rendered Claude Code file of a session carries no lantern or epilogue line, a home file holding them still parses with Pi's parser unchanged, and nothing lights a lantern automatically.
 > **Stories:**
-> - S14 (Agent, Continues a session imported from Claude Code on Codex) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
-> - S15 (Agent, Continues a session imported from Claude Code on Codex) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
-> - S16 (Agent, Continues a session imported from Claude Code on Codex) — As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+> - S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+> - S15 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
+> - S16 (Agent, Runs in a harness and wants to continue somewhere else) — As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
 > - S17 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
 
 ## Purpose
@@ -59,8 +59,8 @@ Structure: add the custom-type constants `CUSTOM_LANTERN = "lys.lantern"` and `C
 - C24 — A lantern is a lys.lantern custom entry appended at the session's head, naming an existing entry of that session that is not a lantern or an epilogue as its point, with the note as written, lit-by and lit-at; an epilogue is a lys.lantern_epilogue custom entry naming the lantern's entry id with its words, author and time; both are documented beside the other lys custom entries.
 
 **Stories:**
-- S14 (Agent, Continues a session imported from Claude Code on Codex) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
-- S15 (Agent, Continues a session imported from Claude Code on Codex) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
+- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+- S15 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
 
 ### R2: Read a session without owning it, and list a home's sessions
 
@@ -83,7 +83,7 @@ Add a read-only session reader. WHEN a session is read through it, THE SYSTEM SH
 - C27 — Recall reads without owning: it takes no session lock and writes no file, and a session it cannot read is skipped and named with its reason while every other session is still listed.
 
 **Stories:**
-- S16 (Agent, Continues a session imported from Claude Code on Codex) — As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+- S16 (Agent, Runs in a harness and wants to continue somewhere else) — As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
 
 ### R3: Light a lantern at an entry of a session
 
@@ -111,7 +111,7 @@ WHEN a lantern is lit with a home, a session id, the entry id of the point, a no
 - C25 — Lighting only appends: the session's earlier bytes are unchanged and the head is the lantern; a point that is not an entry of the session, a lantern or epilogue as the point, an empty or whitespace-only note, and a session another owner holds are each refused by name with nothing written.
 
 **Stories:**
-- S14 (Agent, Continues a session imported from Claude Code on Codex) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
 
 ### R4: Add an epilogue to a named lantern
 
@@ -136,7 +136,7 @@ WHEN an epilogue is added with a home, a session id, the lantern's entry id, the
 - C26 — An epilogue is added to a named lantern of a session and appended at that session's head; a lantern the session does not hold and empty or whitespace-only words are each refused by name with nothing written.
 
 **Stories:**
-- S15 (Agent, Continues a session imported from Claude Code on Codex) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
+- S15 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
 
 ### R5: Recall lanterns by note and by point
 
@@ -168,7 +168,7 @@ Recall reads through the R2 reader only. WHEN recall by note is asked with some 
 - C28 — Recall by note lists every lantern in the home whose note or one of whose epilogues contains the given words as one phrase, case-folded; recall by point lists every lantern marking a session and entry id, and refuses an unknown session or entry by name; every row is the lantern's id, session, point, lit-by, lit-at, note and its epilogues in order, and never a line of the transcript.
 
 **Stories:**
-- S16 (Agent, Continues a session imported from Claude Code on Codex) — As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+- S16 (Agent, Runs in a harness and wants to continue somewhere else) — As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
 
 ### R6: Add the lantern subcommands to lys-home
 
@@ -197,9 +197,9 @@ Add a nested `lantern` subcommand to lys-home with three actions, in their own m
 - C29 — Three lys-home subcommands light a lantern, add an epilogue and recall, each printing one JSON report that carries no transcript line.
 
 **Stories:**
-- S14 (Agent, Continues a session imported from Claude Code on Codex) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
-- S15 (Agent, Continues a session imported from Claude Code on Codex) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
-- S16 (Agent, Continues a session imported from Claude Code on Codex) — As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+- S15 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
+- S16 (Agent, Runs in a harness and wants to continue somewhere else) — As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
 
 ### R7: Keep the lantern in the home
 
