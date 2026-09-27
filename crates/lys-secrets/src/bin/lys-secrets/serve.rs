@@ -52,6 +52,7 @@ pub fn serve(broker: Broker<Grants>, layout: Layout, listen: &str) -> Result<(),
             .route("/_lys/secrets", axum::routing::get(crate::view::secrets))
             .route("/_lys/audit", axum::routing::get(crate::view::audit))
             .route("/_lys/grants", axum::routing::get(crate::view::grants))
+            .route("/_lys/next-account", axum::routing::post(next_account))
             .fallback(proxy)
             .with_state(shared);
         axum::serve(listener, app)
@@ -74,6 +75,68 @@ fn header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
 async fn proxy(State(shared): State<Arc<Shared>>, request: Request) -> Response {
     match forward(&shared, request).await {
         Ok(response) => response,
+        Err((status, error)) => refusal(status, &error),
+    }
+}
+
+/// The handle and the presentation a request carries, the presentation
+/// bound to the digest of this very request.
+fn signed(
+    parts: &axum::http::request::Parts,
+    body: &[u8],
+) -> Result<(HandleToken, Presentation), (StatusCode, SecretsError)> {
+    let bad = |error: SecretsError| (StatusCode::BAD_REQUEST, error);
+    let request = request_digest(
+        parts.method.as_str(),
+        parts
+            .uri
+            .path_and_query()
+            .map_or("/", |whole| whole.as_str()),
+        body,
+    )
+    .map_err(bad)?;
+    let unsigned = || SecretsError::PresentationInvalid {
+        handle: String::new(),
+    };
+    let token = header(&parts.headers, "lys-handle")
+        .and_then(from_hex)
+        .ok_or_else(|| bad(SecretsError::HandleUnknown))?;
+    let presentation = Presentation::from_wire(
+        header(&parts.headers, "lys-handle-id").ok_or_else(|| bad(unsigned()))?,
+        header(&parts.headers, "lys-operation").ok_or_else(|| bad(unsigned()))?,
+        header(&parts.headers, "lys-signed-at").ok_or_else(|| bad(unsigned()))?,
+        header(&parts.headers, "lys-presentation").ok_or_else(|| bad(unsigned()))?,
+        request,
+    )
+    .map_err(bad)?;
+    Ok((HandleToken::from_bytes(&token), presentation))
+}
+
+/// The holder of a handle asks for the secret's next account, for example
+/// at the current one's usage limit. The answer names the account, never
+/// its value.
+async fn next_account(State(shared): State<Arc<Shared>>, request: Request) -> Response {
+    let (parts, body) = request.into_parts();
+    let asked = async {
+        let body = axum::body::to_bytes(body, MAX_BODY)
+            .await
+            .map_err(|error| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    SecretsError::Encoding {
+                        context: "request body",
+                        reason: error.to_string(),
+                    },
+                )
+            })?;
+        let (token, presentation) = signed(&parts, &body)?;
+        let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
+        broker
+            .next_account_for(&token, &presentation)
+            .map_err(|error| (StatusCode::FORBIDDEN, error))
+    };
+    match asked.await {
+        Ok(account) => (StatusCode::OK, format!("now {account}\n")).into_response(),
         Err((status, error)) => refusal(status, &error),
     }
 }
@@ -106,29 +169,7 @@ async fn forward(
                 reason: error.to_string(),
             })
         })?;
-    let request = request_digest(
-        parts.method.as_str(),
-        parts
-            .uri
-            .path_and_query()
-            .map_or("/", |whole| whole.as_str()),
-        &body,
-    )
-    .map_err(bad)?;
-    let unsigned = || SecretsError::PresentationInvalid {
-        handle: String::new(),
-    };
-    let token = header(&parts.headers, "lys-handle")
-        .and_then(from_hex)
-        .ok_or_else(|| bad(SecretsError::HandleUnknown))?;
-    let presentation = Presentation::from_wire(
-        header(&parts.headers, "lys-handle-id").ok_or_else(|| bad(unsigned()))?,
-        header(&parts.headers, "lys-operation").ok_or_else(|| bad(unsigned()))?,
-        header(&parts.headers, "lys-signed-at").ok_or_else(|| bad(unsigned()))?,
-        header(&parts.headers, "lys-presentation").ok_or_else(|| bad(unsigned()))?,
-        request,
-    )
-    .map_err(bad)?;
+    let (token, presentation) = signed(&parts, &body)?;
     let reserve = match header(&parts.headers, "lys-reserve") {
         None => 0,
         Some(text) => text.parse::<u64>().map_err(|_number| {
@@ -140,7 +181,7 @@ async fn forward(
     };
     let admitted = {
         let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
-        broker.admit_use(&HandleToken::from_bytes(&token), &presentation, reserve)
+        broker.admit_use(&token, &presentation, reserve)
     }
     .map_err(|error| (StatusCode::FORBIDDEN, error))?;
     let ticket = match admitted {

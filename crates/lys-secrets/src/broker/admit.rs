@@ -47,13 +47,13 @@ impl<P: PermissionCheck> Broker<P> {
         found
     }
 
-    pub(super) fn admit(
+    /// The handle `token` names, when `presentation` is signed for it by the
+    /// key it is bound to.
+    pub(super) fn presented(
         &self,
         token: &HandleToken,
         presentation: &Presentation,
-        (operation, mark): (&str, &str),
-        reserve: u64,
-    ) -> Result<Admission, SecretsError> {
+    ) -> Result<&HandleRecord, SecretsError> {
         let record = self.find(token).ok_or(SecretsError::HandleUnknown)?;
         let key: [u8; 32] = unhex(&record.holder_key)
             .and_then(|bytes| bytes.try_into().ok())
@@ -66,15 +66,16 @@ impl<P: PermissionCheck> Broker<P> {
             });
         }
         presentation.verify(&key)?;
-        check_operation_id(&presentation.operation_id)?;
-        if let Some((outcome, held)) = record.operations.get(operation) {
-            if held != mark {
-                return Err(SecretsError::OperationIdReused {
-                    operation: operation.to_owned(),
-                });
-            }
-            return Ok(Admission::Retry(outcome.clone()));
-        }
+        Ok(record)
+    }
+
+    /// Whether the presentation is fresh, and the handle not dropped and
+    /// inside its window.
+    pub(super) fn live(
+        &self,
+        record: &HandleRecord,
+        presentation: &Presentation,
+    ) -> Result<(), SecretsError> {
         let now = (self.clock)();
         let skew = now.saturating_sub(presentation.signed_at_ms);
         if skew.abs() > PRESENTATION_SKEW_MS {
@@ -93,18 +94,45 @@ impl<P: PermissionCheck> Broker<P> {
                 handle: record.id.clone(),
             });
         }
+        Ok(())
+    }
+
+    /// Whether the handle's identity still holds the use relation.
+    pub(super) fn permitted(&self, record: &HandleRecord) -> Result<(), SecretsError> {
+        self.permissions
+            .may_use(&record.identity, &record.secret)
+            .map(|_permit| ())
+            .map_err(|denied| SecretsError::PermissionDenied {
+                holder: record.identity.clone(),
+                secret: record.secret.clone(),
+                reason: denied.reason,
+            })
+    }
+
+    pub(super) fn admit(
+        &self,
+        token: &HandleToken,
+        presentation: &Presentation,
+        (operation, mark): (&str, &str),
+        reserve: u64,
+    ) -> Result<Admission, SecretsError> {
+        let record = self.presented(token, presentation)?;
+        check_operation_id(&presentation.operation_id)?;
+        if let Some((outcome, held)) = record.operations.get(operation) {
+            if held != mark {
+                return Err(SecretsError::OperationIdReused {
+                    operation: operation.to_owned(),
+                });
+            }
+            return Ok(Admission::Retry(outcome.clone()));
+        }
+        self.live(record, presentation)?;
         if record.used >= record.max_uses {
             return Err(SecretsError::LeaseExhausted {
                 handle: record.id.clone(),
             });
         }
-        if let Err(denied) = self.permissions.may_use(&record.identity, &record.secret) {
-            return Err(SecretsError::PermissionDenied {
-                holder: record.identity.clone(),
-                secret: record.secret.clone(),
-                reason: denied.reason,
-            });
-        }
+        self.permitted(record)?;
         let reserved = match record.spend_cap {
             None => None,
             Some(_cap) if reserve == 0 => {

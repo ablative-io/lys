@@ -3,6 +3,7 @@
 
 use crate::audit::AuditKind;
 use crate::error::SecretsError;
+use crate::handle::{HandleToken, Presentation};
 use crate::permission::PermissionCheck;
 use crate::secret::Secret;
 
@@ -60,6 +61,46 @@ impl<P: PermissionCheck> Broker<P> {
                     None,
                     refusal.name(),
                 )?;
+                Err(refusal)
+            }
+        }
+    }
+
+    /// As [`Broker::next_account`], asked by the holder of a handle on the
+    /// secret: the handle, its presentation, its window and its permission
+    /// are checked as for a use, and the ask counts no use. A refused ask is
+    /// one audit line under the refusal's name.
+    ///
+    /// # Errors
+    ///
+    /// The presentation and lease refusals of a use, and those of
+    /// [`Broker::next_account`].
+    pub fn next_account_for(
+        &mut self,
+        token: &HandleToken,
+        presentation: &Presentation,
+    ) -> Result<String, SecretsError> {
+        let checked = self.presented(token, presentation).and_then(|record| {
+            self.live(record, presentation)?;
+            self.permitted(record)?;
+            Ok(record.secret.clone())
+        });
+        match checked {
+            Ok(secret) => self.next_account(&secret),
+            Err(refusal) => {
+                let found = self.find(token).map(|record| {
+                    (
+                        record.id.clone(),
+                        record.identity.clone(),
+                        record.secret.clone(),
+                    )
+                });
+                let subject = found
+                    .as_ref()
+                    .map_or((None, None, None), |(id, who, what)| {
+                        (Some(id.as_str()), Some(who.as_str()), Some(what.as_str()))
+                    });
+                self.record(AuditKind::NextAccount, subject, None, None, refusal.name())?;
                 Err(refusal)
             }
         }
