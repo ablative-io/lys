@@ -196,7 +196,7 @@
         },
         {
           "id": "C33",
-          "text": "The rauthy-ready leg starts the Rauthy image named by digest in deploy/identity/versions.json, whose revision label equals the vendor/rauthy pin, against a scratch PostgreSQL container from the digest there, and exits 0 only when Rauthy answers ready.",
+          "text": "The rauthy-ready leg starts the Rauthy image recorded by its local image ID in deploy/identity/versions.json, whose revision label equals the vendor/rauthy pin, against a scratch PostgreSQL container from the digest reference there, and exits 0 only when Rauthy answers ready.",
           "done": false
         },
         {

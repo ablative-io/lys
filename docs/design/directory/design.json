@@ -616,7 +616,7 @@
     {
       "path": "docs/design/project.json",
       "note": "the lys design project file; gains the rauthy-ready demand leg",
-      "brief": ""
+      "brief": "DIRECTORY-009"
     },
     {
       "path": "scripts/identity-gates/rauthy_ready.py",

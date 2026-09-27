@@ -33,3 +33,11 @@
 **S11.** As a person granting temporary access, I want its end date and ancestor restrictions enforced, so role changes or reinstatement cannot silently extend it.
 
 **S12.** As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
+
+## Release reviewer — Closes the release's missing Rauthy check with a measurement
+
+**S13.** As the release reviewer, I want a gate leg I can ask for that starts the pinned Rauthy against a scratch database and passes only when it answers ready, so that the release's Rauthy blocker is closed by a measured result rather than a claim.
+
+## Operator — Runs the Rauthy readiness leg at the venue
+
+**S14.** As the operator running the readiness leg, I want every missing prerequisite refused by name, so that I know exactly what to put in place and never mistake a skipped check for a pass.

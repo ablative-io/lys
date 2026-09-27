@@ -47,3 +47,13 @@
 - [ ] **C28** — Observed grant usage names its source and time; not seen is not reported as never used.
 - [ ] **C29** — The You and delegation screens show real server authority, separate service accounts from sign-in identities, and preserve personal versus administrator visibility.
 - [ ] **C30** — The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success.
+
+## The Rauthy readiness gate leg (DIRECTORY-009)
+
+- [ ] **C31** — docs/design/project.json declares the rauthy-ready leg with cadence demand and a requires list naming tool:python3, tool:docker and tool:git, its seven existing legs unchanged, and the file validates against the project schema.
+- [ ] **C32** — The directory cluster's design.json gate carries the same rauthy-ready leg with cadence demand, and the directory documents validate with it present.
+- [ ] **C33** — The rauthy-ready leg starts the Rauthy image recorded by its local image ID in deploy/identity/versions.json, whose revision label equals the vendor/rauthy pin, against a scratch PostgreSQL container from the digest reference there, and exits 0 only when Rauthy answers ready.
+- [ ] **C34** — A missing container runtime, a missing Rauthy image, a missing PostgreSQL image, and a Rauthy revision label that is absent or other than the pin each make the leg refuse by name with a non-zero exit; the leg never pulls, builds or relabels an image and never passes by skipping.
+- [ ] **C35** — After every run, passing or not, no container, network or volume the leg created remains, and no object it did not create was touched.
+- [ ] **C36** — A test run by a round leg searches the leg's complete output for every secret value the runtime received, asserts how many it searched for, and finds none.
+- [ ] **C37** — .land/gates.sh is unchanged and no round-cadence leg is added.

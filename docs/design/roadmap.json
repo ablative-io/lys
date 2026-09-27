@@ -337,7 +337,7 @@
       "title": "Start and check the pinned Rauthy in a demand gate leg",
       "status": "idea",
       "kind": "feature",
-      "summary": "One gate leg, cadence demand, declared in docs/design/project.json and in the directory cluster's gate. It starts the Rauthy image whose revision label equals the vendor/rauthy pin against a scratch PostgreSQL container, both named by digest in DIRECTORY-002's deploy/identity/versions.json. It passes only when Rauthy answers ready and removes everything it made. It refuses by name when the runtime or an image is missing, and it lets no secret into its output, which a round-leg test proves. It closes the release row's missing Rauthy check; .land/gates.sh is not changed.",
+      "summary": "One gate leg, cadence demand, declared in docs/design/project.json and in the directory cluster's gate. It starts the Rauthy image whose revision label equals the vendor/rauthy pin against a scratch PostgreSQL container, the Rauthy image by its local image ID and PostgreSQL by its digest reference, both read from DIRECTORY-002's deploy/identity/versions.json. It passes only when Rauthy answers ready and removes everything it made. It refuses by name when the runtime or an image is missing, and it lets no secret into its output, which a round-leg test proves. It closes the release row's missing Rauthy check; .land/gates.sh is not changed.",
       "provenance": {
         "requested_by": "tom",
         "date": "2026-09-27T13:26:00+10:00",

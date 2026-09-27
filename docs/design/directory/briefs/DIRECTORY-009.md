@@ -1,0 +1,154 @@
+---
+type: brief
+id: DIRECTORY-009
+cluster: directory
+title: Start the pinned Rauthy against a scratch PostgreSQL in a demand gate leg and pass only when it answers ready
+---
+
+# DIRECTORY-009: Start the pinned Rauthy against a scratch PostgreSQL in a demand gate leg and pass only when it answers ready
+
+> **Cluster:** directory
+> **Depends on:** DIRECTORY-002
+> **Blocked by:** DIRECTORY-002 has landed: a stranger checks it with git cat-file -e origin/main:deploy/identity/versions.json, which exits 0 only once the file that records the Rauthy image ID and the PostgreSQL digest reference is on main. This brief reads that file and duplicates neither., An image built from ablative-io/rauthy at the vendor/rauthy pin exists at the venue, and that build itself set its org.opencontainers.image.revision label to the pin commit. deploy/identity/versions.json records that image by its local image ID, the sha256 content ID that docker image inspect --format '{{.Id}}' prints, beside the pinned revision, and never as <repo>@sha256:<digest>; no registry is involved and the image is never pushed or pulled. A stranger checks it with docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' on the Rauthy image ID in versions.json, which prints the output of git rev-parse HEAD:vendor/rauthy only once that image is in place. Measured at main 7b53625: the pin is dd61ac3c84d6b238108dc8438b53043b5177a662, and the upstream ghcr.io/sebadob/rauthy:0.36.2 image (sha256:f7d3c501402165e023edbd958b032b41c9cfdac5ea7f8ca7d62217327145577e) carries no org.opencontainers.image.revision label, so R1 refuses it as rauthy_revision_mismatch. A label written onto an image not built from the pin is refused as a source, and there is no fallback. Building the image is venue work outside this brief.
+> **Design anchor:**
+> - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
+> - ADR-005 — The identity database is PostgreSQL, possibly on a network device — PostgreSQL is used for the identity product's database. It may be set up on one of the network devices rather than on Tom's Mac.
+> - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
+> **Checklist:**
+> - C31 — docs/design/project.json declares the rauthy-ready leg with cadence demand and a requires list naming tool:python3, tool:docker and tool:git, its seven existing legs unchanged, and the file validates against the project schema.
+> - C32 — The directory cluster's design.json gate carries the same rauthy-ready leg with cadence demand, and the directory documents validate with it present.
+> - C33 — The rauthy-ready leg starts the Rauthy image recorded by its local image ID in deploy/identity/versions.json, whose revision label equals the vendor/rauthy pin, against a scratch PostgreSQL container from the digest reference there, and exits 0 only when Rauthy answers ready.
+> - C34 — A missing container runtime, a missing Rauthy image, a missing PostgreSQL image, and a Rauthy revision label that is absent or other than the pin each make the leg refuse by name with a non-zero exit; the leg never pulls, builds or relabels an image and never passes by skipping.
+> - C35 — After every run, passing or not, no container, network or volume the leg created remains, and no object it did not create was touched.
+> - C36 — A test run by a round leg searches the leg's complete output for every secret value the runtime received, asserts how many it searched for, and finds none.
+> - C37 — .land/gates.sh is unchanged and no round-cadence leg is added.
+> **Stories:**
+> - S13 (Release reviewer, Closes the release's missing Rauthy check with a measurement) — As the release reviewer, I want a gate leg I can ask for that starts the pinned Rauthy against a scratch database and passes only when it answers ready, so that the release's Rauthy blocker is closed by a measured result rather than a claim.
+> - S14 (Operator, Runs the Rauthy readiness leg at the venue) — As the operator running the readiness leg, I want every missing prerequisite refused by name, so that I know exactly what to put in place and never mistake a skipped check for a pass.
+
+## Purpose
+
+DIRECTORY-002 will install the maintained Rauthy, SpiceDB and one PostgreSQL database, but no gate leg starts the Rauthy container and checks it, and the release row holds that gap as a blocker. This brief adds one gate leg, cadence demand, to the lys design project file and to the directory cluster's gate. The leg starts the Rauthy pinned in vendor/rauthy in a container against a scratch PostgreSQL container, waits for Rauthy's readiness answer, then stops and removes everything it made. It passes only on that answer, refuses by name when the runtime or an image is missing, and lets no secret into its output. A test run by a round leg proves the last of these by searching the output for every secret value the runtime received.
+
+## Task
+
+Write the leg's command as one standard-library Python script at scripts/identity-gates/rauthy_ready.py (R1). Write a Rust integration test at crates/lys/tests/rauthy_ready_leg.rs that runs the script against a stub container runtime and counts what fired (R2). Append the leg to docs/design/project.json (R3) and to the directory cluster's design.json gate (R4). How a person asks for the leg until the method can: from the repository root on the venue, run `python3 scripts/identity-gates/rauthy_ready.py`. The request path inside the method's ledger is design-system card 9jJgCzeG and is out of scope here. That card also carries the acceptance line that a round records rauthy-ready as Unmeasured, with a reason containing 'requires tool:docker', on a venue declaring no tool:docker. This brief does not claim that line, and it lands without it. In scope: the one script, the one test file, one appended leg in each of the two design files, and the directory cluster's rendered markdown that render-cluster.py rewrites from the amended design.json. Out of scope: .land/gates.sh, which is not changed; every existing leg; any round-cadence leg; SpiceDB; building or pulling any image; moving the vendor/rauthy pin; any file under deploy/identity/, which is DIRECTORY-002's and is read, never written. The script is a check, not a provisioning engine: it installs nothing durable, and every object it creates is removed before it exits. That keeps it clear of DIRECTORY-002's boundary against a Python or shell provisioning engine. It reads the image references DIRECTORY-002 records and provisions nothing that DIRECTORY-002's lys identity subcommands own.
+
+## Requirements
+
+### R1: Start the pinned Rauthy against a scratch PostgreSQL container, pass only on its ready answer, and remove everything the leg made
+
+WHEN python3 scripts/identity-gates/rauthy_ready.py runs, THE SYSTEM SHALL do the following, in order. (1) Read the vendor/rauthy pin as the commit git rev-parse HEAD:vendor/rauthy prints in the repository the script lives in; the submodule need not be initialised. (2) Read from deploy/identity/versions.json the Rauthy image, recorded by its local image ID (sha256: followed by 64 hexadecimal characters, as docker image inspect --format '{{.Id}}' prints it), and the PostgreSQL image, named by its @sha256: digest reference. (3) Check that the container runtime answers: the docker client is on PATH and docker version reaches its daemon. (4) Check that each image is present locally with docker image inspect of the Rauthy image ID and of the PostgreSQL digest reference. (5) Read the Rauthy image's org.opencontainers.image.revision label and compare it with the pin. (6) Create one network, one PostgreSQL container and one Rauthy container. Each carries the name lys-rauthy-ready-<run>-<role>, where <run> is 16 random hexadecimal characters drawn for that run, and the label io.lys.gate.rauthy-ready=<run>. The PostgreSQL container publishes no host port. The Rauthy container publishes its HTTP port only on 127.0.0.1, with a host port the runtime picks. Every docker run carries --pull never. (7) Wait until docker exec pg_isready succeeds in the PostgreSQL container. (8) Read the Rauthy container's published port with docker port and poll http://127.0.0.1:<that port>/auth/v1/health. The Rauthy container is started with HEALTH_CHECK_DELAY_SECS=0, so the early answer Rauthy gives inside that delay cannot count. (9) Pass only when that endpoint answers HTTP 200 with a JSON body whose db_healthy and cache_healthy are both true, printing one line beginning 'ready:' to stdout and exiting 0. (10) On every exit path, pass, refusal, failure or interruption by SIGINT or SIGTERM, stop and remove each container with its anonymous volumes, then the network, then the private temporary directory. The removal goes by the exact names this run created. The leg generates five secret values from Python's secrets module and hands them to the runtime only through --env-file files created with mode 0600 in that temporary directory. The five are the PostgreSQL password (POSTGRES_PASSWORD for PostgreSQL, PG_PASSWORD for Rauthy), ENC_KEYS, BOOTSTRAP_ADMIN_PASSWORD_PLAIN, HQL_SECRET_RAFT and HQL_SECRET_API. IF the docker client is absent from PATH, THEN THE SYSTEM SHALL refuse as container_runtime_missing, and it SHALL do the same when docker version cannot reach the daemon. IF docker image inspect of the Rauthy image ID fails, THEN THE SYSTEM SHALL refuse as image_missing, naming rauthy and that image ID. IF the PostgreSQL image is not present locally, THEN THE SYSTEM SHALL refuse as image_missing, naming postgres and the digest reference, and SHALL tell the operator to pull that digest reference before running. IF the revision label is absent, THEN THE SYSTEM SHALL refuse as rauthy_revision_mismatch. The refusal says the image carries no revision label, contains the word 'absent', names the pin, and names the build command that makes a labelled image: `docker buildx build --label org.opencontainers.image.revision=<pin> --load .`, run in the Rauthy source checked out at the pin, with <pin> written out as the pin commit. IF the revision label differs from the pin, THEN THE SYSTEM SHALL refuse as rauthy_revision_mismatch, naming the label's value and the pin. IF git cannot read the pin, THEN THE SYSTEM SHALL refuse as rauthy_pin_unreadable. IF deploy/identity/versions.json is absent, THEN THE SYSTEM SHALL refuse as versions_unreadable, and it SHALL do the same when the file lacks the Rauthy image ID or the PostgreSQL digest reference. IF pg_isready has not succeeded within 60 seconds, THEN THE SYSTEM SHALL refuse as readiness_timeout, naming postgres and the bound. IF Rauthy has not answered ready within 60 seconds, THEN THE SYSTEM SHALL refuse as readiness_timeout, naming rauthy and the bound. IF a runtime command the leg issues exits non-zero, THEN THE SYSTEM SHALL refuse as runtime_step_failed, naming the step and the exit status. Every refusal is one line on stderr of the form 'refused: <name>: <detail>' and exits 1. All checks (1) to (5) complete before anything is created, so a refusal among them creates nothing. THE SYSTEM SHALL NOT pull, build, tag or relabel an image, SHALL NOT refer to the Rauthy image by a <repo>@sha256:<digest> reference, and it SHALL NOT accept an image with no revision label on any other evidence. THE SYSTEM SHALL NOT exit 0 on any path except the ready answer, and it SHALL NOT report a missing prerequisite as a skip. THE SYSTEM SHALL NOT probe a fixed port or any port read from another container. THE SYSTEM SHALL NOT stop, remove, or connect to any container, network or volume it did not create in this run. THE SYSTEM SHALL NOT print a secret value, container logs, docker inspect output of a container, the runtime's own stdout or stderr, or the contents of an env file. THE SYSTEM SHALL NOT pass a secret value on a command line. THE SYSTEM SHALL NOT start SpiceDB, and it SHALL NOT write any file outside its private temporary directory.
+
+**Acceptance:**
+- On a venue with docker, the Rauthy image ID and the PostgreSQL digest reference recorded in deploy/identity/versions.json present locally, and the Rauthy image's org.opencontainers.image.revision label equal to git rev-parse HEAD:vendor/rauthy, running `python3 scripts/identity-gates/rauthy_ready.py` from the repository root exits 0 and prints exactly one stdout line beginning 'ready:'.
+- On that venue, `docker ps -aq --filter label=io.lys.gate.rauthy-ready` prints 0 lines after the passing run, and `docker network ls -q --filter label=io.lys.gate.rauthy-ready` prints 0 lines after the passing run.
+- On that venue, `docker volume ls -q | wc -l` prints the same number before and after the passing run.
+- On that venue, `docker ps -a --format '{{.ID}} {{.State}} {{.Label "io.lys.gate.rauthy-ready"}}'` lines whose label field is empty are identical before and after the passing run.
+- On a machine whose PATH holds python3 and git but no docker, running `python3 scripts/identity-gates/rauthy_ready.py` from the repository root exits 1, prints no 'ready:' line, and prints to stderr a line beginning 'refused: container_runtime_missing'.
+- With the vendor/rauthy pin at dd61ac3c84d6b238108dc8438b53043b5177a662 and the Rauthy image ID in versions.json naming an image carrying no org.opencontainers.image.revision label, the run exits 1 with a stderr line beginning 'refused: rauthy_revision_mismatch'. That line contains 'absent', contains dd61ac3c84d6b238108dc8438b53043b5177a662, and contains 'docker buildx build --label org.opencontainers.image.revision=dd61ac3c84d6b238108dc8438b53043b5177a662'. Afterwards `docker ps -aq --filter label=io.lys.gate.rauthy-ready` prints 0 lines.
+- On that venue, `docker image ls -q --no-trunc | sort` prints identical lines before and after the passing run.
+
+**Files:**
+- create: scripts/identity-gates/rauthy_ready.py
+
+**Checklist:**
+- C33 — The rauthy-ready leg starts the Rauthy image recorded by its local image ID in deploy/identity/versions.json, whose revision label equals the vendor/rauthy pin, against a scratch PostgreSQL container from the digest reference there, and exits 0 only when Rauthy answers ready.
+- C34 — A missing container runtime, a missing Rauthy image, a missing PostgreSQL image, and a Rauthy revision label that is absent or other than the pin each make the leg refuse by name with a non-zero exit; the leg never pulls, builds or relabels an image and never passes by skipping.
+- C35 — After every run, passing or not, no container, network or volume the leg created remains, and no object it did not create was touched.
+
+**Stories:**
+- S13 (Release reviewer, Closes the release's missing Rauthy check with a measurement) — As the release reviewer, I want a gate leg I can ask for that starts the pinned Rauthy against a scratch database and passes only when it answers ready, so that the release's Rauthy blocker is closed by a measured result rather than a claim.
+- S14 (Operator, Runs the Rauthy readiness leg at the venue) — As the operator running the readiness leg, I want every missing prerequisite refused by name, so that I know exactly what to put in place and never mistake a skipped check for a pass.
+
+### R2: Run the leg against a stub runtime in a round-leg test, counting refusals, cleanup, the probe and every secret it searched for
+
+THE SYSTEM SHALL add the Rust integration test crates/lys/tests/rauthy_ready_leg.rs, run by the tests leg (cargo test --workspace --all-features), which runs `python3 scripts/identity-gates/rauthy_ready.py` as a child process from the repository root. PATH starts with a temporary directory holding a stub docker executable that the test writes. The stub appends every argv it receives to a record file. When it receives --env-file, it copies that file's contents into the record, so the record holds what the runtime was actually given. The test supplies the versions file the script reads, holding a Rauthy image ID and a PostgreSQL digest reference of its own making. The stub answers version, image inspect, the revision label or its absence, network create, run, exec pg_isready, port, stop, rm and network rm as the case under test directs. The port it reports belongs to a std::net::TcpListener the test runs on 127.0.0.1, which answers /auth/v1/health as the case directs and counts the requests it receives. The test reads the expected pin itself with git rev-parse HEAD:vendor/rauthy. The secret values it searches for SHALL be the ones the stub record shows the runtime received for POSTGRES_PASSWORD, PG_PASSWORD, ENC_KEYS, BOOTSTRAP_ADMIN_PASSWORD_PLAIN, HQL_SECRET_RAFT and HQL_SECRET_API, and never values the test or the script substitutes. The test SHALL search the child's complete stdout and stderr for each distinct value, both as written and as its lowercase hexadecimal. IF python3 or git is absent from the test's environment, THEN THE TEST SHALL fail naming the absent tool, and it SHALL NOT skip. THE TEST SHALL NOT start a real container, reach a real daemon, or open any port except its own listener. THE TEST SHALL NOT write a fixed credential, token or key value into the test source. THE TEST SHALL NOT be marked #[ignore].
+
+**Acceptance:**
+- Case ready: the listener answers 200 with {"db_healthy":true,"cache_healthy":true}. The child exits 0, stdout holds one line beginning 'ready:', and the listener counted at least 1 request.
+- Case ready, secrets: the stub record yields exactly 5 distinct secret values, and the test asserts that count equals 5. The child's stdout and stderr contain each of the 5 values 0 times.
+- Search control: the same search function, run over the stub record's env-file text, finds each of the 5 values at least once, proving the search fires.
+- Case ready, cleanup: every name the stub record shows in a run --name or network create argument appears in a later rm or network rm argument. The count of names created equals the count removed, and every removed name begins lys-rauthy-ready-.
+- Case ready, no pull: the stub record holds 0 argv whose first argument is pull, and each of its 2 run argv carries --pull never.
+- Case no runtime: PATH holds only python3 and git. The child exits 1, stderr holds a line beginning 'refused: container_runtime_missing', and stdout holds no 'ready:' line.
+- Case no Rauthy image: stub image inspect fails for the Rauthy image ID recorded in the versions file the case supplies. The child exits 1, stderr holds a line beginning 'refused: image_missing' that contains 'rauthy' and that image ID, and the stub record holds 0 run argv.
+- Case no PostgreSQL image: stub image inspect fails for the PostgreSQL reference. The child exits 1, stderr holds a line beginning 'refused: image_missing' that contains 'postgres' and 'pull', and the stub record holds 0 run argv.
+- Case revision differs: the stub reports the Rauthy image ID present, and its label is 0000000000000000000000000000000000000000. The child exits 1, stderr holds a line beginning 'refused: rauthy_revision_mismatch', and the stub record holds 0 run argv.
+- Case revision absent: the stub reports no org.opencontainers.image.revision label. The child exits 1, stderr holds a line beginning 'refused: rauthy_revision_mismatch' that contains 'absent', the pin the test read, and 'docker buildx build --label org.opencontainers.image.revision=', and the stub record holds 0 run argv.
+- Case never ready: the listener answers 500 for every request. The child exits 1 and stderr holds a line beginning 'refused: readiness_timeout' that contains 'rauthy'. Every name the stub saw created was removed, and the 5 secret values occur 0 times in stdout and stderr.
+- The test file declares exactly 10 #[test] functions, one for each of the 10 cases above: ready; ready, secrets; ready, cleanup; ready, no pull; no runtime; no Rauthy image; no PostgreSQL image; revision differs; revision absent; never ready. The search control is not a #[test] of its own: it runs inside the ready, secrets test. cargo test --workspace --all-features reports each of the 10 as passed.
+
+**Files:**
+- create: crates/lys/tests/rauthy_ready_leg.rs
+
+**Checklist:**
+- C34 — A missing container runtime, a missing Rauthy image, a missing PostgreSQL image, and a Rauthy revision label that is absent or other than the pin each make the leg refuse by name with a non-zero exit; the leg never pulls, builds or relabels an image and never passes by skipping.
+- C35 — After every run, passing or not, no container, network or volume the leg created remains, and no object it did not create was touched.
+- C36 — A test run by a round leg searches the leg's complete output for every secret value the runtime received, asserts how many it searched for, and finds none.
+
+**Stories:**
+- S14 (Operator, Runs the Rauthy readiness leg at the venue) — As the operator running the readiness leg, I want every missing prerequisite refused by name, so that I know exactly what to put in place and never mistake a skipped check for a pass.
+
+### R3: Declare the leg in the lys design project file with cadence demand
+
+docs/design/project.json gains exactly one leg, appended as the last entry of trees[0].legs: {"name": "rauthy-ready", "command": "python3 scripts/identity-gates/rauthy_ready.py", "requires": ["tool:python3", "tool:docker", "tool:git"], "cadence": "demand"}. Its requires list names the tools the command uses, in the tool:<name> spelling the other legs use. The seven existing legs keep their bytes and their order, the shorthand map and the roots map are unchanged, and no other tree is added. THE SYSTEM SHALL NOT add a round-cadence leg. THE SYSTEM SHALL NOT change .land/gates.sh. THE SYSTEM SHALL NOT change scripts/design/gate.sh or scripts/design/schemas/project.schema.json. The ledger's record of rauthy-ready as Unmeasured, with a reason containing 'requires tool:docker', on a venue declaring no tool:docker is measured by design-system card 9jJgCzeG, which carries that acceptance line; this requirement does not claim it.
+
+**Acceptance:**
+- `python3 scripts/design/validate.py docs/design/project.json` exits 0 with the new leg present.
+- `sh scripts/design/gate.sh` exits 0.
+- In docs/design/project.json, trees[0].legs has 8 entries. The 8th equals the leg in this requirement's spec, and its cadence is demand. Entries 1 to 7 are equal to their values at main 7b53625, and the count of legs with cadence round is 7.
+- `git diff --quiet 7b53625 -- .land/gates.sh scripts/design/gate.sh scripts/design/schemas/project.schema.json` exits 0.
+
+**Files:**
+- modify: docs/design/project.json
+
+**Checklist:**
+- C31 — docs/design/project.json declares the rauthy-ready leg with cadence demand and a requires list naming tool:python3, tool:docker and tool:git, its seven existing legs unchanged, and the file validates against the project schema.
+- C37 — .land/gates.sh is unchanged and no round-cadence leg is added.
+
+**Stories:**
+- S13 (Release reviewer, Closes the release's missing Rauthy check with a measurement) — As the release reviewer, I want a gate leg I can ask for that starts the pinned Rauthy against a scratch database and passes only when it answers ready, so that the release's Rauthy blocker is closed by a measured result rather than a claim.
+
+### R4: Carry the same demand leg into the directory cluster's gate
+
+docs/design/directory/design.json's gate gains the same leg, {"name": "rauthy-ready", "command": "python3 scripts/identity-gates/rauthy_ready.py", "requires": ["tool:python3", "tool:docker", "tool:git"], "cadence": "demand"}, appended as the last leg of the gate entry whose tree is ".", so directory rounds carry it. docs/design/directory/DESIGN.md is re-rendered from the JSON with scripts/design/render-cluster.py docs/design/directory, and every rendered file it writes is committed beside its JSON. No other leg, tree or field of the gate changes. THE SYSTEM SHALL NOT give the leg any cadence but demand. THE SYSTEM SHALL NOT change any other field of design.json in this requirement.
+
+**Acceptance:**
+- `python3 scripts/design/validate.py docs/design/directory` exits 0 with the new leg present in design.json's gate.
+- In docs/design/directory/design.json, the gate entry with tree "." has exactly one leg named rauthy-ready. That leg's command, requires and cadence equal the leg in docs/design/project.json, and its cadence is demand.
+- `python3 scripts/design/check-coverage.py docs/design/directory` exits 0, and `sh scripts/design/gate.sh` reports no rendered-markdown difference for docs/design/directory.
+
+**Files:**
+- modify: docs/design/directory/design.json
+- modify: docs/design/directory/DESIGN.md
+
+**Checklist:**
+- C32 — The directory cluster's design.json gate carries the same rauthy-ready leg with cadence demand, and the directory documents validate with it present.
+- C37 — .land/gates.sh is unchanged and no round-cadence leg is added.
+
+**Stories:**
+- S13 (Release reviewer, Closes the release's missing Rauthy check with a measurement) — As the release reviewer, I want a gate leg I can ask for that starts the pinned Rauthy against a scratch database and passes only when it answers ready, so that the release's Rauthy blocker is closed by a measured result rather than a claim.
+
+## Boundaries
+
+- .land/gates.sh is not changed, and no leg of this brief enters landing.
+- No round-cadence leg is added, and no existing leg of docs/design/project.json or of the directory gate is changed or reordered.
+- The leg never pulls, builds, tags or relabels an image. The Rauthy image it accepts is one whose revision label its own build set from the pin, and building that image is venue work outside this brief.
+- The vendor/rauthy pin is not moved, and the submodule is not initialised by the leg.
+- Nothing under deploy/identity/ is written; the leg reads deploy/identity/versions.json and duplicates no digest.
+- SpiceDB is neither started nor checked.
+- The method's request path for demand legs, and the ledger's Unmeasured record for rauthy-ready, belong to design-system card 9jJgCzeG; they are named and not done here.
+- No credential, token or key value is written in code, tests, fixtures or documents; every secret is generated per run and discarded.
+- No container, network or volume the leg did not create in its own run is stopped, removed or probed.
+- lys-core, its wire formats and every published crate are unchanged; the test adds no dependency to crates/lys.
+- Builds, test batteries and the full gate run at the venue, never on the development machine.
+
+## Verification
+
+- From the repository root: cargo fmt --check; cargo clippy --all-targets --all-features -- -D warnings; cargo clippy --all-targets -- -D warnings; cargo test --workspace --all-features; cargo doc --no-deps --all-features; cargo doc --no-deps, all clean.
+- From the repository root: sh scripts/design/gate.sh exits 0.
+- From the repository root: git diff --stat between the commit the build starts from and the build's head lists only scripts/identity-gates/rauthy_ready.py, crates/lys/tests/rauthy_ready_leg.rs, docs/design/project.json, docs/design/directory/design.json and docs/design/directory/DESIGN.md.
+- On the venue: run `python3 scripts/identity-gates/rauthy_ready.py` from the repository root once and record its exit status and output beside the before-and-after runtime counts R1 names.
+- On a machine without docker on PATH: run `python3 scripts/identity-gates/rauthy_ready.py` from the repository root once and record the refusal line.
+- A search of every file this brief touches finds no credential, token or key value.
