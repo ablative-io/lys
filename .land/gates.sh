@@ -12,6 +12,21 @@ leg() {
   echo "--- status $code: $* ---"
   [ "$code" -eq 0 ] || status=1
 }
+# The identity leg runs the container-backed identity targets, which are declared
+# test = false so cargo test --workspace stays hermetic. It runs on every lys landing
+# and is never scoped away. Without a container runtime it fails by name; it never
+# skips. It lints every identity target before it runs any of them.
+identity_leg() {
+  if ! docker info >/dev/null 2>&1; then
+    echo "container_runtime_missing: the identity leg needs a container runtime answering docker info"
+    return 1
+  fi
+  if ! cargo clippy -p lys --all-features --test 'identity_*' -- -D warnings; then
+    echo "identity_lint_failed: an identity target has a lint warning; no identity test was run"
+    return 1
+  fi
+  cargo test -p lys --all-features --test 'identity_*'
+}
 leg sh scripts/design/gate.sh
 leg cargo fmt --check
 leg cargo clippy --all-targets --all-features -- -D warnings
@@ -19,4 +34,5 @@ leg cargo clippy --all-targets -- -D warnings
 leg cargo test --workspace --all-features
 leg cargo doc --no-deps --all-features
 leg cargo doc --no-deps
+leg identity_leg
 exit "$status"
