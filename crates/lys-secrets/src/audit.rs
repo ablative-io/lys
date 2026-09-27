@@ -36,6 +36,8 @@ pub enum AuditKind {
     NextAccount,
     /// An admitted call's outcome, with what it spent.
     Settlement,
+    /// A sealed record was read, or a read refused.
+    SealedRead,
 }
 
 impl AuditKind {
@@ -49,6 +51,7 @@ impl AuditKind {
             Self::Rotation => "rotation",
             Self::NextAccount => "next_account",
             Self::Settlement => "settlement",
+            Self::SealedRead => "sealed_read",
         }
     }
 
@@ -61,6 +64,7 @@ impl AuditKind {
             b"rotation" => Some(Self::Rotation),
             b"next_account" => Some(Self::NextAccount),
             b"settlement" => Some(Self::Settlement),
+            b"sealed_read" => Some(Self::SealedRead),
             _ => None,
         }
     }

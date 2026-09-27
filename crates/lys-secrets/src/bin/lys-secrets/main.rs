@@ -2,24 +2,26 @@
 //! standard input, grant and revoke its use, issue and drop handles, sign a
 //! presentation as an agent, read the audit log, and serve the proxy.
 
+mod args;
 mod files;
 mod serve;
 mod spice;
 mod view;
 
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 use lys_core::Ed25519Identity;
 use lys_secrets::{
-    Broker, HandleId, Holder, Presentation, Secret, SecretsError, new_operation_id, request_digest,
-    to_hex,
+    Broker, EntryClass, HandleId, Holder, Presentation, Relation, Secret, SecretsError,
+    new_operation_id, request_digest, to_hex,
 };
 
+use args::{PermissionSource, RecordClass, RelationArg};
 use files::{FileGrants, Layout, Route, now_ms};
-use spice::{Grants, SpiceGrants};
+use spice::Grants;
 
 #[derive(Parser)]
 #[command(name = "lys-secrets", about = "The lys secrets broker")]
@@ -73,6 +75,8 @@ enum Command {
         secret: String,
         #[arg(long)]
         by: String,
+        #[arg(long, value_enum, default_value = "use")]
+        relation: RelationArg,
     },
     /// Revoke an identity's use of a secret; the next use is refused.
     Revoke {
@@ -82,6 +86,8 @@ enum Command {
         identity: String,
         #[arg(long)]
         secret: String,
+        #[arg(long, value_enum, default_value = "use")]
+        relation: RelationArg,
     },
     /// Issue a handle to an identity whose key file is named.
     Issue {
@@ -102,12 +108,8 @@ enum Command {
         /// sends `lys-reserve` with what it may spend.
         #[arg(long)]
         spend_cap: Option<u64>,
-        /// The Lys directory's configuration; when named, the issue is
-        /// judged by the directory's grants.
-        #[arg(long)]
-        directory_config: Option<PathBuf>,
-        #[arg(long, default_value = "edit")]
-        use_action: String,
+        #[command(flatten)]
+        directory: PermissionSource,
     },
     /// Seal another account of a secret, read from standard input.
     AddAccount {
@@ -172,13 +174,35 @@ enum Command {
         at: Where,
         #[arg(long, default_value = "127.0.0.1:8472")]
         listen: String,
-        /// The Lys directory's configuration; when named, every use is
-        /// judged by the directory's grants on `secret/<name>`.
+        #[command(flatten)]
+        directory: PermissionSource,
+    },
+    /// Seal a memory or key record, read from standard input.
+    SealRecord {
+        #[command(flatten)]
+        at: Where,
         #[arg(long)]
-        directory_config: Option<PathBuf>,
-        /// The action the directory must give on the secret for a use.
-        #[arg(long, default_value = "edit")]
-        use_action: String,
+        name: String,
+        #[arg(long)]
+        owner: String,
+        #[arg(long, value_enum)]
+        class: RecordClass,
+    },
+    /// Read a memory record as an identity holding the read relation, and
+    /// write it to standard output; `--from` and `--len` read a piece.
+    ReadRecord {
+        #[command(flatten)]
+        at: Where,
+        #[arg(long)]
+        identity: String,
+        #[arg(long)]
+        name: String,
+        #[arg(long, default_value_t = 0)]
+        from: usize,
+        #[arg(long)]
+        len: Option<usize>,
+        #[command(flatten)]
+        directory: PermissionSource,
     },
 }
 
@@ -251,17 +275,32 @@ fn run(command: Command) -> Result<(), SecretsError> {
             identity,
             secret,
             by,
+            relation,
         } => {
-            FileGrants::new(Layout::grants_in(&root)).set(&identity, &secret, Some(&by))?;
-            println!("{identity} may use {secret}, granted by {by}");
+            let relation = Relation::from(relation);
+            FileGrants::new(Layout::grants_in(&root)).set(
+                relation,
+                &identity,
+                &secret,
+                Some(&by),
+            )?;
+            println!(
+                "{identity} holds {} on {secret}, granted by {by}",
+                relation.label()
+            );
         }
         Command::Revoke {
             root,
             identity,
             secret,
+            relation,
         } => {
-            FileGrants::new(Layout::grants_in(&root)).remove(&identity, &secret)?;
-            println!("{identity} may no longer use {secret}");
+            let relation = Relation::from(relation);
+            FileGrants::new(Layout::grants_in(&root)).remove(relation, &identity, &secret)?;
+            println!(
+                "{identity} no longer holds {} on {secret}",
+                relation.label()
+            );
         }
         Command::Issue {
             at,
@@ -271,21 +310,15 @@ fn run(command: Command) -> Result<(), SecretsError> {
             uses,
             minutes,
             spend_cap,
-            directory_config,
-            use_action,
+            directory,
         } => {
             let key = Ed25519Identity::load(&holder_key)?;
             let holder = Holder {
                 identity,
                 key: key.public_key_bytes(),
             };
-            let mut broker = match directory_config {
-                Some(config) => open_with(
-                    &at,
-                    Grants::Directory(SpiceGrants::from_directory(&config, &use_action)?),
-                )?,
-                None => open(&at)?,
-            };
+            let layout = Layout::new(&at.root, &at.keys);
+            let mut broker = open_with(&at, directory.grants(&layout)?)?;
             let issued = broker.issue_capped(
                 &holder,
                 &secret,
@@ -387,18 +420,45 @@ fn run(command: Command) -> Result<(), SecretsError> {
         Command::Serve {
             at,
             listen,
-            directory_config,
-            use_action,
+            directory,
         } => {
             let layout = Layout::new(&at.root, &at.keys);
-            let grants = match directory_config {
-                Some(config) => {
-                    Grants::Directory(SpiceGrants::from_directory(&config, &use_action)?)
-                }
-                None => Grants::File(FileGrants::new(layout.grants())),
-            };
-            let broker = open_with(&at, grants)?;
+            let broker = open_with(&at, directory.grants(&layout)?)?;
             serve::serve(broker, layout, &listen)?;
+        }
+        Command::SealRecord {
+            at,
+            name,
+            owner,
+            class,
+        } => {
+            let value = read_credential()?;
+            let class = match class {
+                RecordClass::Memory => EntryClass::Memory,
+                RecordClass::Key => EntryClass::Key,
+            };
+            open(&at)?.seal_record(&name, class, &owner, &value)?;
+            println!("sealed {name} ({} bytes, not shown)", value.len());
+        }
+        Command::ReadRecord {
+            at,
+            identity,
+            name,
+            from,
+            len,
+            directory,
+        } => {
+            let layout = Layout::new(&at.root, &at.keys);
+            let mut broker = open_with(&at, directory.grants(&layout)?)?;
+            let piece = len.map(|len| from..from.saturating_add(len));
+            let piece = piece.or((from > 0).then_some(from..usize::MAX));
+            let read = broker.read_record(&identity, &name, piece)?;
+            std::io::stdout()
+                .write_all(read.expose())
+                .map_err(|source| SecretsError::Io {
+                    context: "writing the record to standard output".to_owned(),
+                    source,
+                })?;
         }
     }
     Ok(())

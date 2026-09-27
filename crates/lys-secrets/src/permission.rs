@@ -17,6 +17,25 @@ pub struct Denied {
     pub no_person_root: bool,
 }
 
+/// The relation a permission is asked for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Relation {
+    /// Using a credential or key through the proxy.
+    Use,
+    /// Reading a memory record.
+    Read,
+}
+
+impl Relation {
+    /// The relation as it is written.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Use => "use",
+            Self::Read => "read",
+        }
+    }
+}
+
 /// A source of permission: the in-process grants, or `SpiceDB`.
 pub trait PermissionCheck {
     /// Whether `identity` holds the `use` relation on `secret`, and which
@@ -26,4 +45,12 @@ pub trait PermissionCheck {
     ///
     /// [`Denied`] for every answer that is not a permit.
     fn may_use(&self, identity: &str, secret: &str) -> Result<Permitted, Denied>;
+
+    /// Whether `identity` holds the `read` relation on the sealed record
+    /// `record`.
+    ///
+    /// # Errors
+    ///
+    /// [`Denied`] for every answer that is not a permit.
+    fn may_read(&self, identity: &str, record: &str) -> Result<Permitted, Denied>;
 }

@@ -33,7 +33,7 @@ pub use handle::{
 };
 pub use keys::{KeyId, StoreKey};
 pub use local_grants::{LocalGrants, SecretRelation};
-pub use permission::{Denied, PermissionCheck, Permitted};
+pub use permission::{Denied, PermissionCheck, Permitted, Relation};
 pub use secret::Secret;
 pub use store::{AccountView, EntryClass, EntryView, SecretStore};
 

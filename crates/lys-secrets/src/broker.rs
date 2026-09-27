@@ -4,7 +4,7 @@
 //! drops and retry outcomes are read back from the audit log at start, so a
 //! broker killed at any point reopens to what the log says.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -23,6 +23,7 @@ use crate::store::{EntryClass, SecretStore};
 mod accounts;
 mod admit;
 mod inflight;
+mod records;
 mod rotation;
 mod using;
 
@@ -128,6 +129,9 @@ pub struct Broker<P: PermissionCheck> {
     clock: Clock,
     handles_path: PathBuf,
     paths: BrokerPaths,
+    /// Every (identity, record) pair the log shows read, so a refusal after
+    /// a relation's removal is named `RelationRemoved`.
+    readers: BTreeSet<(String, String)>,
 }
 
 impl<P: PermissionCheck> std::fmt::Debug for Broker<P> {
@@ -166,6 +170,7 @@ impl<P: PermissionCheck> Broker<P> {
         let broker = Self {
             handles_path: paths.store_dir.join(HANDLES),
             paths: paths.clone(),
+            readers: BTreeSet::new(),
             store,
             store_key,
             audit_key,
@@ -202,8 +207,15 @@ impl<P: PermissionCheck> Broker<P> {
             .map(|record| (record.id.clone(), record))
             .collect();
         let mut rotating = None;
+        let mut readers = BTreeSet::new();
         for recorded in audit.replay()? {
             let line = recorded.line;
+            if line.kind == AuditKind::SealedRead && line.outcome == records::READ {
+                if let (Some(identity), Some(record)) = (line.identity, line.secret) {
+                    readers.insert((identity, record));
+                }
+                continue;
+            }
             if line.kind == AuditKind::Rotation {
                 rotating = line.outcome.strip_prefix(ROTATING).map(str::to_owned);
                 continue;
@@ -247,6 +259,7 @@ impl<P: PermissionCheck> Broker<P> {
             clock,
             handles_path,
             paths: paths.clone(),
+            readers,
         };
         broker.settle_rotation(rotating.as_deref())?;
         broker.settle_unknown_outcomes()?;
