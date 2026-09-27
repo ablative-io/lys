@@ -182,7 +182,7 @@
       ]
     },
     {
-      "name": "Row 6.4: issuance entered in the log (DIRECTORY-027)",
+      "name": "Row 6.4: issuance entered in the log (DIRECTORY-029)",
       "items": [
         {
           "id": "C209",
@@ -201,7 +201,7 @@
         },
         {
           "id": "C212",
-          "text": "`lys ca issuer-cert --key <path> --out <path>` writes the issuer's self-signed CA certificate as one PEM block carrying no key material, with the same subject, serial, public key and extensions as the certificate `lys ca issue --issuer-out` writes.",
+          "text": "`lys ca issuer-cert --key <path> --out <path>` writes the issuer's self-signed CA certificate as one PEM block carrying no key material, and it and `lys ca issue --issuer-out` write the same bytes on every call, from one issuer certificate stored beside the CA key when it is first built.",
           "done": false
         },
         {
