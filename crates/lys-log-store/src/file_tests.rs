@@ -253,6 +253,7 @@ fn a_write_failing_before_the_link_leaves_no_leaf() {
                 Err(std::io::Error::other("injected write failure"))
             },
             &AFTER_LINK,
+            &mut next_process_sequence,
         )
         .unwrap_err();
     assert!(matches!(err, StoreError::Io { .. }), "{err}");
@@ -342,49 +343,95 @@ fn leaf_temp_name_differs_by_sequence_and_by_pid() {
     );
 }
 
-/// Rounds of the taken-name case. One round can miss when a concurrent test
-/// takes the predicted sequence number first; a miss in every one of these
-/// rounds is not a realistic outcome.
-const TAKEN_NAME_ROUNDS: u64 = 32;
+/// A sequence source counting up from zero, private to one test, so the names
+/// a write tries are known before it runs.
+fn sequences_from_zero() -> impl FnMut() -> u64 {
+    let mut next = 0;
+    move || {
+        let sequence = next;
+        next += 1;
+        sequence
+    }
+}
 
 #[test]
 fn a_taken_temporary_name_is_skipped_and_never_replaced() {
-    // A leftover sits at the exact name this write would take first. Opening
-    // it with truncation would destroy bytes this write does not own; the
-    // write must move to the next name and leave the leftover whole.
-    //
-    // The sequence counter is shared by every test in this process, so another
-    // test can take the predicted number between the prediction and the write,
-    // and that round then exercises nothing. Repeating the round on successive
-    // leaves makes a collision near certain, and every round must hold.
+    // A leftover sits at the exact name this write tries first. Opening it
+    // with truncation would destroy bytes this write does not own; the write
+    // must move to the next name and leave the leftover whole.
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
     let mut store = create(&dir);
-    let mut leftovers = Vec::new();
-    for index in 0..TAKEN_NAME_ROUNDS {
-        let next = LEAF_TEMP_SEQUENCE.load(Ordering::Relaxed);
-        let taken = dir
-            .join("leaves")
-            .join(leaf_temp_name(std::process::id(), index, next));
-        std::fs::write(&taken, b"a leftover this write does not own").unwrap();
-        store
-            .put_leaf(index, format!("leaf-{index}").as_bytes())
-            .unwrap();
-        assert_eq!(
-            store.leaf(index).unwrap(),
-            Some(format!("leaf-{index}").into_bytes())
-        );
-        leftovers.push(taken);
+    let pid = std::process::id();
+    let taken = dir.join("leaves").join(leaf_temp_name(pid, 0, 0));
+    std::fs::write(&taken, b"a leftover this write does not own").unwrap();
+    let keep_temp = AfterLink {
+        remove_temp: refuse,
+        flush_dir: sync_dir,
+    };
+    store
+        .put_leaf_with(
+            0,
+            |file| file.write_all(b"leaf-0"),
+            &keep_temp,
+            &mut sequences_from_zero(),
+        )
+        .unwrap();
+    assert_eq!(
+        store.leaf(0).unwrap().as_deref(),
+        Some(b"leaf-0".as_slice())
+    );
+    assert_eq!(
+        std::fs::read(&taken).unwrap(),
+        b"a leftover this write does not own"
+    );
+    // The temporary name is kept, so it shows which sequence the write took.
+    let mut expected = vec![
+        format!("{:020}", 0),
+        leaf_temp_name(pid, 0, 0),
+        leaf_temp_name(pid, 0, 1),
+    ];
+    expected.sort();
+    assert_eq!(leaves_entries(&dir), expected);
+}
+
+#[test]
+fn a_write_finding_every_temporary_name_taken_refuses_by_name() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut store = create(&dir);
+    let pid = std::process::id();
+    for sequence in 0..u64::from(LEAF_TEMP_ATTEMPTS) {
+        std::fs::write(
+            dir.join("leaves").join(leaf_temp_name(pid, 0, sequence)),
+            b"taken",
+        )
+        .unwrap();
     }
-    assert_eq!(leftovers.len(), 32);
-    for taken in &leftovers {
-        assert_eq!(
-            std::fs::read(taken).unwrap(),
-            b"a leftover this write does not own",
-            "{}",
-            taken.display()
-        );
-    }
+    let before = leaves_entries(&dir);
+    assert_eq!(before.len(), 16);
+    let err = store
+        .put_leaf_with(
+            0,
+            |file| file.write_all(b"leaf-0"),
+            &AFTER_LINK,
+            &mut sequences_from_zero(),
+        )
+        .unwrap_err();
+    let StoreError::LeafTempNamesTaken {
+        index,
+        attempts,
+        path,
+    } = err
+    else {
+        panic!("expected LeafTempNamesTaken, got {err}");
+    };
+    assert_eq!(index, 0);
+    assert_eq!(attempts, LEAF_TEMP_ATTEMPTS);
+    assert_eq!(path, dir.join("leaves"));
+    assert_eq!(store.extent(), 0);
+    assert!(!leaf_path(&dir, 0).exists(), "no leaf for a refused write");
+    assert_eq!(leaves_entries(&dir), before, "no new file appeared");
 }
 
 #[test]
@@ -419,7 +466,12 @@ fn a_temporary_name_that_cannot_be_removed_still_commits_the_leaf() {
         flush_dir: sync_dir,
     };
     store
-        .put_leaf_with(0, |file| file.write_all(b"leaf-0"), &keep_temp)
+        .put_leaf_with(
+            0,
+            |file| file.write_all(b"leaf-0"),
+            &keep_temp,
+            &mut next_process_sequence,
+        )
         .unwrap();
     assert_eq!(store.extent(), 1);
     assert_eq!(std::fs::read(leaf_path(&dir, 0)).unwrap(), b"leaf-0");
@@ -439,7 +491,12 @@ fn a_failed_directory_flush_is_named_and_halts_the_handle_until_reopen() {
         flush_dir: refuse_flush,
     };
     let err = store
-        .put_leaf_with(1, |file| file.write_all(b"leaf-1"), &no_flush)
+        .put_leaf_with(
+            1,
+            |file| file.write_all(b"leaf-1"),
+            &no_flush,
+            &mut next_process_sequence,
+        )
         .unwrap_err();
     assert!(
         matches!(err, StoreError::LeafDurabilityUncertain { index: 1, .. }),
@@ -473,7 +530,12 @@ fn a_failed_directory_flush_carries_the_flush_error_as_its_source() {
         flush_dir: refuse_flush,
     };
     let err = store
-        .put_leaf_with(0, |file| file.write_all(b"leaf-0"), &no_flush)
+        .put_leaf_with(
+            0,
+            |file| file.write_all(b"leaf-0"),
+            &no_flush,
+            &mut next_process_sequence,
+        )
         .unwrap_err();
     let StoreError::LeafDurabilityUncertain { source, .. } = err else {
         panic!("expected LeafDurabilityUncertain, got {err}");
