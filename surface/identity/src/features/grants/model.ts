@@ -75,12 +75,13 @@ export function standing(w: GrantWorld, g: Grant, depth = 0): Standing {
   return { ok: true };
 }
 
-/** "You may pass it on", in the mock-up's words. */
+/** "Passable", in the mock-up's words: to whom it may be passed on, or `not passable`. */
 export function passText(p: PassOn): string {
-  if (p.kind === 'use_only') return 'no';
-  const people = p.recipients.includes('person');
-  const agents = p.recipients.includes('agent');
-  return 'yes, to ' + (people && agents ? 'people and agents' : agents ? 'agents' : 'people');
+  if (p.kind === 'use_only') return 'not passable';
+  const to: string[] = [];
+  if (p.recipients.includes('person')) to.push('human');
+  if (p.recipients.includes('agent')) to.push('agent');
+  return to.join(', ');
 }
 
 export const passesToAgents = (p: PassOn): boolean => p.kind === 'to' && p.recipients.includes('agent');
@@ -98,7 +99,10 @@ export function relationsSeen(w: GrantWorld): Map<string, string[]> {
 export const withinPassOn = (g: Grant, actions: string[]): boolean =>
   g.pass_on.kind === 'to' && actions.every((a) => (g.pass_on as { actions: string[] }).actions.includes(a));
 
-/** Everything the caller cannot give an agent, each with its reason (conformance 2.4). */
+/**
+ * What the caller cannot give an agent from the grants the service answered, each
+ * with its reason (conformance 2.4): what may not be passed on, then more than is held.
+ */
 export function cannotGive(w: GrantWorld, source: Grant | null): [string, string][] {
   const mine = w.list.grants.filter((g) => g.holder === w.me.person.id && standing(w, g).ok);
   const out: [string, string][] = [];
@@ -111,6 +115,5 @@ export function cannotGive(w: GrantWorld, source: Grant | null): [string, string
       if (!withinPassOn(source, actions)) out.push([`${relation} of ${onText(source)}`, 'More than you hold.']);
     }
   }
-  out.push(['Your sign-in identities', 'They prove who you are. No agent can hold them.']);
   return out;
 }

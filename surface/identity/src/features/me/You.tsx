@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api, useLoad } from '../../api';
 import type { AgentSummary, Login, MeView } from '../../generated';
 import { Delegate } from '../grants/Delegate';
-import { nameOf, onText, passText, passesToAgents, readGrantWorld, standing } from '../grants/model';
+import { nameOf, onText, passesToAgents, readGrantWorld, standing } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import { keyable } from '../../shell/keyable';
 import { useShell } from '../../shell/ShellContext';
@@ -70,7 +70,7 @@ function Page({ data, reload }: { data: YouData; reload: () => void }) {
                   <td className="mono" style={{ color: 'var(--accent)' }}>{g.relation}</td>
                   <td className="mono">{onText(g)}</td>
                   <td className="sec">{g.source ? nameOf(w, w.byId.get(g.source)?.holder ?? g.issuer) : 'root'}</td>
-                  <td>{g.pass_on.kind === 'to' ? <span className="pass">{passText(g.pass_on)}</span> : <span className="dim">no</span>}</td>
+                  <td>{passesToAgents(g.pass_on) ? <span className="pass">yes, to agents</span> : <span className="dim">no</span>}</td>
                   <td>
                     {passesToAgents(g.pass_on) && agents.length ? (
                       <button className="btn" data-act="delegate" data-g={g.id} onClick={() => shell.openDrawer(<Delegate w={w} source={g} done={reload} />)}>
