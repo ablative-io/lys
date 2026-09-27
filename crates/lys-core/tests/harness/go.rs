@@ -15,7 +15,6 @@
 //! CI. A toolchain that is present but *broken* is always a hard failure —
 //! [`build_go_tool`] panics rather than treating it as absent.
 
-
 use std::ffi::OsStr;
 use std::io::Write;
 use std::path::{Path, PathBuf};

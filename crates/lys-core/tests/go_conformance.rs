@@ -17,7 +17,6 @@
 //! Go-less environment never reduces byte-exact coverage (the primary
 //! copies of these vectors live in the always-run unit tests as well).
 
-
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};

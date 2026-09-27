@@ -12,7 +12,6 @@
 //! deliberately breadth-first rather than deep: the per-field shapes are
 //! pinned by unit tests, what needs pinning here is that nothing is missed.
 
-
 use std::path::Path;
 use std::process::{Command, Output};
 

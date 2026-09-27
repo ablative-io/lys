@@ -7,7 +7,6 @@
 //! tests that matter here are the ones where each half is individually valid
 //! and the *pairing* is wrong.
 
-
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 

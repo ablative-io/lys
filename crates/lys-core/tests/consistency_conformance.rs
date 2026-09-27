@@ -34,7 +34,6 @@
 //! See [`harness`] — vendored, network-free, and a hard failure rather than a
 //! skip when `LYS_REQUIRE_GO` is set.
 
-
 mod harness;
 
 use harness::{build_go_tool, go_or_skip, run_built_tool};

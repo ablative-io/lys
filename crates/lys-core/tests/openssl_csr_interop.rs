@@ -44,7 +44,6 @@
 //! Ed25519 key, and a binary that cannot is passed over rather than used to
 //! produce a request this gate would then have to interpret.
 
-
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;

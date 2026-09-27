@@ -29,7 +29,6 @@
 //! was the set the suite happened to cover, stated as though it were the set
 //! that exists.
 
-
 use super::*;
 use crate::delegation::artifact::DelegationSubjectKind;
 use crate::delegation::encoding::{CONTENT_TYPE, MAX_ARTIFACT_LEN, MAX_SEQUENCE, PROTECTED_LEN};
