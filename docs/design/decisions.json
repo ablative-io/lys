@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-28",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,26 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-108",
+      "title": "A Claude Code import builds its session under a staging name and publishes it once",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The home line's lead, answering the survey of the repeated-work card; recorded with HOME-020",
+      "context": "Every imported entry went through Session::append_entry, which syncs the line, syncs the index row and writes the head through a temporary file, a rename and a directory sync: about five syncs per record, though the import sets the head once at its end. Appending in place with no sync until the end cannot be repaired by the existing reconcile: a crash can leave a torn or zero-filled last line that Index::scan refuses as Malformed, so the session will not open, a head still at the header, and a re-import refused as Exists; and the original bytes are never rewritten (P1), so a torn tail cannot be trimmed.",
+      "decision": "The import command builds its new session under the staging name `<id>.jsonl.importing` beside `sessions/<id>.jsonl`, holding `<id>.lock` throughout: the header and every entry line are written to the staging file with no sync, and the index rows and the head are kept in memory. It then publishes once, in this order: one sync of the staging file; the index written whole to `<id>.index.jsonl` through a temporary file, synced and renamed; the head written once to `<id>.head` through a temporary file, synced and renamed; one sync of the sessions directory; the staging file renamed to `<id>.jsonl`; one more sync of the sessions directory. A crash before the rename leaves no session under the final name, so a re-import is not refused as Exists; the next import of that id and the next open of that session file, each holding the lock, remove the staging file and, when `<id>.jsonl` is absent, the `<id>.index.jsonl` and `<id>.head` a part-way publish left. Rejected: appending in place and leaving a session that refuses by name after a crash; extending reconcile to trim an unsynced tail.",
+      "quote": "",
+      "consequences": [
+        "docs/design/home/RECORD.md states the staged import's rule beside the per-append durability order, which is unchanged for every other append.",
+        "Only an import into a session it creates is staged; import_claude_code given a session that is already open keeps append_entry's per-entry syncs, since a rename cannot publish a session that already exists.",
+        "Reconcile is not extended and no session file is trimmed, rewritten or truncated; recovering a session whose last line a crash tore is its own decision.",
+        "A staging file does not end in `.jsonl`, so Home::session_ids never lists it as a session.",
+        "The block store's two syncs per new block are unchanged and are not part of the import's bounded count; they are counted beside it."
       ],
       "supersedes": [],
       "superseded_by": ""
