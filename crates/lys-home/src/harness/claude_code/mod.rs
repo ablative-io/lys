@@ -33,6 +33,7 @@ pub mod import;
 pub(crate) mod import_tests;
 pub mod launch;
 pub mod launch_env;
+mod names;
 pub mod paths;
 #[cfg(test)]
 mod paths_tests;
@@ -46,13 +47,5 @@ pub mod template;
 #[cfg(test)]
 mod template_tests;
 
-/// The harness name as it appears in lys entries.
-pub const HARNESS: &str = "claude-code";
-/// The provider Claude Code talks to.
-pub const PROVIDER: &str = "anthropic";
-/// The api Claude Code speaks.
-pub const API: &str = "anthropic-messages";
-/// The model value that marks a hand-authored turn.
-pub const AUTHORED: &str = "authored";
-
+pub use names::{API, AUTHORED, HARNESS, PROVIDER};
 pub use paths::projects_slug;
