@@ -19,20 +19,21 @@ use super::{Broker, UseError, Used};
 
 const COMPLETED: &str = "completed";
 const UPSTREAM_FAILED: &str = "upstream_failed";
+const COMPLETED_AFTER_DROP: &str = "completed_after_drop";
 const OUTCOME_UNKNOWN: &str = "outcome_unknown";
 
 /// An admitted call: the credential for its one forward, and what it
 /// reserved. Settle it with [`Broker::settle`] once the call has an outcome.
 #[derive(Debug)]
 pub struct Ticket {
-    handle: String,
-    identity: String,
-    secret: String,
-    operation: String,
-    mark: String,
-    reserved: Option<u64>,
-    uses_left: u64,
-    credential: Secret,
+    pub(super) handle: String,
+    pub(super) identity: String,
+    pub(super) secret: String,
+    pub(super) operation: String,
+    pub(super) mark: String,
+    pub(super) reserved: Option<u64>,
+    pub(super) uses_left: u64,
+    pub(super) credential: Secret,
 }
 
 impl Ticket {
@@ -82,6 +83,7 @@ impl<P: PermissionCheck> Broker<P> {
         match self.admit_use(token, presentation, 0)? {
             Admitted::Retried { outcome } => Ok(Used::Retried { outcome }),
             Admitted::Fresh(ticket) => {
+                let ticket = self.at_forward_boundary(ticket)?;
                 let answer = forward(ticket.credential());
                 let uses_left = ticket.uses_left;
                 self.settle(ticket, 0)?;
@@ -224,6 +226,11 @@ impl<P: PermissionCheck> Broker<P> {
             ..
         } = ticket;
         let settled = reserved.map(|_reserved| spent);
+        let outcome = if outcome == COMPLETED && self.cut_off(&handle, &identity, &secret) {
+            COMPLETED_AFTER_DROP
+        } else {
+            outcome
+        };
         self.close(
             &handle,
             (&identity, &secret),
@@ -262,7 +269,7 @@ impl<P: PermissionCheck> Broker<P> {
         Ok(())
     }
 
-    fn close(
+    pub(super) fn close(
         &mut self,
         handle: &str,
         (identity, secret): (&str, &str),

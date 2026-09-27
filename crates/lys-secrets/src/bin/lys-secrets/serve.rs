@@ -153,6 +153,11 @@ async fn forward(
                 .into_response());
         }
     };
+    let ticket = {
+        let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
+        broker.at_forward_boundary(ticket)
+    }
+    .map_err(|error| (StatusCode::FORBIDDEN, error))?;
     let rest = rest.to_owned();
     let called = call_upstream(shared, &route, parts, &rest, body, ticket.credential()).await;
     let reserved = ticket.reserved().unwrap_or(0);

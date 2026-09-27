@@ -1,6 +1,8 @@
 //! Spend caps: a capped lease reserves before a call is forwarded, refuses a
 //! reservation past its cap, settles what the call spent, and settles a call
 //! the broker never saw finish as `outcome_unknown` at its full reservation.
+//! A drop lands on calls in flight: cancelled before forwarding, recorded as
+//! `completed_after_drop` after.
 
 use lys_core::Ed25519Identity;
 use lys_secrets::{
@@ -163,5 +165,46 @@ fn an_uncapped_lease_needs_no_reservation_and_records_no_spend() -> TestResult {
         .map(|recorded| recorded.line.spend)
         .collect();
     assert!(spends.iter().all(Option::is_none));
+    Ok(())
+}
+
+#[test]
+fn a_drop_between_admission_and_forwarding_cancels_the_call_and_releases_its_use() -> TestResult {
+    let world = World::new()?;
+    let mut broker = Broker::create(&world.paths(), grants(), Box::new(|| NOW_MS))?;
+    broker.seal("model-key", "person:tom", &Secret::from_slice(b"sk-demo"))?;
+    let issued = broker.issue_capped(&world.holder, "model-key", 1, NOW_MS + 60_000, Some(100))?;
+    let presented = world.present(&issued.id)?;
+    let admitted = fresh(broker.admit_use(&issued.token, &presented, 40)?)?;
+    broker.drop_handle(&issued.id)?;
+    assert_eq!(
+        refusal(broker.at_forward_boundary(admitted)),
+        "HandleDropped"
+    );
+    match broker.admit_use(&issued.token, &presented, 40)? {
+        Admitted::Retried { outcome } => assert_eq!(outcome, "cancelled_at_boundary"),
+        Admitted::Fresh(_ticket) => return Err("forwarded after a drop".into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_call_forwarded_before_a_revocation_finishes_as_completed_after_drop() -> TestResult {
+    let world = World::new()?;
+    let grants = grants();
+    let mut broker = Broker::create(&world.paths(), grants, Box::new(|| NOW_MS))?;
+    broker.seal("model-key", "person:tom", &Secret::from_slice(b"sk-demo"))?;
+    let issued = broker.issue_capped(&world.holder, "model-key", 5, NOW_MS + 60_000, Some(100))?;
+    let admitted = fresh(broker.admit_use(&issued.token, &world.present(&issued.id)?, 40)?)?;
+    let forwarded = broker.at_forward_boundary(admitted)?;
+    broker.permissions().revoke("agent:noor", "model-key");
+    broker.settle(forwarded, 25)?;
+    let last = broker
+        .audit()
+        .replay()?
+        .into_iter()
+        .rfind(|recorded| recorded.line.kind == AuditKind::Settlement)
+        .map(|recorded| (recorded.line.outcome, recorded.line.spend));
+    assert_eq!(last, Some(("completed_after_drop".to_owned(), Some(25))));
     Ok(())
 }

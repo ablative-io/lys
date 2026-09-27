@@ -22,6 +22,7 @@ use crate::store::{EntryClass, SecretStore};
 
 mod accounts;
 mod admit;
+mod inflight;
 mod rotation;
 mod using;
 
@@ -222,6 +223,9 @@ impl<P: PermissionCheck> Broker<P> {
                     }
                 }
                 AuditKind::Settlement => {
+                    if line.outcome == inflight::CANCELLED_AT_BOUNDARY {
+                        record.used = record.used.saturating_sub(1);
+                    }
                     if let Some(operation) = line.operation {
                         record.open.remove(&operation);
                         if let Some(entry) = record.operations.get_mut(&operation) {
