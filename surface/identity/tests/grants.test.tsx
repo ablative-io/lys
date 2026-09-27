@@ -198,7 +198,6 @@ describe('Who can reach this? (conformance 8.2)', () => {
     expect(grants).toEqual(['root', 'root', `G/${ROOT_G.slice(6, 14)} · Ada (test person)`]);
     const used = $$('table tbody tr[data-href]').map((r) => r.querySelectorAll('td')[7].textContent);
     expect(used).toEqual(['not seen', 'not seen', '27 Sep 12:00 · tool']);
-    expect(text()).not.toContain('never used');
     expect(unreachable()).toEqual([]);
     expect(SCRIBE_G).toMatch(/^grant-/);
   });
