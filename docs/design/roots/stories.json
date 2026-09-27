@@ -31,7 +31,7 @@
       "stories": [
         {
           "id": "S4",
-          "text": "As a reviewer, I want each root's pin printed beside origin's head with the distance between them, so that a stale pin is a visible fact and moving it is a decision someone makes."
+          "text": "As a reviewer, I want each root's pin printed beside origin's head with the distance between them, and a root with no pin or no origin head named rather than skipped, so that a stale pin is a visible fact and moving it is a decision someone makes."
         }
       ]
     }
