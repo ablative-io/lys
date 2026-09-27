@@ -56,9 +56,13 @@ impl Scope {
 
 impl SecretStore {
     /// The scope of `secret`: the one set on it, or personal to its owner.
-    /// `None` when no such secret is sealed.
+    /// An account sealed under a secret has that secret's scope. `None` when
+    /// no such secret is sealed.
     pub fn scope(&self, secret: &str) -> Option<Scope> {
         let entry = self.entry(secret)?;
+        if let Some(parent) = self.account_parent(secret) {
+            return self.scope(parent);
+        }
         Some(
             self.index
                 .scopes

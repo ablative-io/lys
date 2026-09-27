@@ -193,8 +193,10 @@ fn leaving_a_scope_ends_the_use_and_a_team_secret_is_open_to_its_members_only() 
     let tom = party(&keys, "person:tom")?;
     let tom_bot = party(&keys, "agent:tom-bot")?;
 
-    assert_eq!(names(&broker, "person:tom"), vec!["ledger".to_owned()]);
-    assert_eq!(names(&broker, "person:dana"), vec!["ledger".to_owned()]);
+    broker.add_account("ledger", "spare", &Secret::from_slice(b"second"))?;
+    let both = vec!["ledger".to_owned(), "ledger@spare".to_owned()];
+    assert_eq!(names(&broker, "person:tom"), both);
+    assert_eq!(names(&broker, "person:dana"), both);
     assert!(names(&broker, "agent:tom-bot").is_empty());
     assert_eq!(
         refusal(broker.issue(&tom_bot.holder, "ledger", 1, 50_000)),

@@ -5,6 +5,7 @@
 
 use crate::audit::AuditKind;
 use crate::error::SecretsError;
+use crate::handle::{HandleToken, Presentation};
 use crate::permission::PermissionCheck;
 use crate::store::{EntryView, Scope};
 
@@ -40,6 +41,27 @@ impl<P: PermissionCheck> Broker<P> {
             .map_err(|_reason| SecretsError::SecretUnknown {
                 name: secret.to_owned(),
             })
+    }
+
+    /// The identity a presented handle speaks for, when the handle is live
+    /// and the presentation signed by its holder. Counts no use.
+    ///
+    /// # Errors
+    ///
+    /// The presentation's refusals, as a use would meet them.
+    pub fn caller(
+        &self,
+        token: &HandleToken,
+        presentation: &Presentation,
+    ) -> Result<String, SecretsError> {
+        let record = self.presented(token, presentation)?;
+        self.live(record, presentation)?;
+        Ok(record.identity.clone())
+    }
+
+    /// Whether `identity` may discover `secret`.
+    pub fn discovers(&self, identity: &str, secret: &str) -> bool {
+        self.within_scope(identity, secret).is_ok()
     }
 
     /// The secrets `identity` may discover, without their values.

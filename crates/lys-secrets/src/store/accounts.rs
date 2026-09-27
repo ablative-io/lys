@@ -90,6 +90,16 @@ impl SecretStore {
         Ok(())
     }
 
+    /// The secret whose account `entry` is sealed as, when it is one.
+    pub(crate) fn account_parent(&self, entry: &str) -> Option<&str> {
+        self.index.accounts.iter().find_map(|(secret, ring)| {
+            ring.order
+                .iter()
+                .any(|account| account != "primary" && entry_name(secret, account) == entry)
+                .then_some(secret.as_str())
+        })
+    }
+
     /// The accounts of `secret` in order.
     pub fn accounts(&self, secret: &str) -> Vec<AccountView> {
         match self.index.accounts.get(secret) {

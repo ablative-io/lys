@@ -81,7 +81,7 @@ async fn proxy(State(shared): State<Arc<Shared>>, request: Request) -> Response 
 
 /// The handle and the presentation a request carries, the presentation
 /// bound to the digest of this very request.
-fn signed(
+pub(crate) fn signed(
     parts: &axum::http::request::Parts,
     body: &[u8],
 ) -> Result<(HandleToken, Presentation), (StatusCode, SecretsError)> {
