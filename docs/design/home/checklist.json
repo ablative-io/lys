@@ -275,6 +275,46 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The record module layout",
+      "items": [
+        {
+          "id": "C45",
+          "text": "The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs.",
+          "done": false
+        },
+        {
+          "id": "C46",
+          "text": "Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs.",
+          "done": false
+        },
+        {
+          "id": "C47",
+          "text": "Home and its impl are defined in crates/lys-home/src/record/home.rs.",
+          "done": false
+        },
+        {
+          "id": "C48",
+          "text": "crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line.",
+          "done": false
+        },
+        {
+          "id": "C49",
+          "text": "crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it.",
+          "done": false
+        },
+        {
+          "id": "C50",
+          "text": "Every public path lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolves as before the move, and no crate outside lys-home changes.",
+          "done": false
+        },
+        {
+          "id": "C51",
+          "text": "Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass.",
+          "done": false
+        }
+      ]
     }
   ]
 }

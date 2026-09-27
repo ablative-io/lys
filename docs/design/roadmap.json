@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,29 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-028",
+      "title": "Move the home record's logic out of record/mod.rs into named files",
+      "status": "idea",
+      "kind": "fix",
+      "summary": "crates/lys-home/src/record/mod.rs carries Home, Session, their impls, the shared helpers and two constants, against the repository's rule that a mod.rs holds only pub mod, pub use and module docs. HOME-013 moves Home to record/home.rs, Session with the helpers only it calls to record/session.rs, and the shared helpers and constants to record/helpers.rs, re-exports every public item from mod.rs so no public path moves, and changes no behaviour, no test and no crate outside lys-home.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T11:37:00+10:00",
+        "quote": "The repository's CLAUDE.md says a mod.rs carries only pub mod, pub use and module docs, with logic in named files and tests in sibling _tests.rs files. On lys main at 7b53625, crates/lys-home/src/record/mod.rs is 630 lines and carries logic. It holds the Home struct and its impl, the Session struct and its impl, the helpers safe_component, write_durable, take_lock, load_checked, custom_type_of, to_line, now, fresh_id and json_len, and the constants MAX_NAME_BYTES and PI_FORMAT_VERSION. The judged-rows card records this as a finding on HOME-001 R1 and names this card as the act that answers it.\n\nThis card moves that logic out of mod.rs into named files under crates/lys-home/src/record, with Home in home.rs and Session in session.rs, and the shared helpers and constants in a file whose name says what they are. It moves the code and changes no behaviour. Every public path the crate exposes today, such as lys_home::record::Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES and PI_FORMAT_VERSION, stays reachable at the same path through pub use in mod.rs, so no caller in the workspace changes. After the move mod.rs holds only its module docs, pub mod and mod lines, and pub use lines.\n\nAcceptance. The file crates/lys-home/src/record/mod.rs contains no fn, struct, enum, impl, const or type item, which a grep that the brief names shows by printing nothing. No file in crates/lys-home is over 500 lines of code. Every test that passes on main passes unchanged, and no test file is edited except for a use path the move requires. No crate outside lys-home changes. The gate legs fmt, clippy pedantic and tests pass, and sh scripts/design/gate.sh exits 0.\n\nKeep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh). The brief id, roadmap row and any decision take the next free id after main's highest and every open brief/* and draft/* branch's, checked with git ls-remote immediately before writing. Other home cards in flight change files under record, so the build starts from main as it stands when it runs and moves whatever mod.rs then holds. Not in scope are any rename of a public item, any change to what a function does, and any other module's mod.rs. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie, lead for the home line, on 27 September 2026 on lys main 7b53625.",
+        "context": "A card on the home line answering the judged-rows card's finding on HOME-001 R1, surveyed against lys main 7b53625. The lead answered that the 500-line measure counts non-test source only, by the repository's own measure, so record/call_tests.rs stays outside it and unedited."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [],
+        "briefs": [
+          "HOME-013"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Ids checked with git ls-remote against origin immediately before writing: main 7b53625 holds HOME-007, RM-016 and ADR-018 at most; across every open brief/* and draft/* branch the highest are HOME-012 (draft/home/4c46aabc), RM-027 (draft/rauthy-rebase/be0c979d) and ADR-041, so this row is RM-028 and its brief HOME-013. No new decision. Further units, not written: Split crates/lys-home/src/record/call_tests.rs under 500 lines of code; Move the items out of crates/lys-home/src/harness/claude_code/mod.rs."
     }
   ]
 }
