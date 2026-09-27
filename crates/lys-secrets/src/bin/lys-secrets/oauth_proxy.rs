@@ -106,21 +106,28 @@ pub async fn live(
     Ok((grant, retired))
 }
 
-/// Asks the provider to revoke `grant`. Answers whether it confirmed.
-pub async fn revoke(client: &reqwest::Client, grant: &OAuthGrant) -> bool {
-    let Some(endpoint) = grant.provenance().revocation_endpoint.clone() else {
-        return false;
-    };
-    let Ok(body) = form(&grant.revocation_form()) else {
-        return false;
-    };
-    client
+/// Asks the provider to revoke `grant`. Answers `Ok` when it confirmed,
+/// and why not otherwise.
+pub async fn revoke(client: &reqwest::Client, grant: &OAuthGrant) -> Result<(), String> {
+    let endpoint = grant
+        .provenance()
+        .revocation_endpoint
+        .clone()
+        .ok_or_else(|| "the grant names no revocation endpoint".to_owned())?;
+    let body = form(&grant.revocation_form())
+        .map_err(|(_, error)| format!("the revocation request did not form: {error}"))?;
+    let answer = client
         .post(endpoint)
         .header("content-type", "application/x-www-form-urlencoded")
         .body(body.expose().to_vec())
         .send()
         .await
-        .is_ok_and(|answer| answer.status().is_success())
+        .map_err(|error| format!("the provider did not answer: {error}"))?;
+    if answer.status().is_success() {
+        Ok(())
+    } else {
+        Err(format!("the provider answered {}", answer.status()))
+    }
 }
 
 /// After the handle `id` is dropped, asks the provider to revoke the OAuth
@@ -143,8 +150,9 @@ pub fn revoke_after_drop(broker: &mut Broker<Grants>, id: &HandleId) -> Result<b
             context: "starting the revocation call".to_owned(),
             source,
         })?;
-    let confirmed = runtime.block_on(revoke(&reqwest::Client::new(), &grant));
-    broker.record_upstream_revocation(id, confirmed)?;
+    let answer = runtime.block_on(revoke(&reqwest::Client::new(), &grant));
+    let confirmed = answer.is_ok();
+    broker.record_upstream_revocation(id, answer)?;
     Ok(confirmed)
 }
 

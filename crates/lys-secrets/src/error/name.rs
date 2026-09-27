@@ -49,6 +49,7 @@ impl SecretsError {
             Self::NotFound => "NotFound",
             Self::RecipientRefused { .. } => "RecipientRefused",
             Self::InvalidScope { .. } => "InvalidScope",
+            Self::Revocation(refusal) => refusal.name(),
             Self::LendingNotPermitted { .. } => "LendingNotPermitted",
             Self::BeyondAncestry { .. } => "BeyondAncestry",
             Self::MemoryNotUsable { .. } => "MemoryNotUsable",

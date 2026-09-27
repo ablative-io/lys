@@ -6,7 +6,7 @@
 use lys_core::Ed25519Identity;
 use lys_secrets::{
     Admitted, AuditKind, Broker, BrokerPaths, Holder, LocalGrants, OAuthGrant, Presentation,
-    Provenance, Secret, SecretRelation, new_operation_id,
+    Provenance, RevocationState, Secret, SecretRelation, UpstreamRevocation, new_operation_id,
 };
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -90,9 +90,41 @@ fn a_refreshed_grant_is_resealed_and_revocation_is_recorded() -> TestResult {
     let reopened = next.oauth()?.ok_or("not an OAuth grant")?;
     assert_eq!(reopened.access_token().expose(), b"access-two");
     broker.settle(next, 0)?;
+    assert_eq!(
+        broker
+            .record_upstream_revocation(&issued.id, Ok(()))
+            .map_err(|error| error.name()),
+        Err("RevocationBeforeDrop")
+    );
     broker.drop_handle(&issued.id)?;
     assert!(broker.oauth_grant_of(&issued.id)?.is_some());
-    broker.record_upstream_revocation(&issued.id, false)?;
+    assert_eq!(
+        broker.revocation_state(&issued.id)?,
+        RevocationState {
+            stopped_here: true,
+            upstream: UpstreamRevocation::NotAsked,
+        }
+    );
+    broker.record_upstream_revocation(&issued.id, Err("the provider answered 503".to_owned()))?;
+    assert_eq!(
+        broker.revocation_state(&issued.id)?,
+        RevocationState {
+            stopped_here: true,
+            upstream: UpstreamRevocation::Unconfirmed("the provider answered 503".to_owned()),
+        }
+    );
+    assert_eq!(
+        broker
+            .confirm_upstream_revocation(&issued.id, "someone-else")
+            .map_err(|error| error.name()),
+        Err("ProviderMismatch")
+    );
+    assert!(broker.confirm_upstream_revocation(&issued.id, "service-account-2")?);
+    assert_eq!(
+        broker.revocation_state(&issued.id)?.upstream,
+        UpstreamRevocation::Confirmed
+    );
+    assert!(!broker.confirm_upstream_revocation(&issued.id, "service-account-2")?);
     let outcomes: Vec<String> = broker
         .audit()
         .replay()?
@@ -100,6 +132,13 @@ fn a_refreshed_grant_is_resealed_and_revocation_is_recorded() -> TestResult {
         .filter(|recorded| recorded.line.kind == AuditKind::Refresh)
         .map(|recorded| recorded.line.outcome)
         .collect();
-    assert_eq!(outcomes, ["refreshed", "revocation_unconfirmed"]);
+    assert_eq!(
+        outcomes,
+        [
+            "refreshed",
+            "revocation_unconfirmed: the provider answered 503",
+            "revoked_upstream"
+        ]
+    );
     Ok(())
 }

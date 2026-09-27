@@ -4,6 +4,9 @@
 use std::path::PathBuf;
 
 mod name;
+mod revocation;
+
+pub use revocation::RevocationRefusal;
 
 /// A named refusal or failure of the secrets broker.
 #[derive(Debug, thiserror::Error)]
@@ -383,6 +386,9 @@ pub enum SecretsError {
         /// The secret's name.
         secret: String,
     },
+    /// A provider revocation's confirmation refused.
+    #[error(transparent)]
+    Revocation(#[from] RevocationRefusal),
     /// A scope written as none of the three kinds.
     #[error(
         "InvalidScope: {text:?} is not a scope (act: name it as personal:<person>, team:<name> or organisation:<name>)"
