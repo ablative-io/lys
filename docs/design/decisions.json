@@ -344,6 +344,25 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-098",
+      "title": "A file log store's only expectation of its leaves is the pin; a damaged pinned prefix is refused without naming a leaf",
+      "status": "decided",
+      "scope": "lys-log-store",
+      "date": "2026-09-27",
+      "decided_by": "The lead for the identity line, answering the survey and the author's questions on the card behind RM-058",
+      "context": "The card asked that a leaf whose bytes do not hash to the leaf the tree expects be refused by name at open. Nothing in the store records an expected hash per leaf: state.json holds one tree size and one root. One changed leaf breaks every leaf's inclusion against that root, so bisecting against the pin cannot pick out an index. A per-leaf record would change the store's layout, open a new crash window between the record and the leaf, and add a criterion every second backend must meet.",
+      "decision": "The pin is the store's only expectation of its leaves. When the leaves inside the pinned prefix rebuild to another root, Log::open refuses with StoreError::PinMismatch as it does today. That refusal states the pin's tree size and root and the tree size and root recomputed from the leaves, and it never names a leaf index, because which leaf changed is not known. The one-leaf repair for a leaf just past the pin is kept exactly as it is. Rejected: a per-leaf hash record beside the leaves, which changes the layout and BACKENDS.md and adds a crash window. Also rejected: naming a leaf by bisecting the pin's root, which cannot be done. Also rejected: a read-only open of a refused log, and refusing a torn leaf just past the pin, which would turn routine crash recovery into a refusal.",
+      "quote": "",
+      "consequences": [
+        "No per-leaf hash record is added; state.json, the leaves/ layout and BACKENDS.md do not change.",
+        "StoreError::PinMismatch keeps its fields and message, and no refusal claims to know which leaf changed.",
+        "A leaf just past the pin, torn or whole, is adopted, pinned and reported through recovered_to as before.",
+        "Tests hold the refusal's content, the untouched state.json and the one-leaf repair, and the lys and lys-anchor status commands exit 1 with the refusal on stderr."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

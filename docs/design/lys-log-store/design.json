@@ -1,28 +1,35 @@
 {
   "cluster": "lys-log-store",
-  "title": "lys-log-store: a leaf store that says what it skipped, and a witness that reads only what is new",
-  "intention": "A log store is trusted because a stranger can rebuild its tree from the leaf files and get the pinned root. Anything the store sees in its own directory and decides not to count is part of that story, so it is reported to the operator instead of skipped in silence.\n\nA witness is a durable memory of other logs' checkpoints. Its cost per observation should follow what it has not yet read, not the whole length of its own log, so that a witness can keep running for as long as the logs it watches keep growing.",
-  "problem": "Two defects were found in a sweep of crates/lys-log-store and crates/lys-anchor. First, the file store's open skips every dot-prefixed entry in leaves/ without a word, so the leftover temporary file an interrupted append leaves behind is invisible to the operator. The temporary-name write itself, with its no-replace hard link, is already on main and is kept as it stands. Second, every observe in crates/lys-anchor/src/witness/observe.rs folds the witness's entire log through WitnessProjection::rebuild_prefix to find one origin's latest checkpoint. One observe parses every leaf recorded before it, so n observes cost about n squared over two parses and the witness slows as its log grows.",
-  "solution": "The file store's open already walks leaves/ to find the contiguous extent. That walk now also recognises names in the store's own temporary-leaf form (a dot, a process id, a dash, the twenty-digit index, a dash, a sequence number and .tmp). It keeps them out of the extent as today, leaves them untouched, and hands their names back to the caller through the opened store. The two command-line tools that open a file store, lys (log commands) and lys-anchor, read those names straight after the store opens and print one stderr line naming them, the same way both already print an interrupted-append recovery. Nothing changes in the LeafStore trait, in Log, in state.json or in the leaf files, so BACKENDS.md and the second-backend criteria are unchanged.\n\nThe witness keeps its per-origin memory in memory, as ADR-097 records. WitnessProjection, which is already the per-origin map, also records how many of the anchor's leaves it has folded. One pass over the whole log builds it once, when the caller opens the anchor. After that, observe takes the kept projection, folds only the leaves recorded since its position, compares the new note against it, and then adds the new note to it. The note is not parsed twice. The projection stays derived and rebuildable: discarding it and folding again from the leaves gives the same answer, and a test holds the kept projection to a fresh fold after every step. Parses are counted by a test-only counter on the parse path, so the bound is asserted on the number of parses and never on elapsed time. The witness stays behind the federation feature (ADR-004 standalone operation).",
+  "title": "lys-log-store: a store that refuses what its pin cannot vouch for and says what it skipped, and a witness that reads only what is new",
+  "intention": "A log store is trusted because a stranger can rebuild its tree from the leaf files and get the pinned root. When the leaves inside the pin no longer rebuild to it, the store refuses to open. It states exactly what it knows, the pin and the root the leaves now give, and claims nothing it cannot prove. Anything the store sees in its own directory and decides not to count is part of that story too, so it is reported to the operator instead of skipped in silence.\n\nA witness is a durable memory of other logs' checkpoints. Its cost per observation should follow what it has not yet read, not the whole length of its own log, so that a witness can keep running for as long as the logs it watches keep growing.",
+  "problem": "Two defects were found in a sweep of crates/lys-log-store and crates/lys-anchor. First, the file leaf store could let a torn leaf become part of the tree. The torn-write half of that is already closed on main: a leaf is written under a temporary name, synced and put in place by a no-replace hard link, which is kept as it stands. What remains is that nothing asserts that a torn or changed leaf inside the pinned prefix is refused at open, and that the leftover temporary file an interrupted append leaves in leaves/ is skipped without a word. Second, every observe in crates/lys-anchor/src/witness/observe.rs folds the witness's entire log through WitnessProjection::rebuild_prefix to find one origin's latest checkpoint. One observe parses every leaf recorded before it, so n observes cost about n squared over two parses and the witness slows as its log grows.",
+  "solution": "The pin is the store's only expectation of its leaves: one tree size and one root (ADR-098). No per-leaf hash record is added. When the leaves inside the pinned prefix, one of them torn or changed, rebuild to a root other than the pinned one, Log::open refuses with StoreError::PinMismatch as it does today. The refusal states the pin's tree size and root and the tree size and root recomputed from the leaves. A single root cannot tell which leaf changed, so the refusal does not name one and nothing claims to. Nothing is pinned and state.json is left as it was. The one-leaf repair for a leaf just past the pin is kept exactly as it is, since it is what makes crash recovery routine: such a leaf, torn or whole, is adopted, pinned and reported through recovered_to. The lys log commands and the lys-anchor commands already turn the refusal into a stderr diagnostic and a non-zero exit, and tests now hold them to it. No read-only open is added.\n\nThe file store's open already walks leaves/ to find the contiguous extent. That walk now also recognises names in the store's own temporary-leaf form (a dot, a process id, a dash, the twenty-digit index, a dash, a sequence number and .tmp). It keeps them out of the extent as today, leaves them untouched, and hands their names back to the caller through the opened store. The two command-line tools that open a file store, lys (log commands) and lys-anchor, read those names straight after the store opens and print one stderr line naming them, the same way both already print an interrupted-append recovery. Nothing changes in the LeafStore trait, in Log, in state.json or in the leaf files, so BACKENDS.md and the second-backend criteria are unchanged.\n\nThe witness keeps its per-origin memory in memory, as ADR-097 records. WitnessProjection, which is already the per-origin map, also records how many of the anchor's leaves it has folded. One pass over the whole log builds it once, when the caller opens the anchor. After that, observe takes the kept projection, folds only the leaves recorded since its position, compares the new note against it, and then adds the new note to it. The note is not parsed twice. The projection stays derived and rebuildable: discarding it and folding again from the leaves gives the same answer, and a test holds the kept projection to a fresh fold after every step. Parses are counted by a test-only counter on the parse path, so the bound is asserted on the number of parses and never on elapsed time. The witness stays behind the federation feature (ADR-004 standalone operation).",
   "principles": [
     {
       "id": "P1",
-      "text": "What open decides not to count is named to the operator; a skipped file is never silent."
+      "text": "A leaf the pin cannot vouch for is refused, and the refusal states what the store knows (the pin and the recomputed root) and claims nothing more."
     },
     {
       "id": "P2",
-      "text": "The leaves are the record. The witness's per-origin memory is a view of them, held in memory, never stored, and it agrees with a fresh fold at every point."
+      "text": "What open decides not to count is named to the operator; a skipped file is never silent."
     },
     {
       "id": "P3",
+      "text": "The leaves are the record. The witness's per-origin memory is a view of them, held in memory, never stored, and it agrees with a fresh fold at every point."
+    },
+    {
+      "id": "P4",
       "text": "A bound on work is measured by counting the work, not by timing it."
     }
   ],
   "decisions": [
     "ADR-004",
-    "ADR-097"
+    "ADR-097",
+    "ADR-098"
   ],
   "goals": [
+    "Opening a file store whose pinned prefix holds a torn or changed leaf fails with StoreError::PinMismatch stating the pin and the recomputed root, pins nothing, and the lys and lys-anchor status commands exit non-zero with that refusal on stderr.",
+    "A torn leaf just past the pin is repaired, pinned and reported exactly as before this change.",
     "Opening a file store whose leaves/ holds a leftover temporary leaf file returns that file's name to the caller, and the lys and lys-anchor tools print it on one stderr line.",
     "After the witness's projection is built once, an observe on a 256-leaf log parses one leaf when no other leaf was recorded since the previous observe.",
     "Every test that exists in lys-log-store and lys-anchor on main passes, with its assertions unchanged.",
@@ -38,8 +45,12 @@
       "reason": "A refused log fails to open; no read-only handle is added."
     },
     {
-      "text": "Naming the changed or torn leaf when open refuses a log",
-      "reason": "Held open: the pin records only a tree size and a root, which cannot identify a single leaf, and no per-leaf record is kept. It waits on the lead's answer."
+      "text": "Naming which leaf changed when open refuses a log",
+      "reason": "The pin is one tree size and one root, which cannot identify a single leaf, and no per-leaf hash record is kept (ADR-098). Which leaf changed is not known and is not claimed."
+    },
+    {
+      "text": "Refusing a torn leaf just past the pin",
+      "reason": "The one-leaf repair is kept exactly as it is, since it is what makes crash recovery routine."
     },
     {
       "text": "Changing the leaf format, the checkpoint format or the inclusion artifact format",
@@ -47,7 +58,7 @@
     },
     {
       "text": "Updating BACKENDS.md or the second backend's adoption criteria",
-      "reason": "Nothing in the LeafStore contract changes."
+      "reason": "Nothing in the LeafStore contract changes, and no per-leaf check is added."
     }
   ],
   "structure": [
@@ -68,12 +79,17 @@
     },
     {
       "path": "docs/design/lys-log-store/briefs/LYSLOGSTORE-002.json",
-      "note": "the leftover-temporary report and the bounded witness",
+      "note": "the refusal at open, the leftover-temporary report and the bounded witness",
       "brief": ""
     },
     {
       "path": "docs/design/lys-log-store/BACKENDS.md",
       "note": "second-backend adoption criteria; unchanged",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-log-store/src/log_tests.rs",
+      "note": "Log tests, including the torn and changed leaf inside the pin and the torn leaf just past it",
       "brief": ""
     },
     {
@@ -138,7 +154,15 @@
     },
     {
       "path": "crates/lys-log-store/src/log.rs",
-      "note": "Log::open rebuilds the tree, reconciles it with the (tree_size, root) pin, repairs exactly one leaf past the pin and reports it through recovered_to. Unchanged by this cluster."
+      "note": "Log::open rebuilds the tree, reconciles it with the (tree_size, root) pin, repairs exactly one leaf past the pin and reports it through recovered_to, and otherwise returns StoreError::PinMismatch with pinned_size, pinned_root, rebuilt_size and rebuilt_root. Code unchanged by this cluster."
+    },
+    {
+      "path": "crates/lys-log-store/src/log_tests.rs",
+      "note": "On main: a_tampered_leaf_byte_is_detected_at_open, crash_recovery_repairs_exactly_one_interrupted_append_and_reports_it and crash_recovery_does_not_mask_a_tampered_prefix assert the variant only."
+    },
+    {
+      "path": "crates/lys-log-store/src/error.rs",
+      "note": "StoreError::PinMismatch's message: 'stored leaves rebuild to tree size {rebuilt_size} with root {rebuilt_root}, but the pinned state is tree size {pinned_size} with root {pinned_root}'. Unchanged by this cluster."
     },
     {
       "path": "crates/lys-log-store/src/store.rs",
@@ -146,11 +170,11 @@
     },
     {
       "path": "crates/lys/src/commands/log/store.rs",
-      "note": "open() opens FileLeafStore then Log and prints 'recovered interrupted append: state advanced to N' on stderr."
+      "note": "open() opens FileLeafStore then Log and prints 'recovered interrupted append: state advanced to N' on stderr. A PinMismatch becomes a directory-invalid error carrying the store's message, printed as 'error: ...' on stderr with exit status 1."
     },
     {
       "path": "crates/lys-anchor-cli/src/commands/anchor/open.rs",
-      "note": "open() opens FileLeafStore then Anchor and prints the same recovery line on stderr."
+      "note": "open() opens FileLeafStore then Anchor and prints the same recovery line on stderr. A PinMismatch becomes a directory-invalid error carrying the store's message, printed as 'error: ...' on stderr with exit status 1."
     },
     {
       "path": "crates/lys-anchor/src/witness/observe.rs",

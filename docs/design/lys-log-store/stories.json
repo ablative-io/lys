@@ -3,8 +3,12 @@
   "personas": [
     {
       "name": "Log operator",
-      "role": "Opens a log store after a crash",
+      "role": "Opens a log store, including after a crash",
       "stories": [
+        {
+          "id": "S4",
+          "text": "As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove."
+        },
         {
           "id": "S1",
           "text": "As a log operator, I want to be told which leftover temporary files opening my store ignored, so that what an interrupted append left behind is visible rather than skipped in silence."
