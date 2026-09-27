@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,34 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-050",
+      "title": "Enter every issued certificate in the lys-log-store log and prove a stranger verifies it offline (CONFORMANCE row 6.4)",
+      "status": "idea",
+      "kind": "feature",
+      "summary": "Every certificate `lys ca issue` produces is entered, before anything is written, in the lys-log-store log that `lys log` keeps, as one leaf whose bytes are the certificate's DER, with the issuer holding only the CA key; the log's operator makes the lys/log-inclusion-proof/v1 artifact with `lys log prove inclusion`; `lys ca issuer-cert` writes the issuer's self-signed certificate; and a recorded proof shows a stranger checking the certificate with `openssl verify` and its entry with scripts/verify_inclusion.py, with no lys binary. No new wire format.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T15:31:00+10:00",
+        "quote": "Conformance row 6.4 says issuance is entered in a transparency log, and anyone verifies the certificate and its inclusion offline with standard tools. Today lys ca issue writes a certificate and enters it nowhere, and the log that lys-anchor keeps, with its lys/log-inclusion-proof/v1 artifact and scripts/verify_inclusion.py, holds no certificate. No brief joins the two.\n\nThis card enters every certificate lys ca issue produces into the lys-anchor log at issuance, as one leaf whose bytes are the certificate's DER encoding and nothing else, so no new wire format is made. The issue command then writes, beside the certificate, the leaf file and the inclusion-proof artifact the anchor already produces. It reports the log, the leaf index and the checkpoint root. If the log refuses the entry, the command refuses by name, and it writes no certificate, so no certificate exists outside the log. A person with the issuer's certificate, the issued certificate, the leaf file and the artifact verifies all of it offline with standard tools and nothing from lys. The openssl verify command checks the certificate against the issuer, and scripts/verify_inclusion.py checks the inclusion against the checkpoint root. The proof document records both commands and their output, using hashes, counts and paths only.\n\nAcceptance: issuing with a test key and a test log writes the certificate, the leaf and the artifact; the leaf's bytes equal the certificate's DER; openssl verify accepts the certificate against the test issuer; verify_inclusion.py exits 0 on the artifact and the leaf; a leaf changed by one byte makes verify_inclusion.py exit 2; a log that refuses the entry makes issue refuse by name and write no certificate; and the whole check runs with no network and no lys binary, as a stranger would run it. This brief names row 6.4 as the row it passes. Withdrawal in the log is row 6.3's, and it is carried by DIRECTORY-012. The typed claims are row 6.2's, and card hhAN8h77 carries them. This card does neither. Production keys and the production log stay Tom's acts under row 6.6, so tests and the proof use test keys and a test log only.\n\nKeep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh). The brief id, roadmap row and any decision take the next free id past main and every open brief, draft and hand branch, checked with git ls-remote immediately before writing. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie, lead for the identity line, on 27 September 2026, against lys main 7b536253.",
+        "context": "The row 6.4 card on the Lys board, filed by the identity line's lead against lys main 7b536253. The survey's four questions were answered by the lead: issuance enters the lys-log-store log (not lys-anchor's), a command exports the issuer certificate, the issuer holds only the CA key and the log's operator makes the artifact, and the directory non-goal is amended to bring capability certificates into scope. Main has since moved to fa3dd5311e98d1a751c770319e1cfe2570718c76, whose commits 101115b and fa3dd53 add `lys ca issue --log` in another shape; DIRECTORY-027 is written as the change against that main."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-003",
+          "ADR-004",
+          "ADR-008",
+          "ADR-081"
+        ],
+        "briefs": [
+          "DIRECTORY-027"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Further units, not written: Verify the checkpoint signature with standard tools in the stranger check; The salted-hash issuance record for sensitive claims (DP3's hatch); An inclusion artifact at a stated tree size (inclusion_artifact_at); Show the issuance inclusion on the agent's file; Production issuance against the production anchor. Ids taken with git ls-remote immediately before writing, past main and every brief, draft and hand branch: DIRECTORY-026, RM-049 and ADR-080 were the highest in use."
     }
   ]
 }

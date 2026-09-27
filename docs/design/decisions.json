@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,26 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-081",
+      "title": "Issuance enters the lys-log-store log `lys log` keeps before any certificate is written, and the issuer holds only the CA key",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for the identity line, answering the row 6.4 survey",
+      "context": "CONFORMANCE row 6.4 asks that certificate issuance is entered in a transparency log and that anyone verifies the certificate and its inclusion offline with standard tools. The published `lys` crate (0.2.0) cannot depend on lys-anchor, which is publish = false, and docs/design/lys-anchor/BUILD-PLAN.md section 2.5 keeps anchor surface out of `lys`; row 6.4's brief column says 'on lys-log-store'. The lys/log-inclusion-proof/v1 artifact embeds a checkpoint signed with the log's key, so writing it at issuance would make the issuer hold that key too.",
+      "decision": "`lys ca issue` enters every certificate it produces, on both issuance paths, in the lys-log-store log that `lys log` keeps, as one leaf whose bytes are the certificate's DER and nothing else, before any certificate file is written; if the log refuses the entry no certificate is written. The issuer holds only the CA key: issuance appends the leaf, writes the certificate and the leaf file, and reports the log and the leaf index, and the log's operator makes the lys/log-inclusion-proof/v1 artifact with `lys log prove inclusion`, which holds the log's key. Rejected: giving `lys` a dependency on lys-anchor, which would stop `lys` being publishable and reverse BUILD-PLAN section 2.5; putting issue-and-enter in the lys-anchor binary instead of `lys ca issue`; and having the issuer hold the log's key to write the artifact at issuance.",
+      "quote": "",
+      "consequences": [
+        "`lys` keeps lys-core and lys-log-store as its only lys dependencies and stays publishable; lys-anchor and lys-anchor-cli stay publish = false.",
+        "No new wire format: the leaf is the DER alone and the artifact is the existing lys/log-inclusion-proof/v1; no draft format from unstable-anchor is reached by issuance.",
+        "The entry precedes every certificate write, so a refused entry leaves no certificate on disk.",
+        "Tests and proofs use test keys and a test log; production keys and the production log stay the project owner's acts under row 6.6.",
+        "Withdrawal (row 6.3) and typed claims (row 6.2) are not part of issuance-with-entry."
       ],
       "supersedes": [],
       "superseded_by": ""

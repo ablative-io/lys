@@ -78,6 +78,36 @@
           "text": "As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect."
         }
       ]
+    },
+    {
+      "name": "Stranger",
+      "role": "Checks an issued certificate and its log entry offline, holding nothing from lys",
+      "stories": [
+        {
+          "id": "S84",
+          "text": "As a stranger holding the issuer's certificate, an issued certificate, its leaf and its inclusion artifact, I want to check the certificate and its entry in the log offline with openssl and a standard-library script, so that I rely on nothing from lys and on no one's word that the certificate was logged."
+        }
+      ]
+    },
+    {
+      "name": "Issuer",
+      "role": "Issues an agent's certificate under the CA key it holds",
+      "stories": [
+        {
+          "id": "S85",
+          "text": "As the issuer, I want every certificate I issue entered in the log before it is written, holding only my CA key, so that no certificate of mine exists outside the log."
+        }
+      ]
+    },
+    {
+      "name": "Log operator",
+      "role": "Keeps the log and signs its checkpoints with the log's key",
+      "stories": [
+        {
+          "id": "S86",
+          "text": "As the log's operator, I want to be the only holder of the log's key and to make the inclusion artifact for an issued certificate's leaf myself, so that issuing a certificate never needs the log's key."
+        }
+      ]
     }
   ]
 }

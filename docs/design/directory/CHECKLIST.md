@@ -47,3 +47,13 @@
 - [ ] **C28** — Observed grant usage names its source and time; not seen is not reported as never used.
 - [ ] **C29** — The You and delegation screens show real server authority, separate service accounts from sign-in identities, and preserve personal versus administrator visibility.
 - [ ] **C30** — The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success.
+
+## Row 6.4: issuance entered in the log (DIRECTORY-027)
+
+- [ ] **C209** — `lys ca issue` refuses to run without `--log` and `--leaf-out`, and on both issuance paths enters the certificate in the lys-log-store log as one leaf whose bytes are the certificate's DER and nothing else before any file is written.
+- [ ] **C210** — With `--log` and `--leaf-out` and no log key, `lys ca issue` writes the certificate and the leaf and reports the log, the leaf index, the tree size and the root in base64, signing nothing and writing no artifact; the log's operator makes the lys/log-inclusion-proof/v1 artifact with `lys log prove inclusion`.
+- [ ] **C211** — When the log refuses the entry, `lys ca issue` exits 1 with the log's refusal by name, writes no certificate and no leaf, and the log's leaves are unchanged.
+- [ ] **C212** — `lys ca issuer-cert --key <path> --out <path>` writes the issuer's self-signed CA certificate as one PEM block carrying no key material.
+- [ ] **C213** — Holding only the issuer certificate, the issued certificate, the leaf and the operator's artifact, with no lys binary on PATH, `openssl verify -CAfile` accepts the certificate, `scripts/verify_inclusion.py` exits 0 under the reported root, and a leaf changed by one byte makes it exit 2.
+- [ ] **C214** — docs/design/directory/PROOF-ISSUANCE.md records the stranger's check run with test keys and a test log: each command, its exit code and its output, and otherwise hashes, counts and paths only.
+- [ ] **C215** — The directory design's non-goal for road step 2 no longer excludes capability certificates, cites CONFORMANCE rows 6.1 to 6.4 as the reason, and still excludes anchoring in production.

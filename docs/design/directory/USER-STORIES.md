@@ -33,3 +33,15 @@
 **S11.** As a person granting temporary access, I want its end date and ancestor restrictions enforced, so role changes or reinstatement cannot silently extend it.
 
 **S12.** As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
+
+## Stranger — Checks an issued certificate and its log entry offline, holding nothing from lys
+
+**S84.** As a stranger holding the issuer's certificate, an issued certificate, its leaf and its inclusion artifact, I want to check the certificate and its entry in the log offline with openssl and a standard-library script, so that I rely on nothing from lys and on no one's word that the certificate was logged.
+
+## Issuer — Issues an agent's certificate under the CA key it holds
+
+**S85.** As the issuer, I want every certificate I issue entered in the log before it is written, holding only my CA key, so that no certificate of mine exists outside the log.
+
+## Log operator — Keeps the log and signs its checkpoints with the log's key
+
+**S86.** As the log's operator, I want to be the only holder of the log's key and to make the inclusion artifact for an issued certificate's leaf myself, so that issuing a certificate never needs the log's key.
