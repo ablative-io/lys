@@ -186,7 +186,7 @@
       "items": [
         {
           "id": "C222",
-          "text": "The graph module under surface/identity/src/features/graph/ imports only the generated Access client, React and its own files, declares none of the mock-up's rule functions and references no mutation, and a test that counts what it checked proves it (conformance 8.3).",
+          "text": "The graph module under surface/identity/src/features/graph/ imports nothing from the permission engine except the generated Access client (its other imports are only React, the surface's router package, the surface's shared presentation modules and its own files), declares none of the mock-up's rule functions and references no mutation, and a test that counts what it checked proves it (conformance 8.3).",
           "done": false
         },
         {
@@ -216,7 +216,7 @@
         },
         {
           "id": "C228",
-          "text": "The graph is reached by the deep links #/graph and #/graph/<id> and by a Show in graph link on each screen present at build time that shows one identity (the directory's preview drawer, the identity record screen and the You page), with no rail entry or g h shortcut of its own.",
+          "text": "The graph is reached by the deep links #/graph and #/graph/<id> and by a Show in graph link on each screen present at build time that shows one identity (the directory's preview drawer, the identity record screen and the You page) and on the grant explanation, whose link opens the graph on the holder's node with that grant's edge selected, none on sign-in or the delegation form, with no rail entry or g h shortcut of its own.",
           "done": false
         }
       ]
