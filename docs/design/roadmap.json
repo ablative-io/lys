@@ -337,7 +337,7 @@
       "title": "Say who may revoke a lease and filter the secrets list by scope (CONFORMANCE 7.6 and 7.8)",
       "status": "idea",
       "kind": "feature",
-      "summary": "SECRETS-004 amends SECRETS-002 for CONFORMANCE rows 7.6 and 7.8. The person acted for revokes a lease, stopping issuing at once with upstream pending until confirmed; the holder relinquishes, recorded as its own act with the same two facts; a revoke by the holder is refused and pointed at relinquish; every other caller, a secret's owner among them, gets the not-found refusal that names nothing; and a revoke or relinquish of an already ended lease is refused as already ended. The secrets list takes one scope from organisation, team and mine, applied at the server, with no scope meaning everything the caller may see, and refuses an agent by name. Whether a secret's owner may revoke every derived credential is proposed ADR-076, and nothing grants it. Every visibility and revoke check goes through one seam that answers from the record's fields until the step-2 SpiceDB evaluator lands.",
+      "summary": "SECRETS-004 amends SECRETS-002 for CONFORMANCE rows 7.6 and 7.8. The person acted for revokes a lease, stopping issuing at once with upstream pending until confirmed; the holder relinquishes, recorded as its own act with the same two facts; a revoke by the holder is refused and pointed at relinquish; every other caller, a secret's owner among them, gets the not-found refusal that names nothing; and a revoke or relinquish of an already ended lease is refused as already ended. The secrets list takes one scope from organisation, team and mine, applied at the server, with no scope meaning everything the caller may see, and refuses an agent by name. Whether a secret's owner may revoke every derived credential is proposed ADR-089, and nothing grants it. Every visibility and revoke check goes through one seam that answers from the record's fields until the step-2 SpiceDB evaluator lands.",
       "provenance": {
         "requested_by": "tom",
         "date": "2026-09-27T13:07:00+10:00",
@@ -352,7 +352,7 @@
           "ADR-003",
           "ADR-004",
           "ADR-009",
-          "ADR-076"
+          "ADR-089"
         ],
         "briefs": [
           "SECRETS-004"
@@ -362,7 +362,7 @@
       "depends_on": [
         "RM-002"
       ],
-      "notes": "Further units, not written: Build the scoped secrets list and the revoke, relinquish and lease answers in crates/lys-secrets; Make the visibility and revoke seam ask SpiceDB through the step-2 evaluator; Rule the proposed ADR on owner revocation; The secrets list screen and the lease screen with its Revoke control; Replace the group-claim team source with a directory team model; Rewrite DESIGN.md's Solution and Intention to the crates/lys-secrets host. Ids read at write time against main and every origin branch: SECRETS-004, C30 to C38 and S19 to S21 are claimed only by this card's own earlier draft and kept; ADR-076 is the next after ADR-075, the highest on any branch, since ADR-068 is also claimed by a directory draft; RM-047 is the next after RM-046, the highest on any branch, since RM-040 is also claimed by other branches."
+      "notes": "Further units, not written: Build the scoped secrets list and the revoke, relinquish and lease answers in crates/lys-secrets; Make the visibility and revoke seam ask SpiceDB through the step-2 evaluator; Rule the proposed ADR on owner revocation; The secrets list screen and the lease screen with its Revoke control; Replace the group-claim team source with a directory team model; Rewrite DESIGN.md's Solution and Intention to the crates/lys-secrets host. Ids read at write time against main and every origin branch: SECRETS-004, C30 to C38 and S19 to S21 are claimed only by this card's own earlier draft and kept; ADR-089 is the next after ADR-088, the highest on any branch, since ADR-068, ADR-076 and ADR-085 to ADR-088 are also claimed by directory drafts; RM-047 is claimed only by this card's own earlier draft and kept."
     }
   ]
 }
