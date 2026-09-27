@@ -29,6 +29,10 @@ pub const INHERITED_FROM: &str = "inherited from ";
 /// The custom type of the context record: what a session was given at
 /// render, as paths, lengths and hashes (see [`crate::record::given`]).
 pub const CUSTOM_GIVEN: &str = "lys.given";
+/// The custom type of a given statement: one entry under a `lys.given`
+/// entry naming the block that holds a `lys/attestation/v2` over that
+/// record's canonical bytes (see [`crate::record::given_statement`]).
+pub const CUSTOM_GIVEN_STATEMENT: &str = "lys.given_statement";
 /// The custom type of a lantern (HOME-004): a note plus a point in this
 /// session, lit on purpose, that a later session walks back to.
 pub const CUSTOM_LANTERN: &str = "lys.lantern";

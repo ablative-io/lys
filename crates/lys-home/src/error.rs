@@ -302,6 +302,15 @@ pub enum HomeError {
         path: PathBuf,
     },
 
+    /// The signing key file given to render-launch could not be loaded.
+    #[error("render-launch signing key could not be loaded from {}: {reason}", path.display())]
+    SigningKey {
+        /// The key file.
+        path: PathBuf,
+        /// lys-core's reason, which names a length or an I/O error, never a key byte.
+        reason: String,
+    },
+
     /// A file translate-codex would write already exists.
     #[error("translate-codex target already exists: {}; choose another --out", path.display())]
     TranslationTargetExists {

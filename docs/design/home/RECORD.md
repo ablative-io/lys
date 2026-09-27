@@ -116,9 +116,24 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   `environment` is the names of the variables the template set for the
   session, sorted, never a value or a handle. The
   entry hangs under the `template_render` event it follows, beside the
-  context path, so the head does not move. It is unsigned and unencrypted
-  and carries no document content: signing (stage 6) and encryption at rest
+  context path, so the head does not move. The entry itself is unsigned and
+  unencrypted and carries no document content; a render given a key signs
+  its data as a separate `lys.given_statement`, and encryption at rest
   (stage 3) can be added later without changing what is recorded.
+- `lys.given_statement` (HOME-016 R2, R3): `{given, statement}`. `given` is
+  the id of the `lys.given` entry it signs, and it hangs under that entry,
+  beside the context path, so the head does not move. `statement` is the
+  hash of a block holding a `lys/attestation/v2` `COSE_Sign1`, lys-core's
+  existing attestation, whose payload is the RFC 8785 bytes of the
+  `lys.given` entry's data (keys ordered, no whitespace, no trailing
+  newline); the report's `given_sha256` is the SHA-256 of those bytes. The
+  same render writes the statement and its payload under `--out` as
+  `given-statement.cose` and `given-data.json`, which `lys verify
+  --attestation given-statement.cose --payload given-data.json` checks
+  offline. It is written only when `render-launch` is given `--key`, a raw
+  32-byte Ed25519 seed file; a render with no key writes no block, no entry
+  and neither file, and its report's `signing` is `unsigned`. The entry holds
+  no payload byte, no key byte and no document content.
 - `lys.authored` (R3, R4): no data. Precedes the first authored message entry
   of a session; every authored assistant message carries provider, api and
   model `authored`, so a demonstration is never mistaken for history.

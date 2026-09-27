@@ -11,7 +11,16 @@
 //! and the seed file when the render wrote one (HOME-006 R6), are hashed; the
 //! manifest block is stored; the documents the session is
 //! given are resolved (HOME-003 R4); the event is appended (R5) and the
-//! `lys.given` entry under it; the report is returned.
+//! `lys.given` entry under it; the report is returned with the given hash,
+//! the SHA-256 of the record's canonical bytes, and says signed or unsigned.
+//!
+//! With `--key`, a raw 32-byte Ed25519 seed file, the key is loaded and the
+//! two statement files are refused by path before anything is written; after
+//! the given entry, the record is signed as a `lys.given_statement` (see
+//! [`crate::record::given_statement`]) and the canonical bytes and the
+//! statement are written as `given-data.json` and `given-statement.cose`, the
+//! pair `lys verify --attestation --payload` reads. Without it none of that is
+//! written. The `template_render` event never carries the given hash.
 //! Nothing runs: the launch line is text in the report (ADR-007). `--out` is
 //! made absolute first, so the manifest, the launch line and the given entry
 //! never carry a relative path; the render is given the rendered file's path
@@ -24,6 +33,7 @@
 use std::path::{Path, PathBuf};
 
 use clap::Args;
+use lys_core::Ed25519Identity;
 use serde_json::{Value, json};
 
 use crate::error::HomeError;
@@ -36,6 +46,7 @@ use crate::harness::claude_code::template::{Template, read_template};
 use crate::record::blocks::Hash;
 use crate::record::entries::{CUSTOM_HARNESS_EVENT, EntryBody};
 use crate::record::given::GivenRecord;
+use crate::record::given_statement::GivenStatement;
 use crate::record::{Home, safe_component};
 
 /// The MCP configuration file's name under `--out`.
@@ -44,6 +55,10 @@ pub const MCP_FILE: &str = "mcp.json";
 pub const ENV_FILE: &str = "env.json";
 /// The appended-instructions file's name under `--out`.
 pub const INSTRUCTIONS_FILE: &str = "instructions.md";
+/// The given statement's file name under `--out`.
+pub const STATEMENT_FILE: &str = "given-statement.cose";
+/// The given statement's payload file name under `--out`.
+pub const PAYLOAD_FILE: &str = "given-data.json";
 
 /// The arguments of `render-launch`.
 #[derive(Clone, Debug, PartialEq, Eq, Args)]
@@ -72,6 +87,10 @@ pub struct LaunchArgs {
     /// The directory the five files are written into.
     #[arg(long)]
     pub out: PathBuf,
+    /// A raw 32-byte Ed25519 seed file; when given, what the session was
+    /// given is signed as a given statement.
+    #[arg(long)]
+    pub key: Option<PathBuf>,
 }
 
 /// The five files a launch is made of, under `out`, in write order.
@@ -89,12 +108,25 @@ fn targets(out: &Path, uuid: &str) -> [PathBuf; 5] {
 pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
     let (mut template, template_bytes) = read_template(&args.template)?;
     safe_component("uuid", &args.uuid)?;
+    let key = args
+        .key
+        .as_deref()
+        .map(|path| {
+            Ed25519Identity::load(path).map_err(|e| HomeError::SigningKey {
+                path: path.to_path_buf(),
+                reason: e.to_string(),
+            })
+        })
+        .transpose()?;
     let home = Home::open(&args.home)?;
     let mut session = home.open_session(&args.session)?;
     let out = std::path::absolute(&args.out)
         .map_err(|e| HomeError::io("resolving the out directory", &args.out, e))?;
     let [rendered, loss, mcp_file, env, instructions] = targets(&out, &args.uuid);
-    for path in [&rendered, &loss, &mcp_file, &env, &instructions] {
+    let signing = key.map(|key| (key, out.join(STATEMENT_FILE), out.join(PAYLOAD_FILE)));
+    let mut refused = vec![&rendered, &loss, &mcp_file, &env, &instructions];
+    refused.extend(signing.iter().flat_map(|(_, cose, data)| [cose, data]));
+    for path in refused {
         if path.exists() {
             return Err(HomeError::LaunchTargetExists { path: path.clone() });
         }
@@ -157,6 +189,16 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
         data: Some(event.data()?),
     })?;
     let given_id = given.append_under(&mut session, &event_id)?;
+    let canonical = given.canonical_bytes()?;
+    let signed = match &signing {
+        Some((key, cose_file, data_file)) => {
+            let signed = GivenStatement::sign(&mut session, &blocks, &given_id, &canonical, key)?;
+            write_new(data_file, canonical.as_bytes())?;
+            write_new(cose_file, &signed.cose)?;
+            Some((signed.entry, cose_file, data_file))
+        }
+        None => None,
+    };
     let launch = launch_line(
         &template,
         &rendered,
@@ -165,7 +207,7 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
         &instructions,
         render.seed.as_deref(),
     );
-    Ok(json!({
+    let mut report = json!({
         "command": "render-launch",
         "template": stored.hash.as_str(),
         "session_head": session_head.as_str(),
@@ -177,7 +219,15 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
         "render": render,
         "given": given_id,
         "given_documents": given.documents.len(),
-    }))
+        "given_sha256": canonical.hash().as_str(),
+        "signing": if signed.is_some() { "signed" } else { "unsigned" },
+    });
+    if let Some((entry, cose_file, data_file)) = signed {
+        report["statement"] = json!(entry);
+        report["statement_file"] = json!(cose_file);
+        report["payload_file"] = json!(data_file);
+    }
+    Ok(report)
 }
 
 /// The names of the variables the environment file sets for the session:

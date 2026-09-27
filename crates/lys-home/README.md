@@ -21,6 +21,7 @@ lys adds nothing to Pi's grammar. Its own data rides in Pi's `custom` entries:
 | `lys.authored`      | this session is a hand-written demonstration, not history         |
 | `lys.inherited`     | this entry came from the canon or another session, and says so    |
 | `lys.given`         | what a rendered session was given: each instruction document Claude Code loads and each file the render wrote, by kind, path, length and SHA-256 in the measured order, with the config directory and the environment names; never a document's content |
+| `lys.given_statement` | a render's signed given statement (`given`, `statement`): the `lys.given` entry it hangs under and the block holding a `lys/attestation/v2` over the RFC 8785 bytes of that entry's data; written only with `--key` |
 | `lys.lantern`       | a lantern: a note on a point of this session (`point`, `note`, `lit_by`, `lit_at`, `lit_in`), lit on purpose at the head |
 | `lys.lantern_epilogue` | further words on a lantern of this session (`lantern`, `words`, `added_by`, `added_at`), appended after it |
 | `lys.forked_from`   | the child's ancestry after a fork (`parent_session`, `lantern`, `point`, `cut_at`, `coordinate_carried`, `carried`, `seed_left_out`), the first entry the fork writes after the copied chain |
@@ -51,7 +52,8 @@ run), and `resume-check` counts tool_use ids a fork repeats and the tool
 actions in the fork's own records.
 
 `render-launch --home <dir> --session <id> --template <file> --uuid <uuid>
---cwd <dir> --model <id> --version <claude code version> --out <dir>` turns a
+--cwd <dir> --model <id> --version <claude code version> --out <dir>
+[--key <file>]` turns a
 session into the files a Claude Code launch needs, from a launch template
 (schema: `docs/design/home/launch-template.schema.json`; `harness`, `flags`
 and the five slots `transcript`, `mcp`, `env`, `secrets`, `instructions`; a
@@ -78,6 +80,16 @@ with the config directory (the template's `CLAUDE_CONFIG_DIR`, or
 `HOME/.claude` from the rendering process's `HOME`) and the names the
 environment file sets. Nothing of a document is kept, and a document the
 harness would read that cannot be read fails the render by path.
+The report carries `given_sha256`, the SHA-256 of the RFC 8785 bytes of
+that entry's data, and `signing`, `signed` or `unsigned`. With `--key <file>`,
+a raw 32-byte Ed25519 seed file such as `lys key generate` writes, the render
+also signs those bytes as a `lys/attestation/v2` statement, keeps it as a
+block named by one `lys.given_statement` entry under the `lys.given` entry,
+writes `given-statement.cose` and `given-data.json` into `--out` for `lys
+verify --attestation given-statement.cose --payload given-data.json`, and
+reports `statement`, `statement_file` and `payload_file`. The key is loaded,
+and the two files refused if they exist, before anything is written; an
+unreadable key fails by its path and never prints a key byte.
 
 `given --home <dir> --session <id>` reports every `lys.given` entry of the
 session in file order, each with its entry id, harness and version, config
