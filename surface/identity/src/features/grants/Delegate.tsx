@@ -30,7 +30,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
   const relations = [...relationsSeen(w)];
   const fits = relations.filter(([, actions]) => withinPassOn(source, actions));
   const [recipient, setRecipient] = useState(to ?? agents[0]?.[0] ?? '');
-  const [relation, setRelation] = useState(fits.at(-1)?.[0] ?? '');
+  const [relation, setRelation] = useState(fits.find(([r]) => r === 'viewer')?.[0] ?? fits.at(-1)?.[0] ?? '');
   const [lasts, setLasts] = useState('7 days');
   const [pass, setPass] = useState('no');
   const [outcome, setOutcome] = useState<Outcome>({ at: 'editing' });
@@ -105,8 +105,8 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         <label htmlFor="dLease">Lasts</label>
         <select id="dLease" value={lasts} onChange={(e) => setLasts(e.target.value)}>
           <option>7 days</option>
-          <option disabled>ends with assignment (not built yet)</option>
-          <option value="no end">no end of its own{ends === null ? '' : ', until ' + day(ends)}</option>
+          <option disabled title="not built yet">ends with assignment</option>
+          <option>no end</option>
         </select>
       </div>
       <div className="field">
@@ -120,8 +120,8 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         <h2>Where it comes from</h2>
         <div className="row"><span className="sec">Source grant</span><span className="mono">{grantNo(source.id)} · {source.relation} of {onText(source)}</span></div>
         <div className="row"><span className="sec">Actions it allows</span><span className="mono">{source.actions.join(', ')}</span></div>
-        <div className="row"><span className="sec">You may pass it on</span><span className="pass">{passText(source.pass_on)}{source.pass_on.kind === 'to' ? ': ' + source.pass_on.actions.join(', ') : ''}</span></div>
-        <div className="row"><span className="sec">Ends no later than</span><span>{ends !== null ? day(ends) + ', when yours does' : 'when yours ends or is revoked'}</span></div>
+        <div className="row"><span className="sec">You may pass it on</span><span className="pass">{passText(source.pass_on)}</span></div>
+        <div className="row"><span className="sec">Ends no later than <span className="open-q">illustrative</span></span><span>{ends !== null ? day(ends) + ', when yours does' : 'when yours ends or is revoked'}</span></div>
       </div>
       <div className="card"><h2>What you can&apos;t give</h2><CannotGive w={w} source={source} /></div>
       {outcome.at === 'refused' ? (

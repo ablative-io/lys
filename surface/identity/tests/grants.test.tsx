@@ -34,14 +34,16 @@ describe('The delegation form (conformance 2.1 to 2.3)', () => {
     expect(from).toContain('Source grant');
     expect(from).toContain('owner of project:identity');
     expect(from).toContain('Actions it allowsedit, grant, view');
-    expect(from).toContain('You may pass it onyes, to agents: edit, view');
-    expect(from).toContain('Ends no later than27 Oct, when yours does');
+    expect(from).toContain('You may pass it onagent');
+    expect(from).toContain('Ends no later thanillustrative27 Oct, when yours does');
+    expect($$('#dLease option').map((o) => o.textContent)).toEqual(['7 days', 'ends with assignment', 'no end']);
     expect(unreachable()).toEqual([]);
   });
 
   it('offers only relations within what may be passed on, greying the rest', async () => {
     await open();
     expect($$('[data-pickrel]').map((c) => c.textContent)).toEqual(['viewer']);
+    expect($('[data-pickrel].on')?.textContent).toBe('viewer');
     const greyed = $$('#drawer .chk').filter((c) => !c.dataset.pickrel).map((c) => c.textContent);
     expect(greyed).toEqual(['owner']);
   });
@@ -106,8 +108,8 @@ describe("What you can't give (conformance 2.4)", () => {
     expect(reasons).toEqual([
       ['viewer of project:ledger', `You may use it; G/${LEDGER_G.slice(6, 14)} does not let you pass it on.`],
       ['owner of project:identity', 'More than you hold.'],
-      ['Your sign-in identities', 'They prove who you are. No agent can hold them.'],
       ['Service accounts', 'not built yet The directory records no service accounts yet, so none is listed here.'],
+      ['Your sign-in identities', 'They prove who you are. No agent can hold them.'],
     ]);
   });
 });
