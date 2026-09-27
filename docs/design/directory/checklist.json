@@ -186,7 +186,7 @@
       "items": [
         {
           "id": "C303",
-          "text": ".land/gates.sh runs the surface's test command as a leg that fails by name when npm is missing.",
+          "text": ".land/gates.sh runs the surface's test command as a leg that fails by name when npm is missing, and the design's gate array measures the same surface leg.",
           "done": false
         },
         {
@@ -196,7 +196,7 @@
         },
         {
           "id": "C305",
-          "text": "The rail toggles by its button and by [, kept under iam.labels across a reload, and the dock side switches by the palette act and by \\, kept under iam.dock, with the layout flipped.",
+          "text": "The rail toggles by its button and by [, kept under iam.labels across a reload, and the dock side switches by the Configuration Layout segment, by the palette act and by \\, kept under iam.dock, with the layout flipped.",
           "done": false
         },
         {

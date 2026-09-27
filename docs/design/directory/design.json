@@ -59,7 +59,7 @@
     "Every decision still open for Tom is recorded as open and decided nowhere in this cluster.",
     "The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6).",
     "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record.",
-    "DIRECTORY-037 passes conformance rows 9.1 to 9.3: the surface's test command runs in .land/gates.sh and proves the rail, the dock side, the route table, the palette and go-to keys, the help overlay and a counted Tab walk, and index.v6.html carries the same two fixes as the built shell."
+    "DIRECTORY-037 passes conformance rows 9.1 to 9.3: the surface's test command runs in .land/gates.sh and proves the rail, the dock side by all three of its controls, the route table, the palette and go-to keys, the help overlay and a counted Tab walk, and index.v6.html carries the same two fixes as the built shell."
   ],
   "non_goals": [
     {
@@ -107,7 +107,7 @@
       "reason": "Tom left it as a thing to look at, not a row (ADR-010)."
     },
     {
-      "text": "Building the screens the route table marks not yet: roles, resources, graph, requests, reviews, secrets, connections, network, sessions, model and configuration",
+      "text": "Building the screens and sections the route table marks not yet: roles, resources, graph, requests, reviews, secrets, connections, network, sessions, model, and the six Configuration sections other than Layout",
       "reason": "Each is screen content, which DIRECTORY-037 leaves unchanged, and each belongs to its own conformance rows and card; its row is marked built when that card lands."
     },
     {
@@ -869,6 +869,20 @@
           "requires": [
             "tool:sh",
             "tool:python3"
+          ],
+          "cadence": "round"
+        }
+      ]
+    },
+    {
+      "tree": "surface/identity",
+      "legs": [
+        {
+          "name": "surface",
+          "command": "npm install-ci-test",
+          "requires": [
+            "tool:node",
+            "tool:npm"
           ],
           "cadence": "round"
         }

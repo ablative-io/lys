@@ -50,9 +50,9 @@
 
 ## The identity surface shell (conformance 9.1 to 9.3)
 
-- [ ] **C303** — .land/gates.sh runs the surface's test command as a leg that fails by name when npm is missing.
+- [ ] **C303** — .land/gates.sh runs the surface's test command as a leg that fails by name when npm is missing, and the design's gate array measures the same surface leg.
 - [ ] **C304** — One route table names the 14 rail screens and the 30 hash-routed tabs with a built column, and the tests fail by name on a built row the shell does not serve.
-- [ ] **C305** — The rail toggles by its button and by [, kept under iam.labels across a reload, and the dock side switches by the palette act and by \, kept under iam.dock, with the layout flipped.
+- [ ] **C305** — The rail toggles by its button and by [, kept under iam.labels across a reload, and the dock side switches by the Configuration Layout segment, by the palette act and by \, kept under iam.dock, with the layout flipped.
 - [ ] **C306** — The palette Go to entries and the fourteen g go-to letters reach every rail screen.
 - [ ] **C307** — Every element with a click action is a button or a link, or has tabindex 0 and dispatches one click on Enter and Space, palette rows included.
 - [ ] **C308** — j and k move focus with the cursor without replacing the screen, and Enter opens the focused row.
