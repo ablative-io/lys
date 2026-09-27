@@ -1,12 +1,15 @@
 //! The read routes: each route's shape, personal scoping across two people,
 //! the administrator's separate wider view, refusals by name that leak no
-//! other person's records, and no read that writes.
+//! other person's records, and no read that writes. Every answer is read into
+//! the route's own wire type.
 
 use std::error::Error;
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
 use lys_identity_server::dev_seed::{Seeded, SeededPerson, seed_configured};
+use lys_identity_server::read_views::{AgentView, MeView, PeopleView, PersonView};
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -23,6 +26,18 @@ fn login(subject: &str) -> Login {
 
 async fn seeded() -> Result<(Service, Seeded), Box<dyn Error>> {
     Service::start_with(|config| Ok(seed_configured(config, [ADA, BEA])?)).await
+}
+
+/// GET `path` as `cookie`, which must answer 200, read into the route's wire
+/// type, and the raw body beside it.
+async fn read<T: DeserializeOwned>(
+    service: &Service,
+    path: &str,
+    cookie: &str,
+) -> Result<(T, Value), Box<dyn Error>> {
+    let (status, body) = service.get(path, Some(cookie)).await?;
+    assert_eq!(status, 200, "{path}: {body}");
+    Ok((serde_json::from_value(body.clone())?, body))
 }
 
 fn person<'a>(seeded: &'a Seeded, subject: &str) -> Result<&'a SeededPerson, Box<dyn Error>> {
@@ -48,13 +63,14 @@ fn carries_none_of(body: &Value, marks: &[String]) -> bool {
     marks.iter().all(|mark| !text.contains(mark.as_str()))
 }
 
-fn states(person: &Value) -> Vec<String> {
-    person["agents"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|agent| agent["state"].as_str().map(str::to_owned))
-        .collect()
+fn states(person: &PersonView) -> Vec<&str> {
+    let mut states = person
+        .agents
+        .iter()
+        .map(|agent| agent.state.as_str())
+        .collect::<Vec<_>>();
+    states.sort_unstable();
+    states
 }
 
 #[tokio::test]
@@ -63,21 +79,16 @@ async fn me_answers_the_signed_in_person_their_sign_in_identities_and_service_ac
     let (service, seeded) = seeded().await?;
     let ada = person(&seeded, ADA)?;
     let cookie = service.sign_in(login(ADA)).await?;
-    let (status, body) = service.get("/me", Some(&cookie)).await?;
-    assert_eq!(status, 200, "{body}");
-    assert_eq!(body["person"]["id"], ada.id.to_string());
-    assert_eq!(body["person"]["display_name"], ada.display_name.as_str());
-    assert_eq!(body["person"]["state"], "active");
-    let identities = body["sign_in_identities"]
-        .as_array()
-        .ok_or("no sign-in identities")?;
-    assert_eq!(identities.len(), 1, "{body}");
-    assert_eq!(identities[0]["provider"], service.issuer.issuer());
-    assert_eq!(identities[0]["subject"], ADA);
-    assert_eq!(body["signed_in"]["subject"], ADA);
-    assert_eq!(
-        body["service_accounts"].as_array().map(Vec::len),
-        Some(0),
+    let (me, body) = read::<MeView>(&service, "/me", &cookie).await?;
+    assert_eq!(me.person.id, ada.id.to_string());
+    assert_eq!(me.person.display_name, ada.display_name);
+    assert_eq!(me.person.state, "active");
+    assert_eq!(me.sign_in_identities.len(), 1, "{body}");
+    assert_eq!(me.sign_in_identities[0].provider, service.issuer.issuer());
+    assert_eq!(me.sign_in_identities[0].subject, ADA);
+    assert_eq!(me.signed_in, me.sign_in_identities[0]);
+    assert!(
+        me.service_accounts.is_empty(),
         "service accounts are their own list, apart from sign-in identities"
     );
     assert!(carries_none_of(&body, &marks(person(&seeded, BEA)?)));
@@ -93,23 +104,20 @@ async fn people_answers_only_the_signed_in_person_with_their_agents() -> TestRes
     ] {
         let own = person(&seeded, subject)?;
         let cookie = service.sign_in(login(subject)).await?;
-        let (status, body) = service.get("/people", Some(&cookie)).await?;
-        assert_eq!(status, 200, "{body}");
-        assert_eq!(body["scope"], "personal");
-        let people = body["people"].as_array().ok_or("no people")?;
-        assert_eq!(people.len(), 1, "{body}");
-        assert_eq!(people[0]["id"], own.id.to_string());
-        let mut answered = states(&people[0]);
-        answered.sort();
-        assert_eq!(answered, expected, "{body}");
-        let answered_agents = people[0]["agents"].as_array().ok_or("no agents")?;
+        let (people, body) = read::<PeopleView>(&service, "/people", &cookie).await?;
+        assert_eq!(people.scope, "personal");
+        assert_eq!(people.people.len(), 1, "{body}");
+        let answered = &people.people[0];
+        assert_eq!(answered.id, own.id.to_string());
+        assert_eq!(states(answered), expected, "{body}");
         for seeded_agent in &own.agents {
-            let agent = answered_agents
+            let agent = answered
+                .agents
                 .iter()
-                .find(|agent| agent["id"] == seeded_agent.id.to_string())
+                .find(|agent| agent.id == seeded_agent.id.to_string())
                 .ok_or("a seeded agent is missing")?;
-            assert_eq!(agent["display_name"], seeded_agent.display_name.as_str());
-            assert_eq!(agent["state"], seeded_agent.state.to_string());
+            assert_eq!(agent.display_name, seeded_agent.display_name);
+            assert_eq!(agent.state, seeded_agent.state.to_string());
         }
         assert!(
             carries_none_of(&body, &marks(person(&seeded, other)?)),
@@ -125,26 +133,24 @@ async fn an_agent_answers_its_person_role_version_state_and_provenance() -> Test
     let ada = person(&seeded, ADA)?;
     let cookie = service.sign_in(login(ADA)).await?;
     for agent in &ada.agents {
-        let (status, body) = service
-            .get(&format!("/agents/{}", agent.id), Some(&cookie))
-            .await?;
-        assert_eq!(status, 200, "{body}");
-        assert_eq!(body["id"], agent.id.to_string());
-        assert_eq!(body["display_name"], agent.display_name.as_str());
-        assert_eq!(body["state"], agent.state.to_string());
-        assert_eq!(body["person"]["id"], ada.id.to_string());
-        assert_eq!(body["person"]["display_name"], ada.display_name.as_str());
-        assert_eq!(body["needs_new_person"], false);
-        assert!(
-            body["role"].is_null() && body["version"].is_null(),
-            "{body}"
-        );
-        let provenance = &body["provenance"];
-        assert_eq!(provenance["registered_by"]["subject"], ADMINISTRATOR);
-        let events = provenance["events"].as_array().ok_or("no events")?;
-        assert!(!events.is_empty(), "{body}");
-        assert_eq!(provenance["registration"]["identity"], agent.id.to_string());
-        assert_eq!(provenance["registration"]["log"]["index"], events[0]);
+        let path = format!("/agents/{}", agent.id);
+        let (view, body) = read::<AgentView>(&service, &path, &cookie).await?;
+        assert_eq!(view.id, agent.id.to_string());
+        assert_eq!(view.display_name, agent.display_name);
+        assert_eq!(view.state, agent.state.to_string());
+        assert_eq!(view.person.id, ada.id.to_string());
+        assert_eq!(view.person.display_name, ada.display_name);
+        assert!(!view.needs_new_person);
+        assert!(view.role.is_none() && view.version.is_none(), "{body}");
+        assert_eq!(view.provenance.registered_by.subject, ADMINISTRATOR);
+        let first = *view.provenance.events.first().ok_or("no events")?;
+        let registration = view
+            .provenance
+            .registration
+            .as_ref()
+            .ok_or("no registration receipt")?;
+        assert_eq!(registration["identity"], agent.id.to_string());
+        assert_eq!(registration["log"]["index"], first);
     }
     Ok(())
 }
@@ -185,19 +191,22 @@ async fn another_persons_agent_is_refused_as_an_unknown_one_is_and_leaks_nothing
 async fn the_administrators_wider_view_is_its_own_route() -> TestResult {
     let (service, seeded) = seeded().await?;
     let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
-    let (status, body) = service.get("/directory/people", Some(&cookie)).await?;
-    assert_eq!(status, 200, "{body}");
-    assert_eq!(body["scope"], "directory");
-    let people = body["people"].as_array().ok_or("no people")?;
-    assert_eq!(people.len(), 2, "{body}");
-    let agents: usize = people.iter().map(|person| states(person).len()).sum();
-    assert_eq!(agents, 5, "{body}");
+    let (people, body) = read::<PeopleView>(&service, "/directory/people", &cookie).await?;
+    assert_eq!(people.scope, "directory");
+    assert_eq!(people.people.len(), 2, "{body}");
+    for seeded_person in &seeded.people {
+        let answered = people
+            .people
+            .iter()
+            .find(|person| person.id == seeded_person.id.to_string())
+            .ok_or("a seeded person is missing")?;
+        assert_eq!(answered.agents.len(), seeded_person.agents.len(), "{body}");
+    }
     let bea = person(&seeded, BEA)?;
     let path = format!("/directory/agents/{}", bea.agents[1].id);
-    let (status, body) = service.get(&path, Some(&cookie)).await?;
-    assert_eq!(status, 200, "{body}");
-    assert_eq!(body["state"], "retired");
-    assert_eq!(body["person"]["id"], bea.id.to_string());
+    let (view, _) = read::<AgentView>(&service, &path, &cookie).await?;
+    assert_eq!(view.state, "retired");
+    assert_eq!(view.person.id, bea.id.to_string());
     let (status, body) = service.get("/me", Some(&cookie)).await?;
     assert_eq!(status, 403, "{body}");
     assert_eq!(
@@ -238,9 +247,7 @@ async fn an_unauthenticated_caller_is_refused_by_name_on_every_route() -> TestRe
 async fn no_read_and_no_refusal_writes_anything() -> TestResult {
     let (service, seeded) = seeded().await?;
     let administrator = service.sign_in(login(ADMINISTRATOR)).await?;
-    let (_, before) = service
-        .get("/directory/people", Some(&administrator))
-        .await?;
+    let (before, _) = read::<PeopleView>(&service, "/directory/people", &administrator).await?;
     let ada = service.sign_in(login(ADA)).await?;
     let stranger = service.sign_in(login("stranger")).await?;
     let bea_agent = format!("/agents/{}", person(&seeded, BEA)?.agents[0].id);
@@ -254,9 +261,7 @@ async fn no_read_and_no_refusal_writes_anything() -> TestResult {
             service.get(path, cookie).await?;
         }
     }
-    let (_, after) = service
-        .get("/directory/people", Some(&administrator))
-        .await?;
+    let (after, _) = read::<PeopleView>(&service, "/directory/people", &administrator).await?;
     assert_eq!(before, after, "the directory is as it was");
     let last = seeded.tree_size - 1;
     let (status, body) = service.get(&format!("/receipts/{last}"), None).await?;

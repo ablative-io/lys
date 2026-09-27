@@ -15,6 +15,7 @@ pub mod grants;
 pub mod link_audit_api;
 pub mod oidc;
 pub mod read_api;
+pub mod read_views;
 pub mod receipts_api;
 pub mod routes;
 pub mod session;
