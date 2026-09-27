@@ -183,7 +183,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `crates/lys-identity/tests/revocation_verify.rs` | revoked, stale, unreadable, not-in-log, expired and no-log legs | DIRECTORY-013 |
 | `crates/lys-identity/tests/revocation_history.rs` | attestations before and after revocation, proofs and issuance record | DIRECTORY-013 |
 | `crates/lys-identity/tests/revocation_support/mod.rs` | test authorities, certificates and file-backed logs; generated keys only | DIRECTORY-013 |
-| `crates/lys/src/cli_tests.rs` | the CLI's help tests; DIRECTORY-013 adds the no-log revocation sentence test |  |
+| `crates/lys/src/cli_tests.rs` | the CLI's help tests; DIRECTORY-013 adds the no-log revocation sentence test | DIRECTORY-013 |
 
 ## Inventory
 
