@@ -22,6 +22,10 @@
 
 **S7.** As a verifier, I want to check a recorded identity change against a checkpoint and key with standard tooling, so that the directory's history does not rest on the operator's word.
 
+**S28.** As a verifier, I want to read from an agent's certificate what it was granted at issuance and have a holder, a grant or an instant outside that refused, so that a signed claim is never taken as checked when nothing checked it.
+
+**S29.** As a stranger verifying lys artifacts, I want the capability claim format specified, attacked and ratified before anything is signed under it, with every shipped format left byte-identical, so that no historical verification breaks.
+
 ## Grant holder and reviewer — Exercises or delegates current authority and verifies its exact origin
 
 **S8.** As a responsible person, I want to give my agent a bounded part of my authority and revoke it, so the same action is allowed before revocation and refused after it.
@@ -33,3 +37,5 @@
 **S11.** As a person granting temporary access, I want its end date and ancestor restrictions enforced, so role changes or reinstatement cannot silently extend it.
 
 **S12.** As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
+
+**S30.** As a responsible person, I want my agent issued one certificate listing the grants it holds and naming its holder, against a key enrolled for it, so that it carries proof of those grants from its first spawn and a lost key or an expired certificate can be replaced.
