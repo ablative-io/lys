@@ -201,7 +201,7 @@
         },
         {
           "id": "C34",
-          "text": "A missing container runtime, a missing Rauthy image, a missing PostgreSQL image and a Rauthy revision label other than the pin each make the leg refuse by name with a non-zero exit; the leg never pulls an image and never passes by skipping.",
+          "text": "A missing container runtime, a missing Rauthy image, a missing PostgreSQL image, and a Rauthy revision label that is absent or other than the pin each make the leg refuse by name with a non-zero exit; the leg never pulls, builds or relabels an image and never passes by skipping.",
           "done": false
         },
         {
