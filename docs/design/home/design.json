@@ -57,7 +57,8 @@
     "ADR-015",
     "ADR-016",
     "ADR-017",
-    "ADR-018"
+    "ADR-018",
+    "ADR-055"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -108,6 +109,10 @@
     {
       "text": "Rendering tool parts from the stored block, and moving the render's default Claude Code version off 2.1.281.",
       "reason": "Both change what a rendered file holds; the deterministic render changes nothing a file holds beyond the determinism."
+    },
+    {
+      "text": "Removing the Claude Code importer's own defaults (model \"\", toolCallId \"\", isError false, a redacted_thinking signature of null, tool_use id and name \"\", tool_result content []) at import.rs:151, 213-215, 466-474 and 508-519.",
+      "reason": "They are the other half of the file-looks-whole defect and belong to the importer card that records every field it drops; the render refuses what it is given, and the importer is not touched by HOME-015."
     }
   ],
   "structure": [
@@ -650,6 +655,41 @@
       "path": "docs/design/home/PROOF-FORK.md",
       "note": "the measured fork: Pi's parentSession read, a real session forked, rendered and launched, as hashes, counts and exit codes",
       "brief": "HOME-006"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-015.json",
+      "note": "the render refuses by name what it cannot shape and writes nothing",
+      "brief": "HOME-015"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-015.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-015"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_fields.rs",
+      "note": "the render's checked readers: a field present and of the target's type, or a refusal by entry id, field and expected type; the stopReason arms",
+      "brief": "HOME-015"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_fields_tests.rs",
+      "note": "the checked readers' unit tests",
+      "brief": "HOME-015"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_write.rs",
+      "note": "the render's one write stage: every serialisation decided before any directory or file is created",
+      "brief": "HOME-015"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_write_tests.rs",
+      "note": "the write stage's tests, the failing-serialiser account among them",
+      "brief": "HOME-015"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_refusal_tests.rs",
+      "note": "one fixture per refusal of the render, the absent-redacted reading and the unknown role",
+      "brief": "HOME-015"
     }
   ],
   "inventory": [
@@ -734,6 +774,10 @@
     {
       "id": "CN10",
       "text": "A fork copies the parent file's own line bytes and writes no block; nothing of the parent's header but cwd, and no credential, handle or launch setting, enters the child; the parent gains one lys.fork entry at its head and no earlier byte of it changes."
+    },
+    {
+      "id": "CN15",
+      "text": "The Claude Code render never writes a default in place of a value the record did not carry: a missing field, or a field of another type than the target takes, refuses the render by session, entry id, field and expected type before any directory or file is created, and so does a serialisation that fails. The only values written that no record carries are the format constants gitBranch \"\", usage {input_tokens 0, output_tokens 0} and stop_sequence null, and the only field read from its absence is `redacted`: absent means not redacted (ADR-055)."
     }
   ],
   "gate": [

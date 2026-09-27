@@ -20,6 +20,8 @@
 
 **S20.** As an agent, I want to fork a new session from a lantern's point, carrying everything said up to that point and nothing after it, and launch the child like any session, so that I can go back and talk with the self that lit the lantern.
 
+**S46.** As the agent launching a session, I want a launch whose render is refused to store nothing in the home, so that a launch that wrote no file leaves no template behind.
+
 ## Tom — Owns the platform and reads what a session was given
 
 **S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
@@ -36,6 +38,8 @@
 
 **S23.** As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything.
 
+**S44.** As Tom, I want a session the render cannot shape refused by name with nothing written, never rendered with a default where the record carried no value, so that a rendered file that looks whole is whole.
+
 ## Reviewer — Checks the proofs before anything relies on them
 
 **S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
@@ -51,3 +55,5 @@
 **S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
 
 **S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S45.** As the reviewer, I want each render refusal to name the entry id, the field and the expected type and never the value, with its own fixture, so that I can find the broken entry from the error alone and no transcript reaches it.

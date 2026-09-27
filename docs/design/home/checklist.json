@@ -275,6 +275,61 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Render refusals",
+      "items": [
+        {
+          "id": "C106",
+          "text": "HomeError names the render's refusals: a field refusal carrying the session, the entry id, the field, the expected type and whether the field was missing, whose Display for a missing provider or api names the act that answers it, a record whose assistant messages carry provider and api; a stopReason refusal carrying the session, the entry id and the value; and a serialisation refusal carrying the session, what would not serialise (`record`, `loss account` or `dropped part`) and the entry id when there is one; none carries a transcript value.",
+          "done": false
+        },
+        {
+          "id": "C107",
+          "text": "Every value the Claude Code render copies from a message entry is read through a checked reader that refuses a missing field and a field of another type than the target takes, and no reader substitutes a default; the one field read from its absence is `redacted`, absent meaning not redacted.",
+          "done": false
+        },
+        {
+          "id": "C108",
+          "text": "A message entry with no role, or with a role that is not a string, refuses the render by entry id and the field `role`; a role that is a string the render does not know is still skipped and the render succeeds.",
+          "done": false
+        },
+        {
+          "id": "C109",
+          "text": "A toolResult with no toolCallId, content or isError, a user message with no content or a single text part with no text, an assistant message with no content array, model, provider, api or stopReason, a text part with no text, a toolCall part with no id, name or arguments, a thinking part with no thinking text, a redacted thinking part with no thinkingSignature, and any of these present with another type than the target takes (a `redacted` or a thinkingSignature among them) each refuse the render by entry id and field, and nothing is written.",
+          "done": false
+        },
+        {
+          "id": "C110",
+          "text": "stopReason is mapped by one explicit arm each for toolUse, length, stop, error and aborted, and a wildcard arm: toolUse to tool_use, length to max_tokens and stop to end_turn; the error and aborted arms refuse by entry id and the value; the wildcard arm refuses by entry id and the value and maps to no Claude Code value.",
+          "done": false
+        },
+        {
+          "id": "C111",
+          "text": "Every serialisation the render needs, the record lines, the hashes of dropped parts and the loss account, is decided before any directory or file is created; a loss account whose serialiser fails refuses the render and no rendered file, loss account or seed exists afterwards.",
+          "done": false
+        },
+        {
+          "id": "C112",
+          "text": "Each refusal case has its own fixture asserting the entry id and the field it names; one test renders a thinking part with no `redacted` field as not redacted, and one renders past an unknown role.",
+          "done": false
+        },
+        {
+          "id": "C113",
+          "text": "The render's module doc names gitBranch \"\", usage {input_tokens 0, output_tokens 0} and stop_sequence null as format constants and absence as the only default of `redacted`; the bytes rendered from a session that carries every field and whose assistant stopReasons are toolUse, length or stop do not change; error, aborted or an unmapped stopReason refuses where it rendered as end_turn, and the pinned render hashes, whose fixtures carry only toolUse, length or stop, are unedited.",
+          "done": false
+        },
+        {
+          "id": "C114",
+          "text": "render-launch renders before it stores the template, so a refused launch leaves the home's templates directory with the same entries and hashes as before the call.",
+          "done": false
+        },
+        {
+          "id": "C115",
+          "text": "The cluster's rendered markdown, briefs/HOME-015.md among it, is what its JSON renders to, and scripts/design/gate.sh exits 0.",
+          "done": false
+        }
+      ]
     }
   ]
 }

@@ -1,0 +1,229 @@
+---
+type: brief
+id: HOME-015
+cluster: home
+title: Make the Claude Code render refuse by name what it cannot shape and write nothing
+---
+
+# HOME-015: Make the Claude Code render refuse by name what it cannot shape and write nothing
+
+> **Cluster:** home
+> **Design anchor:**
+> - ADR-012 — A harness launch template is kept in the home by hash, and each render is recorded on the session beside its context path — A launch template per harness is a JSON object with named slots (transcript, mcp, env, secrets, instructions) plus flags, stored in the home under templates/ by its SHA-256; lys-home renders a template and a session into files and runtime variables with command mappings in text, prints the launch line and never runs it, and records each render as a sixth lys.harness_event kind, template_render, hung as a side leaf beside the context path with the written paths in a manifest block named by hash. Rejected: a transcript converter or adapter protocol per harness, a template kept outside the home (a seat document of another tool), and a render event that advances the head, which would change the session head hash between two renders of the same session.
+> - ADR-016 — A rendered file's derived uuids are a fixed, versioned contract — Derive every uuid a render needs and the record does not hold as UUIDv5 under the session's namespace and the name `<entry id>#<role>`, with a closed set of roles (`record` first); the session's namespace is UUIDv5 over one fixed lys namespace (32c05904-d1f1-550c-9eee-2f6c8f98b665, itself UUIDv5 of the RFC 9562 URL namespace over `lys/home/claude-code/render-uuid/v1`) and the id of the session being rendered, so the same entry id in two sessions never derives one uuid. Treat the namespace, the session namespace rule, the name form and the roles as frozen: a change is a new version alongside, never a mutation. The fork and launch cards derive by this scheme. Rejected: drawing fresh ids (nondeterministic), keying on a hash of the entry id alone without a namespace, a role and a session (two roles on one entry collide, two sessions with one hand-authored id collide, and it is not reproducible with standard UUID tooling), mixing in the target session id (the record does not hold it), and leaving the scheme mutable until a later card (every recorded hash would move with it).
+> - ADR-017 — A fork is a child session cut from the parent's own lines at a lantern's point, with its ancestry on both sides — A fork resolves a lantern to the session it was lit in, read from the lys.lantern data's lit_in when the record carries it and otherwise by the older-record rule (one holder cuts, several refuse lantern_ambiguous until a session is named), and cuts that session's root-to-point chain at the last assistant message at or before the point, through the index. The child is a new session under the parent's cwd whose header's parentSession is the parent file's path relative to the home, holding each cut entry as the parent file's own line bytes, then one lys.forked_from custom entry as its head naming the parent session, the lantern, the point, the cut entry, whether the coordinate was carried and the carried entry; the parent gains one lys.fork custom entry at its head naming the child. Nothing else is copied and no block is written. Rejected: re-serialising the copied entries (the copy would stop hash-matching the parent's lines), a fork store beside the sessions outside Pi's grammar, cutting at a point no lantern names, and a header field beyond Pi's parentSession.
+> - ADR-018 — A user-message point is carried as a seed prompt beside the rendered file, never copied into the child — When the point is a user message the cut stops at the assistant message before it and the message is carried, not copied: lys.forked_from records its id with coordinate_carried true and counts, by kind, the parts of it that are not text. The Claude Code render of such a child writes the message's text parts, in order, as a seed prompt beside the rendered file under an in-band marker line naming the parent session, the point and the lantern, and names it in the render report; the template's launch line, printed by render-launch only, passes that file as the resumed session's first prompt. A part that is not text never refuses a fork or a render and never enters the seed. Rejected: copying the user message into the child's chain, refusing a fork for a non-text part, and putting the seed's text in the report or the loss account.
+> - ADR-055 — The Claude Code render refuses by name what it cannot shape and never writes a default in place of a value the record did not carry — Every value the render copies from a message entry must be present and of the type the target field takes; a missing field or a field of another type refuses the render by the session, the entry id, the field and the expected type, and nothing is written. The value itself is never named, except an unmapped stopReason, which is named because it is a protocol value and not transcript. Every serialisation the render needs, the records, the dropped parts it hashes and the loss account, is done before any directory or file is created, and a failure refuses by name. Only three values are written that the record does not carry, and they are format constants Claude Code's file requires on every record: gitBranch "", usage {input_tokens 0, output_tokens 0} and stop_sequence null. Only one field reads a meaning from its absence: a thinking part with no `redacted` field is not redacted, since in Pi's grammar the field is optional and its absence is the source's own statement; a `redacted` present and not a boolean refuses. stopReason is mapped by one explicit arm each for toolUse, length, stop, error and aborted, and a wildcard arm: toolUse maps to tool_use, length to max_tokens and stop to end_turn; the error arm and the aborted arm refuse by name, naming the value, because Claude Code's own session files carry no value for an errored or interrupted turn (measured on Claude Code 2.1.283 over every JSONL file of its projects directory, 3379 files, with `grep -rhoE '"stop_reason":("[a-z_]+"|null)' --include='*.jsonl' <projects directory> | sort | uniq -c`: tool_use 547470, null 172397, end_turn 53290, stop_sequence 2253, refusal 22, max_tokens 1, error 0, aborted 0); and the wildcard arm refuses by name, naming the value, and maps to no Claude Code value. A present role the render does not know is still skipped. render-launch stores its template in the home only after the render has succeeded. Rejected: rendering a default and naming it in the loss account, refusing only missing fields and copying wrongly typed ones, mapping every unknown stopReason to end_turn, and keeping the template a refused launch had already stored.
+> **Checklist:**
+> - C106 — HomeError names the render's refusals: a field refusal carrying the session, the entry id, the field, the expected type and whether the field was missing, whose Display for a missing provider or api names the act that answers it, a record whose assistant messages carry provider and api; a stopReason refusal carrying the session, the entry id and the value; and a serialisation refusal carrying the session, what would not serialise (`record`, `loss account` or `dropped part`) and the entry id when there is one; none carries a transcript value.
+> - C107 — Every value the Claude Code render copies from a message entry is read through a checked reader that refuses a missing field and a field of another type than the target takes, and no reader substitutes a default; the one field read from its absence is `redacted`, absent meaning not redacted.
+> - C108 — A message entry with no role, or with a role that is not a string, refuses the render by entry id and the field `role`; a role that is a string the render does not know is still skipped and the render succeeds.
+> - C109 — A toolResult with no toolCallId, content or isError, a user message with no content or a single text part with no text, an assistant message with no content array, model, provider, api or stopReason, a text part with no text, a toolCall part with no id, name or arguments, a thinking part with no thinking text, a redacted thinking part with no thinkingSignature, and any of these present with another type than the target takes (a `redacted` or a thinkingSignature among them) each refuse the render by entry id and field, and nothing is written.
+> - C110 — stopReason is mapped by one explicit arm each for toolUse, length, stop, error and aborted, and a wildcard arm: toolUse to tool_use, length to max_tokens and stop to end_turn; the error and aborted arms refuse by entry id and the value; the wildcard arm refuses by entry id and the value and maps to no Claude Code value.
+> - C111 — Every serialisation the render needs, the record lines, the hashes of dropped parts and the loss account, is decided before any directory or file is created; a loss account whose serialiser fails refuses the render and no rendered file, loss account or seed exists afterwards.
+> - C112 — Each refusal case has its own fixture asserting the entry id and the field it names; one test renders a thinking part with no `redacted` field as not redacted, and one renders past an unknown role.
+> - C113 — The render's module doc names gitBranch "", usage {input_tokens 0, output_tokens 0} and stop_sequence null as format constants and absence as the only default of `redacted`; the bytes rendered from a session that carries every field and whose assistant stopReasons are toolUse, length or stop do not change; error, aborted or an unmapped stopReason refuses where it rendered as end_turn, and the pinned render hashes, whose fixtures carry only toolUse, length or stop, are unedited.
+> - C114 — render-launch renders before it stores the template, so a refused launch leaves the home's templates directory with the same entries and hashes as before the call.
+> - C115 — The cluster's rendered markdown, briefs/HOME-015.md among it, is what its JSON renders to, and scripts/design/gate.sh exits 0.
+> **Stories:**
+> - S44 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a session the render cannot shape refused by name with nothing written, never rendered with a default where the record carried no value, so that a rendered file that looks whole is whole.
+> - S45 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each render refusal to name the entry id, the field and the expected type and never the value, with its own fixture, so that I can find the broken entry from the error alone and no transcript reaches it.
+> - S46 (Agent, Runs in a harness and wants to continue somewhere else) — As the agent launching a session, I want a launch whose render is refused to store nothing in the home, so that a launch that wrote no file leaves no template behind.
+
+## Purpose
+
+The Claude Code render writes a default wherever a home record is missing a field or carries one of the wrong type, and serialises its loss account and the hashes of dropped parts with unwrap_or_default, so a broken session renders to a file that looks whole and the render reports success. This brief makes the render refuse instead, by the session, the entry id, the field and the expected type, before it writes anything, as ADR-055 and CN15 fix it; the three format constants Claude Code's file requires and the absent `redacted` reading are the only values the render writes or reads that the record does not carry. Every session that carries every field and whose assistant stopReasons are toolUse, length or stop renders to the same bytes as before, so every pinned render hash stands; a stopReason of error, aborted or any unmapped value now refuses where it rendered as end_turn.
+
+## Task
+
+All of the render is in crates/lys-home/src/harness/claude_code/render.rs. Its defaults, as the tree holds them: role unwrap_or("") at line 138, so a message with no role, or a role that is not a string, is skipped silently by the `_ => continue` arm at line 230; this corrects the card's words, which said such a message renders with an empty role. The refusal replaces that skip for a missing or non-string role only: a role that is a string the render does not know stays skipped, and this card does not change which real sessions render on that ground. toolResult toolCallId "", content [] and isError false at lines 163-165, copied with no type check; assistant content unwrap_or_default at lines 176-181; text "" at line 183; thinking text "" at line 187; a redacted part's missing signature written as null `data` at line 189, and `sig.is_some()` at lines 191 and 197 taking a present JSON null for a signature; toolCall id and name "" and arguments {} at lines 206-208; stopReason: a `_ =>` arm at lines 213-217 that maps a missing value and every value but toolUse and length to end_turn; model "" at line 222; the loss account serialised with to_vec_pretty(..).unwrap_or_default() at line 267 after the rendered file is already created and synced (lines 244-262) and before the seed (line 271); loss() hashing to_vec(part).unwrap_or_default() at line 287; and user_parts writing "" for a single text part with no text (line 383) and for a missing or wrongly typed content (line 388). provider and api (lines 170-174) are read only to compare them, so a missing one silently turned signed thinking into text; that is a default too, and it refuses. Every one of these becomes a refusal decided before line 240, so nothing is written. The three values the render writes that no record carries are format constants Claude Code's file requires on every record and stay as they are: gitBranch "" (line 148), stop_sequence null (line 225) and usage {input_tokens 0, output_tokens 0} (line 226). A thinking part with no `redacted` field reads as not redacted, since in Pi's grammar the field is optional and absent means not redacted; that is this card's boundary, and only absence defaults: the reading at line 185, which today takes a present non-boolean `redacted` for false as well, is changed to tell the two apart, and a present `redacted` that is not a boolean refuses. stopReason gets one explicit arm each for toolUse, length, stop, error and aborted, and a wildcard arm that refuses by name, naming the value, and maps to no Claude Code value. What `error` and `aborted` map to was measured, not guessed, on Claude Code's own session files the way given.rs measured the version: every JSONL file under the Claude Code projects directory, 3379 files written by the installed Claude Code 2.1.283, counted with `grep -rhoE '"stop_reason":("[a-z_]+"|null)' --include='*.jsonl' <projects directory> | sort | uniq -c`, hold tool_use 547470, null 172397, end_turn 53290, stop_sequence 2253, refusal 22, max_tokens 1, error 0 and aborted 0 (max_tokens is also the value the render writes for length), so Claude Code writes no value of its own for an errored or an interrupted turn. `error` and `aborted` therefore refuse by name, naming the value, and a session holding such a turn does not render until the Claude Code format has a value for it. Canon entries and fork children go through the same walk, so a canon file or a parent line the render cannot shape now refuses the whole render. The importer's own defaults are the known remaining half of the defect and are not touched here: import.rs:151 (model ""), 213-215 (toolCallId "", isError false), 466-474 (tool_use id and name "", input {}) and 508-519 (tool_result content []), with import.rs:460 writing thinkingSignature null for a redacted_thinking part with no data, which this card now refuses; they belong with the importer card that records every field it drops, card nBeQclbH, which is held; this card does not touch import.rs. render-launch (launch.rs) stores its template at line 102 before it renders at line 113; it renders first and stores the template only after the render succeeds. Out of scope: import.rs, any change to which block kinds are carried, turned into text or dropped (the `_ => content.push(part.clone())` arm stays), the Loss and loss-account fields, record_uuid and every derived uuid, and any harness but Claude Code.
+
+## Requirements
+
+### R1: Name the render's refusals in HomeError
+
+Add three variants to HomeError in crates/lys-home/src/error.rs, each documented and each naming no transcript value: RenderField { session: String, entry: String, field: &'static str, expected: &'static str, missing: bool }, whose Display reads `render of session <session> refused entry <entry>: field <field> is missing, expected <expected>` when missing is true and `render of session <session> refused entry <entry>: field <field> is not <expected>` when it is false, except that when missing is true and field is `provider` or `api` the Display names the act that answers the refusal and reads `render of session <session> refused entry <entry>: field <field> is missing, expected string; the render needs a record whose assistant messages carry provider and api`; RenderStopReason { session: String, entry: String, value: String }, whose Display reads `render of session <session> refused entry <entry>: stopReason <value> has no Claude Code value`; and RenderUnserialisable { session: String, what: &'static str, entry: Option<String>, source: serde_json::Error }, whose Display names the session, what would not serialise (`record`, `loss account` or `dropped part`) and the entry when there is one, with the serde error as its #[source]. The expected type is one of `string`, `array`, `boolean`, `object` and `array or string`. The variants SHALL NOT carry the value of a field, a part's text or any entry's data; SHALL NOT change any existing variant; and SHALL NOT add a dependency.
+
+**Acceptance:**
+- A unit test builds RenderField { session: "s", entry: "x1", field: "toolCallId", expected: "string", missing: true } and asserts its Display equals `render of session s refused entry x1: field toolCallId is missing, expected string`.
+- A unit test builds RenderField { session: "s", entry: "x1", field: "isError", expected: "boolean", missing: false } and asserts its Display equals `render of session s refused entry x1: field isError is not boolean`.
+- A unit test builds RenderField { session: "s", entry: "x1", field: "provider", expected: "string", missing: true } and asserts its Display equals `render of session s refused entry x1: field provider is missing, expected string; the render needs a record whose assistant messages carry provider and api`, and the same with field `api` equals `render of session s refused entry x1: field api is missing, expected string; the render needs a record whose assistant messages carry provider and api`.
+- A unit test builds RenderStopReason { session: "s", entry: "x1", value: "halted" } and asserts its Display equals `render of session s refused entry x1: stopReason halted has no Claude Code value`.
+- `git diff 7b53625 -- crates/lys-home/src/error.rs` shows only added lines.
+
+**Files:**
+- modify: crates/lys-home/src/error.rs
+
+**Checklist:**
+- C106 — HomeError names the render's refusals: a field refusal carrying the session, the entry id, the field, the expected type and whether the field was missing, whose Display for a missing provider or api names the act that answers it, a record whose assistant messages carry provider and api; a stopReason refusal carrying the session, the entry id and the value; and a serialisation refusal carrying the session, what would not serialise (`record`, `loss account` or `dropped part`) and the entry id when there is one; none carries a transcript value.
+
+**Stories:**
+- S45 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each render refusal to name the entry id, the field and the expected type and never the value, with its own fixture, so that I can find the broken entry from the error alone and no transcript reaches it.
+
+### R2: Read every copied field through checked readers
+
+Add crates/lys-home/src/harness/claude_code/render_fields.rs, declared in crates/lys-home/src/harness/claude_code/mod.rs beside render, with readers the render walk uses for every value it copies from a message entry or one of its parts: a string, an array, a boolean, an object, and an array-or-string, each taking the session id, the entry id, the source value and the field name. IF the field is absent, THEN THE SYSTEM SHALL return RenderField with missing true and the reader's expected type. IF the field is present and not of the reader's type, a JSON null included, THEN THE SYSTEM SHALL return RenderField with missing false and the expected type. WHEN the field is present and of the type, THE SYSTEM SHALL return it unchanged. Add one reader for `redacted` that returns false when the field is absent, the boolean when it is a boolean, and RenderField { field: "redacted", expected: "boolean", missing: false } otherwise, and one for stopReason with one explicit arm each for toolUse, length, stop, error and aborted, and a wildcard arm: toolUse gives tool_use, length gives max_tokens and stop gives end_turn; the error arm and the aborted arm each return RenderStopReason naming the value, since Claude Code's files carry no value for either; the wildcard arm returns RenderStopReason naming the value; a missing stopReason returns RenderField missing true and one that is not a string RenderField missing false, both expected string. No reader SHALL substitute a default for a missing or wrongly typed value except the absent `redacted`, the stopReason reader's wildcard arm SHALL NOT map to a Claude Code value, the error and aborted arms SHALL NOT map to one either, and no reader SHALL put the value it read into an error. Unit tests go in crates/lys-home/src/harness/claude_code/render_fields_tests.rs.
+
+**Acceptance:**
+- The string reader over {"text": 3} for field `text` in entry `x1` returns RenderField { entry: "x1", field: "text", expected: "string", missing: false }.
+- The string reader over {} for field `text` returns RenderField with missing true and expected `string`; over {"text": null} it returns missing false.
+- The array-or-string reader returns the value unchanged for {"content": "a"} and for {"content": []}, and returns expected `array or string`, missing false, for {"content": 5}.
+- The redacted reader returns false for {}, true for {"redacted": true} and RenderField { field: "redacted", expected: "boolean", missing: false } for {"redacted": "yes"}.
+- The stopReason reader maps toolUse, length and stop to tool_use, max_tokens and end_turn; returns RenderStopReason with value `error` for error and value `aborted` for aborted, from their own arms, and with value `halted` for halted, from the wildcard arm; and returns RenderField { field: "stopReason", expected: "string" } with missing true for {} and missing false for {"stopReason": 1}.
+- `grep -cE '"(toolUse|length|stop|error|aborted)" *=>' crates/lys-home/src/harness/claude_code/render_fields.rs` prints 5, one explicit arm each, and the stopReason match's `_ =>` arm returns RenderStopReason.
+- `grep -n 'unwrap_or' crates/lys-home/src/harness/claude_code/render_fields.rs` prints nothing.
+
+**Files:**
+- create: crates/lys-home/src/harness/claude_code/render_fields.rs
+- create: crates/lys-home/src/harness/claude_code/render_fields_tests.rs
+- modify: crates/lys-home/src/harness/claude_code/mod.rs
+
+**Checklist:**
+- C107 — Every value the Claude Code render copies from a message entry is read through a checked reader that refuses a missing field and a field of another type than the target takes, and no reader substitutes a default; the one field read from its absence is `redacted`, absent meaning not redacted.
+- C110 — stopReason is mapped by one explicit arm each for toolUse, length, stop, error and aborted, and a wildcard arm: toolUse to tool_use, length to max_tokens and stop to end_turn; the error and aborted arms refuse by entry id and the value; the wildcard arm refuses by entry id and the value and maps to no Claude Code value.
+
+**Stories:**
+- S44 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a session the render cannot shape refused by name with nothing written, never rendered with a default where the record carried no value, so that a rendered file that looks whole is whole.
+
+### R3: Decide every serialisation before anything is written
+
+Add crates/lys-home/src/harness/claude_code/render_write.rs holding the render's one write stage, which render_claude_code calls for all its writing: it takes the home session's header id, the rendered path, the record values each paired with the entry id it was rendered from (None for a summary record), the loss account as any value implementing serde::Serialize, and the seed with its path when there is one. Before it creates the render directory or any file, THE SYSTEM SHALL serialise every record compactly with serde_json::to_string, one line per record followed by a newline, as render.rs writes them before this card, and the loss account, alone, with serde_json::to_vec_pretty. THE SYSTEM SHALL NOT pretty-print a record line. render.rs SHALL create no directory or file and write no seed itself: every write of the render goes through the stage. IF a serialisation fails, THEN THE SYSTEM SHALL return RenderUnserialisable with the session id it was given, what would not serialise (`record`, `loss account` or `dropped part`) and the entry id paired with that record, or None for a summary record and for the loss account, and SHALL NOT create the directory, the rendered file, the loss account or the seed. loss() in render.rs SHALL take the session id and the id of the entry the dropped part came from, SHALL return Result<Loss, HomeError>, and IF the dropped part cannot be serialised, THEN it SHALL return RenderUnserialisable with that session id, what `dropped part` and Some of that entry id, and every caller SHALL propagate it with `?`. The production loss account SHALL be the same JSON object, with the same keys and values, serialised to the same bytes as before this card. THE SYSTEM SHALL NOT hash empty bytes in place of a part, and SHALL NOT write a loss account of zero bytes.
+
+**Acceptance:**
+- A test in render_write_tests.rs defines an account type whose Serialize returns serde's custom error, calls the write stage with session id `s`, one record paired with entry id `u1`, that account, a seed and a rendered path `nested/r.jsonl` under a fresh temporary directory, and asserts the result is RenderUnserialisable with session `s`, what `loss account` and entry None, and that `nested/`, `nested/r.jsonl`, `nested/r.loss.json` and the seed path do not exist.
+- The same call with the account replaced by a serde_json object succeeds and writes all three files.
+- In that succeeding call, the rendered file is, byte for byte, serde_json::to_string of the record followed by one newline, and the loss account is, byte for byte, serde_json::to_vec_pretty of the object.
+- `grep -nE 'std::fs|OpenOptions|create_dir|write_seed|sync_all|io::Write' crates/lys-home/src/harness/claude_code/render.rs` prints nothing, and `grep -n 'render_write::' crates/lys-home/src/harness/claude_code/render.rs` prints at least one line.
+- The stage's signature takes the session id and each record's entry id as an Option<String> beside its value, and render.rs passes the home session's header id and, for each record, the id of the entry it was rendered from.
+- loss() is declared taking the session id and the entry id and returning Result<Loss, HomeError>, and both of its call sites pass the home session's header id and the id of the entry the part came from.
+- `grep -n 'unwrap_or' crates/lys-home/src/harness/claude_code/render_write.rs` prints nothing.
+- tests/launch_template.rs passes with its RECORDED hash of `00000000-0000-4000-8000-000000000001.loss.json` still 460f96f14dad62da55296f49be6dee44a82c5bf4a810ee3859190d83dd923a26.
+
+**Files:**
+- create: crates/lys-home/src/harness/claude_code/render_write.rs
+- create: crates/lys-home/src/harness/claude_code/render_write_tests.rs
+- modify: crates/lys-home/src/harness/claude_code/render.rs
+- modify: crates/lys-home/src/harness/claude_code/mod.rs
+
+**Checklist:**
+- C111 — Every serialisation the render needs, the record lines, the hashes of dropped parts and the loss account, is decided before any directory or file is created; a loss account whose serialiser fails refuses the render and no rendered file, loss account or seed exists afterwards.
+
+**Stories:**
+- S44 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a session the render cannot shape refused by name with nothing written, never rendered with a default where the record carried no value, so that a rendered file that looks whole is whole.
+
+### R4: Shape every rendered record from checked fields and refuse what the render cannot shape
+
+WHEN the render walks a message entry, THE SYSTEM SHALL read through R2's readers: role (string); for a toolResult, toolCallId (string), content (array or string) and isError (boolean); for a user message, content (array or string), and for a content array of exactly one text part, that part's text (string); for an assistant message, provider, api and model (string), content (array) and stopReason; for an assistant text part, text (string); for a toolCall part, id and name (string) and arguments (object); for a thinking part, redacted by the redacted reader, thinkingSignature (string, absent allowed and a JSON null refused), thinking (string), and, when redacted is true, thinkingSignature required. IF any reader refuses, THEN THE SYSTEM SHALL return that refusal naming the home session's header id and the entry, before any directory or file is created, and the first field in entry order then field order is the one named. WHEN the role is a string other than user, toolResult and assistant, THE SYSTEM SHALL skip the entry as today. WHEN every field is present and of its type and every assistant stopReason is toolUse, length or stop, THE SYSTEM SHALL write the same bytes as before this card. IF an assistant stopReason is error, aborted or any value R2 does not map, THEN THE SYSTEM SHALL refuse, where before this card it wrote end_turn. The module doc of render.rs SHALL name gitBranch "", usage {input_tokens 0, output_tokens 0} and stop_sequence null as the Claude Code format constants written on every record, and absence as the only default of `redacted`. THE SYSTEM SHALL NOT change which block kinds are carried, turned into text or dropped, SHALL NOT change the Loss or loss-account fields, record_uuid or any derived uuid, and SHALL NOT change import.rs.
+
+**Acceptance:**
+- `grep -n 'unwrap_or' crates/lys-home/src/harness/claude_code/render.rs` prints nothing.
+- The module doc (the leading `//!` lines) of render.rs contains `gitBranch`, `usage`, `stop_sequence` and `redacted`.
+- Every test that render_tests.rs, tests/claude_code_round_trip.rs, tests/launch_template.rs and tests/fork.rs hold at 7b53625 passes with its body and its pinned hashes unedited.
+- The pinned fixtures carry no stopReason but the three whose bytes do not move: `grep -rhoE '"stopReason": ?"[A-Za-z]+"' crates/lys-home/tests/fixtures crates/lys-home/tests/launch_template.rs crates/lys-home/tests/fork.rs | sort -u` prints only `stop`, `toolUse` or `length` values, and the Claude Code fixture behind PINNED_FIXTURE_SHA256 reaches the render through import.rs, whose stop_reason returns only toolUse, length and stop and is unchanged by the last line; `git diff 7b53625 -- crates/lys-home/tests/claude_code_round_trip.rs crates/lys-home/tests/launch_template.rs | grep -E '^-.*[0-9a-f]{64}'` prints nothing.
+- `git diff 7b53625 -- crates/lys-home/src/harness/claude_code/import.rs crates/lys-home/src/harness/claude_code/seed.rs` prints nothing.
+
+**Files:**
+- modify: crates/lys-home/src/harness/claude_code/render.rs
+
+**Checklist:**
+- C108 — A message entry with no role, or with a role that is not a string, refuses the render by entry id and the field `role`; a role that is a string the render does not know is still skipped and the render succeeds.
+- C109 — A toolResult with no toolCallId, content or isError, a user message with no content or a single text part with no text, an assistant message with no content array, model, provider, api or stopReason, a text part with no text, a toolCall part with no id, name or arguments, a thinking part with no thinking text, a redacted thinking part with no thinkingSignature, and any of these present with another type than the target takes (a `redacted` or a thinkingSignature among them) each refuse the render by entry id and field, and nothing is written.
+- C110 — stopReason is mapped by one explicit arm each for toolUse, length, stop, error and aborted, and a wildcard arm: toolUse to tool_use, length to max_tokens and stop to end_turn; the error and aborted arms refuse by entry id and the value; the wildcard arm refuses by entry id and the value and maps to no Claude Code value.
+- C113 — The render's module doc names gitBranch "", usage {input_tokens 0, output_tokens 0} and stop_sequence null as format constants and absence as the only default of `redacted`; the bytes rendered from a session that carries every field and whose assistant stopReasons are toolUse, length or stop do not change; error, aborted or an unmapped stopReason refuses where it rendered as end_turn, and the pinned render hashes, whose fixtures carry only toolUse, length or stop, are unedited.
+
+**Stories:**
+- S44 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a session the render cannot shape refused by name with nothing written, never rendered with a default where the record carried no value, so that a rendered file that looks whole is whole.
+
+### R5: Prove each refusal with its own fixture
+
+Add crates/lys-home/src/harness/claude_code/render_refusal_tests.rs. Each test builds a home session `thin` holding a well-formed user entry `u1` then one entry `x1` under it that carries every field but the one under test, renders it with session id aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa, cwd /w, model claude-opus-5-5, version 2.1.281 and out `r.jsonl` in an empty temporary directory, and asserts the error variant, entry `x1`, the field, the expected type and missing, and that the temporary directory is still empty. One test per case: a message with no role; role 12345; a toolResult with no toolCallId; with no content; with no isError; with isError "maybe"; a user message with no content; a user message whose content is one text part with no text; an assistant message with no content; with content "fixture words" where an array is required; with no model; with no provider; with no api; with no stopReason; with stopReason error; with stopReason aborted; with stopReason halted; an assistant text part with no text; a toolCall part with no id; with no name; with no arguments; a thinking part with no thinking; a redacted thinking part with no thinkingSignature; a thinking part whose thinkingSignature is null; and a thinking part with redacted "yes". Add passing tests: an entry with role `narrator` is skipped and the render succeeds with one record; a same-model thinking part with thinking and thinkingSignature and no `redacted` field renders as a `thinking` block with its signature, not as `redacted_thinking`; stopReason stop, toolUse and length render as end_turn, tool_use and max_tokens. Add to tests/claude_code_round_trip.rs one test that runs `render` through lys_home::cli::run on a home whose session holds a message with no role and asserts the RenderField error and that the out path does not exist. No test name, fixture value or error SHALL carry transcript content, and no refusal's Display SHALL contain the value under test.
+
+**Acceptance:**
+- Each of the 25 refusal tests passes and asserts entry `x1`; the 22 RenderField tests assert the field, in order role, role, toolCallId, content, isError, isError, content, text, content, content, model, provider, api, stopReason, text, id, name, arguments, thinking, thinkingSignature, thinkingSignature, redacted, and the 3 RenderStopReason tests assert a Display containing `stopReason`.
+- The role-12345 test asserts expected `string`, missing false and that the Display does not contain `12345`; the isError-"maybe" test asserts expected `boolean` and that the Display does not contain `maybe`; the content-"fixture words" test asserts expected `array` and that the Display does not contain `fixture words`.
+- The no-provider and no-api tests each assert that the refusal's Display ends with `the render needs a record whose assistant messages carry provider and api`.
+- The error, aborted and halted tests assert RenderStopReason with value `error`, `aborted` and `halted`.
+- Every refusal test asserts that the temporary directory holds 0 entries after the call.
+- The narrator test asserts the report's records equals 1.
+- The absent-redacted test asserts the rendered assistant record's content[0].type is `thinking`, its signature is the fixture's, the file does not contain `redacted_thinking`, and thinking_kept equals 1.
+- The stopReason mapping test asserts the three rendered stop_reason values in order: end_turn, tool_use, max_tokens.
+- The CLI test asserts RenderField with entry id, field `role` and missing true, and that the out path does not exist.
+- `git diff 7b53625 -- crates/lys-home/tests/claude_code_round_trip.rs` shows only added lines, so PINNED_FIXTURE_SHA256 stays 798a64be2164b48c30e4e64fa80c4a307687f7808c256e7606be52b2c9f03074.
+- Restoring `.cloned().unwrap_or(Value::String(String::new()))` on toolCallId makes exactly the no-toolCallId test fail, and restoring `.and_then(Value::as_bool).unwrap_or(false)` on redacted makes exactly the redacted-"yes" test fail; both are recorded as drift injections in the dev record.
+
+**Files:**
+- create: crates/lys-home/src/harness/claude_code/render_refusal_tests.rs
+- modify: crates/lys-home/src/harness/claude_code/mod.rs
+- modify: crates/lys-home/tests/claude_code_round_trip.rs
+
+**Checklist:**
+- C108 — A message entry with no role, or with a role that is not a string, refuses the render by entry id and the field `role`; a role that is a string the render does not know is still skipped and the render succeeds.
+- C109 — A toolResult with no toolCallId, content or isError, a user message with no content or a single text part with no text, an assistant message with no content array, model, provider, api or stopReason, a text part with no text, a toolCall part with no id, name or arguments, a thinking part with no thinking text, a redacted thinking part with no thinkingSignature, and any of these present with another type than the target takes (a `redacted` or a thinkingSignature among them) each refuse the render by entry id and field, and nothing is written.
+- C110 — stopReason is mapped by one explicit arm each for toolUse, length, stop, error and aborted, and a wildcard arm: toolUse to tool_use, length to max_tokens and stop to end_turn; the error and aborted arms refuse by entry id and the value; the wildcard arm refuses by entry id and the value and maps to no Claude Code value.
+- C112 — Each refusal case has its own fixture asserting the entry id and the field it names; one test renders a thinking part with no `redacted` field as not redacted, and one renders past an unknown role.
+
+**Stories:**
+- S45 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each render refusal to name the entry id, the field and the expected type and never the value, with its own fixture, so that I can find the broken entry from the error alone and no transcript reaches it.
+
+### R6: Store the launch template only after its render succeeds
+
+WHEN render-launch runs, THE SYSTEM SHALL call render_claude_code before home.templates().put, so the template is stored only after the render has succeeded. IF the render is refused, THEN THE SYSTEM SHALL return the refusal and SHALL NOT store the template, write the MCP, env or instructions file, or record a template_render event. THE SYSTEM SHALL NOT change the files, the manifest or the event of a launch whose render succeeds.
+
+**Acceptance:**
+- A test in tests/launch_template.rs runs one successful render-launch of the fixture template into a first out directory, records the templates directory's file names and their SHA-256, appends to the fixture session a message entry with no role, runs render-launch with a template whose instructions differ into a second empty out directory, and asserts exit status 1, stderr containing `field role`, empty stdout, the second out directory holding 0 entries, and the templates directory holding the same file names with the same SHA-256 as recorded.
+- The same test asserts the session holds one lys.harness_event entry after both calls.
+- The existing launch_template tests pass with RECORDED unedited.
+
+**Files:**
+- modify: crates/lys-home/src/harness/claude_code/launch.rs
+- modify: crates/lys-home/tests/launch_template.rs
+
+**Checklist:**
+- C114 — render-launch renders before it stores the template, so a refused launch leaves the home's templates directory with the same entries and hashes as before the call.
+
+**Stories:**
+- S46 (Agent, Runs in a harness and wants to continue somewhere else) — As the agent launching a session, I want a launch whose render is refused to store nothing in the home, so that a launch that wrote no file leaves no template behind.
+
+### R7: Regenerate the cluster's rendered markdown
+
+Regenerate docs/design/home's rendered markdown with render-cluster.py so DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/HOME-015.md are what their JSON renders to. THE SYSTEM SHALL NOT edit a rendered markdown file by hand, and SHALL NOT change any other brief's markdown beyond what rendering gives.
+
+**Acceptance:**
+- `sh scripts/design/gate.sh` exits 0.
+- docs/design/home/briefs/HOME-015.md exists and contains `HOME-015`.
+
+**Files:**
+- modify: docs/design/home/briefs/HOME-015.md
+- modify: docs/design/home/DESIGN.md
+- modify: docs/design/home/CHECKLIST.md
+- modify: docs/design/home/USER-STORIES.md
+
+**Checklist:**
+- C115 — The cluster's rendered markdown, briefs/HOME-015.md among it, is what its JSON renders to, and scripts/design/gate.sh exits 0.
+
+**Stories:**
+- S45 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each render refusal to name the entry id, the field and the expected type and never the value, with its own fixture, so that I can find the broken entry from the error alone and no transcript reaches it.
+
+## Boundaries
+
+- No change to crates/lys-home/src/harness/claude_code/import.rs; its defaults at lines 151, 213-215, 466-474 and 508-519 are the remaining half and belong to the importer card, card nBeQclbH.
+- No change to which block kinds are carried, turned into text or dropped, and no change to the Loss or loss-account fields.
+- No change to record_uuid, the render namespace or any derived uuid (ADR-016).
+- No change to the bytes rendered from a session that carries every field and whose assistant stopReasons are toolUse, length or stop; a stopReason of error, aborted or an unmapped value refuses where it rendered as end_turn, and nothing else changes; record lines stay compact, one per line; PINNED_FIXTURE_SHA256 and the launch_template RECORDED hashes are not edited.
+- A role that is a string the render does not know stays skipped.
+- gitBranch "", usage {input_tokens 0, output_tokens 0} and stop_sequence null stay as written; they are format constants.
+- An absent `redacted` reads as not redacted and is never refused; a present non-boolean one refuses.
+- No transcript content in an error, the output, a test name or a fixture (CN3, P7); an unmapped stopReason is the one value a refusal names.
+- No new dependency.
+- The design's structure array is the whole file list; a path outside it is not created.
+
+## Verification
+
+- From the repository root: cargo fmt --all leaves the tree unchanged.
+- cargo clippy --all-targets --all-features -- -D warnings and cargo clippy --all-targets -- -D warnings exit 0.
+- cargo test --workspace --all-features exits 0 and lists R1's, R2's, R3's, R5's and R6's tests as passed.
+- cargo doc --no-deps --all-features and cargo doc --no-deps exit 0 with no warnings.
+- sh scripts/design/gate.sh exits 0.
+- grep -n 'unwrap_or' crates/lys-home/src/harness/claude_code/render.rs crates/lys-home/src/harness/claude_code/render_fields.rs crates/lys-home/src/harness/claude_code/render_write.rs prints nothing.
+- git diff 7b53625 -- crates/lys-home/src/harness/claude_code/import.rs prints nothing.
+- Each of render.rs, render_fields.rs and render_write.rs holds under 500 lines of code, excluding tests, comments and blank lines.
