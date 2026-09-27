@@ -38,7 +38,7 @@ fn run(root: &Path) -> Result<(), SecretsError> {
         context: "creating the key folder".to_owned(),
         source,
     })?;
-    let paths = BrokerPaths {
+    let mut paths = BrokerPaths {
         store_dir: root.join("store"),
         log_dir: root.join("audit-log"),
         store_key: keys.join("store.key"),
@@ -142,7 +142,33 @@ fn run(root: &Path) -> Result<(), SecretsError> {
         broker.use_handle(&again.token, &after_drop, Secret::len),
     );
 
-    step("10. The audit log, every line signature-checked; no credential and no handle in it");
+    step(
+        "10. The store key is rotated; the old key file is gone and every entry opens under the new one",
+    );
+    let (old_id, new_id) = broker.rotate_store_key(&keys.join("store-2.key"))?;
+    println!("  old key {old_id}\n  new key {new_id}");
+    broker.permissions().grant(SecretRelation {
+        identity: "agent:noor".to_owned(),
+        secret: "github-token".to_owned(),
+        granted_by: Some("person:tom".to_owned()),
+    });
+    let after_rotation = broker.issue(&agent, "github-token", 1, now_ms() + 600_000)?;
+    let rotated_use = Presentation::sign(
+        &after_rotation.id,
+        &new_operation_id()?,
+        now_ms(),
+        &agent_key,
+    )?;
+    if let Used::Forwarded { answer, .. } =
+        broker.use_handle(&after_rotation.token, &rotated_use, Secret::len)?
+    {
+        println!("  use after rotation: upstream received the same {answer}-byte credential");
+    }
+
+    step(
+        "11. The broker restarts from disk; the audit log, every line signature-checked, holds no credential and no handle",
+    );
+    paths.store_key = keys.join("store-2.key");
     drop(broker);
     let reopened = Broker::open(&paths, LocalGrants::new(), Box::new(now_ms))?;
     for recorded in reopened.audit().replay()? {

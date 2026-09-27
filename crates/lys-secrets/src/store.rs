@@ -210,6 +210,48 @@ impl SecretStore {
         Ok(view)
     }
 
+    /// Reseals every entry to `new`, advancing each sequence, beside the
+    /// current sealing. Nothing is read under `new` until
+    /// [`SecretStore::commit_rotation`] runs after the rotation's audit line.
+    pub(crate) fn prepare_rotation(
+        &self,
+        old: &StoreKey,
+        new: &StoreKey,
+    ) -> Result<Vec<EntryView>, SecretsError> {
+        let mut staged = Vec::with_capacity(self.index.entries.len());
+        for view in self.index.entries.values() {
+            let value = self.open_for_use(old, &view.name, view.class)?;
+            let mut next = view.clone();
+            next.sequence = next.sequence.saturating_add(1);
+            Self::write_sealing(new, &next, &value, &self.next_path(&next.id))?;
+            staged.push(next);
+        }
+        Ok(staged)
+    }
+
+    /// Makes the staged sealings current and records `new` as the store's
+    /// key.
+    pub(crate) fn commit_rotation(
+        &mut self,
+        new: &StoreKey,
+        staged: Vec<EntryView>,
+    ) -> Result<(), SecretsError> {
+        for view in &staged {
+            let from = self.next_path(&view.id);
+            let to = self.entry_path(&view.id);
+            fs::rename(&from, &to).map_err(io(format!("moving {} into place", from.display())))?;
+        }
+        for view in staged {
+            self.index.entries.insert(view.name.clone(), view);
+        }
+        new.id().as_str().clone_into(&mut self.index.key_id);
+        self.write_index()
+    }
+
+    fn next_path(&self, id: &str) -> PathBuf {
+        self.dir.join(ENTRIES).join(format!("{id}.next.sealed"))
+    }
+
     /// Opens `name` for use under `key`, refusing any binding other than the
     /// entry asked for and any sequence older than the index records.
     pub(crate) fn open_for_use(
@@ -270,6 +312,15 @@ impl SecretStore {
         view: &EntryView,
         value: &Secret,
     ) -> Result<(), SecretsError> {
+        Self::write_sealing(key, view, value, &self.entry_path(&view.id))
+    }
+
+    fn write_sealing(
+        key: &StoreKey,
+        view: &EntryView,
+        value: &Secret,
+        path: &Path,
+    ) -> Result<(), SecretsError> {
         let mut plain = Canonical::new(PLAIN_DOMAIN)?;
         plain
             .field(view.id.as_bytes())?
@@ -285,7 +336,7 @@ impl SecretStore {
             .field(&envelope.ephemeral_public_key)?
             .field(&envelope.ciphertext)?
             .field(&envelope.nonce)?;
-        write_atomic(&self.entry_path(&view.id), &encoded.into_bytes())
+        write_atomic(path, &encoded.into_bytes())
     }
 
     fn entry_path(&self, id: &str) -> PathBuf {
