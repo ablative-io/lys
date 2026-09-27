@@ -27,14 +27,19 @@ impl<P: PermissionCheck> Broker<P> {
         secret: &str,
     ) -> Result<(String, Secret), SecretsError> {
         let taken = self
-            .permissions
-            .may_use(seat, secret)
-            .map_err(|denied| SecretsError::PermissionDenied {
+            .within_scope(seat, secret)
+            .and_then(|()| {
+                self.permissions
+                    .may_use(seat, secret)
+                    .map(|_permit| ())
+                    .map_err(|denied| denied.reason)
+            })
+            .map_err(|reason| SecretsError::PermissionDenied {
                 holder: seat.to_owned(),
                 secret: secret.to_owned(),
-                reason: denied.reason,
+                reason,
             })
-            .and_then(|_permit| self.store.take_turn(secret))
+            .and_then(|()| self.store.take_turn(secret))
             .and_then(|(entry, account)| {
                 self.store
                     .open_for_use(&self.store_key, &entry, EntryClass::Credential)

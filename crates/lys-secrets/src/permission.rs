@@ -26,6 +26,9 @@ pub enum Relation {
     Read,
     /// Lending a secret one does not own to another identity.
     Lend,
+    /// Standing inside a scope: acting for a person, or a member of a team
+    /// or an organisation.
+    Member,
 }
 
 impl Relation {
@@ -35,6 +38,7 @@ impl Relation {
             Self::Use => "use",
             Self::Read => "read",
             Self::Lend => "lend",
+            Self::Member => "member",
         }
     }
 }
@@ -64,4 +68,12 @@ pub trait PermissionCheck {
     ///
     /// [`Denied`] for every answer that is not a permit.
     fn may_lend(&self, identity: &str, secret: &str) -> Result<Permitted, Denied>;
+
+    /// Whether `identity` stands inside the scope `target` (`person/<id>`,
+    /// `team/<name>` or `organisation/<name>`): the `member` relation.
+    ///
+    /// # Errors
+    ///
+    /// [`Denied`] for every answer that is not a permit.
+    fn member_of(&self, identity: &str, target: &str) -> Result<Permitted, Denied>;
 }

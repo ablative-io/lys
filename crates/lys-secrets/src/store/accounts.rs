@@ -90,6 +90,16 @@ impl SecretStore {
         Ok(())
     }
 
+    /// The secret whose account `entry` is sealed as, when it is one.
+    pub(crate) fn account_parent(&self, entry: &str) -> Option<&str> {
+        self.index.accounts.iter().find_map(|(secret, ring)| {
+            ring.order
+                .iter()
+                .any(|account| account != "primary" && entry_name(secret, account) == entry)
+                .then_some(secret.as_str())
+        })
+    }
+
     /// The accounts of `secret` in order.
     pub fn accounts(&self, secret: &str) -> Vec<AccountView> {
         match self.index.accounts.get(secret) {
@@ -159,11 +169,17 @@ impl SecretStore {
             .ok_or_else(|| SecretsError::NoAccountAvailable {
                 secret: secret.to_owned(),
             })?;
+        let account =
+            ring.order
+                .get(next)
+                .cloned()
+                .ok_or_else(|| SecretsError::NoAccountAvailable {
+                    secret: secret.to_owned(),
+                })?;
         if let Some(current) = ring.order.get(ring.current) {
             ring.resting.insert(current.clone());
         }
         ring.current = next;
-        let account = ring.order.get(next).cloned().unwrap_or_default();
         self.write_index()?;
         Ok(account)
     }

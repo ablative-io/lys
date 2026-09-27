@@ -126,6 +126,36 @@ pub enum Command {
         #[arg(long)]
         secret: String,
     },
+    /// Set whose a secret is, as its owner: personal:<person>,
+    /// team:<name> or organisation:<name>.
+    Scope {
+        #[command(flatten)]
+        at: Where,
+        #[arg(long)]
+        secret: String,
+        #[arg(long)]
+        by: String,
+        #[arg(long)]
+        scope: String,
+    },
+    /// Set who a secret may be handed to, as its owner.
+    Recipients {
+        #[command(flatten)]
+        at: Where,
+        #[arg(long)]
+        secret: String,
+        #[arg(long)]
+        by: String,
+        #[arg(long)]
+        people_only: bool,
+    },
+    /// List the secrets an identity may discover, without their values.
+    List {
+        #[command(flatten)]
+        at: Where,
+        #[arg(long)]
+        identity: String,
+    },
     /// Drop a handle.
     Drop {
         #[command(flatten)]

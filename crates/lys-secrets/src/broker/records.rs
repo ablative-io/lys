@@ -90,6 +90,8 @@ impl<P: PermissionCheck> Broker<P> {
     }
 
     fn admit_read(&self, identity: &str, name: &str) -> Result<EntryClass, SecretsError> {
+        self.within_scope(identity, name)
+            .map_err(|_reason| SecretsError::NotFound)?;
         let class = self
             .store
             .entry(name)

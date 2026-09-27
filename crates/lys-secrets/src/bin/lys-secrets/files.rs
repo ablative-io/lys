@@ -231,4 +231,8 @@ impl PermissionCheck for FileGrants {
     fn may_lend(&self, identity: &str, secret: &str) -> Result<Permitted, Denied> {
         self.check(Relation::Lend, identity, secret)
     }
+
+    fn member_of(&self, identity: &str, target: &str) -> Result<Permitted, Denied> {
+        self.check(Relation::Member, identity, target)
+    }
 }

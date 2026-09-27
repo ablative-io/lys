@@ -16,8 +16,8 @@ use std::process::ExitCode;
 use clap::Parser;
 use lys_core::Ed25519Identity;
 use lys_secrets::{
-    Broker, EntryClass, HandleId, Holder, Presentation, Relation, Secret, SecretsError,
-    new_operation_id, request_digest, to_hex,
+    Broker, EntryClass, HandleId, Holder, Presentation, Recipients, Relation, Scope, Secret,
+    SecretsError, new_operation_id, request_digest, to_hex,
 };
 
 use args::RecordClass;
@@ -186,6 +186,39 @@ fn run(command: Command) -> Result<(), SecretsError> {
                     "ready"
                 };
                 println!("{:<16} {state}", view.account);
+            }
+        }
+        Command::Scope {
+            at,
+            secret,
+            by,
+            scope,
+        } => {
+            let scope = Scope::parse(&scope)?;
+            let target = scope.target();
+            open(&at)?.set_scope(&by, &secret, scope)?;
+            println!("{secret} is now in the scope {target}");
+        }
+        Command::Recipients {
+            at,
+            secret,
+            by,
+            people_only,
+        } => {
+            let policy = if people_only {
+                Recipients::PeopleOnly
+            } else {
+                Recipients::Anyone
+            };
+            open(&at)?.set_recipients(&by, &secret, policy)?;
+            println!("{secret} may now be handed to {}", policy.label());
+        }
+        Command::List { at, identity } => {
+            for entry in open(&at)?.listing(&identity) {
+                println!(
+                    "{:<24} {:?} owned by {}",
+                    entry.name, entry.class, entry.owner
+                );
             }
         }
         Command::Drop {

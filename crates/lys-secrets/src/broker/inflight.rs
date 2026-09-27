@@ -48,6 +48,8 @@ impl<P: PermissionCheck> Broker<P> {
     /// Whether the handle was dropped, or the access it was issued under
     /// revoked.
     pub(super) fn cut_off(&self, handle: &str, identity: &str, secret: &str) -> bool {
-        self.line_dropped(handle) || self.permissions.may_use(identity, secret).is_err()
+        self.line_dropped(handle)
+            || self.within_scope(identity, secret).is_err()
+            || self.permissions.may_use(identity, secret).is_err()
     }
 }

@@ -25,6 +25,10 @@ pub struct PermissionSource {
     /// The action the directory must give on a secret for lending it on.
     #[arg(long, default_value = "grant")]
     lend_action: String,
+    /// The action the directory must give on a scope (`person/<id>`,
+    /// `team/<name>` or `organisation/<name>`) for standing inside it.
+    #[arg(long, default_value = "view")]
+    member_action: String,
 }
 
 impl PermissionSource {
@@ -34,7 +38,7 @@ impl PermissionSource {
                 config,
                 &self.use_action,
                 &self.read_action,
-                &self.lend_action,
+                [&self.lend_action, &self.member_action],
             )?),
             None => Grants::File(FileGrants::new(layout.grants())),
         })
@@ -46,6 +50,7 @@ pub enum RelationArg {
     Use,
     Read,
     Lend,
+    Member,
 }
 
 impl From<RelationArg> for Relation {
@@ -54,6 +59,7 @@ impl From<RelationArg> for Relation {
             RelationArg::Use => Self::Use,
             RelationArg::Read => Self::Read,
             RelationArg::Lend => Self::Lend,
+            RelationArg::Member => Self::Member,
         }
     }
 }

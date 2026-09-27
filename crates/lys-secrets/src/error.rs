@@ -383,6 +383,14 @@ pub enum SecretsError {
         /// The secret's name.
         secret: String,
     },
+    /// A scope written as none of the three kinds.
+    #[error(
+        "InvalidScope: {text:?} is not a scope (act: name it as personal:<person>, team:<name> or organisation:<name>)"
+    )]
+    InvalidScope {
+        /// The text given.
+        text: String,
+    },
     /// A read of a record that is not there to be read.
     #[error("NotFound: no record by that name (act: ask for a record by a name you can discover)")]
     NotFound,
