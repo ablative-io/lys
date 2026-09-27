@@ -327,7 +327,7 @@
       "superseded_by": ""
     },
     {
-      "id": "ADR-089",
+      "id": "ADR-092",
       "title": "The access graph draws Access's answers and the directory's records, and holds no permission rule",
       "status": "proposed",
       "scope": "directory",
@@ -339,7 +339,7 @@
       "consequences": [
         "No grant edge is drawn without an Access answer behind it: before a question the graph shows nodes, containment and answers-to edges only.",
         "Every grant and does not stand edge carries the model version of the answer it came from, every containment edge that of the resource route's answer, and each draw shows its time; a draw of mixed versions names each and is neither refused nor re-asked.",
-        "The graph module imports nothing from the permission engine except the generated Access client: its imports are limited to that client, React, the surface's router package, the surface's shared presentation modules and its own files, and a test proves it.",
+        "The graph module imports nothing from the permission engine except the generated Access client: its imports, followed transitively, are limited to that client, React, the surface's router package, the shell modules listed by file name, the surface's stylesheets and its own files, the surface's API client is refused by name wherever it is reached, and a test proves it.",
         "Visibility is Access's: a person sees their own reach, the reverse question needs its own visibility permission, a directory administrator holding it sees the whole directory, and a refused question is shown by name.",
         "A suspended holder is drawn as not standing only once Access refuses on suspension, which waits for the lifecycle card and the open suspension semantics."
       ],
