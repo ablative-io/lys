@@ -8,8 +8,8 @@ use std::error::Error;
 
 use lys_identity::grants::lineage::resolve;
 use lys_identity::grants::{
-    Grant, GrantError, GrantId, GrantParts, PassOn, RecipientKind, Relation, Resource, Route,
-    Source, Window,
+    Grant, GrantError, GrantId, GrantParts, MemoryRelationships, PassOn, RecipientKind, Relation,
+    Resource, Route, Source, Window,
 };
 use lys_identity::{IdentityId, OperationId};
 use support::{T0, World, actions, alpha, pass};
@@ -326,6 +326,13 @@ fn grant_ancestry_refuses_at_the_blocking_boundary_and_explains_a_permitted_chai
     assert_eq!(
         (permit.path, permit.root_person),
         (vec![last, middle, root], world.dana)
+    );
+    world.reopen(MemoryRelationships::default())?;
+    let replayed = world.exercise(tom_agent, "read", Route::Api)?;
+    assert_eq!(
+        replayed.path,
+        vec![last, middle, root],
+        "a replay answers the same authority"
     );
     assert_eq!(refusals.len(), 8);
     Ok(())
