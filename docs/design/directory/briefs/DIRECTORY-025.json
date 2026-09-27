@@ -1,0 +1,287 @@
+{
+  "id": "DIRECTORY-025",
+  "cluster": "directory",
+  "title": "Road step 2: every permission check the identity server makes asks SpiceDB, and the screen answers why",
+  "depends_on": [
+    "DIRECTORY-002",
+    "DIRECTORY-003",
+    "DIRECTORY-005",
+    "DIRECTORY-006"
+  ],
+  "blocked_by": [
+    "DIRECTORY-006 is a brief on main, not a landed foundation. The grant representation ruled under ADR-078 (C5), together with DIRECTORY-006 R1 to R5 as built and accepted on the branch hand/DIRECTORY-006-R5 at e525a91, whose second reader's review items were fixed in its R5, stands as the ratification DIRECTORY-006 R1 and DIRECTORY-006's blocked_by ask for, and this brief waits on no separate contract review. The freshness mechanism (C25) is settled by the owning lead with a second reader as DIRECTORY-006 R4 builds it. For the grant contract, the committed grant event, the permission decision, the freshness rule and the explain seam, R2 and R3 wait only on DIRECTORY-006 landing on lys main, and R4 to R7, which follow them, wait on nothing further for any of these. Check, run after git fetch origin main: git cat-file -e origin/main:crates/lys-identity/src/grants/authority.rs exits 0.",
+    "The typed capability claim an agent authenticates its calls with is card hhAN8h77's, whose brief DIRECTORY-012 creates the claim type in crates/lys-identity/src/capability/claim.rs. R5 does not dispatch until that claim type has landed; every other requirement proceeds without it. The blocker is keyed on that artifact: git cat-file -e origin/main:crates/lys-identity/src/capability/claim.rs exits 0 only once the claim type has landed. Run it after git fetch origin main: in a clone that holds no origin/main ref the command exits 128 whatever has landed, and that exit is not a reading of this blocker.",
+    "DIRECTORY-002 and DIRECTORY-005 are briefs, not built foundations, and DIRECTORY-006's built branch creates neither deploy/identity/ nor surface/identity/: deploy/identity/versions.json, which R1 reads the pinned SpiceDB release from, and deploy/identity/README.md, which R3 writes its step-2 sentence into, are DIRECTORY-002's, and surface/identity/, which R7 writes into, is DIRECTORY-005's. crates/lys-identity-server/Cargo.toml, crates/lys-identity-server/src/lib.rs and deploy/identity/README.md stay modify targets under this blocker, and every modify path here is reconciled to the foundations' landed manifests before dispatch (CN9, CN12). Check, run after git fetch origin main: git cat-file -e origin/main:crates/lys-identity-server/src/lib.rs && git cat-file -e origin/main:deploy/identity/versions.json && git cat-file -e origin/main:deploy/identity/README.md && git cat-file -e origin/main:surface/identity/src/routes.tsx exits 0."
+  ],
+  "checklist": [
+    "C186",
+    "C187",
+    "C188",
+    "C189",
+    "C190",
+    "C191",
+    "C192"
+  ],
+  "stories": [
+    "S77",
+    "S78",
+    "S79"
+  ],
+  "design_anchor": [
+    "ADR-003",
+    "ADR-004",
+    "ADR-005",
+    "ADR-009",
+    "ADR-010",
+    "ADR-011",
+    "ADR-078"
+  ],
+  "purpose": "Road step 2 of the directory design, for the standalone identity server: every grant and permission check it makes is answered by SpiceDB, and the browser shows what the server decided and is never the authority. The one named exception to every check is the administrator's admission (P9, C13), which stays with the configured issuer and subject and never asks SpiceDB, because that admission is how an operator bootstraps the directory before any relation exists. It is done when an agent that loses a permission between the two steps of a task is refused on its next call to the identity server, and the screen answers why an identity can, and why it cannot, do a thing. The reverse question, who can act on a resource, is answered by SpiceDB at the same revision as the forward answer, so the two agree. SpiceDB's relationships are a projection of the signed directory log and are never written on their own (P4). ADR-078 brings this enforcement into the directory design.",
+  "task": "Implement R1 to R7 in order; no requirement depends on a later one. R1 (the client and a disposable SpiceDB) proceeds once the foundations land. R2 (schema and projection) follows R1. R3 (the one evaluator, which checks against R2's schema and relationships, and where the consistency rule is set) comes after R2. The grant representation (C5), which the SpiceDB schema is, is decided by the owning lead with Apollo as second reader and recorded in ADR-078, so neither R2 nor R3 waits on it: a grant is one SpiceDB relationship on its resource, carrying an expiry caveat that ends no later than its source's; a delegated grant also records its source grant through a source relation, so derivation is a walk of that relation; withdrawing a grant deletes it and every relationship derived from it through the source relation on the same committed revoke event, the grant's own relationship in the first write and the derived relationships in further writes within SpiceDB's configured max_updates_per_write. That ruling, with DIRECTORY-006 R1 to R5 as built and accepted, stands as the ratification DIRECTORY-006 R1 asks for, so no separate contract review is waited on. A person's root authority on a resource comes from a root grant the directory's root authority, one person fixed when the grants are opened, issues through DIRECTORY-006's root issue (Grants::issue_root, served as POST /grants/roots): a root grant has no source, and its expiry is the end its issuer states, or no end. Every fixture in which a person grants an agent an action on a resource first issues that person a root grant on that resource; this brief uses the root issue as DIRECTORY-006 builds it and adds no bootstrap of its own. R4 follows R3, refers back to R3's consistency rule, and answers under the freshness mechanism (C25) as the owning lead settled it with a second reader and DIRECTORY-006 R4 builds it. R3's agent route is DIRECTORY-006 R5's authenticated agent-tool route and does not use the typed capability claim; R5 is the one requirement whose calls authenticate with that claim. R5 follows R4 and waits on the typed capability claim. R6 follows R3, and R7 follows R6. Estimates, proposals for review: R1 3h, R2 3h, R3 3h, R4 3h, R5 1h, R6 3h, R7 3h, 19 hours in total. In scope: the standalone identity server (crates/lys-identity-server), the pure grant-to-relationship mapping in crates/lys-identity, the screen in surface/identity, and one step-2 sentence in the operator's install guide, deploy/identity/README.md, beside DIRECTORY-002 R4's step-1 sentence, which stays word for word (R3). 'Every check' means every grant and permission check; the administrator's admission (P9, C13) is the one named exception and stays with the configured issuer and subject. The reverse question DIRECTORY-006 R5 asks, who can act on a resource, is answered through SpiceDB's LookupSubjects at the same revision as the forward check (R6). This brief puts SpiceDB behind DIRECTORY-006 R4's permission decision and R5's explain seam and depends on DIRECTORY-006; it replaces neither, DIRECTORY-006 keeps owning the seams, and this brief owns what answers behind them. 'The server' is the standalone identity server only: the done condition is met for calls made to the identity server. The door (Cambium) asking SpiceDB on every call is a later Cambium card, and that card is the act that answers the statement's framing of step 2 (docs/design/identity/STATEMENT-2026-09-22.md:17 and :143); this brief names it and does not do it, the non-goal on rows 06 and 07 stands, and an agent calling through the door is not refused by this work until that card lands. This brief's checks read grants and nothing else: no check here reads an identity's lifecycle state or refuses a suspended agent, because ADR-011 is proposed and the meaning of suspension is open, and a check that refused on it would decide it here. The check that reads the state stays with the lifecycle card, a further unit not written here, taken up once ADR-011 is decided; ADR-011's consequence is the reason: 'DIRECTORY-003 records the state beside each identity; no check reads it until the permission work of road step 2.' Out of scope besides: the typed capability claim and any agent certificate (card hhAN8h77), capability certificates, arbitrary grants, credential handles, and any change to the Rauthy fork or its pin (ADR-009). DIRECTORY-002 R4 is held unchanged: SpiceDB's step-1 sentence stands word for word, and nothing in crates/lys/src/identity/ asks SpiceDB for a decision or writes to it. Every search over files that an acceptance line or the verification runs is a git grep over Rust source run from the repository root, excluding crates/lys-identity-server/proto/ and every tests/ directory by name, with its exact expected output; a count is piped through wc -l | tr -d ' ' so that it prints a bare number. The one count that is not a search over files is R1's cargo tree line, which counts -sys crates in the dependency graph and prints its exact expected count.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Connect the identity server to SpiceDB through a pure-Rust gRPC client, with a disposable SpiceDB for tests",
+      "spec": "THE SYSTEM SHALL give crates/lys-identity-server one SpiceDB client in crates/lys-identity-server/src/spicedb/client.rs, speaking SpiceDB's v1 gRPC API through tonic and prost, with the authzed v1 API protocol files vendored under crates/lys-identity-server/proto/authzed/ from the one tagged authzed/api release that the SpiceDB release pinned in deploy/identity/versions.json builds against, whose tag and commit crates/lys-identity-server/proto/SOURCE.md names and compiled by crates/lys-identity-server/build.rs with protox, and with tonic, prost and protox declared in the root Cargo.toml's [workspace.dependencies], so that no protoc binary and no non-Rust toolchain is needed to build. The SpiceDB address and preshared key SHALL come from the configuration DIRECTORY-002 declares. WHEN the client reads the schema of a store that holds none, SpiceDB answers ReadSchema with the gRPC status NOT_FOUND, and THE SYSTEM SHALL map that status to the typed no-schema result SchemaRead::NoSchema; it SHALL NOT report it as an error and SHALL NOT return it as an empty schema text. The preshared key SHALL NOT appear in Debug output, a log line or an error message. IF SpiceDB cannot be reached or answers with any other error, THEN THE SYSTEM SHALL return a typed error from crates/lys-identity-server/src/spicedb/error.rs naming the operation and the configured address, and SHALL NOT substitute any answer of its own. crates/lys-identity-server/src/spicedb/mod.rs carries only module declarations and re-exports. Tests SHALL run against a disposable SpiceDB started by crates/lys-identity-server/tests/spicedb_support/ from the SpiceDB release pinned in deploy/identity/versions.json, in its in-memory testing mode, one isolated store per test, each test presenting its own preshared key; no test SHALL reach a shared or long-lived SpiceDB. The tests' relationship writes are built inside crates/lys-identity-server/tests/spicedb_support/; client.rs SHALL NOT build a WriteRelationshipsRequest, a DeleteRelationshipsRequest or a WriteSchemaRequest. DIRECTORY-002 R4 is held as written: THE SYSTEM SHALL NOT add a SpiceDB permission check, relationship write or schema write anywhere in crates/lys/src/identity/; road step 2 lives in crates/lys-identity/ and crates/lys-identity-server/ instead.",
+      "acceptance": [
+        "With the PROTOC environment variable unset and no protoc on PATH, cargo build -p lys-identity-server exits 0.",
+        "cargo tree -p lys-identity-server -e normal --prefix none | grep -c -- '-sys ' prints 0.",
+        "A test starts the disposable SpiceDB through spicedb_support and calls the client's schema read against the fresh store: SpiceDB answers the gRPC status NOT_FOUND, and the client returns exactly SchemaRead::NoSchema.",
+        "Two tests running in parallel each write one relationship to their own disposable store; each then reads back exactly one relationship, its own.",
+        "Run from the repository root, git grep --untracked -c -E -e 'WriteRelationshipsRequest|DeleteRelationshipsRequest|WriteSchemaRequest' -- 'crates/lys-identity-server/src/spicedb/client.rs' ':(exclude)crates/lys-identity-server/proto/' ':(exclude,glob)**/tests/**' | wc -l | tr -d ' ' prints 0.",
+        "With the configured SpiceDB address pointing at a closed local port, a client schema read returns the unreachable-engine error variant, whose Display text contains the configured address and does not contain the configured preshared key.",
+        "format!(\"{:?}\", config) of a configuration whose preshared key is the fixture string spicedb-test-key-fixture does not contain spicedb-test-key-fixture.",
+        "From the repository root, on the build branch: git diff --stat <base>..HEAD -- crates/lys/src/identity/ prints nothing, where <base> is the commit the build of R1 started from."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/build.rs",
+          "crates/lys-identity-server/proto/SOURCE.md",
+          "crates/lys-identity-server/proto/authzed/",
+          "crates/lys-identity-server/src/spicedb/mod.rs",
+          "crates/lys-identity-server/src/spicedb/client.rs",
+          "crates/lys-identity-server/src/spicedb/error.rs",
+          "crates/lys-identity-server/tests/spicedb_support/mod.rs",
+          "crates/lys-identity-server/tests/spicedb_support/server.rs"
+        ],
+        "modify": [
+          "Cargo.toml",
+          "Cargo.lock",
+          "crates/lys-identity-server/Cargo.toml",
+          "crates/lys-identity-server/src/lib.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C186"
+      ],
+      "stories": []
+    },
+    {
+      "id": "R2",
+      "title": "Write the SpiceDB schema at start-up and project committed signed grant events into relationships",
+      "spec": "The SpiceDB schema in crates/lys-identity-server/src/spicedb/schema.zed is the grant representation ADR-078 records (C5): a grant is one relationship on its resource, carrying an expiry caveat that ends no later than its source grant's; a delegated grant also records its source grant through a source relation, so that derivation is a walk of that relation. A root grant, issued by the directory's root authority through DIRECTORY-006's root issue, records no source through the source relation, and its expiry caveat carries the end its issuer states, or no end when the issuer states none; THE SYSTEM SHALL NOT give a root grant's relationship an expiry other than the one its committed event records. The expiry bound is refused, never clamped: WHEN a delegation asks for an expiry later than its source grant's, THE SYSTEM SHALL refuse it in crates/lys-identity/src/grants/authority.rs, behind DIRECTORY-006 R2's delegation check, with the named refusal delegation_outlives_source, whose words name the source grant's identifier, the source grant's expiry and the requested expiry, before any grant event is committed; IF a committed delegation event nonetheless asks for an expiry later than its source grant's, THEN THE SYSTEM SHALL treat it as a corrupt or foreign event: the projector SHALL refuse to project it with the named refusal projection_expiry_past_source, whose words name the event's log position, the source grant's identifier and both expiries, SHALL write no relationship for it, and SHALL stop there, leaving its recorded log position before that event and applying no later event, as it does for any leaf the projection refuses. THE SYSTEM SHALL NOT clamp a requested expiry to its source's, and SHALL NOT write a relationship whose expiry caveat differs from the expiry its committed event records. WHEN the identity server starts, THE SYSTEM SHALL write the schema held in crates/lys-identity-server/src/spicedb/schema.zed to SpiceDB through crates/lys-identity-server/src/spicedb/schema.rs if the store holds no schema (SchemaRead::NoSchema, R1), and SHALL read the stored schema back; IF the stored schema differs from schema.zed, THEN THE SYSTEM SHALL refuse to start with the named error spicedb_schema_mismatch and SHALL NOT overwrite the stored schema. THE SYSTEM SHALL write SpiceDB relationships only by projecting committed signed grant events (the event DIRECTORY-006 R3 commits), through a pure mapping from event to relationship updates in crates/lys-identity/src/grants/relationships.rs and one writer in crates/lys-identity-server/src/spicedb/projector.rs, which applies each committed event once, in log order, and records the log position and the SpiceDB revision token it reached. In Rust source outside crates/lys-identity-server/proto/ and the tests/ directories, the scope of R2's searches, THE SYSTEM SHALL NOT write a relationship from a route, a screen or any file other than projector.rs, SHALL NOT write one for an event that is not committed, and SHALL NOT delete or rewrite a relationship except as the projection of a committed revoke or expiry event. WHEN the projector applies a committed revoke of a grant, THE SYSTEM SHALL keep the revoke one committed event, SHALL first delete that grant's own relationship in one WriteRelationships call, so that no check through that grant succeeds from then on, and SHALL then delete every relationship derived from it through the source relation in further WriteRelationships calls, each carrying no more updates than the max_updates_per_write the deployment configures for SpiceDB, which the projector reads from the identity server's configuration. Every such write SHALL be idempotent, and the projector SHALL NOT record its log position past the revoke event until a read of the store shows that no relationship of the withdrawn grant or of a grant derived from it remains, so that a projector stopped between two of those writes resumes the revoke on replay. THE SYSTEM SHALL NOT raise the configured max_updates_per_write for a revoke, SHALL NOT send a write carrying more updates than it, and SHALL NOT delete a relationship of any grant that does not derive from the withdrawn grant (ADR-003). The one relationship write site outside the projector is test-only: the tests' relationship writes are built inside crates/lys-identity-server/tests/spicedb_support/ (R1), reach only a test's own disposable store, and are not part of the built server. The expected relationships in the tests are written by hand from the recorded grant contract and schema, and are never produced by relationships.rs.",
+      "acceptance": [
+        "Starting the server against an empty disposable SpiceDB leaves a stored schema byte-equal to schema.zed; a second start against the same store writes nothing and starts.",
+        "Starting the server against a store holding a schema that differs from schema.zed by one relation exits with spicedb_schema_mismatch, and the stored schema read back afterwards equals the differing schema.",
+        "Fixture log in crates/lys-identity-server/tests/spicedb_projection.rs: the directory's root authority issues person P a root grant RP on project X and person Q a root grant RQ on project Y; person P grants agent A read on project X (grant G1, derived from RP); A delegates it to agent C (grant G2, derived from G1); C delegates it to agent D (grant G3, derived from G2); person Q grants agent E read on project Y (grant G4, of a different root: it derives from RQ, has its own subject and resource, and does not derive from G1); then G1 is revoked. The fixture holds, as the named constant EXPECTED_RELATIONSHIPS_BEFORE_REVOKE, the relationship list after G4, written by hand from the recorded grant contract and schema and not produced by relationships.rs. Replaying the log up to G4 into an empty store leaves exactly that list, compared as sorted lists.",
+        "After replaying the log up to G4, a CheckPermission call the test makes directly against the store permits read on X for A, for C and for D, and permits read on Y for E: four permissions asserted one at a time.",
+        "After replaying the whole fixture log through the revoke of G1, a CheckPermission call the test makes directly against the store refuses read on X for A, for C and for D, three refusals asserted one at a time, and still permits read on Y for E.",
+        "The number of relationships of G1, G2 and G3 remaining in the store after the revoke of G1 is declared in crates/lys-identity-server/tests/spicedb_projection.rs as the named constant RELATIONSHIPS_AFTER_ROOT_REVOKE, with a comment naming C5 and ADR-078; its value is 0, and the test asserts the count of the store's relationships of G1, G2 and G3 after the revoke equals that constant, and the counts of RP's, RQ's and G4's relationships are unchanged by the revoke.",
+        "With a counting wrapper around the SpiceDB client and the disposable SpiceDB at its default max_updates_per_write, projecting the revoke of G1 makes exactly 2 WriteRelationships calls: the first deletes the relationship of G1 and no relationship of RP, G2, G3, RQ or G4, and the second deletes the relationships of G2 and G3 and no relationship of RP, RQ or G4.",
+        "With the disposable SpiceDB and the projector both configured with max_updates_per_write of 1, smaller than the derived set of G2 and G3, projecting the revoke of G1 makes at least 3 WriteRelationships calls, each carrying exactly 1 update, and the first deletes the relationship of G1 and nothing else. With the projector paused after that first call, a CheckPermission call the test makes directly against the store refuses read on X for A, for C and for D, and permits read on Y for E. After the last call, the count of the store's relationships of G1, G2 and G3 equals RELATIONSHIPS_AFTER_ROOT_REVOKE and the projector's recorded log position equals the revoke's position.",
+        "With max_updates_per_write of 1, a crash injected into the projector after the first WriteRelationships call of the revoke of G1 and before the second leaves the projector's recorded log position before the revoke's position; restarting the projector over the same log and the same store then leaves the count of the store's relationships of G1, G2 and G3 equal to RELATIONSHIPS_AFTER_ROOT_REVOKE, the counts of RP's, RQ's and G4's relationships unchanged, and the recorded log position equal to the revoke's position.",
+        "The fixture gives the root grants RP and RQ the issued expiries named by the fixture constants E0 and E5, gives G1, G2 and G3 the expiries E1, E2 and E3, E3 before E2, E2 before E1 and E1 before E0, and gives G4 the expiry E4, before E5. In the store after replaying the log up to G4, the relationship of RP carries the expiry caveat E0 and records no source, that of RQ carries E5 and records no source, that of G1 carries E1 and records RP through the source relation, that of G2 carries E2 and records G1 through the source relation, that of G3 carries E3 and records G2 through the source relation, and that of G4 carries E4 and records RQ through the source relation; EXPECTED_RELATIONSHIPS_BEFORE_REVOKE holds these caveats and source relations, written by hand.",
+        "With the fixture's grant G1 carrying expiry E1, a delegation of G1 from agent A to agent C asking for the expiry E1 plus one hour is refused with delegation_outlives_source, its words containing G1's identifier, E1 and the requested expiry; the count of grant events committed by that request is 0 and the count of relationships in the store is unchanged.",
+        "A fixture log whose committed events are the root grant RP with expiry E0, then G1 derived from RP with expiry E1, then a delegation event G2 derived from G1 carrying the expiry E1 plus one hour, then the root grant RQ, then G4, replayed into an empty store: the projector refuses with projection_expiry_past_source, its words containing G2's log position, G1's identifier, E1 and G2's expiry; the store holds RP's and G1's relationships and no relationship of G2, RQ or G4; and the projector's recorded log position equals G1's position.",
+        "Replaying the same fixture log a second time into the same store changes no relationship and leaves the recorded log position equal to the log's head.",
+        "A fixture log holding one grant event that is appended but not committed projects zero relationships for that event.",
+        "Run from the repository root, git grep --untracked -l -E -e 'WriteRelationshipsRequest|DeleteRelationshipsRequest' -- '*.rs' ':(exclude)crates/lys-identity-server/proto/' ':(exclude,glob)**/tests/**' prints exactly one line, crates/lys-identity-server/src/spicedb/projector.rs.",
+        "Run from the repository root, git grep --untracked -l -e 'WriteSchemaRequest' -- '*.rs' ':(exclude)crates/lys-identity-server/proto/' ':(exclude,glob)**/tests/**' prints exactly one line, crates/lys-identity-server/src/spicedb/schema.rs."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/spicedb/schema.rs",
+          "crates/lys-identity-server/src/spicedb/schema.zed",
+          "crates/lys-identity-server/src/spicedb/projector.rs",
+          "crates/lys-identity/src/grants/relationships.rs",
+          "crates/lys-identity/tests/grant_relationships.rs",
+          "crates/lys-identity-server/tests/spicedb_projection.rs"
+        ],
+        "modify": [
+          "crates/lys-identity/src/grants/mod.rs",
+          "crates/lys-identity/src/grants/authority.rs",
+          "crates/lys-identity/tests/grant_delegation.rs",
+          "crates/lys-identity-server/src/spicedb/mod.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C187"
+      ],
+      "stories": []
+    },
+    {
+      "id": "R3",
+      "title": "Answer every grant and permission check the identity server makes through the one SpiceDB evaluator, at least as fresh as the projection",
+      "spec": "This row checks against R2's schema and relationships. WHEN the identity server makes a permission check, from the browser route, the API route or the agent route, THE SYSTEM SHALL answer its grant question through DIRECTORY-006 R4's permission decision (crates/lys-identity/src/grants/permission.rs), and that decision SHALL get its answer from SpiceDB's CheckPermission through crates/lys-identity-server/src/spicedb/check.rs, the one evaluator. check.rs is the only site that calls CheckPermission: no other Rust source file outside crates/lys-identity-server/proto/ and the tests/ directories builds a CheckPermissionRequest or contains the text check_permission(. It offers the plain check, which returns the verdict, and a traced variant, which returns the verdict with SpiceDB's check trace and the checked_at revision token SpiceDB answered at, and which takes an optional revision token: given none it reads under the consistency rule's first form, and given a token it reads at_exact_snapshot of that token; every other module that needs SpiceDB's verdict consumes one of those two and SHALL NOT call CheckPermission itself. The consistency rule: each CheckPermission call SHALL ask for consistency at_least_as_fresh the revision token the projector (R2) recorded for the last grant event it applied, or at_exact_snapshot of a checked_at token that an earlier call made under the first form returned, which is at least as fresh as the projector's token that call asked for; it SHALL NOT ask at minimize_latency or at any consistency weaker than the projector's token. The expiry caveat R2's schema carries is evaluated with context check.rs supplies: on every CheckPermission call, the plain check and the traced variant alike, check.rs SHALL send as the caveat's context the current time, read from the named clock DIRECTORY-006 R4 enforces expiry with, which check.rs takes as an injected clock so that a test controls it; a grant whose caveat's expiry is at or before that time is refused, and one whose expiry is after it is permitted as its relationships allow. IF CheckPermission answers CONDITIONAL_PERMISSION, the answer SpiceDB gives when a caveat's context is missing, THEN THE SYSTEM SHALL refuse with the named refusal permission_conditional and SHALL NOT admit the call. THE SYSTEM SHALL NOT make a CheckPermission call without the caveat's context, and SHALL NOT read the caveat's time from any source other than that clock. The agent route in this row is DIRECTORY-006 R5's authenticated agent-tool route, authenticated as DIRECTORY-006 authenticates it; this row SHALL NOT depend on card hhAN8h77's typed capability claim, and the blocker on that card stays on the requirement that uses it. Every grant and permission check makes exactly one CheckPermission call through check.rs. The one named exception: the administrator's admission, made by the configured issuer and subject (P9, C13), stays with that configuration and SHALL NOT ask SpiceDB, because it is how an operator bootstraps the directory before any relation exists; THE SYSTEM SHALL NOT treat any other check as an exception. WHEN this row lands, THE SYSTEM SHALL write into deploy/identity/README.md, beside DIRECTORY-002 R4's step-1 sentence, this step-2 sentence word for word: \"SpiceDB's step-2 role, in one sentence: from road step 2 on, SpiceDB answers every grant and permission check the identity server makes and holds the directory's relations, projected from the signed directory log, and the administrator's admission by its configured issuer and subject is the one check that never asks it.\" It SHALL NOT change or remove a word of the step-1 sentence. DIRECTORY-006 keeps owning the decision seam; this row supplies what answers behind it and replaces no DIRECTORY-006 requirement. THE SYSTEM SHALL NOT answer a grant question from a cache, a local copy of the relationships, the browser's request, a display label or any evaluator other than check.rs, and SHALL NOT admit a call when SpiceDB gives no answer: IF CheckPermission fails or cannot be reached, THEN THE SYSTEM SHALL refuse with the named refusal permission_engine_unavailable.",
+      "acceptance": [
+        "With a counting wrapper around the SpiceDB client, one permitted and one refused request on each of the browser route, the API route and the agent route, DIRECTORY-006 R5's authenticated agent-tool route with no typed capability claim presented (six requests) produce exactly six CheckPermission calls, and each route's answer equals the answer CheckPermission gave.",
+        "Every CheckPermission call the wrapper records in the six-request case carries at_least_as_fresh with the revision token the projector recorded for the last grant event it applied; the count of calls carrying minimize_latency is 0.",
+        "Run from the repository root, git grep --untracked -l -e 'CheckPermissionRequest' -e 'check_permission(' -- '*.rs' ':(exclude)crates/lys-identity-server/proto/' ':(exclude,glob)**/tests/**' prints exactly one line, crates/lys-identity-server/src/spicedb/check.rs.",
+        "A request permitted while the disposable SpiceDB runs is refused with permission_engine_unavailable after SpiceDB is stopped, and the count of admitted calls after the stop is 0.",
+        "The root authority issues person P a root grant on project X whose expiry is after the fixture constant E plus one second; grant G, from P to agent A for read on X, derived from that root grant, carries the expiry caveat at E, and check.rs's clock is under the test's control: a check of A's read on X through check.rs's plain check with the clock at E minus one second is permitted, with the clock at E is refused, and with the clock at E plus one second is refused; the counting wrapper records exactly one CheckPermission call for each of the three checks, and each call carries the clock's time as the caveat's context. The same three checks through the traced variant give the same three verdicts, again with exactly one CheckPermission call each.",
+        "With the counting wrapper set to strip the caveat's context from each request before it reaches SpiceDB, the check of A's read on X through check.rs with the clock at E minus one second receives CONDITIONAL_PERMISSION from SpiceDB and is refused with permission_conditional, and the count of admitted calls is 0.",
+        "A directory mutation request made by the configured administrator issuer and subject against a disposable SpiceDB holding no relationship is admitted, and the counting wrapper records 0 CheckPermission calls for it.",
+        "grep -c -F \"SpiceDB's step-2 role, in one sentence: from road step 2 on, SpiceDB answers every grant and permission check the identity server makes and holds the directory's relations, projected from the signed directory log, and the administrator's admission by its configured issuer and subject is the one check that never asks it.\" deploy/identity/README.md prints 1, and run from the repository root on the build branch, git diff --numstat <base>..HEAD -- deploy/identity/README.md prints a deletions count of 0, where <base> is the commit the build of R3 started from."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/spicedb/check.rs",
+          "crates/lys-identity-server/tests/spicedb_checks.rs"
+        ],
+        "modify": [
+          "crates/lys-identity/src/grants/permission.rs",
+          "crates/lys-identity-server/src/spicedb/mod.rs",
+          "deploy/identity/README.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C188"
+      ],
+      "stories": []
+    },
+    {
+      "id": "R4",
+      "title": "Never admit a call after a committed revoke, refuse only what an unapplied grant event affects, and say which refusal it is",
+      "spec": "The freshness mechanism (C25) is the one DIRECTORY-006 R4 builds, as the owning lead settled it with a second reader: a check is answered only from a projection that has applied every committed revocation it depends on, and otherwise it is refused with permission_not_current. This row carries that rule behind SpiceDB in crates/lys-identity-server/src/spicedb/freshness.rs, and SHALL NOT change DIRECTORY-006 R4's rule: WHILE the projector's recorded log position (R2) is behind the directory log's committed head of grant events, WHEN a permission check depends on a committed grant event the projector has not applied (the event creates, delegates, revokes or expires a grant on the checked identity's path to the resource), THE SYSTEM SHALL refuse that check with the named refusal permission_not_current, whose words name the affected grant's identifier, the log position of the unapplied event, and the act that answers it: ask again once the permission projection has applied that position. that refused check still makes its one CheckPermission call through check.rs under R3's consistency rule, so that every check asks SpiceDB; THE SYSTEM SHALL discard that verdict and SHALL NOT admit that call, even when the verdict permits. A check that depends on no unapplied grant event SHALL stay usable and be answered through R3 under R3's consistency rule, as DIRECTORY-006 R3 requires of unrelated authority; THE SYSTEM SHALL NOT refuse it because the projector is behind. WHEN the projection has applied the revoke and the answer is no because a grant on the path was withdrawn by a committed revoke, THE SYSTEM SHALL refuse with permission_revoked naming the withdrawn grant's identifier. A call after a committed revoke SHALL NOT be admitted in either case. WHEN a question asked of DIRECTORY-006 R5's explain seam depends on a committed grant event the projector has not applied, THE SYSTEM SHALL answer it with that same permission_not_current refusal, naming the affected grant, and SHALL NOT return a path, a verdict or a reason for it.",
+      "acceptance": [
+        "With person P holding a root grant on project X and P's grant G of read on X to agent A, derived from that root grant, permitting A's request and the projector paused, commit a revoke of G: A's next request is refused with permission_not_current, its words contain G's identifier, the log position of the revoke and the words ask again once the permission projection has applied; the counting wrapper records exactly 1 CheckPermission call for that refused request and that call's verdict was permitted; and the count of admitted calls after the revoke is 0.",
+        "With the projector still paused behind that one unapplied revoke of G, a request by agent E under person Q's grant H of read on project Y, derived from Q's root grant on Y, which shares no identity, no resource and no ancestry with G, is permitted; in the same state A's request under G is refused with permission_not_current naming G.",
+        "With the projector still paused behind that one unapplied revoke of G, the question why can A read X, asked of DIRECTORY-006 R5's explain seam, returns permission_not_current naming G, and no path.",
+        "Resume the projector until its recorded position equals the log head: A's next identical request is refused with permission_revoked, its words contain G's identifier, and the count of A's admitted calls after the revoke is still 0."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/spicedb/freshness.rs",
+          "crates/lys-identity-server/tests/spicedb_freshness.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/spicedb/mod.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C189"
+      ],
+      "stories": [
+        "S79"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Refuse an agent's next call when its permission is withdrawn between the two steps of a task",
+      "spec": "WHEN an agent has made the first call of a two-step task to the identity server under a grant, and that grant is revoked through the signed event path before its second call, THE SYSTEM SHALL refuse the second call through R3 and R4, and SHALL NOT admit it on the strength of the first call's answer, a session, a connection kept open or any answer given before the revoke. The agent authenticates each call with the typed capability claim card hhAN8h77 delivers; this row SHALL NOT issue, define or change that claim or any certificate, and SHALL NOT be dispatched until the claim type has landed (blocked_by). The refusal's words are those R4 gives: permission_not_current naming the grant while the projection is behind the revoke, and permission_revoked naming the grant once it has applied it.",
+      "acceptance": [
+        "A scripted two-step task by one agent: call 1 under grant G is admitted and changes one record; G is revoked through the signed event path; call 2, the same request, is refused. The test counts 2 calls made, 1 admitted, 1 refused, and exactly 1 record changed.",
+        "The same script with the projector paused across the revoke refuses call 2 with permission_not_current, its words containing G's identifier, and counts 1 admitted call and 0 admitted calls after the revoke.",
+        "The same script with the projector caught up refuses call 2 with permission_revoked, its words containing G's identifier, and counts 1 admitted call and 0 admitted calls after the revoke."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/tests/agent_mid_task.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C190"
+      ],
+      "stories": [
+        "S77"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Answer why an identity can, and why it cannot, do a thing, and who can, from the one evaluator at one revision, behind DIRECTORY-006 R5's explain seam",
+      "spec": "WHEN the explain seam DIRECTORY-006 R5 exposes (crates/lys-identity-server/src/grants.rs) is asked whether an identity can perform an action on a resource, THE SYSTEM SHALL answer in crates/lys-identity-server/src/spicedb/explain.rs from one call to check.rs's traced variant (R3), mapping SpiceDB's check trace onto the directory's lineage. explain.rs consumes that variant and SHALL NOT call CheckPermission itself or build a CheckPermission request, and SHALL NOT be a second evaluator. A yes SHALL carry the path of identities from the identity to a responsible person, the resource, the action, and the policy revision: the SHA-256 of schema.zed and the revision token the answer was read at. A no SHALL carry the named reason (permission_revoked, with the withdrawn grant's identifier, when a revoke is the reason; no_grant when no grant covers the question) and the same policy revision. The explanation's verdict SHALL be the traced variant's verdict; THE SYSTEM SHALL NOT compute an explanation from anything but that answer, and SHALL NOT answer a why when the check refuses as permission_engine_unavailable, returning that refusal instead; a check refused as not current has no path to explain. WHEN the explain seam is asked who can perform an action on a resource, THE SYSTEM SHALL answer through crates/lys-identity-server/src/spicedb/lookup.rs, the only site that calls LookupSubjects: no other Rust source file outside crates/lys-identity-server/proto/ and the tests/ directories builds a LookupSubjectsRequest or contains the text lookup_subjects(. Every answer to one question set, the questions asked of the explain seam together, SHALL be read at one revision T: the set's first forward traced check calls check.rs's traced variant with no token, so it reads at_least_as_fresh the projector's token under R3's consistency rule, and T is the checked_at token it returns; every later forward traced check of the set calls the traced variant with T, reading at_exact_snapshot T, and every LookupSubjects call of the set asks for consistency at_exact_snapshot T. This fits R3's consistency rule because T was returned by a call made at least as fresh as the projector's token. WHEN a question set holds only a who-can question, its first LookupSubjects call asks for consistency at_least_as_fresh the projector's token, T is the looked_up_at token it returns, and every later LookupSubjects call of the set asks at_exact_snapshot T. So an identity is in the who-can answer if and only if check.rs's traced variant, called with T for that identity, the action and the resource, answers yes. lookup.rs SHALL NOT compute a verdict of its own and SHALL NOT be a second evaluator. DIRECTORY-006 R5 keeps the reverse question's visibility permission and paging; this row supplies the answer behind them.",
+      "acceptance": [
+        "Fixture: the root authority issues person P a root grant on project X; P grants agent A the action read on X (grant PA); identity B holds no grant on X. Why can A read X answers yes with the path [A, P], P marked as the responsible person, resource X, action read, the SHA-256 of schema.zed and a non-empty revision token.",
+        "After grant PA is revoked and projected, why can A read X answers no with reason permission_revoked and PA's identifier.",
+        "Why can B read X answers no with the reason no_grant.",
+        "In each of those three cases the counting wrapper records exactly one CheckPermission call, made by check.rs's traced variant, and the explanation's verdict equals the verdict R3's plain check returns for the same identity, action, resource and revision.",
+        "Run from the repository root, git grep --untracked -c -e 'CheckPermissionRequest' -e 'check_permission(' -- 'crates/lys-identity-server/src/spicedb/explain.rs' ':(exclude)crates/lys-identity-server/proto/' ':(exclude,glob)**/tests/**' | wc -l | tr -d ' ' prints 0.",
+        "With R6's fixture of P, A, B and X, one question set asks, in this order, why can A read X, why can B read X and who can read X. The counting wrapper records the set's first CheckPermission call, for A, carrying at_least_as_fresh the projector's recorded token, and T is the checked_at token that call returns; the set's second CheckPermission call, for B, carries at_exact_snapshot T; every LookupSubjects call of the set carries at_exact_snapshot T, the count of such calls being greater than 0; and the three answers each report the revision token T. The test then calls check.rs's traced variant with T once for each of P, A and B, action read, resource X, three calls each carrying at_exact_snapshot T; each of P, A and B is in the who-can answer if and only if its call answers yes; A is in it and B is not.",
+        "Run from the repository root, git grep --untracked -l -e 'LookupSubjectsRequest' -e 'lookup_subjects(' -- '*.rs' ':(exclude)crates/lys-identity-server/proto/' ':(exclude,glob)**/tests/**' prints exactly one line, crates/lys-identity-server/src/spicedb/lookup.rs."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/spicedb/explain.rs",
+          "crates/lys-identity-server/src/spicedb/lookup.rs",
+          "crates/lys-identity-server/tests/spicedb_explain.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/grants.rs",
+          "crates/lys-identity-server/src/spicedb/mod.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C191"
+      ],
+      "stories": []
+    },
+    {
+      "id": "R7",
+      "title": "Show on the screen why an identity can or cannot do a thing, read from the server's answer",
+      "spec": "THE SYSTEM SHALL give surface/identity a view, surface/identity/src/features/grants/PermissionWhy.tsx, reached from the identity's record through surface/identity/src/routes.tsx, where a person picks an action and a resource and the screen shows the server's R6 answer: for yes, the path of identities to the responsible person, the resource, the action and the policy revision; for no, the named reason, the grant it concerns when there is one, and the policy revision. The browser shows what is permitted and is never the authority: THE SYSTEM SHALL NOT compute, infer or cache a verdict in the browser from grant lists, labels or earlier answers, SHALL show no verdict until the server has answered, and SHALL show the server's refusal by name when the server answers permission_not_current or permission_engine_unavailable, and an unreachable refusal when the server cannot be reached. The view follows Aion's appearance with the identity orange (ADR-010).",
+      "acceptance": [
+        "With the explain API answering R6's yes fixture, the view shows A, P marked responsible, read, X and the policy revision the response carries.",
+        "With the page's loaded grant list containing grant PA from P to A on X and the explain API answering no with permission_revoked and PA's identifier, the view shows refused, permission_revoked and PA's identifier, and shows no yes.",
+        "Asking one question sends exactly 1 explain request; before its response arrives the view shows no verdict.",
+        "With the explain API unreachable, the view shows the unreachable refusal and no verdict.",
+        "With the explain API answering permission_not_current, the view shows permission_not_current and no verdict.",
+        "The browser acceptance test runs against the standalone server with this fixture, extending R6's fixture of P, A and B: person P, a second person Q, agent A and identity B; the root authority issues P a root grant on project X and Q a root grant on project Y; P grants A read on project X (grant PA); Q grants B read on project Y (grant QB); B holds no grant on X. Permitted question: can A read X; expected verdict yes, its reason the path A, P with P the responsible person; the server answers yes and the view shows permitted with the path A, P, P marked responsible. Refused question: can B read X; expected verdict no, its reason no_grant; the server answers no and the view shows refused with the reason no_grant. For each question the view's verdict and reason equal the server's response."
+      ],
+      "files": {
+        "create": [
+          "surface/identity/src/features/grants/PermissionWhy.tsx",
+          "surface/identity/tests/permission_why.test.tsx",
+          "surface/identity/tests/acceptance/permission_why.spec.ts"
+        ],
+        "modify": [
+          "surface/identity/src/routes.tsx"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C192"
+      ],
+      "stories": [
+        "S78"
+      ]
+    }
+  ],
+  "boundaries": [
+    "The card is built from this brief only after Tom or the lead signs it off on the card; no requirement is dispatched before that sign-off is recorded.",
+    "SHALL NOT change DIRECTORY-002 R4, its step-1 README sentence, or crates/lys/src/identity/; deploy/identity/README.md gains only R3's step-2 sentence beside the step-1 sentence, and step 2's checks, relationship writes and schema writes live in crates/lys-identity/ and crates/lys-identity-server/.",
+    "SHALL NOT change the Rauthy fork, its files or its pin at vendor/rauthy (ADR-009).",
+    "SHALL NOT decide suspension semantics and SHALL NOT change the freshness mechanism: C25 is the one DIRECTORY-006 R4 builds, as the owning lead settled it with a second reader. The grant representation is the one ADR-078 records (C5), and this brief changes nothing of it. SHALL NOT add a root-authority bootstrap: a root grant comes from DIRECTORY-006's root issue as built.",
+    "SHALL NOT add a second permission evaluator: check.rs is the only site that calls CheckPermission, it offers the plain check and the traced variant, explain.rs consumes the traced variant and never calls CheckPermission itself, and lookup.rs is the only site that calls LookupSubjects, at the forward answer's revision.",
+    "SHALL NOT move the administrator's admission (P9, C13) to SpiceDB; it is the one named exception to every check asking SpiceDB.",
+    "SHALL NOT replace or rewrite a DIRECTORY-006 requirement; this brief answers behind DIRECTORY-006's seams.",
+    "SHALL NOT touch Cambium, the door or any other repository, and SHALL NOT issue or define an agent certificate or capability claim. An agent calling through the door is not refused by this work until the later Cambium card lands.",
+    "SHALL NOT change lys-core or any published wire format.",
+    "The browser never computes, infers, caches or grants a permission; it shows the server's answer.",
+    "No real credentials, production SpiceDB or shared store in tests; every test uses a disposable SpiceDB (ADR-004)."
+  ],
+  "verification": [
+    "python3 scripts/design/render-cluster.py docs/design/directory is run, and the change includes the rendered docs/design/directory/USER-STORIES.md, docs/design/directory/CHECKLIST.md, docs/design/directory/DESIGN.md and docs/design/directory/briefs/DIRECTORY-025.md.",
+    "sh scripts/design/gate.sh exits 0 from the repository root at the published commit.",
+    "At implementation time run the repository battery at the exact revision: cargo fmt --all, cargo clippy --all-targets --all-features -- -D warnings, cargo clippy --all-targets -- -D warnings, cargo test --workspace --all-features, cargo doc --no-deps --all-features and cargo doc --no-deps, each exiting 0.",
+    "Report the count of CheckPermission calls, admitted calls and refused calls each acceptance test measured, not only that it passed.",
+    "One evaluator: run from the repository root, git grep --untracked -l -e 'CheckPermissionRequest' -e 'check_permission(' -- '*.rs' ':(exclude)crates/lys-identity-server/proto/' ':(exclude,glob)**/tests/**' prints exactly one line, crates/lys-identity-server/src/spicedb/check.rs, and git grep --untracked -c -e 'CheckPermissionRequest' -e 'check_permission(' -- 'crates/lys-identity-server/src/spicedb/explain.rs' ':(exclude)crates/lys-identity-server/proto/' ':(exclude,glob)**/tests/**' | wc -l | tr -d ' ' prints 0: explain.rs consumes check.rs's traced variant.",
+    "DIRECTORY-002 R4 held: run from the repository root, git grep --untracked -c -E -e 'CheckPermission|WriteRelationships|DeleteRelationships|WriteSchema' -- 'crates/lys/src/identity/*.rs' ':(exclude)crates/lys-identity-server/proto/' ':(exclude,glob)**/tests/**' | wc -l | tr -d ' ' prints 0."
+  ]
+}

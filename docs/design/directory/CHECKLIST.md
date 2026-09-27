@@ -6,7 +6,7 @@
 - [ ] **C2** — The project decision ledger holds the identity decisions with their authority and quote: the maintained Rauthy fork, one PostgreSQL service and database (ADR-005, already recorded), the product accents, and the lifecycle states as working team decisions marked proposed.
 - [ ] **C3** — Each open row (02, 04, 03, 05) is a design-system brief, DIRECTORY-002 to DIRECTORY-005, in dependency order, with its wall as files, its ID001 acceptance identifiers kept, and its estimate in its task.
 - [ ] **C4** — The grant path (create an agent under a person, grant it a project, the action is allowed, revoke or suspend, the same action is refused) is a requirement with acceptance criteria in the row that owns it, and row 02 states what SpiceDB enforces in step 1 and what it does not.
-- [ ] **C5** — Every decision still open for Tom is recorded as open: the grant representation, suspension semantics, the service name, the anchor, and nightly versus waiting for the upstream release.
+- [ ] **C5** — Every decision still open for Tom is recorded as open: the grant representation, suspension semantics, the service name, the anchor, and nightly versus waiting for the upstream release. Decided under ADR-078: the grant representation was ruled by the owning lead, Archie, with Apollo as second reader, on Waffles' ruling of 12:13 on Tom's word of 12:12 that technical formats are the owning lead's with a second reader.
 - [ ] **C6** — The rendered markdown of this cluster matches its JSON and coverage is clean.
 
 ## Row 02: the standalone service dependencies (DIRECTORY-002)
@@ -47,3 +47,13 @@
 - [ ] **C28** — Observed grant usage names its source and time; not seen is not reported as never used.
 - [ ] **C29** — The You and delegation screens show real server authority, separate service accounts from sign-in identities, and preserve personal versus administrator visibility.
 - [ ] **C30** — The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success.
+
+## Road step 2: SpiceDB answers every permission check (DIRECTORY-025)
+
+- [ ] **C186** — The identity server reaches SpiceDB through one pure-Rust gRPC client that maps a fresh store's NOT_FOUND schema answer to a typed no-schema result, tests run against a disposable SpiceDB, and crates/lys/src/identity/ gains no SpiceDB check or write.
+- [ ] **C187** — SpiceDB's schema is written only by the identity server at start-up, and its relationships only by projecting committed signed grant events; revoking a root refuses every grant derived from it and no unrelated grant; a delegation or a committed delegation event whose expiry passes its source grant's is refused by name, never clamped; a root revoke deletes the root's relationship first and the derived ones in writes within SpiceDB's configured update cap, resuming on replay after a crash.
+- [ ] **C188** — Every grant and permission check the identity server makes, from browser, API and agent routes, is answered by SpiceDB through one evaluator behind DIRECTORY-006 R4's decision, at least as fresh as the projection, and an engine outage refuses by name; the administrator's admission by configured issuer and subject is the one check that never asks SpiceDB, and the install guide says so beside SpiceDB's unchanged step-1 sentence. An expired grant is refused by the caveat's time from the named clock, and an answer missing that context is refused, never admitted.
+- [ ] **C189** — A call after a committed revoke is never admitted: before the projection catches up only a check that depends on the unapplied grant event is refused as not yet current, naming the grant, and unrelated authority stays usable; after it catches up the refusal names the withdrawn grant.
+- [ ] **C190** — An agent whose permission is withdrawn between the two steps of a task is refused on its next call to the identity server.
+- [ ] **C191** — The server answers why an identity can and why it cannot do a thing from the one evaluator's traced verdict, with the path to a responsible person, the named reason and the policy revision, and answers who can act on a resource through SpiceDB at the same revision, so the forward and reverse answers agree.
+- [ ] **C192** — The screen shows the server's why answer for a permitted and a refused question and never decides a permission in the browser.

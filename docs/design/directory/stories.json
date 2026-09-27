@@ -16,6 +16,10 @@
         {
           "id": "S5",
           "text": "As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email."
+        },
+        {
+          "id": "S77",
+          "text": "As the responsible person, I want an agent whose permission I withdraw in the middle of a task to be refused on its next call, so that the withdrawal takes effect at once and not when the task ends."
         }
       ]
     },
@@ -40,6 +44,10 @@
         {
           "id": "S6",
           "text": "As the operator, I want the directory's screens to show every refusal, pending audit and outage as it is, so that I never act on a completed state that did not happen."
+        },
+        {
+          "id": "S79",
+          "text": "As the operator, I want a permission check the permission projection has not yet caught up with to be refused by name, naming the grant, while unrelated checks keep being answered, so that a lagging projection never admits a call and never stops unrelated work."
         }
       ]
     },
@@ -76,6 +84,10 @@
         {
           "id": "S12",
           "text": "As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect."
+        },
+        {
+          "id": "S78",
+          "text": "As a grant holder or reviewer looking at an identity, I want the screen to answer why it can or cannot do a thing, with the path to a responsible person or the named reason, so that I can trust or correct its access from the server's own decision."
         }
       ]
     }

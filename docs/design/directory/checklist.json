@@ -26,7 +26,7 @@
         },
         {
           "id": "C5",
-          "text": "Every decision still open for Tom is recorded as open: the grant representation, suspension semantics, the service name, the anchor, and nightly versus waiting for the upstream release.",
+          "text": "Every decision still open for Tom is recorded as open: the grant representation, suspension semantics, the service name, the anchor, and nightly versus waiting for the upstream release. Decided under ADR-078: the grant representation was ruled by the owning lead, Archie, with Apollo as second reader, on Waffles' ruling of 12:13 on Tom's word of 12:12 that technical formats are the owning lead's with a second reader.",
           "done": false
         },
         {
@@ -177,6 +177,46 @@
         {
           "id": "C30",
           "text": "The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Road step 2: SpiceDB answers every permission check (DIRECTORY-025)",
+      "items": [
+        {
+          "id": "C186",
+          "text": "The identity server reaches SpiceDB through one pure-Rust gRPC client that maps a fresh store's NOT_FOUND schema answer to a typed no-schema result, tests run against a disposable SpiceDB, and crates/lys/src/identity/ gains no SpiceDB check or write.",
+          "done": false
+        },
+        {
+          "id": "C187",
+          "text": "SpiceDB's schema is written only by the identity server at start-up, and its relationships only by projecting committed signed grant events; revoking a root refuses every grant derived from it and no unrelated grant; a delegation or a committed delegation event whose expiry passes its source grant's is refused by name, never clamped; a root revoke deletes the root's relationship first and the derived ones in writes within SpiceDB's configured update cap, resuming on replay after a crash.",
+          "done": false
+        },
+        {
+          "id": "C188",
+          "text": "Every grant and permission check the identity server makes, from browser, API and agent routes, is answered by SpiceDB through one evaluator behind DIRECTORY-006 R4's decision, at least as fresh as the projection, and an engine outage refuses by name; the administrator's admission by configured issuer and subject is the one check that never asks SpiceDB, and the install guide says so beside SpiceDB's unchanged step-1 sentence. An expired grant is refused by the caveat's time from the named clock, and an answer missing that context is refused, never admitted.",
+          "done": false
+        },
+        {
+          "id": "C189",
+          "text": "A call after a committed revoke is never admitted: before the projection catches up only a check that depends on the unapplied grant event is refused as not yet current, naming the grant, and unrelated authority stays usable; after it catches up the refusal names the withdrawn grant.",
+          "done": false
+        },
+        {
+          "id": "C190",
+          "text": "An agent whose permission is withdrawn between the two steps of a task is refused on its next call to the identity server.",
+          "done": false
+        },
+        {
+          "id": "C191",
+          "text": "The server answers why an identity can and why it cannot do a thing from the one evaluator's traced verdict, with the path to a responsible person, the named reason and the policy revision, and answers who can act on a resource through SpiceDB at the same revision, so the forward and reverse answers agree.",
+          "done": false
+        },
+        {
+          "id": "C192",
+          "text": "The screen shows the server's why answer for a permitted and a refused question and never decides a permission in the browser.",
           "done": false
         }
       ]
