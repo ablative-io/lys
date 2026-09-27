@@ -60,7 +60,6 @@
 //! plaintext is the original payload. That is the assertion which proves the
 //! derivation here is genuinely correct rather than merely self-consistent.
 
-
 use aes_gcm::aead::{Aead, KeyInit, Payload};
 use aes_gcm::{Aes256Gcm, Key, Nonce};
 use hkdf::Hkdf;

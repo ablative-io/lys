@@ -8,7 +8,6 @@
 //! not a broken fixture. A chain test that only shows "invalid input rejected"
 //! proves nothing about whether the links are checked at all.
 
-
 use super::*;
 use crate::bundle::artifact::BundleLink;
 use crate::checkpoint::{CheckpointBody, NoteVerifierKey, sign_note, verify_checkpoint};

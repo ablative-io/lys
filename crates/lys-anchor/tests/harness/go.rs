@@ -42,7 +42,6 @@
 //! quietly report a pass for a cross-check that never ran. A toolchain that is
 //! present but *broken* is always a hard failure.
 
-
 use std::ffi::OsStr;
 use std::io::Write;
 use std::path::{Path, PathBuf};

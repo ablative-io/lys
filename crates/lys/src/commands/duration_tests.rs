@@ -6,7 +6,6 @@
 //! direction — it looks like it worked — so every ambiguous spec is pinned as
 //! refused rather than left to whatever `str::parse` happens to do with it.
 
-
 use super::*;
 
 #[test]

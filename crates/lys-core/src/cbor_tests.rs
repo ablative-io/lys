@@ -6,7 +6,6 @@
 //! computed, so a change to the writers fails against the specification and
 //! not against itself.
 
-
 use super::*;
 
 /// Helper: encode one head and return it.

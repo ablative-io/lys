@@ -16,7 +16,6 @@
 //! code — and explicitly not *platform*: one machine, one toolchain, one
 //! dependency resolution.
 
-
 use std::path::PathBuf;
 use std::process::{Command, Output};
 

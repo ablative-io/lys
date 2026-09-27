@@ -11,7 +11,6 @@
 //! one rule fails one test. Where a case could be caught by two rules at once,
 //! it is constructed so only the intended one can fire.
 
-
 use super::*;
 use crate::delegation::artifact::{DelegationRole, DelegationSubjectKind};
 use crate::merkle::tree::{AppendOnlyTree, RawLeaf};
