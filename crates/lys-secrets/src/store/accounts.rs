@@ -159,11 +159,17 @@ impl SecretStore {
             .ok_or_else(|| SecretsError::NoAccountAvailable {
                 secret: secret.to_owned(),
             })?;
+        let account =
+            ring.order
+                .get(next)
+                .cloned()
+                .ok_or_else(|| SecretsError::NoAccountAvailable {
+                    secret: secret.to_owned(),
+                })?;
         if let Some(current) = ring.order.get(ring.current) {
             ring.resting.insert(current.clone());
         }
         ring.current = next;
-        let account = ring.order.get(next).cloned().unwrap_or_default();
         self.write_index()?;
         Ok(account)
     }
