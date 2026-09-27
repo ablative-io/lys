@@ -71,9 +71,9 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 | `docs/design/decisions.json` | the project decision ledger; gains proposed ADR-095, ownership alone confers no revoke (SECRETS-004 R1) | SECRETS-004 |
 | `Cargo.lock` | the workspace lockfile; gains the HTTP routing dependencies of crates/lys-secrets (SECRETS-004 R4) and the lys-secrets dependency of crates/lys-identity-server (SECRETS-004 R7) | SECRETS-004 |
 | `crates/lys-secrets/Cargo.toml` | the broker crate's manifest, created by SECRETS-003; gains the HTTP routing dependencies (SECRETS-004 R4) | SECRETS-003 |
-| `crates/lys-secrets/src/lib.rs` | the broker crate's module declarations, created by SECRETS-003; declares the SECRETS-004 modules (SECRETS-004 R3 to R7) | SECRETS-003 |
+| `crates/lys-secrets/src/lib.rs` | the broker crate's module declarations, created by SECRETS-003; declares the SECRETS-004 modules (SECRETS-004 R3 to R7) and re-exports the lease record as lys_secrets::Lease (SECRETS-004 R5) | SECRETS-003 |
 | `crates/lys-secrets/src/store.rs` | the encrypted store, created by SECRETS-003; each secret record, the entry that carries its owning identity, gains its scope and its team (SECRETS-004 R3) | SECRETS-003 |
-| `crates/lys-secrets/src/lease.rs` | the lease record, created by SECRETS-003; each lease carries its holder, its person acted for, its source secret and its end (SECRETS-004 R3) | SECRETS-003 |
+| `crates/lys-secrets/src/lease.rs` | the lease record Lease, created by SECRETS-003; each lease carries its holder, its person acted for, its source secret and its end (SECRETS-004 R3), and its upstream field, not public outside the crate (SECRETS-004 R5) | SECRETS-003 |
 | `crates/lys-secrets/src/secret.rs` | the redacting type for credential bytes, created by SECRETS-003; its fields unchanged, it gains only the declaration of its test module (SECRETS-004 R3) | SECRETS-003 |
 | `crates/lys-secrets/schema/secrets.zed` | the SpiceDB relations, created by SECRETS-003; gains the relations the seam asks (SECRETS-004 R7) | SECRETS-003 |
 | `crates/lys-secrets/tests/support/mod.rs` | shared test doubles, created by SECRETS-003; gains the two-people, two-teams fixture and the injected group claims (SECRETS-004 R4 to R7) | SECRETS-003 |
@@ -93,7 +93,7 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 | `crates/lys-secrets/src/revoke.rs` | the revoke by the person acted for, its refusals and the refusal of an already ended lease, end_with_upstream_pending, the one function that ends a lease with upstream pending for revoke and relinquish, and deliver_upstream_ack, the one writer of confirmed (SECRETS-004 R5, R6) | SECRETS-004 |
 | `crates/lys-secrets/src/relinquish.rs` | the holder's relinquish, recorded as its own act (SECRETS-004 R6) | SECRETS-004 |
 | `crates/lys-secrets/tests/secret_list.rs` | the CONFORMANCE 7.8 legs (SECRETS-004 R4) | SECRETS-004 |
-| `crates/lys-secrets/tests/lease_revoke.rs` | the CONFORMANCE 7.6 revoke legs and the always-no seam double (SECRETS-004 R5) | SECRETS-004 |
+| `crates/lys-secrets/tests/lease_revoke.rs` | the CONFORMANCE 7.6 revoke legs (SECRETS-004 R5) and the revoke leg against an always-no PermissionCheck double (SECRETS-004 R7) | SECRETS-004 |
 | `crates/lys-secrets/tests/lease_relinquish.rs` | the CONFORMANCE 7.6 relinquish legs (SECRETS-004 R6) | SECRETS-004 |
 
 ## Inventory
