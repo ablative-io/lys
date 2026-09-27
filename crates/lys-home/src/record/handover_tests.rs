@@ -58,7 +58,7 @@ fn user(id: &str, parent: Option<&str>) -> Entry {
     entry(id, parent, message)
 }
 
-fn assistant(id: &str, parent: &str, part: Value, who: [&str; 3]) -> Entry {
+fn assistant(id: &str, parent: &str, part: &Value, who: [&str; 3]) -> Entry {
     let [provider, api, model] = who;
     let message = json!({"role": "assistant", "content": [part], "provider": provider,
         "api": api, "model": model});
@@ -76,13 +76,13 @@ fn fixture() -> Result<(TempDir, PathBuf), Box<dyn Error>> {
     let mut s = home.create_session(OUTGOING, "/work/outgoing", None)?;
     let body = |id: &str| text(&format!("fixture-text-{id}"));
     s.append_entry(&user("u1", None))?;
-    s.append_entry(&assistant("a1", "u1", thinking("a1"), ANTHROPIC))?;
-    s.append_entry(&assistant("a2", "a1", body("a2"), ANTHROPIC))?;
+    s.append_entry(&assistant("a1", "u1", &thinking("a1"), ANTHROPIC))?;
+    s.append_entry(&assistant("a2", "a1", &body("a2"), ANTHROPIC))?;
     s.append_entry(&user("u2", Some("a2")))?;
-    s.append_entry(&assistant("a3", "u2", body("a3"), ANTHROPIC))?;
-    s.append_entry(&assistant("b1", "a1", thinking("b1"), ANTHROPIC))?;
+    s.append_entry(&assistant("a3", "u2", &body("a3"), ANTHROPIC))?;
+    s.append_entry(&assistant("b1", "a1", &thinking("b1"), ANTHROPIC))?;
     let authored = ["authored"; 3];
-    s.append_entry(&assistant("x1", "a3", body("x1"), authored))?;
+    s.append_entry(&assistant("x1", "a3", &body("x1"), authored))?;
     Ok((dir, root))
 }
 
@@ -481,11 +481,12 @@ fn the_handover_subcommand_prints_its_report_and_refuses_by_name() -> Gate {
     Ok(())
 }
 
+/// A render of the successor: its directory, report, records and the source part.
+type Rendered = (TempDir, RenderReport, Vec<Value>, Value);
+
 /// Render the fixture successor of `[a1, a2]` for `model`, returning the
 /// report, the records written and the source `a1` thinking part.
-fn render_successor(
-    model: &str,
-) -> Result<(TempDir, RenderReport, Vec<Value>, Value), Box<dyn Error>> {
+fn render_successor(model: &str) -> Result<Rendered, Box<dyn Error>> {
     let (dir, root) = fixture()?;
     let successor = dir.path().join("successor");
     let report = handover(&root, OUTGOING, &ids(&["a1", "a2"]), &successor)?;
