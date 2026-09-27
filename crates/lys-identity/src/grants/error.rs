@@ -274,6 +274,115 @@ pub enum GrantError {
         /// The grant named.
         grant: String,
     },
+    /// A signed message names an envelope other than the grant envelope.
+    #[error("EnvelopeMismatch: the message is not a grant event: {reason}")]
+    EnvelopeMismatch {
+        /// What was found instead.
+        reason: String,
+    },
+    /// A grant event's bytes do not decode to the envelope's shape.
+    #[error("EventMalformed: {reason}")]
+    EventMalformed {
+        /// The part of the shape that was wrong.
+        reason: &'static str,
+    },
+    /// A grant event decodes, but its bytes are not the canonical encoding of what it decodes to.
+    #[error(
+        "EventNotCanonical: the grant event's bytes are not the canonical encoding of what they decode to"
+    )]
+    EventNotCanonical,
+    /// A grant event is larger than any event the grants write.
+    #[error("EventTooLarge: {len} bytes, over the limit of {limit}")]
+    EventTooLarge {
+        /// The event's length in bytes.
+        len: usize,
+        /// The largest event read.
+        limit: usize,
+    },
+    /// A grant event names a version the grants do not read.
+    #[error("VersionUnsupported: grant event version {version} is not one the grants read")]
+    VersionUnsupported {
+        /// The version named.
+        version: u64,
+    },
+    /// A grant event names a service key other than the one it is verified against.
+    #[error(
+        "SignerMismatch: the grant event names a service key other than the one it is verified against"
+    )]
+    SignerMismatch,
+    /// A grant event's signature does not verify.
+    #[error("SignatureInvalid: the grant event's signature does not verify")]
+    SignatureInvalid,
+    /// A receipt does not match the signed grant event and log position it is checked against.
+    #[error("ReceiptInvalid: {reason}")]
+    ReceiptInvalid {
+        /// The first thing that did not match.
+        reason: &'static str,
+    },
+    /// The grant log could not be opened, read or written.
+    #[error("LogUnavailable: {reason}")]
+    LogUnavailable {
+        /// What the log store reported.
+        reason: String,
+    },
+    /// A leaf of the grant log is not a grant event this service signed.
+    #[error("LeafNotAnEvent: leaf {index} is not a grant event this service signed: {reason}")]
+    LeafNotAnEvent {
+        /// The leaf's index.
+        index: u64,
+        /// Why it was refused.
+        reason: String,
+    },
+    /// An append failed and its leaf is known not to be in the log: nothing was recorded.
+    #[error("AppendRefused: the grant change was not recorded: {reason}")]
+    AppendRefused {
+        /// What the log store reported.
+        reason: String,
+    },
+    /// Whether an operation's event was committed is not yet known.
+    #[error(
+        "OperationUnresolved: whether {operation} on {grant} was committed is not yet known, and nothing depending on it is answered until it is"
+    )]
+    OperationUnresolved {
+        /// The operation.
+        operation: String,
+        /// The grant it changes.
+        grant: String,
+    },
+    /// An operation's event is committed and not yet in the permission relationships.
+    #[error(
+        "ProjectionPending: {operation} on {grant} is committed at index {index} and not yet projected into the permission relationships"
+    )]
+    ProjectionPending {
+        /// The operation.
+        operation: String,
+        /// The grant it changes.
+        grant: String,
+        /// The index of its event.
+        index: u64,
+    },
+    /// The permission relationships are older than the revision the decision needs.
+    #[error(
+        "StaleDecision: the decision needs revision {required} and the permission relationships stand at {projected}"
+    )]
+    StaleDecision {
+        /// The revision required.
+        required: u64,
+        /// The revision projected.
+        projected: u64,
+    },
+    /// The permission engine could not be read or written.
+    #[error("PermissionEngineUnavailable: {reason}")]
+    PermissionEngineUnavailable {
+        /// What the engine reported.
+        reason: String,
+    },
+    /// The permission relationships hold no live relationship for a grant the book holds.
+    #[error("PermissionAbsent: the permission relationships hold no live relationship for {grant}")]
+    PermissionAbsent {
+        /// The grant.
+        grant: String,
+    },
     /// A directory refusal met while judging a grant.
     #[error(transparent)]
     Identity(#[from] IdentityError),

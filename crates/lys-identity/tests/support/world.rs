@@ -1,21 +1,25 @@
 //! A directory of four people and two agents on a temporary log, every one
-//! active, and the grants judged against a three-relation model.
+//! active, and the grants on their own log, judged against a three-relation
+//! model, with a permission engine the test chooses.
 
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
 use lys_identity::grants::{
-    Action, DelegateRequest, ExerciseRequest, GrantError, GrantId, Grants, Model, PassOn, Permit,
-    RecipientKind, Recorded, Relation, Resource, RootRequest, Route, Window,
+    Action, DelegateRequest, ExerciseRequest, GrantError, GrantId, Grants, MemoryRelationships,
+    Model, PassOn, Permit, RecipientKind, Recorded, Relation, RelationshipStore, Resource,
+    RootRequest, Route, Window,
 };
+use lys_identity::log::Reopen;
 use lys_identity::{
     Actor, AgentId, AuthMethod, Directory, IdentityId, LoginBinding, OperationId, PersonId,
     Profile, Provenance, Transition,
 };
-use lys_log_store::FileLeafStore;
+use lys_log_store::{FileLeafStore, LeafStore};
 
 /// The first second every test starts at.
 pub const T0: u64 = 1_800_000_000;
@@ -58,12 +62,15 @@ fn administrator() -> Result<Actor, Box<dyn Error>> {
     ))
 }
 
+/// Opens a grant log's store in the directory it is given.
+pub type Opener<S> = Box<dyn Fn(&Path) -> Reopen<S>>;
+
 /// The directory, the grants, and who is in them.
-pub struct World {
+pub struct World<S: LeafStore = FileLeafStore, R: RelationshipStore = MemoryRelationships> {
     /// The directory of people and agents.
     pub directory: Directory<FileLeafStore>,
     /// The grants.
-    pub grants: Grants,
+    pub grants: Grants<S, R>,
     /// The root authority.
     pub admin: PersonId,
     /// A person who holds root grants.
@@ -78,25 +85,45 @@ pub struct World {
     pub dana_agent: AgentId,
     /// The time every request is made at.
     pub now: u64,
+    /// Holds the logs and the key: `log`, `grants` and `service.key`.
+    pub dir: Arc<tempfile::TempDir>,
+    opener: Opener<S>,
 }
 
-/// The directory over a fresh log in `dir`, which lives as long as the directory does.
-fn open_directory(dir: tempfile::TempDir) -> Result<Directory<FileLeafStore>, Box<dyn Error>> {
+/// The directory over its log in `dir`.
+fn open_directory(
+    dir: &Arc<tempfile::TempDir>,
+) -> Result<Directory<FileLeafStore>, Box<dyn Error>> {
     let key = Ed25519Identity::load(&dir.path().join("service.key"))?;
-    let dir = Arc::new(dir);
-    let reopen = Box::new(move || FileLeafStore::open(&dir.path().join("log")));
+    let held = Arc::clone(dir);
+    let reopen = Box::new(move || FileLeafStore::open(&held.path().join("log")));
     Ok(Directory::open(reopen, key)?)
 }
 
 impl World {
-    /// A fresh world at [`T0`].
+    /// A fresh world at [`T0`], its grants on a file log and an in-process engine.
     pub fn new() -> Result<Self, Box<dyn Error>> {
-        let dir = tempfile::TempDir::new()?;
+        World::with(
+            Box::new(|path: &Path| -> Reopen<FileLeafStore> {
+                let path = path.to_owned();
+                Box::new(move || FileLeafStore::open(&path))
+            }),
+            MemoryRelationships::default(),
+        )
+    }
+}
+
+impl<S: LeafStore, R: RelationshipStore> World<S, R> {
+    /// A fresh world at [`T0`], its grant log opened by `opener` and its
+    /// permission relationships held by `relationships`.
+    pub fn with(opener: Opener<S>, relationships: R) -> Result<Self, Box<dyn Error>> {
+        let dir = Arc::new(tempfile::TempDir::new()?);
         FileLeafStore::create(&dir.path().join("log"), "example.test/lys/directory")?;
+        FileLeafStore::create(&dir.path().join("grants"), "example.test/lys/grants")?;
         let key = dir.path().join("service.key");
         std::fs::write(&key, [7; 32])?;
         std::fs::set_permissions(&key, std::fs::Permissions::from_mode(0o600))?;
-        let mut directory = open_directory(dir)?;
+        let mut directory = open_directory(&dir)?;
         let mut person = |name: &str| -> Result<PersonId, Box<dyn Error>> {
             let (id, _) = directory.register_person(
                 administrator()?,
@@ -137,9 +164,16 @@ impl World {
                 T0,
             )?;
         }
+        let grants = Grants::open(
+            opener(&dir.path().join("grants")),
+            Ed25519Identity::load(&key)?,
+            relationships,
+            model()?,
+            admin,
+        )?;
         Ok(Self {
             directory,
-            grants: Grants::new(model()?, admin),
+            grants,
             admin,
             dana,
             tom,
@@ -147,7 +181,21 @@ impl World {
             tom_agent,
             dana_agent,
             now: T0 + 10,
+            dir,
+            opener,
         })
+    }
+
+    /// Restart the grants over the same log, with `relationships` as the engine.
+    pub fn reopen(&mut self, relationships: R) -> Result<(), Box<dyn Error>> {
+        self.grants = Grants::open(
+            (self.opener)(&self.dir.path().join("grants")),
+            Ed25519Identity::load(&self.dir.path().join("service.key"))?,
+            relationships,
+            model()?,
+            self.admin,
+        )?;
+        Ok(())
     }
 
     /// Issue `holder` a root grant on [`alpha`], as the root authority.
@@ -229,11 +277,11 @@ impl World {
             action: Action::new(action)?,
         };
         let directory = self.directory.projection()?;
-        self.grants.check(directory, &request, self.now)
+        self.grants.check(directory, &request, self.now, None)
     }
 
     /// How many grant events are recorded.
-    pub fn events(&self) -> usize {
-        self.grants.events().len()
+    pub fn events(&self) -> u64 {
+        self.grants.revision()
     }
 }
