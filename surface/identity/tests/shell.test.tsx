@@ -64,6 +64,7 @@ describe('shell (conformance 9.1)', () => {
     await press('k', { ctrlKey: true }, document.body);
     const input = $('#palIn') as HTMLInputElement;
     expect($$('#palList .it').some((i) => i.textContent?.includes("Scribe"))).toBe(true);
+    expect($$('#palList .it').find((i) => i.textContent?.startsWith("Scribe"))?.textContent).toContain('agent · active');
     await press('ArrowDown', {}, input);
     expect($('#palList .it.sel')?.textContent).toContain('Bea (test person)');
     await press('ArrowUp', {}, input);

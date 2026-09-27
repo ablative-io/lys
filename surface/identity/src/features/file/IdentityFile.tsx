@@ -30,7 +30,7 @@ export interface FileData {
 async function readAgent(id: string): Promise<FileData> {
   const agent = await api.agent(id);
   const [receipts, grants] = await Promise.all([Promise.all(agent.provenance.events.map((index) => api.receipt(index))), readGrantWorld()]);
-  const x: Entry = { id: agent.id, display_name: agent.display_name, state: agent.state, kind: 'agent', person: agent.person };
+  const x: Entry = { id: agent.id, display_name: agent.display_name, state: agent.state, kind: 'agent', role: agent.role, person: agent.person };
   return { x, agent, agents: [], receipts, grants };
 }
 
@@ -40,7 +40,7 @@ async function readPerson(id: string): Promise<FileData> {
   if (!person) {
     throw new Refused(404, { refusal: 'PersonNotVisible', reason: 'this person is not among the records you may see' });
   }
-  const x: Entry = { id: person.id, display_name: person.display_name, state: person.state, kind: 'person', person: null };
+  const x: Entry = { id: person.id, display_name: person.display_name, state: person.state, kind: 'person', role: null, person: null };
   return { x, agent: null, agents: person.agents, receipts: [], grants };
 }
 

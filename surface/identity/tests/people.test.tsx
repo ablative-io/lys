@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { $, $$, click, mount, press, text, unreachable } from './harness';
-import { ADA, SCRIBE, SERVICE, refused } from './fixtures';
+import { ADA, DIRECTORY, SCRIBE, SERVICE, ok, refused } from './fixtures';
 
 const names = () => $$('tbody tr[data-pick] td:first-child').map((td) => td.textContent);
 
@@ -22,6 +22,14 @@ describe('People and agents', () => {
     expect(reviewer?.textContent).toContain('(retired)');
     const lamplighter = $$('tbody tr').find((tr) => tr.textContent?.includes("Lamplighter"));
     expect(lamplighter?.textContent).not.toContain('(retired)');
+  });
+
+  it('flags an agent whose person is suspended, not only retired (conformance 3.1)', async () => {
+    const suspended = { ...DIRECTORY, people: DIRECTORY.people.map((p) => (p.id === ADA ? { ...p, state: 'suspended' as const } : p)) };
+    await mount('#/people', { ...SERVICE, '/directory/people': ok(suspended) });
+    const scribe = $(`tr[data-href="#/file/${SCRIBE}"]`);
+    expect(scribe?.textContent).toContain('(suspended)');
+    expect($$('.stat .n')[2].textContent).toBe('4');
   });
 
   it('shows no sample data and marks what has no server', async () => {

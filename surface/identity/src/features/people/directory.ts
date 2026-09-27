@@ -7,18 +7,21 @@ export interface Entry {
   display_name: string;
   state: LifecycleState;
   kind: IdentityKind;
+  /** The role's title, when the service names one; the people view names none yet. */
+  role: string | null;
   person: PersonSummary | null;
 }
 
 /** People first, then every agent, as the mock-up lists them. */
 export function entries(view: PeopleView): Entry[] {
-  const people: Entry[] = view.people.map((p) => ({ id: p.id, display_name: p.display_name, state: p.state, kind: 'person', person: null }));
+  const people: Entry[] = view.people.map((p) => ({ id: p.id, display_name: p.display_name, state: p.state, kind: 'person', role: null, person: null }));
   const agents: Entry[] = view.people.flatMap((p) =>
     p.agents.map((a) => ({
       id: a.id,
       display_name: a.display_name,
       state: a.state,
       kind: 'agent' as const,
+      role: null,
       person: { id: p.id, display_name: p.display_name, state: p.state },
     })),
   );
@@ -34,6 +37,6 @@ export const fileNo = (id: string): string => {
 /** The first word of a name, exactly as the mock-up writes `x.name.split(' ')[0]`. */
 export const firstName = (name: string): string => name.split(' ')[0];
 
-/** An agent still standing whose person is retired needs a new person (conformance 3.1). */
+/** An agent still standing whose person is not active needs a new person (conformance 3.1). */
 export const needsNewPerson = (x: Entry): boolean =>
-  x.kind === 'agent' && x.state !== 'retired' && x.person?.state === 'retired';
+  x.kind === 'agent' && x.state !== 'retired' && x.person !== null && x.person.state !== 'active';

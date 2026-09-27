@@ -47,7 +47,7 @@ export function Palette() {
 
   const go = (hash: string) => navigate(hash.slice(1));
   const source: Item[] = [
-    ...ids.map((x) => ({ g: 'People and agents', t: x.display_name, d: `${x.kind} · ${x.state}`, go: () => go('#/file/' + x.id) })),
+    ...ids.map((x) => ({ g: 'People and agents', t: x.display_name, d: `${x.role ?? x.kind} · ${x.state}`, go: () => go('#/file/' + x.id) })),
     ...ids.map((x) => ({ g: 'Ask', t: `What can ${x.display_name} reach?`, d: '', go: () => go('#/access/reach/' + x.id) })),
     { g: 'Acts', t: 'Register an agent', d: 'from a description', go: () => shell.toast('Registering an agent from this screen is not built yet') },
     { g: 'Acts', t: 'Toggle dock side', d: '\\', go: shell.toggleDockSide },
