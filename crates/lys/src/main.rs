@@ -94,17 +94,12 @@ fn main() -> ExitCode {
                 artifact_out,
             } => commands::duration::validity_window(validity_days, validity.as_deref()).and_then(
                 |ttl| {
-                    let entry = match (&log, &log_key, &leaf_out, &artifact_out) {
-                        (Some(dir), Some(key), Some(leaf_out), Some(artifact_out)) => {
-                            Some(commands::ca::LogEntry {
-                                dir,
-                                key,
-                                leaf_out,
-                                artifact_out,
-                            })
-                        }
-                        _ => None,
-                    };
+                    let entry = commands::ca_log::LogEntry::from_flags(
+                        log.as_deref(),
+                        log_key.as_deref(),
+                        leaf_out.as_deref(),
+                        artifact_out.as_deref(),
+                    )?;
                     let outputs = commands::ca::IssueOutputs {
                         certificate: &out,
                         issuer_certificate: issuer_out.as_deref(),

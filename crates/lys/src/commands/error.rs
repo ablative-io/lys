@@ -195,6 +195,74 @@ pub enum CliError {
     #[error("consistency proof verification failed: invalid artifact or checkpoints")]
     LogConsistencyVerificationFailed,
 
+    /// An output path already names something on disk. Refused before
+    /// anything is signed or appended, so a run never silently replaces a
+    /// file it did not write.
+    #[error(
+        "refusing to overwrite the existing {what} {}: remove it or choose another path",
+        path.display()
+    )]
+    OutputExists {
+        /// Which output, e.g. "certificate file".
+        what: &'static str,
+        /// The path that already exists.
+        path: PathBuf,
+    },
+
+    /// Two outputs of one run name the same path, so one would overwrite the
+    /// other. Refused before anything is signed or appended.
+    #[error(
+        "the {first} and the {second} both name {}: give each output its own path",
+        path.display()
+    )]
+    OutputPathShared {
+        /// The output that named the path first.
+        first: &'static str,
+        /// The output that named it again.
+        second: &'static str,
+        /// The shared path, as the second output gave it.
+        path: PathBuf,
+    },
+
+    /// Only some of the flags that enter a certificate in a transparency log
+    /// were given. They come together or not at all; a partial set is never
+    /// read as "no log".
+    #[error(
+        "--log, --log-key, --leaf-out and --artifact-out come together or not at all: \
+         missing {missing}"
+    )]
+    LogFlagsIncomplete {
+        /// The flags that were not given, comma-separated.
+        missing: String,
+    },
+
+    /// A certificate was entered in its transparency log and then an output
+    /// could not be written. The entry is permanent, so the message names it
+    /// in full and the one command that recovers its inclusion proof; issuing
+    /// again would sign a second certificate and append a second leaf.
+    #[error(
+        "the certificate was entered in the transparency log {} at leaf index {leaf_index} \
+         (tree size {tree_size}, root {root_base64}), but its outputs were not all written: \
+         {cause}. The entry stands and the log's leaf file holds the certificate's DER; do not \
+         issue again. Recover the inclusion proof with: {recover}",
+        log.display()
+    )]
+    LoggedButUnwritten {
+        /// The log directory the certificate was entered in.
+        log: PathBuf,
+        /// The leaf index the certificate holds.
+        leaf_index: u64,
+        /// The tree size after the entry.
+        tree_size: u64,
+        /// The root after the entry, in standard base64 as the checkpoint
+        /// carries it.
+        root_base64: String,
+        /// The `lys log prove inclusion` command that writes the artifact.
+        recover: String,
+        /// What failed after the entry.
+        cause: Box<CliError>,
+    },
+
     /// A timestamp argument could not be parsed as RFC 3339.
     /// A `--validity` spec could not be read as a duration, or no validity
     /// window was supplied at all. Carries the spec verbatim so the operator

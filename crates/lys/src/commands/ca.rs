@@ -44,14 +44,14 @@ use lys_core::ca::{
     CertificateAuthority, LYS_OID_ARC, create_certificate_request, decode_extension,
     encode_extension, verify_certificate_chain_at,
 };
-use lys_core::tlog::build_inclusion_artifact;
 
+use crate::commands::ca_log::LogEntry;
 use crate::commands::error::{CliError, CliResult};
-use crate::commands::files::{read_file, write_file};
+use crate::commands::files::{
+    StagedFile, read_file, refuse_existing, refuse_shared_paths, write_file,
+};
 use crate::commands::hex::{hex_lower, parse_hex_32};
 use crate::commands::key::load_identity;
-use crate::commands::log::prove::write_artifact;
-use crate::commands::log::store;
 use crate::commands::output::Emitter;
 use crate::commands::pem;
 
@@ -147,25 +147,19 @@ pub struct IssueOutputs<'a> {
     pub log: Option<LogEntry<'a>>,
 }
 
-/// A transparency log an issued certificate is entered in, and where the
-/// evidence of that entry is written.
-#[derive(Debug)]
-pub struct LogEntry<'a> {
-    /// An initialized `lys log` directory.
-    pub dir: &'a Path,
-    /// The log operator's identity key, which signs the proof's checkpoint.
-    pub key: &'a Path,
-    /// Where the leaf is written: the certificate's DER bytes, exactly.
-    pub leaf_out: &'a Path,
-    /// Where the `lys/log-inclusion-proof/v1` artifact is written.
-    pub artifact_out: &'a Path,
-}
-
-/// What entering a certificate in a log produced.
-struct Entered {
-    leaf_index: u64,
-    tree_size: u64,
-    root: [u8; 32],
+impl IssueOutputs<'_> {
+    /// Every output path this issuance writes, each with what it holds.
+    fn named(&self) -> Vec<(&'static str, &Path)> {
+        let mut named = vec![("certificate file", self.certificate)];
+        if let Some(path) = self.issuer_certificate {
+            named.push(("issuer certificate file", path));
+        }
+        if let Some(entry) = &self.log {
+            named.push(("leaf file", entry.leaf_out));
+            named.push(("inclusion proof artifact", entry.artifact_out));
+        }
+        named
+    }
 }
 
 /// `lys ca issue --key <path> --subject <name> [--request <file>]
@@ -180,6 +174,13 @@ struct Entered {
 /// certificate with `openssl verify` against `--issuer-out`. A log that cannot
 /// be opened, or refuses the entry, stops the issuance before the certificate
 /// is written, so no certificate this command writes is missing from its log.
+///
+/// Every output is refused, before anything is signed or appended, if it
+/// already exists or shares a path with another output. Each is written to a
+/// flushed temporary file and renamed into place, so none is ever torn. With
+/// `--log`, the certificate, issuer certificate and leaf are staged before the
+/// append; a failure after it names the entry and the command that recovers
+/// its artifact, and never signs again (see [`crate::commands::ca_log`]).
 ///
 /// `ttl` is the already-resolved validity window; the two flags are reconciled
 /// in [`crate::commands::duration::validity_window`] so this function has one
@@ -198,7 +199,9 @@ struct Entered {
 /// claims file is not valid JSON, [`CliError::PemParse`] if the request is not
 /// a PEM `CERTIFICATE REQUEST` block, and [`CliError::Trust`] if the library
 /// rejects the issuance parameters, rejects the request's proof of possession,
-/// or signing fails.
+/// or signing fails. [`CliError::OutputExists`] and
+/// [`CliError::OutputPathShared`] refuse outputs before anything is signed;
+/// [`CliError::LoggedButUnwritten`] reports a failure after the log entry.
 pub fn issue(
     key: &Path,
     subject: &str,
@@ -208,11 +211,13 @@ pub fn issue(
     request_path: Option<&Path>,
     json: bool,
 ) -> CliResult<()> {
+    let named = outputs.named();
+    refuse_shared_paths(&named)?;
+    for &(what, path) in &named {
+        refuse_existing(path, what)?;
+    }
     let identity = load_identity(key)?;
-    let opened = match &outputs.log {
-        Some(entry) => Some((store::open(entry.dir)?, load_identity(entry.key)?, entry)),
-        None => None,
-    };
+    let opened = outputs.log.as_ref().map(LogEntry::open).transpose()?;
 
     let extensions = match claims {
         Some(claims_path) => {
@@ -260,40 +265,27 @@ pub fn issue(
         }
     };
 
-    let issuer_pem = match outputs.issuer_certificate {
-        Some(_) => Some(pem::encode_certificate(
-            &authority.issuer_certificate_der()?,
-        )),
-        None => None,
-    };
-
-    let entered = match opened {
-        Some((mut log, log_identity, entry)) => {
-            let (leaf_index, _) = log.append(&issued.der_bytes)?;
-            let artifact = build_inclusion_artifact(
-                log.tree(),
-                &issued.der_bytes,
-                log.origin(),
-                &log_identity,
-                leaf_index,
-            )?;
-            write_file(entry.leaf_out, &issued.der_bytes, "leaf file")?;
-            write_artifact(entry.artifact_out, &artifact, "inclusion proof artifact")?;
-            let (root, tree_size) = log.tree().root().to_parts();
-            Some(Entered {
-                leaf_index,
-                tree_size,
-                root,
-            })
-        }
-        None => None,
-    };
-
-    let pem_text = pem::encode_certificate(&issued.der_bytes);
-    write_file(outputs.certificate, pem_text.as_bytes(), "certificate file")?;
-    if let (Some(path), Some(text)) = (outputs.issuer_certificate, &issuer_pem) {
-        write_file(path, text.as_bytes(), "issuer certificate file")?;
+    let mut staged = vec![StagedFile::stage(
+        outputs.certificate,
+        pem::encode_certificate(&issued.der_bytes).as_bytes(),
+        "certificate file",
+    )?];
+    if let Some(path) = outputs.issuer_certificate {
+        let issuer_pem = pem::encode_certificate(&authority.issuer_certificate_der()?);
+        staged.push(StagedFile::stage(
+            path,
+            issuer_pem.as_bytes(),
+            "issuer certificate file",
+        )?);
     }
+    let entered = if let Some(log) = opened {
+        Some(log.enter(&issued.der_bytes, staged)?)
+    } else {
+        for file in staged {
+            file.place()?;
+        }
+        None
+    };
 
     let mut emit = Emitter::new(json);
     emit.field("issued certificate for subject", "subject", subject);
@@ -342,24 +334,9 @@ pub fn issue(
             path.display().to_string(),
         );
     }
-    match (&outputs.log, &entered) {
-        (Some(entry), Some(entered)) => {
-            emit.field("entered in log", "log_dir", entry.dir.display().to_string());
-            emit.field("leaf index", "leaf_index", entered.leaf_index);
-            emit.field("tree size", "tree_size", entered.tree_size);
-            emit.field("root hash (sha256)", "root_hash", hex_lower(&entered.root));
-            emit.field(
-                "leaf written",
-                "leaf_path",
-                entry.leaf_out.display().to_string(),
-            );
-            emit.field(
-                "artifact written",
-                "artifact_path",
-                entry.artifact_out.display().to_string(),
-            );
-        }
-        _ => emit.field("transparency log", "log", "none"),
+    match &entered {
+        Some(entered) => entered.report(&mut emit),
+        None => emit.field("transparency log", "log", "none"),
     }
     emit.finish();
     Ok(())
