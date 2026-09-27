@@ -333,7 +333,7 @@
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
     },
     {
-      "id": "RM-052",
+      "id": "RM-054",
       "title": "Check, give and record an agent's start command, and never run the agent",
       "status": "idea",
       "kind": "feature",
@@ -357,7 +357,7 @@
           "ADR-086",
           "ADR-087",
           "ADR-088",
-          "ADR-089"
+          "ADR-091"
         ],
         "briefs": [
           "DIRECTORY-029"
@@ -368,7 +368,7 @@
         "RM-001",
         "RM-002"
       ],
-      "notes": "Further units, named and not written: A grant to start an agent held by someone other than its responsible person or an administrator; The launch command's own proof (one-time code bound to a machine and a time window); The network record: machines, runtimes, reporting state, where each role may run, egress lists (CONFORMANCE 8.5); Add the launch record id to lys/session-start/v1 in the sessions brief d5055cc1; Record the executable, arguments and working directory on the reviewed profile version in the roles card Ink1H1Os; Runtimes that run the given command: a terminal view, sandbox, VM or container runners (CONFORMANCE 5.7). Ids, re-checked with git ls-remote and the refs it lists immediately before writing, each giving way to the next free id past every brief, draft and hand head that held it first: DIRECTORY-009 was held first by the lifecycle card and several drafts; DIRECTORY-027 was held first by draft c7c2ac1b and DIRECTORY-028 by draft 73184e72, so the brief is DIRECTORY-029; ADR-085 was held first by drafts fb954264 and 73184e72, so the new decisions are ADR-086 to ADR-089; RM-050 was held first by draft c7c2ac1b and RM-051 by drafts fb954264 and 73184e72, so this row is RM-052; the cluster's checklist and stories gave way where draft c7c2ac1b held C209 to C215 and S84 to S86 first, and take C229 to C241 and S98 to S108, past C228 and S97, the highest any draft holds. The brief depends on the sessions brief by its run d5055cc1 (drafted as DIRECTORY-015), on the roles card Ink1H1Os, SECRETS-002, DIRECTORY-002, DIRECTORY-003, DIRECTORY-005 and DIRECTORY-011; row 8.5 has no card, so until one exists every start is refused by name at the egress check. Waffles reviews the written brief before the lead signs it off and the build is fired."
+      "notes": "Further units, named and not written: A grant to start an agent held by someone other than its responsible person or an administrator; The launch command's own proof (one-time code bound to a machine and a time window); The network record: machines, runtimes, reporting state, where each role may run, egress lists (CONFORMANCE 8.5); Add the launch record id to lys/session-start/v1 in the sessions brief d5055cc1; Record the executable, arguments and working directory on the reviewed profile version in the roles card Ink1H1Os; Runtimes that run the given command: a terminal view, sandbox, VM or container runners (CONFORMANCE 5.7). Ids, re-checked with git ls-remote and the refs it lists immediately before writing, each giving way to the next free id past every brief, draft and hand head that held it first: DIRECTORY-009 was held first by the lifecycle card and several drafts; DIRECTORY-027 was held first by draft c7c2ac1b and DIRECTORY-028 by draft 73184e72, so the brief is DIRECTORY-029; ADR-085 was held first by drafts fb954264 and 73184e72, so the new decisions are ADR-086 to ADR-088 and ADR-091, because ADR-089 was held first by draft fb954264 and ADR-090 by brief 8a60bd7a; RM-050 was held first by draft c7c2ac1b, RM-051 by drafts fb954264 and 73184e72, RM-052 by draft fb954264 and RM-053 by draft c7c2ac1b, so this row is RM-054; the cluster's checklist and stories gave way where draft c7c2ac1b held C209 to C215 and S84 to S86 first and draft fb954264 held S98 first, and take C229 to C241, S99 to S108 and S109, past C228 and S97, the highest any other draft held when these were first written. DIRECTORY-029, C229 to C241 and S99 to S108 were held by this draft before any other ref held them. The brief depends on the sessions brief by its run d5055cc1 (drafted as DIRECTORY-015), on the roles card Ink1H1Os, SECRETS-002, DIRECTORY-002, DIRECTORY-003, DIRECTORY-005 and DIRECTORY-011; row 8.5 has no card, so until one exists every start is refused by name at the egress check. Waffles reviews the written brief before the lead signs it off and the build is fired."
     }
   ]
 }

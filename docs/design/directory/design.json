@@ -3,7 +3,7 @@
   "title": "The standalone identity directory, with every grant rooted in a person",
   "intention": "An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change. Cambium later uses this issuer, keeping its participant ids (rows 06 and 07); that direction is recorded here while rows 06 and 07 stay the non-goal recorded below, and this sentence promises neither row.",
   "problem": "IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands.",
-  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5. DIRECTORY-029 builds CONFORMANCE section 5, Starting an agent, as ADR-007 decides: the directory checks an agent, gives its start command and records it, and never runs it. A start request names the agent, the profile version and the machine (ADR-087), and its agent resolves to the enduring agent record DIRECTORY-011 keeps, which a start never creates or changes; the command given is the profile version's own executable with its recorded arguments in its recorded working directory, preceded by the ids-only assignments LYS_AGENT_ID, LYS_LAUNCH_RECORD and LYS_CREDENTIAL_IDS (ADR-089), and one start stands per agent at a time; five named checks each read their owner's record (the lifecycle state of DIRECTORY-003, the roles card Ink1H1Os's review record and role machines, SECRETS-002's handle record, and the network record of CONFORMANCE row 8.5) and refuse by name while that record does not exist. Every command given keeps one signed launch record (P4, ADR-086), whose id the agent's lys/session-start/v1 report names once the sessions brief (run d5055cc1, drafted as DIRECTORY-015) adds it to that signed message, so running is read from the sessions brief's record and never assumed (P5); a withdrawal records only that the request no longer stands (ADR-088). Giving a command is not a launch, so P6 stands. The launch record is the directory's own and is not the home's template render event (ADR-012).",
+  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5. DIRECTORY-029 builds CONFORMANCE section 5, Starting an agent, as ADR-007 decides: the directory checks an agent, gives its start command and records it, and never runs it. A start request names the agent, the profile version and the machine (ADR-087), and its agent resolves to the enduring agent record DIRECTORY-011 keeps, which a start never creates or changes; the command given is the profile version's own executable with its recorded arguments in its recorded working directory, preceded by the ids-only assignments LYS_AGENT_ID, LYS_LAUNCH_RECORD and LYS_CREDENTIAL_IDS (ADR-091), and one start stands per agent at a time; five named checks each read their owner's record (the lifecycle state of DIRECTORY-003, the roles card Ink1H1Os's review record and role machines, SECRETS-002's handle record, and the network record of CONFORMANCE row 8.5) and refuse by name while that record does not exist. Every command given keeps one signed launch record (P4, ADR-086), whose id the agent's lys/session-start/v1 report names once the sessions brief (run d5055cc1, drafted as DIRECTORY-015) adds it to that signed message, so running is read from the sessions brief's record and never assumed (P5); a withdrawal records only that the request no longer stands (ADR-088). Giving a command is not a launch, so P6 stands. The launch record is the directory's own and is not the home's template render event (ADR-012).",
   "principles": [
     {
       "id": "P1",
@@ -55,7 +55,7 @@
     "ADR-086",
     "ADR-087",
     "ADR-088",
-    "ADR-089"
+    "ADR-091"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -695,7 +695,17 @@
     },
     {
       "path": "crates/lys-identity-server/src/door_handles.rs",
-      "note": "the HandleRecords client of the door's handle-resolving endpoint (SECRETS-002 R1); ids and validity only",
+      "note": "the HandleRecords client of the door's handle-resolving endpoint (SECRETS-002 R1); ids and validity only; wired into the start route by R12",
+      "brief": "DIRECTORY-029"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/door_handles.rs",
+      "note": "R6 test: the HandleRecords door client against a local stub of the door's handle read shape; ids and validity only, no credential value carried on",
+      "brief": "DIRECTORY-029"
+    },
+    {
+      "path": "crates/lys-identity-server/examples/door_handles.rs",
+      "note": "R6 verification: asks the door client for one agent at a given door address and prints its answer",
       "brief": "DIRECTORY-029"
     },
     {

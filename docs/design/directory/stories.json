@@ -18,7 +18,7 @@
           "text": "As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email."
         },
         {
-          "id": "S98",
+          "id": "S109",
           "text": "As the responsible person, I want my agent's start command given only after its checks pass, so that I never start an agent that is not active, reviewed, allowed on the machine, credentialed and able to reach what it needs."
         },
         {

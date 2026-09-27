@@ -8,7 +8,7 @@
 
 **S5.** As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email.
 
-**S98.** As the responsible person, I want my agent's start command given only after its checks pass, so that I never start an agent that is not active, reviewed, allowed on the machine, credentialed and able to reach what it needs.
+**S109.** As the responsible person, I want my agent's start command given only after its checks pass, so that I never start an agent that is not active, reviewed, allowed on the machine, credentialed and able to reach what it needs.
 
 **S99.** As the responsible person, I want each failed check named in words, so that I know what to fix before a command can be given.
 
