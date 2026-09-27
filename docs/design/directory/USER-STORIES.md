@@ -33,3 +33,15 @@
 **S11.** As a person granting temporary access, I want its end date and ancestor restrictions enforced, so role changes or reinstatement cannot silently extend it.
 
 **S12.** As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
+
+## Certificate verifier — Checks an agent's certificate and its record against the certificate log without the issuer's cooperation
+
+**S31.** As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word.
+
+**S32.** As a certificate verifier, I want a revoked certificate's past record to still verify, so that revoking a certificate does not erase what it legitimately did before its revocation.
+
+**S34.** As a certificate verifier using the command that takes no log, I want its help to say it does not check revocation, so that I never take its pass as proof a certificate is live.
+
+## Responsible person — Relies on an agent's certificate staying ended once it is revoked
+
+**S33.** As a responsible person, I want my agent's certificate revocable only by its issuing authority's key, so that nobody else can end it and nothing can quietly bring it back.
