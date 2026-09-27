@@ -8,7 +8,7 @@
 //! nothing is added to Pi's grammar. lys's own data rides in [`EntryBody::Custom`]
 //! under the `lys.*` custom types named below.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 
 /// The custom type of a harness-local event (a hook outcome, a permission
@@ -52,6 +52,54 @@ pub struct LanternData {
     pub lit_by: String,
     /// When, RFC 3339 as the record's clock writes it.
     pub lit_at: String,
+    /// The session that held the point when the lantern was lit: the one
+    /// the light act appended it to. `None` when the key is absent, as in
+    /// every lantern lit before HOME-014; a present value that is not a
+    /// string, null included, is kept as it is and never read as absent.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_lit_in"
+    )]
+    pub lit_in: Option<LitIn>,
+}
+
+/// A recorded `lit_in` as it stands in a lantern's data: a JSON string,
+/// which may name a session, or any other JSON value, null included, which
+/// names none and is kept so it can be refused by name.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum LitIn {
+    /// A JSON string: a session id, once checked against the home.
+    Session(String),
+    /// Any other JSON value, null included.
+    Other(Value),
+}
+
+/// Read whatever value a present `lit_in` key carries as `Some`, so a
+/// present null stays distinct from an absent key, which `default` reads
+/// as `None`.
+pub(crate) fn present_lit_in<'de, D>(deserializer: D) -> Result<Option<LitIn>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    LitIn::deserialize(deserializer).map(Some)
+}
+
+/// The part of a `lys.lantern` entry's data the fork reads: the point, who
+/// lit it, and the recorded `lit_in` when there is one. It requires neither
+/// `note` nor `lit_at` and allows other keys, so an older record whose data
+/// is exactly `{point, note, lit_by}` reads as a lantern; [`LanternData`]
+/// keeps the full shape for lighting and recall.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+pub struct LanternHeld {
+    /// The entry id of the point the lantern marks.
+    pub point: String,
+    /// Who lit it, as they named themselves.
+    pub lit_by: String,
+    /// The recorded lit-in session, as [`LanternData::lit_in`] reads it.
+    #[serde(default, deserialize_with = "present_lit_in")]
+    pub lit_in: Option<LitIn>,
 }
 
 /// What a `lys.lantern_epilogue` entry carries in `custom.data`. `added_by`
