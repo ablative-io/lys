@@ -1,6 +1,6 @@
 # Home — User Stories
 
-## Agent — Runs in a harness and wants to continue somewhere else
+## Agent — Continues a session imported from Claude Code on Codex
 
 **S1.** As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
 
@@ -22,6 +22,10 @@
 
 **S41.** As an agent that lights a lantern, I want it to record the session I lit it in and recall to show that session beside the point and the note, so that I know which session the lantern leads back to.
 
+**S28.** As an agent whose session was imported from Claude Code, I want it rendered as a Codex thread that Codex resumes, with every text, tool call and tool result carried whole, so that I continue on Codex knowing what the session knew rather than a clipped summary of it.
+
+**S31.** As a Codex thread translated from a home session, I want to open on a marker naming the session I was translated from, so that I never mistake myself for that session.
+
 ## Tom — Owns the platform and reads what a session was given
 
 **S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
@@ -37,6 +41,8 @@
 **S21.** As Tom, I want a fork at a user message to carry that message as the child's first prompt beside the rendered file, with nothing from the parent's header but its working directory, so that the child starts at the coordinate and no credential, handle or launch setting is copied from the parent.
 
 **S23.** As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything.
+
+**S29.** As Tom, I want every translation to carry an account, by entry id and hash, of what was kept, what changed and how, and what was lost and why, so that the difference between the session and its Codex fork can be read without reading the transcript.
 
 ## Reviewer — Checks the proofs before anything relies on them
 
@@ -59,6 +65,8 @@
 **S42.** As the reviewer, I want a lantern lit before lit_in was recorded to stay readable and forkable by its holders, and a lit_in that is not a session id refused by name, so that no lantern is ever read as a session it does not name.
 
 **S43.** As the reviewer, I want the fork's tests to light their lanterns with the light act wherever it can produce them, so that the fork is proved on the record the light act really writes.
+
+**S30.** As the reviewer, I want the Codex rollout shape measured from files Codex 0.156.0 wrote and its resume recorded with hashes and counts, so that a later Codex version is refused until it is measured rather than assumed to match.
 
 ## Developer — Works on lys-home's code beside the record module
 

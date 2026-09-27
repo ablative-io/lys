@@ -112,6 +112,28 @@ first prompt and lists the seed in its manifest, and `render` prints no
 launch line.
 A lantern before any assistant message is refused `nothing_to_fork`.
 
+`translate-codex --home <dir> --session <id> --out <dir> --codex-version <version> [--zone <iana name>]`
+translates a session into a rollout in the shape Codex 0.156.0 writes for
+its own threads, the one pair Claude Code to Codex. `--out` is a Codex home
+directory: the rollout goes to
+`sessions/YYYY/MM/DD/rollout-<local date and time>-<thread>.jsonl` under it,
+the date and time the head entry's stamp in `--zone` (read from `TZ` when
+the flag is absent, resolved through the time zone database bundled in the
+build), with the loss account beside it as `<same stem>.loss.json`. The
+thread id is the head's record uuid, so each head makes a new thread; the
+thread is a fork of the session and says so in its first message. Every
+text part, tool call and tool result on the context path is carried whole,
+readable thinking as text, a base64 image as `input_image`; a compaction,
+branch summary or custom message on the path becomes marked developer
+text, and an `agent` sidechain beside the path one marked developer message.
+The account names by entry id and hash what was kept, what changed and how,
+and what was lost and why, and holds no content. Once both files are
+written, one `lys.translation` side leaf records the translation beside the
+context path; the head does not move. Only `0.156.0` is accepted, an
+existing target is refused, and a stamp that is not RFC 3339 is refused
+naming the entry. The report is the two paths and the counts; Codex is
+never run.
+
 What the crate does not do: interpret, print or log transcript contents (errors
 and reports carry ids, hashes, offsets and counts only; a lantern's note and
 its epilogues are the one text the crate prints, and only `lantern recall`
@@ -120,6 +142,6 @@ log or anchor; encrypt; move a home between devices; run or supervise an
 agent; talk to Norn.
 
 Design and briefs: `docs/design/home/` (HOME-001, HOME-002, HOME-003,
-HOME-004, HOME-006). Pi
+HOME-004, HOME-006, HOME-009). Pi
 reference: the checkout
 at `3d5cbe98`, `packages/coding-agent/src/core/session-manager.ts`.
