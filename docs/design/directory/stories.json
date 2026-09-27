@@ -78,6 +78,46 @@
           "text": "As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect."
         }
       ]
+    },
+    {
+      "name": "Keyboard user",
+      "role": "Working the identity screens without a mouse",
+      "stories": [
+        {
+          "id": "S132",
+          "text": "As a person working by keyboard, I want to reach and press every control on every screen without a mouse, so that nothing the screens offer is closed to me."
+        }
+      ]
+    },
+    {
+      "name": "Responsible person",
+      "role": "Sharing and returning to a place in the screens",
+      "stories": [
+        {
+          "id": "S133",
+          "text": "As a responsible person, I want every screen and tab to have its own address, so that a link I send opens exactly the view I was looking at."
+        }
+      ]
+    },
+    {
+      "name": "Newcomer to the screens",
+      "role": "Learning what a screen shows",
+      "stories": [
+        {
+          "id": "S134",
+          "text": "As a newcomer, I want the help overlay to number what is on screen and put me back where I was when I leave it, so that asking for help never costs me my place."
+        }
+      ]
+    },
+    {
+      "name": "Identity line lead",
+      "role": "Keeping the mock-up and the build in step",
+      "stories": [
+        {
+          "id": "S135",
+          "text": "As the identity line lead, I want the mock-up and the built shell to change together and the proof to run in the gate, so that the mock-up stays the definition the build is held to."
+        }
+      ]
     }
   ]
 }
