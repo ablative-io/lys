@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,32 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-038",
+      "title": "Give a file-store leaf its final name only after it is whole and flushed",
+      "status": "idea",
+      "kind": "fix",
+      "summary": "lys-log-store's FileLeafStore writes each leaf in a hidden temporary file, flushes it, links it to its final name with an operation that refuses to replace, and flushes the leaves directory; the link is the commit point. A writable open flushes the leaves directory before counting and fails with Io when it cannot; a read-only open counts without flushing; neither counts or touches a leftover temporary file. A post-link directory-flush failure is a new named error and the handle refuses further appends until reopened. DIRECTORY-003 records that it lands after this.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T16:42:00+10:00",
+        "quote": "The file store in lys-log-store gives a leaf its final name only after every byte of it is written and flushed to disk. Today a leaf file is created under its final name and then written, so a crash or a failed write leaves a torn leaf that the next open counts and pins. A write that fails to flush also leaves bytes in the page cache that read back as if they were durable. A leaf is written to a hidden temporary file in the leaves directory, flushed, and then linked to its final name by an operation that refuses to replace an existing leaf, and the leaves directory is flushed after that. A second writer that has already taken the index is still refused by name. Opening the store flushes the leaves directory before it counts the leaves, so a leaf that is named at open is durable. A leftover hidden temporary file is never counted as a leaf. Tests show that a write failing before the link leaves no leaf, that a leftover temporary file is ignored at open, and that a second writer on the same index is refused. The identity directory in DIRECTORY-003 waits on this card before it lands, because its uncertain append takes a leaf that reads back as committed.",
+        "context": "The lys-log-store card's words, surveyed and briefed by the brief method as LYSLOGSTORE-001; the lead for the identity line answered four open questions: leftover temporary files are left in place and open never deletes anything; the no-replace link is the commit point, with a named uncertain error for a failed directory flush after it; that error carries the flush's io error as its source; and a write that fails before a successful link removes its own temporary file; and, in a second round, the temporary name is `.<pid>-<padded index>-<sequence>.tmp` from a process-wide counter, created with create_new and never truncated, and the injected leaves/ flush error is of kind TimedOut; and, in a third round, the error's message tells the caller to reopen the store, the temporary file's sequence is a parameter that put_leaf fills from the process-wide counter and tests fill from zero, a drift injection replaces the link with a rename, and file_tests.rs names the no-replace link wherever it named create_new; and, in the rounds after, the collision test proves the collision by the sequences its own closure returned, exactly [0, 1]; and the flush at open is the writer's act: a read-only open never flushes and counts the named leaves, while a writable open whose flush fails returns Io and writes nothing."
+      },
+      "links": {
+        "cluster": "lys-log-store",
+        "decisions": [
+          "ADR-059",
+          "ADR-060"
+        ],
+        "briefs": [
+          "LYSLOGSTORE-001"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "A new row: none of RM-001 to RM-016 on main names lys-log-store, and RM-017 to RM-037 are taken on open brief branches, so this row is RM-038 and its decisions ADR-059 and ADR-060, the next free after the highest on main and on every open brief branch at 7b53625. RM-001 (the identity directory) is left unchanged; LYSLOGSTORE-001 R9 writes the wait into DIRECTORY-003's depends_on. Units beyond the first, by title, not written: Clear stranded leaf temporary files under the write lock; DIRECTORY-003 settles an uncertain append by reading the leaf back."
     }
   ]
 }

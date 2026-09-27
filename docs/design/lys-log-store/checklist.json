@@ -1,0 +1,95 @@
+{
+  "cluster": "lys-log-store",
+  "sections": [
+    {
+      "name": "Errors",
+      "items": [
+        {
+          "id": "C1",
+          "text": "StoreError has a variant LeafDurabilityUncertain carrying the leaf index and the failed flush's std::io::Error as its source, its message naming both, distinct from Io and from LeafAlreadyWritten, and LeafStore::put_leaf's documented errors name it.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Writing a leaf",
+      "items": [
+        {
+          "id": "C2",
+          "text": "FileLeafStore::put_leaf writes and flushes a leaf's bytes in a dot-prefixed temporary file in leaves/, named by leaf_temp_name from the process id, the index and a sequence the caller supplies (a process-wide counter for put_leaf) and created with create_new so it never replaces an existing file, before any file exists under the leaf's 20-digit name, and removes that temporary file when writing or flushing it fails.",
+          "done": false
+        },
+        {
+          "id": "C3",
+          "text": "put_leaf gives the leaf its final name with a link that refuses to replace an existing entry, and an existing final name returns LeafAlreadyWritten for that index with the existing bytes unchanged and this writer's temporary file removed.",
+          "done": false
+        },
+        {
+          "id": "C4",
+          "text": "A successful link advances the extent; put_leaf then removes the temporary name and flushes leaves/, and a failure to remove the temporary name still returns Ok.",
+          "done": false
+        },
+        {
+          "id": "C5",
+          "text": "A failure to flush leaves/ after the link returns LeafDurabilityUncertain for that index, and the handle refuses every further put_leaf with that error until the store is reopened.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Opening a store",
+      "items": [
+        {
+          "id": "C6",
+          "text": "FileLeafStore::open flushes leaves/ before it counts the leaves, and when that flush fails it returns Io naming the leaves directory and the flush, and writes nothing.",
+          "done": false
+        },
+        {
+          "id": "C7",
+          "text": "FileLeafStore::open never counts, deletes or changes a leftover dot-prefixed temporary file in leaves/.",
+          "done": false
+        },
+        {
+          "id": "C12",
+          "text": "FileLeafStore::open_read_only performs FileLeafStore::open's checks without flushing leaves/, counts the named leaves, and does not fail because a flush of leaves/ would fail.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Invariant and tests",
+      "items": [
+        {
+          "id": "C8",
+          "text": "file.rs's module docs state that a named leaf is whole and flushed, that only hidden temporary files may be partial, and that the link is the commit point.",
+          "done": false
+        },
+        {
+          "id": "C9",
+          "text": "A fault seam that fails a chosen step of put_leaf or the leaves/ flush at open exists in FileLeafStore and compiles only under cfg(test).",
+          "done": false
+        },
+        {
+          "id": "C10",
+          "text": "file_tests.rs holds the sixteen new tests of LYSLOGSTORE-001 R8, names the no-replace link wherever it named create_new, and each drift injection in its module-doc tables fails exactly its own test.",
+          "done": false
+        },
+        {
+          "id": "C11",
+          "text": "Every leg of the design's gate array passes and file.rs stays under 500 lines of code.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Dependent briefs",
+      "items": [
+        {
+          "id": "C13",
+          "text": "DIRECTORY-003's depends_on names LYSLOGSTORE-001 after DIRECTORY-002, and no other field of DIRECTORY-003 changes.",
+          "done": false
+        }
+      ]
+    }
+  ]
+}
