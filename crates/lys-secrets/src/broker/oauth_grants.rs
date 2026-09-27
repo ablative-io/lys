@@ -95,37 +95,4 @@ impl<P: PermissionCheck> Broker<P> {
             .open_for_use(&self.store_key, &entry, EntryClass::OAuth)?;
         OAuthGrant::from_sealed(&sealed).map(Some)
     }
-
-    /// Records what the provider answered to revoking the grant behind the
-    /// handle `id`: `revoked_upstream` when it confirmed, and
-    /// `revocation_unconfirmed` when it did not, so a screen can tell a
-    /// local refusal from an unconfirmed provider action.
-    ///
-    /// # Errors
-    ///
-    /// `HandleUnknown`, and the audit log's refusals.
-    pub fn record_upstream_revocation(
-        &mut self,
-        id: &HandleId,
-        confirmed: bool,
-    ) -> Result<(), SecretsError> {
-        let record = self
-            .handles
-            .get(id.as_str())
-            .ok_or(SecretsError::HandleUnknown)?;
-        let (identity, secret) = (record.identity.clone(), record.secret.clone());
-        let outcome = if confirmed {
-            "revoked_upstream"
-        } else {
-            "revocation_unconfirmed"
-        };
-        self.record(
-            AuditKind::Refresh,
-            (Some(id.as_str()), Some(&identity), Some(&secret)),
-            None,
-            None,
-            outcome,
-        )?;
-        Ok(())
-    }
 }

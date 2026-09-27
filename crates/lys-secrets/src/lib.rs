@@ -25,10 +25,10 @@ pub mod store;
 
 pub use audit::{AuditKind, AuditLine, AuditLog, RecordedLine};
 pub use broker::{
-    Admitted, Broker, BrokerPaths, Clock, PRESENTATION_SKEW_MS, RevokeOutcome, Ticket, UseError,
-    Used,
+    Admitted, Broker, BrokerPaths, Clock, PRESENTATION_SKEW_MS, RevocationState, RevokeOutcome,
+    Ticket, UpstreamRevocation, UseError, Used,
 };
-pub use error::SecretsError;
+pub use error::{RevocationRefusal, SecretsError};
 pub use handle::{
     HandleId, HandleToken, Holder, IssuedHandle, Presentation, new_operation_id, request_digest,
 };

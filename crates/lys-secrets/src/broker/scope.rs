@@ -5,7 +5,7 @@
 //! listed only to its owner and the identities it is granted to.
 
 use crate::audit::AuditKind;
-use crate::error::SecretsError;
+use crate::error::{LendingRefusal, SecretsError};
 use crate::handle::{HandleToken, Presentation};
 use crate::permission::PermissionCheck;
 use crate::store::{EntryView, Scope};
@@ -121,10 +121,10 @@ impl<P: PermissionCheck> Broker<P> {
             .entry(secret)
             .is_some_and(|entry| entry.owner == owner);
         if !owns {
-            return Err(SecretsError::LendingNotPermitted {
+            return Err(SecretsError::from(LendingRefusal::NotPermitted {
                 holder: owner.to_owned(),
                 secret: secret.to_owned(),
-            });
+            }));
         }
         let outcome = format!("scope {}", scope.target());
         self.store.set_scope(secret, scope)?;

@@ -156,6 +156,23 @@ pub enum Command {
         #[arg(long)]
         identity: String,
     },
+    /// Show where a handle's revocation stands: use here, and the provider.
+    Revocation {
+        #[command(flatten)]
+        at: Where,
+        #[arg(long)]
+        handle_id: String,
+    },
+    /// Record the provider's later answer confirming a revocation; the
+    /// answer must name the grant's provider subject.
+    ConfirmRevocation {
+        #[command(flatten)]
+        at: Where,
+        #[arg(long)]
+        handle_id: String,
+        #[arg(long)]
+        provider_subject: String,
+    },
     /// Drop a handle.
     Drop {
         #[command(flatten)]

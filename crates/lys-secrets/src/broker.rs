@@ -26,6 +26,8 @@ mod inflight;
 mod lineage;
 mod oauth_grants;
 mod records;
+mod revocation;
+pub use revocation::{RevocationState, UpstreamRevocation};
 mod rotation;
 mod scope;
 mod spawn;

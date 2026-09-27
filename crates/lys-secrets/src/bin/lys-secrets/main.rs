@@ -17,7 +17,7 @@ use clap::Parser;
 use lys_core::Ed25519Identity;
 use lys_secrets::{
     Broker, EntryClass, HandleId, Holder, Presentation, Recipients, Relation, Scope, Secret,
-    SecretsError, new_operation_id, request_digest, to_hex,
+    SecretsError, UpstreamRevocation, new_operation_id, request_digest, to_hex,
 };
 
 use args::RecordClass;
@@ -220,6 +220,36 @@ fn run(command: Command) -> Result<(), SecretsError> {
                     entry.name, entry.class, entry.owner
                 );
             }
+        }
+        Command::Revocation { at, handle_id } => {
+            let state = open(&at)?.revocation_state(&HandleId::from_text(&handle_id))?;
+            let here = if state.stopped_here {
+                "stopped"
+            } else {
+                "still admitted"
+            };
+            println!("use here: {here}");
+            match state.upstream {
+                UpstreamRevocation::NotAsked => println!("provider: not asked"),
+                UpstreamRevocation::Unconfirmed(reason) => {
+                    println!("provider: unconfirmed ({reason})");
+                }
+                UpstreamRevocation::Confirmed => println!("provider: confirmed"),
+            }
+        }
+        Command::ConfirmRevocation {
+            at,
+            handle_id,
+            provider_subject,
+        } => {
+            let id = HandleId::from_text(&handle_id);
+            let changed = open(&at)?.confirm_upstream_revocation(&id, &provider_subject)?;
+            let said = if changed {
+                "now confirmed"
+            } else {
+                "was already confirmed"
+            };
+            println!("provider revocation of {handle_id} {said}");
         }
         Command::Drop {
             at,

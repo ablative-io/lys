@@ -3,7 +3,12 @@
 
 use std::path::PathBuf;
 
+mod lending;
 mod name;
+mod revocation;
+
+pub use lending::LendingRefusal;
+pub use revocation::RevocationRefusal;
 
 /// A named refusal or failure of the secrets broker.
 #[derive(Debug, thiserror::Error)]
@@ -353,36 +358,12 @@ pub enum SecretsError {
         /// The record's name.
         record: String,
     },
-    /// A derived handle asked for by a holder who neither owns the secret
-    /// nor holds the right to lend it.
-    #[error(
-        "LendingNotPermitted: {holder} neither owns {secret} nor holds the right to lend it (act: ask the secret's owner for the lend relation)"
-    )]
-    LendingNotPermitted {
-        /// The holder asking to lend.
-        holder: String,
-        /// The secret's name.
-        secret: String,
-    },
-    /// A derived handle asked for with a bound past the handle above it.
-    #[error(
-        "BeyondAncestry: a handle derived from {handle} must stay within its uses, window and spend (act: ask for bounds within the handle it is derived from)"
-    )]
-    BeyondAncestry {
-        /// The handle derived from.
-        handle: String,
-    },
-    /// A handle asked for on a secret whose recipient policy excludes the
-    /// recipient.
-    #[error(
-        "RecipientRefused: {secret} may be handed to people only and {recipient} is not a person (act: hand it to a person, or ask its owner to change the recipient policy)"
-    )]
-    RecipientRefused {
-        /// The recipient asked for.
-        recipient: String,
-        /// The secret's name.
-        secret: String,
-    },
+    /// A derived or issued handle refused by the rules of lending.
+    #[error(transparent)]
+    Lending(#[from] LendingRefusal),
+    /// A provider revocation's confirmation refused.
+    #[error(transparent)]
+    Revocation(#[from] RevocationRefusal),
     /// A scope written as none of the three kinds.
     #[error(
         "InvalidScope: {text:?} is not a scope (act: name it as personal:<person>, team:<name> or organisation:<name>)"
