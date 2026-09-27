@@ -5,7 +5,6 @@
   "depends_on": [],
   "blocked_by": [
     "HOME-013 (roadmap RM-028, brief branch brief/home/a3186728), the split of crates/lys-home/src/record/mod.rs, must land on origin/main first: the leg lands only when R9's count command prints 0 for that file on origin/main.",
-    "The lead's answer to this brief's question on crates/lys-core/src/lib.rs line 54: the no-Result form at line 59 leaves `use std::fmt::Write;` unused, and the tree reaches zero no-let-underscore-on-results hits only when line 59 changes.",
     "ast-grep installed at the gate place, at 0.44.1 as this brief was measured with, so a leg requiring tool:ast-grep can be placed."
   ],
   "checklist": [
@@ -56,11 +55,12 @@
     {
       "id": "R1",
       "title": "Keep the hand-written lys-core documents as *-PRE-METHOD.md and render the cluster beside them",
-      "spec": "Structural. Before the cluster is rendered, docs/design/lys-core/DESIGN.md, CHECKLIST.md and USER-STORIES.md are renamed to DESIGN-PRE-METHOD.md, CHECKLIST-PRE-METHOD.md and USER-STORIES-PRE-METHOD.md with their bytes unchanged, and DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSCORE-001.md are then written by scripts/design/render-cluster.py from the cluster's JSON. The kept files are the historical record and are not edited: CHECKLIST-PRE-METHOD.md's C4 says the env-backed tests call std::env::set_var under an explicit #[allow], which the code no longer bears out after R5, and the rendered CHECKLIST.md is the current truth. THE SYSTEM SHALL NOT edit a *-PRE-METHOD.md file, SHALL NOT hand-edit a rendered markdown file, and SHALL NOT write under any docs/design directory other than lys-core.",
+      "spec": "Structural. Before the cluster is rendered, docs/design/lys-core/DESIGN.md, CHECKLIST.md and USER-STORIES.md are renamed to DESIGN-PRE-METHOD.md, CHECKLIST-PRE-METHOD.md and USER-STORIES-PRE-METHOD.md with their bytes unchanged, and DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSCORE-001.md are then written by scripts/design/render-cluster.py from the cluster's JSON; briefs/LYSCORE-001.md does not exist before this card and is created by that render. The kept files are the historical record and are not edited: CHECKLIST-PRE-METHOD.md's C4 says the env-backed tests call std::env::set_var under an explicit #[allow], which the code no longer bears out after R5, and the rendered CHECKLIST.md is the current truth. THE SYSTEM SHALL NOT edit a *-PRE-METHOD.md file, SHALL NOT hand-edit a rendered markdown file, and SHALL NOT write under any docs/design directory other than lys-core.",
       "acceptance": [
         "`git show 7b53625:docs/design/lys-core/DESIGN.md | cmp - docs/design/lys-core/DESIGN-PRE-METHOD.md` exits 0.",
         "`git show 7b53625:docs/design/lys-core/CHECKLIST.md | cmp - docs/design/lys-core/CHECKLIST-PRE-METHOD.md` exits 0.",
         "`git show 7b53625:docs/design/lys-core/USER-STORIES.md | cmp - docs/design/lys-core/USER-STORIES-PRE-METHOD.md` exits 0.",
+        "`test -f docs/design/lys-core/briefs/LYSCORE-001.md` exits 0.",
         "`sh scripts/design/gate.sh` exits 0 and prints no line containing `rendered markdown differs`.",
         "`git diff --name-only origin/main...HEAD -- docs/design | grep -v '^docs/design/lys-core/'` prints exactly `docs/design/project.json`."
       ],
@@ -68,7 +68,8 @@
         "create": [
           "docs/design/lys-core/DESIGN-PRE-METHOD.md",
           "docs/design/lys-core/CHECKLIST-PRE-METHOD.md",
-          "docs/design/lys-core/USER-STORIES-PRE-METHOD.md"
+          "docs/design/lys-core/USER-STORIES-PRE-METHOD.md",
+          "docs/design/lys-core/briefs/LYSCORE-001.md"
         ],
         "modify": [
           "docs/design/lys-core/DESIGN.md",
@@ -301,7 +302,7 @@
     {
       "id": "R5",
       "title": "Test from_env through a seam instead of the process environment, and correct the lib.rs comment",
-      "spec": "Ed25519Identity::from_env keeps its signature `pub fn from_env() -> TrustResult<Self>` and becomes one call: it reads LYS_IDENTITY_KEY with std::env::var and hands the read's Result to a private associated function, from_env_value, that holds today's trimming, decoding, length check and error texts unchanged. The five env-backed tests in identity_tests.rs call from_env_value with the value they used to put in the environment, and with Err(std::env::VarError::NotPresent) for the missing-variable case; they lose #[serial_test::serial], and the EnvCleanup guard with its two #[allow(unsafe_code)] is removed. WHEN from_env_value is given Ok of the standard base64 of 32 bytes, THE SYSTEM SHALL return the identity whose seed is those bytes; WHEN it is given an Err, THE SYSTEM SHALL return TrustError::KeyManagement saying LYS_IDENTITY_KEY is not set. The comment above `#![cfg_attr(not(test), forbid(unsafe_code))]` in crates/lys-core/src/lib.rs (lines 27-30) is rewritten to say what is true after this change: library code has no unsafe, non-test builds forbid it, test builds fall back to the workspace-level deny, and no test in the crate uses unsafe code. It names no person and no date. THE SYSTEM SHALL NOT change the attribute line, SHALL NOT change any code line of lib.rs other than line 59, SHALL NOT make from_env_value public, SHALL NOT change the three KeyManagement reason texts, and SHALL NOT mutate the process environment in any test. This touches the key-loading path of a published crate, so the change is reviewed adversarially before landing, as the repository requires for cryptographic changes.",
+      "spec": "Ed25519Identity::from_env keeps its signature `pub fn from_env() -> TrustResult<Self>` and becomes one call: it reads LYS_IDENTITY_KEY with std::env::var and hands the read's Result to a private associated function, from_env_value, that holds today's trimming, decoding, length check and error texts unchanged. The five env-backed tests in identity_tests.rs call from_env_value with the value they used to put in the environment, and with Err(std::env::VarError::NotPresent) for the missing-variable case; they lose #[serial_test::serial], and the EnvCleanup guard with its two #[allow(unsafe_code)] is removed. identity_tests.rs is the only user of serial_test in the tree, so the dev-dependency goes with it: the line `serial_test.workspace = true` under [dev-dependencies] in crates/lys-core/Cargo.toml and the line `serial_test = \"3\"` under [workspace.dependencies] in Cargo.toml are removed, and Cargo.lock is regenerated by cargo so it no longer lists serial_test or serial_test_derive. WHEN from_env_value is given Ok of the standard base64 of 32 bytes, THE SYSTEM SHALL return the identity whose seed is those bytes; WHEN it is given an Err, THE SYSTEM SHALL return TrustError::KeyManagement saying LYS_IDENTITY_KEY is not set. The comment above `#![cfg_attr(not(test), forbid(unsafe_code))]` in crates/lys-core/src/lib.rs (lines 27-30) is rewritten to say what is true after this change: library code has no unsafe, non-test builds forbid it, test builds fall back to the workspace-level deny, and no test in the crate uses unsafe code. It names no person and no date. THE SYSTEM SHALL NOT change the attribute line, SHALL NOT change any code line of lib.rs other than lines 54 and 59, which R7 changes, SHALL NOT make from_env_value public, SHALL NOT change the three KeyManagement reason texts, and SHALL NOT mutate the process environment in any test, and SHALL NOT change any other dependency line in either Cargo.toml. This touches the key-loading path of a published crate, so the change is reviewed adversarially before landing, as the repository requires for cryptographic changes.",
       "acceptance": [
         "`grep -cE 'set_var|remove_var|unsafe|serial' crates/lys-core/src/keys/identity_tests.rs` prints 0.",
         "`grep -c 'pub fn from_env() -> TrustResult<Self>' crates/lys-core/src/keys/identity.rs` prints 1, and the body of from_env is the single expression `Self::from_env_value(std::env::var(KEY_ENV_VAR))`.",
@@ -311,7 +312,9 @@
         "from_env_value(Ok(\"not-base64!!!@@\".to_string())) returns TrustError::KeyManagement whose message contains `invalid base64`.",
         "from_env_value(Ok(STANDARD.encode([1u8; 16]))) returns TrustError::KeyManagement whose message contains `decoded to 16 bytes, expected 32`.",
         "`grep -cx '#!\\[cfg_attr(not(test), forbid(unsafe_code))\\]' crates/lys-core/src/lib.rs` prints 1, and `grep -cE 'set_var|#\\[allow' crates/lys-core/src/lib.rs` prints 0.",
-        "Every line `git diff -U0 origin/main...HEAD -- crates/lys-core/src/lib.rs` adds or removes, other than the one hunk at original line 59, begins with `//` after its leading whitespace.",
+        "Every line `git diff -U0 origin/main...HEAD -- crates/lys-core/src/lib.rs` adds or removes begins with `//` after its leading whitespace, except the removal of original line 54 `use std::fmt::Write;`, the removal of original line 59 `let _ = s.write_fmt(format_args!(\"{b:02x}\"));`, and the one line added in place of line 59.",
+        "`grep -rc serial_test crates Cargo.toml | grep -vc ':0$'` prints 0.",
+        "`grep -c 'name = \"serial_test' Cargo.lock` prints 0.",
         "`cargo test -p lys-core --all-features` exits 0."
       ],
       "files": {
@@ -319,7 +322,10 @@
         "modify": [
           "crates/lys-core/src/keys/identity.rs",
           "crates/lys-core/src/keys/identity_tests.rs",
-          "crates/lys-core/src/lib.rs"
+          "crates/lys-core/src/lib.rs",
+          "crates/lys-core/Cargo.toml",
+          "Cargo.toml",
+          "Cargo.lock"
         ],
         "delete": []
       },
@@ -368,12 +374,13 @@
     {
       "id": "R7",
       "title": "Fix the `let _ =` discards at their cause",
-      "spec": "The two CLI hex writers (crates/lys/src/commands/hex.rs:15 and crates/lys-anchor-cli/src/commands/hex.rs:15) take a form that returns no Result: each byte pushes its two lowercase digits from a 16-character digit table, and the `use std::fmt::Write;` and the deliberate-discard comment go. `s.push_str(&format!(..))` is not the form, because clippy's format_push_string refuses it under the workspace's pedantic lints. The 14 test-code writes to a String handle their Result with `.expect(\"writing to a String cannot fail\")`: anchor_receipt_conformance.rs:163, sealed_envelope_tests.rs:286, bundle_conformance.rs:673 and :692, consistency_conformance.rs:52, consistency_receipt_conformance.rs:80, delegation_conformance.rs:188, delegation_vector.rs:616, receipt_conformance.rs:48, signed_note_crosscheck.rs:55, given_tests.rs:29, given_record.rs:47, cli_tests.rs:52 and log_tests.rs:81. The two discards of values that are not Results are removed with what they held: identity_tests.rs:589 `let _ = id.public_key_bytes();` is deleted; json_output_tests.rs:375 `let _ = recipient_pub;` is deleted with the binding at line 92, and the key-generate call at line 87 stays as a statement, since json_ok asserts its success. The lys-core writer at crates/lys-core/src/lib.rs:59 is not changed by this requirement; it waits on the question this brief carries. IF a hex writer is given the bytes 0x00, 0x0f, 0xab, 0xff, THEN THE SYSTEM SHALL return `000fabff`. THE SYSTEM SHALL NOT discard a Result, SHALL NOT use `_ =` in place of `let _ =`, and SHALL NOT add any #[allow].",
+      "spec": "The three hex writers (crates/lys/src/commands/hex.rs:15, crates/lys-anchor-cli/src/commands/hex.rs:15 and crates/lys-core/src/lib.rs:59) take a form that returns no Result: each byte pushes its two lowercase digits from a 16-character digit table, and the `use std::fmt::Write;` and the deliberate-discard comment go. `s.push_str(&format!(..))` is not the form, because clippy's format_push_string refuses it under the workspace's pedantic lints. The 14 test-code writes to a String handle their Result with `.expect(\"writing to a String cannot fail\")`: anchor_receipt_conformance.rs:163, sealed_envelope_tests.rs:286, bundle_conformance.rs:673 and :692, consistency_conformance.rs:52, consistency_receipt_conformance.rs:80, delegation_conformance.rs:188, delegation_vector.rs:616, receipt_conformance.rs:48, signed_note_crosscheck.rs:55, given_tests.rs:29, given_record.rs:47, cli_tests.rs:52 and log_tests.rs:81. The two discards of values that are not Results are removed with what they held: identity_tests.rs:589 `let _ = id.public_key_bytes();` is deleted; json_output_tests.rs:375 `let _ = recipient_pub;` is deleted with the binding at line 92, and the key-generate call at line 87 stays as a statement, since json_ok asserts its success. In crates/lys-core/src/lib.rs the new form is the one line that replaces line 59, the deliberate-discard comment above it goes, and line 54's `use std::fmt::Write;`, which the new form leaves unused, is removed; no other code line of lib.rs changes. IF a hex writer is given the bytes 0x00, 0x0f, 0xab, 0xff, THEN THE SYSTEM SHALL return `000fabff`. THE SYSTEM SHALL NOT discard a Result, SHALL NOT use `_ =` in place of `let _ =`, and SHALL NOT add any #[allow].",
       "acceptance": [
-        "`ast-grep scan --config sgconfig.yml --filter no-let-underscore-on-results --json=stream` prints exactly one hit, at crates/lys-core/src/lib.rs line 59.",
+        "`ast-grep scan --config sgconfig.yml --filter no-let-underscore-on-results --json=stream | wc -l` prints 0.",
         "crates/lys/src/commands/hex.rs's hex_lower(&[0x00, 0x0f, 0xab, 0xff]) returns `000fabff`.",
         "crates/lys-anchor-cli/src/commands/hex.rs's hex_lower(&[0x00, 0x0f, 0xab, 0xff]) returns `000fabff`.",
-        "`grep -c 'write_fmt\\|std::fmt::Write' crates/lys/src/commands/hex.rs crates/lys-anchor-cli/src/commands/hex.rs` prints 0 for each file.",
+        "lys-core's hex_lower(&[0x00, 0x0f, 0xab, 0xff]) returns `000fabff`.",
+        "`grep -c 'write_fmt\\|std::fmt::Write' crates/lys/src/commands/hex.rs crates/lys-anchor-cli/src/commands/hex.rs crates/lys-core/src/lib.rs` prints 0 for each file.",
         "`grep -c 'recipient_pub' crates/lys/tests/json_output_tests.rs` prints 0."
       ],
       "files": {
@@ -381,6 +388,7 @@
         "modify": [
           "crates/lys/src/commands/hex.rs",
           "crates/lys-anchor-cli/src/commands/hex.rs",
+          "crates/lys-core/src/lib.rs",
           "crates/lys-core/src/keys/identity_tests.rs",
           "crates/lys/tests/json_output_tests.rs",
           "crates/lys-anchor/tests/anchor_receipt_conformance.rs",
@@ -409,12 +417,12 @@
     {
       "id": "R8",
       "title": "Correct CLAUDE.md and the Cargo.toml lint comment to name clippy.toml and the ast-grep leg",
-      "spec": "Structural. The coding-standards sentence at CLAUDE.md:35 that tells tests to opt out per module with `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]` is replaced by one naming clippy.toml's allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests and the #![cfg(test)] first line that marks a file as test code. The comment at Cargo.toml:69-70 is corrected the same way. CLAUDE.md's `Gates before any commit` block gains the line `ast-grep scan --config sgconfig.yml` after `cargo doc --no-deps`, and its count sentence `All five clean.` becomes `All seven clean.`, matching the seven lines the block then lists. THE SYSTEM SHALL NOT change any other rule CLAUDE.md states and SHALL NOT change any lint level in Cargo.toml.",
+      "spec": "Structural. The coding-standards sentence at CLAUDE.md:35 that tells tests to opt out per module with `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]` is replaced by one naming clippy.toml's allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests and the #![cfg(test)] first line that marks a file as test code. The comment at Cargo.toml:69-70 is corrected the same way. CLAUDE.md's `Gates before any commit` block gains the line `ast-grep scan --config sgconfig.yml` after `cargo doc --no-deps`, and its count sentence `All five clean.` becomes `All seven clean.`, matching the seven lines the block then lists. THE SYSTEM SHALL NOT change any other rule CLAUDE.md states and SHALL NOT change any line inside Cargo.toml's [workspace.lints] tables other than those comment lines; the serial_test removal from [workspace.dependencies] is R5's.",
       "acceptance": [
         "`grep -c 'Tests opt out per-module' CLAUDE.md` prints 0, and `grep -c 'clippy.toml' CLAUDE.md` prints at least 1.",
         "`grep -c '#!\\[allow' Cargo.toml` prints 0, and `grep -c 'clippy.toml' Cargo.toml` prints 1.",
         "`sed -n '/^## Gates before any commit/,/^All /p' CLAUDE.md | grep -c '^ast-grep scan --config sgconfig.yml$'` prints 1, and the block's last line is `All seven clean. No exceptions.`",
-        "`git diff origin/main...HEAD -- Cargo.toml | grep -E '^[-+][a-z_]+ *='` prints nothing."
+        "`diff <(git show origin/main:Cargo.toml | sed -n '/^\\[workspace\\.lints/,$p' | grep -v '^#') <(sed -n '/^\\[workspace\\.lints/,$p' Cargo.toml | grep -v '^#')` prints nothing, over the [workspace.lints.rust] and [workspace.lints.clippy] tables that end the file."
       ],
       "files": {
         "create": [],
@@ -476,7 +484,7 @@
     "No unwrap, expect or panic call in a fixture, a *_tests.rs file or a file under tests/ is rewritten.",
     "No rule, config or script names a file or a list of file names to exempt; test code is recognised by structure only.",
     "No #[allow], #![allow], #[expect] or #[ignore] of any kind is added, in tests or in library code; an #[allow] that cannot be fixed at its cause goes back to the lead as a question with its line.",
-    "#![cfg_attr(not(test), forbid(unsafe_code))] in crates/lys-core/src/lib.rs stays byte-identical, and no code line of lib.rs changes other than line 59.",
+    "#![cfg_attr(not(test), forbid(unsafe_code))] in crates/lys-core/src/lib.rs stays byte-identical, and no code line of lib.rs changes other than lines 54 and 59.",
     "crates/lys-home/src/record/mod.rs is not changed.",
     "Nothing is written under any docs/design directory other than lys-core, except the one ast-grep leg in docs/design/project.json.",
     "No wire format, domain-separation tag, public API signature or public behaviour of any crate changes.",

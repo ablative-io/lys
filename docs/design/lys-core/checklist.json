@@ -91,7 +91,7 @@
         },
         {
           "id": "C15",
-          "text": "The `let _ =` hits in the two CLI hex writers, the 14 test-code writes, identity_tests.rs and json_output_tests.rs are gone.",
+          "text": "The `let _ =` hits in the three hex writers, the 14 test-code writes, identity_tests.rs and json_output_tests.rs are gone.",
           "done": false
         }
       ]
