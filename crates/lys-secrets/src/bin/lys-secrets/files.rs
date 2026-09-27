@@ -146,6 +146,15 @@ impl FileGrants {
         self.write(&rows)
     }
 
+    /// Every grant as (identity, secret, granted by).
+    pub fn list(&self) -> Result<Vec<(String, String, Option<String>)>, SecretsError> {
+        Ok(self
+            .rows()?
+            .into_iter()
+            .map(|row| (row.identity, row.secret, row.granted_by))
+            .collect())
+    }
+
     pub fn remove(&self, identity: &str, secret: &str) -> Result<(), SecretsError> {
         let mut rows = self.rows()?;
         rows.retain(|row| !(row.identity == identity && row.secret == secret));

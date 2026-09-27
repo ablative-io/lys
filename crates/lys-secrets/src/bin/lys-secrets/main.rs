@@ -4,6 +4,7 @@
 
 mod files;
 mod serve;
+mod view;
 
 use std::io::Read;
 use std::path::PathBuf;

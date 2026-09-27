@@ -18,9 +18,9 @@ use crate::files::{FileGrants, Layout};
 const MAX_BODY: usize = 16 * 1024 * 1024;
 const REDACTED: &[u8] = b"[redacted]";
 
-struct Shared {
-    broker: Mutex<Broker<FileGrants>>,
-    layout: Layout,
+pub(crate) struct Shared {
+    pub(crate) broker: Mutex<Broker<FileGrants>>,
+    pub(crate) layout: Layout,
     client: reqwest::Client,
 }
 
@@ -45,7 +45,12 @@ pub fn serve(broker: Broker<FileGrants>, layout: Layout, listen: &str) -> Result
                 source,
             })?;
         println!("lys-secrets proxy listening on {listen}");
-        let app = Router::new().fallback(proxy).with_state(shared);
+        let app = Router::new()
+            .route("/_lys/secrets", axum::routing::get(crate::view::secrets))
+            .route("/_lys/audit", axum::routing::get(crate::view::audit))
+            .route("/_lys/grants", axum::routing::get(crate::view::grants))
+            .fallback(proxy)
+            .with_state(shared);
         axum::serve(listener, app)
             .await
             .map_err(|source| SecretsError::Io {
