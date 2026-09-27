@@ -37,6 +37,12 @@ pub enum CliError {
     #[error(transparent)]
     Trust(#[from] lys_core::TrustError),
 
+    /// A `lys identity` operation failed. The identity error already opens
+    /// with its stable name and carries operation, resource and path; it
+    /// never carries secret bytes.
+    #[error(transparent)]
+    Identity(#[from] crate::identity::IdentityError),
+
     /// A JSON file carrying a `lys-core` wire type (sealed envelope, log
     /// proof artifact) could not be parsed. Attestations are not JSON — a
     /// malformed attestation artifact collapses into the relevant command's

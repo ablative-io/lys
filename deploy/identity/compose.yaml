@@ -1,0 +1,131 @@
+# deploy/identity/compose.yaml
+#
+# The three dependency processes of the standalone identity product, for a
+# development install: the maintained Rauthy (ADR-009), SpiceDB, and one
+# PostgreSQL service with one durable database (ADR-005). Cambium, Manifold,
+# Argus and Aion servers are not dependencies of anything here (ADR-004).
+#
+# Every value comes from the private env file `lys identity prepare` writes
+# (<state_dir>/identity.env, mode 0600, outside Git). A missing value stops
+# compose by name before any container starts; nothing here falls back to a
+# default secret, a default database address or a development database.
+#
+#   docker compose --env-file <state_dir>/identity.env \
+#     -f deploy/identity/compose.yaml [--profile local-database] up -d
+#
+# The postgres service runs only under the local-database profile, chosen when
+# the configured database host is `postgres` (this file's own service). Any
+# other host is an external PostgreSQL, for example on a network device, and
+# the local service is never started in its place.
+#
+# Migration order: PostgreSQL ready (its init SQL has run) -> SpiceDB's
+# one-shot `datastore migrate head` -> Rauthy, whose own migrations run at its
+# start, and SpiceDB serve. See README.md for readiness, stop and start, and
+# backup and restore. Image digests are recorded in versions.json.
+
+name: ${IDENTITY_COMPOSE_PROJECT:?identity_config_missing - IDENTITY_COMPOSE_PROJECT is not set; run lys identity prepare}
+
+x-database-order: &database-order
+  postgres:
+    condition: service_healthy
+    required: false
+
+services:
+  postgres:
+    image: public.ecr.aws/docker/library/postgres:17.11-bookworm@sha256:639ab7ceb90e13123085b741fb31ef493fba25463002f6da665352e7b534b652
+    profiles: ["local-database"]
+    command: ["postgres", "-c", "track_commit_timestamp=on"]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${IDENTITY_POSTGRES_PASSWORD:?identity_secret_missing - IDENTITY_POSTGRES_PASSWORD is not set}
+      POSTGRES_DB: ${IDENTITY_DB_NAME:?identity_config_missing - IDENTITY_DB_NAME is not set}
+      IDENTITY_DB_NAME: ${IDENTITY_DB_NAME:?identity_config_missing - IDENTITY_DB_NAME is not set}
+      IDENTITY_RAUTHY_DB_PASSWORD: ${IDENTITY_RAUTHY_DB_PASSWORD:?identity_secret_missing - IDENTITY_RAUTHY_DB_PASSWORD is not set}
+      IDENTITY_SPICEDB_DB_PASSWORD: ${IDENTITY_SPICEDB_DB_PASSWORD:?identity_secret_missing - IDENTITY_SPICEDB_DB_PASSWORD is not set}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/10-identity.sql:ro
+    ports:
+      - "${IDENTITY_PG_PUBLISH:?identity_config_missing - IDENTITY_PG_PUBLISH is not set}:5432"
+    healthcheck:
+      # -h forces TCP, which the entrypoint's temporary init server does not
+      # listen on, so the service is healthy only after the init SQL has run.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "${IDENTITY_DB_NAME}"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+    restart: unless-stopped
+
+  spicedb-migrate:
+    image: ghcr.io/authzed/spicedb:v1.56.2@sha256:aa96009a0477f8a759149823407d47ad16d1a74390bae3102b3b0b7143502764
+    command: ["datastore", "migrate", "head"]
+    environment:
+      SPICEDB_DATASTORE_ENGINE: postgres
+      SPICEDB_DATASTORE_CONN_URI: postgres://identity_spicedb:${IDENTITY_SPICEDB_DB_PASSWORD:?identity_secret_missing - IDENTITY_SPICEDB_DB_PASSWORD is not set}@${IDENTITY_DB_HOST:?identity_config_missing - IDENTITY_DB_HOST is not set}:${IDENTITY_DB_PORT:?identity_config_missing - IDENTITY_DB_PORT is not set}/${IDENTITY_DB_NAME:?identity_config_missing - IDENTITY_DB_NAME is not set}?sslmode=${IDENTITY_DB_SSLMODE:?identity_config_missing - IDENTITY_DB_SSLMODE is not set}&search_path=spicedb
+    depends_on: *database-order
+    restart: "no"
+
+  spicedb:
+    image: ghcr.io/authzed/spicedb:v1.56.2@sha256:aa96009a0477f8a759149823407d47ad16d1a74390bae3102b3b0b7143502764
+    command: ["serve"]
+    environment:
+      SPICEDB_GRPC_PRESHARED_KEY: ${IDENTITY_SPICEDB_PRESHARED_KEY:?identity_secret_missing - IDENTITY_SPICEDB_PRESHARED_KEY is not set}
+      SPICEDB_DATASTORE_ENGINE: postgres
+      SPICEDB_DATASTORE_CONN_URI: postgres://identity_spicedb:${IDENTITY_SPICEDB_DB_PASSWORD:?identity_secret_missing - IDENTITY_SPICEDB_DB_PASSWORD is not set}@${IDENTITY_DB_HOST:?identity_config_missing - IDENTITY_DB_HOST is not set}:${IDENTITY_DB_PORT:?identity_config_missing - IDENTITY_DB_PORT is not set}/${IDENTITY_DB_NAME:?identity_config_missing - IDENTITY_DB_NAME is not set}?sslmode=${IDENTITY_DB_SSLMODE:?identity_config_missing - IDENTITY_DB_SSLMODE is not set}&search_path=spicedb
+      SPICEDB_HTTP_ENABLED: "true"
+    ports:
+      - "${IDENTITY_SPICEDB_HTTP_PUBLISH:?identity_config_missing - IDENTITY_SPICEDB_HTTP_PUBLISH is not set}:8443"
+      - "${IDENTITY_SPICEDB_GRPC_PUBLISH:?identity_config_missing - IDENTITY_SPICEDB_GRPC_PUBLISH is not set}:50051"
+    depends_on:
+      spicedb-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  rauthy:
+    image: ghcr.io/sebadob/rauthy:0.36.2@sha256:f7d3c501402165e023edbd958b032b41c9cfdac5ea7f8ca7d62217327145577e
+    environment:
+      # PostgreSQL is the identity datastore; Hiqlite remains only Rauthy's
+      # internal cache (see README.md for the files it keeps under /app/data).
+      HIQLITE: "false"
+      PG_HOST: ${IDENTITY_DB_HOST:?identity_config_missing - IDENTITY_DB_HOST is not set}
+      PG_PORT: ${IDENTITY_DB_PORT:?identity_config_missing - IDENTITY_DB_PORT is not set}
+      PG_DB_NAME: ${IDENTITY_DB_NAME:?identity_config_missing - IDENTITY_DB_NAME is not set}
+      PG_USER: identity_rauthy
+      PG_PASSWORD: ${IDENTITY_RAUTHY_DB_PASSWORD:?identity_secret_missing - IDENTITY_RAUTHY_DB_PASSWORD is not set}
+      PG_TLS: ${IDENTITY_DB_RAUTHY_TLS:?identity_config_missing - IDENTITY_DB_RAUTHY_TLS is not set}
+      PG_TLS_NO_VERIFY: "false"
+      PG_MAX_CONN: "10"
+      HQL_NODE_ID: "1"
+      HQL_NODES: "1 localhost:8100 localhost:8200"
+      HQL_SECRET_RAFT: ${IDENTITY_RAUTHY_HQL_SECRET_RAFT:?identity_secret_missing - IDENTITY_RAUTHY_HQL_SECRET_RAFT is not set}
+      HQL_SECRET_API: ${IDENTITY_RAUTHY_HQL_SECRET_API:?identity_secret_missing - IDENTITY_RAUTHY_HQL_SECRET_API is not set}
+      ENC_KEYS: ${IDENTITY_RAUTHY_ENC_KEYS:?identity_secret_missing - IDENTITY_RAUTHY_ENC_KEYS is not set}
+      ENC_KEY_ACTIVE: ${IDENTITY_RAUTHY_ENC_KEY_ACTIVE:?identity_config_missing - IDENTITY_RAUTHY_ENC_KEY_ACTIVE is not set}
+      PUB_URL: ${IDENTITY_RAUTHY_PUB_URL:?identity_config_missing - IDENTITY_RAUTHY_PUB_URL is not set}
+      # WebAuthn relying party: the public origin's host and the origin itself.
+      RP_ID: ${IDENTITY_RAUTHY_RP_ID:?identity_config_missing - IDENTITY_RAUTHY_RP_ID is not set}
+      RP_ORIGIN: ${IDENTITY_RAUTHY_RP_ORIGIN:?identity_config_missing - IDENTITY_RAUTHY_RP_ORIGIN is not set}
+      RP_NAME: Identity
+      LISTEN_SCHEME: http
+      LISTEN_PORT_HTTP: "8080"
+      PROXY_MODE: ${IDENTITY_RAUTHY_PROXY_MODE:?identity_config_missing - IDENTITY_RAUTHY_PROXY_MODE is not set}
+      TRUSTED_PROXIES: ${IDENTITY_RAUTHY_TRUSTED_PROXIES?identity_config_missing - IDENTITY_RAUTHY_TRUSTED_PROXIES is not set}
+      HEALTH_CHECK_DELAY_SECS: "0"
+      BOOTSTRAP_ADMIN_EMAIL: ${IDENTITY_RAUTHY_ADMIN_EMAIL:?identity_config_missing - IDENTITY_RAUTHY_ADMIN_EMAIL is not set}
+      BOOTSTRAP_ADMIN_PASSWORD_PLAIN: ${IDENTITY_RAUTHY_ADMIN_PASSWORD:?identity_secret_missing - IDENTITY_RAUTHY_ADMIN_PASSWORD is not set}
+      BOOTSTRAP_API_KEY: ${IDENTITY_RAUTHY_BOOTSTRAP_API_KEY:?identity_config_missing - IDENTITY_RAUTHY_BOOTSTRAP_API_KEY is not set}
+      BOOTSTRAP_API_KEY_SECRET: ${IDENTITY_RAUTHY_BOOTSTRAP_API_KEY_SECRET:?identity_secret_missing - IDENTITY_RAUTHY_BOOTSTRAP_API_KEY_SECRET is not set}
+      RAUTHY_ADMIN_EMAIL: ${IDENTITY_RAUTHY_ADMIN_EMAIL:?identity_config_missing - IDENTITY_RAUTHY_ADMIN_EMAIL is not set}
+    volumes:
+      - rauthy-data:/app/data
+    ports:
+      - "${IDENTITY_RAUTHY_PUBLISH:?identity_config_missing - IDENTITY_RAUTHY_PUBLISH is not set}:8080"
+    depends_on:
+      <<: *database-order
+      spicedb-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  rauthy-data:

@@ -19,4 +19,20 @@ leg cargo clippy --all-targets -- -D warnings
 leg cargo test --workspace --all-features
 leg cargo doc --no-deps --all-features
 leg cargo doc --no-deps
+# The identity leg: the container-backed targets declared `test = false` in
+# crates/lys/Cargo.toml. It runs on every landing and is never scoped away. With
+# no container runtime answering it fails by name rather than skipping; with one,
+# it lints the identity targets first and runs them only if the lint is clean.
+identity_leg() {
+  if ! docker info >/dev/null 2>&1; then
+    echo "container_runtime_missing: docker info did not answer; the identity leg does not skip"
+    return 1
+  fi
+  if ! cargo clippy -p lys --all-features --test 'identity_*' -- -D warnings; then
+    echo "identity leg: cargo clippy failed on the identity targets; no identity test was run"
+    return 1
+  fi
+  cargo test -p lys --all-features --test 'identity_*'
+}
+leg identity_leg
 exit "$status"

@@ -121,6 +121,12 @@ pub enum Command {
     #[command(subcommand)]
     Inspect(InspectCommand),
 
+    /// Development install of the standalone identity product: prepare its
+    /// private configuration, configure its Rauthy clients and themes, and
+    /// check the readiness of Rauthy, `SpiceDB` and its `PostgreSQL` database.
+    #[command(subcommand)]
+    Identity(crate::identity::IdentityCommand),
+
     /// Seal a payload for a recipient and sign the envelope with the
     /// sender's identity (X25519 + HKDF-SHA256 + AES-256-GCM, Ed25519
     /// attestation over the sealed bytes).

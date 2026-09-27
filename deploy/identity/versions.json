@@ -1,0 +1,51 @@
+{
+  "schema": "lys/identity-deploy-versions/v1",
+  "checked_at": "2026-09-27T02:12:41Z",
+  "note": "Every image in deploy/identity/compose.yaml is pinned by the index digest recorded here. A development install re-runs the release and advisory check recorded under advisory_check before it starts, and records the result in docs/design/identity/reports/IDENTITY-001-deployment.md.",
+  "rauthy": {
+    "release": "v0.36.2",
+    "fork": "https://github.com/ablative-io/rauthy.git",
+    "branch": "ablative",
+    "commit": "dd61ac3c84d6b238108dc8438b53043b5177a662",
+    "submodule": "vendor/rauthy",
+    "image": "ghcr.io/sebadob/rauthy:0.36.2",
+    "digest": "sha256:f7d3c501402165e023edbd958b032b41c9cfdac5ea7f8ca7d62217327145577e",
+    "platform_digests": {
+      "linux/amd64": "sha256:2f227cdc1cb8b5377c34deecf4472218e7b33d7c3d891344bf0b3911312744a6",
+      "linux/arm64": "sha256:979c51e5fcc4215602618ebaff557bd0f9157b7e0c70636a8e657afd95f6f945"
+    },
+    "image_source": "The upstream release image of tag v0.36.2, whose tag object is commit dd61ac3c84d6b238108dc8438b53043b5177a662, the exact commit the ablative branch and the vendor/rauthy pin name. While the fork carries no change of its own the release image is the pinned source; the first fork change (row 03) replaces it with an image built from the pin."
+  },
+  "spicedb": {
+    "release": "v1.56.2",
+    "image": "ghcr.io/authzed/spicedb:v1.56.2",
+    "digest": "sha256:aa96009a0477f8a759149823407d47ad16d1a74390bae3102b3b0b7143502764"
+  },
+  "postgres": {
+    "release": "17.11",
+    "image": "public.ecr.aws/docker/library/postgres:17.11-bookworm",
+    "digest": "sha256:639ab7ceb90e13123085b741fb31ef493fba25463002f6da665352e7b534b652",
+    "image_source": "The Docker Official Image as mirrored at public.ecr.aws; the index digest is the same as docker.io/library/postgres:17.11-bookworm."
+  },
+  "advisory_check": {
+    "rauthy": {
+      "latest_release": "v0.36.2",
+      "advisories": [
+        {"id": "GHSA-wx92-7mmw-5x82", "severity": "high", "affected": "<= 0.36.1", "patched": "0.36.2"},
+        {"id": "GHSA-7qh2-3hc5-2vqp", "severity": "medium", "affected": ">= 0.30.0, < 0.36.1", "patched": "0.36.1"},
+        {"id": "GHSA-x8jp-v2j6-6vjf", "severity": "medium", "affected": "< 0.36.0", "patched": "0.36.0"}
+      ],
+      "accepted_exception": "v0.36.2 carries no open published advisory, but upstream's later hardening (sebadob/rauthy #1696, merged 2026-08-26, and #1728, merged 2026-09-18) is in no release. Waffles' ruling of 15:36:25 accepts v0.36.2 for isolated development installs with test identities only; IDENTITY-001-UPSTREAM-AUTH-STATE still binds real sign-in (row 06) and install (row 07), and the rebase is IDENTITY-002."
+    },
+    "spicedb": {
+      "latest_release": "v1.56.2",
+      "advisories": [
+        {"id": "GHSA-jf7w-wx43-32gc", "severity": "low", "affected": ">= v1.54.0, < v1.56.2", "patched": "v1.56.2"},
+        {"id": "GHSA-5784-6qcr-48fq", "severity": "low", "affected": "<= v1.54.0", "patched": ">= v1.56.0"}
+      ]
+    },
+    "postgres": {
+      "latest_release": "17.11"
+    }
+  }
+}

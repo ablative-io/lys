@@ -99,6 +99,7 @@ cargo clippy --all-targets -- -D warnings
 cargo test --workspace --all-features
 cargo doc --no-deps --all-features
 cargo doc --no-deps
+cargo clippy -p lys --all-features --test 'identity_*' -- -D warnings && cargo test -p lys --all-features --test 'identity_*'   # identity leg: needs docker, never skipped
 ```
 
 All five clean. No exceptions.
