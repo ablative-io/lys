@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,25 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-038",
+      "title": "The gate's test leg runs every test binary; it never stops at the first failure",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-27",
+      "decided_by": "The gate test-leg card's words and its lead's answers; recorded with LYSGATE-001",
+      "context": "The gate's test leg runs cargo test over the workspace with all features and without --no-fail-fast, so it stops at the first failing test binary: a run that fails in one crate reports nothing about the binaries and crates after it, and a gate can go red for one reason while hiding others. project.json's legs are copied verbatim into every new cluster's gate, so the fail-fast form spreads with each cluster.",
+      "decision": "Every declaration of the gate's test leg runs `cargo test --workspace --all-features --no-fail-fast`: project.json, every cluster design.json gate, .land/gates.sh and CLAUDE.md's 'Gates before any commit' block; CI's test step gains the same one flag and nothing else. Rejected: keeping cargo's default fail-fast run, which is shorter on a red round but reports only the first failing binary.",
+      "quote": "",
+      "consequences": [
+        "A new cluster's gate copied from project.json carries --no-fail-fast.",
+        "A red test leg runs every test binary before it exits, so a red round holds the build venue's battery lock longer than a fail-fast run did.",
+        "The leg still exits non-zero when any test fails; no timeout is raised and no test is split to compensate.",
+        "--no-fail-fast does not continue past a compile error, so evidence that every binary ran comes from a planted test that compiles and fails."
       ],
       "supersedes": [],
       "superseded_by": ""
