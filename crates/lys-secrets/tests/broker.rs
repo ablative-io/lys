@@ -7,8 +7,8 @@ use std::sync::atomic::{AtomicI64, Ordering};
 
 use lys_core::Ed25519Identity;
 use lys_secrets::{
-    Broker, BrokerPaths, Holder, IssuedHandle, LocalGrants, Presentation, Secret, SecretRelation,
-    SecretsError, Used, new_operation_id,
+    AuditKind, Broker, BrokerPaths, Holder, IssuedHandle, LocalGrants, Presentation, Secret,
+    SecretRelation, SecretsError, Used, new_operation_id,
 };
 use tempfile::TempDir;
 
@@ -328,8 +328,8 @@ fn a_ciphertext_moved_between_entries_is_refused() -> TestResult {
     };
     let entries = world.paths.store_dir.join("entries");
     std::fs::copy(
-        entries.join(format!("{}.sealed", id_of("other")?)),
-        entries.join(format!("{}.sealed", id_of("token")?)),
+        entries.join(format!("{}.1.sealed", id_of("other")?)),
+        entries.join(format!("{}.1.sealed", id_of("token")?)),
     )?;
     let issued = broker.issue(&world.holder, "token", 1, START_MS + 60_000)?;
     let presentation = present(&world, &issued, &world.agent)?;
@@ -351,6 +351,33 @@ fn rotation_retires_the_old_key_and_every_entry_opens_under_the_new_one() -> Tes
     let issued = broker.issue(&world.holder, "token", 1, START_MS + 60_000)?;
     let presentation = present(&world, &issued, &world.agent)?;
     assert_eq!(value(&mut broker, &issued, &presentation)?, b"value-one");
+    let change = format!("{old} to {new}");
+    let rotations: Vec<String> = broker
+        .audit()
+        .replay()?
+        .into_iter()
+        .filter(|recorded| recorded.line.kind == AuditKind::Rotation)
+        .map(|recorded| recorded.line.outcome)
+        .collect();
+    assert_eq!(
+        rotations,
+        [format!("rotating {change}"), format!("rotated {change}")]
+    );
+    let entries = world.paths.store_dir.join("entries");
+    assert_eq!(std::fs::read_dir(&entries)?.count(), 1);
+    Ok(())
+}
+
+#[test]
+fn a_sealing_no_entry_names_is_swept_when_the_store_opens() -> TestResult {
+    let world = world()?;
+    let broker = started(&world)?;
+    let stray = world.paths.store_dir.join("entries").join("stray.9.sealed");
+    std::fs::write(&stray, b"left by a rotation that never took effect")?;
+    drop(broker);
+    let reopened = Broker::open(&world.paths, granted(), clock(&world))?;
+    assert!(!stray.exists());
+    assert!(reopened.store().entry("token").is_some());
     Ok(())
 }
 

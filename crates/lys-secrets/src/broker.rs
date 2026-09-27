@@ -26,6 +26,7 @@ mod accounts;
 mod admit;
 mod rotation;
 
+const ROTATING: &str = "rotating ";
 const HANDLES: &str = "handles.json";
 const LOG_ORIGIN: &str = "lys.local/secrets-audit";
 /// How far a presentation's time may be from the broker's clock.
@@ -189,8 +190,13 @@ impl<P: PermissionCheck> Broker<P> {
             .into_iter()
             .map(|record| (record.id.clone(), record))
             .collect();
+        let mut rotating = None;
         for recorded in audit.replay()? {
             let line = recorded.line;
+            if line.kind == AuditKind::Rotation {
+                rotating = line.outcome.strip_prefix(ROTATING).map(str::to_owned);
+                continue;
+            }
             let Some(record) = line.handle.as_ref().and_then(|id| handles.get_mut(id)) else {
                 continue;
             };
@@ -205,7 +211,7 @@ impl<P: PermissionCheck> Broker<P> {
                 _ => {}
             }
         }
-        Ok(Self {
+        let mut broker = Self {
             store,
             store_key,
             audit_key,
@@ -215,7 +221,9 @@ impl<P: PermissionCheck> Broker<P> {
             clock,
             handles_path,
             paths: paths.clone(),
-        })
+        };
+        broker.settle_rotation(rotating.as_deref())?;
+        Ok(broker)
     }
 
     /// The sealed store, for listing entries. No secret byte is reachable.
