@@ -129,18 +129,41 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   has `authored: true`, no source, and provider, api and model `authored`.
   The canon is appended only, through the repository's review, and rendered
   first (before a session's own entries) when a render is given `--canon`;
-  R4's thinking rule applies to every inherited thinking block.
-- `lys.lantern` (HOME-004 R1, R3; HOME-014): `{point, note, lit_by, lit_at, lit_in}`. `point` is
+  R4's thinking rule applies to every inherited thinking block. Every
+  `lys.inherited` entry in the canon file is a canon example and states its
+  rule: the canon loader refuses one whose data has no `rule` by name,
+  `canon_example_without_rule`, naming its entry id, so `canon add` and a
+  render with `--canon` both refuse it before writing anything.
+  The handover (HOME-015, HOME-001 R12, ADR-058) uses the same custom type
+  without a rule, since a letter is not a rule: `{authored, from_session,
+  from_entries, provider, api, model, curated_at, curated_by}`, with
+  `authored` false, `from_session` and `curated_by` the outgoing session's
+  id, `from_entries` the letter's entry ids in path order, provider, api and
+  model those of the first letter entry, and `curated_at` the last letter
+  entry's timestamp. `lys-home handover` writes it as the first entry of the
+  one session of a new successor home (fresh id, the outgoing header's cwd,
+  no parentSession), followed by the letter's entries copied whole, each
+  keeping its id, timestamp and message with only its parent link rewritten,
+  then a `session_info` named `inherited from <outgoing session id>` with no
+  other field. That first entry is what says the successor's first memory is
+  inherited; the handover's report reads `inherited` from it. A rule-less
+  `lys.inherited` entry in a session of a home is read without the canon's
+  check. The outgoing session is read without being owned and nothing is
+  written under its home. Before anything is created the handover refuses by
+  name: `letter_not_assistant` (a letter entry that is not an assistant
+  message), `letter_not_contiguous` (a letter entry off the root-to-head
+  path, or not the child of the entry named before it), `letter_authored`
+  (a letter entry whose message carries provider `authored`),
+  `letter_without_thinking` (no letter entry holds a thinking block) and
+  `successor_not_empty` (the successor path exists and is not an empty
+  directory).
+- `lys.lantern` (HOME-004 R1, R3): `{point, note, lit_by, lit_at}`. `point` is
   the entry id of an entry of the same session that is neither a lantern nor
   an epilogue (the head or any entry the head has moved past); `note` is the
   note byte for byte as written; `lit_by` is a self-declared name, as the
   canon's `curated_by` is, not a verified identity; `lit_at` is when, as the
-  record's clock writes it; `lit_in` is the id of the session the light act
-  appended the lantern to. `lit_in` is absent from a lantern lit before
-  HOME-014, which is read as it stands and which recall shows with `lit_in`
-  null; a present `lit_in` that is null or not a string is kept as it is,
-  never read as absent. Lit only by `lantern light`, appended as a child of
-  the head, and the head advances to it.
+  record's clock writes it. Lit only by `lantern light`, appended as a child
+  of the head, and the head advances to it.
 - `lys.lantern_epilogue` (HOME-004 R1, R4): `{lantern, words, added_by,
   added_at}`. `lantern` is the entry id of a `lys.lantern` entry of the same
   session; `words` are the further words byte for byte as written; `added_by`
@@ -167,18 +190,6 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
 - `lys.fork` (HOME-006 R3): `{child}`, the child's session id. Appended at
   the parent's head, which advances to it, once per fork; the parent gains
   this one line and no earlier byte of it changes.
-- `lys.translation` (HOME-009 R6): `{harness, codex_version, thread, head,
-  head_hash, rollout, rollout_sha256, account_sha256}`. One entry appended
-  by `translate-codex` beside the context path through `append_beside`, as a
-  child of the head, once the rollout and its loss account are written and
-  synced; the head does not move and no earlier byte of the session changes.
-  `harness` is `codex`, `codex_version` the version the rollout shape was
-  recorded against, `thread` the Codex thread id (the head's record uuid),
-  `head` the head entry's id, `head_hash` the session head hash before the
-  append, `rollout` the rollout's path relative to `--out`, and the two
-  hashes the SHA-256 of the rollout's and the account's bytes. With the
-  account, it is the durable link from the Codex fork back to the session.
-  Off the path, a later translation lists it lost.
 
 ## The rendered uuid
 
@@ -206,13 +217,9 @@ A fork (HOME-006) cuts from the session a lantern was lit in, read from
 the `lys.lantern` data key `lit_in`; a lantern whose data carries no
 `lit_in` is an older record and resolves by the sessions holding it (one
 holder cuts, several refuse `lantern_ambiguous` until one is named with
-`--session`). A present `lit_in` that is not a session id (null, not a
-string, not a safe session name, or no session of the home) is refused
-`lit_in_not_a_session` by the fork and by recall, and is never read as
-any session. A fork's child lists, in recall, a copy of each lantern on
-the copied chain, and that copy's `lit_in` names the parent. A copy of a lantern's line in a
-child (copied lines keep their ids) is a copy, not a second lantern: with
-`lit_in` recorded it is never cut from. The chain is read through the index, never by loading the
+`--session`). A copy of a lantern's line in a child (copied lines keep
+their ids) is a copy, not a second lantern: with `lit_in` recorded it is
+never cut from. The chain is read through the index, never by loading the
 file, and the cut ends at the last assistant message at or before the
 point; a point before any assistant message is refused `nothing_to_fork`.
 
