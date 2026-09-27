@@ -101,18 +101,34 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   and `home` when it set none and the path is `HOME/.claude` from the
   rendering process's `HOME` (never that process's `CLAUDE_CONFIG_DIR`).
   `documents` is the ordered list, each `{kind, path, length, sha256}`, in
-  the measured order: `user_claude_md` (`<config>/CLAUDE.md`), then
-  `appended_instructions` and `mcp_config` (the two files the render wrote,
-  named by their path relative to the render's out directory, so two renders
-  that write no per-render bytes give equal lists), then `claude_md_chain`
-  for each directory from the outermost ancestor of the working directory
-  down to it, its `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md` in
-  that order, then `memory_index`
+  one order, the order the harness's request gives (HOME-011, ADR-031):
+  wherever the request's order and the read order, the order the harness
+  reads the files in, differ, the request's order wins, since it is what
+  reached the model. So the entry lists `appended_instructions`,
+  `mcp_config`, `user_claude_md`, `claude_md_chain`, `memory_index`:
+  first `appended_instructions` and `mcp_config` (the two files the render
+  wrote, named by their path relative to the render's out directory, so two
+  renders that write no per-render bytes give equal lists), both
+  harness-side inputs ahead of the first message; the MCP configuration sits
+  straight after the appended instructions, a place taken from the read
+  order until a real server's tools position is measured; then
+  `user_claude_md` (`<config>/CLAUDE.md`), then `claude_md_chain` for each
+  directory from the outermost ancestor of the working directory down to it,
+  its `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md` in that order
+  within one directory, then `memory_index`
   (`<config>/projects/<slug>/memory/MEMORY.md`, the slug being every
   character outside ASCII letters and digits replaced by `-`); every path
   but the two written files is absolute. A position whose file is absent is
   omitted; when the config directory is `D/.claude` for a `D` on the chain,
-  `D/.claude/CLAUDE.md` is listed once, first, as `user_claude_md`.
+  `D/.claude/CLAUDE.md` is listed once, as `user_claude_md`, in the user
+  file's place and not again on the chain. The old order, `user_claude_md`,
+  `appended_instructions`, `mcp_config`, `claude_md_chain`, `memory_index`,
+  is superseded by the commit that lands HOME-011 and from that commit's
+  date; entries written under it stand as written and are never rewritten.
+  The old order was written under `harness_version` 2.1.283, and the
+  harness version does not tell the two orders apart: a reader tells an
+  entry's order by comparing its recorded time with the date of the commit
+  that lands HOME-011, an entry written before it listing the old order.
   `environment` is the names of the variables the template set for the
   session, sorted, never a value or a handle. The
   entry hangs under the `template_render` event it follows, beside the

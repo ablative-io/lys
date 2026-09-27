@@ -1,10 +1,10 @@
 #![cfg(test)]
 //! The context record end to end through the built binary (HOME-003 R6):
 //! the fixture template rendered for a fixture working directory holding a
-//! CLAUDE.md and a memory index under the fixture config directory, with
-//! HOME a fresh directory and `CLAUDE_CONFIG_DIR` removed from the rendering
-//! process's environment, so nothing here depends on the machine's own
-//! configuration. Every assertion over a documents list first counts it.
+//! CLAUDE.md, with a user CLAUDE.md and a memory index under the fixture
+//! config directory, HOME a fresh directory and `CLAUDE_CONFIG_DIR` removed
+//! from the rendering process's environment, so nothing here depends on the
+//! machine's own configuration. Every assertion over a documents list first counts it.
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -30,10 +30,14 @@ const UUID: &str = "00000000-0000-4000-8000-000000000003";
 /// The one line of the fixture CLAUDE.md; searched for, never quoted in a name.
 const SENTENCE: &str =
     "Fixture instructions: the record carries this line's hash and never the line.\n";
+/// The one line of the fixture user CLAUDE.md in the config directory.
+const USER_SENTENCE: &str =
+    "Fixture user file: the record lists it after the render's two files.\n";
 const MEMORY: &str = "# Fixture memory index\n";
-const KINDS: [&str; 4] = [
+const KINDS: [&str; 5] = [
     "appended_instructions",
     "mcp_config",
+    "user_claude_md",
     "claude_md_chain",
     "memory_index",
 ];
@@ -72,9 +76,9 @@ fn stderr(output: &Output) -> String {
 }
 
 /// The fixture: a home holding the fixture session, a working directory `w`
-/// with the fixture CLAUDE.md, a config directory `c` with the memory index
-/// for `w`, a HOME `h` with no `.claude`, and the fixture template with
-/// `CLAUDE_CONFIG_DIR` set to `c` in its env slot.
+/// with the fixture CLAUDE.md, a config directory `c` with a user CLAUDE.md
+/// and the memory index for `w`, a HOME `h` with no `.claude`, and the
+/// fixture template with `CLAUDE_CONFIG_DIR` set to `c` in its env slot.
 struct Fixture {
     dir: tempfile::TempDir,
     home: PathBuf,
@@ -95,6 +99,7 @@ impl Fixture {
         let c = dir.path().join("c");
         let h = dir.path().join("h");
         put(&w.join("CLAUDE.md"), SENTENCE.as_bytes())?;
+        put(&c.join("CLAUDE.md"), USER_SENTENCE.as_bytes())?;
         put(&Self::memory_index(&c, &w)?, MEMORY.as_bytes())?;
         std::fs::create_dir_all(&c)?;
         std::fs::create_dir_all(&h)?;
@@ -211,14 +216,15 @@ fn rendered(fixture: &mut Fixture) -> Fallible<(PathBuf, Value)> {
 }
 
 #[test]
-fn the_first_render_records_four_documents_in_order_under_the_render_event() -> Outcome {
+fn the_first_render_records_five_documents_in_the_request_s_order_under_the_render_event()
+-> Outcome {
     let mut fixture = Fixture::new()?;
     let (out, report) = rendered(&mut fixture)?;
     let records = fixture.records()?;
     assert_eq!(records.len(), 1);
     let (id, record) = &records[0];
     assert_eq!(report["given"], json!(id));
-    assert_eq!(report["given_documents"], 4);
+    assert_eq!(report["given_documents"], 5);
     let session = fixture.session()?;
     let entry = session.entry(id)?;
     assert_eq!(
@@ -229,15 +235,17 @@ fn the_first_render_records_four_documents_in_order_under_the_render_event() -> 
     assert_eq!(session.context_path()?.len(), 4);
     drop(session);
     let documents = &record.documents;
-    assert_eq!(documents.len(), 4);
+    assert_eq!(documents.len(), 5);
     let kinds: Vec<&str> = documents.iter().map(|d| d.kind.name()).collect();
     assert_eq!(kinds, KINDS);
     let on_disk = [
         out.join("instructions.md"),
         out.join("mcp.json"),
+        fixture.c.join("CLAUDE.md"),
         fixture.claude_md(),
         Fixture::memory_index(&fixture.c, &fixture.w)?,
     ];
+    assert_eq!(on_disk.len(), documents.len());
     for (document, path) in documents.iter().zip(&on_disk) {
         let bytes = std::fs::read(path)?;
         assert_eq!(
@@ -255,8 +263,11 @@ fn the_first_render_records_four_documents_in_order_under_the_render_event() -> 
     }
     assert_eq!(documents[0].path, Path::new("instructions.md"));
     assert_eq!(documents[1].path, Path::new("mcp.json"));
-    assert_eq!(documents[2].path, fixture.claude_md());
-    assert!(documents[3].path.starts_with(&fixture.c));
+    assert_eq!(documents[2].path, fixture.c.join("CLAUDE.md"));
+    assert_eq!(documents[2].length, USER_SENTENCE.len() as u64);
+    assert_eq!(documents[2].sha256, sha256_hex(USER_SENTENCE.as_bytes()));
+    assert_eq!(documents[3].path, fixture.claude_md());
+    assert!(documents[4].path.starts_with(&fixture.c));
     let data = record.data()?;
     assert_eq!(
         data["config_dir"],
@@ -266,7 +277,6 @@ fn the_first_render_records_four_documents_in_order_under_the_render_event() -> 
         data["environment"],
         json!(["CLAUDE_CONFIG_DIR", "LYS_FIXTURE_MODE", "LYS_FIXTURE_TOKEN"])
     );
-    assert_eq!(kinds.iter().filter(|k| **k == "user_claude_md").count(), 0);
     assert_eq!(record.harness, "claude-code");
     assert_eq!(record.harness_version, "2.1.283");
     Ok(())
@@ -279,8 +289,8 @@ fn two_renders_give_equal_lists_and_one_changed_byte_changes_exactly_one_hash() 
     rendered(&mut fixture)?;
     let records = fixture.records()?;
     assert_eq!(records.len(), 2);
-    assert_eq!(records[0].1.documents.len(), 4);
-    assert_eq!(records[1].1.documents.len(), 4);
+    assert_eq!(records[0].1.documents.len(), 5);
+    assert_eq!(records[1].1.documents.len(), 5);
     assert_eq!(records[0].1.documents, records[1].1.documents);
     assert_eq!(records[0].1, records[1].1);
     let second = records[1].0.clone();
@@ -299,8 +309,8 @@ fn two_renders_give_equal_lists_and_one_changed_byte_changes_exactly_one_hash() 
     assert_eq!(records.len(), 3);
     assert_eq!(records[2].0, third_report["given"].as_str().ok_or("an id")?);
     let (before, after) = (&records[1].1, &records[2].1);
-    assert_eq!(before.documents.len(), 4);
-    assert_eq!(after.documents.len(), 4);
+    assert_eq!(before.documents.len(), 5);
+    assert_eq!(after.documents.len(), 5);
     let mut differing = Vec::new();
     for (b, a) in before.documents.iter().zip(&after.documents) {
         assert_eq!(b.kind, a.kind);
@@ -311,7 +321,8 @@ fn two_renders_give_equal_lists_and_one_changed_byte_changes_exactly_one_hash() 
         }
     }
     assert_eq!(differing, ["claude_md_chain"]);
-    assert_eq!(after.documents[2].sha256, sha256_hex(&bytes));
+    assert_eq!(after.documents[3].kind.name(), "claude_md_chain");
+    assert_eq!(after.documents[3].sha256, sha256_hex(&bytes));
     assert_eq!(before.config_dir, after.config_dir);
     assert_eq!(before.environment, after.environment);
     assert_eq!(before.kinds, after.kinds);
@@ -335,7 +346,7 @@ fn two_renders_give_equal_lists_and_one_changed_byte_changes_exactly_one_hash() 
         assert_eq!(listed_record["environment"], record.data()?["environment"]);
         assert_eq!(
             listed_record["documents"].as_array().ok_or("a list")?.len(),
-            4
+            5
         );
     }
     let sentence = SENTENCE.trim();
@@ -482,14 +493,14 @@ fn the_rendering_process_s_config_dir_is_never_read_and_home_dot_claude_is_the_f
     assert_eq!(
         kinds,
         [
-            "user_claude_md",
             "appended_instructions",
             "mcp_config",
+            "user_claude_md",
             "claude_md_chain",
             "memory_index"
         ]
     );
-    assert_eq!(record.documents[0].path, home_config.join("CLAUDE.md"));
+    assert_eq!(record.documents[2].path, home_config.join("CLAUDE.md"));
     assert_eq!(
         record.documents[4].path,
         Fixture::memory_index(&home_config, &fixture.w)?
