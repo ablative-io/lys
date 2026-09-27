@@ -203,4 +203,19 @@ pub enum Command {
         #[command(flatten)]
         directory: PermissionSource,
     },
+    /// As an engine starting a seat: take the seat's own login from the
+    /// login set, in turn, and write it to standard output for the seat's
+    /// environment. The log records which account went to which seat.
+    SpawnLogin {
+        #[command(flatten)]
+        at: Where,
+        /// The seat's identity.
+        #[arg(long)]
+        seat: String,
+        /// The login set: a secret whose accounts are the logins.
+        #[arg(long)]
+        secret: String,
+        #[command(flatten)]
+        directory: PermissionSource,
+    },
 }

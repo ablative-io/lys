@@ -70,3 +70,59 @@ fn the_holder_moves_to_the_next_account_and_a_thief_or_a_dropped_handle_cannot()
     );
     Ok(())
 }
+
+#[test]
+fn each_spawn_takes_the_next_login_and_the_log_names_the_seat() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let keys = root.path().join("keys");
+    std::fs::create_dir_all(&keys)?;
+    let paths = BrokerPaths {
+        store_dir: root.path().join("store"),
+        log_dir: root.path().join("log"),
+        store_key: keys.join("store.key"),
+        audit_key: keys.join("audit.key"),
+        anchor: keys.join("audit.anchor"),
+    };
+    let grants = LocalGrants::new();
+    for seat in ["seat:one", "seat:two", "seat:three"] {
+        grants.grant(SecretRelation {
+            identity: seat.to_owned(),
+            secret: "logins".to_owned(),
+            granted_by: Some("person:tom".to_owned()),
+        });
+    }
+    let mut broker = Broker::create(&paths, grants, Box::new(|| 1_000))?;
+    broker.seal("logins", "person:tom", &Secret::from_slice(b"login-a"))?;
+    broker.add_account("logins", "b", &Secret::from_slice(b"login-b"))?;
+    let (first, one) = broker.spawn_login("seat:one", "logins")?;
+    let (second, two) = broker.spawn_login("seat:two", "logins")?;
+    let (third, _three) = broker.spawn_login("seat:three", "logins")?;
+    assert_eq!(
+        (first.as_str(), second.as_str(), third.as_str()),
+        ("primary", "b", "primary")
+    );
+    assert_ne!(one.expose(), two.expose());
+    assert_eq!(
+        refusal(broker.spawn_login("seat:stranger", "logins")),
+        "PermissionDenied"
+    );
+    let handed: Vec<(Option<String>, Option<String>)> = broker
+        .audit()
+        .replay()?
+        .into_iter()
+        .filter(|recorded| {
+            recorded.line.kind == lys_secrets::AuditKind::SpawnLogin
+                && recorded.line.outcome == "handed"
+        })
+        .map(|recorded| (recorded.line.identity, recorded.line.secret))
+        .collect();
+    assert_eq!(handed.len(), 3);
+    assert_eq!(
+        handed.first(),
+        Some(&(
+            Some("seat:one".to_owned()),
+            Some("logins@primary".to_owned())
+        ))
+    );
+    Ok(())
+}

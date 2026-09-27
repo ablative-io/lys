@@ -40,6 +40,8 @@ pub enum AuditKind {
     SealedRead,
     /// An OAuth access token was refreshed, or a grant revoked upstream.
     Refresh,
+    /// A seat's own login was handed to it at spawn.
+    SpawnLogin,
 }
 
 impl AuditKind {
@@ -55,6 +57,7 @@ impl AuditKind {
             Self::Settlement => "settlement",
             Self::SealedRead => "sealed_read",
             Self::Refresh => "refresh",
+            Self::SpawnLogin => "spawn_login",
         }
     }
 
@@ -69,6 +72,7 @@ impl AuditKind {
             b"settlement" => Some(Self::Settlement),
             b"sealed_read" => Some(Self::SealedRead),
             b"refresh" => Some(Self::Refresh),
+            b"spawn_login" => Some(Self::SpawnLogin),
             _ => None,
         }
     }

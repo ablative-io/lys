@@ -168,6 +168,36 @@ impl SecretStore {
         Ok(account)
     }
 
+    /// The entry the next spawn takes, and its account; the turn then
+    /// passes to the next account not resting. Nothing rests.
+    ///
+    /// # Errors
+    ///
+    /// `SecretUnknown`, and `NoAccountAvailable` when every account rests.
+    pub(crate) fn take_turn(&mut self, secret: &str) -> Result<(String, String), SecretsError> {
+        if self.entry(secret).is_none() {
+            return Err(SecretsError::SecretUnknown {
+                name: secret.to_owned(),
+            });
+        }
+        let taken = self.current_entry(secret)?;
+        if let Some(ring) = self.index.accounts.get_mut(secret) {
+            let len = ring.order.len();
+            let next = (1..=len)
+                .map(|step| (ring.current + step) % len)
+                .find(|at| {
+                    ring.order
+                        .get(*at)
+                        .is_some_and(|account| !ring.resting.contains(account))
+                });
+            if let Some(next) = next {
+                ring.current = next;
+                self.write_index()?;
+            }
+        }
+        Ok(taken)
+    }
+
     /// Returns a resting account to service.
     ///
     /// # Errors

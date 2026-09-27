@@ -26,6 +26,7 @@ mod inflight;
 mod oauth_grants;
 mod records;
 mod rotation;
+mod spawn;
 mod using;
 
 pub use using::{Admitted, Ticket};

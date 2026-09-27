@@ -224,6 +224,23 @@ fn run(command: Command) -> Result<(), SecretsError> {
             )?;
             println!("sealed OAuth grant {name} for {subject} (tokens not shown)");
         }
+        Command::SpawnLogin {
+            at,
+            seat,
+            secret,
+            directory,
+        } => {
+            let layout = Layout::new(&at.root, &at.keys);
+            let mut broker = open_with(&at, directory.grants(&layout)?)?;
+            let (account, login) = broker.spawn_login(&seat, &secret)?;
+            std::io::stdout()
+                .write_all(login.expose())
+                .map_err(|source| SecretsError::Io {
+                    context: "writing the login to standard output".to_owned(),
+                    source,
+                })?;
+            eprintln!("{seat} took the login of {secret}@{account}");
+        }
         Command::Sign {
             key,
             handle_id,
