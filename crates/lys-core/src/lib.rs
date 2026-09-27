@@ -24,10 +24,9 @@
 //! assert!(fallible_op().is_ok());
 //! ```
 
-// Library code contains no unsafe whatsoever. Test builds relax `forbid` to
-// the workspace-level `deny` because the env-backed tests must call
-// `std::env::set_var` (unsafe in edition 2024) under `#[allow(unsafe_code)]`,
-// which a crate-level `forbid` would reject outright.
+// Library code contains no unsafe whatsoever, and no test in this crate uses
+// unsafe code either. Non-test builds forbid it outright; test builds are held
+// by the workspace-level `deny`, which no test overrides.
 #![cfg_attr(not(test), forbid(unsafe_code))]
 
 pub mod attestation;
