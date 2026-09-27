@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -72,7 +72,7 @@
       "title": "Move the Rauthy fork onto the next hardened upstream release",
       "status": "idea",
       "kind": "fix",
-      "summary": "Rebase the platform's own Rauthy fork (ADR-009) onto the next upstream release that upstream tags as a release and whose changelog carries security or hardening fixes. Our commits stay on top of the upstream tag, unsquashed and unaltered; the pin moves to the rebased head; the fork builds and passes its own suite; the standalone install comes up from the rebased build against the existing database with no migration by hand; the provider-link behaviour of DIRECTORY-004 still holds.",
+      "summary": "Rebase the platform's own Rauthy fork (ADR-009) onto the newest upstream tag above v0.36.2 that is not a pre-release, whose commit contains c44f7cac (#1696) and 989f9ff9 (#1728), checked by git merge-base --is-ancestor, and at which the three account-status, redirect and logout guard tests are present and pass. A release with other hardening but without #1728 does not trigger it. Our commits stay on top of the upstream tag, unsquashed and unaltered, with one guard-test commit on top; the pin moves to that head; the fork builds and passes its own suite; the standalone install comes up from the rebased build against a database the previous build wrote, with no migration by hand; the provider-link behaviour of DIRECTORY-004 still holds when its commit exists.",
       "provenance": {
         "requested_by": "tom",
         "date": "2026-09-25",
@@ -84,13 +84,15 @@
         "decisions": [
           "ADR-009"
         ],
-        "briefs": [],
+        "briefs": [
+          "RAUTHYREBASE-001"
+        ],
         "commits": []
       },
       "depends_on": [
         "RM-001"
       ],
-      "notes": "The card is built only when the trigger is met. It needs DIRECTORY-004 (the provider link commit the rebase must carry) and DIRECTORY-002 (the standalone install it must prove) landed first. If the rebase cannot carry a fork commit cleanly the card stops and reports the conflicting upstream commit rather than rewriting ours. Nothing in Cambium or Aion changes; no production node is touched; Tom's three acts stay Tom's."
+      "notes": "The card is built only when the trigger is met. It needs DIRECTORY-004 (the provider link commit the rebase must carry) and DIRECTORY-002 (the standalone install it must prove) landed first. If the rebase cannot carry a fork commit cleanly the card stops and reports the conflicting upstream commit rather than rewriting ours. Nothing in Cambium or Aion changes; no production node is touched; Tom's three acts stay Tom's. Briefed as RAUTHYREBASE-001 (the card IDENTITY-001 and ADR-009 call IDENTITY-002) from the card's words and the identity lead's rulings of 2026-09-27, which narrowed the trigger to the one in the summary, added the guard-test commit, the candidate-branch and pre-rebase-tag protocol (ADR-055), the migration-number stop and the disposable-database install proof, and moved this row's trigger text into line with them; the provenance above is unchanged. Further units, not yet written: Build RAUTHYREBASE-001 when the trigger is met; Amend DIRECTORY-004 so its migrations number after upstream's highest at the rebase commit; Move the kept development data onto the new Rauthy release; Record Tom's decision to lift IDENTITY-001-UPSTREAM-AUTH-STATE and open real sign-in on rows 06 and 07; Create the fork-owned brief and chain in ablative-io/rauthy."
     },
     {
       "id": "RM-004",

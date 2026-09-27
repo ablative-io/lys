@@ -1,0 +1,53 @@
+{
+  "cluster": "rauthy-rebase",
+  "personas": [
+    {
+      "name": "Operator",
+      "role": "Runs the standalone identity product",
+      "stories": [
+        {
+          "id": "S1",
+          "text": "As the operator, I want the identity product rebuilt on the hardened Rauthy release to start on data the previous release wrote, so that the upgrade needs no migration run by hand."
+        }
+      ]
+    },
+    {
+      "name": "Fork maintainer",
+      "role": "Keeps the ablative branch of the Rauthy fork",
+      "stories": [
+        {
+          "id": "S2",
+          "text": "As the fork maintainer, I want our commits to sit unaltered on top of the upstream release tag, so that a diff against the tag shows only our work by name."
+        },
+        {
+          "id": "S3",
+          "text": "As the fork maintainer, I want ablative to move only after its new head is green, with its previous head kept under a tag, so that ablative never sits on a failing head and every earlier lys pin still resolves."
+        }
+      ]
+    },
+    {
+      "name": "Reviewer",
+      "role": "Reads the rebase pull request",
+      "stories": [
+        {
+          "id": "S4",
+          "text": "As the reviewer, I want the trigger recorded as facts in the pull request, so that whether the card may start is checked rather than judged."
+        },
+        {
+          "id": "S5",
+          "text": "As the reviewer, I want the account-status, redirect and logout guards proved at the release tag, so that a release without the hardening can never be taken as the base."
+        }
+      ]
+    },
+    {
+      "name": "Person",
+      "role": "Signs in with two linked providers",
+      "stories": [
+        {
+          "id": "S6",
+          "text": "As a person who linked two sign-in providers, I want both to still resolve to me after the rebase, so that the upgrade never splits my identity."
+        }
+      ]
+    }
+  ]
+}
