@@ -653,19 +653,19 @@
       "brief": "HOME-006"
     },
     {
-      "path": "docs/design/home/briefs/HOME-008.json",
-      "note": "the eighth brief: the context record's documents in the request's order, re-measured, with the old order named as superseded",
-      "brief": "HOME-008"
+      "path": "docs/design/home/briefs/HOME-011.json",
+      "note": "the brief of the request's order: the context record's documents in the request's order, re-measured, with the old order named as superseded",
+      "brief": "HOME-011"
     },
     {
-      "path": "docs/design/home/briefs/HOME-008.md",
+      "path": "docs/design/home/briefs/HOME-011.md",
       "note": "its rendered markdown",
-      "brief": "HOME-008"
+      "brief": "HOME-011"
     },
     {
       "path": "docs/design/home/proof-given/measure.py",
       "note": "PROOF-GIVEN's measure fixture, committed byte for byte (SHA-256 db17cccb008507eed1ca67ab197a353c6901d09a63d1c284bf8a1f7d49ac245d): Claude Code pointed at a local listener, printing the read order and the request's order as orders, counts and hashes only",
-      "brief": "HOME-008"
+      "brief": "HOME-011"
     }
   ],
   "inventory": [

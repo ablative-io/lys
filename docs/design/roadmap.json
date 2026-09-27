@@ -337,7 +337,7 @@
       "title": "Record the lys.given documents in the request's order, re-measured, with the old order named as superseded",
       "status": "idea",
       "kind": "fix",
-      "summary": "The lys.given context record lists a session's documents in the order Claude Code reads the files, user CLAUDE.md first, while the request the harness sends puts the appended instructions in the system array ahead of the first user message. The record moves to the request's order (appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index), one rule stated in RECORD.md (ADR-030), with PROOF-GIVEN's measure.py committed unchanged and re-run on the installed Claude Code, the resolver, its unit test and the fixture test moved to the new order, S12 reworded, and the old order named as superseded by the commit that lands HOME-008 without rewriting any entry already written.",
+      "summary": "The lys.given context record lists a session's documents in the order Claude Code reads the files, user CLAUDE.md first, while the request the harness sends puts the appended instructions in the system array ahead of the first user message. The record moves to the request's order (appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index), one rule stated in RECORD.md (ADR-030), with PROOF-GIVEN's measure.py committed unchanged and re-run on the installed Claude Code, the resolver, its unit test and the fixture test moved to the new order, S12 reworded, and the old order named as superseded by the commit that lands HOME-011 without rewriting any entry already written.",
       "provenance": {
         "requested_by": "tom",
         "date": "2026-09-27T07:24:00+10:00",
@@ -352,12 +352,12 @@
           "ADR-030"
         ],
         "briefs": [
-          "HOME-008"
+          "HOME-011"
         ],
         "commits": []
       },
       "depends_on": [],
-      "notes": "Carried on its own row rather than on RM-007, whose HOME-003 is already on main; it stands on HOME-003's resolver and fixture test there, so no roadmap dependency is written. Numbered after main's highest and every open brief branch's as checked on 27 September 2026 (RM-018, ADR-029, C76, S34 on brief/home/b9d7f174): RM-019, ADR-030, C77 to C81; S12 and S13 are reused. brief/home/5898fcb0 also holds a HOME-008 (the rendered-uuid rule, RM-011) and keeps it, having written it first; this brief is drafted under HOME-008 and is renumbered to the next free HOME id across main and every open brief/ draft branch before it lands. Further units, not written: Measure a real MCP server's tools position in the request and fix mcp_config's place by it."
+      "notes": "Carried on its own row rather than on RM-007, whose HOME-003 is already on main; it stands on HOME-003's resolver and fixture test there, so no roadmap dependency is written. Ids are the next after main's highest and every open brief/ branch's, checked on 27 September 2026: brief/home/5898fcb0 holds HOME-008 (the rendered-uuid rule, RM-011) and keeps it, having written it first; brief/home/9e701467 holds HOME-009; brief/home/99985c4a and b9d7f174 hold HOME-010, RM-018 and ADR-029, and 99985c4a holds C77. This brief, first drafted as HOME-008, is renumbered HOME-011, its checklist rows C78 to C82; RM-019 and ADR-030 are held by no open brief/ branch. S12 and S13 are reused. Further units, not written: Measure a real MCP server's tools position in the request and fix mcp_config's place by it."
     }
   ]
 }
