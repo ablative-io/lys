@@ -5,6 +5,7 @@
 mod args;
 mod cli;
 mod files;
+mod manage;
 mod oauth_proxy;
 mod serve;
 mod spice;
