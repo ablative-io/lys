@@ -180,6 +180,36 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Rendered brief list fields",
+      "items": [
+        {
+          "id": "C31",
+          "text": "scripts/design/render-brief.py is byte-identical to the design-system method's scripts/render-brief.py at the method commit that lands the prose-list rule, and scripts/design/SOURCE.md names that commit for render-brief.py.",
+          "done": false
+        },
+        {
+          "id": "C32",
+          "text": "A brief's blocked_by, and any other list field whose entries are not all bare ids, renders as its label followed by one Markdown list item per entry, in JSON order, each item's text byte-equal to its entry.",
+          "done": false
+        },
+        {
+          "id": "C33",
+          "text": "A list field whose entries are all bare ids (ADR-, RM-, C, S and brief ids) renders on one ', '-joined line exactly as before, and render-brief.py states the rule that tells the two kinds of list apart in the docstring of is_bare_id, which render_list_field applies to every list field.",
+          "done": false
+        },
+        {
+          "id": "C34",
+          "text": "Every brief markdown that render-brief.py produces from a brief JSON in a cluster with a design.json is re-rendered in the same change, sh scripts/design/gate.sh exits 0, and docs/design/identity/briefs/IDENTITY-001.md and CONTEXT-001.md are unchanged.",
+          "done": false
+        },
+        {
+          "id": "C35",
+          "text": "scripts/design/tests/test_render_brief.py proves a two-entry prose blocked_by renders two list items byte-equal to their entries and a bare-id list renders on one line, and scripts/design/gate.sh runs it so the design leg fails when it fails.",
+          "done": false
+        }
+      ]
     }
   ]
 }

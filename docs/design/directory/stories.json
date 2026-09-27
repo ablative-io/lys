@@ -78,6 +78,26 @@
           "text": "As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect."
         }
       ]
+    },
+    {
+      "name": "Brief reader",
+      "role": "Reads a rendered brief before it is dispatched or built",
+      "stories": [
+        {
+          "id": "S13",
+          "text": "As a reader of a rendered brief, I want each blocker and each other prose entry on its own line in the order the brief gives them, so that I can tell where one entry ends and the next begins."
+        }
+      ]
+    },
+    {
+      "name": "Design gate maintainer",
+      "role": "Keeps the repository's rendered documents what its renderer makes of their JSON",
+      "stories": [
+        {
+          "id": "S14",
+          "text": "As the maintainer of the design gate, I want the renderer in this repository to stay the method's copy and every rendered brief to be what it makes of its JSON, so that no .md disagrees with the script that made it and a card finished through the chain never turns the gate red."
+        }
+      ]
     }
   ]
 }

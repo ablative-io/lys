@@ -585,6 +585,56 @@
       "path": "docs/design/directory/briefs/DIRECTORY-008.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-008"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-009.json",
+      "note": "rendered brief list fields: the sync of the method's render-brief.py, its test, and the re-render of every rendered brief",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-009.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "scripts/design/render-brief.py",
+      "note": "the brief renderer, a copy of the design-system method's scripts/render-brief.py; re-copied at the method commit that holds the prose-list rule (DIRECTORY-009)",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "scripts/design/SOURCE.md",
+      "note": "where the design scripts are copied from; names the method commit render-brief.py is copied at (DIRECTORY-009)",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "scripts/design/gate.sh",
+      "note": "the design leg; runs the renderer test beside validate, coverage and the render cmp (DIRECTORY-009)",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "scripts/design/tests/test_render_brief.py",
+      "note": "stdlib unittest of the renderer's prose-list and bare-id list rendering",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-001.md",
+      "note": "rendered markdown; re-rendered with blocked_by as a list (DIRECTORY-009)",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-003.md",
+      "note": "rendered markdown; re-rendered with blocked_by as a list (DIRECTORY-009)",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-006.md",
+      "note": "rendered markdown; re-rendered with blocked_by as a list (DIRECTORY-009)",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "docs/design/secrets/briefs/SECRETS-002.md",
+      "note": "rendered markdown; re-rendered with blocked_by as a list (DIRECTORY-009)",
+      "brief": "DIRECTORY-009"
     }
   ],
   "inventory": [
@@ -631,6 +681,18 @@
     {
       "path": "docs/design/decisions.json",
       "note": "the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row"
+    },
+    {
+      "path": "scripts/design/render-brief.py",
+      "note": "the brief renderer copied from the design-system method at 3c3bac7; joins every list field of a brief onto one line with ', ', blocked_by and depends_on included"
+    },
+    {
+      "path": "scripts/design/SOURCE.md",
+      "note": "states that the design scripts, render-brief.py among them, are copies of the design-system method at 3c3bac7"
+    },
+    {
+      "path": "scripts/design/gate.sh",
+      "note": "the design leg: validates the ledgers, checks coverage, and cmp-checks every cluster's rendered markdown against a fresh render; runs no Python tests"
     }
   ],
   "constraints": [
@@ -686,12 +748,19 @@
   "gate": [
     {
       "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
       "legs": [
         {
           "name": "fmt",
           "command": "cargo fmt --all",
           "requires": [
-            "place:here"
+            "tool:cargo",
+            "tool:rustfmt"
           ],
           "cadence": "round"
         },
@@ -699,7 +768,7 @@
           "name": "clippy-all-features",
           "command": "cargo clippy --all-targets --all-features -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -707,7 +776,7 @@
           "name": "clippy",
           "command": "cargo clippy --all-targets -- -D warnings",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -715,7 +784,7 @@
           "name": "tests",
           "command": "cargo test --workspace --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -723,7 +792,7 @@
           "name": "doc-all-features",
           "command": "cargo doc --no-deps --all-features",
           "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
@@ -731,36 +800,16 @@
           "name": "doc",
           "command": "cargo doc --no-deps",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        }
-      ]
-    },
-    {
-      "tree": "docs",
-      "legs": [
-        {
-          "name": "render",
-          "command": "python3 ../scripts/design/render-cluster.py design/directory",
-          "requires": [
-            "place:here"
+            "rust-build"
           ],
           "cadence": "round"
         },
         {
-          "name": "validate",
-          "command": "python3 ../scripts/design/validate.py design/directory",
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
           "requires": [
-            "place:here"
-          ],
-          "cadence": "round"
-        },
-        {
-          "name": "coverage",
-          "command": "python3 ../scripts/design/check-coverage.py design/directory",
-          "requires": [
-            "place:here"
+            "tool:sh",
+            "tool:python3"
           ],
           "cadence": "round"
         }

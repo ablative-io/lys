@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-28",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,29 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-070",
+      "title": "Render a brief's prose list fields one entry per line",
+      "status": "idea",
+      "kind": "fix",
+      "summary": "render-brief.py joins every list field of a brief onto one ', '-joined line, so a blocked_by of whole paragraphs renders as one run-on sentence. Lists whose entries are not all bare ids render one entry per line as a Markdown list under their label, in JSON order and byte for byte, while bare-id lists stay on one line under a rule the script states. The rule lands in the design-system method's render-brief.py through its own card; this item syncs lys's copy at that commit, adds a test the design gate runs, and re-renders every rendered brief with scripts/design/gate.sh passing.",
+      "provenance": {
+        "requested_by": "archie",
+        "date": "2026-09-28T06:00:00+10:00",
+        "quote": "A brief's list fields render as lists.\n\nscripts/design/render-brief.py joins every list field of a brief's JSON into one line with \", \": depends_on and blocked_by at lines 233 and 235, design_anchor, checklist and stories when there is no lookup (244, 253, 262), and the review and gate lines at 158, 160, 190 and 196. That is fine for short ids, but blocked_by entries are whole paragraphs. DIRECTORY-037's three blockers (a pull request that must land with its check command, node on the build venue, and a rebase) render at DIRECTORY-037.md:12 as one run-on sentence. A reader cannot tell where one blocker ends and the next begins, and the rendered brief loses the structure the JSON carries.\n\nWhat must be true after this card:\n- Every list field that can hold prose (blocked_by, depends_on, and any other list whose entries are not bare ids) renders one entry per line as a Markdown list under its label, in the JSON's order, with nothing joined, dropped or rewritten.\n- Lists of bare ids (ADR-, RM-, C-, S- and brief ids) may stay on one line; the rule deciding which is which is stated in the script and applies to every brief, not one file.\n- Every committed rendered brief in the repository is re-rendered in the same change, and the gate's render check (render, validate, coverage on the docs tree) passes on the result, so no .md disagrees with the script that made it.\n- A test proves it: a brief JSON with a blocked_by of two multi-sentence entries renders two list items, each byte-equal to its entry; a brief with a bare-id list renders the ids as before.\n\nOut of scope: changing any brief's content, ids or JSON schema.",
+        "context": "A card on the lys directory cluster about scripts/design/render-brief.py, surveyed on lys main a426b9a. The lead's answers settled that the acceptance is shown on DIRECTORY-006 rather than waiting on DIRECTORY-037, which is not on main; that the hand-kept IDENTITY-001.md and CONTEXT-001.md are outside 'every committed rendered brief'; and that the renderer change lands in the design-system method through its own card, with this card as the lys sync blocked until the method's main holds it."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [],
+        "briefs": [
+          "DIRECTORY-009"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Further units, not written: Carry the prose-list rule into the design-system method's render-brief.py and its tests. That unit is the design-system card the lead is carding in the method's repository; DIRECTORY-009 is blocked on it by the check in its blocked_by. RM-070 is the next id after the highest roadmap id held by main (RM-016) and every open brief branch (RM-069)."
     }
   ]
 }
