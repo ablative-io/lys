@@ -1,0 +1,15 @@
+# Lys-Log-Store — User Stories
+
+## Log operator — Opens a log store, including after a crash
+
+**S4.** As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove.
+
+**S1.** As a log operator, I want to be told which leftover temporary files opening my store ignored, so that what an interrupted append left behind is visible rather than skipped in silence.
+
+## Third-party verifier — Checks a leaf without lys
+
+**S2.** As a third-party verifier, I want a leaf from a store written after this change to verify with the standalone Python verifier, so that checking a leaf still needs no lys code.
+
+## Witness operator — Runs a witness anchor that observes other logs' checkpoints
+
+**S3.** As a witness operator, I want each observation to cost only the leaves recorded since the previous one, so that the witness stays usable as its own log grows.

@@ -327,12 +327,12 @@
       "superseded_by": ""
     },
     {
-      "id": "ADR-097",
+      "id": "ADR-100",
       "title": "The witness keeps a derived per-origin projection in memory and folds only new leaves",
       "status": "decided",
       "scope": "lys-log-store",
       "date": "2026-09-27",
-      "decided_by": "The lead for the identity line, answering the survey of the card behind RM-058",
+      "decided_by": "The lead for the identity line, answering the survey of the card behind RM-062",
       "context": "observe in lys-anchor's witness rebuilt its per-origin projection from index 0 on every call, so one observe parsed every leaf before it and n observes cost about n squared over two parses. The card offered two remedies: scan backward from the newest leaf and stop at the first match, or keep a per-origin position. A backward scan still parses the whole log for an origin the witness has never seen. The projection's module invariant also says nothing in it is stored.",
       "decision": "The witness's per-origin projection is built by one pass when the anchor is opened. It records how many leaves it has folded, and each observe folds only the leaves recorded since then before comparing, then adds the note it just recorded. The projection lives in memory only and is derived from the leaves, so discarding it and folding again gives the same answer, and it is never authoritative. Observe is bounded for a known origin and a first sighting alike. Rejected: the backward scan, which leaves a first sighting unbounded. Also rejected: any stored index, which would be a second copy of the truth beside the leaves.",
       "quote": "",
@@ -346,12 +346,12 @@
       "superseded_by": ""
     },
     {
-      "id": "ADR-098",
+      "id": "ADR-101",
       "title": "A file log store's only expectation of its leaves is the pin; a damaged pinned prefix is refused without naming a leaf",
       "status": "decided",
       "scope": "lys-log-store",
       "date": "2026-09-27",
-      "decided_by": "The lead for the identity line, answering the survey and the author's questions on the card behind RM-058",
+      "decided_by": "The lead for the identity line, answering the survey and the author's questions on the card behind RM-062",
       "context": "The card asked that a leaf whose bytes do not hash to the leaf the tree expects be refused by name at open. Nothing in the store records an expected hash per leaf: state.json holds one tree size and one root. One changed leaf breaks every leaf's inclusion against that root, so bisecting against the pin cannot pick out an index. A per-leaf record would change the store's layout, open a new crash window between the record and the leaf, and add a criterion every second backend must meet.",
       "decision": "The pin is the store's only expectation of its leaves. When the leaves inside the pinned prefix rebuild to another root, Log::open refuses with StoreError::PinMismatch as it does today. That refusal states the pin's tree size and root and the tree size and root recomputed from the leaves, and it never names a leaf index, because which leaf changed is not known. The one-leaf repair for a leaf just past the pin is kept exactly as it is. Rejected: a per-leaf hash record beside the leaves, which changes the layout and BACKENDS.md and adds a crash window. Also rejected: naming a leaf by bisecting the pin's root, which cannot be done. Also rejected: a read-only open of a refused log, and refusing a torn leaf just past the pin, which would turn routine crash recovery into a refusal.",
       "quote": "",

@@ -333,11 +333,11 @@
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
     },
     {
-      "id": "RM-058",
+      "id": "RM-062",
       "title": "Refuse a damaged pinned prefix at open, report leftover temporary leaf files, and bound the witness's observe",
       "status": "idea",
       "kind": "fix",
-      "summary": "The file log store could let a torn leaf into the tree. On main the torn write is already closed by the temporary-name write and its no-replace hard link, which are kept. LYSLOGSTORE-002 holds the rest under tests: a torn or changed leaf inside the pinned prefix is refused with StoreError::PinMismatch, which states the pin and the recomputed root and names no leaf (ADR-098), and the one-leaf repair just past the pin stays as it is. Open also returns the leftover temporary names, and the lys and lys-anchor tools print them on one stderr line. The federation witness's observe parses only the leaves recorded since its previous call, through an in-memory per-origin projection built once (ADR-097).",
+      "summary": "The file log store could let a torn leaf into the tree. On main the torn write is already closed by the temporary-name write and its no-replace hard link, which are kept. LYSLOGSTORE-002 holds the rest under tests: a torn or changed leaf inside the pinned prefix is refused with StoreError::PinMismatch, which states the pin and the recomputed root and names no leaf (ADR-101), and the one-leaf repair just past the pin stays as it is. Open also returns the leftover temporary names, and the lys and lys-anchor tools print them on one stderr line. The federation witness's observe parses only the leaves recorded since its previous call, through an in-memory per-origin projection built once (ADR-100).",
       "provenance": {
         "requested_by": "tom",
         "date": "2026-09-27T22:43:00+10:00",
@@ -347,9 +347,8 @@
       "links": {
         "cluster": "lys-log-store",
         "decisions": [
-          "ADR-004",
-          "ADR-097",
-          "ADR-098"
+          "ADR-100",
+          "ADR-101"
         ],
         "briefs": [
           "LYSLOGSTORE-002"
@@ -357,7 +356,7 @@
         "commits": []
       },
       "depends_on": [],
-      "notes": "Ids are the next free past main a426b9a and every open brief, draft and hand branch, read from each remote tip after git ls-remote immediately before writing. In the first round RM-057, ADR-096 and LYSLOGSTORE-001 were the highest held, so this row is RM-058 with LYSLOGSTORE-002 and ADR-097. In this round every remote tip was fetched and read, none unreadable. The highest ids held are RM-058, ADR-097 and LYSLOGSTORE-002, so the new decision is ADR-098. Collision: draft/directory/844a587d, written three minutes after this draft, also holds RM-058 and ADR-097 for other work; this row keeps the ids it was written under and the later draft must renumber. Further units, not written: Update BACKENDS.md and haematite's adoption criteria for the per-leaf check at open (under ADR-098 no per-leaf check is added, so nothing in it is owed yet); Surface refused leaves and stray temporary files in the lys and lys-anchor CLIs' status output (the lead's answers brought the stderr line and the refusal's exit into LYSLOGSTORE-002; anything beyond them stays here)."
+      "notes": "Ids are the next free past main a426b9a and every open brief, draft and hand branch. The draft's commits sit on main a426b9a. git ls-remote was read immediately before each of rounds 1 and 2, and each time every one of the 239 branch tips it listed, outside refs/pull and card-gate, was fetched and read, none unreadable. The highest ids held on any other tip were, both times, RM-061 and ADR-099 (draft/directory/844a587d, which held RM-058 and ADR-097 when the lead read it, now holds RM-059 and ADR-098), and LYSLOGSTORE-001 was the highest other brief under the prefix. The words give no first-writer priority, so this row, first written as RM-058 with ADR-097 and ADR-098, is renumbered to RM-062 with ADR-100 and ADR-101, and it keeps LYSLOGSTORE-002. Further units, not written: Update BACKENDS.md and haematite's adoption criteria for the per-leaf check at open (under ADR-101 no per-leaf check is added, so nothing in it is owed yet); Surface refused leaves and stray temporary files in the lys and lys-anchor CLIs' status output (the lead's answers brought the stderr line and the refusal's exit into LYSLOGSTORE-002; anything beyond them stays here)."
     }
   ]
 }
