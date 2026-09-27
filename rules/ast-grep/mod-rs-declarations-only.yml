@@ -1,0 +1,17 @@
+id: mod-rs-declarations-only
+language: rust
+severity: error
+message: "mod.rs holds only `pub mod` declarations and `pub use` re-exports. Logic goes in a named file (CLAUDE.md)."
+ignores:
+  - "vendor/**"
+files:
+  - "**/mod.rs"
+rule:
+  any:
+    - kind: function_item
+    - kind: struct_item
+    - kind: enum_item
+    - kind: trait_item
+    - kind: impl_item
+    - kind: const_item
+    - kind: static_item
