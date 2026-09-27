@@ -80,14 +80,14 @@ function File({ data, tab, reload }: { data: FileData; tab: string; reload: () =
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span className={'state ' + x.state} id="state">{x.state}</span>
-            {kind === 'agent' && x.state === 'active' ? (
-              <button className="btn primary" data-act="start" onClick={notBuilt('Starting an agent')}>Start…</button>
-            ) : null}
             {ACTIONS[x.state].map((a) => (
               <button key={a} className={'btn ' + (a === 'suspend' || a === 'retire' ? 'danger' : 'primary')} data-act={a} onClick={notBuilt(a[0].toUpperCase() + a.slice(1))}>
                 {a[0].toUpperCase() + a.slice(1)}
               </button>
             ))}
+            {kind === 'agent' && x.state === 'active' ? (
+              <button className="btn primary" data-act="start" onClick={notBuilt('Starting an agent')}>Start…</button>
+            ) : null}
             {kind === 'agent' && x.state === 'active' ? (
               <button className="btn danger" data-act="stop" title="Revoke its tokens and ask every runtime to end its sessions" onClick={notBuilt('Emergency stop')}>
                 Emergency stop
