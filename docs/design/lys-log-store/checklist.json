@@ -58,6 +58,11 @@
           "id": "C14",
           "text": "put_leaf on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly naming the store's directory and the act, and writes nothing.",
           "done": false
+        },
+        {
+          "id": "C16",
+          "text": "pin on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly naming the store's directory and the act, and leaves state.json and the pinned root unchanged.",
+          "done": false
         }
       ]
     },
@@ -76,7 +81,7 @@
         },
         {
           "id": "C10",
-          "text": "file_tests.rs holds the sixteen new tests of LYSLOGSTORE-001 R8, names the no-replace link wherever it named create_new, and each drift injection in its module-doc tables fails exactly its own test.",
+          "text": "file_tests.rs holds the eighteen new tests of LYSLOGSTORE-001 R8, names the no-replace link wherever it named create_new, and each drift injection in its module-doc tables fails exactly its own test.",
           "done": false
         },
         {
@@ -101,7 +106,17 @@
       "items": [
         {
           "id": "C15",
-          "text": "Anchor::open_read_only's doc examples and lys-anchor's read-only tests open their store with FileLeafStore::open_read_only, and nothing else in lys-anchor changes.",
+          "text": "Anchor::open_read_only's doc examples and lys-anchor's read-only tests open their store with FileLeafStore::open_read_only.",
+          "done": false
+        },
+        {
+          "id": "C17",
+          "text": "Log::open_at_pin opens a store found one leaf ahead of its pin at the pinned head without pinning, reports the pending repair, and refuses to append while it is pending; Log::open alone repairs.",
+          "done": false
+        },
+        {
+          "id": "C18",
+          "text": "Anchor::open_read_only never repairs a store found one leaf ahead of its pin: it opens at the pinned head, and its status says in words that one leaf stands ahead of the pin and that a writable open repairs it.",
           "done": false
         }
       ]
