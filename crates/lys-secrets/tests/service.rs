@@ -116,3 +116,43 @@ fn a_trusted_service_speaks_for_a_person_once_for_the_request_it_signed() -> Tes
     assert_eq!(fresh.admit(&trusted, &read, now)?, "person-dana");
     Ok(())
 }
+
+#[test]
+fn the_broker_admits_what_the_identity_service_signs() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let key = Ed25519Identity::load_or_generate(&dir.path().join("identity.key"))?;
+    let trusted = [ServiceKey {
+        name: "identity".to_owned(),
+        public_key: to_hex(&key.public_key_bytes()),
+    }];
+    let now = 1_000_000;
+    let body = br#"{"secret":"token","scope":"team:accounts"}"#;
+    let wire = lys_identity_server::secrets_sign::headers(
+        &lys_identity_server::secrets_sign::Asked {
+            service: "identity",
+            person: "person-dana",
+            method: "POST",
+            path: "/_lys/scope",
+            body,
+            signed_at_ms: now,
+        },
+        &key,
+    )?;
+    let asked = OnBehalf::from_wire(
+        [&wire[0], &wire[1], &wire[2], &wire[3], &wire[4]],
+        request_digest("POST", "/_lys/scope", body)?,
+    )?;
+    assert_eq!(
+        ServiceWindow::new().admit(&trusted, &asked, now)?,
+        "person-dana"
+    );
+    let elsewhere = OnBehalf::from_wire(
+        [&wire[0], &wire[1], &wire[2], &wire[3], &wire[4]],
+        request_digest("POST", "/_lys/recipients", body)?,
+    )?;
+    assert_eq!(
+        refusal(ServiceWindow::new().admit(&trusted, &elsewhere, now)),
+        "ServiceSignatureInvalid"
+    );
+    Ok(())
+}

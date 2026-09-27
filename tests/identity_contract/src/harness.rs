@@ -251,6 +251,7 @@ impl Service {
             grant_log_origin: GRANT_ORIGIN.to_owned(),
             grant_model_file: dir.path().join("grant-model.json"),
             spicedb,
+            secrets: None,
         };
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;

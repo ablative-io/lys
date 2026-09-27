@@ -117,7 +117,7 @@ fn person_record(projection: &Projection, id: PersonId) -> Result<&Record, Serve
 }
 
 /// The person the signed-in `actor`'s login is bound to, or `NoPerson`.
-fn own_person(projection: &Projection, actor: &Actor) -> Result<PersonId, ServerError> {
+pub(crate) fn own_person(projection: &Projection, actor: &Actor) -> Result<PersonId, ServerError> {
     projection
         .person_for(actor.binding())
         .ok_or(ServerError::NoPerson)

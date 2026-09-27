@@ -18,6 +18,8 @@ pub mod read_api;
 pub mod read_views;
 pub mod receipts_api;
 pub mod routes;
+pub mod secrets_api;
+pub mod secrets_sign;
 pub mod session;
 pub mod spicedb;
 mod spicedb_http;
