@@ -1,4 +1,6 @@
 //! The one-owner lock on a session: `<id>.lock` beside the session file.
+//! The canon takes the same lock on its own lock file beside it (see
+//! [`crate::record::canon`]).
 //!
 //! Between processes the lock is a POSIX record lock (`fcntl` with
 //! `F_SETLK`) over the whole lock file. A record lock belongs to the process
@@ -29,7 +31,7 @@ use crate::record::index::Index;
 /// directory so two spellings of one path meet here.
 static HELD: Mutex<BTreeSet<PathBuf>> = Mutex::new(BTreeSet::new());
 
-/// The exclusive lock one session owner holds, released when it drops.
+/// The exclusive lock one owner holds, released when it drops.
 pub(crate) struct SessionLock {
     /// Declared before `claim`, so it drops first: the descriptor closes, and
     /// the record lock with it, before the path leaves the registry.
@@ -75,9 +77,15 @@ impl SessionLock {
     /// Take the exclusive lock beside `session_file`, or refuse by name when
     /// another owner holds it, naming the holding process when the lock does.
     pub(crate) fn take(session_file: &Path) -> Result<Self, HomeError> {
-        let path = Index::lock_path(session_file);
-        let claim = Claim::enter(resolved(&path)?).ok_or_else(|| HomeError::SessionHeld {
-            path: session_file.to_path_buf(),
+        Self::take_at(&Index::lock_path(session_file), session_file)
+    }
+
+    /// Take the exclusive lock on the lock file at `path`, which guards
+    /// `held`; a refusal names `held` and, when the lock does, the holding
+    /// process. The lock file is created when absent and never removed.
+    pub(crate) fn take_at(path: &Path, held: &Path) -> Result<Self, HomeError> {
+        let claim = Claim::enter(resolved(path)?).ok_or_else(|| HomeError::SessionHeld {
+            path: held.to_path_buf(),
             holder: Some(std::process::id()),
         })?;
         let file = std::fs::OpenOptions::new()
@@ -85,9 +93,9 @@ impl SessionLock {
             .truncate(false)
             .read(true)
             .write(true)
-            .open(&path)
-            .map_err(|e| HomeError::io("opening the session lock", &path, e))?;
-        lock_exclusive(&file, &path, session_file)?;
+            .open(path)
+            .map_err(|e| HomeError::io("opening the lock file", path, e))?;
+        lock_exclusive(&file, path, held)?;
         Ok(Self { file, claim })
     }
 
@@ -113,16 +121,16 @@ fn resolved(path: &Path) -> Result<PathBuf, HomeError> {
 
 /// Take the process's record lock on the whole lock file without waiting.
 #[cfg(unix)]
-fn lock_exclusive(file: &File, path: &Path, session_file: &Path) -> Result<(), HomeError> {
+fn lock_exclusive(file: &File, path: &Path, held: &Path) -> Result<(), HomeError> {
     use rustix::fs::{FlockOperation, fcntl_lock};
     use rustix::io::Errno;
     match fcntl_lock(file, FlockOperation::NonBlockingLockExclusive) {
         Ok(()) => Ok(()),
         Err(e) if e == Errno::AGAIN || e == Errno::ACCESS => Err(HomeError::SessionHeld {
-            path: session_file.to_path_buf(),
+            path: held.to_path_buf(),
             holder: holder(file),
         }),
-        Err(e) => Err(HomeError::io("locking the session", path, e.into())),
+        Err(e) => Err(HomeError::io("taking the lock", path, e.into())),
     }
 }
 
@@ -136,13 +144,13 @@ fn holder(file: &File) -> Option<u32> {
 
 /// Take the exclusive lock on the lock file's handle without waiting.
 #[cfg(not(unix))]
-fn lock_exclusive(file: &File, path: &Path, session_file: &Path) -> Result<(), HomeError> {
+fn lock_exclusive(file: &File, path: &Path, held: &Path) -> Result<(), HomeError> {
     match file.try_lock() {
         Ok(()) => Ok(()),
         Err(std::fs::TryLockError::WouldBlock) => Err(HomeError::SessionHeld {
-            path: session_file.to_path_buf(),
+            path: held.to_path_buf(),
             holder: None,
         }),
-        Err(std::fs::TryLockError::Error(e)) => Err(HomeError::io("locking the session", path, e)),
+        Err(std::fs::TryLockError::Error(e)) => Err(HomeError::io("taking the lock", path, e)),
     }
 }

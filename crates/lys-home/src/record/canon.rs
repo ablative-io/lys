@@ -12,19 +12,28 @@
 //!
 //! The canon is read and appended as a plain file: it has no index or head
 //! beside it, since it lives in a repository and is small. An add holds an
-//! exclusive lock on the canon file itself for the whole of its read, check
-//! and append, so two adds cannot read the same leaf and interleave; a second
-//! adder is refused by name. Curation is a person's act: the tool copies what
+//! exclusive lock for the whole of its read, check and append, so two adds
+//! cannot read the same leaf and interleave; a second adder is refused by
+//! name, with the holding process when the lock names it. The lock is the
+//! sessions' process record lock (`SessionLock`) on `<canon file>.lock`
+//! beside the canon (`canon.jsonl.lock`), never on the canon file itself: a
+//! lock on the canon's own descriptor would be released by the read of the
+//! canon, and a `flock` there was carried by any child spawned while an add
+//! ran. The lock file is created by the first add, held only while an add
+//! runs, and left in place afterwards, since removing it could let two adders
+//! lock two different files; it is empty and safe to delete when no add is
+//! running. Curation is a person's act: the tool copies what
 //! it is told to and records who told it.
 
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::error::HomeError;
 use crate::record::entries::{CUSTOM_INHERITED, Entry, EntryBase, EntryBody, SessionHeader};
+use crate::record::lock::SessionLock;
 use crate::record::{PI_FORMAT_VERSION, Session, now};
 
 /// The session id the canon file carries.
@@ -357,29 +366,34 @@ pub fn parse_turns(path: &Path) -> Result<Vec<(Role, String)>, HomeError> {
     Ok(out)
 }
 
+/// The lock file beside a canon: the canon file's name with `.lock` added.
+pub(crate) fn lock_path(canon_path: &Path) -> PathBuf {
+    let mut name = canon_path
+        .file_name()
+        .map(std::ffi::OsStr::to_os_string)
+        .unwrap_or_default();
+    name.push(".lock");
+    canon_path.with_file_name(name)
+}
+
+/// Take the canon's exclusive lock, or refuse by name when another adder
+/// holds it, naming the holding process when the lock does.
+pub(crate) fn hold(canon_path: &Path) -> Result<SessionLock, HomeError> {
+    SessionLock::take_at(&lock_path(canon_path), canon_path)
+}
+
 fn append_example(
     canon_path: &Path,
     inherited: &Inherited,
     mut entries: Vec<Entry>,
 ) -> Result<AddReport, HomeError> {
-    // One adder at a time: the canon file is held exclusively from before the
-    // read to after the sync, so no other add can read the same leaf.
+    // One adder at a time: the canon's lock is held from before the read to
+    // after the sync, so no other add can read the same leaf.
+    let held = hold(canon_path)?;
     let mut file = std::fs::OpenOptions::new()
         .append(true)
         .open(canon_path)
         .map_err(|e| HomeError::io("opening the canon", canon_path, e))?;
-    match file.try_lock() {
-        Ok(()) => {}
-        Err(std::fs::TryLockError::WouldBlock) => {
-            return Err(HomeError::SessionHeld {
-                path: canon_path.to_path_buf(),
-                holder: None,
-            });
-        }
-        Err(std::fs::TryLockError::Error(e)) => {
-            return Err(HomeError::io("locking the canon", canon_path, e));
-        }
-    }
     let canon = load(canon_path)?;
     let mut fresh = std::collections::HashSet::with_capacity(entries.len());
     for entry in &entries {
@@ -418,6 +432,8 @@ fn append_example(
     }
     file.sync_all()
         .map_err(|e| HomeError::io("syncing the canon", canon_path, e))?;
+    drop(file);
+    drop(held);
     Ok(AddReport {
         canon: canon_path.to_path_buf(),
         inherited_id: mark.base.id,
