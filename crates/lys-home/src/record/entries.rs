@@ -19,8 +19,13 @@ pub const CUSTOM_CALL: &str = "lys.call";
 /// The custom type marking a session as authored by hand: a demonstration,
 /// never a history of tools that ran.
 pub const CUSTOM_AUTHORED: &str = "lys.authored";
-/// The custom type marking an entry inherited from another session.
+/// The custom type marking entries inherited from another session: both a
+/// canon example, whose data states the rule it shows, and a handover, the
+/// first entry of a successor session, whose data carries no rule.
 pub const CUSTOM_INHERITED: &str = "lys.inherited";
+/// The prefix of the `session_info` name a handover writes, followed by the
+/// outgoing session's id.
+pub const INHERITED_FROM: &str = "inherited from ";
 /// The custom type of the context record: what a session was given at
 /// render, as paths, lengths and hashes (see [`crate::record::given`]).
 pub const CUSTOM_GIVEN: &str = "lys.given";
