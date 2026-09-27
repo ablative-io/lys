@@ -47,3 +47,16 @@
 - [ ] **C28** — Observed grant usage names its source and time; not seen is not reported as never used.
 - [ ] **C29** — The You and delegation screens show real server authority, separate service accounts from sign-in identities, and preserve personal versus administrator visibility.
 - [ ] **C30** — The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success.
+
+## The identity surface shell (conformance 9.1 to 9.3)
+
+- [ ] **C303** — .land/gates.sh runs the surface's test command as a leg that fails by name when npm is missing, the project setup's trees measure surface/identity by npm ci and npm test, and the design's gate array is its parent's with the one surface leg appended and nothing else changed.
+- [ ] **C304** — One route table names the 14 rail screens and the 30 hash-routed tabs with a built column, and the tests fail by name on a built row the shell does not serve.
+- [ ] **C305** — The rail toggles by its button and by [, kept under iam.labels across a reload, and the dock side switches by the Configuration Layout segment, by the palette act and by \, kept under iam.dock, with the layout flipped.
+- [ ] **C306** — The palette Go to entries and the fourteen g go-to letters reach every rail screen.
+- [ ] **C307** — Every element with a click action is a button or a link, or has tabindex 0 and dispatches one click on Enter and Space, palette rows included, with no caller under surface/identity/src/features changed.
+- [ ] **C308** — j and k move focus with the cursor without replacing the screen, and Enter opens the focused row.
+- [ ] **C309** — The help overlay places one numbered mark per explained element and states the count, swallows its dismissing click, and returns focus on Escape to the element that had it.
+- [ ] **C310** — A Tab walk over every built route, driven by @testing-library/user-event, reaches every element with a click action other than those in a closed layer (the closed palette's rows, walked instead with the palette open) and the two dismiss backdrops, and activates each with Enter and, for non-links, Space, with a non-zero count asserted.
+- [ ] **C311** — index.v6.html sits beside index.v5.html and differs from it by the focus fix and the keyboard fix only, each proved against v6 and shown failing on v5.
+- [ ] **C312** — CONFORMANCE.md line 3 names index.v6.html as the reference, with v5 as the prior, and pins index.v6.html by its path and sha256, the first pin of the mock-up.

@@ -33,3 +33,19 @@
 **S11.** As a person granting temporary access, I want its end date and ancestor restrictions enforced, so role changes or reinstatement cannot silently extend it.
 
 **S12.** As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
+
+## Keyboard user — Working the identity screens without a mouse
+
+**S132.** As a person working by keyboard, I want to reach and press every control on every screen without a mouse, so that nothing the screens offer is closed to me.
+
+## Responsible person — Sharing and returning to a place in the screens
+
+**S133.** As a responsible person, I want every screen and tab to have its own address, so that a link I send opens exactly the view I was looking at.
+
+## Newcomer to the screens — Learning what a screen shows
+
+**S134.** As a newcomer, I want the help overlay to number what is on screen and put me back where I was when I leave it, so that asking for help never costs me my place.
+
+## Identity line lead — Keeping the mock-up and the build in step
+
+**S135.** As the identity line lead, I want the mock-up and the built shell to change together and the proof to run in the gate, so that the mock-up stays the definition the build is held to.

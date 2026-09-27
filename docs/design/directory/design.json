@@ -808,19 +808,12 @@
   "gate": [
     {
       "tree": ".",
-      "shorthand": {
-        "rust-build": [
-          "toolchain:rust",
-          "lockfile:Cargo.lock"
-        ]
-      },
       "legs": [
         {
           "name": "fmt",
           "command": "cargo fmt --all",
           "requires": [
-            "tool:cargo",
-            "tool:rustfmt"
+            "place:here"
           ],
           "cadence": "round"
         },
@@ -828,7 +821,7 @@
           "name": "clippy-all-features",
           "command": "cargo clippy --all-targets --all-features -- -D warnings",
           "requires": [
-            "rust-build"
+            "place:here"
           ],
           "cadence": "round"
         },
@@ -836,7 +829,7 @@
           "name": "clippy",
           "command": "cargo clippy --all-targets -- -D warnings",
           "requires": [
-            "rust-build"
+            "place:here"
           ],
           "cadence": "round"
         },
@@ -844,7 +837,7 @@
           "name": "tests",
           "command": "cargo test --workspace --all-features",
           "requires": [
-            "rust-build"
+            "place:here"
           ],
           "cadence": "round"
         },
@@ -852,7 +845,7 @@
           "name": "doc-all-features",
           "command": "cargo doc --no-deps --all-features",
           "requires": [
-            "rust-build"
+            "place:here"
           ],
           "cadence": "round"
         },
@@ -860,16 +853,36 @@
           "name": "doc",
           "command": "cargo doc --no-deps",
           "requires": [
-            "rust-build"
+            "place:here"
+          ],
+          "cadence": "round"
+        }
+      ]
+    },
+    {
+      "tree": "docs",
+      "legs": [
+        {
+          "name": "render",
+          "command": "python3 ../scripts/design/render-cluster.py design/directory",
+          "requires": [
+            "place:here"
           ],
           "cadence": "round"
         },
         {
-          "name": "design",
-          "command": "sh scripts/design/gate.sh",
+          "name": "validate",
+          "command": "python3 ../scripts/design/validate.py design/directory",
           "requires": [
-            "tool:sh",
-            "tool:python3"
+            "place:here"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "coverage",
+          "command": "python3 ../scripts/design/check-coverage.py design/directory",
+          "requires": [
+            "place:here"
           ],
           "cadence": "round"
         }
