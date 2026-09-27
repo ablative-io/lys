@@ -182,35 +182,35 @@
       ]
     },
     {
-      "name": "Row 07: gate, install and demonstrate the release (DIRECTORY-025)",
+      "name": "Row 07: gate, install and demonstrate the release (DIRECTORY-030)",
       "items": [
         {
-          "id": "C186",
+          "id": "C242",
           "text": "The identity-release leg is registered once, as a demand-cadence leg in docs/design/project.json running scripts/identity-gates/release.sh, named in one line of CLAUDE.md and mirrored in the directory design's gate, and .land/gates.sh is unchanged.",
           "done": false
         },
         {
-          "id": "C187",
+          "id": "C243",
           "text": "Every required venue leg is recorded green on the exact pushed Lys, Rauthy and Cambium refs in IDENTITY-001-commands.jsonl and the release report, and a missing leg is named as a blocker.",
           "done": false
         },
         {
-          "id": "C188",
+          "id": "C244",
           "text": "The row 03 and row 05 live install receipts are verified against the release refs and each is marked test-keyed.",
           "done": false
         },
         {
-          "id": "C189",
+          "id": "C245",
           "text": "The staged install runs the tested refs on the node the operator names under a test service key, with its backups and a rollback that never launches an older Rauthy binary against a forward-only migrated database recorded.",
           "done": false
         },
         {
-          "id": "C190",
+          "id": "C246",
           "text": "Standalone acceptance on the staged install is recorded before any cutover, with the staging statement at the demonstration's opening, who the two providers resolve to and the agent's recorded creation.",
           "done": false
         },
         {
-          "id": "C191",
+          "id": "C247",
           "text": "Every requirement not met is named in the release report, preserved Cambium identities among them until the cutover, the three reserved acts are named, and no health check is counted as completion.",
           "done": false
         }

@@ -51,7 +51,7 @@
     "ADR-009",
     "ADR-010",
     "ADR-011",
-    "ADR-078"
+    "ADR-092"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -63,7 +63,7 @@
   "non_goals": [
     {
       "text": "Row 06 (connect Cambium)",
-      "reason": "It changes the Cambium repository and depends on IDENTITY-002, the upstream release rebase; it needs a Cambium cluster or an agreed cross-repository arrangement first. Row 07 left this non-goal with DIRECTORY-025 (ADR-078)."
+      "reason": "It changes the Cambium repository and depends on IDENTITY-002, the upstream release rebase; it needs a Cambium cluster or an agreed cross-repository arrangement first. Row 07 left this non-goal with DIRECTORY-030 (ADR-092)."
     },
     {
       "text": "Row 03's changes inside the Rauthy fork",
@@ -588,39 +588,39 @@
       "brief": "DIRECTORY-008"
     },
     {
-      "path": "docs/design/directory/briefs/DIRECTORY-025.json",
+      "path": "docs/design/directory/briefs/DIRECTORY-030.json",
       "note": "row 07 of IDENTITY-001: gate, install and demonstrate the exact release, up to a staged, test-keyed install",
-      "brief": "DIRECTORY-025"
+      "brief": "DIRECTORY-030"
     },
     {
-      "path": "docs/design/directory/briefs/DIRECTORY-025.md",
+      "path": "docs/design/directory/briefs/DIRECTORY-030.md",
       "note": "rendered markdown",
-      "brief": "DIRECTORY-025"
+      "brief": "DIRECTORY-030"
     },
     {
       "path": "docs/design/project.json",
       "note": "the project's gate trees; gains the demand-cadence identity-release leg",
-      "brief": "DIRECTORY-025"
+      "brief": "DIRECTORY-030"
     },
     {
       "path": "CLAUDE.md",
       "note": "the repository's standing instructions; its gate list gains one line naming the identity-release demand leg",
-      "brief": "DIRECTORY-025"
+      "brief": "DIRECTORY-030"
     },
     {
       "path": "scripts/identity-gates/release.sh",
       "note": "the identity-release leg: refuses an unclean tree, a vendor/rauthy pin off ablative and an unpushed HEAD, then runs the six lys legs and prints one JSON line per leg",
-      "brief": "DIRECTORY-025"
+      "brief": "DIRECTORY-030"
     },
     {
       "path": "docs/design/identity/reports/IDENTITY-001-release.md",
       "note": "row 07's release report: refs, venue legs, review, install, receipts, standalone acceptance, not met, reserved acts, status",
-      "brief": "DIRECTORY-025"
+      "brief": "DIRECTORY-030"
     },
     {
       "path": "docs/design/identity/reports/IDENTITY-001-commands.jsonl",
       "note": "row 07's command record: one JSON line per command run for the release",
-      "brief": "DIRECTORY-025"
+      "brief": "DIRECTORY-030"
     }
   ],
   "inventory": [

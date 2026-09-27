@@ -327,12 +327,12 @@
       "superseded_by": ""
     },
     {
-      "id": "ADR-078",
+      "id": "ADR-092",
       "title": "Row 07 is carried in the directory cluster up to a staged install, with its Cambium parts on Cambium-owned cards and the production acts left to Tom",
       "status": "decided",
       "scope": "directory",
       "date": "2026-09-27",
-      "decided_by": "The lead's answers to the directory survey for the row 07 card; recorded with DIRECTORY-025",
+      "decided_by": "The lead's answers to the directory survey for the row 07 card; recorded with DIRECTORY-030",
       "context": "The directory design kept row 07 (gate, install and demonstrate the release) a non-goal until a Cambium cluster or an agreed cross-repository arrangement existed. Row 07 is now to be carried as a brief in this cluster, which scripts/design/gate.sh measures, while its wall names a Cambium install document, its acceptance needs Cambium's gates.json legs on an exact Cambium ref, and its end state touches a production key, production receipts and a Cambium cutover that no card may perform.",
       "decision": "Row 07 leaves the non-goal and is carried by a directory brief that stops at a staged install on the node the operator names, keyed with a test service key, where standalone acceptance is proved and recorded before any cutover. The Cambium install document lands through its own Cambium card with its own pull request and gate, and row 06's Cambium half stays on its own Cambium card; this brief names both as blockers and lists no Cambium file. The brief registers exactly one release leg, as a demand-cadence leg in docs/design/project.json, and every other row registers the leg it needs in its own brief. The production signing key, production receipts and the Cambium cutover are Tom's three acts. Rejected: leaving row 07 a non-goal beside a brief that carries it, listing the Cambium install document on this brief's wall, adding the release leg to .land/gates.sh where every land would run it, and standing up a staging Cambium inside this row.",
       "quote": "",
@@ -340,8 +340,8 @@
         "The design's first non-goal no longer covers row 07 and names this decision.",
         "The release report lists 'preserved Cambium identities are observed' as not met until the cutover, naming the cutover as the act that meets it and Tom as the one who performs it.",
         "Every receipt the release inspects is test-keyed and marked so in the release report; no signed Lys receipt under a production key is produced.",
-        "A leg that DIRECTORY-002, DIRECTORY-004 or DIRECTORY-005 needs and nothing registers is a finding for that brief's owner and a blocker of DIRECTORY-025, never registered by DIRECTORY-025.",
-        "IDENTITY-001.json and IDENTITY-001.md are not changed; status from evidence is recorded only in DIRECTORY-025 and the release report."
+        "A leg that DIRECTORY-002, DIRECTORY-004 or DIRECTORY-005 needs and nothing registers is a finding for that brief's owner and a blocker of DIRECTORY-030, never registered by DIRECTORY-030.",
+        "IDENTITY-001.json and IDENTITY-001.md are not changed; status from evidence is recorded only in DIRECTORY-030 and the release report."
       ],
       "supersedes": [],
       "superseded_by": ""

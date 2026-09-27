@@ -42,7 +42,7 @@
           "text": "As the operator, I want the directory's screens to show every refusal, pending audit and outage as it is, so that I never act on a completed state that did not happen."
         },
         {
-          "id": "S78",
+          "id": "S111",
           "text": "As the operator, I want the exact release installed on a node I name and shown to me as a staging install, so that I can accept the product standalone before anything is cut over."
         }
       ]
@@ -88,7 +88,7 @@
       "role": "Decides from the record whether the release proof is complete",
       "stories": [
         {
-          "id": "S77",
+          "id": "S110",
           "text": "As the release reviewer, I want every command, result, ref and hash recorded with every unmet requirement named, so that completion rests on recorded evidence and never on a health check."
         }
       ]
