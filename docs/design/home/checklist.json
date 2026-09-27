@@ -275,6 +275,36 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The loss account document",
+      "items": [
+        {
+          "id": "C95",
+          "text": "docs/design/home/LOSS-ACCOUNT.md exists, names on its first line the commit it was read from, and states that the loss account is written beside the rendered file under the rendered file's stem with .loss.json, naming the default render path and render-launch as the two cases where that stem is the session uuid.",
+          "done": false
+        },
+        {
+          "id": "C96",
+          "text": "LOSS-ACCOUNT.md states the account's four keys, one entry's two fields hash and reason, and that every render writes the account, with dropped: [] when nothing was dropped.",
+          "done": false
+        },
+        {
+          "id": "C97",
+          "text": "LOSS-ACCOUNT.md quotes every reason string the render passes to the loss constructor, with the line that writes it, and the reason check prints 1 3 3 [] at the landing commit.",
+          "done": false
+        },
+        {
+          "id": "C98",
+          "text": "LOSS-ACCOUNT.md states that an entry's hash is the SHA-256 of the part as serde_json serialises it and that an entry never carries the part's text, signature or redacted data.",
+          "done": false
+        },
+        {
+          "id": "C99",
+          "text": "LOSS-ACCOUNT.md lists the four things the render changes without a loss entry, custom entries and labels, compaction, gitBranch and usage, each with the line that does it.",
+          "done": false
+        }
+      ]
     }
   ]
 }

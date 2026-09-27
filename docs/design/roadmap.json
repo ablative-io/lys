@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "items": [
     {
       "id": "RM-001",
@@ -331,6 +331,32 @@
         "RM-001"
       ],
       "notes": "Ids under the ruling of 26 September at 20:31 that a brief's ids are the next after main's highest and every open brief branch's: DIRECTORY-008 and RM-016. RM-011 to RM-015 are taken on open brief branches, RM-015 by DIRECTORY-007, the audit receipt card's brief, fired beside this one, so this row is appended as RM-016 although main's ledger ends at RM-010 at 1756688; every row main holds is unchanged. Checked at 22:34 against main 1756688 and the open brief branches brief/home/31aa723f, 5898fcb0, 7d3f3efb, 9e701467, c322f3e6, d388a9f7, de72f0a4, e35a7157 and brief/secrets/309540a4, none of which holds DIRECTORY-008 or RM-016. No new ADR: the brief records no decision. The build changes only the four files DIRECTORY-008 R1 to R3 name under docs/design/directory."
+    },
+    {
+      "id": "RM-027",
+      "title": "Write the loss account of the Claude Code render down as the code writes it",
+      "status": "idea",
+      "kind": "design",
+      "summary": "HOME-001 R4 and the home design name docs/design/home/LOSS-ACCOUNT.md, which was never written. One docs-only card writes it from the Claude Code render on main: where the account is written (beside the rendered file under its stem, with the two cases where the stem is the session uuid), the account's keys and one entry's fields, every reason quoted with its source line, when an entry is written, that an entry names a part by hash and never carries its content, that every render writes the account, and what the render changes without an entry. A reason check keyed on the source proves both directions; no file under crates changes.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T11:35:00+10:00",
+        "quote": "HOME-001 row R4 lists docs/design/home/LOSS-ACCOUNT.md among the files it creates, at HOME-001.json:148 and HOME-001.md:137, and DESIGN.md:84 and design.json:135 name the same path. The document does not exist on lys main at 7b53625, checked with git cat-file. The judged-rows card holds R4's card in review on that finding and names this card as the act that answers it. This card writes the document and changes no code.\n\nThe document is written from crates/lys-home/src/harness/claude_code/render.rs and launch.rs as they stand on main at the brief's commit. It states where the loss account is written, as the file named by the session uuid with .loss.json beside the rendered session, and the shape of one entry as the Loss struct carries it. It states every reason the render writes into it, each quoted exactly as the source writes it, with the source line that writes it. It states when an entry is written, which is when signed thinking is rendered as text for a different provider, api or model, and when redacted or empty thinking is dropped. It states that the account names each dropped block by its hash and never carries the block's content. It states whether a render with nothing dropped still writes the account, as the code shows.\n\nAcceptance. The file docs/design/home/LOSS-ACCOUNT.md exists on the landing commit. A check that the brief names reads every reason string in render.rs from the source and finds each one quoted in the document, and finds no reason in the document that the source does not write. Every file:line the document cites exists at the commit it names. No file under crates changes. The design gate, sh scripts/design/gate.sh, exits 0.\n\nKeep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh). The brief id, roadmap row and any decision take the next free id after main's highest and every open brief/* and draft/* branch's, checked with git ls-remote immediately before writing. If the render card, which changes render.rs refusals, lands before this card is built, the document is written from main as it then stands and names that commit. Not in scope are any change to what the render drops or why, and the loss account of any harness other than Claude Code. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie, lead for the home line, on 27 September 2026 on lys main 7b53625.",
+        "context": "The words of the card that answers the judged-rows card's finding that HOME-001 R4's LOSS-ACCOUNT.md is absent on main at 7b53625; the survey's three questions were answered by the lead for the home line before this round."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-012",
+          "ADR-018"
+        ],
+        "briefs": [
+          "HOME-013"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Ids checked with git ls-remote and a fetch of all 74 open brief/* and draft/* branches immediately before writing, against main 7b53625: HOME-012 and RM-026 are taken on open branches (draft/home/4c46aabc, brief/lys-anchor/6b1c7df6) and ADR-040 likewise, so this row is RM-027 and its brief HOME-013; checklist C95 to C99 and story S40 follow the highest numbers on those branches (C94, S39). No new decision: the document records existing behaviour. Further units, not written: Pin the three loss reasons' text in render_tests.rs; Fix the loss account's silent empty write on serialisation failure and its overwrite under plain render; Write PROOF-PROXY.md for HOME-001 R7; Decide whether custom entries, labels, compaction, gitBranch or usage should write a loss entry."
     }
   ]
 }
