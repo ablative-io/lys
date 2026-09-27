@@ -10,6 +10,7 @@ mod account_tests;
 pub mod beside;
 #[cfg(test)]
 mod beside_tests;
+pub mod leaf;
 #[cfg(test)]
 mod leaf_tests;
 pub mod parts;
