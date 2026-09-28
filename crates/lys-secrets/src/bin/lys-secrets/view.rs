@@ -59,7 +59,9 @@ struct HeldAsked {
 }
 
 /// The handles an identity holds, each only when the caller may discover
-/// its secret: what it stands for, its uses and its end, never the handle.
+/// its secret: what it stands for, its uses and its end, whether and by whom
+/// it was ended, and where the provider's part of its revocation stands,
+/// never the handle.
 pub async fn handles(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
     let (parts, _body) = request.into_parts();
     let Query(asked) = Query::<HeldAsked>::try_from_uri(&parts.uri).map_err(|error| {
@@ -80,6 +82,10 @@ pub async fn handles(State(shared): State<Arc<Shared>>, request: Request) -> Ans
         .held_by(&identity, &asked.holder)
         .into_iter()
         .map(|held| {
+            let (upstream, upstream_reason) = crate::manage::upstream_label(&held.upstream);
+            let ended = held.ended.map(
+                |ended| json!({ "by": ended.by, "operation": ended.operation, "root": ended.root }),
+            );
             json!({
                 "id": held.id,
                 "secret": held.secret,
@@ -90,6 +96,9 @@ pub async fn handles(State(shared): State<Arc<Shared>>, request: Request) -> Ans
                 "spend_cap": held.spend_cap,
                 "settled": held.settled,
                 "parent": held.parent,
+                "ended": ended,
+                "upstream": upstream,
+                "upstream_reason": upstream_reason,
             })
         })
         .collect();
