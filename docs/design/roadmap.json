@@ -2078,6 +2078,60 @@
       },
       "depends_on": [],
       "notes": "Written by hand straight to main."
+    },
+    {
+      "id": "RM-085",
+      "title": "Every app registers its sign-in and permission schema with Lys through a published API",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Apps are records in Lys with their own sign-in client and permission schema, registered through the API and approved on a Lys screen; the API is described by a generated OpenAPI document; Lys depends on no app.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T20:00:00+10:00",
+        "quote": "a quality API as well, because we're going to need a way of getting in the permission schema and everything for every one of the apps that it covers. This has to be able to handle sign in and authentication and permissions for every single one of our apps, but not depend on them.",
+        "context": "No MCP server or app registration existed in Lys on 28 September 2026; the mock-up assumed both."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-116"
+        ],
+        "briefs": [
+          "DIRECTORY-048"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-084"
+      ],
+      "notes": "Written by hand straight to main."
+    },
+    {
+      "id": "RM-086",
+      "title": "Lys MCP server: secure and compact",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Three tools over the published API, signed per call by the caller's own identity, no secret values, no authority of its own.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T20:00:00+10:00",
+        "quote": "Have you started work on the MCP? It will need to be secure and compact.",
+        "context": "No MCP server or app registration existed in Lys on 28 September 2026; the mock-up assumed both."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-116"
+        ],
+        "briefs": [
+          "DIRECTORY-049"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-085"
+      ],
+      "notes": "Written by hand straight to main."
     }
   ]
 }
