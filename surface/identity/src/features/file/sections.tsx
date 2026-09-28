@@ -9,7 +9,6 @@ import { AssignedRoles } from '../roles/AssignedRoles';
 import { api, useLoad } from '../../api';
 import type { ReceiptAnswer } from '../../generated';
 import { Gate } from '../signin/Gate';
-import type { ReactNode } from 'react';
 import { useShell } from '../../shell/ShellContext';
 import { CheckBox } from '../grants/CheckBox';
 import { Delegate } from '../grants/Delegate';
@@ -20,15 +19,6 @@ import { Pill } from '../people/Pill';
 import { firstName } from '../people/directory';
 import type { FileData } from './IdentityFile';
 import { clock } from './time';
-
-/** The mock-up's own empty state, marked as not built, with why. */
-export function NotBuilt({ children }: { children: ReactNode }) {
-  return (
-    <div className="empty-note">
-      <span className="open-q">not built yet</span> {children}
-    </div>
-  );
-}
 
 function Profile({ data }: { data: FileData }) {
   const { x, agent, agents } = data;
@@ -84,7 +74,6 @@ function Access({ data, reload }: { data: FileData; reload: () => void }) {
   const shell = useShell();
   const { x, grants: w } = data;
   const name = firstName(x.display_name);
-  if (!w) return <NotBuilt>The grants could not be read for this file.</NotBuilt>;
   const held = w.list.grants.filter((g) => g.holder === x.id);
   const reach = new Map<string, string[]>();
   for (const g of held) {
@@ -99,7 +88,6 @@ function Access({ data, reload }: { data: FileData; reload: () => void }) {
       <div>
         <div className="section-h" style={{ marginTop: 0 }}>
           <span>Grants</span>
-          <span className="open-q" title="The grant representation is not yet decided">draft form</span>
         </div>
         {held.length ? held.map((g) => <GrantCard key={g.id} w={w} g={g} chain={chainOf(w, g)} done={reload} />) : <div className="dim">No grants.</div>}
         {x.kind === 'agent' && x.state !== 'retired' ? (
