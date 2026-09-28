@@ -775,6 +775,13 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/backchannel_logout.rs` | R4: Signing out of Lys signs the person out of every registered app | DIRECTORY-059 |
 | `crates/lys-identity-server/tests/backchannel_logout.rs` | R4: Signing out of Lys signs the person out of every registered app | DIRECTORY-059 |
 | `crates/lys-identity-server/src/sessions_api.rs` | R4: Signing out of Lys signs the person out of every registered app | DIRECTORY-059 |
+| `crates/lys-secrets/tests/held_states.rs` | A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
+| `crates/lys-secrets/src/bin/lys-secrets/serve.rs` | A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
+| `crates/lys-secrets/src/bin/lys-secrets/view.rs` | A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
+| `crates/lys-identity-server/src/issuer_sign_out.rs` | Signing out of Lys ends the person's sessions at the issuer, and the issuer tells every registered app | DIRECTORY-059 |
+| `crates/lys-identity-server/src/apps_connect.rs` | An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code | DIRECTORY-059 |
+| `crates/lys-identity-server/tests/apps_connect.rs` | An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code | DIRECTORY-059 |
+| `surface/identity/src/features/apps/ConnectRequest.tsx` | An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code | DIRECTORY-059 |
 
 ## Inventory
 

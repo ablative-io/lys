@@ -13,7 +13,8 @@ title: Lys finds its own credentials, says where it is, serves its members to an
 > - C411 — A start reads its credentials from Lys's own broker, and no route reaches an app for them (DIRECTORY-059 R1).
 > - C412 — Lys writes a discovery record any app can find (DIRECTORY-059 R2).
 > - C413 — Any registered app reads Lys's people, seats and agents (DIRECTORY-059 R3).
-> - C414 — Signing out of Lys signs the person out of every registered app (DIRECTORY-059 R4).
+> - C414 — Signing out of Lys ends the person's sessions at the issuer, and the issuer tells every registered app (DIRECTORY-059 R4).
+> - C415 — An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code (DIRECTORY-059 R5).
 > **Stories:**
 > - S165 (Operator, Installs and runs the standalone identity product) — As an operator, I want Lys to start agents with their credentials, tell apps where it is and sign people out of every app, with no app needing to run, so that Lys and each app work on their own and together.
 
@@ -23,29 +24,38 @@ Lys and every app on a machine integrate natively, but neither depends on the ot
 
 ## Task
 
-Read the handle records from the broker Lys already runs and remove the app endpoint client. Write a discovery record at Lys's data root. Serve people, seats and agents to any registered app. Send a back-channel sign-out to every registered app when a person signs out. Nothing here names any app.
+Read the handle records from the broker Lys already runs and remove the app endpoint client. Write a discovery record at Lys's data root. Serve people, seats and agents to the registered apps allowed to see them. Have the issuer tell every registered app when a person signs out. Let an app ask for its registration and receive its client secret by a one-time code once an administrator approves it. Nothing here names any app. Overlap. This brief builds after DIRECTORY-048 lands, and routes.rs is shared with 048 R1 and R6 and with DIRECTORY-050 R4. The file door_handles.rs is changed by 048 R7 and deleted here. The file crates/lys/src/identity/install.rs is shared with 050 R1. The files serve.rs and view.rs of lys-secrets are shared with SECRETS-006. The files apps_api.rs and apps_store.rs are created by 048 and changed here. Each of those lands first and this brief is cut from the main that holds them.
 
 ## Requirements
 
 ### R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them
 
-Behavioural. The start route's HandleRecords (crates/lys-identity/src/start/credentials.rs line 59) is read from the secrets broker the service is already configured with (the secrets member of the service configuration, crates/lys-identity-server/src/config.rs lines 67 to 70, rendered by the install at crates/lys/src/identity/install/server_config.rs lines 74 to 75). The broker answers, for one holder, the ids of the handles it holds and whether each is active, from the records it already keeps (crates/lys-secrets/src/access.rs and the holder handling in crates/lys-secrets/src/bin/lys-secrets/callers.rs). The answer carries ids and states only, and an answer with any other member is refused credential_value_in_answer, as door_handles.rs refuses it today. The client that reads it is broker_handles.rs in lys-identity-server, asking as the service the broker trusts. door_handles.rs and its tests are deleted, and routes.rs lines 168 to 183 build the broker client. A service with no broker configured answers every credentialed start refused secrets_unavailable, naming the missing setting.
+Behavioural. The start route's HandleRecords (crates/lys-identity/src/start/credentials.rs line 59) is read from the secrets broker the service is already configured with (the secrets member of the service configuration, crates/lys-identity-server/src/config.rs lines 67 to 70, rendered by the install at crates/lys/src/identity/install/server_config.rs lines 74 to 75). The broker's existing GET /_lys/handles (crates/lys-secrets/src/bin/lys-secrets/serve.rs line 87, answered by view.rs lines 116 to 146) is not used, because it answers the secret's name, the uses and the limits, and access.rs lines 17 to 20 let only the holder or the person acted for discover a lease. The broker gains GET /_lys/held-states?holder= in serve.rs and view.rs. It answers, for one holder, each handle's id and whether it is active, and no other member. The access rule is new and lives in crates/lys-secrets/src/access.rs. The trusted screen service, asking for itself with its signature over the request (callers.rs on_behalf, line 104, with no person named), may read the held states of any holder, and it may read nothing else through that standing. Every other caller asking this route is refused. The client is broker_handles.rs in lys-identity-server. It refuses an answer carrying any member beside id and state with credential_value_in_answer, as door_handles.rs does today. The function door_handles::credential_id (door_handles.rs line 39) moves unchanged into broker_handles.rs. These are deleted. The file door_handles.rs, tests/door_handles.rs, examples/door_handles.rs, the module lines at routes.rs 84 to 85, and the three assertions at tests/start.rs 437 to 439 that name the old client. The start test is given assertions that name the broker client instead. Lines 168 to 183 of routes.rs build the broker client. A service with no broker configured answers every credentialed start with a new start refusal, broker_not_configured, in crates/lys-identity/src/start/error.rs. The name secrets_unavailable is already the secrets screens' refusal (config.rs lines 66 to 67) and is not reused.
 
 **Acceptance:**
-- A test starts an agent that needs a credential against a scratch Lys service and broker, with no other program listening anywhere, and the start answers the credential's id.
+- A test starts an agent that needs a credential against a scratch Lys service and broker with no other program listening, and the start answers the credential's id.
 - A test of an agent holding a dropped handle answers that handle as not valid.
 - A broker answer carrying a member beside id and state is refused credential_value_in_answer, naming the member and never its value.
-- A search of crates/ for DoorHandles and door_handles prints nothing.
+- A signed-in person asking GET /_lys/held-states for another holder is refused.
+- A service with no broker configured refuses a credentialed start with broker_not_configured.
+- A search of crates/ for DoorHandles prints nothing.
+- A search of crates/ for door_handles prints nothing.
 
 **Files:**
 - create: crates/lys-identity-server/src/broker_handles.rs
 - create: crates/lys-identity-server/src/broker_handles_tests.rs
 - create: crates/lys-identity-server/tests/start_with_own_broker.rs
+- create: crates/lys-secrets/tests/held_states.rs
 - modify: crates/lys-identity-server/src/routes.rs
+- modify: crates/lys-identity-server/tests/start.rs
+- modify: crates/lys-identity/src/start/error.rs
 - modify: crates/lys-secrets/src/access.rs
 - modify: crates/lys-secrets/src/bin/lys-secrets/callers.rs
-- modify: crates/lys-secrets/src/bin/lys-secrets/main.rs
+- modify: crates/lys-secrets/src/bin/lys-secrets/serve.rs
+- modify: crates/lys-secrets/src/bin/lys-secrets/view.rs
 - delete: crates/lys-identity-server/src/door_handles.rs
+- delete: crates/lys-identity-server/tests/door_handles.rs
+- delete: crates/lys-identity-server/examples/door_handles.rs
 
 **Checklist:**
 - C411 — A start reads its credentials from Lys's own broker, and no route reaches an app for them (DIRECTORY-059 R1).
@@ -75,16 +85,20 @@ Behavioural. The install and every upgrade write install/lys.json under the data
 
 ### R3: Any registered app reads Lys's people, seats and agents
 
-Behavioural. A registered app of DIRECTORY-048, signed in with its own client, reads GET /apps/members. It answers each person, seat and agent the app is granted to see, with the subject id the app's sign-in carries, a display name, the kind, and whether it is active. It pages from a cursor and never reads a whole log. An app that is not registered, or not approved, is refused by name. The feed is the same for every app.
+Behavioural. A registered app of DIRECTORY-048, signed in with its own client, reads GET /apps/members. An app sees a person, seat or agent when that subject holds the member relation on the object app/<app id> in Lys's own schema (the 'lys' app of DIRECTORY-048 R4). The 'lys' schema gains the kind app with the relation member and the action see_members. Approval of an app gives the member relation to every person and agent of the deployment unless the approving administrator narrows it on the approval screen. The feed answers each subject the app sees with the subject id the app's sign-in carries, a display name, the kind, and whether it is active. It pages from a cursor and never reads a whole log. An unregistered client is refused app_not_registered, and a registered app not yet approved is refused app_not_approved, the refusal DIRECTORY-048 R1 names. The feed is the same for every app.
 
 **Acceptance:**
-- A test registers two apps, and each reads the members its grant allows with the subject ids its own sign-in gives.
+- A test approves two apps and narrows the second to one person, and the first app's feed lists every person and agent.
+- The second app's feed lists only that one person.
+- Each feed carries the subject ids that app's own sign-in gives.
 - An unregistered client is refused app_not_registered.
+- A pending app is refused app_not_approved.
 
 **Files:**
 - create: crates/lys-identity-server/src/app_members_api.rs
 - create: crates/lys-identity-server/tests/app_members.rs
 - modify: crates/lys-identity-server/src/routes.rs
+- modify: crates/lys-identity-server/src/apps_api.rs
 
 **Checklist:**
 - C413 — Any registered app reads Lys's people, seats and agents (DIRECTORY-059 R3).
@@ -92,22 +106,55 @@ Behavioural. A registered app of DIRECTORY-048, signed in with its own client, r
 **Stories:**
 - S165 (Operator, Installs and runs the standalone identity product) — As an operator, I want Lys to start agents with their credentials, tell apps where it is and sign people out of every app, with no app needing to run, so that Lys and each app work on their own and together.
 
-### R4: Signing out of Lys signs the person out of every registered app
+### R4: Signing out of Lys ends the person's sessions at the issuer, and the issuer tells every registered app
 
-Behavioural. When a person signs out (crates/lys-identity-server/src/sessions_api.rs line 162), Lys ends the session at its issuer and sends an OpenID back-channel logout token, signed by the issuer, to the back-channel address each registered app declared at registration. Each send is recorded with its answer, and a failed send is named on the person's sign-out answer and never retried by a clock. An app that declared no back-channel address is named as not told.
+Behavioural. The issuer is Rauthy (crates/lys/src/identity/install/server_config.rs lines 29 to 31), and crates/lys-identity-server/src/oidc.rs is only a sign-in client of it, so Lys holds no key to sign a logout token and signs none. Rauthy 0.36.2 sends OpenID back-channel logout tokens itself, signed by its own key, to each client's backchannel_logout_uri when a user's sessions are deleted (DELETE /auth/v1/sessions/{user_id}, src/api/src/sessions.rs line 162 of the pinned Rauthy source, which calls execute_backchannel_logout). Registration of DIRECTORY-048 gains an optional back-channel address, kept in apps_store.rs and set as the backchannel_logout_uri of the app's client at Rauthy when the app is approved. The function end_session (crates/lys-identity-server/src/sessions_api.rs line 139) ends the person's sessions at Rauthy in two cases. The first is a person ending the session they are signed in with (end_own, line 187, where the ended session is the current one). The second is an administrator ending a person's session (end_persons, line 217). Ending one of one's own other sessions ends only that Lys session and asks nothing of Rauthy. The call is one request to Rauthy with the service's Rauthy key, whose rights (crates/lys/src/identity/prepare.rs lines 149 to 158) gain Sessions delete. The upgrade grants that right to the key of an install made before this change. Lys waits only for Rauthy's answer and never for an app. When Rauthy refuses or cannot be reached, the Lys session is still ended and the answer is refused issuer_sign_out_failed, naming Rauthy's answer. The sign-out answer lists each approved app with no back-channel address under not_told. Lys adds no timeout, retry or clock of its own.
 
 **Acceptance:**
-- A test with two registered apps signs a person out, and each app's stand-in receives a logout token for that person's subject that verifies under the issuer's key.
-- An app whose back-channel address refuses is named on the sign-out answer.
+- A test with two approved apps holding back-channel addresses signs a person out, and each app's stand-in receives a logout token for that person's subject.
+- That token verifies under the key Rauthy's discovery document publishes.
+- An administrator ending a person's session makes each stand-in receive a logout token.
+- Ending one of one's own other sessions sends no logout token.
+- An approved app with no back-channel address is listed under not_told on the sign-out answer.
+- A sign-out while Rauthy is stopped ends the Lys session and answers issuer_sign_out_failed.
+- After an upgrade of an install made before this change, a sign-out ends the person's Rauthy sessions.
 
 **Files:**
-- create: crates/lys-identity-server/src/backchannel_logout.rs
+- create: crates/lys-identity-server/src/issuer_sign_out.rs
 - create: crates/lys-identity-server/tests/backchannel_logout.rs
 - modify: crates/lys-identity-server/src/sessions_api.rs
-- modify: crates/lys-identity-server/src/oidc.rs
+- modify: crates/lys-identity-server/src/apps_api.rs
+- modify: crates/lys-identity-server/src/apps_store.rs
+- modify: crates/lys/src/identity/prepare.rs
 
 **Checklist:**
-- C414 — Signing out of Lys signs the person out of every registered app (DIRECTORY-059 R4).
+- C414 — Signing out of Lys ends the person's sessions at the issuer, and the issuer tells every registered app (DIRECTORY-059 R4).
+
+**Stories:**
+- S165 (Operator, Installs and runs the standalone identity product) — As an operator, I want Lys to start agents with their credentials, tell apps where it is and sign people out of every app, with no app needing to run, so that Lys and each app work on their own and together.
+
+### R5: An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code
+
+Behavioural. DIRECTORY-048 R1 shows an approved app's client secret once, to the approving administrator. An app on the same machine that registers itself needs the secret delivered to it instead, with no person copying it. Lys serves a connect page at GET /apps/connect on the Apps screen. It takes a registration request from the app (the app id, display name, redirect addresses, back-channel address, permission schema, a return address among the redirect addresses, and the SHA-256 hash of a one-time verifier the app keeps). A signed-in administrator sees the request in words, as the Apps screen shows a registration, and one button registers and approves it together. Lys then sends the browser to the return address with a one-time code. POST /apps/{app}/secret takes the code and the verifier. When the verifier's hash matches, it answers the client secret once and spends the code, so the secret is delivered to the app and is not shown on the screen. A code is spent by its first use, whether that use succeeds or fails. The secret is never written to a log, a receipt or a stored record in the clear, as 048 R1 requires. A registration made through the ordinary POST /apps keeps 048's behaviour.
+
+**Acceptance:**
+- A test posts a connect request, approves it as the administrator, and redeems the code with the verifier, and the answer holds a secret that completes a sign-in for the app.
+- A second redemption of the same code is refused code_spent.
+- A redemption with a wrong verifier is refused verifier_mismatch.
+- After a wrong verifier, the code is spent.
+- A person who is not an administrator is refused on the connect page.
+- No log line written during the test holds the secret.
+
+**Files:**
+- create: crates/lys-identity-server/src/apps_connect.rs
+- create: crates/lys-identity-server/tests/apps_connect.rs
+- create: surface/identity/src/features/apps/ConnectRequest.tsx
+- modify: crates/lys-identity-server/src/apps_api.rs
+- modify: crates/lys-identity-server/src/apps_store.rs
+- modify: crates/lys-identity-server/src/routes.rs
+
+**Checklist:**
+- C415 — An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code (DIRECTORY-059 R5).
 
 **Stories:**
 - S165 (Operator, Installs and runs the standalone identity product) — As an operator, I want Lys to start agents with their credentials, tell apps where it is and sign people out of every app, with no app needing to run, so that Lys and each app work on their own and together.

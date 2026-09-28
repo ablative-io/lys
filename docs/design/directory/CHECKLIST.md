@@ -369,4 +369,5 @@
 - [ ] **C411** — A start reads its credentials from Lys's own broker, and no route reaches an app for them (DIRECTORY-059 R1).
 - [ ] **C412** — Lys writes a discovery record any app can find (DIRECTORY-059 R2).
 - [ ] **C413** — Any registered app reads Lys's people, seats and agents (DIRECTORY-059 R3).
-- [ ] **C414** — Signing out of Lys signs the person out of every registered app (DIRECTORY-059 R4).
+- [ ] **C414** — Signing out of Lys ends the person's sessions at the issuer, and the issuer tells every registered app (DIRECTORY-059 R4).
+- [ ] **C415** — An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code (DIRECTORY-059 R5).

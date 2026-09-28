@@ -2449,10 +2449,10 @@
         "context": "Tom's 21:34 rule that Lys and every app integrate natively and neither depends on the other."
       },
       "links": {
-        "cluster": "secrets",
+        "cluster": "directory",
         "decisions": [],
         "briefs": [
-          "SECRETS-007"
+          "DIRECTORY-059"
         ],
         "commits": []
       },

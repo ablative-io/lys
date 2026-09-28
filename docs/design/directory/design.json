@@ -3411,6 +3411,41 @@
       "path": "crates/lys-identity-server/src/sessions_api.rs",
       "note": "R4: Signing out of Lys signs the person out of every registered app",
       "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-secrets/tests/held_states.rs",
+      "note": "A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-secrets/src/bin/lys-secrets/serve.rs",
+      "note": "A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-secrets/src/bin/lys-secrets/view.rs",
+      "note": "A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/src/issuer_sign_out.rs",
+      "note": "Signing out of Lys ends the person's sessions at the issuer, and the issuer tells every registered app",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_connect.rs",
+      "note": "An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/apps_connect.rs",
+      "note": "An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "surface/identity/src/features/apps/ConnectRequest.tsx",
+      "note": "An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code",
+      "brief": "DIRECTORY-059"
     }
   ],
   "inventory": [
