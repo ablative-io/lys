@@ -26,9 +26,9 @@ pub mod store;
 
 pub use audit::{AuditKind, AuditLine, AuditLog, Opened, RecordedLine, STATE_DOMAIN};
 pub use broker::{
-    Admitted, Broker, BrokerPaths, Clock, OwnerChanged, PRESENTATION_SKEW_MS, RevocationState,
-    RevokeOutcome, SNAPSHOT_EVERY, SecretSettings, SnapshotReport, Ticket, UpstreamRevocation,
-    UseError, Used,
+    Admitted, Broker, BrokerPaths, Clock, HeldHandle, OwnerChanged, PRESENTATION_SKEW_MS,
+    RevocationState, RevokeOutcome, SNAPSHOT_EVERY, SecretSettings, SnapshotReport, Ticket,
+    UpstreamRevocation, UseError, Used,
 };
 pub use error::{OwnerChangeRefusal, RevocationRefusal, SecretsError, ServiceRefusal};
 pub use handle::{

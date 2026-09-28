@@ -141,6 +141,57 @@ fn the_settings_route_reads_what_a_change_left() -> TestResult {
 }
 
 #[test]
+fn the_handles_route_lists_what_a_holder_holds_and_never_the_handle() -> TestResult {
+    let served = Served::start(Seeded::new()?)?;
+    let target = format!("/_lys/handles?holder={OWNER}");
+
+    let (status, body) = served.ask(&Method::GET, &target, b"", OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let answered: Value = serde_json::from_str(&body)?;
+    assert_eq!(answered["holder"], OWNER);
+    let handles = answered["handles"].as_array().ok_or("no handles")?;
+    assert_eq!(handles.len(), 1, "{body}");
+    assert_eq!(handles[0]["id"], served.seeded.owned_handle);
+    assert_eq!(handles[0]["secret"], OWNED);
+    assert_eq!(handles[0]["used"], 0);
+    assert_eq!(handles[0]["dropped"], false);
+    let shown: Vec<&String> = handles[0]
+        .as_object()
+        .ok_or("not an object")?
+        .keys()
+        .collect();
+    assert_eq!(
+        shown,
+        [
+            "dropped",
+            "id",
+            "max_uses",
+            "not_after_ms",
+            "parent",
+            "secret",
+            "settled",
+            "spend_cap",
+            "used"
+        ],
+        "no token, digest or key is shown"
+    );
+
+    let (status, body) = served.ask(&Method::GET, &target, b"", OTHER)?;
+    assert_eq!(status, 200, "{body}");
+    let hidden: Value = serde_json::from_str(&body)?;
+    assert_eq!(
+        hidden,
+        json!({ "holder": OWNER, "handles": [] }),
+        "a handle on a secret the asker may not discover is left out"
+    );
+
+    let (status, body) = served.ask(&Method::GET, "/_lys/handles?holder=", b"", OWNER)?;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.starts_with("Encoding:"), "{body}");
+    Ok(())
+}
+
+#[test]
 fn the_revocation_route_reads_a_percent_encoded_handle() -> TestResult {
     let served = Served::start(Seeded::new()?)?;
     let owned = served.seeded.owned_handle.clone();

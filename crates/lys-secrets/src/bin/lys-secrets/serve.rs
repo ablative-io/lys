@@ -59,6 +59,7 @@ pub fn serve(mut broker: Broker<Grants>, layout: Layout, listen: &str) -> Result
             .route("/_lys/secrets", axum::routing::get(crate::view::secrets))
             .route("/_lys/audit", axum::routing::get(crate::view::audit))
             .route("/_lys/grants", axum::routing::get(crate::view::grants))
+            .route("/_lys/handles", axum::routing::get(crate::view::handles))
             .route("/_lys/next-account", axum::routing::post(next_account))
             .route("/_lys/scope", axum::routing::post(crate::manage::scope))
             .route(

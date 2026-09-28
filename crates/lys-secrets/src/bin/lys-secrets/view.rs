@@ -8,8 +8,9 @@
 use std::sync::{Arc, PoisonError};
 
 use axum::Json;
-use axum::extract::{Request, State};
+use axum::extract::{Query, Request, State};
 use axum::http::StatusCode;
+use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::callers::{self, refused};
@@ -48,6 +49,51 @@ pub async fn secrets(State(shared): State<Arc<Shared>>, request: Request) -> Ans
         })
         .collect();
     Ok(Json(json!({ "secrets": entries })))
+}
+
+/// The query of a handles read: the holder, percent-decoded.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HeldAsked {
+    holder: String,
+}
+
+/// The handles an identity holds, each only when the caller may discover
+/// its secret: what it stands for, its uses and its end, never the handle.
+pub async fn handles(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
+    let (parts, _body) = request.into_parts();
+    let Query(asked) = Query::<HeldAsked>::try_from_uri(&parts.uri).map_err(|error| {
+        failed(&lys_secrets::SecretsError::Encoding {
+            context: "query",
+            reason: error.body_text(),
+        })
+    })?;
+    if asked.holder.is_empty() {
+        return Err(failed(&lys_secrets::SecretsError::Encoding {
+            context: "query",
+            reason: "no holder named".to_owned(),
+        }));
+    }
+    let identity = callers::caller(&shared, &parts, &[])?.identity;
+    let broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
+    let handles: Vec<Value> = broker
+        .held_by(&identity, &asked.holder)
+        .into_iter()
+        .map(|held| {
+            json!({
+                "id": held.id,
+                "secret": held.secret,
+                "max_uses": held.max_uses,
+                "used": held.used,
+                "not_after_ms": held.not_after_ms,
+                "dropped": held.dropped,
+                "spend_cap": held.spend_cap,
+                "settled": held.settled,
+                "parent": held.parent,
+            })
+        })
+        .collect();
+    Ok(Json(json!({ "holder": asked.holder, "handles": handles })))
 }
 
 pub async fn grants(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
