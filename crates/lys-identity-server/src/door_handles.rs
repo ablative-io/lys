@@ -241,7 +241,11 @@ pub fn report(handles: &DoorHandles, agent: &str) -> String {
         HandleAnswer::Held(held) => {
             let mut lines = vec![format!("credentials: {}", held.len())];
             for credential in held {
-                let validity = if credential.valid { "valid" } else { "not valid" };
+                let validity = if credential.valid {
+                    "valid"
+                } else {
+                    "not valid"
+                };
                 lines.push(format!("{} {validity}", credential.id));
             }
             lines.join("\n")

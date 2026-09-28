@@ -21,13 +21,22 @@ impl ProfileReviews for Reviews {
 
 #[test]
 fn a_reviewed_version_passes() {
-    assert_eq!(check(&Reviews(Some(vec!["pv-fixture-1".to_owned()])), "pv-fixture-1"), Ok(()));
+    assert_eq!(
+        check(
+            &Reviews(Some(vec!["pv-fixture-1".to_owned()])),
+            "pv-fixture-1"
+        ),
+        Ok(())
+    );
 }
 
 #[test]
 fn a_version_with_no_review_is_refused_by_name() {
-    let refusal = check(&Reviews(Some(vec!["pv-fixture-1".to_owned()])), "pv-fixture-2")
-        .expect_err("no review is on record");
+    let refusal = check(
+        &Reviews(Some(vec!["pv-fixture-1".to_owned()])),
+        "pv-fixture-2",
+    )
+    .expect_err("no review is on record");
     assert_eq!(refusal.name(), "profile_version_not_reviewed");
     assert!(refusal.to_string().contains("pv-fixture-2"), "{refusal}");
 }

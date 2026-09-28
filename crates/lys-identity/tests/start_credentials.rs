@@ -86,7 +86,10 @@ fn with_no_handle_record_the_check_names_secrets_002() -> Result<(), Box<dyn std
     let refusal = check(&Handles(None), "agent-fixture-1")?.expect_err("the record is missing");
     assert_eq!(refusal.name(), "check_record_missing");
     let words = refusal.to_string();
-    assert!(words.contains("its virtual credentials are valid"), "{words}");
+    assert!(
+        words.contains("its virtual credentials are valid"),
+        "{words}"
+    );
     assert!(words.contains("SECRETS-002"), "{words}");
     Ok(())
 }
@@ -123,7 +126,10 @@ fn an_answer_that_carried_a_value_is_refused_by_name() -> Result<(), Box<dyn std
     let refusal = check(&Carried, "agent-fixture-1")?.expect_err("a value in the answer");
     assert_eq!(refusal.name(), "credential_value_in_answer");
     let words = refusal.to_string();
-    assert!(words.contains("vc-fixture-1") && words.contains("value"), "{words}");
+    assert!(
+        words.contains("vc-fixture-1") && words.contains("value"),
+        "{words}"
+    );
     assert_eq!(Carried.handles("agent-fixture-1").refusal(), Some(refusal));
     Ok(())
 }

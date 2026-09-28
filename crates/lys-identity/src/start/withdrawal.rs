@@ -77,12 +77,13 @@ pub fn withdraw<S: LeafStore>(
     now: u64,
 ) -> Result<LaunchState, StartError> {
     store.settle()?;
-    let record = store
-        .record(launch_record)
-        .cloned()
-        .ok_or_else(|| StartError::LaunchRecordUnknown {
-            launch_record: launch_record.to_owned(),
-        })?;
+    let record =
+        store
+            .record(launch_record)
+            .cloned()
+            .ok_or_else(|| StartError::LaunchRecordUnknown {
+                launch_record: launch_record.to_owned(),
+            })?;
     let agent = resolve(owners.agents, &record.agent)?;
     let admitted = admit(owners.admission, caller, &agent)?;
     if store.withdrawal(launch_record).is_none() {

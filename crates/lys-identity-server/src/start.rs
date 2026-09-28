@@ -21,12 +21,12 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
+use axum::Router;
 use axum::body::Bytes;
 use axum::extract::{Path as UrlPath, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
-use axum::Router;
 use lys_core::Ed25519Identity;
 use lys_identity::start::active::Lifecycles;
 use lys_identity::start::authority::Admission;
@@ -235,8 +235,14 @@ async fn start(
         );
     };
     answer(service, &headers, move |service, launches, caller| {
-        give(launches, &service.owners(), caller, members, (service.clock)())
-            .map(|given| given.to_json())
+        give(
+            launches,
+            &service.owners(),
+            caller,
+            members,
+            (service.clock)(),
+        )
+        .map(|given| given.to_json())
     })
     .await
 }
@@ -247,8 +253,14 @@ async fn start_again(
     UrlPath(source): UrlPath<String>,
 ) -> Response {
     answer(service, &headers, move |service, launches, caller| {
-        give_again(launches, &service.owners(), caller, &source, (service.clock)())
-            .map(|given| given.to_json())
+        give_again(
+            launches,
+            &service.owners(),
+            caller,
+            &source,
+            (service.clock)(),
+        )
+        .map(|given| given.to_json())
     })
     .await
 }

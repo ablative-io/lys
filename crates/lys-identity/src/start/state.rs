@@ -464,7 +464,10 @@ impl LaunchState {
             }
         };
         if let Some(withdrawal) = &self.withdrawal {
-            words = format!("{words} Withdrawn by {} at {}.", withdrawal.by, withdrawal.at);
+            words = format!(
+                "{words} Withdrawn by {} at {}.",
+                withdrawal.by, withdrawal.at
+            );
         }
         words
     }
@@ -506,12 +509,9 @@ pub fn derive(
     withdrawal: Option<&Withdrawal>,
     sessions: &dyn SessionReports,
 ) -> LaunchState {
-    let running = sessions
-        .reports(&record.id)
-        .into_iter()
-        .find(|report| {
-            report.verified && report.agent == record.agent && report.launch_record == record.id
-        });
+    let running = sessions.reports(&record.id).into_iter().find(|report| {
+        report.verified && report.agent == record.agent && report.launch_record == record.id
+    });
     let reading = match (running, withdrawal) {
         (Some(report), _) => Reading::Running {
             session: report.session,

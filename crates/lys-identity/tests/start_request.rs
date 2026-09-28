@@ -127,13 +127,18 @@ impl World {
     }
 
     fn knows_version(&self, profile_version: &str) -> bool {
-        self.profile_versions.iter().any(|held| held == profile_version)
+        self.profile_versions
+            .iter()
+            .any(|held| held == profile_version)
     }
 }
 
 impl AgentRecords for World {
     fn agent(&self, agent: &str) -> Option<AgentRecord> {
-        self.agents.iter().find(|record| record.id == agent).cloned()
+        self.agents
+            .iter()
+            .find(|record| record.id == agent)
+            .cloned()
     }
 }
 
@@ -192,7 +197,9 @@ impl HandleRecords for World {
 
 impl ProfileNeeds for World {
     fn needs(&self, profile_version: &str) -> Option<Vec<String>> {
-        self.needs.clone().filter(|_| self.knows_version(profile_version))
+        self.needs
+            .clone()
+            .filter(|_| self.knows_version(profile_version))
     }
 }
 
@@ -306,7 +313,10 @@ fn a_request_without_its_machine_is_refused() -> TestResult {
     let dir = tempfile::tempdir()?;
     let world = World::passing();
     let mut records = store(dir.path())?;
-    let members = owned(&[("agent", "agent-fixture-1"), ("profile_version", "pv-fixture-1")]);
+    let members = owned(&[
+        ("agent", "agent-fixture-1"),
+        ("profile_version", "pv-fixture-1"),
+    ]);
     let error = give(&mut records, &world.owners(), "admin-fixture", members, 1)
         .expect_err("a missing member is refused");
     let refused = refusal(error)?;

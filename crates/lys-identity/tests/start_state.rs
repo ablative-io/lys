@@ -20,8 +20,8 @@ use lys_identity::start::profile_command::ProfileVersionRecords;
 use lys_identity::start::profile_review::{ProfileReviews, Review};
 use lys_identity::start::request::{AgentRecord, AgentRecords};
 use lys_identity::start::state::{LaunchRecords, SessionReport, SessionReports};
-use lys_identity::start::{Grammars, Owners};
 use lys_identity::start::state::{LaunchState, Reading, standing};
+use lys_identity::start::{Grammars, Owners};
 use lys_identity::start::{StartError, give, give_again, state_of, withdraw};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -127,13 +127,18 @@ impl World {
     }
 
     fn knows_version(&self, profile_version: &str) -> bool {
-        self.profile_versions.iter().any(|held| held == profile_version)
+        self.profile_versions
+            .iter()
+            .any(|held| held == profile_version)
     }
 }
 
 impl AgentRecords for World {
     fn agent(&self, agent: &str) -> Option<AgentRecord> {
-        self.agents.iter().find(|record| record.id == agent).cloned()
+        self.agents
+            .iter()
+            .find(|record| record.id == agent)
+            .cloned()
     }
 }
 
@@ -192,7 +197,9 @@ impl HandleRecords for World {
 
 impl ProfileNeeds for World {
     fn needs(&self, profile_version: &str) -> Option<Vec<String>> {
-        self.needs.clone().filter(|_| self.knows_version(profile_version))
+        self.needs
+            .clone()
+            .filter(|_| self.knows_version(profile_version))
     }
 }
 
@@ -397,9 +404,15 @@ fn a_report_after_a_withdrawal_reads_running_with_the_withdrawal_beside_it() -> 
         .push(report("sess-fixture-1", "agent-fixture-1", &l1, true));
     let read = state(&world, &records, &l1)?;
     assert_eq!(read.name(), "running");
-    let beside = read.withdrawal.as_ref().ok_or("the withdrawal is not beside it")?;
+    let beside = read
+        .withdrawal
+        .as_ref()
+        .ok_or("the withdrawal is not beside it")?;
     assert_eq!(beside.by, "admin-fixture");
-    assert!(read.to_json().contains("\"withdrawal\":{\"by\":\"admin-fixture\""));
+    assert!(
+        read.to_json()
+            .contains("\"withdrawal\":{\"by\":\"admin-fixture\"")
+    );
     Ok(())
 }
 
@@ -437,7 +450,10 @@ fn no_state_says_the_agent_did_not_start_and_nothing_else_is_written() -> TestRe
         .push(report("sess-fixture-1", "agent-fixture-1", &l1, true));
     reached.push(state(&world, &records, &l1)?);
     let names: Vec<&str> = reached.iter().map(LaunchState::name).collect();
-    assert_eq!(names, ["unconfirmed", "withdrawn", "unconfirmed", "running"]);
+    assert_eq!(
+        names,
+        ["unconfirmed", "withdrawn", "unconfirmed", "running"]
+    );
     for read in &reached {
         let shown = format!("{} {} {}", read.name(), read.words(), read.to_json()).to_lowercase();
         assert!(!shown.contains("not started"), "{shown}");

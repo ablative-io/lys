@@ -293,8 +293,7 @@ fn carried_entry(session: &Session, forked: &Entry) -> Result<Entry, HomeError> 
     };
     safe_component("session id", &data.parent_session)?;
     let sessions = sessions_dir_of(session.file())?;
-    SessionReader::open(sessions.join(format!("{}.jsonl", data.parent_session)))?
-        .entry(&carried)
+    SessionReader::open(sessions.join(format!("{}.jsonl", data.parent_session)))?.entry(&carried)
 }
 
 /// The positions from the head back to the root, root first, as the index's

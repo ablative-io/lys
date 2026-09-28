@@ -297,11 +297,18 @@ async fn a_passing_start_answers_a_command_and_runs_nothing() -> TestResult {
     let (status, body) = served.start_agent("admin-fixture").await?;
     assert_eq!(status, 200, "{body}");
     let answer = parsed(&body)?;
-    assert!(answer["command"].as_str().is_some_and(|line| line.starts_with("env ")));
+    assert!(
+        answer["command"]
+            .as_str()
+            .is_some_and(|line| line.starts_with("env "))
+    );
     assert_eq!(answer["working_directory"], "fixture-cwd");
     assert!(launch_record(&body)?.starts_with("launch-"));
     assert!(!body.contains(VALUE_ONE));
-    assert!(!served.ran(), "the marker exists: something ran the command");
+    assert!(
+        !served.ran(),
+        "the marker exists: something ran the command"
+    );
     Ok(())
 }
 
@@ -348,7 +355,10 @@ async fn a_start_is_withdrawn_given_again_and_read() -> TestResult {
     let read = parsed(&read)?;
     assert_eq!(read["state"], "running");
     assert_eq!(read["withdrawal"]["by"], "admin-fixture");
-    assert!(!served.ran(), "the marker exists: something ran the command");
+    assert!(
+        !served.ran(),
+        "the marker exists: something ran the command"
+    );
     Ok(())
 }
 
@@ -362,8 +372,14 @@ async fn each_refusal_is_the_librarys_own_bytes() -> TestResult {
             ("agent".to_owned(), agent.to_owned()),
         ];
         let mut launches = served.service.launches();
-        let error = give(&mut launches, &served.service.owners(), caller, members, 1_000)
-            .expect_err("the library refuses the same inputs");
+        let error = give(
+            &mut launches,
+            &served.service.owners(),
+            caller,
+            members,
+            1_000,
+        )
+        .expect_err("the library refuses the same inputs");
         Ok(error.to_json())
     };
     let mut compared = 0;
