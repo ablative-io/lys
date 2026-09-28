@@ -26,6 +26,10 @@ thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 
+# The build stamp `--version` prints, computed in one shared crate.
+[build-dependencies]
+lys-build-stamp.workspace = true
+
 [dev-dependencies]
 identity-contract = { path = "../../tests/identity_contract" }
 tempfile.workspace = true

@@ -3,6 +3,7 @@ members = [
     "crates/lys",
     "crates/lys-anchor",
     "crates/lys-anchor-cli",
+    "crates/lys-build-stamp",
     "crates/lys-core",
     "crates/lys-home",
     "crates/lys-identity",
@@ -23,6 +24,7 @@ rust-version = "1.85"
 
 [workspace.dependencies]
 # Internal
+lys-build-stamp = { version = "0.2.0", path = "crates/lys-build-stamp" }
 lys-core = { version = "0.2.0", path = "crates/lys-core" }
 lys-home = { version = "0.2.0", path = "crates/lys-home" }
 lys-identity = { version = "0.2.0", path = "crates/lys-identity" }

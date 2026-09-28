@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use clap::Subcommand;
+use clap::{Args, Subcommand};
 
 /// `lys identity` subcommands: install the standalone identity product's
 /// dependencies for development and check them.
@@ -49,16 +49,17 @@ pub enum IdentityCommand {
     /// one's --version, stop the service and the broker, keep the running
     /// binaries in bin.previous/, place the new ones and start them. When a
     /// new one does not start or become ready, the previous build is put
-    /// back and started, and the failure is named. Data, credentials,
-    /// configuration and the compose services are never touched.
+    /// back and started, and the failure is named. With --back, return to
+    /// the build kept in bin.previous/ by the same path, keeping the one it
+    /// leaves. Data, credentials, configuration and the compose services
+    /// are never touched.
     Upgrade {
-        /// The folder holding the newly built lys-secrets and
-        /// lys-identity-server.
-        #[arg(long)]
-        from: PathBuf,
+        /// The build to move to: a folder, or back to the kept one.
+        #[command(flatten)]
+        from: Source,
         /// A compiled screens package to verify and place, keeping the
         /// previous screens to return to.
-        #[arg(long)]
+        #[arg(long, conflicts_with = "back")]
         surface: Option<PathBuf>,
         /// The data root; the platform's application data path when absent.
         #[arg(long)]
@@ -72,4 +73,21 @@ pub enum IdentityCommand {
         #[arg(long)]
         config: PathBuf,
     },
+}
+
+/// Where `lys identity upgrade` takes the build it moves to: exactly one of
+/// a folder of newly built binaries or the build kept beside the install.
+#[derive(Debug, Args)]
+#[group(required = true, multiple = false)]
+pub struct Source {
+    /// The folder holding the newly built lys-secrets and
+    /// lys-identity-server.
+    #[arg(long = "from")]
+    pub folder: Option<PathBuf>,
+    /// Return to the build kept in bin.previous/ (and surface.previous/):
+    /// stopped, exchanged, started and waited on for ready as an upgrade
+    /// is, so the build it leaves becomes the one kept. Refused, stopping
+    /// nothing, when there is none or the kept build cannot read the data.
+    #[arg(long)]
+    pub back: bool,
 }

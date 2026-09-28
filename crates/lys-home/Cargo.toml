@@ -41,6 +41,10 @@ path = "src/main.rs"
 name = "lys-proxy"
 path = "src/bin/lys-proxy.rs"
 
+# The build stamp `--version` prints, computed in one shared crate.
+[build-dependencies]
+lys-build-stamp.workspace = true
+
 [dev-dependencies]
 tempfile.workspace = true
 

@@ -1,0 +1,21 @@
+[package]
+name = "lys-build-stamp"
+description = "The one build stamp every Lys binary carries: the commit it was built from, called from each binary's build.rs."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+keywords = ["build", "version", "git"]
+categories = ["development-tools::build-utils"]
+
+# The standard library only, so a crate built from an exported tree builds
+# its stamp the same way.
+[dependencies]
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

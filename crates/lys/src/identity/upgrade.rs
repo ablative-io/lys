@@ -13,13 +13,32 @@
 //! `surface.previous/`; and starts the broker and the service, each waited
 //! on for ready on its readiness event.
 //!
+//! `--back` ([`back`]) returns to the build kept in `bin.previous/` by the
+//! same stop, swap, start and ready path: it reads the version of every
+//! binary in `bin/` and in `bin.previous/`, then exchanges `bin/` with
+//! `bin.previous/` and the screens with `surface.previous/` when that
+//! exists, so the build it leaves becomes the one kept and `--back` again
+//! returns to it.
+//!
+//! Each build states, in its `--version` detail, the data formats it knows:
+//! lines `data format N adds KIND, KIND` naming the log event kinds each
+//! format added; a build stating none predates the numbering and reads as
+//! format [`BASELINE_FORMAT`]. `install/build.json` records the newest
+//! format the data may hold: the highest any build recorded there states.
+//!
 //! Invariants: nothing is stopped until every input has been read and
-//! checked. When a start or a readiness fails, what was started is stopped,
-//! the previous binaries (and screens) are put back, started and waited on
-//! for ready, and the upgrade fails naming the binary and its log. An
-//! upgrade writes only `bin/`, `bin.previous/`, the screens, the logs, the
-//! process files and `install/build.json`: never `data/`, a credential,
-//! `deployment.toml`, `identity.json` or the compose services.
+//! checked, and `--back` is refused `back_would_not_read`, naming the first
+//! event kind the kept build does not know, when the data's format is newer
+//! than the kept build's: data is never rolled back. Neither runs over an
+//! unfinished upgrade's intent record (`install/upgrade.json`), and
+//! `--back` never runs over a half-made exchange; each is refused by name
+//! before anything stops. When a start or a readiness
+//! fails, what was started is stopped, the build it began from (and its
+//! screens) is put back, started and waited on for ready, and the command
+//! fails naming the binary and its log. An upgrade writes only `bin/`,
+//! `bin.previous/`, the screens, the logs, the process files and
+//! `install/build.json`: never `data/`, a credential, `deployment.toml`,
+//! `identity.json` or the compose services.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -28,17 +47,22 @@ use std::process::{Command, Stdio};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
+use super::cli::Source;
 use super::error::{ErrorKind, IdentityError, IdentityResult};
 use super::install::layout::{BINARIES, BROKER_PORT, Layout, SERVICE_PORT};
 use super::install::{services, surface};
 use super::private_files;
 use crate::commands::output::Emitter;
 
+mod back;
+
+pub use back::back;
+
 /// What the operator chose.
 #[derive(Debug)]
 pub struct Options {
-    /// The folder holding the newly built binaries.
-    pub from: PathBuf,
+    /// The folder holding the newly built binaries, or back to the kept build.
+    pub from: Source,
     /// A compiled screens package to verify and place.
     pub surface: Option<PathBuf>,
     /// The data root; the platform's application data path when absent.
@@ -157,10 +181,26 @@ pub fn place_binary(source: &Path, dir: &Path, name: &str) -> IdentityResult<()>
     std::fs::rename(&placing, &target).map_err(|error| io("place binary", &target, &error))
 }
 
-/// Runs `program --version`, reads `name VERSION (COMMIT)` and answers what
-/// the parentheses hold: a commit, perhaps with `; dirty`, or the words of a
-/// build with no commit.
-pub fn version(program: &Path, name: &str) -> IdentityResult<String> {
+/// The format a build that states no data format is read as: the first
+/// numbered, which every build from before the numbering writes.
+pub const BASELINE_FORMAT: u32 = 1;
+
+/// Each data format a build states, with the log event kinds it added.
+pub type Formats = BTreeMap<u32, Vec<String>>;
+
+/// The newest format in `formats`, or [`BASELINE_FORMAT`] when it is empty.
+pub fn newest(formats: &Formats) -> u32 {
+    match formats.last_key_value() {
+        Some((format, _)) => *format,
+        None => BASELINE_FORMAT,
+    }
+}
+
+/// Runs `program --version` and answers what its first line,
+/// `name VERSION (COMMIT)`, holds in its parentheses (a commit, perhaps
+/// with `; dirty`, or the words of a build with no commit), and the data
+/// formats its `data format N adds KIND, KIND` lines state.
+pub fn stated(program: &Path, name: &str) -> IdentityResult<(String, Formats)> {
     let unreadable = |detail: String| {
         refuse(ErrorKind::VersionUnreadable, "read version", name, detail).at(program)
     };
@@ -173,13 +213,38 @@ pub fn version(program: &Path, name: &str) -> IdentityResult<String> {
     if !output.status.success() {
         return Err(unreadable(format!("--version exited {}", output.status)));
     }
-    let line = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    line.strip_prefix(&format!("{name} "))
+    let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let first = text.lines().next().unwrap_or_default().trim();
+    let commit = first
+        .strip_prefix(&format!("{name} "))
         .and_then(|rest| rest.split_once(" ("))
         .and_then(|(_, inside)| inside.strip_suffix(')'))
         .filter(|commit| !commit.is_empty())
         .map(str::to_string)
-        .ok_or_else(|| unreadable(format!("`{line}` is not `{name} VERSION (COMMIT)`")))
+        .ok_or_else(|| unreadable(format!("`{first}` is not `{name} VERSION (COMMIT)`")))?;
+    let mut formats = Formats::new();
+    for line in text.lines().skip(1) {
+        let Some(declared) = line.trim().strip_prefix("data format ") else {
+            continue;
+        };
+        let (number, kinds) = declared.split_once(" adds ").unwrap_or((declared, ""));
+        let parsed = number.trim().parse::<u32>();
+        let number = parsed.map_err(|error| {
+            unreadable(format!("`data format {declared}` names no format: {error}"))
+        })?;
+        let known = formats.entry(number).or_default();
+        for kind in kinds.split(',').map(str::trim) {
+            if !kind.is_empty() {
+                known.push(kind.to_string());
+            }
+        }
+    }
+    Ok((commit, formats))
+}
+
+/// The commit `program --version` names, as [`stated`] reads it.
+pub fn version(program: &Path, name: &str) -> IdentityResult<String> {
+    stated(program, name).map(|(commit, _)| commit)
 }
 
 /// The build an install is running, as `install/build.json` records it.
@@ -189,6 +254,9 @@ pub struct BuildRecord {
     pub binaries: BTreeMap<String, String>,
     /// The placed screens, when there are any.
     pub surface: Option<SurfaceBuild>,
+    /// The newest data format the data here may hold: the highest any
+    /// build recorded here states.
+    pub data_format: u32,
 }
 
 /// The placed screens package.
@@ -208,11 +276,14 @@ pub fn record_build(
     say: &mut dyn FnMut(&str),
 ) -> IdentityResult<BuildRecord> {
     let mut binaries = BTreeMap::new();
+    let mut data_format = recorded_format(layout)?;
     for name in names {
-        let commit = version(&layout.binary(name), name)?;
+        let (commit, formats) = stated(&layout.binary(name), name)?;
         say(&format!("build {name} {commit}"));
         binaries.insert((*name).to_string(), commit);
+        data_format = data_format.max(newest(&formats));
     }
+    say(&format!("build data format {data_format}"));
     let manifest_path = layout.surface_dir().join(surface::MANIFEST);
     let surface = match std::fs::read(&manifest_path) {
         Ok(bytes) => {
@@ -238,7 +309,11 @@ pub fn record_build(
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
         Err(error) => return Err(io("read screens", &manifest_path, &error)),
     };
-    let record = BuildRecord { binaries, surface };
+    let record = BuildRecord {
+        binaries,
+        surface,
+        data_format,
+    };
     let text = serde_json::to_vec_pretty(&record).map_err(|error| {
         refuse(
             ErrorKind::RenderFailed,
@@ -251,6 +326,29 @@ pub fn record_build(
     let path = layout.build_record();
     std::fs::write(&path, text).map_err(|error| io("write build record", &path, &error))?;
     Ok(record)
+}
+
+/// The data format `install/build.json` records: none (0) when there is no
+/// record or the record predates formats, refused by name when unreadable.
+fn recorded_format(layout: &Layout) -> IdentityResult<u32> {
+    let path = layout.build_record();
+    let bytes = match std::fs::read(&path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+        Err(error) => return Err(io("read build record", &path, &error)),
+    };
+    let invalid = |detail: String| {
+        refuse(ErrorKind::ConfigInvalid, "read build", "build.json", detail).at(&path)
+    };
+    let parsed = serde_json::from_slice::<serde_json::Value>(&bytes);
+    let record = parsed.map_err(|error| invalid(error.to_string()))?;
+    let Some(format) = record.get("data_format") else {
+        return Ok(0);
+    };
+    match format.as_u64().map(u32::try_from) {
+        Some(Ok(number)) => Ok(number),
+        _ => Err(invalid(format!("data_format {format} is not a format number"))),
+    }
 }
 
 /// Refuses by name unless `layout` holds an install with its binaries.
@@ -361,6 +459,7 @@ pub fn upgrade(
     say: &mut dyn FnMut(&str),
 ) -> IdentityResult<BuildRecord> {
     let names: Vec<&str> = units.iter().map(|unit| unit.binary).collect();
+    back::refuse_unfinished(layout)?;
     require_install(layout, &names)?;
     for name in &names {
         let new = from.join(name);
@@ -381,18 +480,35 @@ pub fn upgrade(
         let (manifest, _) = surface::verify(package)?;
         say(&format!("screens: new {}", manifest.commit));
     }
+    let mut swap = |moved: &mut Moved| swap_in(layout, from, &names, package, moved);
+    let undo = |moved: &Moved| put_back(layout, moved);
+    cycle(layout, units, say, &mut swap, &undo, "the previous build")
+}
+
+/// Stops `units`, runs `swap`, starts them ready and records the build; on
+/// a failure stops what started, runs `undo` over what `swap` moved, starts
+/// `began` (the build it began from) ready and fails naming what broke.
+fn cycle(
+    layout: &Layout,
+    units: &[Unit],
+    say: &mut dyn FnMut(&str),
+    swap: &mut dyn FnMut(&mut Moved) -> IdentityResult<()>,
+    undo: &dyn Fn(&Moved) -> IdentityResult<()>,
+    began: &str,
+) -> IdentityResult<BuildRecord> {
+    let names: Vec<&str> = units.iter().map(|unit| unit.binary).collect();
     let mut moved = Moved::default();
     let outcome = stop_all(units, say)
-        .and_then(|()| swap_in(layout, from, &names, package, &mut moved))
+        .and_then(|()| swap(&mut moved))
         .map_err(|error| error.to_string())
         .and_then(|()| start_all(layout, units, say));
     let Err(failure) = outcome else {
         return record_build(layout, &names, say);
     };
     say(&format!("upgrade failed: {failure}"));
-    say("putting the previous build back");
+    say(&format!("putting {began} back"));
     let restored = stop_all(units, say)
-        .and_then(|()| put_back(layout, &moved))
+        .and_then(|()| undo(&moved))
         .map_err(|error| error.to_string())
         .and_then(|()| start_all(layout, units, say));
     if let Err(again) = restored {
@@ -400,7 +516,7 @@ pub fn upgrade(
             ErrorKind::UpgradeFailed,
             "upgrade",
             "install",
-            format!("{failure}; the previous build did not come back either: {again}"),
+            format!("{failure}; {began} did not come back either: {again}"),
         ));
     }
     record_build(layout, &names, say)?;
@@ -408,7 +524,7 @@ pub fn upgrade(
         ErrorKind::UpgradeFailed,
         "upgrade",
         "install",
-        format!("{failure}; the previous build is back and running"),
+        format!("{failure}; {began} is back and running"),
     ))
 }
 
@@ -420,17 +536,26 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     };
     let mut emitter = Emitter::new(json);
     emitter.field("root", "root", layout.root.display().to_string());
-    let record = upgrade(
-        &layout,
-        &options.from,
-        options.surface.as_deref(),
-        &units(&layout),
-        &mut |line| {
-            if !json {
-                println!("{line}");
-            }
-        },
-    )?;
+    let mut say = |line: &str| {
+        if !json {
+            println!("{line}");
+        }
+    };
+    let units = units(&layout);
+    let record = match (&options.from.folder, options.from.back) {
+        (None, true) if options.surface.is_none() => back(&layout, &units, &mut say)?,
+        (Some(from), false) => {
+            upgrade(&layout, from, options.surface.as_deref(), &units, &mut say)?
+        }
+        _ => {
+            return Err(refuse(
+                ErrorKind::ConfigInvalid,
+                "choose build",
+                "upgrade",
+                "name exactly one of --from DIR or --back, and --surface only with --from",
+            ));
+        }
+    };
     let value = serde_json::to_value(&record).map_err(|error| {
         refuse(
             ErrorKind::RenderFailed,
@@ -449,3 +574,7 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
 #[cfg(test)]
 #[path = "upgrade_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "upgrade_back_tests.rs"]
+mod back_tests;
