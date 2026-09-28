@@ -1,0 +1,17 @@
+.providers .sub { color: var(--text-secondary); margin-top: 0; }
+.provider-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 14px 0 18px; }
+.provider-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; padding: 14px; border-radius: var(--radius-lg); border: 1px solid var(--border-default); background: var(--surface-base); transition: border-color .12s ease, background .12s ease; }
+.provider-card:hover:not(:disabled) { background: var(--surface-hover); }
+.provider-card.on { border-color: var(--accent); background: var(--accent-glow); }
+.provider-card .provider-name { font-size: 14px; font-weight: 600; }
+.provider-card .provider-blurb { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+.steps { list-style: none; counter-reset: step; padding: 0; margin: 18px 0 0; }
+.steps > li { counter-increment: step; position: relative; padding: 0 0 18px 38px; border-left: 1px solid var(--border-default); margin-left: 12px; }
+.steps > li:last-child { border-left-color: transparent; }
+.steps > li::before { content: counter(step); position: absolute; left: -13px; top: 0; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600; background: var(--surface-hover); color: var(--accent); border: 1px solid var(--border-default); }
+.steps h3 { font-size: 13.5px; margin: 3px 0 8px; }
+.prepare { margin: 0; padding-left: 18px; color: var(--text-secondary); }
+.prepare li { margin: 0 0 8px; }
+.prepare .btn { margin-left: 4px; padding: 3px 9px; min-height: 0; font-size: 11.5px; }
+.copy-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.copy-row code { padding: 8px 11px; border-radius: var(--radius-md); background: var(--surface-code); border: 1px solid var(--border-default); }

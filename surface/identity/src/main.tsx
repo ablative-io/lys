@@ -4,6 +4,7 @@ import { App } from './App';
 import './styles/tokens.css';
 import './styles/rail.css';
 import './styles/screen.css';
+import './styles/forms.css';
 import './styles/overlays.css';
 import './styles/dock.css';
 
