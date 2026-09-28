@@ -5,10 +5,11 @@ mod requests;
 mod views;
 
 pub use requests::{
-    ActionBody, DelegateBody, PAGE_MAX, PassOnWire, ResourceWire, RevokeBody, RootBody, RouteWire,
-    WhoBody, WindowWire, grant_id,
+    ActionBody, CannotGiveBody, DelegateBody, PAGE_MAX, PassOnWire, ResourceWire, RevokeBody,
+    RootBody, RouteWire, WhoBody, WindowWire, grant_id,
 };
 pub use views::{
-    GrantList, GrantView, HolderView, LastUseView, LogView, ModelView, PassOnView, PermitView,
-    ReceiptView, RecordedView, ResourceView, UseEventView, WhoPage, WindowView,
+    CannotGiveAnswer, CannotGiveItemView, CannotGiveReasonView, CannotGiveSubjectView, GrantList,
+    GrantView, HolderView, LastUseView, LogView, ModelView, PassOnView, PermitView, ReceiptView,
+    RecordedView, ResourceView, UnknownCannotGiveReason, UseEventView, WhoPage, WindowView,
 };

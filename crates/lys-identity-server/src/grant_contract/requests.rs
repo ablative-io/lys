@@ -8,8 +8,8 @@ use std::collections::BTreeSet;
 use std::str::FromStr;
 
 use lys_identity::grants::{
-    Action, DelegateRequest, GrantId, PassOn, RecipientKind, Relation, Resource, RevokeRequest,
-    RootRequest, Route, Window,
+    Action, CannotGiveRequest, DelegateRequest, GrantId, PassOn, RecipientKind, Relation, Resource,
+    RevokeRequest, RootRequest, Route, Window,
 };
 use lys_identity::{IdentityId, OperationId, PersonId};
 use serde::{Deserialize, Deserializer};
@@ -254,4 +254,27 @@ pub struct WhoBody {
     /// The last grant of the previous page, or null.
     #[serde(deserialize_with = "nullable")]
     pub after: Option<String>,
+}
+
+/// The delegation form's question: what the caller cannot give the chosen
+/// recipient, asked from the source grant the form was opened from. It is
+/// read from the query of a `GET`, every member required.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CannotGiveBody {
+    route: RouteWire,
+    source: String,
+    recipient: String,
+}
+
+impl CannotGiveBody {
+    /// The question, asked by `caller`.
+    pub fn request(&self, caller: IdentityId) -> Result<CannotGiveRequest, ServerError> {
+        Ok(CannotGiveRequest {
+            caller,
+            route: self.route.into(),
+            source: grant_id(&self.source)?,
+            recipient: identity_id(&self.recipient)?,
+        })
+    }
 }

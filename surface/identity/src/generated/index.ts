@@ -139,3 +139,35 @@ export interface DirectoryRecord {
   logins: { issuer: string; subject: string }[];
   events: number[];
 }
+
+/**
+ * `CannotGiveReasonView`, in crates/lys-identity-server/src/grant_contract/views.rs:
+ * why an item cannot be given, one of six, in precedence order.
+ */
+export type CannotGiveReason = 'sign_in_identity' | 'above_what_you_hold' | 'lent_to_you' | 'use_only' | 'people_only' | 'agents_only';
+
+export const CANNOT_GIVE_REASONS: readonly CannotGiveReason[] = ['sign_in_identity', 'above_what_you_hold', 'lent_to_you', 'use_only', 'people_only', 'agents_only'];
+
+/** `CannotGiveSubjectView`: a grant or service account by the caller's own grant id, a relation by name, or the caller's sign-in identity. */
+export type CannotGiveSubject =
+  | { subject: 'grant'; grant: string }
+  | { subject: 'service_account'; grant: string }
+  | { subject: 'relation'; relation: string }
+  | { subject: 'sign_in_identity' };
+
+/** `CannotGiveItemView`: one thing the caller cannot give, with its one reason. No item carries a standing. */
+export type CannotGiveItem = CannotGiveSubject & { reason: CannotGiveReason; source: boolean };
+
+/** GET /grants/cannot-give: `CannotGiveAnswer`. */
+export interface CannotGiveAnswer {
+  source: string;
+  recipient: string;
+  items: CannotGiveItem[];
+}
+
+/** The query of GET /grants/cannot-give: `CannotGiveBody` in grant_contract/requests.rs. */
+export interface CannotGiveQuery {
+  route: 'browser' | 'api' | 'tool';
+  source: string;
+  recipient: string;
+}

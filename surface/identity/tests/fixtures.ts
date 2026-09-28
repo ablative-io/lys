@@ -1,4 +1,4 @@
-import type { AgentView, MeView, PeopleView, ReceiptAnswer } from '../src/generated';
+import type { AgentView, CannotGiveAnswer, MeView, PeopleView, ReceiptAnswer } from '../src/generated';
 import type { ActionBody, Grant, GrantModel, Permit, WhoBody } from '../src/generated/grants';
 
 // Fixture API responses in the shapes read_api.rs answers. Names are test names.
@@ -102,6 +102,20 @@ export const GRANTS: Grant[] = [
   grant({ id: SCRIBE_G, holder: SCRIBE, relation: 'viewer', actions: ['view'], pass_on: { kind: 'use_only' }, source: ROOT_G, window: { starts_at: at(27, 9), ends_at: at(4, 10) }, last_use: { seen: true, at: at(27, 9), route: 'tool', use_event: 5 } }),
 ];
 
+/**
+ * GET /grants/cannot-give for Ada giving from her root grant to the scribe, as
+ * the service answers it: her use-only ledger grant, and her sign-in identity.
+ * Her root grant covers every relation of the model, so no relation is listed.
+ */
+export const CANNOT_GIVE_ROOT_SCRIBE: CannotGiveAnswer = {
+  source: ROOT_G,
+  recipient: SCRIBE,
+  items: [
+    { subject: 'grant', grant: LEDGER_G, reason: 'use_only', source: false },
+    { subject: 'sign_in_identity', reason: 'sign_in_identity', source: false },
+  ],
+};
+
 /** GET /grants/model: the relations the service's model defines. */
 export const MODEL: GrantModel = { version: 3, relations: { editor: ['edit', 'view'], owner: ['edit', 'grant', 'view'], viewer: ['view'] } };
 
@@ -153,4 +167,5 @@ export const SERVICE: Record<string, Route> = {
   'POST /grants/why': why,
   'POST /grants/who': who,
   'POST /grants': (body) => ok({ operation: (body as { operation: string }).operation, grant: 'grant-' + hex(34), index: 3, receipt: { caller: ADA } }),
+  [`/grants/cannot-give?route=browser&source=${ROOT_G}&recipient=${SCRIBE}`]: ok(CANNOT_GIVE_ROOT_SCRIBE),
 };

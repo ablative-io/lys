@@ -1,5 +1,6 @@
-//! The grant routes: list, read, issue, pass on, revoke, and the two
-//! questions, why this caller may act and who can.
+//! The grant routes: list, read, issue, pass on, revoke, the two questions,
+//! why this caller may act and who can, and the delegation form's question,
+//! what the caller cannot give a recipient.
 //!
 //! Every route calls the grants' one authority owner through `with_grants`,
 //! which takes the directory lock first and the grants' second, so every
@@ -14,27 +15,35 @@
 //! from, or when it is the root authority. A refusal that would name a grant
 //! or identity the caller may not see is answered with its name and without
 //! the record.
+//!
+//! The cannot-give question, `GET /grants/cannot-give`, is asked from a
+//! source grant the caller holds, for a recipient the caller may name: any
+//! person, or an agent it may see. A source it does not hold is refused
+//! exactly as one that does not exist, and a recipient it may not name exactly
+//! as one that does not exist, so no refusal says whether either exists. It
+//! reads and records nothing.
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::sync::{Arc, PoisonError};
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::grants::{ExerciseRequest, GrantError, Grants, MemoryRelationships, Model};
 use lys_identity::projection::Projection;
 use lys_identity::signer::load_service_key;
-use lys_identity::{IdentityId, PersonId};
+use lys_identity::{IdentityError, IdentityId, PersonId};
 use lys_log_store::FileLeafStore;
 
 use crate::error::ServerError;
 use crate::grant_contract::{
-    ActionBody, DelegateBody, GrantList, GrantView, HolderView, ModelView, PAGE_MAX, PermitView,
-    RecordedView, RevokeBody, RootBody, WhoBody, WhoPage, grant_id,
+    ActionBody, CannotGiveAnswer, CannotGiveBody, DelegateBody, GrantList, GrantView, HolderView,
+    ModelView, PAGE_MAX, PermitView, RecordedView, RevokeBody, RootBody, WhoBody, WhoPage,
+    grant_id,
 };
-use crate::grant_sight::{as_seen_by, sees, sees_with, visible_or};
+use crate::grant_sight::{as_seen_by, sees, sees_identity, sees_with, visible_or};
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
 use crate::spicedb::{Relationships, SpiceDb, SpiceDbSettings};
@@ -93,6 +102,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/grants/check", post(check))
         .route("/grants/why", post(why))
         .route("/grants/who", post(who))
+        .route("/grants/cannot-give", get(cannot_give))
         .route("/grants/{id}", get(read))
         .route("/grants/{id}/revoke", post(revoke))
 }
@@ -400,5 +410,46 @@ async fn who(
             complete: next.is_none(),
             next,
         }))
+    })
+}
+
+/// Whether `caller` may name `recipient` on the delegation form: a person the
+/// directory records, since the policy admits people as recipients, or an
+/// agent the caller may see.
+fn names_recipient(judged: &Judged<'_>, caller: IdentityId, recipient: IdentityId) -> bool {
+    judged.directory.record(recipient).is_some()
+        && (matches!(recipient, IdentityId::Person(_)) || sees_identity(judged, caller, recipient))
+}
+
+/// What the caller cannot give the recipient from the source grant, each
+/// item with its one reason, as the grants' one authority owner lists it.
+/// The question is a read, asked in the query: `route`, `source` and `recipient`.
+async fn cannot_give(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(body): Query<CannotGiveBody>,
+) -> Result<Json<CannotGiveAnswer>, ServerError> {
+    with_grants(&state, |judged| {
+        let caller = caller(&state, &headers, judged.directory)?;
+        let request = body.request(caller)?;
+        judged
+            .grants
+            .book()
+            .grant(request.source)
+            .filter(|source| source.holder() == caller)
+            .ok_or(ServerError::GrantNotVisible)?;
+        if !names_recipient(&judged, caller, request.recipient) {
+            let unknown = ServerError::from(IdentityError::IdentityUnknown {
+                identity: request.recipient.to_string(),
+            });
+            return Err(ServerError::Withheld {
+                refusal: unknown.name(),
+            });
+        }
+        let at = now();
+        match judged.grants.cannot_give(judged.directory, &request, at) {
+            Ok(list) => Ok(Json(CannotGiveAnswer::from(&list))),
+            Err(error) => Err(as_seen_by(&judged, caller, error)),
+        }
     })
 }
