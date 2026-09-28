@@ -1,6 +1,7 @@
 //! The permission database, live: a grant gives its holder the permission its
 //! relation carries and its revocation takes it away, asked of the engine and
-//! asked of the service's own routes.
+//! asked of the service's own routes; and the test bench asks a scratch scope
+//! of the same engine, leaving nothing of it behind.
 //!
 //! The target is named to run, against a running `SpiceDB`:
 //! `LYS_SPICEDB_ENDPOINT=127.0.0.1:18443 LYS_SPICEDB_KEY_FILE=<file> cargo test -p lys-identity-server --test identity_spicedb`
@@ -10,7 +11,7 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, Service};
+use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_identity::grants::{
     Action, Model, ObjectRef, Relation, Relationship, RelationshipStore, Resource,
 };
@@ -18,6 +19,9 @@ use lys_identity::{IdentityId, OperationId, PersonId};
 use lys_identity_server::dev_seed::seed_configured;
 use lys_identity_server::spicedb::{SpiceDb, SpiceDbSettings};
 use serde_json::json;
+
+#[path = "shared/bench.rs"]
+mod bench;
 
 type Outcome = Result<(), Box<dyn std::error::Error>>;
 
@@ -231,5 +235,68 @@ async fn the_service_allows_a_granted_check_and_refuses_it_once_revoked() -> Out
         .post("/grants/check", Some(&bea_cookie), &question)
         .await?;
     assert_eq!(status, 403, "the revoked grant gives nothing: {refused}");
+    assert_eq!(refused["refusal"], "Revoked", "{refused}");
+    Ok(())
+}
+
+/// Send `body` to the engine's `path` as it arrives, no scope applied.
+async fn engine_call(
+    settings: &SpiceDbSettings,
+    path: &str,
+    body: &serde_json::Value,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    let key = std::fs::read_to_string(&settings.key_file)?;
+    let answer = reqwest::Client::new()
+        .post(format!("http://{}{path}", settings.endpoint))
+        .bearer_auth(key.trim())
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .body(body.to_string())
+        .send()
+        .await?;
+    let status = answer.status();
+    let text: String = answer.text().await?;
+    if !status.is_success() {
+        return Err(format!("{path} answered {status}: {text}").into());
+    }
+    Ok(serde_json::from_str(&text)?)
+}
+
+/// The whole schema the engine holds.
+async fn held_schema(settings: &SpiceDbSettings) -> Result<String, Box<dyn std::error::Error>> {
+    let answer = engine_call(settings, "/v1/schema/read", &json!({})).await?;
+    Ok(answer["schemaText"].as_str().unwrap_or_default().to_owned())
+}
+
+#[tokio::test]
+async fn the_bench_asks_a_scratch_scope_of_the_engine_and_leaves_none_behind() -> Outcome {
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let run = format!("{}_{now}", std::process::id());
+    let engine = settings(&format!("proof_bench_{run}"))?;
+    let (service, seeded) = Service::start_judging(GRANT_MODEL, Some(engine.clone()), |config| {
+        Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)
+    })
+    .await?;
+    let left = "lys/bdeadbeefdeadbeef";
+    let held = held_schema(&engine).await?;
+    let planted = format!("{held}\n\ndefinition {left}/person {{}}\n");
+    engine_call(&engine, "/v1/schema/write", &json!({ "schema": planted })).await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let bea = seeded.people[1].id.to_string();
+
+    bench::answers_as_saved(&service, &admin, &bea).await?;
+
+    let after = held_schema(&engine).await?;
+    assert!(
+        !after.contains(left),
+        "the scope an earlier question left is removed: {after}"
+    );
+    assert!(
+        !after.contains("definition lys/") && !after.contains("caveat lys/"),
+        "no question leaves its scratch scope: {after}"
+    );
+    assert!(
+        after.contains("definition fixture_notes/channel"),
+        "the service's own app kinds stand beside them: {after}"
+    );
     Ok(())
 }

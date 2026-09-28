@@ -1,0 +1,10 @@
+id: no-app-names-rust
+valid:
+  - "fn read(app: &str) -> &str { app }"
+  - "const PREFIX: &str = \"fixture_notes\";"
+  - "// an app registers itself through the Apps API"
+invalid:
+  - "// the Cambium client"
+  - "const NAME: &str = \"manifold\";"
+  - "fn argus_seat() {}"
+  - "const BLUE: &str = \"#6B96D1\"; // Aion blue"

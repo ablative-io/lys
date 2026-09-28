@@ -37,9 +37,9 @@ post_logout_redirect_uris = ["http://localhost:{{service_port}}/"]
 token_alg = "EdDSA"
 challenges = ["S256"]
 
-[clients.cambium]
-id = "cambium"
-name = "Cambium"
+[clients.app]
+id = "app"
+name = "App"
 redirect_uris = ["http://localhost:8400/auth/oidc/callback"]
 post_logout_redirect_uris = ["http://localhost:8400/"]
 token_alg = "RS256"

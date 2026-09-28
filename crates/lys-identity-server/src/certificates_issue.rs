@@ -51,7 +51,7 @@ const CLAIMS_COMPONENT: u64 = 1;
 const REASON_MAX: usize = 500;
 
 /// A certificate to issue. Every member is required.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct IssueBody {
     operation: String,
@@ -59,7 +59,7 @@ pub(crate) struct IssueBody {
 }
 
 /// A certificate to withdraw.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct WithdrawBody {
     reason: String,

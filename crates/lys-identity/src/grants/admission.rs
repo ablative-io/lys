@@ -169,7 +169,8 @@ pub fn judge_root(
     }
     active(directory, request.caller)?;
     active(directory, IdentityId::Person(request.holder))?;
-    let actions = model.actions(&request.relation)?.clone();
+    let kind = request.resource.kind();
+    let actions = model.actions_on(kind, &request.relation)?.clone();
     Grant::new(GrantParts {
         id,
         issuer: request.caller,
@@ -181,7 +182,7 @@ pub fn judge_root(
         pass_on: request.pass_on.clone(),
         source: Source::Root,
         window: request.window,
-        model_version: model.version(),
+        model_version: model.version_on(kind),
         operation: request.operation,
     })
 }
@@ -231,7 +232,7 @@ pub fn judge_delegation(
             source_grant: request.source.to_string(),
         });
     }
-    let within = model.within(&request.relation, passable)?;
+    let within = model.within_on(request.resource.kind(), &request.relation, passable)?;
     if let PassOn::To {
         actions: onward,
         recipients: onward_to,

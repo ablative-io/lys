@@ -22,7 +22,7 @@ fn the_example_configuration_is_valid() -> Result<(), Box<dyn Error>> {
     assert_eq!(config.rp_id(), "localhost");
     assert!(!config.public_tls());
     assert_eq!(config.managed_clients()[0].0, ClientRole::Platform);
-    assert_eq!(config.clients.cambium.token_alg, "RS256");
+    assert_eq!(config.clients.app.token_alg, "RS256");
     assert_eq!(config.clients.platform.challenges, ["S256"]);
     Ok(())
 }
@@ -103,9 +103,9 @@ fn an_invalid_redirect_is_refused_by_name() {
 
 #[test]
 fn clients_are_distinct_and_never_rauthys_own() {
-    let text = EXAMPLE.replace("id = \"cambium\"", "id = \"lys-platform\"");
+    let text = EXAMPLE.replace("id = \"app\"", "id = \"lys-platform\"");
     assert!(refused_as(&text, ErrorKind::ClientInvalid));
-    let text = EXAMPLE.replace("id = \"cambium\"", "id = \"rauthy\"");
+    let text = EXAMPLE.replace("id = \"app\"", "id = \"rauthy\"");
     assert!(refused_as(&text, ErrorKind::ClientInvalid));
     let text = EXAMPLE.replace("token_alg = \"RS256\"", "token_alg = \"HS256\"");
     assert!(refused_as(&text, ErrorKind::ClientInvalid));

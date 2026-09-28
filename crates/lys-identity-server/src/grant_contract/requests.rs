@@ -27,7 +27,7 @@ fn nullable<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
 }
 
 /// How a request says it arrived. It is recorded, and never changes a decision.
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RouteWire {
     /// The browser screens.
@@ -49,7 +49,7 @@ impl From<RouteWire> for Route {
 }
 
 /// A resource, by kind and id.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ResourceWire {
     kind: String,
@@ -63,7 +63,7 @@ impl ResourceWire {
 }
 
 /// What a grant lets its holder pass on, stated affirmatively.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PassOnWire {
     /// Exercise only.
@@ -110,7 +110,7 @@ impl PassOnWire {
 }
 
 /// When a grant may be exercised. `ends_at` is required, and null means no end of its own.
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct WindowWire {
     starts_at: u64,
@@ -134,7 +134,7 @@ pub fn grant_id(text: &str) -> Result<GrantId, ServerError> {
 }
 
 /// A request to issue a root grant to a person.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RootBody {
     operation: String,
@@ -163,7 +163,7 @@ impl RootBody {
 }
 
 /// A request to pass on part of a grant the caller holds.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DelegateBody {
     operation: String,
@@ -196,7 +196,7 @@ impl DelegateBody {
 }
 
 /// A request to revoke a grant, and everything derived from it.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RevokeBody {
     operation: String,
@@ -223,7 +223,7 @@ impl RevokeBody {
 
 /// A question about one action on one resource: why the caller may or may not
 /// exercise it, or who can.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActionBody {
     route: RouteWire,
@@ -243,7 +243,7 @@ impl ActionBody {
 }
 
 /// A page of the who-can question. `after` is required, null for the first page.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct WhoBody {
     /// The action and resource asked about.

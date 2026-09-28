@@ -37,7 +37,7 @@ const WORDS_MAX: usize = 100;
 const HOST_MAX: usize = 253;
 
 /// One machine.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct MachineView {
     /// The machine's id, which is the operation id it was named with.
     pub id: String,
@@ -68,7 +68,7 @@ pub struct MachineView {
 }
 
 /// The answer of `GET /network`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct NetworkView {
     /// Every machine, in the order named.
     pub machines: Vec<MachineView>,
@@ -78,9 +78,9 @@ pub struct NetworkView {
 }
 
 /// A machine to name. Every member is required; `runtime` may be null.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct NameBody {
+pub(crate) struct NameBody {
     operation: String,
     name: String,
     kind: String,

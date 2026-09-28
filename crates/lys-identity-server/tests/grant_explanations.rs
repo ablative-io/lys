@@ -221,6 +221,13 @@ async fn a_grant_the_caller_may_not_inspect_leaks_nothing() -> TestResult {
     let absent = service.post(&path, Some(&bea), &body).await?;
     assert_eq!(hidden.0, absent.0);
     assert_eq!(hidden.1["refusal"], absent.1["refusal"]);
+    assert_eq!(absent.1["refusal"], "GrantUnknown", "{}", absent.1);
+    let malformed = service.get("/grants/not-a-grant", Some(&bea)).await?;
+    assert_eq!(
+        malformed.1["refusal"], "GrantIdMalformed",
+        "{}",
+        malformed.1
+    );
     assert_eq!(
         hidden.1["reason"]
             .as_str()

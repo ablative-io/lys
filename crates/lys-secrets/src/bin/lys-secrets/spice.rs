@@ -153,7 +153,7 @@ pub enum Grants {
     /// The broker's own grants file.
     File(crate::files::FileGrants),
     /// The Lys directory's grants, through its permission engine.
-    Directory(SpiceGrants),
+    Directory(Box<SpiceGrants>),
 }
 
 impl Grants {

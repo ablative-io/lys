@@ -18,7 +18,7 @@ pub enum IdentityCommand {
         config: PathBuf,
     },
 
-    /// Register the platform and Cambium clients in Rauthy and apply their
+    /// Register the platform's and the installed app's clients in Rauthy and apply their
     /// themes. Idempotent: a second run changes nothing and reports the same
     /// operation identifiers. Rauthy's built-in client is never touched.
     Configure {

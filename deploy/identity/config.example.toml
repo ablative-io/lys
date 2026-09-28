@@ -70,11 +70,13 @@ post_logout_redirect_uris = ["http://localhost:8490/"]
 token_alg = "EdDSA"
 challenges = ["S256"]
 
-[clients.cambium]
-# Cambium's confidential client: RS256, which the Cambium verifier requires,
-# themed Cambium green. PKCE for Cambium is a separate decision for row 06.
-id = "cambium"
-name = "Cambium"
+[clients.app]
+# The one app client installed beside the platform's: RS256, themed with the
+# app accent. Every further app registers itself through the directory's Apps
+# API; the install names no product. PKCE for this client is a separate decision
+# for row 06.
+id = "app"
+name = "App"
 redirect_uris = ["http://localhost:8400/auth/oidc/callback"]
 post_logout_redirect_uris = ["http://localhost:8400/"]
 token_alg = "RS256"

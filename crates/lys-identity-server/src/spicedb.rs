@@ -1,24 +1,42 @@
 //! The grants' permission engine in `SpiceDB`: the schema the model gives,
 //! the relationships the grant log projects, and the check.
 //!
+//! Lys's own kinds, written without a prefix, each take one definition with a
+//! relation per model relation. An approved app's kind `{app}.{kind}` is the
+//! definition `{app}/{kind}`, under the app's prefix and no other: its own
+//! relations, a `parent_` relation to each parent kind, and one permission
+//! per declared action, carried by its relations and by the same permission
+//! on each parent that declares it. Placing a resource in its parent writes
+//! the parent relation and moves no revision, since it is no grant event.
+//!
 //! The relationships are written by the grants' own projection, one grant
 //! event at a time in log order, so `SpiceDB` holds a mirror of the grant log.
 //! The revision the mirror stands at is itself a relationship, moved in the
 //! same write as the relationships it counts and under a precondition that
 //! the revision before it is held, so two writers cannot both move it.
+//!
+//! An engine may be a scratch scope of the same `SpiceDB` (`spicedb_scope`):
+//! every name it holds is under the scope's prefix, it sees only its own,
+//! and the service's engine never sees a scratch name and keeps every one
+//! when it writes its schema. Every request passes through [`SpiceDb`]'s one
+//! call, where the scope is applied, so no other part of the engine knows it.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
+use std::sync::{Mutex, PoisonError};
 
 use lys_identity::IdentityId;
 use lys_identity::grants::{
-    Action, GrantError, MemoryRelationships, Model, ObjectRef, Relationship, RelationshipStore,
-    Resource, SCHEMA,
+    Action, GrantError, KindModel, MemoryRelationships, Model, ObjectRef, Relationship,
+    RelationshipStore, Resource, SCHEMA, placement,
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use crate::spicedb_http::post_json;
+use crate::spicedb_apps::{app_definition, app_definitions, definition};
+
+#[path = "spicedb_scope.rs"]
+pub(crate) mod scope;
 
 /// The line of an environment file that holds the preshared key.
 const KEY_LINE: &str = "SPICEDB_GRPC_PRESHARED_KEY=";
@@ -51,6 +69,8 @@ pub struct SpiceDb {
     key: String,
     mirror: String,
     relations: BTreeMap<String, BTreeSet<String>>,
+    app_kinds: Mutex<BTreeMap<String, KindModel>>,
+    scope: Option<String>,
 }
 
 impl std::fmt::Debug for SpiceDb {
@@ -58,6 +78,7 @@ impl std::fmt::Debug for SpiceDb {
         f.debug_struct("SpiceDb")
             .field("endpoint", &self.endpoint)
             .field("mirror", &self.mirror)
+            .field("scope", &self.scope)
             .finish_non_exhaustive()
     }
 }
@@ -85,7 +106,7 @@ fn engine_name(what: &str, name: &str) -> Result<(), GrantError> {
 }
 
 fn object_json(object: &ObjectRef) -> Value {
-    json!({"objectType": object.kind, "objectId": object.id.replace('.', "|")})
+    json!({"objectType": definition(&object.kind), "objectId": object.id.replace('.', "|")})
 }
 
 fn relationship_json(relationship: &Relationship) -> Value {
@@ -107,7 +128,7 @@ fn relationship_json(relationship: &Relationship) -> Value {
 
 fn object_of(value: &Value) -> Option<ObjectRef> {
     Some(ObjectRef {
-        kind: value.get("objectType")?.as_str()?.to_owned(),
+        kind: value.get("objectType")?.as_str()?.replacen('/', ".", 1),
         id: value.get("objectId")?.as_str()?.replace('|', "."),
     })
 }
@@ -135,6 +156,21 @@ impl SpiceDb {
     /// Reach the engine `settings` names and write the schema `model` gives,
     /// keeping every resource kind the engine already holds.
     pub fn open(settings: &SpiceDbSettings, model: &Model) -> Result<Self, GrantError> {
+        Self::open_in(settings, model, None)
+    }
+
+    /// Reach the engine `settings` names as the scratch scope `scope`, and
+    /// write the schema `model` gives under the scope's prefix, beside every
+    /// name the engine holds outside it.
+    pub(crate) fn open_scratch(
+        settings: &SpiceDbSettings,
+        model: &Model,
+        scope: &str,
+    ) -> Result<Self, GrantError> {
+        Self::open_in(settings, model, Some(scope.to_owned()))
+    }
+
+    fn key(settings: &SpiceDbSettings) -> Result<String, GrantError> {
         let text = std::fs::read_to_string(&settings.key_file).map_err(|error| {
             unavailable(format!(
                 "the permission engine's key file {} could not be read: {}",
@@ -151,6 +187,15 @@ impl SpiceDb {
         if key.is_empty() {
             return Err(unavailable("the permission engine's key file is empty"));
         }
+        Ok(key)
+    }
+
+    fn open_in(
+        settings: &SpiceDbSettings,
+        model: &Model,
+        scope: Option<String>,
+    ) -> Result<Self, GrantError> {
+        let key = Self::key(settings)?;
         engine_name("mirror name", &settings.mirror)?;
         let mut relations = BTreeMap::new();
         for (relation, actions) in model.relations() {
@@ -167,6 +212,8 @@ impl SpiceDb {
             key,
             mirror: settings.mirror.clone(),
             relations,
+            app_kinds: Mutex::new(model.kinds().clone()),
+            scope,
         };
         if let Some(both) = engine
             .relations
@@ -180,12 +227,6 @@ impl SpiceDb {
         }
         engine.write_schema(&engine.kinds()?)?;
         Ok(engine)
-    }
-
-    fn call(&self, path: &str, body: &Value) -> Result<(u16, String), GrantError> {
-        let answer =
-            post_json(&self.endpoint, path, &self.key, &body.to_string()).map_err(unavailable)?;
-        Ok((answer.status, answer.body))
     }
 
     /// The schema for the resource kinds `kinds`.
@@ -206,18 +247,52 @@ impl SpiceDb {
         let body: String = relations.chain(permissions).collect();
         let kinds = kinds
             .iter()
+            .filter(|kind| !kind.contains('.'))
             .map(|kind| format!("\ndefinition {kind} {{\n{body}}}\n"));
+        let app_kinds = self
+            .app_kinds
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        let apps = app_kinds
+            .iter()
+            .map(|(kind, model)| app_definition(kind, model, &app_kinds));
         [SCHEMA.to_owned(), MIRROR_SCHEMA.to_owned()]
             .into_iter()
             .chain(kinds)
+            .chain(apps)
             .collect()
     }
 
-    /// The resource kinds the engine's schema holds.
-    pub fn kinds(&self) -> Result<BTreeSet<String>, GrantError> {
+    /// Hold `kinds` as the approved apps' kinds from now on and write the
+    /// schema they give, keeping every kind of Lys's own the engine holds.
+    pub fn set_app_kinds(&self, kinds: &BTreeMap<String, KindModel>) -> Result<(), GrantError> {
+        *self
+            .app_kinds
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = kinds.clone();
+        self.write_schema(&self.kinds()?)
+    }
+
+    /// Place `child` in `parent`, so the permissions on the parent flow to
+    /// the child. It moves no revision: a placement is no grant event.
+    pub fn place(&self, child: &Resource, parent: &Resource) -> Result<(), GrantError> {
+        let update = json!({
+            "operation": "OPERATION_TOUCH",
+            "relationship": relationship_json(&placement(child, parent)),
+        });
+        let (status, body) = self.call("/v1/relationships/write", &json!({"updates": [update]}))?;
+        if status == 200 {
+            return Ok(());
+        }
+        Err(unavailable(format!("the placement was refused: {body}")))
+    }
+
+    /// The engine's schema text; none when it holds no schema.
+    fn schema_text(&self) -> Result<Option<String>, GrantError> {
         let (status, body) = self.call("/v1/schema/read", &json!({}))?;
         if status == 404 {
-            return Ok(BTreeSet::new());
+            return Ok(None);
         }
         if status != 200 {
             return Err(unavailable(format!("the schema could not be read: {body}")));
@@ -228,21 +303,45 @@ impl SpiceDb {
             .get("schemaText")
             .and_then(Value::as_str)
             .ok_or_else(|| unavailable("the schema answer carries no schemaText"))?;
+        Ok(Some(text.to_owned()))
+    }
+
+    /// The resource kinds the engine's schema holds.
+    pub fn kinds(&self) -> Result<BTreeSet<String>, GrantError> {
+        let text = self.schema_text()?.unwrap_or_default();
         Ok(text
             .lines()
             .filter_map(|line| line.strip_prefix("definition "))
             .filter_map(|rest| rest.split([' ', '{']).next())
             .filter(|name| !FIXED.contains(name))
-            .map(str::to_owned)
+            .map(|name| name.replacen('/', ".", 1))
             .collect())
     }
 
+    /// Write the schema for `kinds`, keeping as they stand the definitions
+    /// of every app kind the engine holds and this engine was not given, so
+    /// a writer that knows only Lys's own model never removes an app's kinds.
     fn write_schema(&self, kinds: &BTreeSet<String>) -> Result<(), GrantError> {
-        for kind in kinds {
+        for kind in kinds.iter().filter(|kind| !kind.contains('.')) {
             engine_name("resource kind", kind)?;
         }
-        let (status, body) =
-            self.call("/v1/schema/write", &json!({"schema": self.schema(kinds)}))?;
+        let known = self
+            .app_kinds
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .keys()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let text = self.schema_text()?.unwrap_or_default();
+        let mut schema = self.schema(kinds);
+        for (kind, definition) in app_definitions(&text) {
+            if !known.contains(&kind) {
+                schema.push('\n');
+                schema.push_str(&definition);
+                schema.push('\n');
+            }
+        }
+        let (status, body) = self.call("/v1/schema/write", &json!({"schema": schema}))?;
         if status == 200 {
             return Ok(());
         }
@@ -290,10 +389,11 @@ impl SpiceDb {
         subject: IdentityId,
         now: u64,
     ) -> Result<bool, GrantError> {
-        let carried = self
-            .relations
-            .values()
-            .any(|actions| actions.contains(action.as_str()));
+        let carried = resource.kind().contains('.')
+            || self
+                .relations
+                .values()
+                .any(|actions| actions.contains(action.as_str()));
         if !carried || !self.kinds()?.contains(resource.kind()) {
             return Ok(false);
         }
@@ -344,7 +444,7 @@ impl RelationshipStore for SpiceDb {
         let needed: BTreeSet<String> = touch
             .iter()
             .map(|relationship| relationship.resource.kind.clone())
-            .filter(|kind| !FIXED.contains(&kind.as_str()))
+            .filter(|kind| !FIXED.contains(&kind.as_str()) && !kind.contains('.'))
             .collect();
         let held = self.kinds()?;
         if !needed.is_subset(&held) {
@@ -390,7 +490,7 @@ impl RelationshipStore for SpiceDb {
         let kinds = self.kinds()?;
         let mut held = BTreeSet::new();
         for kind in kinds.iter().map(String::as_str).chain(["grant"]) {
-            held.extend(self.read_of(&json!({"resourceType": kind}))?);
+            held.extend(self.read_of(&json!({"resourceType": definition(kind)}))?);
         }
         Ok(held)
     }

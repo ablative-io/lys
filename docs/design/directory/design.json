@@ -2945,6 +2945,16 @@
       "path": "rules/ast-grep/no-poll.yml",
       "note": "R1: Usage measured from the transcript, per turn",
       "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys/src/cli/mcp.rs",
+      "note": "DIRECTORY-049 R7: 'lys mcp', the stdio face agents reach the MCP server by, signing with their own key",
+      "brief": "DIRECTORY-049"
+    },
+    {
+      "path": "crates/lys/tests/mcp_stdio.rs",
+      "note": "DIRECTORY-049 R7: 'lys mcp' over stdio, each call signed with the agent's own key",
+      "brief": "DIRECTORY-049"
     }
   ],
   "inventory": [

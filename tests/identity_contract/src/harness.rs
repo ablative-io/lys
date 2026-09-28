@@ -332,7 +332,12 @@ impl Service {
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;
         let prepared = prepare(&config)?;
-        let app = service(&config).await?;
+        let documented = crate::refusals::listed();
+        let app = service(&config)
+            .await?
+            .layer(axum::middleware::from_fn(move |request, next| {
+                crate::refusals::listed_only(Arc::clone(&documented), request, next)
+            }));
         tokio::spawn(async move { axum::serve(listener, app).await });
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())

@@ -4,10 +4,20 @@
 //! authority is answered by comparing the action sets the model resolves them
 //! to, never by the order of their names or a rank read from a label. Every
 //! answer carries the model version it was made under.
+//!
+//! The model's own relations are Lys's, and judge every kind written without
+//! a prefix. A kind written `{app}.{kind}` is judged only by the relations
+//! its approved app's schema gives that kind, under that schema's version; a
+//! prefixed kind the model does not hold resolves no relation at all, so no
+//! grant is ever judged on a kind no approved app declares.
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use lys_log_store::LeafStore;
+
+use super::authority::Grants;
 use super::error::GrantError;
+use super::permission::RelationshipStore;
 use super::types::{Action, Relation};
 
 /// A versioned model of relations and the actions each carries.
@@ -15,6 +25,21 @@ use super::types::{Action, Relation};
 pub struct Model {
     version: u64,
     relations: BTreeMap<Relation, BTreeSet<Action>>,
+    kinds: BTreeMap<String, KindModel>,
+}
+
+/// One app kind's relations, under the version of the app's schema that
+/// gives them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KindModel {
+    /// The app schema's version.
+    pub version: u64,
+    /// The actions the kind declares.
+    pub actions: BTreeSet<Action>,
+    /// Each relation of the kind, with the actions it carries.
+    pub relations: BTreeMap<Relation, BTreeSet<Action>>,
+    /// The kinds whose relations flow down to this one.
+    pub parents: BTreeSet<String>,
 }
 
 /// A relation the model placed within an authority, with what it resolved to.
@@ -51,7 +76,89 @@ impl Model {
                 reason: "every relation carries at least one action",
             });
         }
-        Ok(Self { version, relations })
+        Ok(Self {
+            version,
+            relations,
+            kinds: BTreeMap::new(),
+        })
+    }
+
+    /// The same model judging each app kind of `kinds` by its own relations.
+    #[must_use]
+    pub fn with_kinds(mut self, kinds: BTreeMap<String, KindModel>) -> Self {
+        self.kinds = kinds;
+        self
+    }
+
+    /// Every app kind the model judges, in the order of their names.
+    pub fn kinds(&self) -> &BTreeMap<String, KindModel> {
+        &self.kinds
+    }
+
+    /// The version and relations a resource of `kind` is judged by: the
+    /// model's own for a kind without a prefix, its app's for one with.
+    fn table(&self, kind: &str) -> Option<(u64, &BTreeMap<Relation, BTreeSet<Action>>)> {
+        if !kind.contains('.') {
+            return Some((self.version, &self.relations));
+        }
+        self.kinds
+            .get(kind)
+            .map(|model| (model.version, &model.relations))
+    }
+
+    /// The version a resource of `kind` is judged under: its app schema's,
+    /// or the model's own for a kind without a prefix or one it does not hold.
+    pub fn version_on(&self, kind: &str) -> u64 {
+        self.table(kind)
+            .map_or(self.version, |(version, _)| version)
+    }
+
+    /// Every relation a resource of `kind` may be held under, with the
+    /// actions each carries, in the order of their names; none for a kind
+    /// the model does not hold.
+    pub fn relations_on(&self, kind: &str) -> impl Iterator<Item = (&Relation, &BTreeSet<Action>)> {
+        self.table(kind)
+            .into_iter()
+            .flat_map(|(_, relations)| relations.iter())
+    }
+
+    /// The actions `relation` carries on a resource of `kind`.
+    pub fn actions_on(
+        &self,
+        kind: &str,
+        relation: &Relation,
+    ) -> Result<&BTreeSet<Action>, GrantError> {
+        let unknown = || GrantError::RelationUnknown {
+            relation: relation.to_string(),
+            model_version: self.version_on(kind),
+        };
+        let (_, relations) = self.table(kind).ok_or_else(unknown)?;
+        relations.get(relation).ok_or_else(unknown)
+    }
+
+    /// Whether `requested`, on a resource of `kind`, resolves to actions
+    /// that all lie within `held`.
+    pub fn within_on(
+        &self,
+        kind: &str,
+        requested: &Relation,
+        held: &BTreeSet<Action>,
+    ) -> Result<Within, GrantError> {
+        let actions = self.actions_on(kind, requested)?;
+        let model_version = self.version_on(kind);
+        let outside: Vec<&str> = actions.difference(held).map(Action::as_str).collect();
+        if !outside.is_empty() {
+            return Err(GrantError::ActionsOutside {
+                relation: requested.to_string(),
+                outside: outside.join(", "),
+                model_version,
+            });
+        }
+        Ok(Within {
+            relation: requested.clone(),
+            actions: actions.clone(),
+            model_version,
+        })
     }
 
     /// The model's version.
@@ -95,5 +202,14 @@ impl Model {
             actions: actions.clone(),
             model_version: self.version,
         })
+    }
+}
+
+impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
+    /// Judge new requests on app kinds by `kinds` from now on, as the apps'
+    /// approved schemas give them. Lys's own relations and version stay as
+    /// they are, and grants already held keep their actions and their ends.
+    pub fn set_kinds(&mut self, kinds: BTreeMap<String, KindModel>) {
+        self.model.kinds = kinds;
     }
 }

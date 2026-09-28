@@ -18,6 +18,10 @@ pub mod receipt;
 pub mod recovery;
 mod refusal_codec;
 pub mod revocation;
+pub mod schema;
+pub mod schema_diff;
+#[cfg(test)]
+mod schema_tests;
 mod state;
 #[cfg(any(test, feature = "test-support"))]
 pub mod test_support;
@@ -36,11 +40,16 @@ pub use events::{
     sign_grant_event, verify_grant_event,
 };
 pub use lineage::Lineage;
-pub use model::{Model, Within};
-pub use permission::{MemoryRelationships, ObjectRef, Relationship, RelationshipStore, SCHEMA};
+pub use model::{KindModel, Model, Within};
+pub use permission::{
+    MemoryRelationships, ObjectRef, Relationship, RelationshipStore, SCHEMA, parent_relation,
+    placement,
+};
 pub use projection::{GrantBook, GrantRecord, LastUse, Revocation};
 pub use receipt::{GrantReceipt, verify_grant_receipt};
 pub use recovery::{GrantLedger, Uncertain};
+pub use schema::{ANY_KIND, AppSchema, KindSchema, LYS_APP, SchemaError, app_id, owner_of};
+pub use schema_diff::{Named, SchemaDiff, Standing, diff, stranded};
 pub use types::{
     Action, Grant, GrantId, GrantParts, PassOn, RecipientKind, Relation, Resource, Source, Window,
 };

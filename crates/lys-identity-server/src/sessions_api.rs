@@ -29,7 +29,7 @@ use crate::routes::{AppState, cookie_header, signed_in, with_directory};
 use crate::session::SessionEntry;
 
 /// A session's login: the issuer that authenticated it and the subject it names.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionLogin {
     /// The issuer URL, exactly as recorded.
     pub issuer: String,
@@ -38,7 +38,7 @@ pub struct SessionLogin {
 }
 
 /// One live session.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionView {
     /// The session's public id.
     pub id: String,
@@ -53,7 +53,7 @@ pub struct SessionView {
 }
 
 /// One person's live sessions, newest first.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionsView {
     /// The person's enduring id.
     pub person: String,
@@ -62,7 +62,7 @@ pub struct SessionsView {
 }
 
 /// The answer to ending a session.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct EndedView {
     /// The ended session's public id.
     pub ended: String,

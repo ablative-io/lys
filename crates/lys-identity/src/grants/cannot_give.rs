@@ -234,7 +234,7 @@ pub fn cannot_give(
             source: id == request.source,
         })
         .collect();
-    for (relation, actions) in model.relations() {
+    for (relation, actions) in model.relations_on(source.resource().kind()) {
         let covered = book
             .held_by(request.caller)
             .map(GrantRecord::grant)
