@@ -920,6 +920,46 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Canonical paths in the context record",
+      "items": [
+        {
+          "id": "C71",
+          "text": "One helper canonicalises a given path: a directory whole, a document by its parent directory with its own final name kept and its own entry required to exist (a dangling symlink exists at its link position), a relative path left as written, and a path whose parent or own entry does not exist kept byte for byte and marked unresolved.",
+          "done": false
+        },
+        {
+          "id": "C72",
+          "text": "resolve_given canonicalises the working directory before walking the CLAUDE.md chain and the config directory before recording it, records every absolute document at its canonical parent and own name, and computes the memory index's slug from the working directory as given.",
+          "done": false
+        },
+        {
+          "id": "C73",
+          "text": "A canonicalisation failure other than a path not existing is refused by path and operation: render-launch refuses with its existing status 1 with no lys.given entry written, and given-check exits 2 with nothing on stdout.",
+          "done": false
+        },
+        {
+          "id": "C74",
+          "text": "given-check canonicalises the listed path and the --path argument before comparing, so a record written before the rule compares by its canonical form, and its report names in `unresolved` every path it compared as written because it does not exist.",
+          "done": false
+        },
+        {
+          "id": "C75",
+          "text": "`given` names in each listed record's `unresolved` the recorded absolute paths that do not exist at listing time, and the lys.given entry's data keeps exactly its six fields.",
+          "done": false
+        },
+        {
+          "id": "C76",
+          "text": "One fixture test builds a symlinked directory, a `..` path and a trailing-slash config directory under a temporary directory, proves each records the reference render's config_dir and documents and that given-check matches the symlinked and `..` forms, and asserts the 3 shapes and 2 checks it ran.",
+          "done": false
+        },
+        {
+          "id": "C77",
+          "text": "RECORD.md's lys.given paragraph states the canonicalisation rule, the written files' exemption, the link-position rule for a document, the unresolved marker in the reports, and that the slug takes the working directory as given.",
+          "done": false
+        }
+      ]
     }
   ]
 }

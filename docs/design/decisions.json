@@ -845,20 +845,24 @@
     },
     {
       "id": "ADR-029",
-      "title": "A lantern records the session it was lit in as lit_in; a lantern without it is an older record resolved by its holders",
+      "title": "Every lys.given path is canonicalised before it is recorded or compared, a document at its link position",
       "status": "decided",
       "scope": "home",
       "date": "2026-09-27",
-      "decided_by": "The lit_in card's request and the lead's answers to its survey; recorded with HOME-010",
-      "context": "ADR-014 fixed what a lantern carries (its point, the note, who lit it and when) and not the session it was lit in, and ADR-017's fork has to know that session, since a copied line keeps its id and a fork's child holds a copy of every lantern on the copied chain. Until now the light act recorded no lit_in, LanternData refused the key as unknown, and the fork read it from the entry's raw data as a stopgap, with fixtures writing a lit_in lantern by hand. Lanterns lit before this change carry no lit_in and cannot be rewritten to carry it (P1).",
-      "decision": "LanternData gains an optional lit_in, the id of the session that held the point when the lantern was lit, and keeps refusing unknown keys. The light act writes it as the id of the session it appends the lantern to, at that session's head, and reports it; recall reports it beside point, note and lit_by, as null for a lantern whose data has no lit_in, and gives a lantern whose lit_in is present and not a session id the same lit_in_not_a_session refusal, skipped by note and refused by point, never a row and never entry_shape. The fork reads the typed field: a lantern whose data has no lit_in is an older record and resolves by its holders as ADR-017 rules (one holder cuts, several refuse lantern_ambiguous until a session is named), and a lit_in that is present but is null, not a string, not a safe session name, or names no session of the home is refused lit_in_not_a_session naming which, never read as any session. A present null is kept distinct from an absent key. Rejected: making lit_in required (every lantern lit before it would become the wrong shape, skipped by recall by note and refused by recall by point); refusing a lantern with no lit_in by name (every lantern lit before it would become unforkable, retiring ADR-017's older-record rule); reading a null lit_in as an absent one (a silent fallback to the holder rule); and rewriting earlier lanterns to carry it (P1).",
+      "decided_by": "The lead's answers to the canonical-path survey; recorded with HOME-010",
+      "context": "lys.given records each document's path as the resolver built it and given-check compares paths as written, so /var and /private/var, a path with `..` and a config directory with a trailing slash record as different documents though they are one file, and given-check reports a difference that is not one. Homes already hold lys.given entries written before any rule, with paths in those shapes.",
+      "decision": "Every absolute path is canonicalised before it is recorded or compared: the config directory and the working directory (before the chain is walked) whole, a document by its parent directory canonicalised and its own final name kept, so a symlinked document is recorded where the harness loaded it from. The two written files stay relative to the render's out directory, the exemption. A path that cannot be canonicalised because it does not exist is recorded as given and named unresolved in the given and given-check reports; the entry's data is unchanged. given-check canonicalises both the listed path and the argument at check time. The memory index's slug keeps the working directory as given. Rejected: resolving a document's final component (the record would name a symlink's target rather than the load position); canonicalising the written files (two renders would stop giving equal lists); an unresolved field in the entry's data (it would change a shape homes already hold, ADR-013); canonicalising only new input at check time (records written before the rule would stop matching); and canonicalising the working directory for the slug (the slug rule is its own requirement).",
       "quote": "",
       "consequences": [
         "HOME-010 adds the field to LanternData, the light act, its report and recall's rows, switches the fork to the typed field, and documents lit_in in docs/design/home/RECORD.md.",
         "ADR-014's lantern shape is extended by one optional key, not replaced: a lantern lit before HOME-010 is read as it is and stays forkable.",
         "ADR-017's older-record rule stays in force for a lantern with no lit_in; retiring it is a separate decision.",
         "The fork's fixtures light with the light act every lantern it can produce, and write by hand only the records it cannot: a lantern with no lit_in, a copy whose lit_in names another session, and a malformed lit_in.",
-        "Once lanterns are lit under it in a real home the shape is frozen; a change to lit_in's meaning is a new version alongside."
+        "Once lanterns are lit under it in a real home the shape is frozen; a change to lit_in's meaning is a new version alongside.",
+        "RECORD.md states the rule, the exemption, the link-position rule and the unresolved marker.",
+        "Existing records are not rewritten; they compare by canonicalisation at check time.",
+        "A canonicalisation failure other than a path not existing is refused by path and operation.",
+        "The chain and the slug may see different forms of one working directory until the slug rule's own requirement settles it."
       ],
       "supersedes": [],
       "superseded_by": ""

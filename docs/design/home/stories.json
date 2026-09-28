@@ -920,6 +920,82 @@
           "text": "As the reviewer, I want the fork's tests to light their lanterns with the light act wherever it can produce them, so that the fork is proved on the record the light act really writes."
         }
       ]
+    },
+    {
+      "name": "Tom",
+      "role": "Owns the platform and reads what a session was given",
+      "stories": [
+        {
+          "id": "S3",
+          "text": "As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives."
+        },
+        {
+          "id": "S4",
+          "text": "As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured."
+        },
+        {
+          "id": "S6",
+          "text": "As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded."
+        },
+        {
+          "id": "S10",
+          "text": "As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process."
+        },
+        {
+          "id": "S12",
+          "text": "As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents."
+        },
+        {
+          "id": "S21",
+          "text": "As Tom, I want a fork at a user message to carry that message as the child's first prompt beside the rendered file, with nothing from the parent's header but its working directory, so that the child starts at the coordinate and no credential, handle or launch setting is copied from the parent."
+        },
+        {
+          "id": "S23",
+          "text": "As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything."
+        },
+        {
+          "id": "S32",
+          "text": "As Tom, I want one file reached through a symlinked directory, a `..` path or a trailing-slash config directory to record and check as one path, so that given-check never reports a difference that is not one."
+        }
+      ]
+    },
+    {
+      "name": "Reviewer",
+      "role": "Checks the proofs before anything relies on them",
+      "stories": [
+        {
+          "id": "S5",
+          "text": "As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught."
+        },
+        {
+          "id": "S11",
+          "text": "As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with."
+        },
+        {
+          "id": "S13",
+          "text": "As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed."
+        },
+        {
+          "id": "S17",
+          "text": "As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes."
+        },
+        {
+          "id": "S18",
+          "text": "As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written."
+        },
+        {
+          "id": "S19",
+          "text": "As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom."
+        },
+        {
+          "id": "S22",
+          "text": "As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone."
+        },
+        {
+          "id": "S33",
+          "text": "As the reviewer, I want a recorded path that does not exist kept as given and named unresolved in the report, so that nothing a record lists drops out of what I check."
+        }
+      ]
     }
   ]
 }

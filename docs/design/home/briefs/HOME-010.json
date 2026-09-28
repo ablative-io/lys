@@ -1,11 +1,8 @@
 {
   "id": "HOME-010",
   "cluster": "home",
-  "title": "LanternData carries lit_in, the light act records it, recall reports it and the fork reads the typed field",
-  "depends_on": [
-    "HOME-004",
-    "HOME-006"
-  ],
+  "title": "Canonicalise every lys.given path before it is recorded or compared",
+  "depends_on": [],
   "blocked_by": [],
   "checklist": [
     "C71",
@@ -13,41 +10,45 @@
     "C73",
     "C74",
     "C75",
-    "C76"
+    "C76",
+    "C77"
   ],
   "stories": [
     "S32",
-    "S33",
-    "S34"
+    "S33"
   ],
   "design_anchor": [
-    "ADR-014",
-    "ADR-015",
-    "ADR-017",
+    "ADR-012",
+    "ADR-013",
     "ADR-029"
   ],
-  "purpose": "A fork has to know the session a lantern was lit in, because a copied line keeps its id and a fork's child holds a copy of every lantern on the copied chain. HOME-006 reads that session from a lit_in key the light act does not write, pulled from the entry's raw data as a stopgap, with fixtures writing the lit_in lantern by hand. This brief makes lit_in part of the lantern's typed shape: LanternData carries it, the light act records it, recall reports it, and the fork reads the typed field, while every lantern lit before it stays readable and forkable (ADR-029).",
-  "task": "Add an optional `lit_in` to `LanternData` in `crates/lys-home/src/record/entries.rs`, modelled so that an absent key, a present JSON null and a present non-string value stay three distinct things. `light()` writes `lit_in` as the id of the session it appends the lantern to, at that session's head, and its `Lit` report (printed by `lys-home lantern light`) carries `lit_in` beside `id`, `session`, `point` and `lit_at`. Recall's `LanternRow` carries `lit_in` beside `point`, `note` and `lit_by`, as JSON null for a lantern whose data has no `lit_in`. `fork_cut.rs` reads `point` and `lit_in` through a typed view instead of raw `serde_json::Value` lookups, keeping every behaviour it has today. The fork's fixtures light `L2` with the light act. In scope: `entries.rs`, `lantern.rs`, `recall.rs`, `fork_cut.rs`, their tests, `tests/lantern_cli.rs`, `tests/fork.rs`, `RECORD.md`, the lys-home README, a note in `PROOF-FORK.md`, and the cluster's rendered markdown.\n\nA correction to the request, as the lead ruled: the request states that a lantern with no lit_in is refused by name as the tree does now, and the tree does not refuse it. A lantern whose data has no `lit_in` key is an older record and resolves by its holders as ADR-017 and HOME-006's third amendment rule: one holder cuts, several give `lantern_ambiguous` until `--session` names one. Only a `lit_in` that is present and not a session id is refused by name (`lit_in_not_a_session`), never read as any session. ADR-017 is not retired, and every lantern lit before this brief stays forkable. `lit_in` is optional: a lantern lit before this brief is read as it is, never as the wrong shape; recall by note skips no session it lists today for want of `lit_in`, and recall by point refuses nothing new for want of it.\n\nThe fixtures, as the lead ruled: the rule against hand-written lantern entries in the fork's fixtures covers every lantern the light act can produce, so `L2` is lit with the light act in both fork fixtures. The records the light act can no longer write stay hand-written: the older records `O2` (in both fixtures), `M2` and `N3` with no `lit_in`, the copy `N2` whose `lit_in` names another session, and `N1` to `N4` with `lit_in` null, 5, `../elsewhere` and `no-such-session`. Each is marked in its test as standing for a record the light act cannot produce. Because the light act chooses the lantern's id, a test that named `L2` by its literal id compares with the id the light act returned (`lanterns.l2`); no assertion, count or refusal changes otherwise.\n\nThe two key-set pins are updated, as the lead ruled: `lantern_data_round_trips_with_exactly_its_four_keys` becomes `lantern_data_round_trips_with_exactly_its_five_keys` with `lit_in`, and `a_row_carries_exactly_its_fields` gains `lit_in`. The light report's pin in `tests/lantern_cli.rs` gains `lit_in`. No other existing lantern or fork test changes beyond the literal-id replacement above.\n\nRecall's refusal, as the lead ruled: a lantern whose `lit_in` is present and not a session id is refused in recall as `lit_in_not_a_session`, with the fork's four reason texts, both as the skip reason by note and as the refusal by point, and is never listed as a row. Recall's other `entry_shape` cases keep their name.\n\nOut of scope: re-measuring PROOF-FORK on a real session whose lanterns carry lit_in; recall telling a lantern lit in a session from a copy a fork carried in; and retiring the older-record holder rule. The card is ordered after HOME-006, which is on main, so it starts on the current main.",
+  "purpose": "The lys.given context record (HOME-003) stores each document's path as the resolver built it from the render's --cwd and config directory, and given-check finds the listed document by comparing those paths as written. One file reached through a symlinked directory, through a path with `..` in it, or through a config directory written with a trailing slash therefore records as a different path, and given-check reports a difference that is not one. This brief canonicalises every absolute path before it is recorded or compared, keeps a path that does not exist as given and names it unresolved in the `given` and `given-check` reports, states the rule in RECORD.md, and proves the three shapes record and compare as one path with a fixture test (CN12, ADR-029).",
+  "task": "Today crates/lys-home/src/harness/claude_code/given.rs builds every recorded path with Path::join from the config directory and from Path::new(cwd).ancestors(), and nothing in crates/lys-home/src canonicalises a path; crates/lys-home/src/cli/given.rs finds the listed document with `document.path == args.path`, its one comparison site. Rust's Path equality already ignores a trailing slash, but a PathBuf serialises with it, and `..` and symlinks are not normalised by it; with a `..` in --cwd the chain walk also visits directories the harness never reads. Add one helper module beside given.rs that canonicalises a given path by the rule ADR-029 fixes, use it in resolve_given (the working directory before the chain walk, the config directory, every absolute document) and in given-check (the listed path and the --path argument, and --file before it is read), and add an `unresolved` list to the `given` and `given-check` reports. The lys.given entry's data keeps exactly its six fields (ADR-013); nothing is added to it. The two written files (instructions.md and mcp.json) stay relative to the render's out directory and are exempt, for the reason RECORD.md already gives. A document path is built by join and cannot carry a trailing slash; only the config directory can, so the trailing-slash shape is proven on the config directory and nowhere else. The memory index's slug keeps taking the working directory as given (projects_slug is unchanged); the chain then walks the canonical working directory while the slug is computed from the one given, so the two may see different forms of one directory, and which form the slug should take is left to the slug rule's own requirement. Existing tests whose expectations are built from a temporary directory (a symlinked /var path on macOS) build them from that directory canonicalised, so the suite asserts the same paths on every platform. Out of scope: the slug rule, canonical paths in any other home record (fork's parentSession, the render manifest's files, render-launch --out), PROOF-GIVEN.md's measured paths, and any harness but Claude Code. Its ids are the next free after main's highest and every open brief branch's, checked against the remote's branch list: main holds up to HOME-007, RM-016, ADR-018, C44, S23 and CN10; brief/home/5898fcb0 holds HOME-008 and RM-011, and brief/home/9e701467 holds HOME-009, RM-012, C70, S31 and CN11; the highest brief-branch RM is RM-017 and ADR is ADR-028. So this brief is HOME-010, with RM-018, ADR-029, C71 to C77, S32, S33 and CN12.",
   "requirements": [
     {
       "id": "R1",
-      "title": "Give LanternData an optional lit_in that keeps null and non-string values distinct from an absent key",
-      "spec": "Structural. `LanternData` in `record/entries.rs` gains a documented fifth field `lit_in: Option<LitIn>`: the session that held the point when the lantern was lit. `LitIn` is a public enum declared beside it, `#[serde(untagged)]`, with `LitIn::Session(String)` for a JSON string and `LitIn::Other(serde_json::Value)` for any other JSON value, null included, each documented. The field carries `#[serde(default, skip_serializing_if = \"Option::is_none\", deserialize_with = ...)]` naming a crate function that wraps whatever value is present in `Some`, so an absent key reads as `None` and a present `null` reads as `Some(LitIn::Other(Value::Null))`. `LanternData` keeps `#[serde(deny_unknown_fields)]`, and `EpilogueData` does not change. THE SYSTEM SHALL NOT read a present null as an absent key, SHALL NOT make `lit_in` required, SHALL NOT refuse a lantern whose data has no `lit_in`, and SHALL NOT rename or retype `point`, `note`, `lit_by` or `lit_at`.",
+      "title": "Canonicalise one given path by the record's rule",
+      "spec": "Add a module given_path beside given.rs with one enum naming what became of a path: canonical, unresolved, or relative. WHEN it canonicalises a directory path, THE SYSTEM SHALL resolve the whole path, every symlink, `..` and trailing slash included, with std::fs::canonicalize. WHEN it canonicalises a document path, THE SYSTEM SHALL canonicalise the path's parent directory whole, join the path's own final component unchanged, and then read the joined path's own entry with std::fs::symlink_metadata, so a document that is itself a symlink is named at its link position and a dangling symlink counts as existing there; a path whose final component is not a normal name (`..`, or the root) SHALL be canonicalised whole as a directory path. WHEN the path is relative, THE SYSTEM SHALL return it unchanged, marked relative, and SHALL NOT resolve it against the process's working directory. IF a directory path cannot be canonicalised because it does not exist, or a document path's parent cannot be canonicalised because it does not exist, or a document path's own entry does not exist (canonicalize or symlink_metadata answering NotFound, or NotADirectory for a component that is a file), THEN THE SYSTEM SHALL return the path byte for byte as given, marked unresolved, and SHALL NOT drop it, SHALL NOT return an error, and SHALL NOT mark it canonical. IF canonicalize or symlink_metadata fails for any other reason (permission denied, a loop of symlinks), THEN THE SYSTEM SHALL refuse with HomeError::Io whose context is `canonicalising a given path` and whose path is the path given. THE SYSTEM SHALL NOT open or read any file's bytes, and SHALL NOT put anything but the path in an error.",
       "acceptance": [
-        "`serde_json::from_value::<LanternData>(json!({\"point\": \"e2\", \"note\": NOTE, \"lit_by\": LIGHTER, \"lit_at\": now()}))` is `Ok` with `lit_in == None`.",
-        "The same object with `\"lit_in\": null` added is `Ok` with `lit_in == Some(LitIn::Other(Value::Null))`.",
-        "The same object with `\"lit_in\": 5` added is `Ok` with `lit_in == Some(LitIn::Other(json!(5)))`.",
-        "The same object with `\"lit_in\": \"parent\"` added is `Ok` with `lit_in == Some(LitIn::Session(\"parent\".to_owned()))`.",
-        "`lantern_data_round_trips_with_exactly_its_five_keys` builds a `LanternData` with `lit_in: Some(LitIn::Session(..))`, and its sorted serialised keys equal `[\"lit_at\", \"lit_by\", \"lit_in\", \"note\", \"point\"]` and it deserialises back equal; no test named `lantern_data_round_trips_with_exactly_its_four_keys` remains.",
-        "A `LanternData` with `lit_in: None` serialises to exactly the keys `[\"lit_at\", \"lit_by\", \"note\", \"point\"]`.",
-        "`lantern_data_with_an_extra_key_is_refused` passes unchanged: data carrying `\"anchors\": []` is `Err`.",
-        "`git diff` of `record/entries.rs` changes no line of `EpilogueData`."
+        "Under a temporary directory canonicalised as `B`, with `B/real/w/CLAUDE.md` a file and `B/link` a symlink to `B/real`, canonicalising the document path `B/link/w/CLAUDE.md` gives canonical `B/real/w/CLAUDE.md`.",
+        "Canonicalising the document path `B/real/w/../w/CLAUDE.md` gives canonical `B/real/w/CLAUDE.md`.",
+        "Canonicalising the directory path written as the string `B/real/c/` (trailing slash, `B/real/c` a directory) gives canonical `B/real/c`, and serde_json serialises the result as the JSON string `\"B/real/c\"` with no trailing slash.",
+        "With `B/real/w/CLAUDE.md` a symlink to `B/real/t/target.md`, canonicalising the document path `B/real/w/CLAUDE.md` gives canonical `B/real/w/CLAUDE.md`, not `B/real/t/target.md`.",
+        "Canonicalising the directory path written as `B/gone/c/`, where `B/gone` does not exist, gives unresolved with the string `B/gone/c/` byte for byte.",
+        "Canonicalising the document path `B/real/w/CLAUDE.md/x`, where `B/real/w/CLAUDE.md` is a file, gives unresolved `B/real/w/CLAUDE.md/x`.",
+        "Canonicalising the document path `B/real/w/absent.md`, where `B/real/w` is a directory and `absent.md` does not exist in it, gives unresolved `B/real/w/absent.md`.",
+        "With `B/real/w/dangling.md` a symlink to `B/real/t/none.md`, which does not exist, canonicalising the document path `B/real/w/dangling.md` gives canonical `B/real/w/dangling.md`.",
+        "Canonicalising `instructions.md` gives relative `instructions.md`.",
+        "With `B/locked` a directory of mode 0o000 holding `w/CLAUDE.md`, canonicalising the document path `B/locked/w/CLAUDE.md` returns HomeError::Io whose Display contains `canonicalising a given path` and `B/locked/w/CLAUDE.md`.",
+        "Every case above is built under the temporary directory by the test itself, and the test asserts the count of cases it ran, 10."
       ],
       "files": {
-        "create": [],
+        "create": [
+          "crates/lys-home/src/harness/claude_code/given_path.rs",
+          "crates/lys-home/src/harness/claude_code/given_path_tests.rs"
+        ],
         "modify": [
-          "crates/lys-home/src/record/entries.rs",
-          "crates/lys-home/src/record/lantern_tests.rs"
+          "crates/lys-home/src/harness/claude_code/mod.rs"
         ],
         "delete": []
       },
@@ -55,29 +56,39 @@
         "C71"
       ],
       "stories": [
-        "S32"
+        "S32",
+        "S33"
       ]
     },
     {
       "id": "R2",
-      "title": "Record lit_in in the light act and print it in the light report",
-      "spec": "WHEN `light(home, session, point, note, by)` appends a lantern, THE SYSTEM SHALL write its data's `lit_in` as `Some(LitIn::Session(session))`, the id of the session at whose head the lantern is appended, and SHALL return a `Lit` report carrying a documented `lit_in: String` field equal to that id beside `id`, `session`, `point` and `lit_at`; `lys-home lantern light` prints that report. THE SYSTEM SHALL NOT take `lit_in` from an argument, from the point entry, or from any other session, SHALL NOT change the order of `light`'s checks or its refusals, and SHALL NOT put the note in the report.",
+      "title": "Resolve and record the given documents at canonical paths",
+      "spec": "WHEN resolve_given resolves a session's documents, THE SYSTEM SHALL canonicalise the working directory as a directory path before walking the CLAUDE.md chain and walk the ancestors of the result; SHALL canonicalise the config directory as a directory path and record the result as config_dir.path; SHALL build the user CLAUDE.md and the memory index under the canonical config directory; SHALL record every absolute document's path as the R1 document canonicalisation of the path it was read at; and SHALL compare a chain position with the user CLAUDE.md on their canonical paths, so `D/.claude/CLAUDE.md` is still listed once, first, as user_claude_md. WHEN the working directory or the config directory is unresolved, THE SYSTEM SHALL use it as given and continue. THE SYSTEM SHALL compute the memory index's slug with projects_slug from the working directory exactly as given. THE SYSTEM SHALL NOT canonicalise the paths of the two written files, SHALL NOT resolve a document's final component, SHALL NOT change the measured order, SHALL NOT list an absent position, and SHALL NOT change projects_slug. IF canonicalising any path fails for a reason other than not existing, THEN THE SYSTEM SHALL fail the resolution with R1's refusal, and render-launch SHALL refuse with its existing refusal status 1, with no lys.given entry written.",
       "acceptance": [
-        "In `lantern_tests.rs`, `light(&home, FIXTURE, \"e2\", NOTE, LIGHTER)` returns a `Lit` whose `lit_in == FIXTURE`, and the appended entry's data read as `LanternData` has `lit_in == Some(LitIn::Session(FIXTURE.to_owned()))`.",
-        "In `tests/lantern_cli.rs`, the light report's sorted keys equal `[\"id\", \"lit_at\", \"lit_in\", \"point\", \"session\"]` and `report[\"lit_in\"] == FIXTURE`; the existing assertion that stdout does not contain `NOTE` still holds.",
-        "Every other test in `lantern_tests.rs` and `tests/lantern_cli.rs` passes unchanged."
+        "Under a canonical temporary directory `B` with `B/link` a symlink to `B/real`, `B/real/w/CLAUDE.md` present and config `B/real/c`, resolving cwd `B/link/w` lists the chain document at `B/real/w/CLAUDE.md`.",
+        "With `B/real/CLAUDE.md` and `B/real/w/CLAUDE.md` present, resolving cwd `B/real/w/../w` lists exactly 2 claude_md_chain documents under `B`, at `B/real/CLAUDE.md` then `B/real/w/CLAUDE.md`.",
+        "Resolving with the config directory `B/real/c/` gives config_dir.path serialised as `B/real/c`, and `B/real/c/CLAUDE.md` listed as user_claude_md at `B/real/c/CLAUDE.md`.",
+        "With config `B/link/.claude`, `B/link` a symlink to `B/real`, cwd `B/real/w`, and `B/real/.claude/CLAUDE.md` and `B/real/w/CLAUDE.md` present, the resolution's absolute documents are exactly 2: `B/real/.claude/CLAUDE.md` as user_claude_md first, then `B/real/w/CLAUDE.md` as claude_md_chain, and no claude_md_chain document has the path `B/real/.claude/CLAUDE.md`.",
+        "Resolving with the config directory `B/gone/c/`, which does not exist, succeeds with config_dir.path serialised as `B/gone/c/` byte for byte and no user_claude_md or memory_index document.",
+        "With cwd `B/link/w` and config `B/real/c`, a MEMORY.md at `B/real/c/projects/<projects_slug(\"B/link/w\")>/memory/MEMORY.md` is listed at that path, and a MEMORY.md placed only under `projects_slug(\"B/real/w\")` gives no memory_index document.",
+        "With `B/real/w/CLAUDE.md` a symlink to `B/real/t/target.md`, the chain document is listed at `B/real/w/CLAUDE.md`.",
+        "The appended_instructions and mcp_config documents are listed at `instructions.md` and `mcp.json`.",
+        "With cwd `B/locked/w` and `B/locked` of mode 0o000, resolution returns HomeError::Io whose Display contains `canonicalising a given path` and `B/locked/w`.",
+        "render-launch with --cwd `B/locked/w`, `B/locked` of mode 0o000, exits 1, stderr contains `canonicalising a given path` and `B/locked/w`, and the session holds 0 lys.given entries afterwards.",
+        "`git diff` against the base of this brief shows no change to crates/lys-home/src/harness/claude_code/paths.rs."
       ],
       "files": {
         "create": [],
         "modify": [
-          "crates/lys-home/src/record/lantern.rs",
-          "crates/lys-home/src/record/lantern_tests.rs",
-          "crates/lys-home/tests/lantern_cli.rs"
+          "crates/lys-home/src/harness/claude_code/given.rs",
+          "crates/lys-home/src/harness/claude_code/given_tests.rs",
+          "crates/lys-home/tests/given_record.rs"
         ],
         "delete": []
       },
       "checklist": [
-        "C72"
+        "C72",
+        "C73"
       ],
       "stories": [
         "S32"
@@ -85,51 +96,32 @@
     },
     {
       "id": "R3",
-      "title": "Read lit_in in the fork from the typed field, keeping the holder rule and the named refusals",
-      "spec": "`read_lantern` in `record/fork_cut.rs` deserialises the lantern entry's data into a crate-private view holding `point: String` and a `lit_in` declared with R1's `LitIn` type and R1's deserialiser; the view does not deny unknown keys and does not require `note`, `lit_by` or `lit_at`, so every lantern the fork resolves today still resolves. The check of a present `lit_in` is one `pub(crate)` function in `fork_cut.rs` taking the home, the lantern id and the `Option<&LitIn>` and returning the session id or the refusal. IF the data has no `lit_in` THEN THE SYSTEM SHALL resolve by the holders exactly as today: one holder cuts, several refuse `lantern_ambiguous` until a session is named. IF `lit_in` is present and is null, not a string, not a safe session name, or names no session of the home THEN THE SYSTEM SHALL refuse `lit_in_not_a_session` with `what` equal to `is null`, `is not a string`, `is not a safe session name` and `names no session of the home` respectively. IF the data does not deserialise into the view (no `point`, or a `point` that is not a string) THEN THE SYSTEM SHALL refuse `EntryShape` as today. THE SYSTEM SHALL NOT look up a `lit_in` key in a raw `serde_json::Value`, SHALL NOT read a present `lit_in` that is not a session id as any session, SHALL NOT refuse a lantern for having no `lit_in`, and SHALL NOT change the names or display prefixes of `lit_in_not_a_session`, `lantern_not_lit_here` and `lantern_ambiguous`, the cut, the copied line bytes, the ancestry entries or the fork report.",
+      "title": "Compare canonical paths in given-check and name unresolved paths in both reports",
+      "spec": "WHEN given-check looks for the listed document, THE SYSTEM SHALL compare the R1 document canonicalisation of each listed path with the R1 document canonicalisation of the --path argument, so a record written before this change compares by its canonical form; a relative path SHALL be compared as written; an unresolved path SHALL be compared as written. THE SYSTEM SHALL canonicalise --file as a document path before reading it, and read it as given when it is unresolved. WHEN given-check answers, THE SYSTEM SHALL add to its report the field `unresolved`: the list of the --path argument and then the listed document's path, each as written and each only when unresolved, without repeating a string already in the list; empty when there is none. WHEN `given` lists a session's records, THE SYSTEM SHALL add to each listed record the field `unresolved`: the record's config_dir.path and then its absolute document paths in record order, each as recorded and each only when unresolved at the time of listing; empty when there is none. THE SYSTEM SHALL NOT add a field to the lys.given entry's data, SHALL NOT change the value of any existing report field (`path` and `file` echo the arguments as given), SHALL NOT change the exit statuses 0 matches, 1 differs, 2 refused, and SHALL NOT put a byte of any file in a report or an error. IF canonicalising --path, --file or a listed path fails for a reason other than not existing, THEN given-check SHALL refuse with R1's refusal and exit 2 with nothing on stdout, and `given` SHALL refuse with it.",
       "acceptance": [
-        "`grep -c '\"lit_in\"' crates/lys-home/src/record/fork_cut.rs` prints `0`.",
-        "`a_lit_in_that_is_not_a_session_id_is_refused_by_name` passes with `refusals == 8`: `N1` gives `is null`, `N2` `is not a string`, `N3` `is not a safe session name` and `N4` `names no session of the home`, each with no session named and with `A` named, each display text starting `lit_in_not_a_session`.",
-        "`a_lit_in_session_that_holds_no_copy_refuses_naming_the_holder_read` passes with `refusals == 3`, each `LanternNotLitHere` with `lit_in == \"elsewhere\"`.",
-        "In `a_lit_in_lantern_cuts_from_its_session_and_an_older_record_needs_one_named`, `O2` (no `lit_in`) with no session named refuses `LanternAmbiguous` with `sessions == [\"A\", PARENT]`, and with `PARENT` named cuts `[\"e1\", \"e2\"]` with `lit_in == None`.",
-        "`fork(&home, \"M2\", None)` still reports `(entries, blocks, unstored) == (2, 1, 2)`, and every test in `fork_tests.rs` that forks `N3` passes unchanged, though neither lantern's data carries `lit_at` or `lit_in`.",
-        "`HomeError::LitInNotASession`, `HomeError::LanternNotLitHere` and `HomeError::LanternAmbiguous` and their `#[error]` texts are unchanged in `git diff` of `crates/lys-home/src/error.rs`, which is empty."
+        "With a record listing `B/real/w/CLAUDE.md`, given-check with --path `B/link/w/CLAUDE.md` and --file `B/real/w/CLAUDE.md` exits 0 with `answer` `matches`, `path` `B/link/w/CLAUDE.md` and `unresolved` [].",
+        "The same record checked with --path `B/real/w/../w/CLAUDE.md` exits 0 with `answer` `matches`.",
+        "A lys.given entry appended with the document path `B/link/w/CLAUDE.md`, as a record written before this change holds it, checked with --path `B/real/w/CLAUDE.md` exits 0 with `answer` `matches`.",
+        "A lys.given entry listing `B/gone/CLAUDE.md`, which does not exist, checked with --path `B/gone/CLAUDE.md` and a --file of equal bytes and length exits 0 with `answer` `matches` and `unresolved` [\"B/gone/CLAUDE.md\"].",
+        "The same entry checked with --path `B/gone/../gone/CLAUDE.md` exits 2, stdout is empty and stderr contains `B/gone/../gone/CLAUDE.md`.",
+        "`given` on a session holding a record whose config_dir.path is `B/gone/c/` and a record whose paths all exist reports `unresolved` [\"B/gone/c/\"] on the first and [] on the second.",
+        "`given` on a session holding a record that lists the document `B/real/w/absent.md`, which does not exist at listing time while `B/real/w` does, reports `unresolved` [\"B/real/w/absent.md\"] on that record.",
+        "given-check with --path `B/locked/w/CLAUDE.md`, `B/locked` of mode 0o000, exits 2, stdout is empty and stderr contains `canonicalising a given path` and `B/locked/w/CLAUDE.md`.",
+        "given-check with --path `instructions.md` against a render's record exits 0 with `answer` `matches` for the render's instructions.md.",
+        "The keys of a lys.given entry's data after a render are exactly harness, harness_version, kinds, config_dir, documents and environment."
       ],
       "files": {
         "create": [],
         "modify": [
-          "crates/lys-home/src/record/fork_cut.rs"
+          "crates/lys-home/src/cli/given.rs",
+          "crates/lys-home/tests/given_record.rs"
         ],
         "delete": []
       },
       "checklist": [
-        "C74"
-      ],
-      "stories": [
-        "S33"
-      ]
-    },
-    {
-      "id": "R4",
-      "title": "Report lit_in in recall's rows, null for a lantern without it",
-      "spec": "`LanternRow` in `record/recall.rs` gains a documented `lit_in: Option<String>`, serialised without `skip_serializing_if`, so every row carries the key beside `point`, `note` and `lit_by`. WHEN recall by note or by point lists a lantern whose data has no `lit_in`, THE SYSTEM SHALL list it with `lit_in` null. WHEN it lists a lantern whose `lit_in` is present, THE SYSTEM SHALL check it by R3's rule and list the session id it names. IF that check refuses THEN the refusal SHALL be `lit_in_not_a_session` with R3's `what` text (`is null`, `is not a string`, `is not a safe session name` or `names no session of the home`): recall by note SHALL skip the lantern's session and name it in `skipped` with that refusal's display text, and recall by point SHALL return that refusal. THE SYSTEM SHALL NOT give such a lantern `entry_shape`, SHALL NOT change the name of recall's other `entry_shape` refusals, SHALL NOT list a lantern whose `lit_in` is present and not a session id as a row, SHALL NOT skip or refuse a lantern for having no `lit_in`, and SHALL NOT print a line of the transcript (ADR-015).",
-      "acceptance": [
-        "`a_row_carries_exactly_its_fields` asserts row keys `[\"epilogues\", \"id\", \"lit_at\", \"lit_by\", \"lit_in\", \"note\", \"point\", \"session\"]`, and still counts 2 rows and 2 epilogues.",
-        "A lantern lit with `light(&home, OTHER, \"o1\", ..)` recalls by point `(OTHER, \"o1\")` as one row whose `lit_in == Some(OTHER.to_owned())`, and every row `recall_by_note(&home, \"fold\")` lists has `lit_in` equal to its own `session`.",
-        "A lantern appended with `Session::append_entry` whose data is exactly `{point, note, lit_by, lit_at}` recalls by its point as one row with `lit_in == None`, serialised as `\"lit_in\": null`, and `recall_by_note` on a phrase of its note lists it with `skipped` empty.",
-        "Four sessions each holding one lantern whose `lit_in` is null, 5, `\"../elsewhere\"` and `\"no-such-session\"`: `recall_by_note` on the lanterns' note lists those four sessions in `skipped` and no row from them, each skip's `reason` starting `lit_in_not_a_session` and containing `is null`, `is not a string`, `is not a safe session name` and `names no session of the home` respectively; `recall_by_point` at each lantern's point is `Err(HomeError::LitInNotASession { .. })` with `what` equal to those four texts respectively; the test counts 4 skips and 4 refusals, and no skip reason starts `entry_shape`.",
-        "Every other test in `recall_tests.rs` passes unchanged."
-      ],
-      "files": {
-        "create": [],
-        "modify": [
-          "crates/lys-home/src/record/recall.rs",
-          "crates/lys-home/src/record/recall_tests.rs"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C73"
+        "C73",
+        "C74",
+        "C75"
       ],
       "stories": [
         "S32",
@@ -137,54 +129,20 @@
       ]
     },
     {
-      "id": "R5",
-      "title": "Light L2 with the light act in both fork fixtures",
-      "spec": "In `fixture_home` of `record/fork_cut_tests.rs`, `L2` is lit with `light(&home, PARENT, \"e2\", NOTE, LIGHTER)` while `parent`'s head is `e2` and no owner holds it, and in `fixture_home` of `tests/fork.rs` with `lys-home lantern light` at `--session parent --point e2`; `Lanterns.l2` holds the returned id and `O2` is appended as its child. The lanterns the fork fixtures write by hand are exactly those the light act cannot produce: `O2` in both fixtures, `M2` and `N3` in `fork_tests.rs` (no `lit_in`), `N2` (a `lit_in` naming a session other than the one it stands in) and `N1` to `N4` (`lit_in` null, 5, `../elsewhere`, `no-such-session`) in `fork_cut_tests.rs`, each call site carrying a comment that it stands for a record the light act cannot produce. A test that named `L2` by its literal id compares with `lanterns.l2`. The module doc of `tests/fork.rs` says `L2` is lit with `lys-home lantern light`. THE SYSTEM SHALL NOT write by hand any lantern the light act can produce, SHALL NOT drop or weaken a hand-written refusal or older-record case, and SHALL NOT change any assertion, count or refusal beyond the literal-id replacement.",
+      "id": "R4",
+      "title": "Prove with one fixture test that the three shapes record and compare as one path",
+      "spec": "Add one test to crates/lys-home/tests/given_record.rs that builds, under a temporary directory canonicalised as `B`, a real directory `B/real` holding `w/CLAUDE.md` and `c/CLAUDE.md`, and a symlink `B/link` to `B/real` made by the test, with no memory index file. It renders the fixture session with render-launch once as the reference (--cwd `B/real/w`, CLAUDE_CONFIG_DIR `B/real/c`) and once for each of three shapes: the symlinked directory (--cwd `B/link/w`, CLAUDE_CONFIG_DIR `B/link/c`), the `..` path (--cwd `B/real/w/../w`, CLAUDE_CONFIG_DIR `B/real/c/../c`), and the trailing slash (--cwd `B/real/w`, CLAUDE_CONFIG_DIR `B/real/c/`). Then it runs given-check on the reference entry for `B/real/w/CLAUDE.md` with --path in the symlinked and the `..` shapes. The existing test functions of the file keep their assertions, and the fixture builds their expectations from its temporary directory canonicalised. The test SHALL NOT depend on a symlink the platform provides, and SHALL NOT compare a render against itself.",
       "acceptance": [
-        "`grep -c '\"L2\"'` prints `0` for `crates/lys-home/src/record/fork_cut_tests.rs`, `crates/lys-home/src/record/fork_tests.rs` and `crates/lys-home/tests/fork.rs`.",
-        "`grep -c 'lantern_entry('` prints `4` for `fork_cut_tests.rs` (the helper and the `O2`, `N2` and `N1` to `N4` sites), `2` for `fork_tests.rs` (`M2`, `N3`) and `2` for `tests/fork.rs` (the helper and `O2`).",
-        "`grep -c 'the light act cannot produce'` prints `3` for `fork_cut_tests.rs`, `2` for `fork_tests.rs` and `1` for `tests/fork.rs`.",
-        "`five_forks_succeed_and_five_are_refused_with_the_ancestry_on_the_parent` passes with 5 children, 5 refusals and 5 `lys.fork` marks, the `lantern_not_lit_here` refusal still coming from `L2` named with a session it was not lit in.",
-        "`cargo test -p lys-home --all-features` passes with the count of `#[test]` functions in `fork_cut_tests.rs`, `fork_tests.rs` and `tests/fork.rs` unchanged from the base commit."
+        "Each of the three shapes' lys.given data serialises `config_dir` and `documents` to the same JSON bytes as the reference render's, and the reference's config_dir.path is `B/real/c`.",
+        "The test asserts it compared exactly 3 shapes against the reference.",
+        "given-check with --path `B/link/w/CLAUDE.md` and with --path `B/real/w/../w/CLAUDE.md` against the reference entry each exits 0 with `answer` `matches`, and the test asserts it ran exactly 2 checks.",
+        "The five test functions the file held before this brief pass with their assertions unchanged.",
+        "`cargo test --workspace --all-features` lists the new test as passed."
       ],
       "files": {
         "create": [],
         "modify": [
-          "crates/lys-home/src/record/fork_cut_tests.rs",
-          "crates/lys-home/src/record/fork_tests.rs",
-          "crates/lys-home/tests/fork.rs"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C75"
-      ],
-      "stories": [
-        "S34"
-      ]
-    },
-    {
-      "id": "R6",
-      "title": "Document lit_in in the record, the README and the fork proof, and render the cluster",
-      "spec": "Structural. `docs/design/home/RECORD.md`'s `lys.lantern` bullet lists `{point, note, lit_by, lit_at, lit_in}` and states that `lit_in` is the id of the session the light act appended the lantern to, absent from a lantern lit before HOME-010; its Forks section states that a lantern with no `lit_in` resolves by its holders and a present `lit_in` that is not a session id is refused `lit_in_not_a_session`. The `lys.lantern` row of the lys-home README's custom-entry table lists `lit_in`. `docs/design/home/PROOF-FORK.md` keeps its measured sentence that the light act on the measured tree records no `lit_in` byte for byte, and gains a note directly after it that from HOME-010 the light act records `lit_in`, and that lanterns lit before it, as those measured, resolve by the older-record rule. `HOME-010.md`, `DESIGN.md`, `CHECKLIST.md` and `USER-STORIES.md` are rendered from their JSON with `scripts/design/render-brief.py` and `scripts/design/render-cluster.py`. THE SYSTEM SHALL NOT rewrite any measured figure, hash, command or result in PROOF-FORK.md, and SHALL NOT edit any rendered markdown by hand.",
-      "acceptance": [
-        "`grep -c 'point, note, lit_by, lit_at, lit_in' docs/design/home/RECORD.md` prints `1`.",
-        "`grep -c 'lit_in_not_a_session' docs/design/home/RECORD.md` prints at least `1`.",
-        "The README line beginning `| \\`lys.lantern\\`` contains `lit_in`.",
-        "`git diff` of `docs/design/home/PROOF-FORK.md` deletes no line, and the added lines contain `HOME-010` and `lit_in`.",
-        "`sh scripts/design/gate.sh` exits 0."
-      ],
-      "files": {
-        "create": [
-          "docs/design/home/briefs/HOME-010.md"
-        ],
-        "modify": [
-          "docs/design/home/RECORD.md",
-          "crates/lys-home/README.md",
-          "docs/design/home/PROOF-FORK.md",
-          "docs/design/home/DESIGN.md",
-          "docs/design/home/CHECKLIST.md",
-          "docs/design/home/USER-STORIES.md"
+          "crates/lys-home/tests/given_record.rs"
         ],
         "delete": []
       },
@@ -192,26 +150,57 @@
         "C76"
       ],
       "stories": [
+        "S32"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "State the canonicalisation rule in RECORD.md and render the cluster",
+      "spec": "Extend the lys.given paragraph of docs/design/home/RECORD.md to state: every absolute path is canonicalised before it is recorded or compared; the config directory, and the working directory before the chain is walked, are canonicalised whole; a document's path is its parent directory canonicalised with its own final name kept, so a symlinked document is recorded at its link position; the two written files stay relative to the render's out directory and are the exemption, for the reason the paragraph already gives; a document path is built by join and cannot carry a trailing slash, the config directory can and canonicalisation removes it; a path that cannot be canonicalised because it does not exist is recorded as given, and the `given` and `given-check` reports name it in `unresolved`, while the entry's data keeps exactly its six fields; a canonicalisation failure of any other kind is refused by path and operation; given-check canonicalises both the listed path and the --path argument at check time, so records written before this rule compare correctly; and the memory index's slug is computed from the working directory as given, not canonicalised. Then regenerate the cluster's rendered markdown with render-cluster.py. THE SYSTEM SHALL NOT change what the paragraph says of the order, the kinds, the absent positions or the entry's place under the render event.",
+      "acceptance": [
+        "RECORD.md's lys.given paragraph contains the words `canonicalised`, `link position`, `unresolved` and `trailing slash`, and names instructions.md and mcp.json as the exemption.",
+        "RECORD.md's lys.given paragraph states that the slug is computed from the working directory as given.",
+        "RECORD.md still states `Data is exactly {harness, harness_version, kinds, config_dir, documents, environment}`.",
+        "`sh scripts/design/gate.sh` exits 0, so DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/HOME-010.md are what their JSON renders to."
+      ],
+      "files": {
+        "create": [
+          "docs/design/home/briefs/HOME-010.md"
+        ],
+        "modify": [
+          "docs/design/home/RECORD.md",
+          "docs/design/home/DESIGN.md",
+          "docs/design/home/CHECKLIST.md",
+          "docs/design/home/USER-STORIES.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C77"
+      ],
+      "stories": [
         "S33"
       ]
     }
   ],
   "boundaries": [
-    "SHALL NOT rewrite, truncate or delete any byte of an existing session line; a lantern lit before this brief stays as it is (P1, ADR-014).",
-    "SHALL NOT refuse, skip or read as the wrong shape a lantern whose data has no lit_in, and SHALL NOT retire ADR-017's older-record rule.",
-    "SHALL NOT change the names or display prefixes of lit_in_not_a_session, lantern_not_lit_here or lantern_ambiguous, and SHALL NOT change error.rs.",
-    "SHALL NOT change the fork's cut, its copied line bytes, its ancestry entries or its report fields.",
-    "SHALL NOT change EpilogueData, and SHALL NOT remove deny_unknown_fields from LanternData.",
-    "SHALL NOT change the Claude Code render or its derived uuids (ADR-016), and SHALL NOT render a lantern into a resume file (C30).",
-    "SHALL NOT put a note, epilogue words or any transcript content in a refusal, a report, a log line, a test name or a proof document; only recall prints notes and epilogues (ADR-015).",
-    "SHALL NOT mark or filter in recall a lantern copied into a fork's child, and SHALL NOT re-measure PROOF-FORK on a real session.",
-    "SHALL NOT add a file beyond HOME-010.md."
+    "No field is added to, removed from or renamed in the lys.given entry's data; `unresolved` lives in the `given` and `given-check` reports only.",
+    "projects_slug and crates/lys-home/src/harness/claude_code/paths.rs do not change; the slug takes the working directory as given.",
+    "The two written files' paths stay relative to the render's out directory and are never canonicalised.",
+    "A document's final component is never resolved; only its parent directory is.",
+    "No path in any other home record (fork's parentSession, the render manifest's files, render-launch --out) is canonicalised.",
+    "given-check keeps its exit statuses 0 matches, 1 differs, 2 refused, and the value of every report field it printed before.",
+    "An absent document position stays omitted, the measured order and MEASURED_VERSION 2.1.283 stay as they are, and the given entry stays a side leaf under the render event with the head unmoved.",
+    "No document content and no variable value appears in any report, error or test name; canonicalisation reads no file's bytes.",
+    "No dependency is added, and the design's structure array is the whole file list."
   ],
   "verification": [
-    "From the repository root: `python3 scripts/design/validate.py docs/design/home` and `python3 scripts/design/check-coverage.py docs/design/home` exit 0.",
-    "From the repository root: `cargo fmt --all`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo clippy --all-targets -- -D warnings`, `cargo test --workspace --all-features`, `cargo doc --no-deps --all-features` and `cargo doc --no-deps` exit 0.",
-    "From the repository root: `sh scripts/design/gate.sh` exits 0.",
-    "`crates/lys-home/src/record/entries.rs`, `lantern.rs`, `recall.rs` and `fork_cut.rs` each have at most 500 lines of code, counted without comments and blank lines.",
-    "`cargo test -p lys-home --all-features --test fork --test lantern_cli` passes, and its output shows the five-successes and five-refusals test and the light report test passing."
+    "From the repository root: cargo fmt --all leaves the tree unchanged.",
+    "cargo clippy --all-targets --all-features -- -D warnings and cargo clippy --all-targets -- -D warnings exit 0.",
+    "cargo test --workspace --all-features exits 0 and lists R1's, R2's, R3's and R4's tests as passed.",
+    "cargo doc --no-deps --all-features and cargo doc --no-deps exit 0 with no warnings.",
+    "sh scripts/design/gate.sh exits 0.",
+    "grep -rn 'canonicalize' crates/lys-home/src | grep -v '_tests.rs' prints lines in crates/lys-home/src/harness/claude_code/given_path.rs only.",
+    "git diff against the brief's base shows no change to crates/lys-home/src/harness/claude_code/paths.rs or crates/lys-home/src/record/given.rs."
   ]
 }
