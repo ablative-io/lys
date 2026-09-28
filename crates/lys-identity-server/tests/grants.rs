@@ -4,6 +4,7 @@
 //! only its own disposable log and the in-process issuer, and no other server.
 
 use std::error::Error;
+use std::os::unix::fs::PermissionsExt;
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
@@ -247,7 +248,11 @@ async fn a_check_records_its_use_and_an_explanation_records_nothing() -> TestRes
     let (_, read) = service
         .get(&format!("/grants/{grant}"), Some(&bea_cookie))
         .await?;
-    assert_eq!(read["last_use"], json!({ "seen": false }), "{read}");
+    assert_eq!(
+        read["last_use"],
+        json!({ "seen": false, "recorded": 0, "source": "reported" }),
+        "{read}"
+    );
 
     let before = revision(&service, &ada_cookie).await?;
     for path in ["/grants/why", "/grants/who"] {
@@ -271,7 +276,11 @@ async fn a_check_records_its_use_and_an_explanation_records_nothing() -> TestRes
     let (_, read) = service
         .get(&format!("/grants/{grant}"), Some(&bea_cookie))
         .await?;
-    assert_eq!(read["last_use"], json!({ "seen": false }), "{read}");
+    assert_eq!(
+        read["last_use"],
+        json!({ "seen": false, "recorded": 0, "source": "reported" }),
+        "{read}"
+    );
 
     let (status, checked) = service
         .post("/grants/check", Some(&bea_cookie), &question)
@@ -290,6 +299,8 @@ async fn a_check_records_its_use_and_an_explanation_records_nothing() -> TestRes
     assert_eq!(read["last_use"]["seen"], true, "{read}");
     assert_eq!(read["last_use"]["route"], "tool", "{read}");
     assert_eq!(read["last_use"]["use_event"], index, "{read}");
+    assert_eq!(read["last_use"]["recorded"], 1, "{read}");
+    assert_eq!(read["last_use"]["source"], "reported", "{read}");
 
     let (status, refused) = service
         .post(
@@ -351,5 +362,112 @@ async fn a_revoked_grant_names_when_and_at_which_revision_it_was_revoked() -> Te
     assert_eq!(read["revoked"], true, "{read}");
     assert!(read["revoked_at"].is_u64(), "{read}");
     assert_eq!(read["revoked_revision"], json!(after), "{read}");
+    Ok(())
+}
+
+fn leaves_writable(service: &Service, writable: bool) -> TestResult {
+    let mode = if writable { 0o755 } else { 0o555 };
+    std::fs::set_permissions(
+        service.dir.path().join("grant-log").join("leaves"),
+        std::fs::Permissions::from_mode(mode),
+    )?;
+    Ok(())
+}
+
+/// `GRANT_LAST_USED` at the service: a zero count is answered as reported, a
+/// permitted exercise whose use event the grant log refused is answered as a
+/// missing report, and a restart answers the recorded use and count from the
+/// log.
+#[tokio::test]
+async fn a_missing_use_report_is_named_and_the_recorded_use_survives_a_restart() -> TestResult {
+    let (mut service, seeded) = seeded().await?;
+    let bea = seeded.people[1].id.to_string();
+    let ada = service.sign_in(login(ADMINISTRATOR)).await?;
+    let bea_cookie = service.sign_in(login(BEA)).await?;
+    let (status, issued) = service
+        .post(
+            "/grants/roots",
+            Some(&ada),
+            &root_body(&bea, "1", &json!({ "kind": "use_only" }))?,
+        )
+        .await?;
+    assert_eq!(status, 200, "{issued}");
+    let grant = issued["grant"].as_str().ok_or("no grant")?.to_owned();
+    let path = format!("/grants/{grant}");
+    let question =
+        json!({ "route": "api", "resource": { "kind": "doc", "id": "1" }, "action": "read" });
+
+    leaves_writable(&service, false)?;
+    let before = revision(&service, &ada).await?;
+    let (status, checked) = service
+        .post("/grants/check", Some(&bea_cookie), &question)
+        .await?;
+    leaves_writable(&service, true)?;
+    assert_eq!(status, 200, "{checked}");
+    assert_eq!(checked["use_event"]["recorded"], false, "{checked}");
+    assert_eq!(
+        revision(&service, &ada).await?,
+        before,
+        "nothing was recorded"
+    );
+    let (_, read) = service.get(&path, Some(&bea_cookie)).await?;
+    let missing = &read["last_use"];
+    assert_eq!(missing["seen"], false, "{read}");
+    assert_eq!(missing["recorded"], 0, "{read}");
+    assert_eq!(
+        missing["source"], "missing",
+        "a missing report is not a zero count: {read}"
+    );
+    assert_eq!(missing["unreported"]["count"], 1, "{read}");
+    assert_eq!(missing["unreported"]["route"], "api", "{read}");
+    assert_eq!(
+        missing["unreported"]["reason"], checked["use_event"]["reason"],
+        "{read}"
+    );
+    let (_, listed) = service.get("/grants", Some(&bea_cookie)).await?;
+    let in_list = listed["grants"]
+        .as_array()
+        .ok_or("no grants")?
+        .iter()
+        .find(|held| held["id"] == grant.as_str())
+        .ok_or("the grant is not listed")?;
+    assert_eq!(
+        in_list["last_use"], read["last_use"],
+        "the list and the read agree"
+    );
+
+    let tool =
+        json!({ "route": "tool", "resource": { "kind": "doc", "id": "1" }, "action": "read" });
+    let (status, checked) = service
+        .post("/grants/check", Some(&bea_cookie), &tool)
+        .await?;
+    assert_eq!(status, 200, "{checked}");
+    let index = checked["use_event"]["index"].clone();
+    assert!(index.is_u64(), "{checked}");
+    let (_, read) = service.get(&path, Some(&bea_cookie)).await?;
+    assert_eq!(read["last_use"]["seen"], true, "{read}");
+    assert_eq!(read["last_use"]["recorded"], 1, "{read}");
+    assert_eq!(
+        read["last_use"]["source"], "missing",
+        "a later recorded use does not make the count whole: {read}"
+    );
+    let seen_at = read["last_use"]["at"].clone();
+
+    service.restart().await?;
+    let bea_cookie = service.sign_in(login(BEA)).await?;
+    let (status, read) = service.get(&path, Some(&bea_cookie)).await?;
+    assert_eq!(status, 200, "{read}");
+    assert_eq!(
+        read["last_use"],
+        json!({
+            "seen": true,
+            "at": seen_at,
+            "route": "tool",
+            "use_event": index,
+            "recorded": 1,
+            "source": "reported",
+        }),
+        "the recorded attribution and count survive the restart; the missing report was in no log"
+    );
     Ok(())
 }

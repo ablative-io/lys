@@ -188,7 +188,7 @@ async fn list(
             .book()
             .records()
             .filter(|record| sees_with(&judged, caller, record, &mut known))
-            .map(GrantView::from)
+            .map(|record| GrantView::new(record, judged.grants.unreported(record.grant().id())))
             .collect();
         Ok(Json(GrantList {
             grants,
@@ -220,7 +220,10 @@ async fn read(
             .record(id)
             .filter(|record| sees(&judged, caller, record))
             .ok_or(ServerError::GrantNotVisible)?;
-        Ok(Json(GrantView::from(record)))
+        Ok(Json(GrantView::new(
+            record,
+            judged.grants.unreported(record.grant().id()),
+        )))
     })
 }
 

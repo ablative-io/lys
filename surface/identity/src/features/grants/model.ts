@@ -94,8 +94,17 @@ export function passText(p: PassOn): string {
 
 export const passesToAgents = (p: PassOn): boolean => p.kind === 'to' && p.recipients.includes('agent');
 
-/** When it was last seen exercised; a grant with no observed use reads `not seen`, never `never used` (conformance 8.4). */
-export const lastUsedText = (g: Grant): string => (g.last_use.seen ? clock(g.last_use.at) + ' · ' + g.last_use.route : 'not seen');
+/**
+ * When it was last seen exercised; a grant with no observed use reads `not seen`, never `never used` (conformance 8.4).
+ * A missing use report is said, so a zero recorded count is never read as no use.
+ */
+export const lastUsedText = (g: Grant): string => {
+  const u = g.last_use;
+  const seen = u.seen ? clock(u.at) + ' · ' + u.route : 'not seen';
+  if (u.source === 'reported') return seen;
+  const n = u.unreported.count;
+  return seen + ' · ' + n + (n === 1 ? ' use' : ' uses') + ' not recorded';
+};
 
 export const lastsText = (g: Grant): string => (g.window.ends_at === null ? 'no end' : 'until ' + day(g.window.ends_at));
 

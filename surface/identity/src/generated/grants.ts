@@ -20,11 +20,25 @@ export interface GrantWindow {
   ends_at: number | null;
 }
 
+/** `UnreportedView`: permitted exercises whose use events could not be recorded. */
+export interface Unreported {
+  count: number;
+  at: number;
+  route: RouteWire;
+  reason: string;
+}
+
 /**
  * `LastUseView`: when a grant was last seen exercised at an enforcement point.
  * Not seen says only that no exercise was observed, never that it was never used.
+ * `recorded` counts the use events in the grant log; `source` is `reported` when
+ * every permitted exercise the service has seen since it opened has one, and
+ * `missing` when some have none, so a zero is then not no use.
  */
-export type LastUse = { seen: false } | { seen: true; at: number; route: RouteWire; use_event: number };
+export type LastUse = ({ seen: false } | { seen: true; at: number; route: RouteWire; use_event: number }) & { recorded: number } & (
+  | { source: 'reported' }
+  | { source: 'missing'; unreported: Unreported }
+);
 
 /** `GrantView`. */
 export interface Grant {
