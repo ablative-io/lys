@@ -44,7 +44,6 @@ pub mod setup_code;
 pub mod surface;
 
 use layout::{BINARIES, Layout};
-use server_config::Carried;
 
 /// What the operator chose.
 #[derive(Debug)]
@@ -122,29 +121,6 @@ fn write_providers_key(config: &DeploymentConfig) -> IdentityResult<()> {
     Ok(())
 }
 
-/// The administrator and the registered products an earlier run's service
-/// configuration already named, so running the install again loses neither.
-fn earlier(layout: &Layout) -> IdentityResult<Carried> {
-    let path = layout.service_config();
-    let Some(bytes) = private_files::read(&path)? else {
-        return Ok(Carried::default());
-    };
-    let earlier: serde_json::Value = serde_json::from_slice(&bytes).map_err(|error| {
-        IdentityError::new(
-            ErrorKind::ConfigInvalid,
-            "read",
-            "identity.json",
-            error.to_string(),
-        )
-        .at(&path)
-    })?;
-    let named = |value: Option<&serde_json::Value>| value.filter(|value| !value.is_null()).cloned();
-    Ok(Carried {
-        administrator: named(earlier.get("administrator")),
-        products: named(earlier.pointer("/provider/clients")),
-    })
-}
-
 /// Runs `lys identity install`. A failure is said in Lys's words, because
 /// the person installing reads it.
 pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
@@ -216,7 +192,7 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
     write_absent(&layout.grant_model(), layout::GRANT_MODEL)?;
     write_providers_key(&config)?;
     provider_key(&config)?;
-    let carried = earlier(&layout)?;
+    let carried = server_config::carried(&layout)?.unwrap_or_default();
     let rendered = server_config::render(&layout, &config, &carried, surface_present);
     let encoded = serde_json::to_vec_pretty(&rendered).map_err(|error| {
         IdentityError::new(

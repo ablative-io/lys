@@ -144,7 +144,13 @@ fn the_templates_render_from_the_recorded_choices_and_only_read() -> TestResult 
     assert_eq!(environment.target, state.join(COMPOSE_ENV));
     assert!(environment.compose && environment.private);
     let config = DeploymentConfig::load(&layout.deployment_config())?;
-    let expected = server_config::render(&layout, &config, "recorded-subject", true);
+    let carried = server_config::Carried {
+        administrator: Some(
+            serde_json::json!({"issuer": "http://localhost:18080/auth/v1/", "subject": "recorded-subject"}),
+        ),
+        products: None,
+    };
+    let expected = server_config::render(&layout, &config, &carried, true);
     let service = file("identity.json")?;
     assert_eq!(
         service.bytes.as_slice(),

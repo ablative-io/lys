@@ -140,7 +140,12 @@ fn an_install_run_again_keeps_the_administrator_and_the_registered_products()
     std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700))?;
     let layout = Layout::at(dir.path().to_path_buf());
     let config = DeploymentConfig::parse(&render_deployment(None), dir.path().to_path_buf())?;
-    let first = server_config::render(&layout, &config, &super::earlier(&layout)?, true);
+    let first = server_config::render(
+        &layout,
+        &config,
+        &server_config::carried(&layout)?.unwrap_or_default(),
+        true,
+    );
     assert_eq!(first["provider"]["clients"], serde_json::json!([]));
     assert!(first.get("administrator").is_none());
     let product = serde_json::json!([{
@@ -153,7 +158,12 @@ fn an_install_run_again_keeps_the_administrator_and_the_registered_products()
     registered["provider"]["clients"] = product.clone();
     registered["administrator"] = administrator.clone();
     private_files::write(&layout.service_config(), &serde_json::to_vec(&registered)?)?;
-    let again = server_config::render(&layout, &config, &super::earlier(&layout)?, true);
+    let again = server_config::render(
+        &layout,
+        &config,
+        &server_config::carried(&layout)?.unwrap_or_default(),
+        true,
+    );
     assert_eq!(again["provider"]["clients"], product);
     assert_eq!(again["administrator"], administrator);
     Ok(())

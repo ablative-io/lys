@@ -115,8 +115,16 @@ impl Render for Templates {
             credentials.push((spec, read_secret(&state, spec)?));
         }
         let environment = prepare::render_env(&config, &credentials)?;
-        let administrator = server_config::recorded_administrator(layout)?;
-        let service = server_config::render(layout, &config, &administrator, screens);
+        let carried = server_config::carried(layout)?.ok_or_else(|| {
+            IdentityError::new(
+                ErrorKind::NotInstalled,
+                "read recorded choices",
+                "identity.json",
+                "no directory service configuration; run `lys identity install`",
+            )
+            .at(&layout.service_config())
+        })?;
+        let service = server_config::render(layout, &config, &carried, screens);
         let service = serde_json::to_vec_pretty(&service)
             .map_err(|error| rendering_failed("identity.json", &error))?;
         let file = |name, target, bytes: &[u8], private, compose| RenderedFile {

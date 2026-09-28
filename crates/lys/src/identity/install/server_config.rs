@@ -136,30 +136,25 @@ pub fn render(
     rendered
 }
 
-/// The administrator subject the configuration written under `layout`
-/// names: the install's recorded choice.
-pub fn recorded_administrator(layout: &Layout) -> IdentityResult<String> {
+/// What the configuration written under `layout` names that a run again
+/// keeps, or `None` when no configuration has been written.
+pub fn carried(layout: &Layout) -> IdentityResult<Option<Carried>> {
     let path = layout.service_config();
-    let refuse = |kind: ErrorKind, detail: String| {
-        IdentityError::new(kind, "read recorded choices", "identity.json", detail).at(&path)
+    let Some(bytes) = private_files::read(&path)? else {
+        return Ok(None);
     };
-    let bytes = private_files::read(&path)?.ok_or_else(|| {
-        refuse(
-            ErrorKind::NotInstalled,
-            "no directory service configuration; run `lys identity install`".to_string(),
+    let earlier: Value = serde_json::from_slice(&bytes).map_err(|error| {
+        IdentityError::new(
+            ErrorKind::ConfigInvalid,
+            "read",
+            "identity.json",
+            error.to_string(),
         )
+        .at(&path)
     })?;
-    let written: Value = serde_json::from_slice(&bytes)
-        .map_err(|error| refuse(ErrorKind::ConfigInvalid, error.to_string()))?;
-    written
-        .get("administrator")
-        .and_then(|administrator| administrator.get("subject"))
-        .and_then(Value::as_str)
-        .map(str::to_string)
-        .ok_or_else(|| {
-            refuse(
-                ErrorKind::ConfigInvalid,
-                "it names no administrator subject".to_string(),
-            )
-        })
+    let named = |value: Option<&Value>| value.filter(|value| !value.is_null()).cloned();
+    Ok(Some(Carried {
+        administrator: named(earlier.get("administrator")),
+        products: named(earlier.pointer("/provider/clients")),
+    }))
 }
