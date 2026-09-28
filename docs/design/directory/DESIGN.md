@@ -647,6 +647,13 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `surface/identity/src/features/apps/SchemaBuilder.tsx` | DIRECTORY-048 R8: the permission schema builder | DIRECTORY-048 |
 | `surface/identity/src/features/apps/schema-builder.css` | DIRECTORY-048 R8: the permission schema builder | DIRECTORY-048 |
 | `surface/identity/tests/schema-builder.test.tsx` | DIRECTORY-048 R8: the permission schema builder | DIRECTORY-048 |
+| `crates/lys-identity-server/src/team_plans_api.rs` | R1: A team plan record | DIRECTORY-052 |
+| `crates/lys-identity-server/src/team_plans_state.rs` | R1: A team plan record | DIRECTORY-052 |
+| `crates/lys-identity-server/tests/team_plans.rs` | R1: A team plan record | DIRECTORY-052 |
+| `crates/lys-identity-server/src/team_plans_provision.rs` | R2: Provision in one all-or-nothing act | DIRECTORY-052 |
+| `surface/identity/src/features/team-plans/TeamPlans.tsx` | R5: Teams screen | DIRECTORY-052 |
+| `surface/identity/src/features/team-plans/team-plans.css` | R5: Teams screen | DIRECTORY-052 |
+| `surface/identity/src/features/apps/SchemaBench.tsx` | R8: Build an app's permission template on a Lys screen | DIRECTORY-048 |
 
 ## Inventory
 

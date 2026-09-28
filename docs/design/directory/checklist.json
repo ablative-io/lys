@@ -1166,7 +1166,7 @@
         },
         {
           "id": "C386",
-          "text": "A permission schema builder on the Apps screen makes, explains in plain words and dry-runs an app's schema; built and uploaded schemas are the same record (DIRECTORY-048 R8).",
+          "text": "A person builds an app's whole permission template on the Apps screen from templates, tests it on example people and resources against the real check, and saves it; built and uploaded schemas are the same record (DIRECTORY-048 R8).",
           "done": false
         }
       ]
@@ -1267,6 +1267,36 @@
         {
           "id": "C385",
           "text": "A Usage screen shows every agent's usage against its budgets, and goals with their state (DIRECTORY-051 R5).",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Provision a working team in one act (DIRECTORY-052)",
+      "items": [
+        {
+          "id": "C387",
+          "text": "A team plan names its purpose, total budget, deliverables with their evidence, and each member's profile, memories, opening conversation, budget share, goals and checker (DIRECTORY-052 R1).",
+          "done": false
+        },
+        {
+          "id": "C388",
+          "text": "Provisioning a plan creates every agent, grant, home, budget and goal in one all-or-nothing act and starts them (DIRECTORY-052 R2).",
+          "done": false
+        },
+        {
+          "id": "C389",
+          "text": "Each member starts with its chosen memories and its opening conversation already in its session (DIRECTORY-052 R3).",
+          "done": false
+        },
+        {
+          "id": "C390",
+          "text": "A deliverable is met only when its checker accepts it with the named evidence; the team's spend is held to its total (DIRECTORY-052 R4).",
+          "done": false
+        },
+        {
+          "id": "C391",
+          "text": "A Teams screen builds a plan from a template, provisions it, and shows each member's state, spend, goals and deliverables (DIRECTORY-052 R5).",
           "done": false
         }
       ]

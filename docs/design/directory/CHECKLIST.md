@@ -294,7 +294,7 @@
 - [ ] **C366** — Apps check many permissions in one call and list the resources a subject may act on (DIRECTORY-048 R5).
 - [ ] **C367** — One OpenAPI document, generated from the routes and types, describes every route; a route without an entry fails the build (DIRECTORY-048 R6).
 - [ ] **C368** — Lys holds no app's name or schema in code or configuration and makes no call to any app (DIRECTORY-048 R7).
-- [ ] **C386** — A permission schema builder on the Apps screen makes, explains in plain words and dry-runs an app's schema; built and uploaded schemas are the same record (DIRECTORY-048 R8).
+- [ ] **C386** — A person builds an app's whole permission template on the Apps screen from templates, tests it on example people and resources against the real check, and saves it; built and uploaded schemas are the same record (DIRECTORY-048 R8).
 
 ## Lys MCP server, secure and compact (DIRECTORY-049)
 
@@ -321,3 +321,11 @@
 - [ ] **C383** — A reached budget compacts, stops or tells, as the budget says, once, with a receipt (DIRECTORY-051 R3).
 - [ ] **C384** — Goals on an agent carry a deadline and reminders delivered into its session (DIRECTORY-051 R4).
 - [ ] **C385** — A Usage screen shows every agent's usage against its budgets, and goals with their state (DIRECTORY-051 R5).
+
+## Provision a working team in one act (DIRECTORY-052)
+
+- [ ] **C387** — A team plan names its purpose, total budget, deliverables with their evidence, and each member's profile, memories, opening conversation, budget share, goals and checker (DIRECTORY-052 R1).
+- [ ] **C388** — Provisioning a plan creates every agent, grant, home, budget and goal in one all-or-nothing act and starts them (DIRECTORY-052 R2).
+- [ ] **C389** — Each member starts with its chosen memories and its opening conversation already in its session (DIRECTORY-052 R3).
+- [ ] **C390** — A deliverable is met only when its checker accepts it with the named evidence; the team's spend is held to its total (DIRECTORY-052 R4).
+- [ ] **C391** — A Teams screen builds a plan from a template, provisions it, and shows each member's state, spend, goals and deliverables (DIRECTORY-052 R5).

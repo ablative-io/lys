@@ -2186,6 +2186,34 @@
         "RM-087"
       ],
       "notes": "Written by hand."
+    },
+    {
+      "id": "RM-089",
+      "title": "Provision a working team in one act: memories, opening conversation, budget, goals, deliverables and a checker",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "A team plan provisions and starts its agents with everything they need and holds them to a budget; deliverables are met only when a checker accepts the evidence.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T19:55:21+10:00",
+        "quote": "I want you to be able to provision new agents so we can provision them off with the right memories, with the right few-shot kind of prompting to start it off, and to be able to send them off to do work without having to know that they've got a budget, know that they've got reminders, know that it's actually going to happen, know that things are actually being checked. So I could say, Waffles, we need a team to work on this. And you could provision them, give them a certain budget, and we can start to budget out things properly.",
+        "context": "Said before bed; the goal of the Lys agent work."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-119"
+        ],
+        "briefs": [
+          "DIRECTORY-052"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-087",
+        "RM-088"
+      ],
+      "notes": "Written by hand."
     }
   ]
 }

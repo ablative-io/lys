@@ -2775,6 +2775,41 @@
       "path": "surface/identity/tests/schema-builder.test.tsx",
       "note": "DIRECTORY-048 R8: the permission schema builder",
       "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-identity-server/src/team_plans_api.rs",
+      "note": "R1: A team plan record",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-identity-server/src/team_plans_state.rs",
+      "note": "R1: A team plan record",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/team_plans.rs",
+      "note": "R1: A team plan record",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-identity-server/src/team_plans_provision.rs",
+      "note": "R2: Provision in one all-or-nothing act",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "surface/identity/src/features/team-plans/TeamPlans.tsx",
+      "note": "R5: Teams screen",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "surface/identity/src/features/team-plans/team-plans.css",
+      "note": "R5: Teams screen",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "surface/identity/src/features/apps/SchemaBench.tsx",
+      "note": "R8: Build an app's permission template on a Lys screen",
+      "brief": "DIRECTORY-048"
     }
   ],
   "inventory": [

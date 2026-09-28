@@ -241,3 +241,5 @@
 **S156.** As a person running agents, I want each agent held to a budget for context, tokens and time, compacted or stopped when it reaches it, so that no agent burns what I cannot afford.
 
 **S157.** As a person running agents, I want to give an agent goals with deadlines and have it reminded, so that work is paced and I can see where each goal stands.
+
+**S158.** As a person running agents, I want to ask for a team for a piece of work and have it provisioned with the right memories, opening conversation, budget, goals and checker, so that I can send it off knowing it will be done and checked within what I can afford.

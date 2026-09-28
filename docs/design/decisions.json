@@ -1693,6 +1693,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-119",
+      "title": "A team is provisioned in one act: agents with memories, an opening conversation, a budget, goals and deliverables, and a checker",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-28",
+      "decided_by": "Tom, 28 September 2026 19:55 Melbourne, on Dot; recorded by Waffles with DIRECTORY-052",
+      "context": "Lys keeps provisioning profiles, a session's home with memory notes and successor letters, and can author an opening conversation a harness resumes (lys-home fewshot, PROOF-FEWSHOT). DIRECTORY-050 runs agents; DIRECTORY-051 holds budgets, goals, expectations and deliverables. Nothing puts them together: starting a working team takes many hand steps and nothing guarantees the work is checked.",
+      "decision": "A team plan is a record: its purpose, a total budget, its deliverables with the evidence each needs, and its members, each with a profile, the memories it starts with, an opening conversation, its share of the budget, its goals and reminders, and a checker (a named person or agent who must accept each deliverable). Provisioning a plan creates the agents, grants, homes, budgets and goals in one act that is all or nothing, and starts them through the runner. A deliverable is met only when its checker accepts it with the evidence.",
+      "quote": "I want you to be able to provision new agents so we can provision them off with the right memories, with the right few-shot kind of prompting to start it off, and to be able to send them off to do work without having to know that they've got a budget, know that they've got reminders, know that it's actually going to happen, know that things are actually being checked. So I could say, Waffles, we need a team to work on this. And you could provision them, give them a certain budget, and we can start to budget out things properly.",
+      "consequences": [
+        "Tom can ask for a team and see it start with its budget, goals and checker in place.",
+        "No agent in a team runs without a budget or a checker.",
+        "Budgets roll up: a team's spend is the sum of its members', held to the team's total."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
