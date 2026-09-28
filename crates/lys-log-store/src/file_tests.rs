@@ -317,3 +317,191 @@ fn open_leaves_a_leftover_temporary_file_byte_identical() {
     assert_eq!(leaves_entries(&dir), before, "open changed no entry");
     assert_eq!(std::fs::read(&leftover).unwrap(), b"half a leaf");
 }
+
+/// Every file under `dir`, dot-prefixed names included, with its bytes, so a
+/// test can say an open or a refusal added, removed and changed nothing.
+fn tree_bytes(dir: &Path) -> std::collections::BTreeMap<std::path::PathBuf, Vec<u8>> {
+    let mut files = std::collections::BTreeMap::new();
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(next) = pending.pop() {
+        for entry in std::fs::read_dir(&next).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                pending.push(path);
+            } else {
+                let bytes = std::fs::read(&path).unwrap();
+                files.insert(path, bytes);
+            }
+        }
+    }
+    files
+}
+
+/// The pin a store holding exactly `leaves` carries.
+fn pin_over(leaves: &[&[u8]]) -> PinnedRoot {
+    let leaves: Vec<Vec<u8>> = leaves.iter().copied().map(<[u8]>::to_vec).collect();
+    let (root, tree_size) = AppendOnlyTree::<RawLeaf>::reconstruct_from_raw_leaves(&leaves)
+        .root()
+        .to_parts();
+    PinnedRoot { tree_size, root }
+}
+
+/// A store holding `leaf` at index 0 with the pin covering it.
+fn store_pinned_over(dir: &Path, leaf: &[u8]) {
+    let mut store = FileLeafStore::create(dir, ORIGIN).unwrap();
+    store.put_leaf(0, leaf).unwrap();
+    store.pin(pin_over(&[leaf])).unwrap();
+}
+
+#[test]
+fn the_read_only_refusals_name_the_store_and_the_refused_act() {
+    let read_only = StoreError::ReadOnly {
+        path: PathBuf::from("store"),
+        operation: "write a leaf",
+    };
+    assert_eq!(
+        read_only.to_string(),
+        "refusing to write a leaf in the log store at store: it was opened read-only"
+    );
+    let repair_pending = StoreError::RepairPending {
+        path: PathBuf::from("store"),
+        pinned_size: 1,
+        extent: 2,
+    };
+    assert_eq!(
+        repair_pending.to_string(),
+        "refusing to open the log store at store read-only: it holds 2 leaves but its pin is \
+         at tree size 1, an interrupted append that only a writable open repairs"
+    );
+}
+
+#[test]
+fn open_read_only_refuses_a_store_one_leaf_past_its_pin_and_changes_no_byte() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut store = FileLeafStore::create(&dir, ORIGIN).unwrap();
+    store.put_leaf(0, b"leaf-0").unwrap();
+    drop(store);
+    let before = tree_bytes(&dir);
+    let err = FileLeafStore::open_read_only(&dir).unwrap_err();
+    assert!(
+        matches!(
+            &err,
+            StoreError::RepairPending { path, pinned_size: 0, extent: 1 } if *path == dir
+        ),
+        "{err}"
+    );
+    assert_eq!(tree_bytes(&dir), before, "the refusal changed no file");
+}
+
+#[test]
+fn open_read_only_on_an_uninitialized_dir_is_not_initialized() {
+    let tmp = tempfile::tempdir().unwrap();
+    let err = FileLeafStore::open_read_only(tmp.path()).unwrap_err();
+    assert!(
+        matches!(&err, StoreError::NotInitialized { path } if path == tmp.path()),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_read_only_handle_refuses_a_leaf_write_and_changes_no_byte() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    store_pinned_over(&dir, b"leaf-0");
+    let mut store = FileLeafStore::open_read_only(&dir).unwrap();
+    let before = tree_bytes(&dir);
+    for (index, bytes) in [(1, b"leaf-1"), (0, b"leaf-X")] {
+        let err = store.put_leaf(index, bytes).unwrap_err();
+        assert!(
+            matches!(
+                &err,
+                StoreError::ReadOnly { path, operation: "write a leaf" } if *path == dir
+            ),
+            "leaf {index}: {err}"
+        );
+    }
+    assert_eq!(store.extent(), 1);
+    assert_eq!(tree_bytes(&dir), before, "the refusals changed no file");
+}
+
+#[test]
+fn a_read_only_handle_refuses_a_pin_and_changes_no_byte() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    store_pinned_over(&dir, b"leaf-0");
+    let mut store = FileLeafStore::open_read_only(&dir).unwrap();
+    let held = store.pinned();
+    let before = tree_bytes(&dir);
+    for tree_size in [2, 0] {
+        let err = store
+            .pin(PinnedRoot {
+                tree_size,
+                root: [0; 32],
+            })
+            .unwrap_err();
+        assert!(
+            matches!(&err, StoreError::ReadOnly { path, operation: "pin" } if *path == dir),
+            "tree size {tree_size}: {err}"
+        );
+    }
+    assert_eq!(store.pinned(), held);
+    assert!(!dir.join("state.json.tmp").exists());
+    assert_eq!(tree_bytes(&dir), before, "the refusals changed no file");
+}
+
+#[test]
+fn leftover_temporaries_names_the_stores_own_temporary_files() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    store_pinned_over(&dir, b"a");
+    let leaves = dir.join("leaves");
+    let leftover = leaves.join(".4242-00000000000000000001-0.tmp");
+    std::fs::write(&leftover, b"partial").unwrap();
+    let expected = vec![".4242-00000000000000000001-0.tmp".to_string()];
+    let writable = FileLeafStore::open(&dir).unwrap();
+    assert_eq!(writable.extent(), 1);
+    assert_eq!(writable.leftover_temporaries().unwrap(), expected);
+    let read_only = FileLeafStore::open_read_only(&dir).unwrap();
+    assert_eq!(read_only.extent(), 1);
+    assert_eq!(read_only.leftover_temporaries().unwrap(), expected);
+    assert_eq!(std::fs::read(&leftover).unwrap(), b"partial");
+}
+
+#[test]
+fn leftover_temporaries_are_in_lexical_order() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    store_pinned_over(&dir, b"a");
+    for name in [
+        ".4242-00000000000000000001-1.tmp",
+        ".17-00000000000000000001-0.tmp",
+    ] {
+        std::fs::write(dir.join("leaves").join(name), b"partial").unwrap();
+    }
+    let store = FileLeafStore::open(&dir).unwrap();
+    assert_eq!(
+        store.leftover_temporaries().unwrap(),
+        vec![
+            ".17-00000000000000000001-0.tmp".to_string(),
+            ".4242-00000000000000000001-1.tmp".to_string(),
+        ]
+    );
+}
+
+#[test]
+fn leftover_temporaries_is_empty_without_one_of_the_stores_form() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut created = FileLeafStore::create(&dir, ORIGIN).unwrap();
+    assert!(created.leftover_temporaries().unwrap().is_empty());
+    created.put_leaf(0, b"a").unwrap();
+    created.pin(pin_over(&[b"a".as_slice()])).unwrap();
+    let store = FileLeafStore::open(&dir).unwrap();
+    assert!(store.leftover_temporaries().unwrap().is_empty());
+    assert_eq!(store.extent(), 1);
+    std::fs::write(dir.join("leaves").join(".DS_Store"), b"finder").unwrap();
+    let store = FileLeafStore::open(&dir).unwrap();
+    assert!(store.leftover_temporaries().unwrap().is_empty());
+    assert_eq!(store.extent(), 1);
+}
