@@ -346,9 +346,9 @@ async fn own_account(
 }
 
 /// A new email, confirmed by the password. Never printed.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct OwnEmail {
+pub(crate) struct OwnEmail {
     email: String,
     password: String,
 }
@@ -374,9 +374,9 @@ async fn own_email(
 }
 
 /// A new password, confirmed by the current one. Never printed.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct OwnPassword {
+pub(crate) struct OwnPassword {
     current: String,
     password: String,
 }
@@ -409,9 +409,9 @@ async fn account_of(
 }
 
 /// A person's new email, set by the administrator.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct NewEmail {
+pub(crate) struct NewEmail {
     email: String,
 }
 
@@ -435,9 +435,9 @@ async fn set_email(
 }
 
 /// A person's new password, set by the administrator. Never printed.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct Reset {
+pub(crate) struct Reset {
     password: String,
 }
 
@@ -456,9 +456,9 @@ async fn reset_password(
 }
 
 /// Whether a person may sign in.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct Enabled {
+pub(crate) struct Enabled {
     enabled: bool,
 }
 

@@ -367,6 +367,60 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<BudgetBody>()),
             Some(api.schema::<Budget>()),
         ),
+        (
+            POST,
+            "/sign-in",
+            Some(api.schema::<crate::sign_in::SignInBody>()),
+            None,
+        ),
+        (
+            POST,
+            "/setup/open",
+            Some(api.schema::<crate::setup::Opened>()),
+            None,
+        ),
+        (
+            POST,
+            "/setup/administrator",
+            Some(api.schema::<crate::setup::NewAdministrator>()),
+            None,
+        ),
+        (
+            POST,
+            "/setup/password",
+            Some(api.schema::<crate::setup::NewPassword>()),
+            None,
+        ),
+        (
+            POST,
+            "/me/account/email",
+            Some(api.schema::<crate::accounts::OwnEmail>()),
+            None,
+        ),
+        (
+            POST,
+            "/me/account/password",
+            Some(api.schema::<crate::accounts::OwnPassword>()),
+            None,
+        ),
+        (
+            POST,
+            "/directory/people/{id}/account/email",
+            Some(api.schema::<crate::accounts::NewEmail>()),
+            None,
+        ),
+        (
+            POST,
+            "/directory/people/{id}/account/enabled",
+            Some(api.schema::<crate::accounts::Enabled>()),
+            None,
+        ),
+        (
+            POST,
+            "/directory/people/{id}/account/password",
+            Some(api.schema::<crate::accounts::Reset>()),
+            None,
+        ),
     ]
 }
 

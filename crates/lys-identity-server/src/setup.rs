@@ -245,9 +245,9 @@ pub fn routes() -> Router<Arc<AppState>> {
 }
 
 /// The code the setup page was opened with.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct Opened {
+pub(crate) struct Opened {
     code: String,
 }
 
@@ -277,9 +277,9 @@ async fn open(
 }
 
 /// What the setup page sends to make the first administrator. Never printed.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct NewAdministrator {
+pub(crate) struct NewAdministrator {
     code: String,
     operation: String,
     display_name: String,
@@ -354,9 +354,9 @@ async fn make_administrator(
 }
 
 /// What the setup page sends to set the administrator's new password. Never printed.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct NewPassword {
+pub(crate) struct NewPassword {
     code: String,
     password: String,
 }
