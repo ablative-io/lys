@@ -77,17 +77,14 @@ Behavioural. `lys package app --out DIR` builds Lys.app (bundle id, Info.plist, 
 
 - Alignment: drifted
 - Acceptance verdicts:
-  - [ ] The built app passes codesign --verify --deep --strict and spctl --assess. — crates/lys/src/package.rs sign() runs codesign --verify --deep --strict (the 'verify' array before notarise_as) and notarise() runs spctl --assess --type execute; notarise_image() assesses the dmg with --type open. No built app exists: security find-identity -v -p codesigning reports '0 valid identities found', and no development package has been run either.
-  - [x] Binaries built from two commits are refused naming the binary. — package_tests.rs binaries_from_two_commits_are_refused_naming_the_binary and packaging_binaries_from_two_commits_writes_nothing (detail starts 'x86_64/lys-app is built from', no output folder). Re-run here: ok.
-  - [x] With no signing identity it is refused signing_identity_missing and no Lys.dmg is written. — package_tests.rs with_no_signing_identity_a_release_is_refused_by_name covers from_flags. The new a_release_without_its_signing_identity_writes_no_disk_image drives run() with a Developer ID absent from the keychain and asserts signing_identity_missing, !out/Lys.dmg and !out. cargo test -p lys --bin lys package: 8 passed.
-  - [ ] lipo -archs on each bundled binary names arm64 and x86_64. — package.rs universal() runs lipo -create, then lipo -archs, and refuses universal_incomplete unless both ARCHS are held. Never run: rustup target list --installed shows only aarch64-apple-darwin and wasm32-unknown-unknown.
+  - [ ] The built app passes codesign --verify --deep --strict and spctl --assess. — crates/lys/src/package.rs runs codesign --verify --deep --strict, and spctl --assess for a release, but no package has been built. This Mac holds 0 codesigning identities, and there is no recorded run in docs/design/directory/reports/.
+  - [x] Binaries built from two commits are refused naming the binary. — cargo test -p lys --bin lys package: binaries_from_two_commits_are_refused_naming_the_binary ok; packaging_binaries_from_two_commits_writes_nothing ok.
+  - [x] With no signing identity it is refused signing_identity_missing and no Lys.dmg is written. — package::tests::with_no_signing_identity_a_release_is_refused_by_name ok; a_release_without_its_signing_identity_writes_no_disk_image ok (run() is refused and no Lys.dmg or output folder is written).
+  - [ ] lipo -archs on each bundled binary names arm64 and x86_64. — package.rs checks lipo -archs (universal_incomplete), but no universal package has been built: x86_64-apple-darwin is not installed here, and the run belongs on Dean's laptop under rule 3.
 - Issues:
-  - The signing_identity_missing test never asserted that no Lys.dmg is written: it only called Signing::from_flags.
-  - Run `lys package app --development` from arm64 and x86_64 builds of one commit (rustup target add x86_64-apple-darwin; a heavy build, so on Dean's laptop per rule 3) and record lipo -archs on each bundled binary and codesign --verify --deep --strict on the app. This is not blocked on Tom.
-  - Build a release with Tom's Developer ID and notary profile, then record codesign --verify --deep --strict and spctl --assess on Lys.app and on Lys.dmg.
-  - cli.rs and commands/error.rs lie outside the manifest; they need a reviewed brief revision under CN9.
-- Fixes:
-  - Added crates/lys/src/package_tests.rs a_release_without_its_signing_identity_writes_no_disk_image: a release refused signing_identity_missing through run() leaves no Lys.dmg and no output folder.
+  - Build a --development package on Dean's laptop and record lipo -archs for each bundled binary and codesign --verify --deep --strict on Lys.app.
+  - Build a release with Tom's Developer ID and notary profile and record codesign and spctl --assess for Lys.app and Lys.dmg.
+  - Get the brief revised: CN1 (documents only) contradicts R1's code, and cli.rs, commands/error.rs, main.rs, Cargo.toml and the shared build.rs restamp lie outside the manifest. A reviewer has to approve the revision under CN9 before these edits stand.
 
 ### R2: Opening the app installs and shows every step on a Lys page
 
@@ -141,14 +138,16 @@ Behavioural. lys-app, when no install exists under the platform data root, serve
 
 - Alignment: drifted
 - Acceptance verdicts:
-  - [ ] Opening the app on a machine without an install reaches the first-run setup page with no terminal started. — flow.rs hands the browser to /setup, but DIRECTORY-047's setup page is not in this tree and no run has been made. flow_tests.rs no_shell_or_terminal_is_ever_started passes, and grep for Terminal, osascript and sh in the non-test lys-app sources finds none.
-  - [x] A failure at any step shows its words and next action on the page and leaves the install resumable. — flow_tests.rs a_failure_is_shown_at_its_step_with_the_next_thing_to_do; progress_tests.rs the_page_hears_each_phase_as_it_is_shown_and_retries_only_a_failure; lys-install install.rs run() reports each Step and remakes only what is missing; surface/identity/tests/install-progress.test.tsx (surface leg passed at the venue). cargo test -p lys-app: 59 passed.
-  - [x] Opening the app twice during an install shows one install. — launcher_tests.rs a_second_opening_is_shown_the_running_works_page (the single-instance claim through flock in launcher.rs); passed in the 59/59 run.
+  - [ ] Opening the app on a machine without an install reaches the first-run setup page with no terminal started. — flow_tests::the_browser_is_handed_to_first_run_setup_on_lys and no_shell_or_terminal_is_ever_started pass, but the app has not been opened live, and DIRECTORY-047's /setup is not in this tree.
+  - [x] A failure at any step shows its words and next action on the page and leaves the install resumable. — flow_tests::a_failure_is_shown_at_its_step_with_the_next_thing_to_do ok. lys-install install.rs run() reports each Step before that step's work, and makes only what is missing, so a rerun resumes. server.rs now names an unreadable file instead of hiding it (the fix below).
+  - [ ] Opening the app twice during an install shows one install. — launcher.rs claim() uses a flock one-instance lock (Claim::Theirs reads the port of the instance already running). No test or live run opens the app twice during an install.
 - Issues:
-  - Record a live run: open a development build on a machine without an install and reach DIRECTORY-047's /setup page with no terminal. This waits on DIRECTORY-047 landing in this tree.
-  - Files outside the manifest need a reviewed brief revision before they stand (CN9): crates/lys/src/identity/*, commands/output.rs, commands/mod.rs, lys-install steps.rs and engine_path.rs, and lys-app's launcher, flow, server, bundle, refusal, uninstall and engine_wait.
-  - lys depends on lys-install (publish = false), so lys cannot be published until a release card publishes lys-install with its embedded deploy/identity files moved inside the crate. Record that decision.
-  - CN1 ('documents only') contradicts every code file this brief's requirements name; revise the brief so its constraints and requirements agree.
+  - lys-app server.rs file() answered 404 not_found when a screens file existed but could not be read, which hid the failure.
+  - Record a live first open of a development build that reaches /setup; this waits on DIRECTORY-047 landing.
+  - Add a test or a recorded run where a second open during an install joins the first install rather than starting another.
+  - Get the CN9 revision approved for identity/*, commands/mod.rs, output.rs, steps.rs, engine_path.rs and the lys-app modules outside the manifest.
+- Fixes:
+  - crates/lys-app/src/server.rs file(): a read error other than NotFound now answers 500 screen_unreadable, naming the path and the error; a missing file still answers 404. lys-app fmt and clippy -D warnings are clean, and tests are 59/59.
 
 ### R3: The container engine, guided in plain words
 
@@ -189,11 +188,9 @@ Behavioural. Before the install starts its services, a container engine that is 
 
 - Alignment: aligned
 - Acceptance verdicts:
-  - [x] With the engine stopped, the page shows the guidance, and starting the engine continues the install with no action in Lys. — flow.rs:164-166 shows Guidance::for_mac and then blocks in engine_wait::wait(&sockets, &engine::state_folders(..)). engine_wait_tests.rs covers the folder notice when the engine starts, a socket made before its engine answers (ended by the held /_ping's 200 with no folder change), and an engine saying 503 asked exactly twice. I checked the wait against kqueue 1.2.1: poll_forever(None) blocks in kevent, and remove_fd issues EV_DELETE before the stream drops. 59/59 passed here. Not recorded against a real Docker Desktop start.
-  - [x] No wait in lys-app reads a clock or loops on a sleep. — engine_tests.rs no_wait_in_the_app_reads_a_clock_or_sleeps scans every non-test lys-app source, including engine_wait.rs. My grep for Duration, Instant, SystemTime, sleep and timeout over crates/lys-app/src non-test files found only doc prose.
+  - [x] With the engine stopped, the page shows the guidance, and starting the engine continues the install with no action in Lys. — engine_wait_tests: the_wait_ends_on_the_folder_notice_when_the_engine_starts, a_socket_made_before_its_engine_answers_ends_the_wait_when_it_answers and an_engine_that_says_not_yet_is_asked_again_when_its_state_folder_changes pass. progress_tests and surface/identity/tests/install-progress.test.tsx show the guidance. These tests use a stand-in engine socket; Docker Desktop itself was not run.
+  - [x] No wait in lys-app reads a clock or loops on a sleep. — A grep of crates/lys-app/src (not the tests) finds no Instant, SystemTime, Duration, sleep or timeout. engine_wait.rs waits only in kqueue poll_forever(None), and progress.rs waits on a Condvar.
 - Checklist verified: C397
-- Issues:
-  - The Docker Desktop state folders (Data and Data/vms/0 in engine.rs state_folders) are assumed, not observed. Record one real Docker Desktop start through the wait on a machine where restarting the engine is agreed, as the developer states.
 
 ### R4: Start at login, reopen, upgrade and uninstall
 
@@ -238,13 +235,13 @@ Behavioural. After a successful install the app registers Lys to start at login 
 
 - Alignment: drifted
 - Acceptance verdicts:
-  - [ ] After a restart of the Mac, Lys is answering without the person doing anything. — login_item.rs writes the LaunchAgent au.com.ablative.lys that runs bin/lys-app --at-login; login_item_tests.rs passes. No restart has been run.
-  - [ ] Opening a newer app upgrades the install and the Build line shows the new commit. — flow.rs attempt() compares the bundle's build with build.json and calls upgrade_to; the shared build.rs restamp is byte-identical across crates (tests/version.rs). No live upgrade has been run.
-  - [ ] Uninstall without the tick leaves the data folder, and a reinstall signs the same people in. — uninstall.rs runs compose down with --volumes only when ticked and otherwise removes only bin/; uninstall_tests.rs and surface uninstall.test.tsx pass. No live uninstall and reinstall has been run.
+  - [ ] After a restart of the Mac, Lys is answering without the person doing anything. — login_item.rs writes the LaunchAgent au.com.ablative.lys, and login_item_tests pass, but no restart has been run.
+  - [ ] Opening a newer app upgrades the install and the Build line shows the new commit. — flow_tests::an_upgrade_says_its_lines ok, but no live upgrade has been run.
+  - [ ] Uninstall without the tick leaves the data folder, and a reinstall signs the same people in. — uninstall_tests and surface/identity/tests/uninstall.test.tsx pass, but no reinstall with sign-in has been run.
 - Issues:
-  - Start at login is a LaunchAgent plist, not the SMAppService the spec names. Get Tom's ruling recorded in a brief revision, or implement SMAppService.
-  - Record live runs of a restart, an upgrade (the Build line showing the new commit) and an uninstall-without-tick followed by a reinstall that signs the same people in.
-  - uninstall_api.rs, ServerError::UninstallUnavailable, error_status.rs, routes.rs and the surface fixture lie outside the manifest; they need a brief revision under CN9.
+  - Start at login is a LaunchAgent, not the SMAppService the spec names. Tom's ruling has to be recorded in a brief revision.
+  - Record the live runs: a restart, an upgrade with the new commit on the Build line, and an uninstall without the tick followed by a reinstall that signs the same people in.
+  - Get the CN9 revision approved for uninstall_api.rs, ServerError::UninstallUnavailable, error_status.rs, routes.rs, lib.rs and surface/identity/tests/fixtures.ts.
 
 ### R5: Proof on a fresh macOS account
 
@@ -281,10 +278,10 @@ Behavioural. On a fresh macOS user account on a machine that has never held Lys,
 
 - Alignment: drifted
 - Acceptance verdicts:
-  - [ ] The recorded run reaches signed in from the disk image. — docs/design/directory/reports/DIRECTORY-054-fresh-account.md says 'Status: not run.' and has an empty record section.
-  - [ ] The process record holds no terminal started for the person, and a text scan of every page shown finds no issuer name. — Not run. Only code-level backing exists: flow_tests.rs no_shell_or_terminal_is_ever_started, progress_tests.rs the_page_is_sent_plain_words_only, and install-progress.test.tsx 'never names the issuer'.
+  - [ ] The recorded run reaches signed in from the disk image. — docs/design/directory/reports/DIRECTORY-054-fresh-account.md says Status: not run.
+  - [ ] The process record holds no terminal started for the person, and a text scan of every page shown finds no issuer name. — There is no run, so there is no process record or page scan.
 - Issues:
-  - Make the fresh-account run from a signed, notarised Lys.dmg on the macOS VM, and record in DIRECTORY-054-fresh-account.md the process record and the page-text scan. This needs R1's release build and the VM on Tom's Mac.
+  - Run the fresh-account procedure on the macOS VM from a signed, notarised Lys.dmg, and record the process record and the page-text scan. This needs R1's release image first.
 
 ## Boundaries
 
