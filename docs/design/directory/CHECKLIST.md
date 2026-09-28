@@ -343,3 +343,14 @@
 - [ ] **C397** — A missing or stopped container engine is a Lys page with what to do, and the install continues by itself when the engine appears, on its socket's event (DIRECTORY-054 R3).
 - [ ] **C398** — Lys starts at login, opening the app again opens Lys, a newer app upgrades through DIRECTORY-045, and uninstalling is a Lys screen that keeps data unless the person chooses otherwise (DIRECTORY-054 R4).
 - [ ] **C399** — On a fresh macOS account, a person goes from the downloaded disk image to signed in with no terminal process started and nothing naming the issuer (DIRECTORY-054 R5).
+
+## The exit lock lives in the service only (DIRECTORY-057)
+
+- [ ] **C400** — The three ways to keep the exit lock out of the starter are compared in ADR-121 and the holder command is chosen, with no unsafe code (DIRECTORY-057 R1).
+- [ ] **C401** — A holder command opens the exit lock, takes it and becomes the service by exec, keeping its pid; a program that cannot run is refused by name (DIRECTORY-057 R2).
+- [ ] **C402** — The starter never opens the exit lock; a service that ends at once beside other starts is seen ended every time (DIRECTORY-057 R3).
+
+## A receipt's checkpoint is signed (DIRECTORY-058)
+
+- [ ] **C403** — The receipts route answers its checkpoint as a note signed by the service key, signed once per append, with its origin read from configuration (DIRECTORY-058 R1).
+- [ ] **C404** — One function verifies a receipt answer against a pinned key with a named refusal for each failure; a forged tree around a genuine event is refused (DIRECTORY-058 R2).

@@ -714,6 +714,13 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/stop_api.rs` | R6: Wake with a message; stop through the runner | DIRECTORY-050 |
 | `surface/identity/src/features/runtime/Sessions.tsx` | R7: Sessions screen: see, type to and stop every agent | DIRECTORY-050 |
 | `rules/ast-grep/no-poll.yml` | R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys/src/identity/install/held_start.rs` | R2: The holder opens the lock, takes it and becomes the service | DIRECTORY-057 |
+| `crates/lys/src/identity/install/held_start_tests.rs` | R2: The holder opens the lock, takes it and becomes the service | DIRECTORY-057 |
+| `crates/lys/src/identity/install/start_race_tests.rs` | R3: The starter never opens the exit lock | DIRECTORY-057 |
+| `crates/lys-identity-server/src/checkpoint_api.rs` | R1: The receipts route answers a signed checkpoint | DIRECTORY-058 |
+| `crates/lys-identity-server/tests/receipts_signed.rs` | R1: The receipts route answers a signed checkpoint | DIRECTORY-058 |
+| `crates/lys-identity/src/receipt_answer.rs` | R2: One function verifies a receipt against a pinned key | DIRECTORY-058 |
+| `crates/lys-identity/src/receipt_answer_tests.rs` | R2: One function verifies a receipt against a pinned key | DIRECTORY-058 |
 
 ## Inventory
 
