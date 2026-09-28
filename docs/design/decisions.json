@@ -391,13 +391,13 @@
     },
     {
       "id": "ADR-019",
-      "title": "Sign-in identities belong to people only; the harness login token is the one named exception",
+      "title": "The fork's ablative branch moves only from a green candidate, with its previous head kept under a tag",
       "status": "decided",
-      "scope": "directory",
+      "scope": "rauthy-rebase",
       "date": "2026-09-27",
-      "decided_by": "The identity line's lead, in the rulings on DIRECTORY-009's survey; the login exception is the standing ruling recorded at docs/design/identity/STATEMENT-2026-09-22.md:43",
-      "context": "Conformance row 1.2 says a sign-in identity is never lent to or held by an agent. IDENTITY-001 was to state it and never did, no ledger entry records it, and no brief tests it, while the directory holds sign-in identities beside people (DIRECTORY-004) and gives grants to agents (DIRECTORY-006). The seat's harness login token already reaches a seat's process (SECRETS-002 R5), so the rule has to say what it governs.",
-      "decision": "A sign-in identity, a provider account linked to a person, belongs to that person only: lys refuses by name every act of its own that would give one to an agent or to another person, and an account once linked to a person stays refused for agents after it is unlinked. The harness login token recorded at docs/design/identity/STATEMENT-2026-09-22.md:43 and :167 and docs/design/identity/PROVISIONING-2026-09-22.md:18 is the one named exception; it never passes through anything lys issues, links or delegates, and it is not redefined. Rejected: letting a person lend a sign-in identity to their own agent, dropping the refusal once an account is unlinked, and redefining the login token so the rule could be claimed without an exception.",
+      "decided_by": "Archie, lead for the identity line, in rulings on the Rauthy release rebase card (RAUTHYREBASE-001)",
+      "context": "ADR-009 says upgrades rebase ablative onto upstream release tags, each in its own gated row, which means force-pushing ablative. Every earlier lys commit pins an exact ablative head as its vendor/rauthy gitlink, so a force-push can leave that head unreachable and break recursive clones of history; a rebased head pushed straight to ablative can leave the branch on a head that does not build; and a fork migration can share a number with an upstream one without any textual conflict.",
+      "decision": "Before any force-push of ablative, its previous head is pushed under a tag naming it (pre-rebase-<old base tag>-<short sha>). The rebased head is proved first on a candidate branch rauthy-rebase/<new upstream commit>; ablative is force-pushed with --force-with-lease naming the tagged previous head only after the fork build and full suite pass there. A failure on the candidate moves nothing and keeps the candidate branch; a later failure in the same card resets ablative to the tagged head with --force-with-lease naming the rebased head, verified by ls-remote, and stops by name. Before the rebased build, the postgres and hiqlite migration numbers of both sides are listed, and a number held by both stops the card naming both files and the upstream commit; it is never renumbered to fit. Rejected: force-pushing the rebased head straight to ablative and proving it there, force-pushing without keeping the previous head reachable, and renumbering a colliding fork migration.",
       "quote": "",
       "consequences": [
         "Amends ADR-001's placement of the broker inside the door; ADR-001's handle model is unchanged and its entry is not edited.",
@@ -417,7 +417,11 @@
         "Entries of other kinds (lys.given, lanterns, forks, messages) are not signed by this.",
         "The directory refuses linking a person's provider account to an agent and delegating a sign-in identity, each by name and writing nothing (DIRECTORY-009).",
         "An agent's own machine account, bound to no person, stays allowed as its issuer-subject binding (conformance row 1.3).",
-        "The broker refuses to issue an agent any credential derived from a person's sign-in session; this is carried by the broker's card against SECRETS-002, and row 1.2 is met in full only when it passes."
+        "The broker refuses to issue an agent any credential derived from a person's sign-in session; this is carried by the broker's card against SECRETS-002, and row 1.2 is met in full only when it passes.",
+        "Every earlier lys gitlink stays reachable through its pre-rebase tag; a pre-rebase tag is never moved or deleted.",
+        "ablative is never left on a head whose build and full suite have not passed.",
+        "Every push of ablative names its lease, so a fork commit pushed while a rebase runs fails the lease instead of being dropped.",
+        "A fork migration takes a number after upstream's highest at the commit it is rebased onto; a collision is a stop, never a fix-up."
       ],
       "supersedes": [],
       "superseded_by": ""
