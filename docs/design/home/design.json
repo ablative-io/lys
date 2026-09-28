@@ -1863,6 +1863,21 @@
       "path": "docs/design/home/PROOF-CHAIN.md",
       "note": "the measured judgement of crates/lys-home at 0073b966: commit and toolchain, row and card maps, Jev lines, leg outcomes, findings and each card's verdict",
       "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/blocks_tests.rs",
+      "note": "gates on the block store: once by hash, a second put proven write-free by pinned modification times, never rewritten, verifiable",
+      "brief": "HOME-013"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-013.json",
+      "note": "the clock-free write-once gates: the block and template tests pin modification times instead of sleeping",
+      "brief": "HOME-013"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-013.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-013"
     }
   ],
   "inventory": [

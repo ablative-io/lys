@@ -52,4 +52,4 @@
 
 **S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
 
-**S40.** As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
+**S40.** As a reviewer, I want the proof that a second put writes nothing to hold on a filesystem with coarse timestamps and on a loaded host without the suite waiting on a clock, so that a passing store gate means the store wrote nothing and never that the tick was too coarse to see a write.

@@ -2,165 +2,119 @@
 
 ## The words, as they were typed
 
-HOME-001 row R4 lists docs/design/home/LOSS-ACCOUNT.md among the files it creates, at HOME-001.json:148 and HOME-001.md:137, and DESIGN.md:84 and design.json:135 name the same path. The document does not exist on lys main at 7b53625, checked with git cat-file. The judged-rows card holds R4's card in review on that finding and names this card as the act that answers it. This card writes the document and changes no code.
+Two tests in crates/lys-home sleep so that a file's modification time can tell a second put that wrote nothing from one that rewrote the same bytes: the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing in src/record/blocks_tests.rs and a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing in src/record/templates_tests.rs, each sleeping 20 milliseconds before the second put. That wait is a clock. On a filesystem with coarse timestamps, or on a loaded host where the second put lands inside the same tick, the 20 milliseconds prove nothing, and the suite pays the wait on every run. Tom's word of 27 September 2026, relayed by Waffles in the pipeline channel: tests must not wait on the clock and must not fail under load; such a wait is a defect, not a flake.
 
-The document is written from crates/lys-home/src/harness/claude_code/render.rs and launch.rs as they stand on main at the brief's commit. It states where the loss account is written, as the file named by the session uuid with .loss.json beside the rendered session, and the shape of one entry as the Loss struct carries it. It states every reason the render writes into it, each quoted exactly as the source writes it, with the source line that writes it. It states when an entry is written, which is when signed thinking is rendered as text for a different provider, api or model, and when redacted or empty thinking is dropped. It states that the account names each dropped block by its hash and never carries the block's content. It states whether a render with nothing dropped still writes the account, as the code shows.
+The rule to meet: the proof that a second put writes nothing does not depend on elapsed time. Each test, before the second put, sets the stored file's modification time to a fixed instant well in the past with std::fs::File::set_modified, reads it back to confirm the instant took, and after the second put asserts the modification time is still exactly that instant and the directory count is unchanged. No sleep. The stores' write paths are not changed: they already write once by hash, and this card only makes the tests prove it without a clock.
 
-Acceptance. The file docs/design/home/LOSS-ACCOUNT.md exists on the landing commit. A check that the brief names reads every reason string in render.rs from the source and finds each one quoted in the document, and finds no reason in the document that the source does not write. Every file:line the document cites exists at the commit it names. No file under crates changes. The design gate, sh scripts/design/gate.sh, exits 0.
-
-Keep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh). The brief id, roadmap row and any decision take the next free id after main's highest and every open brief/* and draft/* branch's, checked with git ls-remote immediately before writing. If the render card, which changes render.rs refusals, lands before this card is built, the document is written from main as it then stands and names that commit. Not in scope are any change to what the render drops or why, and the loss account of any harness other than Claude Code. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie, lead for the home line, on 27 September 2026 on lys main 7b53625.
+Acceptance: both sleeps are gone; a grep for thread::sleep and tokio::time::sleep across crates/lys-home prints nothing; both tests keep every other assertion they have today; no timeout is raised and no test is split; the change is one commit on the card branch. Keep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh), in the home cluster; the brief id, roadmap row and any decision take the next free id after main's highest and every open brief/* and draft/* branch's, checked with git ls-remote immediately before writing. Not in scope: the block or template store's write path, any other test, or the canon's millis_now, which records a timestamp and waits on nothing. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie on 27 September 2026 on lys main 7b53625.
 
 ## What the survey found, and its angles
 
-Archie asks for one missing design document, docs/design/home/LOSS-ACCOUNT.md. HOME-001 R4 promised it, and the inventory in DESIGN.md and design.json names it, but it was never written. The document must describe the Claude Code render's loss account exactly as the code on main writes it: where the file goes, the shape of one entry, every reason string quoted with its source line, when an entry is written, that entries carry hashes and never content, and whether an account is written when nothing was lost. Only the document and the method's brief and roadmap records are added. No code changes, the design gate stays green, and a check the brief names proves the document's reasons match the source both ways.
+The card asks for two lys-home tests to stop depending on a clock. Each test now sleeps 20 ms so a second put that writes nothing can be told from one that rewrites the same bytes. Instead, each test sets the stored file's modification time to a fixed instant in the past with File::set_modified and reads it back to check it took. After the second put, it asserts that instant is unchanged and that the directory count is the same. No store code changes, and the design record gets a brief, a roadmap row and the ids it needs in the home cluster.
 
 ### What the tree holds
 
-- `crates/lys-home/src/harness/claude_code/render.rs:48-55` — The Loss struct: one entry is {hash: String, reason: String}. The doc comments say hash is 'The hash of the part as stored' and reason is 'Why, naming no content'. This is the entry shape the document must state.
-- `crates/lys-home/src/harness/claude_code/render.rs:184-203` — The thinking branch, the only place losses are pushed. Kept whole when provider, api and model all match and the block is redacted or signed. Rendered as text when the text is non-empty and the block is not redacted, with a loss entry only if it carried a signature (198). Otherwise dropped, with the redacted or the empty reason (201).
-- `crates/lys-home/src/harness/claude_code/render.rs:198` — Writes the reason "signed thinking rendered as text: different provider, api or model".
-- `crates/lys-home/src/harness/claude_code/render.rs:201` — Writes two reasons on one line: "redacted thinking dropped: different provider, api or model" and "empty thinking dropped". A check that reads reasons line by line must find both.
-- `crates/lys-home/src/harness/claude_code/render.rs:263-269` — The loss path is path.with_extension("loss.json"), i.e. named after the rendered file's stem. The account object is {session_id, model, authored, dropped: [Loss]}. It is written with std::fs::write every time, even when dropped is empty, and nothing refuses an existing loss file.
-- `crates/lys-home/src/harness/claude_code/render.rs:267` — serde_json::to_vec_pretty(&account).unwrap_or_default(): if serialisation fails, an empty loss file is written silently. The document is written 'as the code shows', so this bears on what it can promise.
-- `crates/lys-home/src/harness/claude_code/render.rs:286-292` — loss(): the hash is Hash::of(serde_json::to_vec(part)), the SHA-256 of the part re-serialised (serde_json without preserve_order, so keys are sorted). The entry holds only hash and reason, never the part's text or signature.
-- `crates/lys-home/src/harness/claude_code/import.rs:415-425` — store_part serialises a part with the same serde_json::to_vec before blocks.put. For an imported session this is what makes the loss hash the block's own hash ('as stored'). A hand-authored or canon part may have no block.
-- `crates/lys-home/src/harness/claude_code/launch.rs:78-86` — render-launch fixes the loss account at out/<uuid>.loss.json, beside out/<uuid>.jsonl.
-- `crates/lys-home/src/harness/claude_code/launch.rs:96-101` — render-launch refuses LaunchTargetExists for the loss path. Plain render does not check the loss path.
-- `crates/lys-home/src/harness/claude_code/launch.rs:123-133` — The loss account is the second file in the render manifest and is hashed into the template_render event (ADR-012). Its bytes are recorded.
-- `crates/lys-home/src/cli.rs:88-110` — lys-home render takes an optional --out path. With --out other.jsonl the account is other.loss.json, not <uuid>.loss.json. render_tests.rs:106 renders to other.jsonl.
-- `crates/lys-home/src/harness/claude_code/render_tests.rs:97-129` — The only test of the account's contents: a different model gives (kept 0, as_text 1, dropped 1), one entry, hash length 64, authored false. None of the three reason strings is asserted anywhere.
-- `docs/design/home/briefs/HOME-001.json:148 and HOME-001.md:137` — R4's files.create lists docs/design/home/LOSS-ACCOUNT.md. This is the finding the document answers.
-- `docs/design/home/DESIGN.md:84 and design.json:134-137` — The inventory row for LOSS-ACCOUNT.md has the note 'what the Claude Code render preserves, transforms and cannot carry', attributed to HOME-001. That is broader than the words' list.
-- `docs/design/home/RECORD.md:232-235` — A four-line stub section '## The loss account' ('Written with R4 ... each dropped block named by hash and reason') that the new document would stand beside.
-- `scripts/design/gate.sh` — The design leg. It validates decisions.json, project.json and each cluster, runs check-coverage, and re-renders each cluster to compare the markdown. A hand-written LOSS-ACCOUNT.md is copied into the temp tree and compares equal to itself, as the PROOF-*.md files do. The new brief JSON must validate and its .md must be the rendered one.
-- `docs/design/roadmap.json and docs/design/decisions.json` — Where the new roadmap row goes, and a decision if any. Main's highest ids are RM-016 and ADR-018.
+- `crates/lys-home/src/record/blocks_tests.rs:6-37` — the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing sleeps 20 ms at line 22. Its mtime assertion (lines 18-21, 27-33) reads the shard DIRECTORY store.root()/<hh>, not the stored block file. It also asserts files()==count and count==1, !second.new, and second.hash==first.hash
+- `crates/lys-home/src/record/templates_tests.rs:13-46` — a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing sleeps 20 ms at line 31. Its mtime assertion reads the stored template FILE templates/<hh>/<hash> (line 30, 35). It asserts the shard has exactly 1 entry afterwards but takes no count before the second put. It keeps its root-absent, bytes, path_of, contains, get and missing-hash assertions
+- `crates/lys-home/src/record/blocks.rs:88-123` — BlockStore::put returns early with new:false when path.is_file(), before create_dir_all and before any temp file. That is why the second put touches neither the file nor the shard directory. Out of scope to change
+- `crates/lys-home/src/record/templates.rs:40-42` — TemplateStore::put delegates to BlockStore::open(root).put, so both tests exercise the same write path. Out of scope to change
+- `crates/lys-home/src/record/canon.rs:461` — millis_now records a timestamp and waits on nothing. The words exclude it explicitly
+- `docs/design/home/briefs/HOME-001.md:85` — The acceptance the blocks test was written to: 'the second put performs no write (measured by the directory's mtime and file count)'. It names the directory's mtime, not the file's
+- `docs/design/home/CHECKLIST.md:37 (C15)` — The template store keeps each template 'written once and never rewritten'. The template test is that item's gate
+- `crates/lys-home/Cargo.toml` — rust-version 1.89. File::set_modified has been stable since 1.75, so no MSRV change. tempfile is already a dev-dependency and no new crate is needed
+- `docs/design/home/ (DESIGN.md, CHECKLIST.md, briefs/, roadmap.json, decisions.json) and scripts/design/gate.sh` — The brief and roadmap row land in the home cluster and must pass validate.py, check-coverage.py and render-cluster.py through gate.sh
+- `.github/workflows/ci.yml` — Both jobs run on ubuntu-latest, so CI proves the tests on Linux only. This Mac (APFS) and Dean's laptop are the other hosts they run on
 
 ### What was already decided
 
-- HOME-001 R4 — The render writes 'a loss account beside the file listing every dropped block by hash and reason'. Its acceptance ties the account's entry count to the signed thinking blocks on the path when rendering for a different model.
-- HOME-001 checklist C4 — Events render to a Claude Code JSONL under a chosen uuid at the harness path, with a loss account beside it.
-- HOME-001 story S4 — As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
-- home P3 — Opaque blocks are rendered whole only when provider, api and model all match. Another model gets readable thinking as text, with opaque blocks dropped and each named by hash in the loss account.
-- home P7 / CN3 — Transcript content never appears in output, logs or errors, only hashes and counts. The document must describe the account without quoting any transcript content.
-- home CN2 — A rendered file never carries another provider's opaque block, and the loss account names each block dropped by hash.
-- ADR-012 — Each render is recorded as a template_render event with the written paths hashed in a manifest. The loss account is one of those files.
-- ADR-016 — Derived uuids are a frozen contract. Not touched here, but it is the precedent for treating a written byte format as frozen.
-- ADR-018 — The seed's text is never put in the report or the loss account. The document can state that the account never carries it.
-- RM-005 / RM-006 — The home and launch-template rows the render and its account belong to.
-- draft/home/9635a408 (HOME-008, 'Refuse by name what the Claude Code render cannot shape') — Open render card. R4 moves assistant shaping, 'the loss reasons and the thinking counts unchanged', out of render.rs into a new render_assistant.rs. R5 makes the loss hash's serialisation return a Result and serialises the account before any write. Its boundary keeps the reasons' text and the account's fields unchanged.
-- draft/home/a6d7b86a (HOME-008, 'Judge the hand-built HOME-001 crate through the chain at 0073b966') — The judged-rows card. It gives each HOME-001 card a verdict from path presence and open findings, and holds R4's card in review because LOSS-ACCOUNT.md is absent.
-- brief/home/54e28af6 (HOME-008, compaction import) — Adds a separate lys.loss custom entry written at import, a different 'loss account', and changes render.rs's compaction output. It states it writes no lys.loss line from the render.
+- HOME-001 — Brief acceptance at line 85: putting the same 1 MiB block twice leaves one file, and the second put performs no write, measured by the directory's mtime and file count
+- HOME-002 / C15 — The template store keeps each template under templates/ by SHA-256, written once and never rewritten, with the block store's write discipline
+- ADR-012 — A harness launch template is kept in the home by hash. That is the store whose written-once property the template test proves
+- home CN9 — A render reads no clock and no random source. The same no-clock stance, applied there to production code rather than tests
+- RM-005 — The home row the block store belongs to
+- RM-006 — The launch-template row the template store belongs to
 
 ### What was measured
 
-- main commit the words name: 7b536253165f920cd8bc5f1d1dfdd987339e3e12 (HEAD of this tree, clean)
-- docs/design/home/LOSS-ACCOUNT.md at 7b53625: absent (git cat-file -e exits 128)
-- docs/design/home/PROOF-PROXY.md at 7b53625 (also in HOME-001's inventory, DESIGN.md:83): absent (exit 128). It belongs to HOME-001 R7, not this card.
-- distinct reason strings render.rs writes: 3, on 2 source lines: 198 (1) and 201 (2)
-- places in crates/ that construct a Loss: 1 (render.rs:286-292, called only from 198 and 201)
-- Loss struct fields: 2: hash (String, 64 hex, SHA-256), reason (String)
-- loss account top-level keys: 4: session_id, model, authored, dropped
-- render.rs size: 390 lines
-- launch.rs size: 247 lines
-- tests asserting any reason string's text: 0 (render_tests.rs asserts count and hash length only)
-- measured runs showing an account with nothing dropped: PROOF-RESUME.md:38 and PROOF-LAUNCH.md:28 both show dropped: []
-- hand-written .md documents in docs/design/home: 11 .md at top level (7 PROOF-*, RECORD, DESIGN, CHECKLIST, USER-STORIES)
-- RECORD.md loss-account section: 4 lines (232-235) in a 235-line file
-- open brief/* and draft/* branches on origin: 68 (11 with objects local, 57 read through gh api)
-- highest brief id in the home cluster across main and open branches: HOME-011 (brief/home/06103633); main's highest is HOME-007. Next free: HOME-012
-- highest roadmap id across main and open branches: RM-025 (draft/directory/1e30a4cb); main's highest is RM-016. Next free: RM-026
-- highest decision id across main and open branches: ADR-039 (draft/directory/1e30a4cb); main's highest is ADR-018. Next free: ADR-040
-- open branches using HOME-008 for different cards: at least 13 distinct HOME-008 titles
+- thread::sleep or tokio::time::sleep calls under crates/lys-home: 2 lines (blocks_tests.rs:22, templates_tests.rs:31), each 20 ms
+- other sleeps in the workspace outside lys-home: 1 file (crates/lys-anchor/src/admission/certificate_tests.rs), out of scope
+- set_modified or FileTimes uses in lys-home today: 0
+- size of the block test: 32 lines (6-37) with 7 assertions, including 2 on the shard directory's mtime and count
+- size of the template test: 34 lines (13-46) with 14 assert-type checks
+- blocks_tests.rs / templates_tests.rs file length: 68 / 61 lines
+- blocks.rs / templates.rs length: 263 / 61 lines
+- highest ids on main 7b53625: HOME-007 brief (HOME-005 absent), RM-016 (11 rows), ADR-018 (18 decisions)
+- highest ids seen on the open brief/* and draft/* heads that are present locally: HOME-010 (HOME-008 and HOME-010 briefs exist), RM-018, ADR-029
+- open brief/* and draft/* branches on origin: 67, of which 56 heads are not in the local object store, so their ids could not be read without a fetch
+- CI platforms: ubuntu-latest only (2 jobs)
+- lys-home rust-version against File::set_modified's stable version: 1.89 against 1.75
 
 ### What it means for the other projects
 
-- cambium — The judged-rows card holds HOME-001 R4's card in review on the missing file. Once this lands, that card's verdict can move, and the board's R4 card should point at this card's landing.
-- aion — The card runs through the chain (brief_card, sign-off, card_build_v3, src_pr, src_land) with inputs naming the lys repository, the commit, the card and the brief. It is docs-only, so the heavy Rust legs still run on Dean's laptop per the standing rules.
-- method — The scripts are copied from the design-system method at 3c3bac7 (scripts/design/SOURCE.md). The new brief must validate against that copy's brief schema. Nothing changes upstream.
+- aion — The card goes through the aion chain (brief_card, sign-off, card_build_v3, src_pr, src_land). The chain must fetch the open brief/* and draft/* heads to find the next free id. There is no code change in aion.
 
 ### The decisions it stands on
 
-- ADR-012 (honour) — The loss account is one of the files hashed in the template_render manifest. The document describes it and must not imply its bytes or name change.
-- ADR-018 (honour) — The seed text never enters the loss account. The document can state this and must not contradict it.
-- ADR-016 (honour) — Not touched. The document must not describe render uuids in a way that reads as a change to the frozen scheme.
--  (new) — No new decision seems needed: the document records existing behaviour. If the lead chooses to widen the document to 'preserves and transforms', or to redefine the file-naming claim, only the design.json inventory note changes. That is a doc edit, not an ADR. Leave ADR-040 unclaimed unless one is actually made.
+- ADR-012 (honour) — The template store stays a by-hash, written-once object store. Only its test changes
+-  (new) — A small home rule may be worth recording: no test in lys-home waits on the clock, and 'wrote nothing' is proven by a pinned mtime. The words say 'any decision', so whether this becomes an ADR or only a checklist line is the author's choice
 
 ### What it requires
 
-- docs/design/home/LOSS-ACCOUNT.md exists on the landing commit.
-- The document names the commit it was written from (7b53625, or main's head at build time if the render card landed first).
-- The document states where the account is written, citing render.rs:263 and launch.rs:81 (or their equivalents at the named commit).
-- The document states one entry's shape as the Loss struct's two fields, hash and reason, citing render.rs:50-55.
-- The document quotes, character for character, each reason the source writes (at 7b53625: "signed thinking rendered as text: different provider, api or model", "redacted thinking dropped: different provider, api or model", "empty thinking dropped"), each with its source file:line.
-- The named check extracts every reason string from the source, asserts it found exactly the number present (3 at 7b53625, not zero), finds each quoted in the document, and finds no reason-shaped quote in the document that the source does not write.
-- The document states when an entry is written, as the thinking branch at render.rs:184-203 decides it.
-- The document states that an entry carries a SHA-256 hash and a reason, never the block's text or signature.
-- The document states that the account is written on every render, including with dropped: [].
-- Every file:line the document cites resolves at the commit it names.
-- git diff --stat of the landing shows no path under crates/.
-- sh scripts/design/gate.sh exits 0 on the landing commit.
-- The new brief, roadmap row and any decision use ids checked free against main and every open brief/* and draft/* branch immediately before writing.
+- grep -rnE 'thread::sleep|tokio::time::sleep' crates/lys-home prints nothing
+- Before the second put, each of the two tests sets the stored file's mtime (and the directory's, if the lead so rules for blocks) to one fixed past instant with File::set_modified, and asserts that reading it back gives exactly that instant
+- After the second put, each test asserts the mtime is still exactly that instant and the directory count is unchanged
+- Every assertion each test has today is kept: !second.new, hash equality, count==1 / read_dir==1, the bytes, path_of, contains, get and the missing-hash error in the template test
+- No test is split, renamed or ignored, and no timeout is raised
+- One commit on the card branch
+- cargo test -p lys-home passes, and the full leg set (fmt, clippy both shapes, workspace tests --all-features, doc both shapes, design gate) passes on Dean's laptop
+- A brief, a roadmap row and any decision in the home cluster take ids above main's highest and every open brief/* and draft/* head's, checked with git ls-remote at write time, and scripts/design/gate.sh passes
 
 ### What must not change
 
-- No file under crates/ changes, including render.rs, launch.rs, their tests and the crate README.
-- The reason strings, the Loss struct, the account's keys and its bytes are not changed or proposed changed.
-- No existing brief's rows, acceptance or identifiers are rewritten. HOME-001's R4 files.create entry stays as it is.
-- No other harness's loss account (e.g. the Codex translation card) and not the import-time lys.loss entry of the compaction card.
-- No transcript content appears in the document (P7, CN3). Examples use hashes and counts only.
-- The design scripts copied from the method are not edited.
+- BlockStore::put, put_file and TemplateStore::put stay byte-for-byte unchanged
+- canon.rs millis_now is untouched
+- No other test changes, including lys-anchor's certificate_tests.rs
+- No new dependency: std::fs::File::set_modified only
+- No #[allow], #[ignore] or cfg to silence anything
 
 ### What we must put in place first
 
-- Immediately before writing, re-read open brief/* and draft/* branches for the highest HOME, RM and ADR ids. Here that meant 57 of the 68 branches through gh api because their objects are not local.
-- Check whether the render card (draft/home/9635a408) has landed on main, and pick the source commit and file(s) accordingly.
+- Fetch or ls-remote and read every open brief/* and draft/* head: 56 of the 67 are not in the local object store, so the next free HOME, RM and ADR ids (at least HOME-011, RM-019 and ADR-030 on what is visible) cannot be fixed yet
+- Get the lead's ruling on whether the block test pins the shard directory's mtime, the file's, or both
 
 ### The risks
 
-- If the render card lands mid-build, the reasons move to render_assistant.rs, and a document or check still pinned to render.rs lines cites lines that no longer hold the reasons.
-- A check that greps render.rs line by line can miss the second reason on line 201, or pass vacuously after a move if it does not assert a found count of 3.
-- Stating 'named by the session uuid' as a universal fact would be false for render --out and would mislead a reader looking for the file.
-- Saying the account names only 'dropped' blocks misstates the as-text entries that share the dropped array and the report's dropped count.
-- Repeating the Loss doc comment's 'hash of the part as stored' as universal is only true for imported parts; canon and hand-authored parts may have no stored block with that hash.
-- Id collisions: HOME-008 is already taken by at least 13 different open cards, so ids read even minutes early can be stale.
-- Documenting render.rs:267's silent unwrap_or_default as intended behaviour could entrench a defect the render card is fixing.
+- Moving the block test's mtime check from the shard directory to the file loses the only check that catches a temp file created and then discarded in the shard, weakening HOME-001's gate
+- A sub-second instant can be truncated on coarse-timestamp filesystems so the read-back fails. A whole-second instant avoids that
+- Setting a directory's mtime needs an fd on the directory. That works on Linux and macOS, but it would fail on Windows without backup semantics, if Windows is ever added to CI
+- If the new check pins a path the second put never touches, it proves nothing. The pin must be on the same path(s) the old check read
+- Picking ids from only the locally visible branches could collide with an unseen draft (HOME-010, RM-018 and ADR-029 are already taken on branches)
 
 ### Still open
 
-- The code names the loss file after the rendered file's stem, not the session uuid. Should the document say that, noting the two cases where the stem is the uuid, or describe only those two cases? The sentence of the words it stands on: "It states where the loss account is written, as the file named by the session uuid with .loss.json beside the rendered session, and the shape of one entry as the Loss struct carries it.". Why only the lead can settle it: render.rs:263 uses path.with_extension("loss.json"). With lys-home render --out other.jsonl (cli.rs:106, render_tests.rs:106) the account is other.loss.json. Only the default path (render.rs:85-93) and render-launch (launch.rs:80-81) give <uuid>.loss.json. A reader using --out would look for the wrong file.
-- If the render card lands first and moves the reasons into render_assistant.rs, should the acceptance check read the reasons from whichever file writes them, or from render.rs as the words say? The sentence of the words it stands on: "A check that the brief names reads every reason string in render.rs from the source and finds each one quoted in the document, and finds no reason in the document that the source does not write.". Why only the lead can settle it: The render card on draft/home/9635a408, R4, moves the reasons 'out of render.rs' into render_assistant.rs. After that landing, a check scoped to render.rs finds zero reasons, and the check fails because the document quotes three reasons that render.rs no longer writes. That conflicts with the words' own rule to write from main as it then stands.
-- Does LOSS-ACCOUNT.md cover only the account, or also what the render preserves and transforms beyond it, as the inventory note promises? The sentence of the words it stands on: "HOME-001 row R4 lists docs/design/home/LOSS-ACCOUNT.md among the files it creates, at HOME-001.json:148 and HOME-001.md:137, and DESIGN.md:84 and design.json:135 name the same path.". Why only the lead can settle it: design.json:136 and DESIGN.md:84 describe the file as 'what the Claude Code render preserves, transforms and cannot carry'. The words list only the account's contents. Custom entries and labels are not rendered, compaction becomes a summary record, and gitBranch and usage are fixed values (render.rs:9-10, 148, 226, 234-237), but none of these writes a loss entry. Either the document is narrower than its inventory row or the row's note changes.
+- The block test's mtime check reads the shard directory, as HOME-001's acceptance specifies. Should the new check pin and assert that directory's mtime, the stored block file's mtime, or both? The sentence of the words it stands on: "Each test, before the second put, sets the stored file's modification time to a fixed instant well in the past with std::fs::File::set_modified, reads it back to confirm the instant took, and after the second put asserts the modification time is still exactly that instant and the directory count is unchanged.". Why only the lead can settle it: The two readings of this sentence give different tests. blocks_tests.rs:18-33 asserts the mtime of store.root()/<hh>, a directory, and docs/design/home/briefs/HOME-001.md:85 says 'measured by the directory's mtime and file count'. The directory mtime also catches a temp file created and then deleted, which the file's mtime and the entry count both miss. Moving the check to the file alone would weaken the gate and contradict HOME-001's acceptance and the card's own 'keep every other assertion'.
 
 ### The units beyond the first
 
-- Pin the three loss reasons' text in render_tests.rs — No test asserts any reason string today (render_tests.rs). This card may not change crates/, so pinning them is code work for a later card, likely the render card's line.
-- Fix the loss account's silent empty write on serialisation failure and its overwrite under plain render — render.rs:267 uses unwrap_or_default, and plain render overwrites an existing loss file. Both are behaviour changes out of scope here. The render card's R5 covers the first.
-- Write PROOF-PROXY.md for HOME-001 R7 — The same inventory lists a second missing file (DESIGN.md:83). It belongs to the R7 proxy-proof card, not to this card.
+- Remove the clock wait from lys-anchor's certificate tests — crates/lys-anchor/src/admission/certificate_tests.rs contains a sleep under the same rule, and the card puts any other test out of scope
 
 ### The smallest complete shape
 
-One docs-only landing:
-- docs/design/home/LOSS-ACCOUNT.md, written from render.rs and launch.rs at the named commit, with all six statements the words list, each cited by file:line.
-- The new brief HOME-012 (JSON and its rendered .md) in the home cluster, naming the reason-matching check, which lives outside crates/.
-- Roadmap row RM-026, with no ADR unless one is made.
-- Optionally a one-line pointer from RECORD.md's loss-account section.
-All of it passes sh scripts/design/gate.sh.
+One commit on the card branch. It edits blocks_tests.rs and templates_tests.rs so that each pins the relevant mtime to one fixed whole-second past instant and reads it back. After the second put, each asserts that instant and an unchanged count. Both sleeps are removed and every existing assertion is kept. The commit also carries the home-cluster brief and roadmap row (and a decision only if wanted) under freshly checked next-free ids, with the design gate and the full cargo legs green on Dean's laptop.
 
 ## The roadmap row
 
-- **RM-027** — Write the loss account of the Claude Code render down as the code writes it (design, idea)
-- Summary: HOME-001 R4 and the home design name docs/design/home/LOSS-ACCOUNT.md, which was never written. One docs-only card writes it from the Claude Code render on main: where the account is written (beside the rendered file under its stem, with the two cases where the stem is the session uuid), the account's keys and one entry's fields, every reason quoted with its source line, when an entry is written, that an entry names a part by hash and never carries its content, that every render writes the account, and what the render changes without an entry. A reason check keyed on the source proves both directions; no file under crates changes.
-- Asked by: tom on 2026-09-27T11:35:00+10:00
-- Context: The words of the card that answers the judged-rows card's finding that HOME-001 R4's LOSS-ACCOUNT.md is absent on main at 7b53625; the survey's three questions were answered by the lead for the home line before this round.
-- Quote: HOME-001 row R4 lists docs/design/home/LOSS-ACCOUNT.md among the files it creates, at HOME-001.json:148 and HOME-001.md:137, and DESIGN.md:84 and design.json:135 name the same path. The document does not exist on lys main at 7b53625, checked with git cat-file. The judged-rows card holds R4's card in review on that finding and names this card as the act that answers it. This card writes the document and changes no code.
+- **RM-027** — Prove the block and template stores' second put writes nothing without waiting on the clock (fix, idea)
+- Summary: The two lys-home store gates that sleep 20 ms before a second put instead pin the shard directory's and the stored file's modification times to a fixed past instant, read them back, and assert after the second put that both are unchanged and the shard's entry count is the same. No sleep; the store write paths, every other test and canon.rs's millis_now are untouched.
+- Asked by: tom on 2026-09-27T10:23:00+10:00
+- Context: The words' sentence on the stored file's modification time is settled by the lead's answer: both the shard directory's and the stored file's modification times are pinned, read back and asserted unchanged, in the block test and in the template test, because the directory's modification time is what catches a temporary file created and deleted in the shard.
+- Quote: Two tests in crates/lys-home sleep so that a file's modification time can tell a second put that wrote nothing from one that rewrote the same bytes: the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing in src/record/blocks_tests.rs and a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing in src/record/templates_tests.rs, each sleeping 20 milliseconds before the second put. That wait is a clock. On a filesystem with coarse timestamps, or on a loaded host where the second put lands inside the same tick, the 20 milliseconds prove nothing, and the suite pays the wait on every run. Tom's word of 27 September 2026, relayed by Waffles in the pipeline channel: tests must not wait on the clock and must not fail under load; such a wait is a defect, not a flake.
 
-The document is written from crates/lys-home/src/harness/claude_code/render.rs and launch.rs as they stand on main at the brief's commit. It states where the loss account is written, as the file named by the session uuid with .loss.json beside the rendered session, and the shape of one entry as the Loss struct carries it. It states every reason the render writes into it, each quoted exactly as the source writes it, with the source line that writes it. It states when an entry is written, which is when signed thinking is rendered as text for a different provider, api or model, and when redacted or empty thinking is dropped. It states that the account names each dropped block by its hash and never carries the block's content. It states whether a render with nothing dropped still writes the account, as the code shows.
+The rule to meet: the proof that a second put writes nothing does not depend on elapsed time. Each test, before the second put, sets the stored file's modification time to a fixed instant well in the past with std::fs::File::set_modified, reads it back to confirm the instant took, and after the second put asserts the modification time is still exactly that instant and the directory count is unchanged. No sleep. The stores' write paths are not changed: they already write once by hash, and this card only makes the tests prove it without a clock.
 
-Acceptance. The file docs/design/home/LOSS-ACCOUNT.md exists on the landing commit. A check that the brief names reads every reason string in render.rs from the source and finds each one quoted in the document, and finds no reason in the document that the source does not write. Every file:line the document cites exists at the commit it names. No file under crates changes. The design gate, sh scripts/design/gate.sh, exits 0.
-
-Keep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh). The brief id, roadmap row and any decision take the next free id after main's highest and every open brief/* and draft/* branch's, checked with git ls-remote immediately before writing. If the render card, which changes render.rs refusals, lands before this card is built, the document is written from main as it then stands and names that commit. Not in scope are any change to what the render drops or why, and the loss account of any harness other than Claude Code. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie, lead for the home line, on 27 September 2026 on lys main 7b53625.
+Acceptance: both sleeps are gone; a grep for thread::sleep and tokio::time::sleep across crates/lys-home prints nothing; both tests keep every other assertion they have today; no timeout is raised and no test is split; the change is one commit on the card branch. Keep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh), in the home cluster; the brief id, roadmap row and any decision take the next free id after main's highest and every open brief/* and draft/* branch's, checked with git ls-remote immediately before writing. Not in scope: the block or template store's write path, any other test, or the canon's millis_now, which records a timestamp and waits on nothing. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie on 27 September 2026 on lys main 7b53625.
 - Cluster: home; briefs: HOME-013
-- Notes: Ids checked with git ls-remote and a fetch of all 74 open brief/* and draft/* branches immediately before writing, against main 7b53625: HOME-012 and RM-026 are taken on open branches (draft/home/4c46aabc, brief/lys-anchor/6b1c7df6) and ADR-040 likewise, so this row is RM-027 and its brief HOME-013; checklist C95 to C99 and story S40 follow the highest numbers on those branches (C94, S39). No new decision: the document records existing behaviour. Further units, not written: Pin the three loss reasons' text in render_tests.rs; Fix the loss account's silent empty write on serialisation failure and its overwrite under plain render; Write PROOF-PROXY.md for HOME-001 R7; Decide whether custom entries, labels, compaction, gitBranch or usage should write a loss entry.
+- Notes: Ids: HOME-013, RM-027, C95, C96 and S40 are the next free after main 7b53625 and every open brief/* and draft/* head on origin, fetched and read immediately before writing (the highest seen: HOME-012 on draft/home/4c46aabc, RM-026 on brief/lys-anchor/6b1c7df6 and draft/home/4c46aabc, ADR-040, C94, S39). No new ADR: the no-clock rule for these gates is carried by C95 and C96. Further unit, not written: Remove the clock wait from lys-anchor's certificate tests.
 
 ## The design
 
@@ -249,6 +203,7 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `docs/design/home/PROOF-PROXY.md` | the measured subscription login through a pass-through proxy: version, headers that mattered, what failed | HOME-001 |
 | `docs/design/home/LOSS-ACCOUNT.md` | what the Claude Code render preserves, transforms and cannot carry | HOME-001 |
 | `crates/lys-home/src/record/blocks.rs` | content-addressed block store: put by SHA-256, get by hash, never rewritten | HOME-001 |
+| `crates/lys-home/src/record/blocks_tests.rs` | gates on the block store: once by hash, a second put proven write-free by pinned modification times, never rewritten, verifiable | HOME-013 |
 | `crates/lys-home/src/harness/claude_code/import.rs` | Claude Code JSONL into SessionEvents plus blocks | HOME-001 |
 | `crates/lys-home/src/harness/claude_code/render.rs` | SessionEvents into a Claude Code JSONL under a chosen uuid, with the loss account | HOME-001 |
 | `crates/lys-home/src/harness/claude_code/mod.rs` | the Claude Code harness profile: transcript root, cwd slug, version measured | HOME-001 |
@@ -351,6 +306,8 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `crates/lys-home/src/harness/claude_code/seed.rs` | the seed prompt of a carried user message: the marker line, the text parts, the seed argument for the template's launch line | HOME-006 |
 | `crates/lys-home/tests/fork.rs` | the fork run as the binary: five forks and five refusals, blocks unchanged, both ancestry sides | HOME-006 |
 | `docs/design/home/PROOF-FORK.md` | the measured fork: Pi's parentSession read, a real session forked, rendered and launched, as hashes, counts and exit codes | HOME-006 |
+| `docs/design/home/briefs/HOME-013.json` | the clock-free write-once gates: the block and template tests pin modification times instead of sleeping | HOME-013 |
+| `docs/design/home/briefs/HOME-013.md` | its rendered markdown | HOME-013 |
 
 ## Inventory
 
@@ -1995,147 +1952,93 @@ Complete the section of docs/design/home/PROOF-RESUME.md that R3 adds with: the 
 type: brief
 id: HOME-013
 cluster: home
-title: Write the loss account of the Claude Code render down as the code writes it
+title: Prove a second put writes nothing by pinned modification times, not by sleeping
 ---
 
-# HOME-013: Write the loss account of the Claude Code render down as the code writes it
+# HOME-013: Prove a second put writes nothing by pinned modification times, not by sleeping
 
 > **Cluster:** home
 > **Design anchor:**
 > - ADR-012 — A harness launch template is kept in the home by hash, and each render is recorded on the session beside its context path — A launch template per harness is a JSON object with named slots (transcript, mcp, env, secrets, instructions) plus flags, stored in the home under templates/ by its SHA-256; lys-home renders a template and a session into files and runtime variables with command mappings in text, prints the launch line and never runs it, and records each render as a sixth lys.harness_event kind, template_render, hung as a side leaf beside the context path with the written paths in a manifest block named by hash. Rejected: a transcript converter or adapter protocol per harness, a template kept outside the home (a seat document of another tool), and a render event that advances the head, which would change the session head hash between two renders of the same session.
-> - ADR-018 — A user-message point is carried as a seed prompt beside the rendered file, never copied into the child — When the point is a user message the cut stops at the assistant message before it and the message is carried, not copied: lys.forked_from records its id with coordinate_carried true and counts, by kind, the parts of it that are not text. The Claude Code render of such a child writes the message's text parts, in order, as a seed prompt beside the rendered file under an in-band marker line naming the parent session, the point and the lantern, and names it in the render report; the template's launch line, printed by render-launch only, passes that file as the resumed session's first prompt. A part that is not text never refuses a fork or a render and never enters the seed. Rejected: copying the user message into the child's chain, refusing a fork for a non-text part, and putting the seed's text in the report or the loss account.
 > **Checklist:**
-> - C95 — docs/design/home/LOSS-ACCOUNT.md exists, names on its first line the commit it was read from, and states that the loss account is written beside the rendered file under the rendered file's stem with .loss.json, naming the default render path and render-launch as the two cases where that stem is the session uuid.
-> - C96 — LOSS-ACCOUNT.md states the account's four keys, one entry's two fields hash and reason, and that every render writes the account, with dropped: [] when nothing was dropped.
-> - C97 — LOSS-ACCOUNT.md quotes every reason string the render passes to the loss constructor, with the line that writes it, and the reason check prints 1 3 3 [] at the landing commit.
-> - C98 — LOSS-ACCOUNT.md states that an entry's hash is the SHA-256 of the part as serde_json serialises it and that an entry never carries the part's text, signature or redacted data.
-> - C99 — LOSS-ACCOUNT.md lists the four things the render changes without a loss entry, custom entries and labels, compaction, gitBranch and usage, each with the line that does it.
+> - C95 — The block store's gate proves a second put of the same bytes writes nothing without elapsed time: before the second put it pins the shard directory's and the block file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock.
+> - C96 — The template store's gate proves a second put of the same template writes nothing without elapsed time: before the second put it pins the template shard directory's and the template file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock.
 > **Stories:**
-> - S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
+> - S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the proof that a second put writes nothing to hold on a filesystem with coarse timestamps and on a loaded host without the suite waiting on a clock, so that a passing store gate means the store wrote nothing and never that the tick was too coarse to see a write.
 
 ## Purpose
 
-HOME-001 R4 names docs/design/home/LOSS-ACCOUNT.md among the files it creates, and the cluster design's structure names the same path, but the document was never written. This brief writes it from the Claude Code render as it stands on main: where the account is written, the shape of the account and of one entry, every reason the render writes quoted with its source line, when an entry is written, that an entry names a part by hash and never carries its content, that every render writes the account, and what the render changes without writing an entry. A reader can then check a render's account against the source without reading the render, and a reason check keyed on the source proves the document and the source agree in both directions.
+The block store's and the template store's gates tell a second put that wrote nothing from one that rewrote the same bytes by a modification time taken 20 milliseconds apart. That wait is a clock: on a filesystem with coarse timestamps, or on a loaded host where the second put lands inside the same tick, it proves nothing, and the suite pays it on every run. This brief makes both gates prove the write-once property with no elapsed time, by pinning the modification times the second put would change to a fixed instant and asserting they did not move.
 
 ## Task
 
-Write docs/design/home/LOSS-ACCOUNT.md by hand from render.rs, launch.rs, import.rs, cli.rs, mod.rs and blocks.rs under crates/lys-home/src as they stand on main when the document is written, and name that commit on the document's first line. At the time of this brief main is 7b53625 and every line number below is read there; if the render card that moves the render's refusals and its assistant shaping has landed first, the document is written from main as it then stands, names that commit, and cites the lines that hold the same code there; the reason check reads whichever files call the loss constructor, so it finds the reasons wherever they are written. The document is the one file this brief creates, and all five requirements are sections of it, so R1 to R5 share it as their primary file. The code decides what the document says: the account is named by the rendered file's stem, which is the session uuid only for the default output path and for render-launch; the array named `dropped` also holds signed thinking rendered as text; and the account is written on every render. In scope: the document only. Out of scope: any change to what the render drops or why, any code, the loss account of any harness other than Claude Code, the import-time `lys.loss` entry of the compaction card, pinning the reasons in a test, and changing the silent empty write or plain render's overwrite of an existing account. Transcript content never appears in the document (CN3): it names keys, reasons, line citations and counts.
+Two tests change and nothing else in crates/lys-home: the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing in crates/lys-home/src/record/blocks_tests.rs and a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing in crates/lys-home/src/record/templates_tests.rs. In each, the std::thread::sleep of 20 milliseconds before the second put is removed. In its place, before the second put, the test sets the modification time of both the shard directory and the stored file to the fixed instant std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000) with std::fs::File::set_modified, reads both back and asserts each equals that instant; after the second put it asserts both are still exactly that instant and the shard's entry count equals the count taken before the second put. The shard directory is pinned as well as the file because the directory's modification time is what catches a temporary file created and deleted in the shard, which neither the file's modification time nor the entry count shows; the block test's existing check reads that directory, as HOME-001's acceptance measures it. Every assertion each test makes today is kept. The block and template stores (blocks.rs, templates.rs) already write once by hash and do not change. Out of scope: any store's write path, every other test in the workspace including the sleep in the lys-anchor crate's admission certificate tests, and canon.rs's millis_now, which records a timestamp and waits on nothing.
 
 ## Requirements
 
-### R1: Name the commit the document is read from and where the loss account is written
+### R1: Pin the block shard and block file modification times in the block store's gate instead of sleeping
 
-Structural: `docs/design/home/LOSS-ACCOUNT.md` is created, a hand-written markdown document titled `# The loss account of the Claude Code render`. Its first line after the title is `Written from commit <id>.`, where <id> is the full 40-character id of main's head at the time the document is written: `7b536253165f920cd8bc5f1d1dfdd987339e3e12` while main stands there, and main's head as it then stands if the render card that moves the render's refusals has landed first. Every source line the document cites is written as a repository-relative path, a colon and a line number or a first-last range (`crates/lys-home/src/harness/claude_code/render.rs:263`, `crates/lys-home/src/harness/claude_code/render.rs:85-93`), read at that commit. The document has the section `## The loss account` first and the section `## What the render changes without a loss entry` second. The loss account section states that the account is written beside the rendered file and named by the rendered file's stem with `.loss.json`, because the render computes its path with `path.with_extension("loss.json")`, citing that line of render.rs; that the stem is the session uuid in two cases, the default output path of `lys-home render` (citing render.rs's `default_path`, lines 85-93 at 7b53625) and `render-launch` (citing launch.rs's `{uuid}.jsonl` and `{uuid}.loss.json` lines, 80-81 at 7b53625); and that `lys-home render --out other.jsonl` writes the account as `other.loss.json` (citing the `out` argument in cli.rs, lines 105-107 at 7b53625). It states that plain render writes the account with `std::fs::write`, which replaces a file already at that path (citing render.rs's lines 265-269 at 7b53625), that `render-launch` refuses an existing loss path by name before it writes any file (citing launch.rs's lines 96-101 at 7b53625), and that `render-launch` hashes the account as the second file of its render manifest (citing launch.rs's lines 123-133 at 7b53625). The document SHALL NOT state that the account is named by the session uuid for every render, SHALL NOT propose a change to the account's path or name, and SHALL NOT cite a line at any commit other than the one it names.
-
-**Acceptance:**
-- `git cat-file -e HEAD:docs/design/home/LOSS-ACCOUNT.md` exits 0 on the landing commit.
-- The document holds exactly one line matching `^Written from commit [0-9a-f]{40}\.$`, and the id on it equals the output of `git merge-base origin/main HEAD` on the card's branch (`7b536253165f920cd8bc5f1d1dfdd987339e3e12` while main stands at 7b53625).
-- `python3 -c "import re;ls=[l for l in open('docs/design/home/LOSS-ACCOUNT.md').read().splitlines() if l.strip()];i=ls.index('# The loss account of the Claude Code render');print(bool(re.fullmatch(r'Written from commit [0-9a-f]{40}\.',ls[i+1])))"` run from the repository root prints `True`: the first non-blank line after `# The loss account of the Claude Code render` is the `Written from commit <id>.` line.
-- `python3 -c "import re,subprocess;d=open('docs/design/home/LOSS-ACCOUNT.md').read();c=re.search(r'(?m)^Written from commit ([0-9a-f]{40})\.$',d).group(1);cs=re.findall(r'((?:crates|docs)/[A-Za-z0-9_./-]+\.[a-z]+):([0-9]+)(?:-([0-9]+))?',d);n=lambda p:len(subprocess.run(['git','show',c+':'+p],capture_output=True,text=True,check=True).stdout.splitlines());print(c,sorted({x[0] for x in cs}),[x for x in cs if not 1<=int(x[1])<=int(x[2] or x[1])<=n(x[0])])"` run from the repository root prints the named commit, a sorted list of cited paths that contains each of the three files this requirement cites, `crates/lys-home/src/cli.rs`, `crates/lys-home/src/harness/claude_code/launch.rs` and `crates/lys-home/src/harness/claude_code/render.rs`, and `[]`.
-- At the named commit, the render.rs line the location paragraph cites holds `with_extension("loss.json")` (line 263 at 7b53625), and the launch.rs range it cites holds `{uuid}.loss.json` (range 80-81 at 7b53625).
-- The document contains the string `--out other.jsonl` and the string `other.loss.json`.
-- At the named commit, the launch.rs range the document cites for the refusal holds `LaunchTargetExists` (range 96-101 at 7b53625), and the render.rs range it cites for the plain write holds `std::fs::write(` (range 265-269 at 7b53625).
-- `grep -c '^## ' docs/design/home/LOSS-ACCOUNT.md` prints 2, and the two headings are `## The loss account` then `## What the render changes without a loss entry`.
-
-**Files:**
-- create: docs/design/home/LOSS-ACCOUNT.md
-
-**Checklist:**
-- C95 — docs/design/home/LOSS-ACCOUNT.md exists, names on its first line the commit it was read from, and states that the loss account is written beside the rendered file under the rendered file's stem with .loss.json, naming the default render path and render-launch as the two cases where that stem is the session uuid.
-
-**Stories:**
-- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
-
-### R2: State the account's shape and that every render writes it
-
-Structural: the loss account section states that the account is one JSON object with exactly four keys, `session_id` (the session id the rendered file carries), `model` (the model the file is rendered for), `authored` (true when an entry on the rendered path is the `lys.authored` custom entry) and `dropped` (an array of entries), citing the render.rs line that builds the object (264 at 7b53625) and the line that sets `authored` (128 at 7b53625); that one entry is the `Loss` struct's two string fields, `hash` and `reason`, citing render.rs's lines 48-55 at 7b53625; and that the account is written on every render, including a render that drops nothing, whose account carries `dropped: []`, citing the render.rs lines that write it with no condition (263-269 at 7b53625) and the two measured runs that show it, docs/design/home/PROOF-RESUME.md:38 and docs/design/home/PROOF-LAUNCH.md:28. It states, as found at the named commit and not as intended behaviour, that the account is serialised with `unwrap_or_default()`, so a serialisation failure writes an empty file and returns no error, citing that render.rs line (267 at 7b53625). The document SHALL NOT name a key or field the code does not write, SHALL NOT propose a change to the account's keys, fields or bytes, and SHALL NOT present the empty-file behaviour as a guarantee.
+WHEN the test the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing has put a 1 MiB block once, THE SYSTEM SHALL, before the second put, set the modification time of the shard directory store.root()/<first two hex digits of the hash> and of the block file store.root()/<hh>/<hash> to the instant std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000) with std::fs::File::set_modified, read each back with std::fs::metadata(..).modified() and assert each equals that instant; WHEN the second put of the same bytes returns, THE SYSTEM SHALL assert the shard directory's and the block file's modification times each still equal that instant and the shard's entry count equals the count taken before the second put. THE SYSTEM SHALL NOT sleep, SHALL NOT read the current time, SHALL NOT drop any assertion the test makes today (first.new, !second.new, second.hash == first.hash, the unchanged count, count == 1), SHALL NOT rename, split, ignore or add a timeout to the test, SHALL NOT change any other test in blocks_tests.rs, and SHALL NOT change crates/lys-home/src/record/blocks.rs.
 
 **Acceptance:**
-- The loss account section contains each of the strings `session_id`, `model`, `authored`, `dropped`, `hash` and `reason` in backticks.
-- At the named commit, the render.rs line the document cites for the object holds `"dropped": losses` (line 264 at 7b53625), and the range it cites for the entry holds `pub struct Loss` (range 48-55 at 7b53625).
-- The document contains the string `dropped: []` and cites `docs/design/home/PROOF-RESUME.md:38` and `docs/design/home/PROOF-LAUNCH.md:28`, and at 7b53625 each of those lines contains `dropped: []`.
-- At the named commit, the render.rs line the document cites for the empty write holds `to_vec_pretty(&account).unwrap_or_default()` (line 267 at 7b53625).
+- `grep -n 'sleep' crates/lys-home/src/record/blocks_tests.rs` prints nothing.
+- `grep -c 'set_modified' crates/lys-home/src/record/blocks_tests.rs` prints a count of at least 1, and the test pins both the path store.root().join(&first.hash.as_str()[..2]) and the path store.root().join(&first.hash.as_str()[..2]).join(first.hash.as_str()).
+- Before the second put the test asserts `std::fs::metadata(p).unwrap().modified().unwrap() == UNIX_EPOCH + Duration::from_secs(1_000_000_000)` for the shard directory and for the block file.
+- After the second put the test asserts the same equality for the shard directory and for the block file, asserts the shard's read_dir count equals the count taken before the second put, and asserts that count equals 1.
+- The test still asserts `first.new`, `!second.new` and `second.hash == first.hash`.
+- `cargo test -p lys-home the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing` reports `1 passed` and `0 failed`.
+- `git diff --exit-code 7b53625 -- crates/lys-home/src/record/blocks.rs` exits 0.
 
 **Files:**
-- create: docs/design/home/LOSS-ACCOUNT.md
+- modify: crates/lys-home/src/record/blocks_tests.rs
 
 **Checklist:**
-- C96 — LOSS-ACCOUNT.md states the account's four keys, one entry's two fields hash and reason, and that every render writes the account, with dropped: [] when nothing was dropped.
+- C95 — The block store's gate proves a second put of the same bytes writes nothing without elapsed time: before the second put it pins the shard directory's and the block file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock.
 
 **Stories:**
-- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
+- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the proof that a second put writes nothing to hold on a filesystem with coarse timestamps and on a loaded host without the suite waiting on a clock, so that a passing store gate means the store wrote nothing and never that the tick was too coarse to see a write.
 
-### R3: Quote every reason the render writes, with its line, and state when each is written
+### R2: Pin the template shard and template file modification times in the template store's gate instead of sleeping
 
-WHEN the document states the reasons, THE DOCUMENT SHALL write each reason string the source passes to the loss constructor on its own line of the form `- reason: "<reason>" (<path>:<line>)`, the reason copied character for character, one line per reason, where the source is every file under `crates/lys-home/src` holding a line that calls `loss(&`; at 7b53625 that is render.rs alone, with one reason on line 198 and two on line 201. It SHALL state when an entry is written as the thinking branch decides it at the named commit, citing render.rs's lines 170-174 (the provider, api and model comparison) and 184-202 (the thinking branch) at 7b53625 and mod.rs's `PROVIDER` and `API` lines (52 and 54 at 7b53625): a thinking part is kept whole with no entry when provider, api and model all equal the target's and the part is redacted or carries a signature; otherwise, when its text is not empty after trimming whitespace and it is not redacted, it is rendered as a text part, and an entry with the signed-as-text reason is written only when it carries a signature, so a thinking part with no signature rendered as text writes no entry, for the same model as for another (citing the `if sig.is_some()` line, 197 at 7b53625); otherwise it is dropped with an entry carrying the redacted reason when it is redacted and the empty reason when it is not, so an empty thinking part with no signature is dropped even for the same model, and a signed empty thinking part for another model carries the empty reason. It SHALL state that the array named `dropped` therefore holds entries for signed thinking rendered as text as well as for dropped parts, that the report's `dropped` count is the number of entries in it (citing render.rs line 279 at 7b53625) while `thinking_as_text` counts every thinking part rendered as text (line 196 at 7b53625), and that no part other than thinking writes an entry (citing lines 183 and 204-210 at 7b53625). The document SHALL NOT write on a `- reason:` line any string the source does not pass to the loss constructor, SHALL NOT paraphrase a reason, and SHALL NOT state that every entry names a dropped part.
+WHEN the test a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing has put the launch template fixture once, THE SYSTEM SHALL, before the second put, take the entry count of the template shard directory <home>/templates/<first two hex digits of the hash>, set the modification time of that shard directory and of the template file <home>/templates/<hh>/<hash> to the instant std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000) with std::fs::File::set_modified, read each back with std::fs::metadata(..).modified() and assert each equals that instant; WHEN the second put of the same bytes returns, THE SYSTEM SHALL assert the shard directory's and the template file's modification times each still equal that instant and the shard's entry count equals the count taken before the second put. THE SYSTEM SHALL NOT sleep, SHALL NOT read the current time, SHALL NOT drop any assertion the test makes today (the root absent before the first put, first.new, first.hash == Hash::of(bytes), the stored bytes, path_of, !second.new, second.hash == first.hash, the shard holding exactly 1 entry, contains, get, and the missing-hash error naming the hash), SHALL NOT rename, split, ignore or add a timeout to the test, SHALL NOT change any other test in templates_tests.rs, and SHALL NOT change crates/lys-home/src/record/templates.rs.
 
 **Acceptance:**
-- `python3 -c "import re,pathlib;fs=[p for p in sorted(pathlib.Path('crates/lys-home/src').rglob('*.rs')) if re.search(r'\bloss\(&',p.read_text())];src={s for p in fs for l in p.read_text().splitlines() if re.search(r'\bloss\(&',l) for s in re.findall(r'\"([^\"]+)\"',l)};doc=re.findall(r'(?m)^- reason: \"([^\"]+)\"',open('docs/design/home/LOSS-ACCOUNT.md').read());print(len(fs),len(src),len(doc),sorted(src^set(doc)))"` run from the repository root at the landing commit prints `1 3 3 []`: one source file found, three reasons in the source, three reason lines in the document, and no reason on one side only.
-- At 7b53625 the document's three reason lines are exactly `- reason: "signed thinking rendered as text: different provider, api or model" (crates/lys-home/src/harness/claude_code/render.rs:198)`, `- reason: "redacted thinking dropped: different provider, api or model" (crates/lys-home/src/harness/claude_code/render.rs:201)` and `- reason: "empty thinking dropped" (crates/lys-home/src/harness/claude_code/render.rs:201)`; at a later named commit, the same three strings with the path and line that write each there.
-- With the line carrying `"empty thinking dropped"` removed from a working copy of the document, the reason check prints `1 3 2 ['empty thinking dropped']`; with a line `- reason: "invented" (crates/lys-home/src/harness/claude_code/render.rs:1)` added instead, it prints `1 3 4 ['invented']`; the document is restored after each.
-- At the named commit, the render.rs range the document cites for the thinking branch holds `Some("thinking") =>` on its first line (range 184-202 at 7b53625), and the line it cites for the signature condition holds `if sig.is_some()` (line 197 at 7b53625).
-- At the named commit, the render.rs line the document cites for the report's count holds `dropped: losses.len()` (line 279 at 7b53625).
+- `grep -n 'sleep' crates/lys-home/src/record/templates_tests.rs` prints nothing.
+- `grep -c 'set_modified' crates/lys-home/src/record/templates_tests.rs` prints a count of at least 1, and the test pins both path.parent() and path, where path is home.root().join("templates").join(&first.hash.as_str()[..2]).join(first.hash.as_str()).
+- Before the second put the test asserts `std::fs::metadata(p).unwrap().modified().unwrap() == UNIX_EPOCH + Duration::from_secs(1_000_000_000)` for the shard directory and for the template file, and takes the shard's read_dir count.
+- After the second put the test asserts the same equality for the shard directory and for the template file, asserts the shard's read_dir count equals the count taken before the second put, and still asserts that count equals 1.
+- The test still asserts the store root is absent before the first put, `first.new`, `first.hash == Hash::of(&bytes)`, the file's bytes equal the fixture, `store.path_of(&first.hash) == path`, `!second.new`, `second.hash == first.hash`, `store.contains(&first.hash)`, `store.get(&first.hash) == bytes`, and that the error for Hash::of(b"never stored") contains that hash.
+- `cargo test -p lys-home a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing` reports `1 passed` and `0 failed`.
+- `git diff --exit-code 7b53625 -- crates/lys-home/src/record/templates.rs` exits 0.
 
 **Files:**
-- create: docs/design/home/LOSS-ACCOUNT.md
+- modify: crates/lys-home/src/record/templates_tests.rs
 
 **Checklist:**
-- C97 — LOSS-ACCOUNT.md quotes every reason string the render passes to the loss constructor, with the line that writes it, and the reason check prints 1 3 3 [] at the landing commit.
+- C96 — The template store's gate proves a second put of the same template writes nothing without elapsed time: before the second put it pins the template shard directory's and the template file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock.
 
 **Stories:**
-- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
-
-### R4: State that an entry names its part by hash and never carries the part's content
-
-Structural: the loss account section states that an entry's `hash` is the SHA-256 of the part as serialised by `serde_json::to_vec` from the assistant message, written as 64 lowercase hexadecimal characters, with object keys in sorted order because serde_json's `preserve_order` feature is not enabled in the workspace, citing render.rs's `loss` function (lines 286-292 at 7b53625) and blocks.rs's `Hash::of` (lines 19-20 at 7b53625); that for an imported part this equals the hash the importer stored the part's block under, because the importer serialises a part the same way before it stores it, citing import.rs's lines 420-424 at 7b53625; and that a part from a canon or a hand-authored session may name no block in the store. It states that an entry carries only the hash and the reason, never the part's thinking text, signature or redacted data, and, as found at the named commit, that the part's serialisation uses `unwrap_or_default()`, so a serialisation failure hashes zero bytes (citing render.rs line 287 at 7b53625). The document SHALL NOT state that every entry's hash names a stored block, SHALL NOT carry any text, signature or hash taken from a real session, and SHALL NOT propose a change to how the hash is computed.
-
-**Acceptance:**
-- At the named commit, the render.rs lines the document cites for the hash hold `serde_json::to_vec(part)` and `Hash::of(&bytes)` (lines 287 and 289 at 7b53625), the import.rs range it cites holds `serde_json::to_vec(part)` (range 420-424 at 7b53625), and the blocks.rs range it cites holds `Sha256::digest` (range 19-20 at 7b53625).
-- The document contains the string `preserve_order` and the string `64`.
-- `grep -cE '[0-9a-f]{64}' docs/design/home/LOSS-ACCOUNT.md` prints 0, and `grep -c 'thinkingSignature": *"' docs/design/home/LOSS-ACCOUNT.md` prints 0.
-
-**Files:**
-- create: docs/design/home/LOSS-ACCOUNT.md
-
-**Checklist:**
-- C98 — LOSS-ACCOUNT.md states that an entry's hash is the SHA-256 of the part as serde_json serialises it and that an entry never carries the part's text, signature or redacted data.
-
-**Stories:**
-- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
-
-### R5: Record what the render changes without writing a loss entry
-
-Structural: the section `## What the render changes without a loss entry` states, each with the render.rs line that does it at the named commit: custom entries, the lys ones included, and labels are not rendered (lines 9-10 and 237 at 7b53625); a compaction becomes a `summary` record carrying the compaction's summary and the previous record's uuid as `leafUuid` (lines 234-236 at 7b53625); every record's `gitBranch` is written as the empty string (line 148 at 7b53625); and every assistant record's `usage` is written as zero input and zero output tokens (line 226 at 7b53625). It states that none of these writes a loss entry at the named commit, records them as found, and names whether any of them should write a loss entry as a question for its own card, which this document does not answer. The section SHALL NOT list any other change, SHALL NOT propose a change to the render, and SHALL NOT state that any of these is carried by the loss account.
-
-**Acceptance:**
-- At the named commit, the render.rs lines this section cites hold, in turn, `Custom entries` (range 9-10 at 7b53625), `_ => {}` (line 237 at 7b53625), `"type": "summary"` (range 234-236 at 7b53625), `"gitBranch": ""` (line 148 at 7b53625) and `"usage": {"input_tokens": 0, "output_tokens": 0}` (line 226 at 7b53625).
-- The section names exactly four items, as four list items: custom entries and labels, compaction, `gitBranch`, `usage`.
-- The section contains the sentence `None of these writes a loss entry.`
-
-**Files:**
-- create: docs/design/home/LOSS-ACCOUNT.md
-
-**Checklist:**
-- C99 — LOSS-ACCOUNT.md lists the four things the render changes without a loss entry, custom entries and labels, compaction, gitBranch and usage, each with the line that does it.
-
-**Stories:**
-- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
+- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the proof that a second put writes nothing to hold on a filesystem with coarse timestamps and on a loaded host without the suite waiting on a clock, so that a passing store gate means the store wrote nothing and never that the tick was too coarse to see a write.
 
 ## Boundaries
 
-- No file under crates/ changes: not render.rs, launch.rs, import.rs, cli.rs, their tests or the crate README.
-- No reason string, no field of the Loss struct, no key of the account, no byte of the account and no part of its path is changed or proposed changed.
-- No change to what the render drops or why, and no loss account of any harness other than Claude Code, including the import-time lys.loss entry.
-- The build writes docs/design/home/LOSS-ACCOUNT.md and no other file: no existing brief, no row of HOME-001, no JSON document of the cluster, no rendered markdown, RECORD.md and none of the scripts under scripts/design is edited.
-- No transcript text, signature or hash taken from a real session appears in the document.
-- The document cites no line at a commit other than the one it names.
+- No change to crates/lys-home/src/record/blocks.rs or crates/lys-home/src/record/templates.rs: BlockStore::put, BlockStore::put_file and TemplateStore::put stay byte-for-byte as they are.
+- No change to any test other than the two this brief names, in lys-home or in any other crate; the sleep in the lys-anchor crate's admission certificate tests stays.
+- No change to crates/lys-home/src/record/canon.rs; millis_now stays.
+- No new dependency: std::fs::File::set_modified only.
+- No test renamed, split, ignored or given a raised timeout, and no #[allow], #[ignore] or cfg added to silence anything.
+- The change is one commit on the card branch.
 
 ## Verification
 
-- `git cat-file -e HEAD:docs/design/home/LOSS-ACCOUNT.md` exits 0 on the landing commit.
-- `git diff --name-only $(git merge-base origin/main HEAD) HEAD -- crates` prints nothing.
-- `python3 -c "import re,pathlib;fs=[p for p in sorted(pathlib.Path('crates/lys-home/src').rglob('*.rs')) if re.search(r'\bloss\(&',p.read_text())];src={s for p in fs for l in p.read_text().splitlines() if re.search(r'\bloss\(&',l) for s in re.findall(r'\"([^\"]+)\"',l)};doc=re.findall(r'(?m)^- reason: \"([^\"]+)\"',open('docs/design/home/LOSS-ACCOUNT.md').read());print(len(fs),len(src),len(doc),sorted(src^set(doc)))"` prints `1 3 3 []`.
-- `python3 -c "import re,subprocess;d=open('docs/design/home/LOSS-ACCOUNT.md').read();c=re.search(r'(?m)^Written from commit ([0-9a-f]{40})\.$',d).group(1);cs=re.findall(r'((?:crates|docs)/[A-Za-z0-9_./-]+\.[a-z]+):([0-9]+)(?:-([0-9]+))?',d);n=lambda p:len(subprocess.run(['git','show',c+':'+p],capture_output=True,text=True,check=True).stdout.splitlines());print(c,sorted({x[0] for x in cs}),[x for x in cs if not 1<=int(x[1])<=int(x[2] or x[1])<=n(x[0])])"` prints the commit on the document's `Written from commit` line, a list of cited paths containing `crates/lys-home/src/cli.rs`, `crates/lys-home/src/harness/claude_code/launch.rs` and `crates/lys-home/src/harness/claude_code/render.rs`, and `[]`.
-- `sh scripts/design/gate.sh` exits 0.
-- cargo fmt --all leaves the tree unchanged; cargo clippy --all-targets --all-features -- -D warnings, cargo clippy --all-targets -- -D warnings, cargo test --workspace --all-features, cargo doc --no-deps --all-features and cargo doc --no-deps each exit 0.
+- From the repository root: `grep -rnE 'thread::sleep|tokio::time::sleep' crates/lys-home` prints nothing.
+- `git diff --name-only 7b53625 -- crates/` prints exactly crates/lys-home/src/record/blocks_tests.rs and crates/lys-home/src/record/templates_tests.rs.
+- `git log --oneline $(git merge-base HEAD origin/main)..HEAD` on the card branch lists exactly one commit; the card branch starts from origin/main, which contains 7b53625.
+- File drift check, run and reverted, never committed: in each test, after the read-back assertions on the pinned instant and before the second put, rewrite the stored file with its own bytes — in the block test `std::fs::write(store.root().join(&first.hash.as_str()[..2]).join(first.hash.as_str()), &block).unwrap();`, in the template test `std::fs::write(&path, &bytes).unwrap();`. Each injection makes exactly that test fail, and the failing assertion is the one after the second put on the stored file's modification time; the shard directory's modification time and the entry count assertions still hold, because rewriting an existing file adds and removes no entry.
+- Directory drift check, run and reverted, never committed: in each test, after the read-back assertions on the pinned instant and before the second put, create a file named drift in the shard directory and remove it — in the block test `let shard = store.root().join(&first.hash.as_str()[..2]); std::fs::write(shard.join("drift"), b"").unwrap(); std::fs::remove_file(shard.join("drift")).unwrap();`, in the template test the same with `path.parent().unwrap()` as the shard. Each injection makes exactly that test fail, and the failing assertion is the one after the second put on the shard directory's modification time; the stored file's modification time and the entry count assertions still hold, because the file is untouched and the created file is gone before the count is taken.
+- cargo fmt --all leaves the tree unchanged.
+- cargo clippy --all-targets --all-features -- -D warnings and cargo clippy --all-targets -- -D warnings exit 0.
+- cargo test --workspace --all-features exits 0 and lists both named tests as passed.
+- cargo doc --no-deps --all-features and cargo doc --no-deps exit 0.
+- sh scripts/design/gate.sh exits 0.
 

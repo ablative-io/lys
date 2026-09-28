@@ -86,6 +86,7 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `docs/design/home/PROOF-PROXY.md` | the measured subscription login through a pass-through proxy: version, headers that mattered, what failed | HOME-001 |
 | `docs/design/home/LOSS-ACCOUNT.md` | what the Claude Code render preserves, transforms and cannot carry | HOME-001 |
 | `crates/lys-home/src/record/blocks.rs` | content-addressed block store: put by SHA-256, get by hash, never rewritten | HOME-001 |
+| `crates/lys-home/src/record/blocks_tests.rs` | gates on the block store: once by hash, a second put proven write-free by pinned modification times, never rewritten, verifiable | HOME-013 |
 | `crates/lys-home/src/harness/claude_code/import.rs` | Claude Code JSONL into SessionEvents plus blocks | HOME-001 |
 | `crates/lys-home/src/harness/claude_code/render.rs` | SessionEvents into a Claude Code JSONL under a chosen uuid, with the loss account | HOME-001 |
 | `crates/lys-home/src/harness/claude_code/mod.rs` | the Claude Code harness profile: transcript root, cwd slug, version measured | HOME-001 |
@@ -191,6 +192,8 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `crates/lys-home/src/harness/claude_code/seed.rs` | the seed prompt of a carried user message: the marker line, the text parts, the seed argument for the template's launch line | HOME-006 |
 | `crates/lys-home/tests/fork.rs` | the fork run as the binary: five forks and five refusals, blocks unchanged, both ancestry sides | HOME-006 |
 | `docs/design/home/PROOF-FORK.md` | the measured fork: Pi's parentSession read, a real session forked, rendered and launched, as hashes, counts and exit codes | HOME-006 |
+| `docs/design/home/briefs/HOME-013.json` | the clock-free write-once gates: the block and template tests pin modification times instead of sleeping | HOME-013 |
+| `docs/design/home/briefs/HOME-013.md` | its rendered markdown | HOME-013 |
 
 ## Inventory
 
