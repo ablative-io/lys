@@ -26,6 +26,9 @@ pub mod events;
 #[cfg(test)]
 mod events_tests;
 pub mod given;
+pub mod given_path;
+#[cfg(test)]
+mod given_path_tests;
 #[cfg(test)]
 mod given_tests;
 pub mod import;
