@@ -69,9 +69,8 @@ impl Stub {
                     }
                 }
                 let head = String::from_utf8_lossy(&request);
-                let asked = head.starts_with(
-                    "GET /secrets/handles?holder=agent-fixture-1 HTTP/1.1\r\n",
-                );
+                let asked =
+                    head.starts_with("GET /secrets/handles?holder=agent-fixture-1 HTTP/1.1\r\n");
                 let current = *set.lock().unwrap_or_else(PoisonError::into_inner);
                 let (status, body) = if asked {
                     *count
@@ -146,7 +145,10 @@ fn the_client_reads_the_doors_handle_records() -> TestResult {
     cases += 1;
 
     stub.set("missing");
-    assert_eq!(client.handles("agent-fixture-1"), HandleAnswer::RecordMissing);
+    assert_eq!(
+        client.handles("agent-fixture-1"),
+        HandleAnswer::RecordMissing
+    );
     let refusal = check(&client, "agent-fixture-1")?.expect_err("no record exists");
     assert_eq!(refusal.name(), "check_record_missing");
     assert!(refusal.to_string().contains("SECRETS-002"), "{refusal}");
@@ -154,11 +156,19 @@ fn the_client_reads_the_doors_handle_records() -> TestResult {
 
     stub.set("value");
     let answer = client.handles("agent-fixture-1");
-    let refused = answer.refusal().ok_or("an answer carrying a value is refused")?;
+    let refused = answer
+        .refusal()
+        .ok_or("an answer carrying a value is refused")?;
     assert_eq!(refused.name(), "credential_value_in_answer");
     let words = refused.to_string();
-    assert!(words.contains("vc-fixture-1") && words.contains("value"), "{words}");
-    assert!(!matches!(answer, HandleAnswer::Held(_)), "no credential id is returned");
+    assert!(
+        words.contains("vc-fixture-1") && words.contains("value"),
+        "{words}"
+    );
+    assert!(
+        !matches!(answer, HandleAnswer::Held(_)),
+        "no credential id is returned"
+    );
     let shown = format!("{words} {refused:?} {answer:?}");
     assert!(!shown.contains(VALUE_ONE), "{shown}");
     let refusal = check(&client, "agent-fixture-1")?.expect_err("a value in the answer");

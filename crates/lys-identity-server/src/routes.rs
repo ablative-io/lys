@@ -171,10 +171,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
 /// client is built without an address and answers that no handle record
 /// exists, naming SECRETS-002, until one does. Launch records are kept in
 /// `launch-records` beside the directory log.
-fn start_service(
-    config: &Config,
-    state: &Shared,
-) -> Result<Arc<start::StartService>, ServerError> {
+fn start_service(config: &Config, state: &Shared) -> Result<Arc<start::StartService>, ServerError> {
     let handles = door_handles::DoorHandles::unconfigured();
     let dir = config.log_dir.with_file_name("launch-records");
     start::directory_service(

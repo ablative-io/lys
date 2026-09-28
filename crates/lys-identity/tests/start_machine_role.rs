@@ -12,7 +12,11 @@ struct Roles(Option<Vec<HeldRole>>);
 impl RoleMachines for Roles {
     fn roles(&self, agent: &str) -> Option<Vec<HeldRole>> {
         let held = self.0.clone()?;
-        Some(if agent == "agent-fixture-1" { held } else { Vec::new() })
+        Some(if agent == "agent-fixture-1" {
+            held
+        } else {
+            Vec::new()
+        })
     }
 }
 
@@ -25,7 +29,10 @@ fn builder() -> Roles {
 
 #[test]
 fn a_machine_the_role_allows_passes() {
-    assert_eq!(check(&builder(), "agent-fixture-1", "machine-fixture-1"), Ok(()));
+    assert_eq!(
+        check(&builder(), "agent-fixture-1", "machine-fixture-1"),
+        Ok(())
+    );
 }
 
 #[test]
@@ -44,6 +51,9 @@ fn with_no_role_machines_record_the_check_names_its_card() {
         .expect_err("the record is missing");
     assert_eq!(refusal.name(), "check_record_missing");
     let words = refusal.to_string();
-    assert!(words.contains("the machine is allowed for the role"), "{words}");
+    assert!(
+        words.contains("the machine is allowed for the role"),
+        "{words}"
+    );
     assert!(words.contains("Ink1H1Os"), "{words}");
 }

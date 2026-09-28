@@ -13,6 +13,7 @@ use lys_core::Ed25519Identity;
 use lys_identity::LifecycleState;
 use lys_identity::start::active::Lifecycles;
 use lys_identity::start::authority::Admission;
+use lys_identity::start::checks::Check;
 use lys_identity::start::credentials::{HandleAnswer, HandleRecords, HeldCredential};
 use lys_identity::start::egress::{EgressLists, ProfileNeeds};
 use lys_identity::start::machine_role::{HeldRole, RoleMachines};
@@ -21,7 +22,6 @@ use lys_identity::start::profile_review::{ProfileReviews, Review};
 use lys_identity::start::request::{AgentRecord, AgentRecords};
 use lys_identity::start::state::{LaunchRecords, SessionReport, SessionReports};
 use lys_identity::start::{Grammars, Owners};
-use lys_identity::start::checks::Check;
 use lys_identity::start::{StartError, active, give};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -127,13 +127,18 @@ impl World {
     }
 
     fn knows_version(&self, profile_version: &str) -> bool {
-        self.profile_versions.iter().any(|held| held == profile_version)
+        self.profile_versions
+            .iter()
+            .any(|held| held == profile_version)
     }
 }
 
 impl AgentRecords for World {
     fn agent(&self, agent: &str) -> Option<AgentRecord> {
-        self.agents.iter().find(|record| record.id == agent).cloned()
+        self.agents
+            .iter()
+            .find(|record| record.id == agent)
+            .cloned()
     }
 }
 
@@ -192,7 +197,9 @@ impl HandleRecords for World {
 
 impl ProfileNeeds for World {
     fn needs(&self, profile_version: &str) -> Option<Vec<String>> {
-        self.needs.clone().filter(|_| self.knows_version(profile_version))
+        self.needs
+            .clone()
+            .filter(|_| self.knows_version(profile_version))
     }
 }
 
@@ -341,9 +348,18 @@ fn the_start_runs_exactly_five_checks_in_order() -> TestResult {
     let mut records = store(dir.path())?;
     let members = request("agent-fixture-1", "pv-fixture-1", "machine-fixture-1");
     let given = give(&mut records, &world.owners(), "admin-fixture", members, 1)?;
-    let ran: Vec<&str> = given.checks.iter().map(|report| report.check.name()).collect();
+    let ran: Vec<&str> = given
+        .checks
+        .iter()
+        .map(|report| report.check.name())
+        .collect();
     assert_eq!(ran, order);
-    assert!(given.checks.iter().all(|report| report.result() == "passed"));
+    assert!(
+        given
+            .checks
+            .iter()
+            .all(|report| report.result() == "passed")
+    );
     assert_eq!(world.checks_run.get(), 5);
     Ok(())
 }

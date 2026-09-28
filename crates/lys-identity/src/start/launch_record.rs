@@ -271,10 +271,7 @@ impl LaunchEvent {
 
 /// Verify `message` against the directory service's public key and read the
 /// event it carries. Every failure is the one refusal, whatever it was.
-pub fn verify_launch_event(
-    message: &[u8],
-    service_key: &[u8; 32],
-) -> Result<LaunchEvent, String> {
+pub fn verify_launch_event(message: &[u8], service_key: &[u8; 32]) -> Result<LaunchEvent, String> {
     let refused = || REFUSED.to_owned();
     if message.len() > MAX_EVENT_BYTES {
         return Err(refused());

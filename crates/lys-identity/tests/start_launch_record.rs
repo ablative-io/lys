@@ -16,6 +16,7 @@ use lys_core::Ed25519Identity;
 use lys_identity::LifecycleState;
 use lys_identity::start::active::Lifecycles;
 use lys_identity::start::authority::Admission;
+use lys_identity::start::command::render;
 use lys_identity::start::credentials::{HandleAnswer, HandleRecords, HeldCredential};
 use lys_identity::start::egress::{EgressLists, ProfileNeeds};
 use lys_identity::start::machine_role::{HeldRole, RoleMachines};
@@ -23,10 +24,9 @@ use lys_identity::start::profile_command::ProfileVersionRecords;
 use lys_identity::start::profile_review::{ProfileReviews, Review};
 use lys_identity::start::request::{AgentRecord, AgentRecords};
 use lys_identity::start::state::{LaunchRecords, SessionReport, SessionReports};
-use lys_identity::start::{Grammars, Owners};
-use lys_identity::start::command::render;
 use lys_identity::start::state::{Reading, state_of};
 use lys_identity::start::{Given, StartError, give, give_again, withdraw};
+use lys_identity::start::{Grammars, Owners};
 use lys_log_store::{FileLeafStore, Start};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -132,13 +132,18 @@ impl World {
     }
 
     fn knows_version(&self, profile_version: &str) -> bool {
-        self.profile_versions.iter().any(|held| held == profile_version)
+        self.profile_versions
+            .iter()
+            .any(|held| held == profile_version)
     }
 }
 
 impl AgentRecords for World {
     fn agent(&self, agent: &str) -> Option<AgentRecord> {
-        self.agents.iter().find(|record| record.id == agent).cloned()
+        self.agents
+            .iter()
+            .find(|record| record.id == agent)
+            .cloned()
     }
 }
 
@@ -197,7 +202,9 @@ impl HandleRecords for World {
 
 impl ProfileNeeds for World {
     fn needs(&self, profile_version: &str) -> Option<Vec<String>> {
-        self.needs.clone().filter(|_| self.knows_version(profile_version))
+        self.needs
+            .clone()
+            .filter(|_| self.knows_version(profile_version))
     }
 }
 
@@ -333,7 +340,9 @@ fn a_start_keeps_exactly_one_launch_record_naming_what_it_gave() -> TestResult {
     let mut records = store(dir.path())?;
     let given = given(&world, &mut records, "machine-fixture-1")?;
     assert_eq!(records.record_count(), 1);
-    let kept = records.record(&given.record.id).ok_or("the record is not kept")?;
+    let kept = records
+        .record(&given.record.id)
+        .ok_or("the record is not kept")?;
     assert_eq!(kept.agent, "agent-fixture-1");
     assert_eq!(kept.machine, "machine-fixture-1");
     assert_eq!(kept.executable, "fixture-exec");
@@ -390,12 +399,19 @@ fn the_command_splits_into_env_three_ids_and_the_recorded_command() -> TestResul
 fn a_credential_id_outside_its_grammar_is_refused() -> TestResult {
     let dir = tempfile::tempdir()?;
     let mut world = World::passing();
-    world.handles = Some(vec![("vc-fixture;1".to_owned(), true, VALUE_ONE.to_owned())]);
+    world.handles = Some(vec![(
+        "vc-fixture;1".to_owned(),
+        true,
+        VALUE_ONE.to_owned(),
+    )]);
     let mut records = store(dir.path())?;
     let error = given(&world, &mut records, "machine-fixture-1").expect_err("outside its grammar");
     let refused = error.refused().ok_or("expected a refusal")?;
     assert!(refused.names("command_value_outside_grammar"), "{refused}");
-    assert!(refused.to_string().contains("LYS_CREDENTIAL_IDS"), "{refused}");
+    assert!(
+        refused.to_string().contains("LYS_CREDENTIAL_IDS"),
+        "{refused}"
+    );
     assert!(!refused.to_json().contains("\"command\""));
     assert_eq!(records.record_count(), 0);
     Ok(())
@@ -413,7 +429,9 @@ fn a_record_renders_the_same_bytes_every_time_and_reads_back_after_a_restart() -
         given.record
     };
     let reopened = store(dir.path())?;
-    let read = reopened.record(&kept.id).ok_or("the record does not read back")?;
+    let read = reopened
+        .record(&kept.id)
+        .ok_or("the record does not read back")?;
     assert_eq!(read, &kept);
     Ok(())
 }

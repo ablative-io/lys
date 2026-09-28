@@ -70,7 +70,10 @@ fn every_library_start_file_is_listed() -> Result<(), Box<dyn Error>> {
     for entry in fs::read_dir(dir)? {
         let name = entry?.file_name().to_string_lossy().into_owned();
         let listed = format!("crates/lys-identity/src/start/{name}");
-        assert!(START_FILES.contains(&listed.as_str()), "{name} is not listed");
+        assert!(
+            START_FILES.contains(&listed.as_str()),
+            "{name} is not listed"
+        );
         found += 1;
     }
     assert_eq!(found, 16);
