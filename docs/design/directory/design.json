@@ -3341,6 +3341,16 @@
       "path": "crates/lys-secrets/src/audit/codec.rs",
       "note": "The broker's audit log codec: its kinds are one list the decoder matches, entered in the workspace kinds registry so go-back can compare kind sets.",
       "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys/src/identity/install/exit_wait_tests.rs",
+      "note": "Exit watch tests, calling start_detached with the holder.",
+      "brief": "DIRECTORY-057"
+    },
+    {
+      "path": "crates/lys/src/identity/install_tests.rs",
+      "note": "Install tests, calling start_detached with the holder.",
+      "brief": "DIRECTORY-057"
     }
   ],
   "inventory": [

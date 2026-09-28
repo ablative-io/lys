@@ -1738,7 +1738,7 @@
       "date": "2026-09-28",
       "decided_by": "Archie, lead of the Lys identity line, 28 September 2026, after the exit watch race was proved on the landing gate; Waffles asked for the comparison with the spawn's file actions",
       "context": "The starter opened and took the exit lock and handed it to the service. A process started by another thread of the starter carries a copy of that descriptor until its exec, and the lock stays held in the copy. The watch side was fixed by a shared lock released by name; the start side remained.",
-      "decision": "The service is started through `lys identity hold`, which opens the lock, takes it and execs the service. Refused: code run between fork and exec (unsafe, async-signal-safe calls only); the spawn's file actions with O_EXLOCK (macOS and BSD only, a foreign call in an unsafe block, no equal on Linux).",
+      "decision": "The service is started through `lys identity hold`, which opens the lock, takes it without waiting, says held on its standard output and execs the service. The starter reads that handshake to its end and only then writes the pid file, which names the service because exec keeps the pid. The holder uses safe standard library calls only and is the same on macOS and Linux. Refused are code run between fork and exec (unsafe, async-signal-safe calls only) and the spawn's file actions with O_EXLOCK (macOS and BSD only, a foreign call in an unsafe block, no equal on Linux).",
       "quote": "",
       "consequences": [
         "The starter never holds the exit lock, so no process it starts can carry a copy.",

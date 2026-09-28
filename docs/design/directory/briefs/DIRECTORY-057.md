@@ -8,9 +8,9 @@ title: A service's exit lock is opened only in the service's own process, so no 
 # DIRECTORY-057: A service's exit lock is opened only in the service's own process, so no other process ever carries a copy of it
 
 > **Cluster:** directory
-> **Depends on:** DIRECTORY-044
+> **Depends on:** DIRECTORY-044, DIRECTORY-045
 > **Design anchor:**
-> - ADR-121 — A service's exit lock is opened in the service's own process by a holder command, not in the starter — The service is started through `lys identity hold`, which opens the lock, takes it and execs the service. Refused: code run between fork and exec (unsafe, async-signal-safe calls only); the spawn's file actions with O_EXLOCK (macOS and BSD only, a foreign call in an unsafe block, no equal on Linux).
+> - ADR-121 — A service's exit lock is opened in the service's own process by a holder command, not in the starter — The service is started through `lys identity hold`, which opens the lock, takes it without waiting, says held on its standard output and execs the service. The starter reads that handshake to its end and only then writes the pid file, which names the service because exec keeps the pid. The holder uses safe standard library calls only and is the same on macOS and Linux. Refused are code run between fork and exec (unsafe, async-signal-safe calls only) and the spawn's file actions with O_EXLOCK (macOS and BSD only, a foreign call in an unsafe block, no equal on Linux).
 > **Checklist:**
 > - C400 — The three ways to keep the exit lock out of the starter are compared in ADR-121 and the holder command is chosen, with no unsafe code (DIRECTORY-057 R1).
 > - C401 — A holder command opens the exit lock, takes it and becomes the service by exec, keeping its pid; a program that cannot run is refused by name (DIRECTORY-057 R2).
@@ -30,10 +30,10 @@ Start each service through a small holder that is the service's own process. The
 
 ### R1: The decision is recorded with the three ways compared
 
-Structural. ADR-121 records the three ways to keep the lock out of the starter and the reason for the one chosen. (a) Code run between fork and exec in the child (pre_exec) needs an unsafe block in Lys code and may call only async-signal-safe functions, so it is refused. (b) The spawn's own file actions (posix_spawn_file_actions_addopen) with O_EXLOCK open and lock in the child with no code of ours run there. But O_EXLOCK exists on macOS and the BSDs only, the standard library exposes no file actions so it needs a foreign call in an unsafe block, and Linux has no equal, so it is refused. (c) A holder command in the lys binary opens the lock, takes it and execs the service. It uses safe standard library calls only, it is the same on macOS and Linux, and the pid written to the pid file is the service's because exec keeps it, so it is chosen.
+Structural. ADR-121 records the three ways to keep the lock out of the starter and the reason for the one chosen. (a) Code run between fork and exec in the child (pre_exec) needs an unsafe block in Lys code and may call only async-signal-safe functions, so it is refused. (b) The spawn's own file actions (posix_spawn_file_actions_addopen) with O_EXLOCK open and lock in the child with no code of ours run there. But O_EXLOCK exists on macOS and the BSDs only, the standard library exposes no file actions so it needs a foreign call in an unsafe block, and Linux has no equal, so it is refused. (c) A holder command in the lys binary opens the lock, takes it and execs the service. It uses safe standard library calls only, it is the same on macOS and Linux, and the pid written to the pid file is the service's because exec keeps it, so it is chosen. ADR-121 is already in docs/design/decisions.json (line 1734), so this requirement amends it. The amended decision adds that the holder is the same on macOS and Linux, that exec keeps the pid so the pid file names the service, and that the starter learns the lock is held through the holder's handshake of R2 before it writes the pid file.
 
 **Acceptance:**
-- ADR-121 is in decisions.json with the three ways, and the brief cites it.
+- ADR-121 in decisions.json names the handshake, the pid file written after it, the same holder on macOS and Linux, and exec keeping the pid, and the brief cites it.
 - No unsafe block is added anywhere in the workspace, checked by the existing lint.
 
 **Files:**
@@ -47,19 +47,21 @@ Structural. ADR-121 records the three ways to keep the lock out of the starter a
 
 ### R2: The holder opens the lock, takes it and becomes the service
 
-Behavioural. `lys identity hold --exit-lock <path> -- <program> [args]` opens the exit lock, waits for an earlier holder to let go, takes the exclusive lock, and execs the program with the lock as its standard input and its own standard output and error unchanged. It starts no thread and no other process before the exec. A program that cannot be run is refused service_not_startable naming the program and the cause, written to standard error, and the holder exits with a status other than 0. The command is not listed in the help an ordinary person reads.
+Behavioural. `lys identity hold --exit-lock <path> --log <path> -- <program> [args]` opens the exit lock and takes the exclusive lock without waiting. A lock already held is refused service_running, naming the lock, and the service already running keeps running. It then opens the log for appending, writes the line held to its own standard output, and execs the program with the lock as its standard input and the log as its standard output and error. So the holder's standard output is the handshake, and the exec closes it. If the exec fails, the holder writes the line refused service_not_startable with the program and the cause to its standard output and exits with a status other than 0. Any other refusal before the lock is held is written the same way. It starts no thread and no other process before the exec. The subcommand is dispatched in crates/lys/src/main.rs beside the other identity commands (lines 46 to 52) and is not listed in the help an ordinary person reads. The error kinds ServiceRunning and ServiceNotStartable join crates/lys/src/identity/error.rs (lines 14 and 61) with their lines in error_tests.rs (lines 19 to 41). The install runs on macOS and Linux, and the holder execs through std::os::unix::process::CommandExt. On any other platform the holder refuses in the words exit_wait already uses there (exit_wait.rs line 140).
 
 **Acceptance:**
 - A service started through the holder has the pid the starter wrote, holds the exit lock, and a watch answers not exited while it lives and exited after it ends.
-- A second holder on the same lock waits for the first service's exit and then starts, so two never run at once.
-- A program that does not exist is refused service_not_startable naming it, and the exit lock is free afterwards.
+- A second holder on the same lock, while the first service lives, is refused service_running at once, and the first service keeps running.
+- A program that does not exist makes the holder write refused service_not_startable naming it, and the exit lock is free afterwards.
 
 **Files:**
 - create: crates/lys/src/identity/install/held_start.rs
 - create: crates/lys/src/identity/install/held_start_tests.rs
 - modify: crates/lys/src/identity/cli.rs
-- modify: crates/lys/src/identity/install.rs
 - modify: crates/lys/src/identity/error.rs
+- modify: crates/lys/src/identity/error_tests.rs
+- modify: crates/lys/src/identity/install.rs
+- modify: crates/lys/src/main.rs
 
 **Checklist:**
 - C401 — A holder command opens the exit lock, takes it and becomes the service by exec, keeping its pid; a program that cannot run is refused by name (DIRECTORY-057 R2).
@@ -69,17 +71,20 @@ Behavioural. `lys identity hold --exit-lock <path> -- <program> [args]` opens th
 
 ### R3: The starter never opens the exit lock
 
-Behavioural. The function services::start_detached starts the holder in place of the program and no longer calls exit_wait::hold, which is called by the holder only. Every start goes this way, in install, in the upgrade's units and in any later unit. The proof is the one that showed the watch side. A service that ends at once is started 300 times beside eight threads that start /usr/bin/true without pause. Its end is learnt from an event other than the lock (the far end of a pipe it held closes), and a watch opened at that moment answers exited every time. The test is seen red against today's start before the change.
+Behavioural. The function services::start_detached starts the holder in place of the program and no longer calls exit_wait::hold, which is called by the holder only. It takes the holder program as an argument. Install and upgrade pass the lys binary that is running them (std::env::current_exe). It reads the holder's standard output to its end. The line held followed by the end means the service runs, and only then does it write the pid file, so no watch ever sees a pid file whose lock is not yet held. The line held followed by a refused line, or a refused line alone, or an end with no line, is returned as that refusal, or as service_not_startable naming the log. It is never Ok. Install and DIRECTORY-045's upgrade treat that refusal as a failed start, as they treat a failed spawn today (services.rs line 368). The unit tests that call start_detached (install_tests.rs lines 194 to 217 and 268, exit_wait_tests.rs line 26) pass their own test binary as the holder. A test named held_start_entry in held_start_tests.rs returns at once unless its environment names an exit lock, and then runs the holder's own code, so the test binary started with --exact on that test and --nocapture is the holder. No test changes what it asserts. Every start goes this way, in install, in the upgrade's units and in any later unit. The proof is the one that showed the watch side. A service that ends at once is started 300 times beside eight threads that start /usr/bin/true without pause. Its end is learnt from an event other than the lock. The service opens for writing a fifo whose path is in its own arguments, so the far end closes only when the service ends, and the starter never holds that pipe. A watch opened at that moment answers exited every time. The proof is not in the tree and is written anew. The test is seen red against today's start before the change.
 
 **Acceptance:**
 - The proof hides 0 of 300 exits after the change and more than 0 before it, both counts recorded in the card's report.
 - A search of the workspace finds exit_wait::hold called from held_start.rs only.
-- The existing install, exit watch and upgrade tests pass unchanged.
+- The existing install, exit watch and upgrade tests pass with only the holder argument added to their calls of start_detached.
 
 **Files:**
 - create: crates/lys/src/identity/install/start_race_tests.rs
-- modify: crates/lys/src/identity/install/services.rs
+- modify: crates/lys/src/identity/install.rs
 - modify: crates/lys/src/identity/install/exit_wait.rs
+- modify: crates/lys/src/identity/install/exit_wait_tests.rs
+- modify: crates/lys/src/identity/install/services.rs
+- modify: crates/lys/src/identity/install_tests.rs
 
 **Checklist:**
 - C402 — The starter never opens the exit lock; a service that ends at once beside other starts is seen ended every time (DIRECTORY-057 R3).

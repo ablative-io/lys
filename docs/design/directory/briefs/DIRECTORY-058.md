@@ -8,6 +8,7 @@ title: A receipt's checkpoint is signed by the service, so inclusion in it prove
 # DIRECTORY-058: A receipt's checkpoint is signed by the service, so inclusion in it proves the act is in the log
 
 > **Cluster:** directory
+> **Depends on:** DIRECTORY-050
 > **Checklist:**
 > - C403 — The receipts route answers its checkpoint as a note signed by the service key, signed once per append, with its origin read from configuration (DIRECTORY-058 R1).
 > - C404 — One function verifies a receipt answer against a pinned key with a named refusal for each failure; a forged tree around a genuine event is refused (DIRECTORY-058 R2).
@@ -26,19 +27,20 @@ Answer the checkpoint as a signed note under the service key, in the form lys-co
 
 ### R1: The receipts route answers a signed checkpoint
 
-Behavioural. The answer of GET /receipts/{index} gains checkpoint.note, the C2SP signed note of the checkpoint body (origin, tree size, root) signed with the service key by lys_core::checkpoint::sign_note. The origin is the deployment's issuer address, read from the service's configuration, never a default. The members tree_size and root stay in the answer and equal the note's body. The note is signed when the checkpoint is made, not on each request. The log's head moves only on an append, so one signature serves every read until the next append. GET /checkpoint answers the same signed note alone.
+Behavioural. The answer of GET /receipts/{index} gains checkpoint.note, the C2SP signed note of the log's signed head (origin, tree size, root) signed with the service key by lys_core::checkpoint::sign_note. The origin is the log's own origin, which the store holds from its creation (config.rs line 38, log_origin, passed at routes.rs line 190). The issuer at config.rs line 42 is the sign-in provider's address and is not used. The key stays where it is held today, inside Directory (crates/lys-identity/src/directory.rs line 43). Directory makes the signed head when it opens, for the head it opens at, and again on each append it commits (directory.rs line 209), and holds it. The signed head, the tree size and the root are one value in the directory's state, replaced together, so every read answers all three from one state. That holds after DIRECTORY-043 moves writes onto a writer thread, because the signed head is made on the write path and published with the head. The members tree_size and root stay in the answer and equal the note's body. GET /checkpoint answers the same signed note alone. The words signed head are used for it, because the ledger's periodic checkpoints are a different thing.
 
 **Acceptance:**
 - The note verifies under the service's public key with lys_core::checkpoint::verify_checkpoint, and its body equals the tree_size and root beside it.
-- Two reads with no append between them answer byte for byte the same note, and a read after an append answers a note of the larger tree.
-- A service whose configuration names no issuer is refused at start by name, not at the first read.
+- After an append, and before any request, the directory's held signed head is of the new tree, so it was made on the write path and not on a read.
+- A read after an append answers a note of the larger tree, and a service opened over an existing log answers a note of the head it opened at.
 
 **Files:**
 - create: crates/lys-identity-server/src/checkpoint_api.rs
 - create: crates/lys-identity-server/tests/receipts_signed.rs
+- modify: crates/lys-identity-server/src/lib.rs
 - modify: crates/lys-identity-server/src/receipts_api.rs
 - modify: crates/lys-identity-server/src/routes.rs
-- modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-identity/src/directory.rs
 
 **Checklist:**
 - C403 — The receipts route answers its checkpoint as a note signed by the service key, signed once per append, with its origin read from configuration (DIRECTORY-058 R1).
@@ -48,7 +50,7 @@ Behavioural. The answer of GET /receipts/{index} gains checkpoint.note, the C2SP
 
 ### R2: One function verifies a receipt against a pinned key
 
-Behavioural. The lys-identity crate gains verify_receipt_answer(answer, service_key, origin). It verifies the note under the pinned key and origin, the event's signature under the same key, that the receipt's fields equal the signed event's, and the inclusion proof of the event's leaf against the note's root at the note's tree size. Each failure is its own named refusal, one of checkpoint_unsigned, checkpoint_signature, checkpoint_origin, checkpoint_behind_receipt (the note's tree is smaller than the receipt's index needs), event_signature, receipt_mismatch, inclusion_proof. A forged tree around a genuine event, with a true proof against its own root, is refused checkpoint_unsigned or checkpoint_signature.
+Behavioural. The lys-identity crate gains verify_receipt_answer(answer, service_key, origin), where answer is a ReceiptAnswer struct of the receipt, the signed message, the signed note and the inclusion proof. The caller builds it from the route's JSON, since lys-identity has no serde dependency, and Receipt is read through its accessors (receipt.rs lines 48 to 78). It reads the origin from the note's body first and refuses a different origin checkpoint_origin. It then verifies the note under the pinned key with verify_checkpoint, which answers an origin fault and a signature fault alike (lys-core note.rs lines 154 to 164), and so here refuses checkpoint_signature. A note that is not signed at all is checkpoint_unsigned. A note whose tree is smaller than the receipt's index needs is checkpoint_behind_receipt. The rest reuses verify_receipt (receipt.rs lines 93 to 140), which today folds every failure into ReceiptInvalid. It is split so that each failure has its own refusal, event_signature, receipt_mismatch and inclusion_proof, and verify_receipt keeps its signature. Each refusal is a variant of IdentityError in crates/lys-identity/src/error.rs. A forged tree around a genuine event, with a true proof against its own root, is refused checkpoint_unsigned or checkpoint_signature.
 
 **Acceptance:**
 - One test per named refusal produces it from a well-formed answer changed in that one respect.
@@ -58,7 +60,9 @@ Behavioural. The lys-identity crate gains verify_receipt_answer(answer, service_
 **Files:**
 - create: crates/lys-identity/src/receipt_answer.rs
 - create: crates/lys-identity/src/receipt_answer_tests.rs
+- modify: crates/lys-identity/src/error.rs
 - modify: crates/lys-identity/src/lib.rs
+- modify: crates/lys-identity/src/receipt.rs
 
 **Checklist:**
 - C404 — One function verifies a receipt answer against a pinned key with a named refusal for each failure; a forged tree around a genuine event is refused (DIRECTORY-058 R2).
@@ -69,7 +73,7 @@ Behavioural. The lys-identity crate gains verify_receipt_answer(answer, service_
 ## Boundaries
 
 - SHALL NOT remove or rename tree_size and root in the answer, so readers that use them keep working.
-- SHALL NOT sign on each request or hold the service key anywhere but where it is held today.
+- SHALL NOT sign on a read, or hold the service key anywhere but inside Directory, where it is held today.
 - SHALL NOT take the origin or any other field from a machine default.
 - SHALL NOT print or log a key value on any path.
 - SHALL NOT add a timeout, deadline, sleep, poll interval, #[allow], #[ignore] or any bypass. A wait ends on an event.
