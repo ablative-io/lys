@@ -34,10 +34,10 @@
 
 **S12.** As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
 
-## Release reviewer — Closes the release's missing Rauthy check with a measurement
+## Grant conformance reader — Reads the grant screens and the conformance table and verifies each row against a test
 
-**S13.** As the release reviewer, I want a gate leg I can ask for that starts the pinned Rauthy against a scratch database and passes only when it answers ready, so that the release's Rauthy blocker is closed by a measured result rather than a claim.
+**S124.** As a signed-in person, I want You to show each grant I hold with its source and whether I may pass it on, and only my own agents and grants, while an administrator's People screen shows others, so what I see is what I hold.
 
-## Operator — Runs the Rauthy readiness leg at the venue
+**S125.** As a person giving an agent part of a grant, I want the form to show the source grant, the actions it allows, whether I may pass it on and the end the new grant can last no later than, as the service judged them, so I give only what my chain allows.
 
-**S14.** As the operator running the readiness leg, I want every missing prerequisite refused by name, so that I know exactly what to put in place and never mistake a skipped check for a pass.
+**S126.** As a stranger checking the conformance table, I want each grant row to name the test that passes it and the command that runs it, and each test to fail when its row's fact is taken away, so the row can be verified without trusting the author.

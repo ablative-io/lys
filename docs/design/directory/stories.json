@@ -614,6 +614,24 @@
           "text": "As the operator running the readiness leg, I want every missing prerequisite refused by name, so that I know exactly what to put in place and never mistake a skipped check for a pass."
         }
       ]
+    },
+    {
+      "name": "Grant conformance reader",
+      "role": "Reads the grant screens and the conformance table and verifies each row against a test",
+      "stories": [
+        {
+          "id": "S124",
+          "text": "As a signed-in person, I want You to show each grant I hold with its source and whether I may pass it on, and only my own agents and grants, while an administrator's People screen shows others, so what I see is what I hold."
+        },
+        {
+          "id": "S125",
+          "text": "As a person giving an agent part of a grant, I want the form to show the source grant, the actions it allows, whether I may pass it on and the end the new grant can last no later than, as the service judged them, so I give only what my chain allows."
+        },
+        {
+          "id": "S126",
+          "text": "As a stranger checking the conformance table, I want each grant row to name the test that passes it and the command that runs it, and each test to fail when its row's fact is taken away, so the row can be verified without trusting the author."
+        }
+      ]
     }
   ]
 }

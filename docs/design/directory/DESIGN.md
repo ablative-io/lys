@@ -14,13 +14,11 @@ An operator installs the identity product without Cambium or Manifold, signs in,
 
 ## Problem
 
-IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands. DIRECTORY-002 will install the maintained Rauthy, SpiceDB and one PostgreSQL database, but no gate leg starts the Rauthy container and checks it, and the release row holds that gap as a blocker. A leg declared only in docs/design/project.json would not reach a directory round either, because a round reads this cluster's gate.
+IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands.
 
 ## Solution
 
 Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.
-
-The Rauthy readiness leg (DIRECTORY-009) closes the release row's missing Rauthy check without touching landing. It is one demand-cadence leg, rauthy-ready, declared in docs/design/project.json and in this cluster's gate, and a round never runs it unless asked. Until the method can request a demand leg, a person runs its command at the venue. Its command is one standard-library Python script under scripts/identity-gates/. The script reads the vendor/rauthy pin from git and the two image digests from DIRECTORY-002's deploy/identity/versions.json, so no digest is duplicated. It accepts only a Rauthy image whose OCI revision label equals the pin (ADR-009), set by a build of the pin at the venue. An image with no revision label is refused, and the refusal names the build command that makes one. That makes a pin move refuse until an image of the new pin exists, instead of passing while checking other software. It starts that image against its own scratch PostgreSQL container (ADR-005), so nothing is configured and no other service is needed (ADR-004). Every object carries a per-run name and label, and only that run's objects are removed. Rauthy's port is read from its own container, never assumed. Secrets are generated per run and reach the runtime only through private env files. The leg is a check, not a provisioning engine: it leaves nothing behind. A Rust test run by the tests leg drives the script against a stub runtime, keying its secret search on what the runtime received.
 
 ## Principles
 
@@ -52,7 +50,6 @@ The Rauthy readiness leg (DIRECTORY-009) closes the release row's missing Rauthy
 - Every decision still open for Tom is recorded as open and decided nowhere in this cluster.
 - The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6).
 - DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record.
-- The rauthy-ready leg is declared with cadence demand in docs/design/project.json and in this cluster's gate, both files validate, and the leg exits 0 at the venue only on Rauthy's ready answer (DIRECTORY-009).
 
 ## Non-Goals
 
@@ -67,10 +64,6 @@ The Rauthy readiness leg (DIRECTORY-009) closes the release row's missing Rauthy
 - The examples in AGENT-PARITY-2026-09-23 (abilities with an assignment or project, seat provisioning within a budget, private and shared notes) — Tom gave them as not yet decided (docs/design/identity/AGENT-PARITY-2026-09-23.md:11-15); they are never turned into requirements.
 - A production Cambium auth cutover, and any upstream Rauthy contribution as a prerequisite — Revision 5 forbids both before scratch acceptance, review and Gypsy's coordinated install (docs/design/identity/briefs/IDENTITY-001.json:31).
 - A shared design-system package extracted for every product — Tom left it as a thing to look at, not a row (ADR-010).
-- A demand leg for SpiceDB readiness on the shared database — DIRECTORY-002 also installs SpiceDB, but the readiness leg's words name only Rauthy and its scratch database.
-- Building a Rauthy image from the vendor/rauthy pin — The leg accepts only an image whose own build set its revision label to the pin, and the upstream v0.36.2 image carries no such label. Building that image is heavy venue work, and the readiness leg's card does not do it.
-- A way for the method to request a demand leg and record its outcome — It lives in the design-system repository and changes the ledger for every project; design-system card 9jJgCzeG carries it, together with the acceptance line that a round records rauthy-ready as Unmeasured on a venue declaring no tool:docker.
-- Adding the readiness leg to .land/gates.sh — The land gate script is not changed; a demand leg never enters landing.
 
 ## Structure
 
@@ -172,11 +165,20 @@ The Rauthy readiness leg (DIRECTORY-009) closes the release row's missing Rauthy
 | `surface/identity/src/generated/index.ts` | Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch | DIRECTORY-006 |
 | `docs/design/directory/briefs/DIRECTORY-008.json` | the grant brief residue after PR 6: DIRECTORY-005's verification line, three inventory rows and the intention sentence, as requirements on the documents | DIRECTORY-008 |
 | `docs/design/directory/briefs/DIRECTORY-008.md` | rendered markdown | DIRECTORY-008 |
-| `docs/design/directory/briefs/DIRECTORY-009.json` | the Rauthy readiness leg brief | DIRECTORY-009 |
-| `docs/design/directory/briefs/DIRECTORY-009.md` | rendered markdown | DIRECTORY-009 |
-| `docs/design/project.json` | the lys design project file; gains the rauthy-ready demand leg | DIRECTORY-009 |
-| `scripts/identity-gates/rauthy_ready.py` | the rauthy-ready leg's command: start the pinned Rauthy against a scratch PostgreSQL, pass on its ready answer, remove what it made | DIRECTORY-009 |
-| `crates/lys/tests/rauthy_ready_leg.rs` | runs the rauthy-ready script against a stub runtime; counts refusals, cleanup and searched secrets | DIRECTORY-009 |
+| `crates/lys-identity-server/src/grant_contract/views.rs` | the grant view the screens read; DIRECTORY-035 adds each grant's effective standing and effective end |  |
+| `crates/lys-identity/tests/grant_last_used.rs` | the last-used tests of conformance 8.4, named by their row under DIRECTORY-035 |  |
+| `surface/identity/src/generated/grants.ts` | the grant wire types the screens compile against, mirroring views.rs; gains the two effective fields |  |
+| `surface/identity/src/features/grants/model.ts` | the grant screens' reading of the service's answers; loses the client standing walk |  |
+| `surface/identity/src/features/grants/GrantCard.tsx` | one grant with its chain, window, last use and standing (conformance 8.4) |  |
+| `surface/identity/src/features/grants/Delegate.tsx` | the delegation form (conformance 2.3): source grant, actions, may-pass-on and the end bound |  |
+| `surface/identity/src/features/me/You.tsx` | the You page: What you hold (conformance 1.4) and the personal scope of conformance 1.5 |  |
+| `surface/identity/src/features/access/Access.tsx` | the access screens that list grants with their standing and last use |  |
+| `surface/identity/src/features/file/sections.tsx` | an identity file's sections that read which grants stand |  |
+| `surface/identity/tests/fixtures.ts` | the vitests' fixture service answers |  |
+| `surface/identity/tests/me.test.tsx` | the You vitests, carrying row 1.5's test |  |
+| `surface/identity/tests/revoke.test.tsx` | the Revoke vitests, carrying row 2.5's screen test |  |
+| `docs/design/project.json` | the project's trees and legs; DIRECTORY-035 registers the surface leg |  |
+| `docs/design/identity/CONFORMANCE.md` | the identity conformance table; DIRECTORY-035 amends the Brief cell of rows 1.4, 1.5, 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4 |  |
 
 ## Inventory
 
@@ -191,10 +193,6 @@ The Rauthy readiness leg (DIRECTORY-009) closes the release row's missing Rauthy
 - `vendor/rauthy` — the maintained Rauthy fork (ADR-009), the git submodule pinned at dd61ac3c84d6b238108dc8438b53043b5177a662, the upstream v0.36.2 commit the ablative branch was created from; DIRECTORY-004 moves the pin (structure row); read here, never changed by a document row
 - `crates/lys` — the lys CLI crate: Cargo.toml, src/main.rs, src/cli.rs and src/commands/ (attest, ca, key, log, inspect, files); DIRECTORY-002 adds src/identity/ and the identity subcommand to it (structure rows)
 - `docs/design/decisions.json` — the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row
-- `docs/design/project.json` — the lys design project file at main 7b53625: one tree, the rust-build shorthand, seven legs all cadence round, and the roots map
-- `scripts/design/schemas/project.schema.json` — the project schema: a leg is name, command, requires (at least one) and cadence (round or demand), the command run with no shell
-- `scripts/design/gate.sh` — the design leg: validates docs/design/project.json and every cluster, checks coverage and the rendered markdown
-- `.land/gates.sh` — the land gate script: the design leg and the six cargo gates; not changed by DIRECTORY-009
 
 ## Constraints
 
