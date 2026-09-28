@@ -38,6 +38,12 @@ fn every_kind_has_a_distinct_snake_case_name() {
         ErrorKind::ReadBackMismatch,
         ErrorKind::ThemeInvalid,
         ErrorKind::Unready,
+        ErrorKind::NotInstalled,
+        ErrorKind::BinaryMissing,
+        ErrorKind::VersionUnreadable,
+        ErrorKind::UpgradeFailed,
+        ErrorKind::InstallBuildDiffers,
+        ErrorKind::UpgradeBuildDiffers,
     ];
     let mut names: Vec<&str> = kinds.iter().map(|kind| kind.name()).collect();
     assert!(

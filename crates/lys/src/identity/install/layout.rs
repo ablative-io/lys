@@ -42,6 +42,10 @@ pub const BROKER_PORT: u16 = 8472;
 /// The loopback port Rauthy is published on.
 pub const RAUTHY_PORT: u16 = 18080;
 
+/// The binaries the install runs from its own `bin/`, in the order they
+/// start: the secrets broker, then the directory service.
+pub const BINARIES: [&str; 2] = ["lys-secrets", "lys-identity-server"];
+
 /// Every path the install writes, all under one root.
 #[derive(Debug, Clone)]
 pub struct Layout {
@@ -96,6 +100,47 @@ impl Layout {
     /// The compiled screens the service serves.
     pub fn surface_dir(&self) -> PathBuf {
         self.root.join("surface")
+    }
+
+    /// The screens an upgrade replaced, kept to return to.
+    pub fn surface_previous_dir(&self) -> PathBuf {
+        self.root.join("surface.previous")
+    }
+
+    /// The binaries the broker and the service run from.
+    pub fn bin_dir(&self) -> PathBuf {
+        self.root.join("bin")
+    }
+
+    /// The binaries an upgrade replaced, kept to return to.
+    pub fn bin_previous_dir(&self) -> PathBuf {
+        self.root.join("bin.previous")
+    }
+
+    /// The installed binary `name`.
+    pub fn binary(&self, name: &str) -> PathBuf {
+        self.bin_dir().join(name)
+    }
+
+    /// What the install knows about itself.
+    pub fn install_dir(&self) -> PathBuf {
+        self.root.join("install")
+    }
+
+    /// The build running: each binary's commit and the screens' digest.
+    pub fn build_record(&self) -> PathBuf {
+        self.install_dir().join("build.json")
+    }
+
+    /// An upgrade under way: its builds and each step as it completes.
+    pub fn upgrade_intent(&self) -> PathBuf {
+        self.install_dir().join("upgrade.json")
+    }
+
+    /// The configuration and compose files an upgrade replaced, kept to
+    /// return to.
+    pub fn config_previous_dir(&self) -> PathBuf {
+        self.root.join("config.previous")
     }
 
     /// The directory service's configuration.

@@ -1,10 +1,17 @@
 //! The directory service's configuration, written from the layout and the
 //! deployment configuration. Every path is under the data root; every
 //! credential is a file the service reads, never a value written here.
+//!
+//! The one choice it carries that neither of those holds, the Rauthy user
+//! who signs in as the administrator, is read back from the configuration
+//! already written, so an upgrade renders the new build's configuration
+//! without asking Rauthy.
 
 use serde_json::{Value, json};
 
 use super::super::config::DeploymentConfig;
+use super::super::error::{ErrorKind, IdentityError, IdentityResult};
+use super::super::private_files;
 use super::layout::{BROKER_PORT, Layout, SERVICE_PORT};
 
 /// The origin the directory service names its own log by.
@@ -96,4 +103,32 @@ pub fn render(
         rendered["surface_dir"] = Value::String(layout.surface_dir().display().to_string());
     }
     rendered
+}
+
+/// The administrator subject the configuration written under `layout`
+/// names: the install's recorded choice.
+pub fn recorded_administrator(layout: &Layout) -> IdentityResult<String> {
+    let path = layout.service_config();
+    let refuse = |kind: ErrorKind, detail: String| {
+        IdentityError::new(kind, "read recorded choices", "identity.json", detail).at(&path)
+    };
+    let bytes = private_files::read(&path)?.ok_or_else(|| {
+        refuse(
+            ErrorKind::NotInstalled,
+            "no directory service configuration; run `lys identity install`".to_string(),
+        )
+    })?;
+    let written: Value = serde_json::from_slice(&bytes)
+        .map_err(|error| refuse(ErrorKind::ConfigInvalid, error.to_string()))?;
+    written
+        .get("administrator")
+        .and_then(|administrator| administrator.get("subject"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .ok_or_else(|| {
+            refuse(
+                ErrorKind::ConfigInvalid,
+                "it names no administrator subject".to_string(),
+            )
+        })
 }
