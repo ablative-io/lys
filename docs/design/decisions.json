@@ -1437,6 +1437,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-104",
+      "title": "The shell and its mock-up change together, and a corrected mock-up is a new version beside the prior",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "The lead's answers to the shell survey; recorded with DIRECTORY-037",
+      "context": "The identity mock-up is the definition the built shell does not deviate from, and conformance rows 9.2 and 9.3 find gaps in the mock-up itself. Fixing only the build would leave the definition wrong; editing index.v5.html in place would move the file DIRECTORY-006's GRANT_CONFORMANCE acceptance pins and lose the version CONFORMANCE.md was written against.",
+      "decision": "A change to the shell's behaviour is made in the built shell and in the mock-up in the same change, and the corrected mock-up is written as a new file, index.v6.html, beside the prior, the way v4 was kept beside v5; CONFORMANCE.md's reference line and DIRECTORY-006's pin move to the new file in that change. Rejected: fixing only the build, which lets the definition drift from what is built; and editing index.v5.html in place, which moves a pinned hash under the briefs that cite it.",
+      "quote": "",
+      "consequences": [
+        "Every shell behaviour change edits the mock-up as a new version file; the prior file is never changed.",
+        "The new version differs from the prior by the change only, shown by a diff whose hunks lie in named ranges.",
+        "CONFORMANCE.md line 3 and every pin of the accepted mock-up move to the new version in the same change."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
