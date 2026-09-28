@@ -194,6 +194,28 @@ subcommand); and `git_failed`. A fetch that refuses after its first write
 removes exactly the paths it created, deepest first: a target it made is
 gone, and an empty target that stood before is left existing and empty.
 
+`lys-proxy --home <dir> --state <dir> [--listen <addr>] [--anthropic <url>]
+[--openai <url>] [--capture-slots <n>]` is the little proxy (HOME-001 R10).
+A harness pointed at `http://<listen>/anthropic` (or `/openai`) has every
+call forwarded to the provider with its headers and streamed body unchanged
+(only `host` is set to the upstream's), frame by frame, through one transport
+that never sends a request twice. Each model call (a `POST` to
+`/v1/messages`, `/v1/chat/completions` or `/v1/responses`) is journalled
+under `<state>/journal` before it is sent, and a journal that cannot be
+written refuses the call by name with nothing sent. The call's bodies are
+spooled under `<state>/capture` while they pass, bounded at
+`--capture-slots` calls (default 64). When it ends, it is recorded as one
+`lys.call` in the home. The session is the one named by the key in the
+call's own body (`metadata.user_id`, read as it passes with bounded memory),
+or `unlinked-<day>` when the body carries no key; the proxy never infers a
+session. The status is `complete`, `cancelled`, `partial`, `unrecorded` or
+`lost`, and only `complete` carries response parts, which are assembled from
+the event stream by the api's grammar. A call a previous run left open is
+recorded `lost` once at the next start. One JSON report line per call goes
+to stdout: ids, the session, the status and counts. The pass-through
+`examples/passthrough.rs` shares the transport, for the subscription proof
+in `docs/design/home/PROOF-PROXY.md`, which is still to be run.
+
 Secrets: no credential lys-home holds is ever written into the home; a
 use-only secret appears only as its handle. That is the one secret guarantee
 ship makes. Ship does not scan the tracked files for secrets: blocks hold
