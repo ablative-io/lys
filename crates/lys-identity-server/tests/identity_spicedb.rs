@@ -1,59 +1,33 @@
+#![cfg(test)]
 //! The permission database, live: a grant gives its holder the permission its
 //! relation carries and its revocation takes it away, asked of the engine and
 //! asked of the service's own routes.
 //!
-//! The target is named to run, against a running `SpiceDB`:
-//! `LYS_SPICEDB_ENDPOINT=127.0.0.1:18443 LYS_SPICEDB_KEY_FILE=<file> cargo test -p lys-identity-server --test identity_spicedb`
+//! Road step 2 writes a grant's relationships only through the projector and
+//! decides only through the step-2 engine, so both proofs run against a
+//! disposable `SpiceDB`: the engine's own store, written by projecting the
+//! committed grant events, and the store of the disposable `SpiceDB` the
+//! harness starts for the service.
 
-use std::collections::BTreeSet;
-use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+mod spicedb_support;
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
-use lys_identity::grants::{
-    Action, Model, ObjectRef, Relation, Relationship, RelationshipStore, Resource,
-};
-use lys_identity::{IdentityId, OperationId, PersonId};
+use lys_identity::grants::{Action, Resource};
+use lys_identity::{IdentityId, OperationId};
 use lys_identity_server::dev_seed::seed_configured;
-use lys_identity_server::spicedb::{SpiceDb, SpiceDbSettings};
+use lys_identity_server::spicedb::SpiceDbClient;
+use lys_identity_server::spicedb::schema::ensure;
+use lys_identity_server::spicedb::wire::authzed::api::v1::check_permission_response::Permissionship;
 use serde_json::json;
-
-type Outcome = Result<(), Box<dyn std::error::Error>>;
-
-fn model() -> Result<Model, Box<dyn std::error::Error>> {
-    let carries = |relation: &str, actions: &[&str]| -> Result<_, Box<dyn std::error::Error>> {
-        let actions = actions
-            .iter()
-            .map(|action| Action::new(action))
-            .collect::<Result<BTreeSet<_>, _>>()?;
-        Ok((Relation::new(relation)?, actions))
-    };
-    Ok(Model::new(
-        1,
-        [
-            carries("owner", &["view", "edit", "grant"])?,
-            carries("editor", &["view", "edit"])?,
-            carries("viewer", &["view"])?,
-        ],
-    )?)
-}
+use spicedb_support::server::SpiceDb;
+use spicedb_support::{
+    T0, TestResult, World, belonging, check_directly, position, project, read, stored,
+};
 
 const MODEL: &str = r#"{"version":1,"relations":{"owner":["view","edit","grant"],"editor":["view","edit"],"viewer":["view"]}}"#;
 
 const BEA: &str = "bea-subject";
-
-fn settings(mirror: &str) -> Result<SpiceDbSettings, Box<dyn std::error::Error>> {
-    Ok(SpiceDbSettings {
-        endpoint: std::env::var("LYS_SPICEDB_ENDPOINT")?,
-        key_file: PathBuf::from(std::env::var("LYS_SPICEDB_KEY_FILE")?),
-        mirror: mirror.to_owned(),
-    })
-}
-
-fn engine() -> Result<SpiceDb, Box<dyn std::error::Error>> {
-    Ok(SpiceDb::open(&settings("proof_live")?, &model()?)?)
-}
 
 fn login(subject: &str) -> Login {
     Login {
@@ -62,113 +36,85 @@ fn login(subject: &str) -> Login {
     }
 }
 
-fn grant_of(
-    grant: &ObjectRef,
-    holder: PersonId,
-    resource: &Resource,
-    ends_at: u64,
-) -> Vec<Relationship> {
-    let person = ObjectRef::identity(IdentityId::Person(holder));
-    vec![
-        Relationship {
-            resource: grant.clone(),
-            relation: "holder".to_owned(),
-            subject: person.clone(),
-            subject_relation: None,
-            ends_at: Some(ends_at),
-        },
-        Relationship {
-            resource: grant.clone(),
-            relation: "source".to_owned(),
-            subject: person,
-            subject_relation: None,
-            ends_at: None,
-        },
-        Relationship {
-            resource: ObjectRef::resource(resource),
-            relation: "viewer".to_owned(),
-            subject: grant.clone(),
-            subject_relation: Some("holder".to_owned()),
-            ends_at: None,
-        },
-    ]
-}
-
 #[test]
-fn a_grant_is_allowed_and_its_revocation_is_denied() -> Outcome {
-    let mut engine = engine()?;
-    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    let run = format!("{}-{now}", std::process::id());
-    let holder = PersonId::generate()?;
-    let stranger = PersonId::generate()?;
-    let resource = Resource::new("document", &format!("live-{run}.txt"))?;
-    let grant = ObjectRef {
-        kind: "grant".to_owned(),
-        id: format!("grant-live-{run}"),
-    };
-    let view = Action::new("view")?;
-    let edit = Action::new("edit")?;
-    let held = grant_of(&grant, holder, &resource, now + 3600);
+fn a_grant_is_allowed_and_its_revocation_is_denied() -> TestResult {
+    let spicedb = SpiceDb::start(None)?;
+    let client = spicedb.client()?;
+    ensure(client.as_ref())?;
+    let mut world = World::new()?;
+    let holder = world.person("Holder")?;
+    let stranger = world.person("Stranger")?;
+    let resource = project("live")?;
+    let ends = T0 + 3_600;
     let person = IdentityId::Person(holder);
+    let (now, edit) = (world.now, Action::new("edit")?);
+    let mut projector = world.projector(&client, 1000)?;
+    let allowed = |client: &dyn lys_identity_server::spicedb::SpiceDbApi,
+                   who: IdentityId,
+                   action: &Action,
+                   at: u64|
+     -> Result<bool, Box<dyn std::error::Error>> {
+        Ok(check_directly(client, who, &resource, action, at)? == Permissionship::HasPermission)
+    };
 
     assert!(
-        !engine.check(&resource, &view, person, now)?,
+        !allowed(client.as_ref(), person, &read()?, now)?,
         "nothing is granted yet"
     );
-
-    let start = engine.revision()?;
-    engine.write(start + 1, &held, &[])?;
-    assert_eq!(engine.revision()?, start + 1);
+    let granted = world.root_grant(holder, &resource, Some(ends))?;
+    projector.catch_up(world.book(), world.grants.revision())?;
+    assert_eq!(projector.reached().position, position(&granted));
     assert!(
-        engine.check(&resource, &view, person, now)?,
-        "the grant gives view"
+        allowed(client.as_ref(), person, &read()?, now)?,
+        "the grant gives read"
     );
     assert!(
-        !engine.check(&resource, &edit, person, now)?,
-        "a viewer may not edit"
+        !allowed(client.as_ref(), person, &edit, now)?,
+        "a reader may not edit"
     );
     assert!(
-        !engine.check(&resource, &view, IdentityId::Person(stranger), now)?,
+        !allowed(client.as_ref(), IdentityId::Person(stranger), &read()?, now)?,
         "another person holds nothing"
     );
     assert!(
-        !engine.check(&resource, &view, person, now + 7200)?,
+        !allowed(client.as_ref(), person, &read()?, ends)?,
         "the grant has ended by then"
     );
-    let read = engine.read()?;
-    assert!(held.iter().all(|relationship| read.contains(relationship)));
+    let grant = granted.event.grant();
+    assert_eq!(belonging(&stored(client.as_ref())?, &[grant]), 3);
 
+    world.revoke(grant, IdentityId::Person(world.root))?;
+    projector.catch_up(world.book(), world.grants.revision())?;
     assert!(
-        engine.write(start + 1, &held, &[]).is_err(),
-        "a write that does not follow the revision is refused"
-    );
-
-    engine.write(start + 2, &[], &held)?;
-    assert_eq!(engine.revision()?, start + 2);
-    assert!(
-        !engine.check(&resource, &view, person, now)?,
+        !allowed(client.as_ref(), person, &read()?, now)?,
         "the revoked grant gives nothing"
     );
-    let read = engine.read()?;
-    assert!(held.iter().all(|relationship| !read.contains(relationship)));
+    assert_eq!(belonging(&stored(client.as_ref())?, &[grant]), 0);
     Ok(())
 }
 
 #[tokio::test]
-async fn the_service_allows_a_granted_check_and_refuses_it_once_revoked() -> Outcome {
-    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    let run = format!("{}_{now}", std::process::id());
-    let mirror = settings(&format!("proof_service_{run}"))?;
-    let (service, seeded) = Service::start_judging(MODEL, Some(mirror.clone()), |config| {
+async fn the_service_allows_a_granted_check_and_refuses_it_once_revoked() -> TestResult {
+    let (service, seeded) = Service::start_judging(MODEL, None, |config| {
         Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)
     })
     .await?;
+    let database = SpiceDbClient::connect(
+        &service
+            .spicedb()
+            .ok_or("the harness started no SpiceDB for the service")?,
+    )?;
     let bea = seeded.people[1].id;
     let ada_cookie = service.sign_in(login(ADMINISTRATOR)).await?;
     let bea_cookie = service.sign_in(login(BEA)).await?;
-    let name = format!("service-{run}.txt");
+    let name = format!("service-{}.txt", std::process::id());
     let question =
         json!({ "route": "api", "resource": { "kind": "document", "id": name }, "action": "view" });
+    let resource = Resource::new("document", &name)?;
+    let (person, view) = (IdentityId::Person(bea), Action::new("view")?);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs();
 
     let (status, refused) = service
         .post("/grants/check", Some(&bea_cookie), &question)
@@ -193,12 +139,10 @@ async fn the_service_allows_a_granted_check_and_refuses_it_once_revoked() -> Out
     assert_eq!(status, 200, "{issued}");
     let grant = issued["grant"].as_str().ok_or("no grant")?.to_owned();
 
-    let database = SpiceDb::open(&mirror, &model()?)?;
-    let resource = Resource::new("document", &name)?;
-    let person = IdentityId::Person(bea);
-    assert!(
-        database.check(&resource, &Action::new("view")?, person, now)?,
-        "the database holds the grant the service wrote"
+    assert_eq!(
+        check_directly(&database, person, &resource, &view, now)?,
+        Permissionship::HasPermission,
+        "the database holds the grant the service projected"
     );
     let (status, allowed) = service
         .post("/grants/check", Some(&bea_cookie), &question)
@@ -223,8 +167,9 @@ async fn the_service_allows_a_granted_check_and_refuses_it_once_revoked() -> Out
         )
         .await?;
     assert_eq!(status, 200, "{revoked}");
-    assert!(
-        !database.check(&resource, &Action::new("view")?, person, now)?,
+    assert_eq!(
+        check_directly(&database, person, &resource, &view, now)?,
+        Permissionship::NoPermission,
         "the database dropped the revoked grant"
     );
     let (status, refused) = service

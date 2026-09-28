@@ -1,24 +1,23 @@
-//! The grants' permission engine in `SpiceDB`: the schema the model gives,
-//! the relationships the grant log projects, and the check.
+//! `SpiceDB` over its HTTP gateway, as DIRECTORY-006 built it, kept only for
+//! the secrets broker, which reads its permission checks through it until
+//! its own card moves it. The identity server never writes a grant's
+//! relationship, writes its schema or decides a grant through this module:
+//! road step 2 answers every grant question through the `client`, `schema`,
+//! `projector` and `check` modules beside it, and a configuration without a
+//! gRPC address has no grant engine at all.
 //!
-//! The relationships are written by the grants' own projection, one grant
-//! event at a time in log order, so `SpiceDB` holds a mirror of the grant log.
-//! The revision the mirror stands at is itself a relationship, moved in the
-//! same write as the relationships it counts and under a precondition that
-//! the revision before it is held, so two writers cannot both move it.
+//! The settings are the identity server's own `SpiceDB` settings, which name
+//! the gRPC address step 2 speaks to beside the gateway's.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use lys_identity::IdentityId;
-use lys_identity::grants::{
-    Action, GrantError, MemoryRelationships, Model, ObjectRef, Relationship, RelationshipStore,
-    Resource, SCHEMA,
-};
+use lys_identity::grants::{Action, GrantError, Model, ObjectRef, Resource, SCHEMA};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use crate::spicedb_http::post_json;
+use super::gateway_http::post_json;
 
 /// The line of an environment file that holds the preshared key.
 const KEY_LINE: &str = "SPICEDB_GRPC_PRESHARED_KEY=";
@@ -36,20 +35,37 @@ pub struct SpiceDbSettings {
     /// The file holding the preshared key, alone or as the
     /// `SPICEDB_GRPC_PRESHARED_KEY=` line of an environment file.
     pub key_file: PathBuf,
-    /// The name the mirror's revision is kept under.
+    /// The name DIRECTORY-006's gateway mirror kept its revision under,
+    /// still refused unless the engine takes it as a name; nothing is
+    /// mirrored under it now.
     #[serde(default = "default_mirror")]
     pub mirror: String,
+    /// The gRPC address the identity server's client speaks to, as
+    /// `http://host:port` or `https://host:port`. Every grant and permission
+    /// check the server makes asks `SpiceDB` through that client (road step
+    /// 2); without it no grant is decided and every grant route is refused
+    /// `spicedb_grpc_absent`.
+    #[serde(default)]
+    pub grpc: Option<String>,
+    /// The most updates `SpiceDB` takes in one `WriteRelationships` call, as
+    /// the deployment configures it (`SpiceDB`'s
+    /// `--write-relationships-max-updates-per-call`, 1000 unless changed).
+    #[serde(default = "default_max_updates_per_write")]
+    pub max_updates_per_write: u32,
 }
 
 fn default_mirror() -> String {
     "grants".to_owned()
 }
 
+fn default_max_updates_per_write() -> u32 {
+    1000
+}
+
 /// The permission engine, reached over its gateway.
 pub struct SpiceDb {
     endpoint: String,
     key: String,
-    mirror: String,
     relations: BTreeMap<String, BTreeSet<String>>,
 }
 
@@ -57,7 +73,6 @@ impl std::fmt::Debug for SpiceDb {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SpiceDb")
             .field("endpoint", &self.endpoint)
-            .field("mirror", &self.mirror)
             .finish_non_exhaustive()
     }
 }
@@ -86,49 +101,6 @@ fn engine_name(what: &str, name: &str) -> Result<(), GrantError> {
 
 fn object_json(object: &ObjectRef) -> Value {
     json!({"objectType": object.kind, "objectId": object.id.replace('.', "|")})
-}
-
-fn relationship_json(relationship: &Relationship) -> Value {
-    let mut subject = json!({"object": object_json(&relationship.subject)});
-    if let Some(relation) = &relationship.subject_relation {
-        subject["optionalRelation"] = json!(relation);
-    }
-    let mut value = json!({
-        "resource": object_json(&relationship.resource),
-        "relation": relationship.relation,
-        "subject": subject,
-    });
-    if let Some(ends_at) = relationship.ends_at {
-        value["optionalCaveat"] =
-            json!({"caveatName": "unexpired", "context": {"ends_at": ends_at}});
-    }
-    value
-}
-
-fn object_of(value: &Value) -> Option<ObjectRef> {
-    Some(ObjectRef {
-        kind: value.get("objectType")?.as_str()?.to_owned(),
-        id: value.get("objectId")?.as_str()?.replace('|', "."),
-    })
-}
-
-fn relationship_of(value: &Value) -> Option<Relationship> {
-    let subject = value.get("subject")?;
-    let ends_at = match value.pointer("/optionalCaveat/context/ends_at") {
-        Some(end) => Some(end.as_u64()?),
-        None => None,
-    };
-    Some(Relationship {
-        resource: object_of(value.get("resource")?)?,
-        relation: value.get("relation")?.as_str()?.to_owned(),
-        subject: object_of(subject.get("object")?)?,
-        subject_relation: subject
-            .get("optionalRelation")
-            .and_then(Value::as_str)
-            .filter(|relation| !relation.is_empty())
-            .map(str::to_owned),
-        ends_at,
-    })
 }
 
 impl SpiceDb {
@@ -165,7 +137,6 @@ impl SpiceDb {
         let engine = Self {
             endpoint: settings.endpoint.clone(),
             key,
-            mirror: settings.mirror.clone(),
             relations,
         };
         if let Some(both) = engine
@@ -249,38 +220,6 @@ impl SpiceDb {
         Err(unavailable(format!("the schema was refused: {body}")))
     }
 
-    fn read_of(&self, filter: &Value) -> Result<Vec<Relationship>, GrantError> {
-        let request =
-            json!({"consistency": {"fullyConsistent": true}, "relationshipFilter": filter});
-        let (status, body) = self.call("/v1/relationships/read", &request)?;
-        if status != 200 {
-            return Err(unavailable(format!(
-                "the relationships could not be read: {body}"
-            )));
-        }
-        body.lines()
-            .filter(|line| !line.trim().is_empty())
-            .map(|line| {
-                serde_json::from_str::<Value>(line)
-                    .ok()
-                    .as_ref()
-                    .and_then(|row| row.pointer("/result/relationship"))
-                    .and_then(relationship_of)
-                    .ok_or_else(|| {
-                        unavailable(format!("a relationship could not be read from {line}"))
-                    })
-            })
-            .collect()
-    }
-
-    fn marker(&self, revision: u64) -> Value {
-        json!({
-            "resource": {"objectType": "lys_mirror", "objectId": self.mirror},
-            "relation": "revision",
-            "subject": {"object": {"objectType": "lys_revision", "objectId": revision.to_string()}},
-        })
-    }
-
     /// Whether the engine gives `subject` the permission `action` on
     /// `resource` at `now`, read at full consistency.
     pub fn check(
@@ -309,126 +248,5 @@ impl SpiceDb {
             return Err(unavailable(format!("the check was refused: {body}")));
         }
         Ok(body.contains("PERMISSIONSHIP_HAS_PERMISSION"))
-    }
-}
-
-impl RelationshipStore for SpiceDb {
-    fn revision(&self) -> Result<u64, GrantError> {
-        let held = self.read_of(&json!({
-            "resourceType": "lys_mirror",
-            "optionalResourceId": self.mirror,
-        }))?;
-        let revisions = held
-            .iter()
-            .map(|relationship| {
-                relationship.subject.id.parse::<u64>().map_err(|error| {
-                    unavailable(format!(
-                        "the mirror's revision `{}` is not a number: {error}",
-                        relationship.subject.id
-                    ))
-                })
-            })
-            .collect::<Result<Vec<u64>, GrantError>>()?;
-        Ok(revisions.into_iter().max().unwrap_or(0))
-    }
-
-    fn write(
-        &mut self,
-        revision: u64,
-        touch: &[Relationship],
-        delete: &[Relationship],
-    ) -> Result<(), GrantError> {
-        let Some(before) = revision.checked_sub(1) else {
-            return Err(unavailable("a write at revision 0 follows nothing"));
-        };
-        let needed: BTreeSet<String> = touch
-            .iter()
-            .map(|relationship| relationship.resource.kind.clone())
-            .filter(|kind| !FIXED.contains(&kind.as_str()))
-            .collect();
-        let held = self.kinds()?;
-        if !needed.is_subset(&held) {
-            self.write_schema(&held.union(&needed).cloned().collect())?;
-        }
-        let update = |operation: &str, relationship: Value| json!({"operation": operation, "relationship": relationship});
-        let mut updates: Vec<Value> = delete
-            .iter()
-            .map(|relationship| update("OPERATION_DELETE", relationship_json(relationship)))
-            .chain(
-                touch
-                    .iter()
-                    .map(|relationship| update("OPERATION_TOUCH", relationship_json(relationship))),
-            )
-            .collect();
-        let mirror = json!({"resourceType": "lys_mirror", "optionalResourceId": self.mirror});
-        let precondition = if before == 0 {
-            json!({"operation": "OPERATION_MUST_NOT_MATCH", "filter": mirror})
-        } else {
-            updates.push(update("OPERATION_DELETE", self.marker(before)));
-            json!({"operation": "OPERATION_MUST_MATCH", "filter": {
-                "resourceType": "lys_mirror",
-                "optionalResourceId": self.mirror,
-                "optionalRelation": "revision",
-                "optionalSubjectFilter": {"subjectType": "lys_revision", "optionalSubjectId": before.to_string()},
-            }})
-        };
-        updates.push(update("OPERATION_TOUCH", self.marker(revision)));
-        let request = json!({"updates": updates, "optionalPreconditions": [precondition]});
-        let (status, body) = self.call("/v1/relationships/write", &request)?;
-        if status == 200 {
-            return Ok(());
-        }
-        if body.contains("PRECONDITION") {
-            return Err(unavailable(format!(
-                "a write at revision {revision} does not follow the revision the permission engine holds"
-            )));
-        }
-        Err(unavailable(format!("the write was refused: {body}")))
-    }
-
-    fn read(&self) -> Result<BTreeSet<Relationship>, GrantError> {
-        let kinds = self.kinds()?;
-        let mut held = BTreeSet::new();
-        for kind in kinds.iter().map(String::as_str).chain(["grant"]) {
-            held.extend(self.read_of(&json!({"resourceType": kind}))?);
-        }
-        Ok(held)
-    }
-}
-
-/// The permission engine the service runs the grants on.
-#[derive(Debug)]
-pub enum Relationships {
-    /// Relationships held in this process, gone when it stops.
-    Memory(MemoryRelationships),
-    /// Relationships held in `SpiceDB`.
-    SpiceDb(SpiceDb),
-}
-
-impl RelationshipStore for Relationships {
-    fn revision(&self) -> Result<u64, GrantError> {
-        match self {
-            Self::Memory(held) => held.revision(),
-            Self::SpiceDb(engine) => engine.revision(),
-        }
-    }
-
-    fn write(
-        &mut self,
-        revision: u64,
-        touch: &[Relationship],
-        delete: &[Relationship],
-    ) -> Result<(), GrantError> {
-        match self {
-            Self::Memory(held) => held.write(revision, touch, delete),
-            Self::SpiceDb(engine) => engine.write(revision, touch, delete),
-        }
-    }
-
-    fn read(&self) -> Result<BTreeSet<Relationship>, GrantError> {
-        match self {
-            Self::Memory(held) => held.read(),
-            Self::SpiceDb(engine) => engine.read(),
-        }
     }
 }

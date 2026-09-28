@@ -134,6 +134,10 @@ pub(crate) fn as_seen_by(
 ) -> ServerError {
     let hidden = match &error {
         GrantError::Revoked { grant }
+        | GrantError::PermissionRevoked { grant }
+        | GrantError::StaleDecision {
+            grant: Some(grant), ..
+        }
         | GrantError::Expired { grant, .. }
         | GrantError::NotStarted { grant, .. }
         | GrantError::OperationUnresolved { grant, .. } => !grant_seen(judged, caller, grant),

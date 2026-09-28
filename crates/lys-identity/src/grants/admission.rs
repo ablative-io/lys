@@ -98,8 +98,9 @@ fn answered_for_by(directory: &Projection, identity: IdentityId) -> Result<Perso
     }
 }
 
-/// Refuse unless the directory records `identity` as active.
-fn active(directory: &Projection, identity: IdentityId) -> Result<(), GrantError> {
+/// Refuse unless the directory records `identity` as active: a suspended or
+/// retired identity is refused `IdentityNotActive` at its next check.
+pub fn active(directory: &Projection, identity: IdentityId) -> Result<(), GrantError> {
     let record = directory
         .record(identity)
         .ok_or_else(|| IdentityError::IdentityUnknown {
@@ -132,6 +133,24 @@ fn responsible_is(
     }
 }
 
+/// Refuse unless every grant on `path` is held by an active identity answered
+/// for by the person the directory records, as [`effective`] requires; the
+/// grants' standing itself is not judged here.
+pub fn holders_active(
+    book: &GrantBook,
+    directory: &Projection,
+    path: &[GrantId],
+) -> Result<(), GrantError> {
+    for id in path {
+        let held = book.grant(*id).ok_or_else(|| GrantError::SourceUnknown {
+            grant: id.to_string(),
+        })?;
+        active(directory, held.holder())?;
+        responsible_is(directory, held.holder(), held.responsible())?;
+    }
+    Ok(())
+}
+
 /// The checked ancestry of `grant`, refused unless every grant on it is
 /// unrevoked, started and unended at `at`, held by an active identity and
 /// answered for by the person the directory records.
@@ -144,13 +163,7 @@ pub fn effective(
     let lineage = book.lineage(grant)?;
     unrevoked(book, &lineage)?;
     within_window(book, &lineage, at)?;
-    for id in &lineage.path {
-        let held = book.grant(*id).ok_or_else(|| GrantError::SourceUnknown {
-            grant: id.to_string(),
-        })?;
-        active(directory, held.holder())?;
-        responsible_is(directory, held.holder(), held.responsible())?;
-    }
+    holders_active(book, directory, &lineage.path)?;
     Ok(lineage)
 }
 

@@ -87,7 +87,7 @@ fn grant_expiry_every_end_binds_at_its_boundary_and_no_role_change_extends_it() 
     ));
     let lengthened = world.request(tom, to_tom, agent, "wren", PassOn::UseOnly, Some(T0 + 600))?;
     assert!(
-        matches!(world.delegate(&lengthened), Err(GrantError::ExpiryBeyondSource { source_ends, .. }) if source_ends == T0 + 500)
+        matches!(world.delegate(&lengthened), Err(GrantError::DelegationOutlivesSource { source_ends, .. }) if source_ends == T0 + 500)
     );
 
     let boundaries = [

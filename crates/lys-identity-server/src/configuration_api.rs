@@ -47,7 +47,7 @@ async fn configuration(
         "directory": {"roles_configured": state.roles.is_some()},
         "permissions": {
             "model_version": state.grant_setup.model.version(),
-            "projection": if state.grant_setup.spicedb.is_some() { "spicedb" } else { "local" }
+            "projection": if state.grant_setup.engine.is_some() { "spicedb" } else { "absent" }
         },
         "secrets": {"configured": state.secrets.is_some()},
         "runtimes": {

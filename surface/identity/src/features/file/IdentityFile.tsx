@@ -78,6 +78,7 @@ function File({ data, tab, reload }: { data: FileData; tab: string; reload: () =
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <a className="btn" href={'#/directory/manage?action=profile&identity=' + encodeURIComponent(x.id)}>Edit name</a>
+            <a className="btn" href={'#/file/' + encodeURIComponent(x.id) + '/why'} title="Ask the server why this identity can or cannot do a thing">Why can it…</a>
             <span className={'state ' + x.state} id="state">{x.state}</span>
             {ACTIONS[x.state].map((a) => (
               <button key={a} className={'btn ' + (a === 'suspend' || a === 'retire' ? 'danger' : 'primary')} data-act={a} onClick={() => { location.hash = '/directory/manage?action=status&identity=' + encodeURIComponent(x.id); }}>

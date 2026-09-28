@@ -1,6 +1,11 @@
 //! A directory on a temporary log, a service key over a fixed seed, a store
 //! that can be told to fail an append at a chosen step, and the directory
 //! service started on a local port behind the fake issuer.
+//!
+//! Every grant question the service answers is asked of `SpiceDB`, so a
+//! service started without `SpiceDB` settings of its own gets a disposable
+//! `SpiceDB` of its own, held as long as the service and reached through a
+//! preshared key no other service uses.
 
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
@@ -12,11 +17,12 @@ use lys_identity::Directory;
 use lys_identity_server::config::ConfiguredLogin;
 use lys_identity_server::secrets_api::SecretsSettings;
 use lys_identity_server::sign_in_providers::SignInProvidersSettings;
-use lys_identity_server::spicedb::SpiceDbSettings;
-use lys_identity_server::{Config, service};
+use lys_identity_server::spicedb::{ClientConfig, SpiceDbSettings};
+use lys_identity_server::{Config, Engine, service, service_engaged};
 use lys_log_store::{FileLeafStore, LeafStore, PinnedRoot, StoreError, StoreResult};
 
 use crate::fake_issuer::{CLIENT_ID, CLIENT_SECRET, FakeIssuer, Login};
+use crate::spicedb::{SpiceDb, unique};
 
 /// Where the next append fails, if anywhere.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -186,6 +192,30 @@ pub const ADMINISTRATOR: &str = "administrator-subject";
 /// The link-audit source's subject at the fake issuer.
 pub const LINK_AUDIT_SOURCE: &str = "link-audit-source-subject";
 
+/// The settings a service is started with beside its log and issuer.
+struct Settings {
+    spicedb: Option<SpiceDbSettings>,
+    secrets: Option<SecretsSettings>,
+    sign_in_providers: Option<SignInProvidersSettings>,
+}
+
+/// A disposable `SpiceDB` for a service keeping its files in `dir`, and the
+/// settings that reach the service's own store in it.
+fn disposable(dir: &Path) -> Result<(Disposable, SpiceDbSettings), Box<dyn Error>> {
+    let server = SpiceDb::start(None)?;
+    let key = unique("service-spicedb-key");
+    let key_file = dir.join("spicedb.key");
+    secret_file(&key_file, key.as_bytes())?;
+    let settings = SpiceDbSettings {
+        endpoint: server.address.trim_start_matches("http://").to_owned(),
+        key_file,
+        mirror: "grants".to_owned(),
+        grpc: Some(server.address.clone()),
+        max_updates_per_write: 1000,
+    };
+    Ok((Disposable { server, key }, settings))
+}
+
 /// A started directory service on a local port, signing in through a fake issuer.
 pub struct Service {
     /// The service's base URL.
@@ -195,6 +225,27 @@ pub struct Service {
     client: reqwest::Client,
     /// Holds the log, keys and secret file for the service's life.
     pub dir: tempfile::TempDir,
+    /// The disposable `SpiceDB` started for this service, when one was.
+    spicedb: Option<Disposable>,
+}
+
+/// A disposable `SpiceDB` started for one service, and the preshared key of
+/// the store the service's grants are projected into.
+struct Disposable {
+    server: SpiceDb,
+    key: String,
+}
+
+/// Makes a started service's step-2 engine from its configuration.
+type Engage = Box<dyn FnOnce(&Config) -> Result<Engine, Box<dyn Error>> + Send>;
+
+/// How a started service gets its step-2 engine.
+enum Engaging {
+    /// From the configuration, as the running server does.
+    Configured,
+    /// Made by the test from the configuration, so it can watch the
+    /// engine's client.
+    Given(Engage),
 }
 
 fn secret_file(path: &Path, bytes: &[u8]) -> Result<(), Box<dyn Error>> {
@@ -238,8 +289,8 @@ impl Service {
     }
 
     /// Start the service as [`Service::start_with`] does, judging grants by
-    /// `model` and keeping their relationships in the permission database
-    /// `spicedb` names, or in the process when it names none.
+    /// `model` through the `SpiceDB` `spicedb` names, or through a disposable
+    /// `SpiceDB` of the service's own when it names none.
     pub async fn start_judging<T: Send>(
         model: &str,
         spicedb: Option<SpiceDbSettings>,
@@ -270,6 +321,40 @@ impl Service {
         sign_in_providers: Option<SignInProvidersSettings>,
         prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
     ) -> Result<(Self, T), Box<dyn Error>> {
+        let settings = Settings {
+            spicedb,
+            secrets,
+            sign_in_providers,
+        };
+        Self::start_engaging(model, settings, Engaging::Configured, prepare).await
+    }
+
+    /// Start the service as [`Service::start_judging`] does with no `SpiceDB`
+    /// settings, its step-2 engine made by `engage`.
+    pub async fn start_engaged<T: Send>(
+        model: &str,
+        engage: impl FnOnce(&Config) -> Result<Engine, Box<dyn Error>> + Send + 'static,
+        prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
+    ) -> Result<(Self, T), Box<dyn Error>> {
+        let settings = Settings {
+            spicedb: None,
+            secrets: None,
+            sign_in_providers: None,
+        };
+        Self::start_engaging(model, settings, Engaging::Given(Box::new(engage)), prepare).await
+    }
+
+    async fn start_engaging<T: Send>(
+        model: &str,
+        settings: Settings,
+        engaging: Engaging,
+        prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
+    ) -> Result<(Self, T), Box<dyn Error>> {
+        let Settings {
+            spicedb,
+            secrets,
+            sign_in_providers,
+        } = settings;
         let dir = tempfile::TempDir::new()?;
         secret_file(&dir.path().join("issuer.key"), &[3; 32])?;
         secret_file(&dir.path().join("service.key"), &[9; 32])?;
@@ -281,6 +366,14 @@ impl Service {
         let configured = |subject: &str| ConfiguredLogin {
             issuer: issuer.issuer().to_owned(),
             subject: subject.to_owned(),
+        };
+        let own = match (&spicedb, &engaging) {
+            (None, Engaging::Configured) => Some(disposable(dir.path())?),
+            (Some(_), _) | (None, Engaging::Given(_)) => None,
+        };
+        let spicedb = match &own {
+            Some((_, settings)) => Some(settings.clone()),
+            None => spicedb,
         };
         let config = Config {
             listen,
@@ -317,7 +410,13 @@ impl Service {
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;
         let prepared = prepare(&config)?;
-        let app = service(&config).await?;
+        let app = match engaging {
+            Engaging::Configured => service(&config).await?,
+            Engaging::Given(engage) => {
+                let engine = engage(&config)?;
+                service_engaged(&config, Arc::new(|_| {}), Some(engine)).await?
+            }
+        };
         tokio::spawn(async move { axum::serve(listener, app).await });
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
@@ -328,9 +427,26 @@ impl Service {
                 issuer,
                 client,
                 dir,
+                spicedb: own.map(|(held, _)| held),
             },
             prepared,
         ))
+    }
+
+    /// A client configuration reaching the store of the disposable `SpiceDB`
+    /// started for this service, when one was.
+    pub fn spicedb(&self) -> Option<ClientConfig> {
+        self.spicedb
+            .as_ref()
+            .map(|own| own.server.client_config(&own.key))
+    }
+
+    /// The gRPC host and port of the disposable `SpiceDB` started for this
+    /// service, when one was.
+    pub fn spicedb_endpoint(&self) -> Option<String> {
+        self.spicedb
+            .as_ref()
+            .map(|own| own.server.address.trim_start_matches("http://").to_owned())
     }
 
     /// Begin a sign-in and let the issuer answer it as `login`, answering the

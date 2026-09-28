@@ -1,0 +1,28 @@
+caveat started(now uint, starts_at uint) {
+	now >= starts_at
+}
+
+caveat within_window(ends_at uint, now uint, starts_at uint) {
+	now >= starts_at && now < ends_at
+}
+
+definition agent {}
+
+definition grant {
+	relation holder: person with started | person with within_window | agent with started | agent with within_window
+	relation source: grant
+	relation root: root_authority
+	permission standing = root->anyone + source->standing
+	permission exercise = holder & standing
+}
+
+definition person {}
+
+definition resource {
+	relation granted: grant
+	permission exercise = granted->exercise
+}
+
+definition root_authority {
+	relation anyone: person:* | agent:*
+}

@@ -107,6 +107,24 @@ pub struct Grants<S: LeafStore, R: RelationshipStore> {
     pub(super) relationships: R,
 }
 
+/// A delegation asking for an end later than its source grant's is refused
+/// by name behind the delegation check, before anything is committed, and
+/// never clamped to the source's end.
+fn outlives(refusal: GrantError) -> GrantError {
+    match refusal {
+        GrantError::ExpiryBeyondSource {
+            requested,
+            source_grant,
+            source_ends,
+        } => GrantError::DelegationOutlivesSource {
+            requested,
+            source_grant,
+            source_ends,
+        },
+        other => other,
+    }
+}
+
 fn root_matches(request: &RootRequest, grant: &Grant) -> bool {
     let parts = grant.parts();
     parts.issuer == request.caller
@@ -299,7 +317,8 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             request,
             at,
             GrantId::generate()?,
-        )?;
+        )
+        .map_err(outlives)?;
         self.commit(GrantEvent::new(
             request.operation,
             request.caller,
@@ -396,6 +415,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             return Err(GrantError::StaleDecision {
                 required,
                 projected,
+                grant: None,
             });
         }
         if let Some(held) = self.ledger.uncertain()

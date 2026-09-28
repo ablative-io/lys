@@ -60,8 +60,10 @@ pub struct Config {
     pub grant_log_origin: String,
     /// The file holding the permission model grants are judged against.
     pub grant_model_file: PathBuf,
-    /// The permission engine the grants are mirrored into. Without it the
-    /// relationships are held in memory.
+    /// The permission engine, `SpiceDB`, that answers every grant and
+    /// permission check through its gRPC address. Without it, or without its
+    /// gRPC address, no grant is decided and every grant route is refused
+    /// `spicedb_grpc_absent`.
     #[serde(default)]
     pub spicedb: Option<SpiceDbSettings>,
     /// The secrets broker the secrets screens ask. Without it those routes

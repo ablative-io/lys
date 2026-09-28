@@ -57,7 +57,7 @@ async fn connections(
     Ok(Json(json!({
         "connections": [
             {"id": "sign_in", "name": "Sign-in provider", "purpose": "Authenticates people signing in to Lys.", "state": "configured", "endpoint": issuer},
-            {"id": "permissions", "name": "Permission engine", "purpose": "Checks the access represented by Lys grants.", "state": if projection.is_some() { "configured" } else { "local" }, "endpoint": projection},
+            {"id": "permissions", "name": "Permission engine", "purpose": "Checks the access represented by Lys grants.", "state": if projection.is_some() { "configured" } else { "unconfigured" }, "endpoint": projection},
             {"id": "secrets", "name": "Secrets broker", "purpose": "Provides secret access on behalf of the signed-in person.", "state": if broker.is_some() { "configured" } else { "unconfigured" }, "endpoint": broker}
         ],
         "health_checked": false

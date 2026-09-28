@@ -252,7 +252,7 @@ fn grant_ancestry_refuses_at_the_blocking_boundary_and_explains_a_permitted_chai
             PassOn::UseOnly,
             Some(ends + 1),
         )?,
-        GrantError::ExpiryBeyondSource {
+        GrantError::DelegationOutlivesSource {
             requested: (ends + 1).to_string(),
             source_grant: middle.to_string(),
             source_ends: ends,
@@ -260,7 +260,7 @@ fn grant_ancestry_refuses_at_the_blocking_boundary_and_explains_a_permitted_chai
     ));
     refusals.push((
         world.request(tom, middle, tom_agent, "tern", PassOn::UseOnly, None)?,
-        GrantError::ExpiryBeyondSource {
+        GrantError::DelegationOutlivesSource {
             requested: "no end".to_owned(),
             source_grant: middle.to_string(),
             source_ends: ends,
