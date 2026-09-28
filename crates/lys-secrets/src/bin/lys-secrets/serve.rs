@@ -61,6 +61,10 @@ pub fn serve(broker: Broker<Grants>, layout: Layout, listen: &str) -> Result<(),
                 axum::routing::post(crate::manage::recipients),
             )
             .route(
+                "/_lys/settings",
+                axum::routing::get(crate::manage::settings),
+            )
+            .route(
                 "/_lys/revocation",
                 axum::routing::get(crate::manage::revocation),
             )
