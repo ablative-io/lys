@@ -81,8 +81,8 @@ Behavioural. The anchor opens, creates, opens read-only and writes its genesis t
 
 **Acceptance:**
 - Every existing lys-anchor test passes unchanged in what it asserts.
-- With every leaf file under the pin removed, an anchor of 100,000 leaves opens, and opens read-only, as before.
-- With every leaf file under the pin removed but one early leaf, an inclusion artifact for that leaf is answered.
+- With every leaf file under the pin removed but the last, an anchor of 100,000 leaves opens, and opens read-only, as before.
+- With every leaf file under the pin removed but the last and one early leaf, an inclusion artifact for that leaf is answered.
 
 **Files:**
 - modify: crates/lys-anchor/src/anchor/open.rs
@@ -119,7 +119,7 @@ Behavioural. The lys log store (crates/lys/src/commands/log/store.rs) opens thro
 
 **Acceptance:**
 - Every existing test of these commands and of revocation append passes unchanged in what it asserts.
-- With the leaf files under the pin removed, apart from the one leaf prove names, lys log status, checkpoint, append and prove over a log of 100,000 leaves each answer as before.
+- With the leaf files under the pin removed, apart from the last and the one leaf prove names, lys log status, checkpoint, append and prove over a log of 100,000 leaves each answer as before.
 
 **Files:**
 - modify: crates/lys/src/commands/log/store.rs
@@ -154,7 +154,7 @@ Behavioural. A new command, lys log audit with a log directory, is the one that 
 - Over a log with one altered tile, lys log audit names that tile.
 - Over a sound log, lys log audit exits 0.
 - No type in the workspace holds every leaf of a log, which the removal of Log and a search in the gate for its name show.
-- cargo doc in the gate (.land/gates.sh lines 51 to 52) warns on no link to Log.
+- The gate's cargo doc (.land/gates.sh lines 51 to 52) warns on no link to Log.
 
 **Files:**
 - create: crates/lys/src/commands/log/audit.rs
@@ -181,7 +181,7 @@ Behavioural. A new command, lys log audit with a log directory, is the one that 
 
 ### R6: A gate test fails when an open reads a leaf under the pin
 
-Behavioural. Tests run every open this card touches after removing every leaf file under the pin other than one an answer names, as LYSLOGSTORE-006 R4 does. A read of a removed leaf fails and names it, so the removal is the count, and it reaches the lys log store through store::open(dir), which is fixed to FileLeafStore at store.rs line 50. The frontier log's open is tested in crates/lys-log-store/tests. The anchor's opens, full and read-only, are tested in crates/lys-anchor/tests. The lys log store's open is tested inside the lys binary crate, in crates/lys/src/commands/log/store_tests.rs, since lys has no library target. A service store with a snapshot is tested in crates/lys-identity-server/tests. All run in the full Lys gate. The anchor and lys log legs fail on main before this card, and the service leg already passes there and guards it.
+Behavioural. Tests run every open this card touches after removing every leaf file under the pin other than the last one and one an answer names, as LYSLOGSTORE-006 R4 does. The last leaf file under the pin also stays, because FileLeafStore::open finds its extent by probing for it (crates/lys-log-store/src/file/leaves.rs lines 198 to 205), and without it the open falls back to listing every leaf. A read of a removed leaf fails and names it, so the removal is the count, and it reaches the lys log store through store::open(dir), which is fixed to FileLeafStore at store.rs line 50. The frontier log's open is tested in crates/lys-log-store/tests. The anchor's opens, full and read-only, are tested in crates/lys-anchor/tests. The lys log store's open is tested inside the lys binary crate, in crates/lys/src/commands/log/store_tests.rs, since lys has no library target. A service store with a snapshot is tested in crates/lys-identity-server/tests. All run in the full Lys gate. The anchor and lys log legs fail on main before this card, and the service leg already passes there and guards it.
 
 **Acceptance:**
 - Run against main before this card, the anchor leg fails naming a removed leaf.
