@@ -37,8 +37,7 @@ fn a_redelivered_source_operation_is_answered_once_and_survives_a_restart() -> T
     let leaf = restarted
         .log()?
         .leaf(first.coordinate().index)?
-        .ok_or("leaf missing")?
-        .to_vec();
+        .ok_or("leaf missing")?;
     let event = lys_identity::verify_event(&leaf, &restarted.service_key())?;
     assert_eq!(
         event.event().actor(),
