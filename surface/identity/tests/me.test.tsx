@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { $, $$, mount, press, text, unreachable } from './harness';
-import { ISSUER, SCRIBE, SERVICE, refused } from './fixtures';
+import { $, $$, mount, press, text, unmountAll, unreachable } from './harness';
+import { ADA, BEA, DIRECTORY, GRANTS, ISSUER, LEDGER_G, SCRIBE, SERVICE, ok, refused } from './fixtures';
+import type { Grant } from '../src/generated/grants';
 
 describe('You', () => {
   it('shows the signed-in person from /me', async () => {
@@ -43,5 +44,47 @@ describe('You', () => {
   it('names the refusal when the login is bound to no person', async () => {
     await mount('#/me', { ...SERVICE, '/me': refused(403, 'NoPerson', 'NoPerson: the signed-in login is bound to no person') });
     expect($('.why-not b')?.textContent).toBe('NoPerson');
+  });
+});
+
+const CAL = 'person-' + '3'.padStart(32, '0');
+const CAL_G = 'grant-' + '41'.padStart(32, '0');
+
+/**
+ * The service as the administrator reads it, with one more active person, Cal,
+ * who holds a root grant Ada issued: a grant admission admits, so the service
+ * answers it standing, and only You's holder check keeps it out of What you hold.
+ */
+function withCal(): { routes: typeof SERVICE; grants: Grant[] } {
+  const base = GRANTS.find((g) => g.id === LEDGER_G) as Grant;
+  const calG: Grant = {
+    ...base, id: CAL_G, issuer: ADA, holder: CAL, responsible: CAL, resource: { kind: 'project', id: 'atlas' }, relation: 'viewer', actions: ['view'],
+    pass_on: { kind: 'use_only' }, source: null, window: { starts_at: base.window.starts_at, ends_at: null }, standing: { stands: true }, effective_ends_at: null,
+  };
+  const people = { ...DIRECTORY, people: [...DIRECTORY.people, { id: CAL, display_name: 'Cal (test person)', state: 'active' as const, agents: [] }] };
+  const grants = [...GRANTS, calG];
+  return { routes: { ...SERVICE, '/directory/people': ok(people), '/grants': ok({ grants, revision: 7 }) }, grants };
+}
+
+describe('Personal scope', () => {
+  it('row_1_5_an_administrators_people_shows_others_while_you_shows_only_the_persons_own', async () => {
+    const { routes, grants } = withCal();
+    expect(grants.filter((g) => g.holder === BEA)).toEqual([]);
+    await mount('#/people', routes);
+    const names = $$('tbody tr[data-pick] td:first-child').map((td) => td.textContent);
+    expect(names).toContain('Cal (test person)');
+    expect(names).toContain('Bea (test person)');
+
+    unmountAll();
+    await mount('#/me', routes);
+    expect($$('tr[data-href]').map((tr) => tr.querySelector('td')?.textContent)).toEqual(['Scribe', 'Courier', 'Archivist']);
+    const holds = [...$$('.grid2 > div:first-child table')[0].querySelectorAll('tbody tr')].map((tr) => {
+      const cells = tr.querySelectorAll('td');
+      return `${cells[0].textContent} of ${cells[1].textContent}`;
+    });
+    expect(holds).toEqual(['owner of project:identity', 'viewer of project:ledger']);
+    expect(holds).not.toContain('viewer of project:atlas');
+    const secrets = $$('.card').find((c) => c.querySelector('h2')?.textContent === 'Secrets available to you');
+    expect(secrets?.textContent).toContain('Secret values are never displayed here.');
   });
 });

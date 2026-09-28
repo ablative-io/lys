@@ -40,7 +40,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::ServerError;
 use crate::grant_contract::{GrantView, grant_id};
 use crate::grant_sight::{is_root, sees};
-use crate::grants::with_grants;
+use crate::grants::{grant_view, with_grants};
 use crate::read_api::{own_person, person_summary};
 use crate::read_views::{AgentSummary, PersonSummary};
 use crate::reviews_state::Kept;
@@ -210,7 +210,7 @@ async fn reviews(
             .filter_map(|record| {
                 let held = answering(judged.directory, record.grant().holder(), viewer)?;
                 Some(DueView {
-                    grant: GrantView::from(record),
+                    grant: grant_view(&judged, IdentityId::Person(person), record, judged_at),
                     agent: held.agent_summary(),
                     reviewer: held.person_summary(),
                     last_kept: kept.as_ref().and_then(|store| {

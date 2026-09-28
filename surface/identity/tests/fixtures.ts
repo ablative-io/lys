@@ -91,10 +91,19 @@ export const LEDGER_G = 'grant-' + hex(32);
 export const SCRIBE_G = 'grant-' + hex(33);
 const at = (d: number, m: number) => new Date(2026, m - 1, d, 12, 0).getTime() / 1000;
 
-const grant = (g: Partial<Grant> & Pick<Grant, 'id' | 'holder' | 'relation' | 'actions' | 'pass_on' | 'source'>): Grant => ({
-  issuer: ADA, responsible: ADA, resource: { kind: 'project', id: 'identity' }, window: { starts_at: at(27, 9), ends_at: null },
-  model_version: 1, operation: 'op-' + hex(200), revoked: false, revoked_at: null, revoked_revision: null, last_use: { seen: false }, ...g,
-});
+/**
+ * A grant as the service answers it: none of these is revoked and each is held
+ * by an active identity on a chain admission admits, so each stands and its
+ * effective end is its own end.
+ */
+const grant = (g: Partial<Grant> & Pick<Grant, 'id' | 'holder' | 'relation' | 'actions' | 'pass_on' | 'source'>): Grant => {
+  const span = g.window ?? { starts_at: at(27, 9), ends_at: null };
+  return {
+    issuer: ADA, responsible: ADA, resource: { kind: 'project', id: 'identity' }, window: span,
+    model_version: 1, operation: 'op-' + hex(200), revoked: false, revoked_at: null, revoked_revision: null, last_use: { seen: false },
+    standing: { stands: true }, effective_ends_at: span.ends_at, ...g,
+  };
+};
 
 export const GRANTS: Grant[] = [
   grant({ id: ROOT_G, holder: ADA, relation: 'owner', actions: ['edit', 'grant', 'view'], pass_on: { kind: 'to', actions: ['edit', 'view'], recipients: ['agent'] }, source: null, window: { starts_at: at(27, 9), ends_at: at(27, 10) } }),

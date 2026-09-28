@@ -245,7 +245,7 @@ fn grant_contract_refuses_each_case_by_name() -> TestResult {
 }
 
 #[test]
-fn grant_contract_supplies_no_permission_by_default() -> TestResult {
+fn row_2_2_grant_contract_supplies_no_permission_by_default() -> TestResult {
     let null_pass_on = with(8, &Value::Null)?;
     assert!(matches!(
         decode_grant(&null_pass_on),
@@ -269,7 +269,7 @@ fn relation(name: &str) -> Result<Relation, GrantError> {
 }
 
 #[test]
-fn grant_model_judges_by_action_sets_and_keeps_its_version() -> TestResult {
+fn row_2_1_grant_model_judges_by_action_sets_and_keeps_its_version() -> TestResult {
     let model = Model::new(
         4,
         [

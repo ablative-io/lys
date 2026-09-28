@@ -57,30 +57,24 @@ export function chainOf(w: GrantWorld, g: Grant): Grant[] {
   return out;
 }
 
-export interface Standing {
-  ok: boolean;
-  kind?: string;
-  why?: string;
-  /** What a suspension refuses is an open question, so a suspended holder's reason says so. */
-  open?: boolean;
+/** Why a grant does not stand, as the service judged it over its whole chain. */
+export interface Void {
+  why: string;
+  /** What a suspension refuses is an open question, so a suspended holder's refusal says so. */
+  open: boolean;
 }
 
-const now = () => Math.floor(Date.now() / 1000);
-
-/** Whether a grant stands, from the facts the service answered: revoked, window, holder state, source. */
-export function standing(w: GrantWorld, g: Grant, depth = 0): Standing {
-  if (g.revoked) return { ok: false, kind: 'grant revoked', why: `grant ${grantNo(g.id)} was revoked` };
-  if (g.window.ends_at !== null && g.window.ends_at <= now()) return { ok: false, kind: 'grant expired', why: `grant ${grantNo(g.id)} ended ${day(g.window.ends_at)}` };
-  const holder = w.who.get(g.holder);
-  if (holder && holder.state !== 'active') return { ok: false, kind: 'identity not active', why: `${holder.name} is ${holder.state}`, open: holder.state === 'suspended' };
-  if (g.source && depth < 64) {
-    const up = w.byId.get(g.source);
-    if (up) {
-      const s = standing(w, up, depth + 1);
-      if (!s.ok) return { ok: false, kind: 'authority withdrawn upstream', why: `it derives from ${grantNo(up.id)}, held by ${nameOf(w, up.holder)}, which no longer stands (${s.why})` };
-    }
-  }
-  return { ok: true };
+/**
+ * Why `g` does not stand, in the service's words, or null when the service
+ * answers that it stands. Nothing here walks a chain, reads a clock or decides
+ * standing from a holder's state: the service's standing is the only answer.
+ */
+export function voidOf(w: GrantWorld, g: Grant): Void | null {
+  const s = g.standing;
+  if (s.stands) return null;
+  const upstream = s.grant !== null && s.grant !== g.id;
+  const why = upstream ? `it derives from ${grantNo(s.grant ?? '')}, which no longer stands (${s.reason})` : s.reason;
+  return { why, open: s.refusal === 'IdentityNotActive' && w.who.get(g.holder)?.state === 'suspended' };
 }
 
 /** "Passable", in the mock-up's words: to whom it may be passed on, or `not passable`. */
@@ -129,7 +123,7 @@ export const withinPassOn = (g: Grant, actions: string[]): boolean =>
  * with its reason (conformance 2.4): what may not be passed on, then more than is held.
  */
 export function cannotGive(w: GrantWorld, source: Grant | null): [string, string][] {
-  const mine = w.list.grants.filter((g) => g.holder === w.me.person.id && standing(w, g).ok);
+  const mine = w.list.grants.filter((g) => g.holder === w.me.person.id && g.standing.stands);
   const out: [string, string][] = [];
   for (const g of mine) {
     if (g.pass_on.kind === 'use_only') out.push([`${g.relation} of ${onText(g)}`, `You may use it; ${grantNo(g.id)} does not let you pass it on.`]);
