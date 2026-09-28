@@ -41,6 +41,7 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
 - ADR-095 — Ownership of a secret alone confers no revoke over the leases derived from it — The person acted for under a lease revokes it, and ownership of the secret the lease was issued from confers no revoke, over the owner revoking every credential derived from the secret, because who may revoke is a policy choice that ownership alone does not confer. Rejected: the owner revokes every credential derived from the secret.
 - ADR-112 — Lys hot paths do each piece of work once: no replay, no whole-state read for a sliver, no clone to read, no blocking on an async worker — Work on a request, append or open path is done once and scales with what the caller touches, not with history: lookups by index instead of scans, a checkpoint or cursor instead of a replay, a filtered read instead of the whole set, borrowed data instead of a clone made to read, one fsync per batch instead of per entry, and blocking I/O and std mutexes kept off async workers. Each fix is proved by counting the work done in a test that fails before it, never by a clock.
+- ADR-124 — A signing key is used inside the secrets broker, which signs typed members under a purpose's domain and never gives the key out — A secret may be sealed as a signing key with one purpose from a closed list. The broker signs for a live, admitted handle, builds the bytes to sign itself from typed members with the same function the verifier uses, and answers a COSE_Sign1 signature and the public key only.
 
 ## Goals
 
@@ -146,6 +147,17 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 | `crates/lys-secrets/src/bin/lys-secrets/args.rs` | R1: The log command pages from the tail | SECRETS-007 |
 | `crates/lys-secrets/src/broker/rotation.rs` | R2: The whole-log read is an audit, by name | SECRETS-007 |
 | `crates/lys-secrets/src/bin/lys-secrets-demo.rs` | R2: The whole-log read is an audit, by name | SECRETS-007 |
+| `crates/lys-secrets/src/error/signing.rs` | the signing refusals | SECRETS-006 |
+| `crates/lys-secrets/src/error/name.rs` | refusal names | SECRETS-006 |
+| `crates/lys-secrets/src/bin/lys-secrets/cli.rs` | the broker's subcommands | SECRETS-006 |
+| `crates/lys-secrets/src/bin/lys-secrets/oauth_proxy.rs` | the OAuth proxy route | SECRETS-006 |
+| `crates/lys-secrets/src/broker/spawn.rs` | the login hand-over at spawn | SECRETS-006 |
+| `crates/lys-secrets/src/broker/records.rs` | the sealed record read | SECRETS-006 |
+| `crates/lys-secrets/src/bin/lys-secrets/signature_route.rs` | the signature route | SECRETS-006 |
+| `crates/lys-core/src/agent_request.rs` | the bytes of a signed agent request, shared by signer and verifier | SECRETS-006 |
+| `crates/lys-core/src/lib.rs` | lys-core's module declarations | SECRETS-006 |
+| `crates/lys-core/src/keys/identity.rs` | the Ed25519 identity and its seed constructor | SECRETS-006 |
+| `crates/lys-identity-server/src/agent_signature.rs` | the agent request signature check | SECRETS-006 |
 
 ## Inventory
 

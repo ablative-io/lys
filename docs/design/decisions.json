@@ -1783,6 +1783,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-124",
+      "title": "A signing key is used inside the secrets broker, which signs typed members under a purpose's domain and never gives the key out",
+      "status": "decided",
+      "scope": "secrets",
+      "date": "2026-09-28",
+      "decided_by": "Archie as secrets lead, for the signing need DIRECTORY-049 R7 found",
+      "context": "An agent signs its requests to lys-identity-server with its certificate key. Reading that key out of the broker at each call breaks the broker's rule that a secret's value never leaves it.",
+      "decision": "A secret may be sealed as a signing key with one purpose from a closed list. The broker signs for a live, admitted handle, builds the bytes to sign itself from typed members with the same function the verifier uses, and answers a COSE_Sign1 signature and the public key only.",
+      "quote": "",
+      "consequences": [
+        "A signing key has no value-bearing use, and every value route refuses it by name.",
+        "The bytes of an agent request are built by one function in lys-core, shared by the signer and the verifier.",
+        "Every signature is on the broker's audit record."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
