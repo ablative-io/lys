@@ -187,6 +187,7 @@ impl ServerError {
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),
             Self::App(error) => error.status(),
+            Self::Goal(error) => error.status(),
         }
     }
 }

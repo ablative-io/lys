@@ -52,6 +52,8 @@ use crate::directory_views::{
     AgentRegistered, IdentitiesView, IdentityRecordView, LinkAuditPerson, PersonRegistered,
     ReceiptAnswer, ReceiptPage, ServiceKeyView, SignedInView,
 };
+use crate::goals_api::{GoalsView, MarkBody, SetBody as GoalBody};
+use crate::goals_state::Item as GoalItem;
 use crate::grant_contract::{
     ActionBody, CannotGiveAnswer, DelegateBody, GrantList, GrantView, ModelView, PermitView,
     RecordedView, RevokeBody, RootBody, WhoBody, WhoPage,
@@ -96,6 +98,7 @@ pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, 
     entries.extend(roles_and_requests(api));
     entries.extend(machines_and_runtime(api));
     entries.extend(accounts_teams_and_sessions(api));
+    entries.extend(goals(api));
     entries
         .into_iter()
         .map(|(method, path, request, response)| ((method, path), (request, response)))
@@ -353,6 +356,24 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
             None,
             Some(api.schema::<StopsView>()),
         ),
+    ]
+}
+
+/// The goals, expectations and deliverables on agents and teams.
+fn goals(api: &mut Api) -> Vec<Entry> {
+    let (list, item) = (api.schema::<GoalsView>(), api.schema::<GoalItem>());
+    let (set, mark) = (api.schema::<GoalBody>(), api.schema::<MarkBody>());
+    vec![
+        (GET, "/agents/{id}/goals", None, Some(list.clone())),
+        (
+            POST,
+            "/agents/{id}/goals",
+            Some(set.clone()),
+            Some(item.clone()),
+        ),
+        (GET, "/teams/{id}/goals", None, Some(list)),
+        (POST, "/teams/{id}/goals", Some(set), Some(item.clone())),
+        (POST, "/goals/{goal}/mark", Some(mark), Some(item)),
     ]
 }
 

@@ -412,6 +412,7 @@ impl Service {
             service_accounts_dir: Some(dir.path().join("service-accounts")),
             teams_dir: Some(dir.path().join("teams")),
             stops_dir: Some(dir.path().join("stops")),
+            goals_dir: Some(dir.path().join("goals")),
             reviews_dir: Some(dir.path().join("reviews")),
             sign_in_providers,
             provider_origins: Some(ProviderOrigins {

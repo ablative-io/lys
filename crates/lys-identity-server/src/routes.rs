@@ -76,6 +76,8 @@ pub struct AppState {
     pub teams: Option<Mutex<crate::teams_store::TeamStore>>,
     /// The emergency stops, when the configuration names their directory.
     pub stops: Option<Mutex<crate::stops_store::StopStore>>,
+    /// The goals and their reminders, when the configuration names their directory.
+    pub goals: Option<crate::goals_store::Goals>,
     /// The apps, kept beside the grant log: always open, holding at least
     /// the app `lys`.
     pub apps: Mutex<crate::apps_store::AppStore>,
@@ -132,6 +134,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let reviews = ReviewStore::configured(config, Arc::clone(&key), &*say)?;
     let teams = crate::teams_store::TeamStore::configured(config, Arc::clone(&key), &say)?;
     let stops = crate::stops_store::StopStore::configured(config, Arc::clone(&key), &say)?;
+    let goals = crate::goals_store::GoalStore::configured(config, Arc::clone(&key), &say)?;
     let acts = crate::runner_acts::ActStore::open(
         &config.log_dir.with_file_name("runner-acts"),
         Arc::clone(&key),
@@ -184,6 +187,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         reviews: reviews.map(Mutex::new),
         teams: teams.map(Mutex::new),
         stops: stops.map(Mutex::new),
+        goals: goals.map(crate::goals_store::Goals::new),
         apps: Mutex::new(apps),
         benches: crate::apps_bench::Benches::new(
             config.apps_dir().with_file_name("benches"),
@@ -204,6 +208,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         acts: Mutex::new(acts),
         say,
     });
+    crate::goals_api::remind_from(&state);
     let configured = crate::configuration_api::routes(config)
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())
@@ -284,6 +289,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::runtime_api::routes())
         .merge(crate::runner_api::routes())
         .merge(crate::stop_api::routes())
+        .merge(crate::goals_api::routes())
         .merge(crate::service_accounts_api::routes())
         .merge(crate::teams_api::routes())
         .merge(crate::resources_api::routes())

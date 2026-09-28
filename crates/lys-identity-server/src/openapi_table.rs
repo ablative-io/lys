@@ -103,6 +103,11 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/runtime/found" "The sessions found" S [ADMIN];
     POST "/agents/{id}/stop" "Stop an agent" S [SIGNED_BODY, &["AgentNotVisible", "StopReused"]];
     GET "/agents/{id}/stops" "An agent's stops" S [SIGNED, &["AgentNotVisible"]];
+    GET "/agents/{id}/goals" "An agent's goals" S [SIGNED, &["AgentNotVisible", "goals_unavailable"]];
+    POST "/agents/{id}/goals" "Set a goal on an agent" S [SIGNED_BODY, &["AgentNotVisible", "evidence_missing", "goal_reused"]];
+    GET "/teams/{id}/goals" "A team's goals" S [SIGNED, &["NotAdmitted", "TeamUnknown"]];
+    POST "/teams/{id}/goals" "Set a goal on a team" S [SIGNED_BODY, &["NotAdmitted", "TeamUnknown"]];
+    POST "/goals/{goal}/mark" "Judge a goal" G [AGENT, SIGNED_BODY, &["evidence_missing", "goal_closed", "goal_reused", "goal_unknown", "not_permitted", "not_your_judgement"]];
     GET "/service-accounts" "The service accounts" S [SIGNED];
     POST "/service-accounts" "Create a service account" S [SIGNED_BODY, &["NotAdmitted"], &["ServiceAccountReused"]];
     POST "/service-accounts/{id}/retire" "Retire a service account" S [SIGNED_BODY, &["ServiceAccountRetired", "ServiceAccountUnknown"]];

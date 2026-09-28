@@ -125,6 +125,7 @@ pub fn render(
         "service_accounts_dir": dir("service-accounts"),
         "teams_dir": dir("teams"),
         "stops_dir": dir("stops"),
+        "goals_dir": dir("goals"),
         "reviews_dir": dir("reviews"),
         "runner_socket": layout.runner_socket().display().to_string(),
     });
