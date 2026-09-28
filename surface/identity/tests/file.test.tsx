@@ -1,6 +1,7 @@
+import { act } from 'react';
 import { describe, expect, it } from 'vitest';
 import { $, $$, click, mount, press, text, unreachable } from './harness';
-import { ADA, REVIEWER, SCRIBE, SERVICE, refused } from './fixtures';
+import { ADA, REVIEWER, SCRIBE, SERVICE, ok, refused } from './fixtures';
 
 describe("An agent's file", () => {
   it('shows its person, state and registration from the service', async () => {
@@ -16,9 +17,24 @@ describe("An agent's file", () => {
 
   it('puts Start… after the lifecycle acts, just before Emergency stop', async () => {
     await mount('#/file/' + SCRIBE);
-    const acts = $$('.file .head button').map((b) => b.dataset.act);
+    const acts = $$('.file .head button, .file .head a[data-act]').map((b) => b.dataset.act);
     expect(acts.slice(-2)).toEqual(['start', 'stop']);
     expect(acts.indexOf('suspend')).toBeLessThan(acts.indexOf('start'));
+    expect($('.file .head a[data-act="start"]')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/provisioning');
+  });
+
+  it('stops an agent only after a reason is given, under one operation, and never claims a session ended', async () => {
+    const { posted } = await mount('#/file/' + SCRIBE, { ...SERVICE, ['POST /agents/' + SCRIBE + '/stop']: (body) => ok({ agent: SCRIBE, operation: (body as { operation: string }).operation, state: 'suspended', certificates_withdrawn: ['op-' + 'a'.repeat(32)], credentials_ended: null, credentials_refused: 'SecretsUnavailable: no secrets broker is configured', sessions_asked: ['op-' + 'b'.repeat(32)], reason: 'leaked its key' }) });
+    await click($('.file .head button[data-act="stop"]'));
+    expect(posted).toEqual([]);
+    const reason = $('form[aria-label="Confirm emergency stop"] input');
+    if (!(reason instanceof HTMLInputElement)) throw new Error('Reason field missing');
+    await act(async () => { reason.value = 'leaked its key'; reason.dispatchEvent(new Event('input', { bubbles: true })); });
+    await click([...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Stop this agent now') ?? null);
+    expect(posted).toEqual([{ path: '/agents/' + SCRIBE + '/stop', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), reason: 'leaked its key' } }]);
+    expect(text()).toContain('the agent is suspended');
+    expect(text()).toContain('Credential handles were not ended: SecretsUnavailable');
+    expect(text()).toContain('stays unconfirmed until its runtime reports it stopped');
   });
 
   it('shows role and version as not recorded, never a sample role', async () => {

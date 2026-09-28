@@ -3,7 +3,7 @@ import { useParams } from 'react-router';
 import { Refused, api, useLoad } from '../../api';
 import { kindOf } from '../../generated';
 import type { AgentSummary, AgentView, ReceiptAnswer } from '../../generated';
-import { useShell } from '../../shell/ShellContext';
+import { EmergencyStop } from './EmergencyStop';
 import { Gate } from '../signin/Gate';
 import { fileNo } from '../people/directory';
 import type { Entry } from '../people/directory';
@@ -47,12 +47,10 @@ async function readPerson(id: string): Promise<FileData> {
 const readFile = (id: string): Promise<FileData> => (kindOf(id) === 'agent' ? readAgent(id) : readPerson(id));
 
 function File({ data, tab, reload }: { data: FileData; tab: string; reload: () => void }) {
-  const shell = useShell();
   const { x, agent } = data;
   const kind = x.kind;
   const person = x.person;
   const since = agent?.provenance.registration?.actor.authenticated_at;
-  const notBuilt = (what: string) => () => shell.toast(`${what} is not built on this screen yet`);
   const counts: Record<string, number | undefined> = {
     record: agent ? agent.provenance.events.length : undefined,
     access: data.grants ? data.grants.list.grants.filter((g) => g.holder === x.id).length : undefined,
@@ -87,12 +85,10 @@ function File({ data, tab, reload }: { data: FileData; tab: string; reload: () =
               </button>
             ))}
             {kind === 'agent' && x.state === 'active' ? (
-              <button className="btn primary" data-act="start" onClick={notBuilt('Starting an agent')}>Start…</button>
+              <a className="btn primary" data-act="start" href={'#/file/' + encodeURIComponent(x.id) + '/provisioning'} title="Prepare a start from the reviewed profile">Start…</a>
             ) : null}
             {kind === 'agent' && x.state === 'active' ? (
-              <button className="btn danger" data-act="stop" title="Revoke its tokens and ask every runtime to end its sessions" onClick={notBuilt('Emergency stop')}>
-                Emergency stop
-              </button>
+              <EmergencyStop id={x.id} stopped={reload} />
             ) : null}
           </div>
         </div>
