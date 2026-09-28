@@ -1637,6 +1637,25 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-116",
+      "title": "Every app registers with Lys through one published API; Lys depends on no app",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-28",
+      "decided_by": "Tom, 28 September 2026 evening; recorded by Waffles with DIRECTORY-048 and DIRECTORY-049",
+      "context": "Lys holds one permission model read from a file at start (grant_model_file: relations and their actions) and accepts any resource kind a grant names, so no app can declare what its resources are, which actions they carry or how they nest, and nothing stops two apps using the same kind name. There is no registration of an app as a product: its sign-in client (DIRECTORY-047 R3) and its permissions are unrelated. There is no published description of the API, and no MCP server: the design mock-up lists 'identity (this service)' among every agent's MCP servers, and nothing serves it.",
+      "decision": "An app is a record in Lys: an id, a name, its sign-in client, and a permission schema it owns (resource kinds under the app's own prefix, each kind's actions, relations carrying actions, and parent kinds whose relations flow down). An app registers and changes its schema only through the API, is approved by an administrator on a Lys screen before it has any effect, and cannot touch another app's kinds. Lys's own model is the schema of the app 'lys'. The API is described by one OpenAPI document generated from the routes and their types, never written by hand. The MCP server is a face over that same API with three tools, the caller's own identity on every call, and no credential or authority of its own. Lys depends on no app. It holds no app's name, kind, schema or code; it never calls an app, waits on one or reads one's store. Every app depends on Lys through this API alone, and Lys runs the same with no apps registered as with twenty.",
+      "quote": "a quality API as well, because we're going to need a way of getting in the permission schema and everything for every one of the apps that it covers / this has to be able to handle sign in and authentication and permissions for every single one of our apps, but not depend on them / it will need to be secure and compact",
+      "consequences": [
+        "Adding an app changes no Lys code and no Lys configuration file.",
+        "A schema change that would strand standing grants is refused by name, never applied with a silent revoke.",
+        "The MCP server and the HTTP API can never disagree: one route table, one set of handlers, one grant check.",
+        "No app outage, slowness or removal changes any Lys answer about another app or about Lys itself."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

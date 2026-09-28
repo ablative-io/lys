@@ -283,3 +283,22 @@
 - [ ] **C358** — Google, GitHub and Microsoft are set up inside Lys, which shows the exact address to paste and tests the provider on save (DIRECTORY-047 R4).
 - [ ] **C359** — A person changes their own email and password, and an administrator changes anyone's, on Lys screens; the issuer's admin site is not reachable from the host (DIRECTORY-047 R5).
 - [ ] **C360** — Nothing a person reads (screens, install output, refusals, page titles) names the issuer (DIRECTORY-047 R6).
+
+## Every app registers with Lys through a published API (DIRECTORY-048)
+
+- [ ] **C361** — An app is registered through the API with its id, name, sign-in client and permission schema, and has no effect until an administrator approves it on a Lys screen (DIRECTORY-048 R1).
+- [ ] **C362** — An app's schema declares kinds under its own prefix, their actions, relations carrying actions and parent kinds; an invalid schema is refused naming the line of the fault (DIRECTORY-048 R2).
+- [ ] **C363** — An app cannot define, change or grant on another app's kinds; the refusal names the owning prefix (DIRECTORY-048 R2).
+- [ ] **C364** — A schema change that would strand standing grants is refused naming the relation and the count; a dry run answers the same without writing (DIRECTORY-048 R3).
+- [ ] **C365** — Lys's own model is the schema of the app 'lys'; existing grants and checks answer the same after the move (DIRECTORY-048 R4).
+- [ ] **C366** — Apps check many permissions in one call and list the resources a subject may act on (DIRECTORY-048 R5).
+- [ ] **C367** — One OpenAPI document, generated from the routes and types, describes every route; a route without an entry fails the build (DIRECTORY-048 R6).
+- [ ] **C368** — Lys holds no app's name or schema in code or configuration and makes no call to any app (DIRECTORY-048 R7).
+
+## Lys MCP server, secure and compact (DIRECTORY-049)
+
+- [ ] **C369** — The MCP server offers exactly three tools over the published API; the tool list is under 2 KB (DIRECTORY-049 R1, R5).
+- [ ] **C370** — Every MCP call is a person's Lys token obtained through the MCP authorization flow, or an agent's signed request; there is no key, shared secret or unauthenticated mode (DIRECTORY-049 R2).
+- [ ] **C371** — Every MCP call runs the same handler and grant check as the HTTP route, as the caller; no MCP answer returns a secret's value (DIRECTORY-049 R3, R4).
+- [ ] **C372** — A destructive write through MCP needs the target's id repeated in confirm; every write leaves a receipt naming the caller and 'mcp' (DIRECTORY-049 R4, R6).
+- [ ] **C373** — An agent's launch renders 'lys mcp' into its MCP configuration, signing with its own certificate key held by handle (DIRECTORY-049 R7).

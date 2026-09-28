@@ -504,6 +504,30 @@
           "text": "As someone using any of our products, I want to sign in with Lys everywhere, so that there is one account and one sign-in page, and it is always Lys's."
         }
       ]
+    },
+    {
+      "name": "Developer of an app that signs in with Lys",
+      "role": "Builds a product that uses Lys for sign-in and permissions without Lys knowing about it",
+      "stories": [
+        {
+          "id": "S151",
+          "text": "As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys."
+        },
+        {
+          "id": "S152",
+          "text": "As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen."
+        }
+      ]
+    },
+    {
+      "name": "Person or agent using Lys through an AI assistant",
+      "role": "Reads and changes Lys through an MCP client, with only their own rights",
+      "stories": [
+        {
+          "id": "S153",
+          "text": "As a person or an agent using an AI assistant, I want the assistant to reach Lys with my own identity and nothing more, so that it can never see a secret or do what I could not."
+        }
+      ]
     }
   ]
 }
