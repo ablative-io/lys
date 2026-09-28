@@ -30,9 +30,11 @@
 //! The contract is `docs/design/identity/CERTIFICATE-REVOCATION.md`.
 
 pub mod error;
+pub mod fold;
 pub mod leaf;
 
 pub use error::{AppendOperation, LeafRefusal, RevocationError};
+pub use fold::{AttestationEntry, LiveSet, RefusedLeaf, fold};
 pub use leaf::{
     CertificateHash, CertificateLeaf, LEAF_DOMAIN_TAG, REVOCATION_DOMAIN_TAG, REVOCATION_LEAF_LEN,
     Revocation, revocation_signed_bytes,
