@@ -152,6 +152,34 @@ pub enum ServerError {
         /// The operation id.
         operation: String,
     },
+    /// The certificate log cannot be read or written.
+    #[error("CertificatesUnavailable: {reason}")]
+    CertificatesUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// No certificate is kept by that serial.
+    #[error("CertificateUnknown: no certificate is kept by serial `{serial}`")]
+    CertificateUnknown {
+        /// The serial asked for.
+        serial: String,
+    },
+    /// The serial already names a certificate issued with other bytes.
+    #[error(
+        "CertificateReused: serial `{serial}` already names a certificate with other bytes: issue this certificate under a new serial"
+    )]
+    CertificateReused {
+        /// The serial.
+        serial: String,
+    },
+    /// The certificate was already withdrawn by someone else, or at another time.
+    #[error("CertificateWithdrawn: certificate `{serial}` was already withdrawn by {by}")]
+    CertificateWithdrawn {
+        /// The serial.
+        serial: String,
+        /// Who withdrew it.
+        by: String,
+    },
     /// The roles cannot be read or written.
     #[error("RolesUnavailable: {reason}")]
     RolesUnavailable {
@@ -226,7 +254,8 @@ impl ServerError {
             | Self::MachineUnknown
             | Self::RoleUnknown
             | Self::RoleVersionUnknown
-            | Self::HolderUnknown => StatusCode::NOT_FOUND,
+            | Self::HolderUnknown
+            | Self::CertificateUnknown { .. } => StatusCode::NOT_FOUND,
             Self::RequestDecided { .. }
             | Self::RequestHeld { .. }
             | Self::RequestReused { .. }
@@ -236,7 +265,9 @@ impl ServerError {
             | Self::HoldingOver { .. }
             | Self::HoldingChanged
             | Self::ProvisioningChanged { .. }
-            | Self::ProvisioningReused { .. } => StatusCode::CONFLICT,
+            | Self::ProvisioningReused { .. }
+            | Self::CertificateReused { .. }
+            | Self::CertificateWithdrawn { .. } => StatusCode::CONFLICT,
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. } | Self::SecretsUnavailable { .. } => StatusCode::BAD_GATEWAY,
             Self::ConfigInvalid { .. }
@@ -244,7 +275,8 @@ impl ServerError {
             | Self::RequestsUnavailable { .. }
             | Self::NetworkUnavailable { .. }
             | Self::RolesUnavailable { .. }
-            | Self::ProvisioningUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
+            | Self::ProvisioningUnavailable { .. }
+            | Self::CertificatesUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),
