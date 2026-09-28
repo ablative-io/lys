@@ -2312,6 +2312,29 @@
       },
       "depends_on": [],
       "notes": "Written by hand."
+    },
+    {
+      "id": "RM-095",
+      "title": "The broker signs with a key it holds and returns the signature only; the key never leaves it",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "A secret can be a signing key with one purpose; the broker builds what it signs from typed members and returns the signature only, under its ordinary admission and audit.",
+      "provenance": {
+        "requested_by": "archie",
+        "date": "2026-09-28T20:55:00+10:00",
+        "quote": "",
+        "context": "Found in the review of DIRECTORY-049: its R7 read an agent's key out of the broker, which the broker forbids. DIRECTORY-049 depends on this card."
+      },
+      "links": {
+        "cluster": "secrets",
+        "decisions": [],
+        "briefs": [
+          "SECRETS-006"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
     }
   ]
 }

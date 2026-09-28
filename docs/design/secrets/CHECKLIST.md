@@ -61,3 +61,9 @@
 - [ ] **C42** — Routes and services are loaded once (SECRETS-005 R4), proved by a counting test that fails at the base.
 - [ ] **C43** — Answers are capped and redacted in one pass (SECRETS-005 R5), proved by a counting test that fails at the base.
 - [ ] **C44** — Views ask each permission once per request (SECRETS-005 R6), proved by a counting test that fails at the base.
+
+## The broker signs and keeps the key (SECRETS-006)
+
+- [ ] **C411** — A signing key is stored as a secret with one named purpose; no route that carries a value serves it, and listing shows its public key and never its seed (SECRETS-006 R1).
+- [ ] **C412** — The signing route admits the use as any other, builds the bytes to sign from typed members, and returns the signature only; it signs no raw digest (SECRETS-006 R2).
+- [ ] **C413** — Every signing use and every refused one is on the audit record, and a revoked handle signs nothing (SECRETS-006 R3).

@@ -20,6 +20,8 @@
 
 **S20.** As an agent holding a lease, I want to give it back by a relinquish recorded as my own act, so that ending my own access is never recorded as a revoke nobody asked for.
 
+**S165.** As an agent, I want the broker to sign my requests with the key it holds for me, so that I can prove who I am without ever holding the key.
+
 ## Token revolver — The worker that runs Claude sessions and builders and turns to the next account on usage-limit words
 
 **S6.** As the token revolver, when a session prints its usage-limit words, I want to ask the broker for my next account instead of walking my own list, so that the spread across accounts is the broker's and no pool file is copied to my machine.

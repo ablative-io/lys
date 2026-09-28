@@ -136,6 +136,12 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 | `crates/lys-secrets/src/bin/lys-secrets/held.rs` | touched by SECRETS-005 R6: Views ask each permission once per request | SECRETS-005 |
 | `crates/lys-secrets/src/broker/scope.rs` | touched by SECRETS-005 R6: Views ask each permission once per request | SECRETS-005 |
 | `crates/lys-secrets/src/files.rs` | touched by SECRETS-005 R6: Views ask each permission once per request | SECRETS-005 |
+| `crates/lys-secrets/src/broker/signing.rs` | R1: A signing key is a secret with one named purpose | SECRETS-006 |
+| `crates/lys-secrets/src/broker/signing_tests.rs` | R1: A signing key is a secret with one named purpose | SECRETS-006 |
+| `crates/lys-secrets/src/broker.rs` | R1: A signing key is a secret with one named purpose | SECRETS-006 |
+| `crates/lys-secrets/src/bin/lys-secrets/sign.rs` | R2: The broker builds what it signs and returns the signature only | SECRETS-006 |
+| `crates/lys-secrets/tests/signing.rs` | R2: The broker builds what it signs and returns the signature only | SECRETS-006 |
+| `crates/lys-secrets/src/bin/lys-secrets/main.rs` | R2: The broker builds what it signs and returns the signature only | SECRETS-006 |
 
 ## Inventory
 
