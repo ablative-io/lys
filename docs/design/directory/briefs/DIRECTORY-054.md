@@ -22,7 +22,7 @@ title: Install Lys by downloading and opening an app, with no terminal
 
 ## Purpose
 
-Tom, 28 September 2026 about 19:10: Lys is the only sign-in for everything, and "how is an average person supposed to do it?" Today the install is a terminal command that needs a container engine already running, and nothing packages Lys as something a person downloads.
+Tom, 28 September 2026 about 19:10: Lys is the only sign-in for everything, and "how is an average person supposed to do it?" Today the install is a terminal command that needs a container engine already running, and nothing packages Lys as something a person downloads. Amended 28 September 2026 21:05 by Waffles after Archie's read against the tree.
 
 ## Task
 
@@ -32,12 +32,13 @@ Add Lys.app for macOS: a packaging command that builds a signed, notarised app a
 
 ### R1: `lys package app` builds the app and disk image
 
-Behavioural. `lys package app --out DIR` builds Lys.app (bundle id, Info.plist, icon) holding lys, lys-identity-server, lys-secrets and lys-home built for the host architecture, the screens package, and lys-app as the bundle's executable, and a Lys.dmg with the app and an Applications link. Each binary's --version must name the same commit, or the packaging is refused naming the one that differs. It signs with the Developer ID named by a secret handle (DIRECTORY-052 R6, SECRETS), with the hardened runtime, and submits for notarisation, stapling the ticket; with no signing identity or a refused notarisation it fails naming which, and never produces an unsigned app under the release name.
+Behavioural. `lys package app --out DIR` builds Lys.app (bundle id, Info.plist, icon) holding lys, lys-identity-server, lys-secrets and lys-home built for the host architecture, the screens package, and lys-app as the bundle's executable, and a Lys.dmg with the app and an Applications link. Each binary's --version must name the same commit, or the packaging is refused naming the one that differs. It signs with the Developer ID named by a secret handle (DIRECTORY-052 R6, SECRETS), with the hardened runtime, and submits for notarisation, stapling the ticket; with no signing identity or a refused notarisation it fails naming which, and never produces an unsigned app under the release name. The app is one universal build holding arm64 and x86_64 binaries (lipo), so one download serves Apple and Intel processors. Without the Developer ID the command builds a locally signed app under the name 'Lys (development)', never the release name; R2 to R4 are built and tested against that. Only R1's notarisation acceptance and R5 wait for Tom's Developer ID.
 
 **Acceptance:**
 - The built app passes codesign --verify --deep --strict and spctl --assess.
 - Binaries built from two commits are refused naming the binary.
 - With no signing identity it is refused signing_identity_missing and no Lys.dmg is written.
+- lipo -archs on each bundled binary names arm64 and x86_64.
 
 **Files:**
 - create: crates/lys/src/package.rs
@@ -54,7 +55,7 @@ Behavioural. `lys package app --out DIR` builds Lys.app (bundle id, Info.plist, 
 
 ### R2: Opening the app installs and shows every step on a Lys page
 
-Behavioural. lys-app, when no install exists under the platform data root, serves a Lys-styled progress page on a loopback port it chooses, opens the default browser to it, and runs the install service as a library call (the same code as `lys identity install`, never a spawned shell or terminal). Each step appears as it happens in plain words ("Preparing your directory", "Starting sign-in"), with a failure shown in the same words and the one next thing to do. When the install is ready it hands the browser to the first-run setup page of DIRECTORY-047. Opening the app while an install is running shows that install's page, never a second install.
+Behavioural. lys-app, when no install exists under the platform data root, serves a Lys-styled progress page on a loopback port it chooses, opens the default browser to it, and runs the install service as a library call (the same code as `lys identity install`, never a spawned shell or terminal). Each step appears as it happens in plain words ("Preparing your directory", "Starting sign-in"), with a failure shown in the same words and the one next thing to do. When the install is ready it hands the browser to the first-run setup page of DIRECTORY-047. Opening the app while an install is running shows that install's page, never a second install. The install moves out of the lys binary crate into a library crate, crates/lys-install, that both lys and lys-app depend on; lys identity install becomes a thin call into it. An app opened from the disk image (a read-only, translocated path) refuses to install and says in plain words to move Lys to Applications first; the install's bin/ (DIRECTORY-045) keeps the running install independent of where the app sits.
 
 **Acceptance:**
 - Opening the app on a machine without an install reaches the first-run setup page with no terminal started.
@@ -67,8 +68,12 @@ Behavioural. lys-app, when no install exists under the platform data root, serve
 - create: crates/lys-app/src/progress.rs
 - create: crates/lys-app/src/progress_tests.rs
 - create: surface/identity/src/features/install/InstallProgress.tsx
+- create: crates/lys-install/Cargo.toml
+- create: crates/lys-install/src/lib.rs
 - modify: Cargo.toml
+- modify: crates/lys/Cargo.toml
 - modify: crates/lys/src/identity/install.rs
+- modify: crates/lys/src/main.rs
 
 **Checklist:**
 - C396 — Opening Lys.app runs the install service in the process, shows each step on a Lys page in the browser in plain words, and hands over to first-run setup (DIRECTORY-054 R2).
@@ -96,7 +101,7 @@ Behavioural. Before the install starts its services, a container engine that is 
 
 ### R4: Start at login, reopen, upgrade and uninstall
 
-Behavioural. After a successful install the app registers Lys to start at login for this user (a LaunchAgent under the user's Library, removed on uninstall). Opening the app when Lys is installed and running opens Lys's screens; when installed and stopped it starts it and then opens them. An app whose bundled build is newer than the install's runs the upgrade of DIRECTORY-045 with its progress on the page and its way back (DIRECTORY-053). An Uninstall control on the account screen of an administrator stops Lys, removes the login registration and the binaries, and keeps the data folder unless the person ticks to remove it after a confirmation that names what is lost.
+Behavioural. After a successful install the app registers Lys to start at login for this user (a LaunchAgent under the user's Library, removed on uninstall). Opening the app when Lys is installed and running opens Lys's screens; when installed and stopped it starts it and then opens them. An app whose bundled build is newer than the install's runs the upgrade of DIRECTORY-045 with its progress on the page and its way back (DIRECTORY-053). An Uninstall control on the account screen of an administrator stops Lys, removes the login registration and the binaries, and keeps the data folder unless the person ticks to remove it after a confirmation that names what is lost. Start at login uses the system's login item service (SMAppService), so its definition stays inside the app bundle and nothing is written into the person's home outside Lys's own data path; the item runs `lys-app --at-login`, which starts the install's units and waits for the container engine as R3 does. The proof of this on Tom's own account waits for his word on this choice. Uninstall is carried out by a helper, `lys-app --uninstall`, started detached by the service before it answers, which outlives the service it stops and removes the binaries, the login item and, if ticked, the data folder, and records the result where the app shows it on next open.
 
 **Acceptance:**
 - After a restart of the Mac, Lys is answering without the person doing anything.
@@ -117,7 +122,7 @@ Behavioural. After a successful install the app registers Lys to start at login 
 
 ### R5: Proof on a fresh macOS account
 
-Behavioural. On a fresh macOS user account on a machine that has never held Lys, a person downloads Lys.dmg, drags Lys to Applications, opens it, completes first-run setup and signs in. The run is recorded (screen recording and the process tree), and the record shows no Terminal or shell process started by the person or by Lys on their behalf and no page naming the issuer.
+Behavioural. On a fresh macOS user account on a machine that has never held Lys, a person downloads Lys.dmg, drags Lys to Applications, opens it, completes first-run setup and signs in. The run is recorded (screen recording and the process tree), and the record shows no Terminal or shell process started by the person or by Lys on their behalf and no page naming the issuer. The fresh account is a macOS virtual machine on Tom's Mac made for the proof, never a new account on Dean's laptop (it belongs to Tom's father); making it waits for Tom's word.
 
 **Acceptance:**
 - The recorded run reaches signed in from the disk image.

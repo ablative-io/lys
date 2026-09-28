@@ -3210,6 +3210,21 @@
       "path": "crates/lys-identity/src/receipt_answer_tests.rs",
       "note": "R2: One function verifies a receipt against a pinned key",
       "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys-identity-server/src/secrets_api.rs",
+      "note": "R6: Accounts and secrets stored and reached by handle",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-install/Cargo.toml",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/lib.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
     }
   ],
   "inventory": [

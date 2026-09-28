@@ -17,7 +17,7 @@ title: Go back to the previous build after an upgrade that succeeded, and one bu
 
 ## Purpose
 
-DIRECTORY-045 upgrades a running install and returns to the previous build only when the upgrade itself fails. A build that starts ready and misbehaves an hour later has no way back but hand moves in the install folder, which an ordinary person cannot make. Its build stamp is also four byte-identical build.rs files that a test holds equal: one script copied four times, not one script.
+DIRECTORY-045 upgrades a running install and returns to the previous build only when the upgrade itself fails. A build that starts ready and misbehaves an hour later has no way back but hand moves in the install folder, which an ordinary person cannot make. Its build stamp is also four byte-identical build.rs files that a test holds equal: one script copied four times, not one script. Amended 28 September 2026 21:05 by Waffles after Archie's read against the tree.
 
 ## Task
 
@@ -27,12 +27,13 @@ Add `lys identity upgrade --back`, which returns the install to the build kept b
 
 ### R1: `lys identity upgrade --back`
 
-Behavioural. `lys identity upgrade --back` (the same verb, so there is one path) reads the version of every binary in bin/ and in bin.previous/ before stopping anything, and refuses by name when there is no bin.previous/ (nothing_to_return_to) or a version cannot be read. It then stops the broker and the service through their exit locks, exchanges bin/ with bin.previous/, the configuration and compose files with config.previous/ (DIRECTORY-045 R5) and surface/ with surface.previous/ when that exists, recreating any compose service whose definition changes (so the build it leaves becomes the one kept, and --back again returns to it), starts both and waits on their readiness events, and writes install/build.json. A failure on the way puts back what it moved, exactly as an upgrade does, and names the binary and its log. It never writes data/ or a credential, and it reads and honours an unfinished upgrade's intent record first (DIRECTORY-045 R7). The Build line on the account screen shows the build now running.
+Behavioural. `lys identity upgrade --back` (the same verb, so there is one path) reads the version of every binary in bin/ and in bin.previous/ before stopping anything, and refuses by name when there is no bin.previous/ (nothing_to_return_to) or a version cannot be read. It then stops the broker and the service through their exit locks, exchanges bin/ with bin.previous/, the configuration and compose files with config.previous/ (DIRECTORY-045 R5) and surface/ with surface.previous/ when that exists, recreating any compose service whose definition changes (so the build it leaves becomes the one kept, and --back again returns to it), starts both and waits on their readiness events, and writes install/build.json. A failure on the way puts back what it moved, exactly as an upgrade does, and names the binary and its log. It never writes data/ or a credential, and it reads and honours an unfinished upgrade's intent record first (DIRECTORY-045 R7). The Build line on the account screen shows the build now running. Each build records the newest data format it writes (the log event kinds it can read, as a format number in install/build.json and its --version detail). Before stopping anything, --back compares the kept build's format with the data's, and when the older build cannot read the data it refuses back_would_not_read, naming the first event kind the older build does not know. Data is never rolled back.
 
 **Acceptance:**
 - After an upgrade that succeeded, --back leaves the earlier commit running, answering /api/authority with that build, and --back again returns to the newer one.
 - With no bin.previous/ it is refused nothing_to_return_to and nothing is stopped.
 - A start failure during --back leaves the build it began from running and names the binary and its log.
+- After an upgrade whose build writes a new event kind, --back is refused back_would_not_read naming that kind, and nothing is stopped.
 
 **Files:**
 - create: crates/lys/src/identity/upgrade_back_tests.rs
@@ -78,7 +79,7 @@ Structural. A build-support crate, crates/lys-build-stamp, holds the one functio
 
 ## Boundaries
 
-- SHALL NOT change what an upgrade writes beyond bin/, bin.previous/, the screens, the logs, the process files and install/build.json.
+- SHALL NOT change what an upgrade writes beyond bin/, bin.previous/, the configuration and compose files and config.previous/, the screens, the logs, the process files, install/upgrade.json and install/build.json; data is never rolled back.
 - SHALL NOT add a timeout, deadline, poll, #[allow], #[ignore] or any bypass.
 - SHALL NOT add a silent fallback: every failure is a named refusal.
 

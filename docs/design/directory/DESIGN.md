@@ -734,6 +734,9 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/tests/receipts_signed.rs` | R1: The receipts route answers a signed checkpoint | DIRECTORY-058 |
 | `crates/lys-identity/src/receipt_answer.rs` | R2: One function verifies a receipt against a pinned key | DIRECTORY-058 |
 | `crates/lys-identity/src/receipt_answer_tests.rs` | R2: One function verifies a receipt against a pinned key | DIRECTORY-058 |
+| `crates/lys-identity-server/src/secrets_api.rs` | R6: Accounts and secrets stored and reached by handle | DIRECTORY-052 |
+| `crates/lys-install/Cargo.toml` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-install/src/lib.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
 
 ## Inventory
 
