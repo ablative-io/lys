@@ -1,3 +1,4 @@
+import { ServiceAccounts } from './features/service-accounts/ServiceAccounts';
 import { Roles } from './features/roles/Roles';
 import { Network } from './features/network/Network';
 import { Connections } from './features/connections/Connections';
@@ -24,6 +25,7 @@ export function AppRoutes() {
     <Routes>
       <Route path="/roles/:id?" element={<Roles />} />
       <Route path="/network" element={<Network />} />
+      <Route path="/service-accounts" element={<ServiceAccounts />} />
       <Route path="/connections" element={<Connections />} />
       <Route path="/directory/manage" element={<Manage />} />
       <Route path="/access/issue" element={<IssueRoot />} />

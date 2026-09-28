@@ -18,8 +18,8 @@ describe('You', () => {
     expect(signIn?.textContent).toContain(new URL(ISSUER).host);
     expect(signIn?.textContent).toContain('this session');
     expect(signIn?.textContent).toContain('Never lent to an agent.');
-    expect(service?.querySelector('h2')?.textContent).toBe('Service accounts you may use');
-    expect(service?.textContent).toContain('Service-account connections are not available in this installation yet.');
+    expect(service?.querySelector('h2')?.textContent).toBe('Your service-account records');
+    expect(service?.textContent).toContain('No service-account records were returned for you.');
     expect(signIn?.contains(service ?? null)).toBe(false);
   });
 

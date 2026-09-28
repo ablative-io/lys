@@ -131,6 +131,12 @@ pub enum ServerError {
         /// The operation id.
         machine: String,
     },
+    /// The memory of an agent cannot be read.
+    #[error("MemoryUnavailable: {reason}")]
+    MemoryUnavailable {
+        /// What failed.
+        reason: String,
+    },
     /// The provisioning profiles cannot be read or written.
     #[error("ProvisioningUnavailable: {reason}")]
     ProvisioningUnavailable {
@@ -485,6 +491,7 @@ impl ServerError {
             | Self::RequestsUnavailable { .. }
             | Self::NetworkUnavailable { .. }
             | Self::RolesUnavailable { .. }
+            | Self::MemoryUnavailable { .. }
             | Self::ProvisioningUnavailable { .. }
             | Self::CertificatesUnavailable { .. }
             | Self::RuntimeUnavailable { .. }

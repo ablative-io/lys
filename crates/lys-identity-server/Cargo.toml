@@ -11,6 +11,7 @@ publish = false
 
 [dependencies]
 axum.workspace = true
+base64.workspace = true
 lys-core.workspace = true
 lys-home.workspace = true
 lys-identity.workspace = true

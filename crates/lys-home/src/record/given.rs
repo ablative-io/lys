@@ -38,9 +38,12 @@ use serde_json::Value;
 use crate::error::HomeError;
 use crate::harness::claude_code::HARNESS;
 use crate::harness::claude_code::given::{ConfigDir, GivenDocument, MEASURED_VERSION, Resolution};
+use crate::record::Home;
 use crate::record::Session;
 use crate::record::blocks::Hash;
 use crate::record::entries::{CUSTOM_GIVEN, Entry, EntryBody};
+use crate::record::reader::SessionReader;
+use crate::record::recall::Skipped;
 
 /// The kinds a given entry resolves, in the order the record names them.
 pub const RESOLVED_KINDS: [&str; 6] = [
@@ -190,6 +193,76 @@ impl GivenRecord {
             .map(|entry| Ok((entry.id().to_owned(), Self::from_entry(entry)?)))
             .collect()
     }
+}
+
+/// A `lys.given` entry as it was found: where it stands and when it was
+/// appended.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GivenSeen {
+    /// The session it stands in.
+    pub session: String,
+    /// The entry's id.
+    pub entry: String,
+    /// When it was appended, RFC 3339 as the home wrote it.
+    pub given_at: String,
+    /// What was given.
+    pub record: GivenRecord,
+}
+
+/// The `lys.given` entry of the home appended last, and the sessions that
+/// could not be read for it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GivenLast {
+    /// The entry appended last, none while nothing was given.
+    pub last: Option<GivenSeen>,
+    /// Each session skipped, with the reason.
+    pub skipped: Vec<Skipped>,
+}
+
+fn given_of(reader: &SessionReader, session: &str) -> Result<Vec<GivenSeen>, HomeError> {
+    reader
+        .customs_everywhere(CUSTOM_GIVEN)?
+        .iter()
+        .map(|entry| {
+            Ok(GivenSeen {
+                session: session.to_owned(),
+                entry: entry.id().to_owned(),
+                given_at: entry.base.timestamp.clone(),
+                record: GivenRecord::from_entry(entry)?,
+            })
+        })
+        .collect()
+}
+
+/// The `lys.given` entry of the home appended last, read by seeking to the
+/// given rows only. The home writes every timestamp in one RFC 3339 form in
+/// UTC, so the last is the greatest as text. A session that cannot be read
+/// is skipped and named.
+pub fn last_given(home: &Home) -> Result<GivenLast, HomeError> {
+    let mut last: Option<GivenSeen> = None;
+    let mut skipped = Vec::new();
+    for session in home.session_ids()? {
+        let given = home
+            .read_session(&session)
+            .and_then(|reader| given_of(&reader, &session));
+        match given {
+            Ok(given) => {
+                for seen in given {
+                    if last
+                        .as_ref()
+                        .is_none_or(|kept| kept.given_at <= seen.given_at)
+                    {
+                        last = Some(seen);
+                    }
+                }
+            }
+            Err(e) => skipped.push(Skipped {
+                session,
+                reason: e.to_string(),
+            }),
+        }
+    }
+    Ok(GivenLast { last, skipped })
 }
 
 fn not_given(entry: &Entry) -> HomeError {

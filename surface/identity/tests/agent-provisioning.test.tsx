@@ -62,6 +62,19 @@ describe('Agent provisioning', () => {
     await click(button('Check original change'));
     expect(next.posted).toEqual(first.posted);
   });
+  it('accepts the original receipt after a later profile version, without replacing that later profile', async () => {
+    const first = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, ['POST ' + path]: refused(503, 'ProvisioningUnavailable', 'Result uncertain') });
+    await submitProfile(); unmountAll(); document.body.innerHTML = '';
+    const later = { ...answer, profile: { ...profile, version: 3, operation: 'op-' + 'b'.repeat(32), instructions: 'Later profile instructions' } };
+    const next = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, [path]: ok(later), ['POST ' + path]: (body) => ok({ ...later, recorded: { operation: (body as Record<string, unknown>).operation, version: 2 } }) });
+    await click(button('Check original change'));
+    expect(next.posted).toEqual(first.posted); expect(text()).toContain('Provisioning profile recorded.');
+    expect(text()).toContain('Later profile instructions'); expect(sessionStorage.length).toBe(0);
+  });
+  it('holds an inconsistent receipt even when its latest profile matches the operation', async () => {
+    await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, ['POST ' + path]: (body) => ok({ ...answer, profile: { ...profile, ...(body as Record<string, unknown>), version: 2 }, recorded: { operation: 'op-' + 'f'.repeat(32), version: 2 } }) });
+    await submitProfile(); expect(text()).not.toContain('Provisioning profile recorded.'); expect(sessionStorage.length).toBe(1);
+  });
   it('leaves the edit form absent for a non-administrator', async () => {
     await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, '/directory/people': refused(403, 'NotAdmitted', 'Not an administrator'), '/people': ok(OWN) });
     expect($('form[aria-label="Record provisioning profile"]')).toBeNull();

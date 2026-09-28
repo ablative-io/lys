@@ -114,19 +114,17 @@ function Page({ data, reload }: { data: YouData; reload: () => void }) {
             </div>
           </div>
           <div className="card" id="service-accounts">
-            <h2>Service accounts you may use</h2>
-            <div className="note" style={{ margin: '2px 0 6px' }}>Accounts in other systems you are authorised to act through. Using one is not the same as being allowed to pass it on.</div>
+            <h2>Your service-account records</h2><a className="btn" href="#/service-accounts">Manage service accounts</a>
+            <div className="note" style={{ margin: '2px 0 6px' }}>These records name accounts. Permission to use or lend their credentials is checked separately.</div>
             {me.service_accounts.length ? (
               me.service_accounts.map((s) => (
-                <div className="row" style={{ alignItems: 'flex-start' }} key={s.system + s.account}>
-                  <span>{s.system} <span className="mono dim">{s.account}</span></span>
-                  <span className={s.may_pass_on ? 'pass' : 'dim'} style={{ textAlign: 'right', maxWidth: '46%', fontSize: 12 }}>
-                    {s.may_pass_on ? 'passable to agents, as a virtual credential' : 'no: use only'}
-                  </span>
+                <div className="row" style={{ alignItems: 'flex-start' }} key={s.id}>
+                  <span>{s.name}<p className="note">{s.description}</p><details><summary>Account record</summary><p className="mono">{s.id}</p><p>Owner: {s.owner}</p></details></span>
+                  <span>{s.state === 'retired' ? 'Retired' : s.state === 'active' ? 'Registered' : s.state}</span>
                 </div>
               ))
             ) : (
-              <p className="note">Service-account connections are not available in this installation yet.</p>
+              <p className="note">No service-account records were returned for you.</p>
             )}
           </div>
           <div className="card">

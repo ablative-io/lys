@@ -25,8 +25,8 @@ use lys_identity::{AgentId, IdentityId, OperationId};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
+use crate::agent_sight::seen_agent;
 use crate::error::ServerError;
-use crate::grants::caller;
 use crate::provisioning_store::{McpServer, Profile, ProvisioningStore, Review, Settings, Version};
 use crate::read_api::own_person;
 use crate::routes::{AppState, signed_in, with_directory};
@@ -98,6 +98,21 @@ pub struct ProvisioningView {
     /// Whether a runtime applies the profile. While none does, the profile
     /// is recorded and not applied.
     pub enforced: bool,
+    /// What this act was recorded as, null on a read. A change sent again
+    /// answers the version it was first recorded as, whatever was set
+    /// after it, while `profile` is always the latest. A review answers the
+    /// version reviewed and the operation of the review that is kept, which
+    /// is an earlier one when the version was reviewed already.
+    pub recorded: Option<Recorded>,
+}
+
+/// The version a change was recorded as.
+#[derive(Debug, Clone, Serialize)]
+pub struct Recorded {
+    /// The operation id the change was set with.
+    pub operation: String,
+    /// The version it was recorded as.
+    pub version: u32,
 }
 
 /// A profile to set. Every member is required.
@@ -218,7 +233,7 @@ pub(crate) fn with_provisioning<T>(
     act(&mut store)
 }
 
-fn view(agent: &str, profile: Option<&Profile>) -> ProvisioningView {
+fn view(agent: &str, profile: Option<&Profile>, recorded: Option<Recorded>) -> ProvisioningView {
     let versions = profile.map_or(&[][..], |profile| profile.versions.as_slice());
     ProvisioningView {
         agent: agent.to_owned(),
@@ -250,6 +265,7 @@ fn view(agent: &str, profile: Option<&Profile>) -> ProvisioningView {
             })
             .collect(),
         enforced: false,
+        recorded,
     }
 }
 
@@ -258,26 +274,9 @@ async fn read(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Result<Json<ProvisioningView>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
-    with_directory(&state, |directory| {
-        let directory = directory.projection()?;
-        let asker = caller(&state, &headers, directory)?;
-        let record = directory
-            .record(IdentityId::Agent(agent))
-            .ok_or(ServerError::AgentNotVisible)?;
-        let sees = state.admission.administrator(&actor).is_ok()
-            || match asker {
-                IdentityId::Agent(own) => own == agent,
-                IdentityId::Person(person) => record.responsible() == Some(person),
-            };
-        if !sees {
-            return Err(ServerError::AgentNotVisible);
-        }
-        let agent = agent.to_string();
-        with_provisioning(&state, |store| {
-            Ok(Json(view(&agent, store.profile(&agent))))
-        })
+    let agent = seen_agent(&state, &headers, &id)?.agent.to_string();
+    with_provisioning(&state, |store| {
+        Ok(Json(view(&agent, store.profile(&agent), None)))
     })
 }
 
@@ -306,8 +305,10 @@ async fn set(
         };
         let agent = agent.to_string();
         with_provisioning(&state, |store| {
-            store.set(&agent, body.from_version, version)?;
-            Ok(Json(view(&agent, store.profile(&agent))))
+            let operation = version.operation.clone();
+            let version = store.set(&agent, body.from_version, version)?;
+            let recorded = Recorded { operation, version };
+            Ok(Json(view(&agent, store.profile(&agent), Some(recorded))))
         })
     })
 }
@@ -348,7 +349,15 @@ async fn review(
         let agent = agent.to_string();
         with_provisioning(&state, |store| {
             store.review(&agent, number, review)?;
-            Ok(Json(view(&agent, store.profile(&agent))))
+            let recorded = store
+                .profile(&agent)
+                .and_then(|profile| profile.versions.iter().find(|kept| kept.number == number))
+                .and_then(|kept| kept.reviewed.as_ref())
+                .map(|kept| Recorded {
+                    operation: kept.operation.clone(),
+                    version: number,
+                });
+            Ok(Json(view(&agent, store.profile(&agent), recorded)))
         })
     })
 }

@@ -90,7 +90,13 @@ async fn the_administrator_sets_a_profile_and_each_change_is_a_version() -> Test
     assert_eq!(status, 200, "{none}");
     assert_eq!(
         none,
-        json!({ "agent": agent, "profile": null, "versions": [], "enforced": false })
+        json!({
+            "agent": agent,
+            "profile": null,
+            "versions": [],
+            "enforced": false,
+            "recorded": null
+        })
     );
 
     let first = profile(&operation()?, 0, "First setup.");
@@ -113,6 +119,10 @@ async fn the_administrator_sets_a_profile_and_each_change_is_a_version() -> Test
         table.seeded.people[0].id.to_string()
     );
     assert_eq!(set["enforced"], false, "no runtime applies a profile");
+    assert_eq!(
+        set["recorded"],
+        json!({ "operation": first["operation"], "version": 1 })
+    );
 
     let (status, again) = table.service.post(&path, Some(&table.ada), &first).await?;
     assert_eq!(status, 200, "{again}");
@@ -127,9 +137,32 @@ async fn the_administrator_sets_a_profile_and_each_change_is_a_version() -> Test
     assert_eq!(versions[0]["note"], "First setup.");
     assert_eq!(versions[1]["version"], 2);
 
+    assert_eq!(
+        next["recorded"],
+        json!({ "operation": second["operation"], "version": 2 })
+    );
+
+    let (status, retried) = table.service.post(&path, Some(&table.ada), &first).await?;
+    assert_eq!(status, 200, "{retried}");
+    assert_eq!(
+        retried["recorded"],
+        json!({ "operation": first["operation"], "version": 1 }),
+        "the first change sent again answers the version it was recorded as"
+    );
+    assert_eq!(
+        retried["profile"], next["profile"],
+        "the profile is the latest"
+    );
+    assert_eq!(
+        retried["versions"], next["versions"],
+        "no version was added"
+    );
+
     let (status, read) = table.service.get(&path, Some(&table.ada)).await?;
     assert_eq!(status, 200, "{read}");
-    assert_eq!(read, next);
+    assert_eq!(read["recorded"], Value::Null, "a read records nothing");
+    assert_eq!(read["profile"], next["profile"]);
+    assert_eq!(read["versions"], next["versions"]);
     Ok(())
 }
 
@@ -168,7 +201,8 @@ async fn a_late_or_reused_change_lands_nowhere() -> TestResult {
 
     let (status, read) = table.service.get(&path, Some(&table.ada)).await?;
     assert_eq!(status, 200, "{read}");
-    assert_eq!(read, set, "nothing was changed");
+    assert_eq!(read["profile"], set["profile"], "nothing was changed");
+    assert_eq!(read["versions"], set["versions"], "nothing was changed");
     Ok(())
 }
 

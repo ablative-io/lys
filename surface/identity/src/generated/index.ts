@@ -46,9 +46,15 @@ export interface PeopleView {
  * fixed with the server when it records them.
  */
 export interface ServiceAccount {
-  system: string;
-  account: string;
-  may_pass_on: boolean;
+  id: string;
+  owner: string;
+  name: string;
+  description: string;
+  state: string;
+  created_by: Login;
+  created_at: number;
+  retired_by: Login | null;
+  retired_at: number | null;
 }
 
 /** GET /me. */
