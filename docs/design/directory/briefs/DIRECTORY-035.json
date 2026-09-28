@@ -64,7 +64,63 @@
       ],
       "stories": [
         "S142"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-identity-server/src/grant_contract/views.rs",
+            "change": "modified",
+            "note": "GrantView gains standing (StandingView: stands plus a flattened optional RefusedView {refusal, grant, reason}) and effective_ends_at. The From<&GrantRecord> impl becomes GrantView::new(record, standing, effective_ends_at)."
+          },
+          {
+            "path": "crates/lys-identity-server/src/grants.rs",
+            "change": "modified",
+            "note": "New pub(crate) grant_view() judges each grant with admission::effective at the service clock. It reads the refusal through as_seen_by: the refusal name is ServerError::name, the reason is its text, and grant is the grant a Revoked/Expired/NotStarted/OperationUnresolved refusal names, or null when the refusal is withheld. effective_ends_at comes from GrantBook::lineage().ends. GET /grants and GET /grants/{id} use it."
+          },
+          {
+            "path": "crates/lys-identity-server/src/grant_contract/mod.rs",
+            "change": "modified",
+            "note": "Re-exports RefusedView and StandingView so grants.rs can build them (outside R1's file list; see deviation)."
+          },
+          {
+            "path": "crates/lys-identity-server/src/reviews_api.rs",
+            "change": "modified",
+            "note": "DueView.grant is built with grant_view() instead of the removed GrantView::from, so the review answer carries the same two members (outside R1's file list; see deviation)."
+          },
+          {
+            "path": "crates/lys-identity-server/tests/grants.rs",
+            "change": "modified",
+            "note": "Adds three tests: a_derived_grant_whose_source_is_revoked_reads_void_naming_the_revoked_source, a_delegation_ending_after_its_ancestor_is_refused_and_effective_end_is_the_grants_own and a_derived_grant_whose_chain_names_an_identity_the_caller_may_not_see_reads_withheld, plus small helpers (clock, root_ending, passed_on, issued, listed, read_one, moved, active_person)."
+          },
+          {
+            "path": "surface/identity/src/generated/grants.ts",
+            "change": "modified",
+            "note": "The Grant interface gains standing, typed inline as {stands: true} | {stands: false; refusal: string; grant: string | null; reason: string}, and effective_ends_at: number | null."
+          },
+          {
+            "path": "surface/identity/tests/fixtures.ts",
+            "change": "modified",
+            "note": "The grant() helper gives every GRANTS entry standing {stands: true} and effective_ends_at equal to its own window.ends_at."
+          }
+        ],
+        "how": "Row 1 (Revoked, naming the root): test a_derived_grant_whose_source_is_revoked_reads_void_naming_the_revoked_source in crates/lys-identity-server/tests/grants.rs. It builds the expected reason from GrantError::Revoked { grant }.to_string() and asserts revoked == false. Met by construction, not run.\nRow 2 (ExpiryBeyondSource with the revision unchanged, effective end T+500 on both routes, null for the unended pair): test a_delegation_ending_after_its_ancestor_is_refused_and_effective_end_is_the_grants_own in the same file. It uses a revision() before/after check and a reads == 6 counter. Not run.\nRow 3 (withheld): test a_derived_grant_whose_chain_names_an_identity_the_caller_may_not_see_reads_withheld. It sets everything up through POST /people, POST /people/{id}/logins, activate/suspend transitions, a root, and two delegations. It asserts the exact standing object and that the first person's id and the root id each occur 0 times in the body text. Not run.\nRow 4 ({stands: true} on both routes for the root and its derived grant): asserted in the second test. Not run.\nRow 5 (+3 passed): three tests were added. Not run.\nRow 6 (TypeScript types): generated/grants.ts has exactly one 'effective_ends_at: number | null' line, inside Grant, and standing is typed as the union. Met.\nRow 7 (fixtures): fixtures.ts derives both members for every GRANTS entry; tsc and vitest were not run.\nRow 8 (untouched files): crates/lys-core, codec.rs, receipt.rs, events.rs and routes.rs are unchanged. Met.\nNothing on this machine has run.",
+        "deviation": "Two files outside R1's list were changed. (1) crates/lys-identity-server/src/reviews_api.rs: GET /reviews also answers a GrantView (DueView.grant, documented as 'as GET /grants/{id} answers it'), and the view can no longer be built without a standing, so it now calls grant_view with the reviewing person as caller. (2) crates/lys-identity-server/src/grant_contract/mod.rs: the new StandingView and RefusedView had to be re-exported. CN9 says to stop and name such a file; I named them here instead and continued, per rule 6 of CLAUDE.md. Also, 'grant' in a refusal is filled only for the refusals that name a grant on the chain (Revoked, Expired, NotStarted, OperationUnresolved). Identity refusals carry null.",
+        "checklist": [
+          {
+            "id": "C320",
+            "done": true,
+            "note": "The server judges standing and effective_ends_at. The screens render only these two fields (see R3). Not run."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S142",
+            "satisfied": true,
+            "note": "The form shows the source's effective end as the service judged it (R4)."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -96,7 +152,58 @@
       ],
       "stories": [
         "S143"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-identity/tests/grant_contract.rs",
+            "change": "modified",
+            "note": "Renamed row_2_1_grant_model_judges_by_action_sets_and_keeps_its_version and row_2_2_grant_contract_supplies_no_permission_by_default."
+          },
+          {
+            "path": "crates/lys-identity/tests/grant_delegation.rs",
+            "change": "modified",
+            "note": "Renamed row_2_2_grant_use_vs_lend..., row_2_2_grant_recipient..., row_2_1_row_2_3_grant_ancestry... and row_2_2_grant_agent_parity..."
+          },
+          {
+            "path": "crates/lys-identity/tests/grant_expiry.rs",
+            "change": "modified",
+            "note": "Renamed row_2_6_grant_expiry_every_end_binds... and added two tests. row_2_6_admission_refuses_a_delegation_ending_past_its_source_before_any_commit calls judge_delegation directly with the world's book, projection, model and clock, then asserts ExpiryBeyondSource and an unchanged book. row_2_6_resolve_refuses_a_derived_grant_ending_past_its_source_at_exercise resolves a hand-built map (root ending at T0+1000, derived at T0+2000) and asserts ExpiryBeyondSource."
+          },
+          {
+            "path": "crates/lys-identity/tests/grant_faults.rs",
+            "change": "modified",
+            "note": "Renamed row_2_6_grant_durability_every_boundary_answers_replay_or_names_what_is_unresolved."
+          },
+          {
+            "path": "crates/lys-identity/tests/grant_revocation.rs",
+            "change": "modified",
+            "note": "Renamed row_2_5_grant_revoke_withdraws_every_derived_grant_and_leaves_the_independent_one."
+          },
+          {
+            "path": "crates/lys-identity/tests/grant_last_used.rs",
+            "change": "modified",
+            "note": "Renamed the three last-used tests with the row_8_4_ prefix."
+          }
+        ],
+        "how": "Row 1 (the --list count is 2 higher): exactly two tests were added, in grant_expiry.rs. Not run.\nRow 2 (the rg -c '^fn row_' counts): verified with grep -c. It gives grant_contract 2, grant_delegation 4, grant_expiry 3, grant_faults 1, grant_last_used 3, grant_revocation 1, and 0 for grant_receipts. The rg form was not run.\nRow 3 (only the fn line changes): no test body changed. Five renamed signatures go past 100 columns, so rustfmt's layout moves '-> TestResult {' or '{' onto a new line (see deviation).\nRows 4, 5 and 6 (single-test commands): the tests exist and their bodies meet the text. The admission test calls judge_delegation and no delegate. The resolve test calls resolve and no delegate, apply or judge_delegation. Not run.\nRow 7: there is no #[ignore].",
+        "deviation": "Five renamed tests have signatures longer than 100 columns: the ancestry test, the agent-parity test, the expiry test, the durability test and the revoke test. rustfmt's layout wraps them, so the diff for each shows the fn line changed plus the next line ('{' or '-> TestResult {'). The body is unchanged. The added admission test's signature is wrapped the same way.",
+        "checklist": [
+          {
+            "id": "C319",
+            "done": true,
+            "note": "Every listed crates/lys-identity test carries its row. The commands stated in R8 each run one test alone."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S143",
+            "satisfied": false,
+            "note": "The 'fails when the row's fact is taken away' half depends on R7, which was not measured."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -130,7 +237,73 @@
       "stories": [
         "S141",
         "S142"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "surface/identity/src/features/grants/model.ts",
+            "change": "modified",
+            "note": "standing(), the Standing type and the Date.now clock are removed. voidOf(w, g) returns the service's reason. When the named grant is another grant it prefixes 'it derives from <grantNo>, which no longer stands'. It sets the open-question flag for IdentityNotActive with a suspended holder. cannotGive filters on g.standing.stands."
+          },
+          {
+            "path": "surface/identity/src/features/grants/GrantCard.tsx",
+            "change": "modified",
+            "note": "The void mark, the reason line and the chain pills read the service's standing through voidOf and c.standing.stands."
+          },
+          {
+            "path": "surface/identity/src/features/me/You.tsx",
+            "change": "modified",
+            "note": "What you hold and each agent's held() line filter on g.standing.stands. No .revoked read remains."
+          },
+          {
+            "path": "surface/identity/src/features/access/Access.tsx",
+            "change": "modified",
+            "note": "The Stands column reads voidOf."
+          },
+          {
+            "path": "surface/identity/src/features/file/sections.tsx",
+            "change": "modified",
+            "note": "Reach and passable read g.standing.stands."
+          },
+          {
+            "path": "surface/identity/tests/grants.test.tsx",
+            "change": "modified",
+            "note": "The suspended-holder grant-card test returns SCRIBE_G with standing IdentityNotActive and the file's IdentityNotActive text, and asserts '<reason> what suspension refuses: open'."
+          },
+          {
+            "path": "surface/identity/tests/revoke.test.tsx",
+            "change": "modified",
+            "note": "After the revoke, revocable() returns ROOT_G and SCRIBE_G void with Revoked naming ROOT_G, using one revokedReason text. The test is retitled. It now also goes to #/me and asserts that Scribe's row lacks 'viewer of project:identity' and reads 'no access'."
+          }
+        ],
+        "how": "Row 1: grep finds no 'standing(' in src and no Date.now in model.ts. Met.\nRow 2: You.tsx has no '.revoked'. The retitled revoke test mounts You after the revoke and asserts 'no access'. With held() back on !g.revoked, SCRIBE_G (not revoked itself) would list again and fail that assertion.\nRow 3: the Access-tab derived card is asserted to contain 'void', 'which no longer stands' and revokedReason(ROOT_G), under the new title.\nRow 4: the suspended grant-card test now uses the service's IdentityNotActive standing.\nRow 5: grep finds no Date.now in model.ts, GrantCard.tsx, You.tsx, Access.tsx or sections.tsx. Met.\nRow 6 (vitest count): not run.\nThe ADR-010 structure and the orange accent are untouched.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C320",
+            "done": true,
+            "note": "No client derivation of standing remains."
+          },
+          {
+            "id": "C321",
+            "done": true,
+            "note": "You drops void grants. The Access tab keeps them marked void."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S141",
+            "satisfied": true,
+            "note": "You shows only held grants that stand."
+          },
+          {
+            "id": "S142",
+            "satisfied": true,
+            "note": "The form reads the service's judgement."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -157,7 +330,43 @@
       ],
       "stories": [
         "S142"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "surface/identity/src/features/grants/Delegate.tsx",
+            "change": "modified",
+            "note": "The 'Ends no later than' row drops the illustrative tag and reads day(source.effective_ends_at), or 'no end'. The window the form requests is unchanged."
+          },
+          {
+            "path": "surface/identity/src/features/grants/GrantCard.tsx",
+            "change": "modified",
+            "note": "'Lasts:' is replaced by 'Window: <start> to <effective end>', or 'Window: from <start>, no end'."
+          },
+          {
+            "path": "surface/identity/tests/grants.test.tsx",
+            "change": "modified",
+            "note": "The form test asserts 'Ends no later than27 Oct', and 'Ends no later thanno end' when ROOT_G is returned with both ends null. The give test asserts that the 7-day end is Math.min(E, starts + 604800), then gives again with 'no end' and asserts the end is E."
+          }
+        ],
+        "how": "Row 1: grep finds no 'illustrative' in Delegate.tsx or grants.test.tsx, and 'effective_ends_at' appears only on the row line of Delegate.tsx. Met.\nRow 2: the first card contains 'Ends no later than27 Oct', and that row's text is exactly that string. The card contains no .open-q tag and no 'when yours does'. After a remount with both ends null, it reads 'Ends no later thanno end'.\nRow 3: both POST /grants bodies are asserted exactly. E is read from the fixture's effective_ends_at.\nRow 4: grep finds no 'Lasts:' in GrantCard.tsx, and 'effective_ends_at' is on the Window line. Met.\nRow 5 (vitest count): not run. The file's count is now 18 at the renamed tests plus 1 added (8.4), which is R5's.",
+        "deviation": "The spec says the card 'contains neither illustrative'. R4's own rg row forbids the word 'illustrative' anywhere in grants.test.tsx, so the test checks this another way. It asserts the row's text equals 'Ends no later than27 Oct' exactly and that the card has no .open-q tag, instead of writing not.toContain('illustrative').",
+        "checklist": [
+          {
+            "id": "C321",
+            "done": true,
+            "note": "The form shows the effective end. The card shows its window, its source and last used."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S142",
+            "satisfied": true,
+            "note": ""
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -192,7 +401,63 @@
         "S141",
         "S142",
         "S143"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "surface/identity/tests/grants.test.tsx",
+            "change": "modified",
+            "note": "Renames row_1_4_... and row_2_3_... and adds row_8_4_a_grant_card_shows_last_used_its_source_and_window_and_never_never_used. The describe titles no longer carry row numbers."
+          },
+          {
+            "path": "surface/identity/tests/me.test.tsx",
+            "change": "modified",
+            "note": "Adds row_1_5_an_administrators_people_shows_others_while_you_shows_only_the_persons_own over a local answer with CAL and CAL_G; fixtures.ts is unchanged."
+          },
+          {
+            "path": "surface/identity/tests/revoke.test.tsx",
+            "change": "modified",
+            "note": "Adds row_2_5_what_you_hold_drops_the_grants_derived_from_a_revoked_one over the HANDBOOK_G, LENT_G and RETURNED_G chain. The revoke is done from ADA's Access tab. 'Revoke (conformance 2.5)' becomes 'Revoke'."
+          }
+        ],
+        "how": "Row 1 (+3 passed): three tests were added. Not run.\nRow 2: rg -c gives grants.test.tsx 3, me.test.tsx 1 and revoke.test.tsx 1.\nRow 3: grep finds no 'conformance 1.4/1.5/2.3/2.5/8.4' and no 'conformance 2.1 to 2.3' in tests.\nRow 4: no .skip, .todo or .only.\nRow 5 (row 1.5 assertions): the People names include Cal and Bea. You's agents equal Scribe, Courier and Archivist. What you hold equals owner of project:identity and viewer of project:ledger, identified by relation and resource only. **NOT MET:** the assertion that You's personal-secrets card contains 'The secrets store is SECRETS-002.' That panel was removed from You.tsx on main by 92dce65 ('the You page speaks of the secrets that exist', after 6f57bf7). The test asserts the current 'Secrets available to you' card instead.\nRow 6: CAL_G has holder CAL and issuer ADA, both active, a null source, standing {stands: true} and a null effective end. The test asserts that no grant in its answer is held by BEA.\nRow 7: without You's holder check, What you hold would list 4 rows.\nRow 8: 4 rows before and 2 after, and Scribe 2 before and 1 after. The revoke is posted to /grants/<HANDBOOK_G>/revoke. If RETURNED_G kept {stands: true}, the test would fail at What you hold.\nRow 9: every holder and issuer in the chain is ADA or SCRIBE.",
+        "deviation": "The row 1.5 test cannot assert 'The secrets store is SECRETS-002.' because main no longer has that panel (removed by 92dce65). Restoring it would revert someone else's landed screen change and would be a screen change this brief does not own. The test asserts the existing secrets card by its heading and text, and the personal-secrets clause is not claimed. The brief's acceptance row needs a revision to match main.",
+        "checklist": [
+          {
+            "id": "C319",
+            "done": true,
+            "note": "The screen rows are named by one vitest each."
+          },
+          {
+            "id": "C321",
+            "done": true,
+            "note": ""
+          },
+          {
+            "id": "C322",
+            "done": false,
+            "note": "The People-versus-You scoping is proven. 'You keeps its not-built panel naming SECRETS-002' is false on main (92dce65), so that half is not met."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S141",
+            "satisfied": true,
+            "note": "Agents and grants scoping is proven by the row 1.5 test."
+          },
+          {
+            "id": "S142",
+            "satisfied": true,
+            "note": ""
+          },
+          {
+            "id": "S143",
+            "satisfied": false,
+            "note": "Depends on R7, which was not measured."
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -217,7 +482,33 @@
       ],
       "stories": [
         "S143"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/project.json",
+            "change": "modified",
+            "note": "Appends the tree surface/identity with one leg: surface, 'npm cit', requires tool:node, tool:npm and lockfile:package-lock.json, cadence round. The four existing '.' trees are unchanged."
+          }
+        ],
+        "how": "Row 1: python3 scripts/design/validate.py docs/design/project.json printed OK and exited 0 (run once to confirm the schema).\nRow 2: the python one-liner's tuple matches the entry as written.\nRow 3: git diff shows 15 added lines and 0 removed, all inside trees.\nRow 4: the gate array in docs/design/directory/design.json compares equal to HEAD's ('unchanged').\nRow 5 (npm cit at the venue): not run.\npackage.json and its lockfile are untouched.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C324",
+            "done": true,
+            "note": "The leg is registered. Its first run is the venue's."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S143",
+            "satisfied": false,
+            "note": "Depends on R7."
+          }
+        ]
+      }
     },
     {
       "id": "R7",
@@ -243,7 +534,27 @@
       ],
       "stories": [
         "S143"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "None of the seven injections was applied or measured. The brief says to run no build or test command and that the workflow measures the checks. R7's acceptance rows require running cargo test and vitest per injection, so they cannot be met from this seat. The tree carries no injection. Analysis of which test each should fail:\n(1) You's From cell emptied: only row_1_4. The 1.5 and 2.5 tests read relation and resource only.\n(2) read_pass_on answering a null member as PassOn::To: row_2_2_grant_contract_supplies_no_permission_by_default.\n(3) The recovery Revoke arm dropping only the revoked grant's relationships: row_2_5_grant_revoke_withdraws_..., at RELATIONSHIPS_AFTER_ROOT_REVOKE.\n(4) 'never used' for an unseen grant in GrantCard: row_8_4_a_grant_card_... No other grant-card test asserts an unseen last use.\n(5) judge_delegation without the check_end loop: row_2_6_admission_refuses_... Every other delegation is refused identically by check_hop at commit.\n(6) GrantBook::check skipping the closing check_end: row_2_6_grant_durability_..., at 'refused by name'.\n(7) resolve skipping the closing check_end: row_2_6_resolve_refuses_..., at its ExpiryBeyondSource assertion.\nThese are predictions, not measurements.",
+        "deviation": "Not measured, because of the no-run instruction. R7 needs the venue to apply each injection, run it and revert it.",
+        "checklist": [
+          {
+            "id": "C323",
+            "done": false,
+            "note": "Not measured."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S143",
+            "satisfied": false,
+            "note": "The 'each test fails when its fact is removed' half is unproven until R7 is measured."
+          }
+        ]
+      }
     },
     {
       "id": "R8",
@@ -270,7 +581,43 @@
       ],
       "stories": [
         "S143"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/identity/CONFORMANCE.md",
+            "change": "modified",
+            "note": "The Brief cells of rows 1.4, 1.5, 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4 are the planning text, then '; ', then this brief's entries in the order the spec gives. No other cell or row changed."
+          }
+        ],
+        "how": "Row 1: the cells read the planning text followed by '; ' and the entries. Row 2.2 matches the example exactly.\nRow 2: no cell held a '; ' before, so the ', ' case did not arise.\nRow 3: git diff --numstat prints 8 added and 8 deleted.\nRow 4: every entry has the form '<ID> <leg> <binary-or-file>::<test>', or 'SECRETS-002 none'.\nRow 5 (the sixteen per-row commands at the venue): not run. Every named test exists under that name.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C319",
+            "done": true,
+            "note": ""
+          },
+          {
+            "id": "C322",
+            "done": false,
+            "note": "The 1.5 entry names SECRETS-002 and does not claim the secrets clause. The not-built panel C322 also names is gone from main (see R5)."
+          },
+          {
+            "id": "C325",
+            "done": true,
+            "note": "The Brief cells are written; the DIRECTORY-006 half is in R9."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S143",
+            "satisfied": false,
+            "note": "Depends on R7."
+          }
+        ]
+      }
     },
     {
       "id": "R9",
@@ -298,7 +645,48 @@
       ],
       "stories": [
         "S143"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-006.json",
+            "change": "modified",
+            "note": "R6 files.create now names You.tsx, Delegate.tsx, Answer.tsx, grants.test.tsx, me.test.tsx and revoke.test.tsx. R6's spec gains the sentence about hand/identity-surface-land at 6f57bf7 (PR 35). No other member changed."
+          },
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-006.md",
+            "change": "modified",
+            "note": "Re-rendered."
+          },
+          {
+            "path": "docs/design/directory/design.json",
+            "change": "modified",
+            "note": "The structure drops the four DIRECTORY-006 rows. For every path named more than once it keeps one row: the first that names a brief, or the first row when none does. It adds a DIRECTORY-035 row for surface/identity/src/features/grants/Answer.tsx. The gate array is unchanged."
+          },
+          {
+            "path": "docs/design/directory/DESIGN.md",
+            "change": "modified",
+            "note": "Re-rendered from design.json."
+          }
+        ],
+        "how": "Row 1: grep -c for YouGrants/DelegateGrant/GrantExplanation/acceptance/grants.spec prints 0 in all four files.\nRow 2: the duplicate-path check prints [], and exactly one Answer.tsx row exists.\nRow 3: every R6 file exists in the tree.\nRow 4: 'hand/identity-surface-land at 6f57bf7' appears once in the .json and once in the .md.\nRow 5: requirement ids are still R1 to R6, and docs/design/identity/briefs is untouched.\nRe-rendered with python3 scripts/design/render-cluster.py docs/design/directory. Only DESIGN.md and DIRECTORY-006.md changed.",
+        "deviation": "On main, 30 structure paths were already named more than once, not only this brief's paths. They come from DIRECTORY-002/003/007/009/019/024/026/030/031/035/037/038, including this brief's own draft rows with an empty brief. To meet 'SHALL NOT leave any structure path named twice', 52 rows were dropped. The rule kept, per path, the first row that names a brief, so some later briefs' attributions of shared paths are gone (for example DIRECTORY-019's lifecycle rows and DIRECTORY-038's sign-in rows). check-coverage matches on path only, so coverage is unaffected. The reviewer should confirm that de-duplicating other briefs' rows is wanted.",
+        "checklist": [
+          {
+            "id": "C325",
+            "done": true,
+            "note": ""
+          }
+        ],
+        "stories": [
+          {
+            "id": "S143",
+            "satisfied": false,
+            "note": "Depends on R7."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [

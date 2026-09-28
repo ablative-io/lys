@@ -614,6 +614,72 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/surface.rs` | DIRECTORY-046 R4: Served screens never block an async worker and index.html is read once | DIRECTORY-046 |
 | `surface/identity/src/features/grants/check.ts` | DIRECTORY-046 R6: The grants screens ask for reach in one concurrent batch | DIRECTORY-046 |
 | `surface/identity/src/api.ts` | DIRECTORY-046 R7: The screens choose the right route first and fetch independent reads together | DIRECTORY-046 |
+| `sgconfig.yml` | DIRECTORY-048 R7: the ast-grep configuration; gains the rule that refuses an app named in Lys code | DIRECTORY-048 |
+| `crates/lys/src/cli/mcp.rs` | DIRECTORY-049 R7: the Lys MCP server over standard input and output: three tools over the published registration API | DIRECTORY-049 |
+| `crates/lys/tests/mcp_stdio.rs` | DIRECTORY-049 R7: the MCP server driven over standard input and output, each tool call carrying the caller's own token or agent signature | DIRECTORY-049 |
+| `crates/lys-runner/Cargo.toml` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/src/lib.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/src/pty.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/src/session.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/src/socket.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/tests/runner.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys/src/cli/runner.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/src/protocol.rs` | DIRECTORY-050 R2: A published runner protocol; any tool may be the runner | DIRECTORY-050 |
+| `crates/lys-runner/tests/conformance.rs` | DIRECTORY-050 R2: A published runner protocol; any tool may be the runner | DIRECTORY-050 |
+| `crates/lys-identity-server/src/runner_client.rs` | DIRECTORY-050 R2: A published runner protocol; any tool may be the runner | DIRECTORY-050 |
+| `crates/lys-identity-server/tests/runner_start.rs` | DIRECTORY-050 R3: Start runs the agent | DIRECTORY-050 |
+| `crates/lys-identity-server/src/runner_api.rs` | DIRECTORY-050 R4: Type, keys, read, wait, resize and compact through Lys | DIRECTORY-050 |
+| `crates/lys-identity-server/tests/runner_api.rs` | DIRECTORY-050 R4: Type, keys, read, wait, resize and compact through Lys | DIRECTORY-050 |
+| `crates/lys-runner/src/rotation.rs` | DIRECTORY-050 R5: Account rotation on usage limit | DIRECTORY-050 |
+| `surface/identity/src/features/runtime/Terminal.tsx` | DIRECTORY-050 R7: Sessions screen: see, type to and stop every agent | DIRECTORY-050 |
+| `surface/identity/src/features/runtime/terminal.css` | DIRECTORY-050 R7: Sessions screen: see, type to and stop every agent | DIRECTORY-050 |
+| `crates/lys-identity-server/src/usage_api.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys-identity-server/src/usage_state.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys-identity-server/src/usage_store.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/usage.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys-identity-server/tests/usage.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys-identity-server/src/budgets_api.rs` | DIRECTORY-051 R2: Budgets on agents, teams and people | DIRECTORY-051 |
+| `crates/lys-identity-server/src/budgets_state.rs` | DIRECTORY-051 R2: Budgets on agents, teams and people | DIRECTORY-051 |
+| `crates/lys-identity-server/tests/budgets.rs` | DIRECTORY-051 R2: Budgets on agents, teams and people | DIRECTORY-051 |
+| `crates/lys-identity-server/src/budgets_act.rs` | DIRECTORY-051 R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-identity-server/src/goals_api.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
+| `crates/lys-identity-server/src/goals_state.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
+| `crates/lys-identity-server/tests/goals.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
+| `surface/identity/src/features/usage/Usage.tsx` | DIRECTORY-051 R5: Usage screen | DIRECTORY-051 |
+| `surface/identity/src/features/usage/usage.css` | DIRECTORY-051 R5: Usage screen | DIRECTORY-051 |
+| `surface/identity/src/features/apps/SchemaBuilder.tsx` | DIRECTORY-048 R8: the permission schema builder | DIRECTORY-048 |
+| `surface/identity/src/features/apps/schema-builder.css` | DIRECTORY-048 R8: the permission schema builder | DIRECTORY-048 |
+| `surface/identity/tests/schema-builder.test.tsx` | DIRECTORY-048 R8: the permission schema builder | DIRECTORY-048 |
+| `crates/lys-identity-server/src/team_plans_api.rs` | R1: A team plan record | DIRECTORY-052 |
+| `crates/lys-identity-server/src/team_plans_state.rs` | R1: A team plan record | DIRECTORY-052 |
+| `crates/lys-identity-server/tests/team_plans.rs` | R1: A team plan record | DIRECTORY-052 |
+| `crates/lys-identity-server/src/team_plans_provision.rs` | R2: Provision in one all-or-nothing act | DIRECTORY-052 |
+| `surface/identity/src/features/team-plans/TeamPlans.tsx` | R5: Teams screen | DIRECTORY-052 |
+| `surface/identity/src/features/team-plans/team-plans.css` | R5: Teams screen | DIRECTORY-052 |
+| `surface/identity/src/features/apps/SchemaBench.tsx` | R8: Build an app's permission template on a Lys screen | DIRECTORY-048 |
+| `crates/lys-home/src/record/given.rs` | DIRECTORY-052 R3: the given record lists a member's starting memories and opening conversation | DIRECTORY-052 |
+| `crates/lys/src/identity/upgrade_back_tests.rs` | R1: `lys identity upgrade --back` | DIRECTORY-053 |
+| `crates/lys-build-stamp/Cargo.toml` | R2: One build stamp | DIRECTORY-053 |
+| `crates/lys-build-stamp/src/lib.rs` | R2: One build stamp | DIRECTORY-053 |
+| `crates/lys-build-stamp/tests/stamp.rs` | R2: One build stamp | DIRECTORY-053 |
+| `crates/lys-secrets/Cargo.toml` | R2: One build stamp | DIRECTORY-053 |
+| `crates/lys-home/Cargo.toml` | R2: One build stamp | DIRECTORY-053 |
+| `crates/lys/tests/version.rs` | R2: One build stamp | DIRECTORY-053 |
+| `crates/lys/src/package.rs` | R1: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `crates/lys/src/package_tests.rs` | R1: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `packaging/macos/Info.plist` | R1: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `packaging/macos/Lys.icns` | R1: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `crates/lys-app/Cargo.toml` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/main.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/progress.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/progress_tests.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `surface/identity/src/features/install/InstallProgress.tsx` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/engine.rs` | R3: The container engine, guided in plain words | DIRECTORY-054 |
+| `crates/lys-app/src/engine_tests.rs` | R3: The container engine, guided in plain words | DIRECTORY-054 |
+| `crates/lys-app/src/login_item.rs` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `crates/lys-app/src/login_item_tests.rs` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `surface/identity/src/features/account/Uninstall.tsx` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `docs/design/directory/reports/DIRECTORY-054-fresh-account.md` | R5: Proof on a fresh macOS account | DIRECTORY-054 |
 | `crates/lys/src/identity/upgrade/render.rs` | R5: The configuration and compose files move with the binaries | DIRECTORY-045 |
 | `crates/lys/src/identity/upgrade/render_tests.rs` | R5: The configuration and compose files move with the binaries | DIRECTORY-045 |
 | `crates/lys/src/identity/install/server_config.rs` | R5: The configuration and compose files move with the binaries | DIRECTORY-045 |
@@ -622,6 +688,55 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/identity/upgrade/intent.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
 | `crates/lys/src/identity/upgrade/intent_tests.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
 | `crates/lys/src/identity/upgrade/swap.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
+| `crates/lys-identity-server/src/apps_api.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `crates/lys-identity-server/src/apps_state.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `crates/lys-identity-server/src/apps_store.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `crates/lys-identity-server/tests/apps.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `surface/identity/src/features/apps/Apps.tsx` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `surface/identity/src/features/apps/apps.css` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `crates/lys-identity/src/grants/schema.rs` | R2: An app's schema: its own kinds, actions, relations and parents, checked on entry | DIRECTORY-048 |
+| `crates/lys-identity/src/grants/schema_tests.rs` | R2: An app's schema: its own kinds, actions, relations and parents, checked on entry | DIRECTORY-048 |
+| `crates/lys-identity-server/src/apps_binding.rs` | R2: An app's schema: its own kinds, actions, relations and parents, checked on entry | DIRECTORY-048 |
+| `crates/lys-identity/src/grants/model.rs` | R2: An app's schema: its own kinds, actions, relations and parents, checked on entry | DIRECTORY-048 |
+| `crates/lys-identity-server/tests/apps_schema.rs` | R3: Schema changes are versioned, dry-run first, and never strand a grant | DIRECTORY-048 |
+| `crates/lys-identity-server/tests/grants_batch.rs` | R5: Apps check many permissions at once and list what a subject may act on | DIRECTORY-048 |
+| `crates/lys-identity-server/src/openapi.rs` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `crates/lys-identity-server/tests/openapi.rs` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `crates/lys-openapi/Cargo.toml` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `crates/lys-openapi/src/lib.rs` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `crates/lys-identity-server/src/error_status.rs` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `rules/ast-grep/no-app-names.yml` | R7: Lys depends on no app | DIRECTORY-048 |
+| `crates/lys-core/src/attestation/mod.rs` | R7: Lys depends on no app | DIRECTORY-048 |
+| `crates/lys/src/identity/install/deployment.template.toml` | R7: Lys depends on no app | DIRECTORY-048 |
+| `surface/styles/tokens.css` | R7: Lys depends on no app | DIRECTORY-048 |
+| `crates/lys-identity-server/src/receipts_api.rs` | R4: Type, keys, read, wait, resize and compact through Lys | DIRECTORY-050 |
+| `crates/lys-identity/src/provisioning.rs` | R5: Account rotation on usage limit | DIRECTORY-050 |
+| `crates/lys-identity-server/src/stop_api.rs` | R6: Wake with a message; stop through the runner | DIRECTORY-050 |
+| `surface/identity/src/features/runtime/Sessions.tsx` | R7: Sessions screen: see, type to and stop every agent | DIRECTORY-050 |
+| `rules/ast-grep/no-poll.yml` | R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys-identity-server/src/setup.rs` | R1: First run is a Lys setup page that asks for the administrator; install fills nothing from the machine | DIRECTORY-047 |
+| `surface/identity/src/features/setup/Setup.tsx` | R1: First run is a Lys setup page that asks for the administrator; install fills nothing from the machine | DIRECTORY-047 |
+| `crates/lys-identity-server/src/sign_in.rs` | R2: Password sign-in is a Lys page; the browser never reaches the issuer's pages | DIRECTORY-047 |
+| `surface/identity/src/features/sign-in/SignIn.tsx` | R2: Password sign-in is a Lys page; the browser never reaches the issuer's pages | DIRECTORY-047 |
+| `crates/lys-identity-server/src/provider.rs` | R3: Lys is the OpenID provider every product is registered with | DIRECTORY-047 |
+| `crates/lys-identity-server/src/oidc.rs` | R3: Lys is the OpenID provider every product is registered with | DIRECTORY-047 |
+| `crates/lys-identity-server/src/sign_in_providers.rs` | R4: Providers are set up inside Lys with every step shown | DIRECTORY-047 |
+| `surface/identity/src/features/connections/SignInProviders.tsx` | R4: Providers are set up inside Lys with every step shown | DIRECTORY-047 |
+| `surface/identity/src/features/people/Account.tsx` | R5: A person's own account, and administration of accounts, are Lys screens | DIRECTORY-047 |
+| `crates/lys-identity-server/src/accounts.rs` | R5: A person's own account, and administration of accounts, are Lys screens | DIRECTORY-047 |
+| `crates/lys/src/identity/install/prepare.rs` | R5: A person's own account, and administration of accounts, are Lys screens | DIRECTORY-047 |
+| `crates/lys-identity-server/src/error.rs` | R6: Nothing a person reads names the issuer | DIRECTORY-047 |
+| `surface/identity/src` | R6: Nothing a person reads names the issuer | DIRECTORY-047 |
+| `crates/lys/src/identity/install/held_start.rs` | R2: The holder opens the lock, takes it and becomes the service | DIRECTORY-057 |
+| `crates/lys/src/identity/install/held_start_tests.rs` | R2: The holder opens the lock, takes it and becomes the service | DIRECTORY-057 |
+| `crates/lys/src/identity/install/start_race_tests.rs` | R3: The starter never opens the exit lock | DIRECTORY-057 |
+| `crates/lys-identity-server/src/checkpoint_api.rs` | R1: The receipts route answers a signed checkpoint | DIRECTORY-058 |
+| `crates/lys-identity-server/tests/receipts_signed.rs` | R1: The receipts route answers a signed checkpoint | DIRECTORY-058 |
+| `crates/lys-identity/src/receipt_answer.rs` | R2: One function verifies a receipt against a pinned key | DIRECTORY-058 |
+| `crates/lys-identity/src/receipt_answer_tests.rs` | R2: One function verifies a receipt against a pinned key | DIRECTORY-058 |
+| `crates/lys-identity-server/src/secrets_api.rs` | R6: Accounts and secrets stored and reached by handle | DIRECTORY-052 |
+| `crates/lys-install/Cargo.toml` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-install/src/lib.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
 
 ## Inventory
 

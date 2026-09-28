@@ -2132,6 +2132,186 @@
         "RM-085"
       ],
       "notes": "Written by hand straight to main."
+    },
+    {
+      "id": "RM-087",
+      "title": "Lys runs and drives the agents it starts, through its own background terminal or another runner",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "A runner on each machine holds each started agent's terminal; Lys starts, types into, reads, waits on, compacts, rotates accounts for, wakes and stops sessions through it, under grants; any tool speaking the runner protocol can be the runner.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T19:48:31+10:00",
+        "quote": "I've decided that I want this to actually handle the launching of agents, either through a background terminal of its own or plugging into something else. I want it to be able to do all of the things that Argus can do currently through herdr, and what was supposed to be done through manifold.",
+        "context": "Said with the go for the API, before bed; target is the presentation on 29 September at 13:00."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-117"
+        ],
+        "briefs": [
+          "DIRECTORY-050"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-085"
+      ],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-088",
+      "title": "Lys tracks every agent's tokens, context, time, budgets and goals, and acts on them",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Usage measured from the transcript per turn; budgets on agents, teams and people that compact, stop or tell; goals with deadlines and reminders delivered into the session; screens and API. Replaces Argus for our sessions.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T19:51:07+10:00",
+        "quote": "Argus is not going to be able to do what we need, to be able to track budgets and token usage, time, goals and everything like that through Lys. We're going to completely rewrite that, in Rust.",
+        "context": "Argus keeps crashing; Tom wants it rewritten in Rust inside Lys."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-118"
+        ],
+        "briefs": [
+          "DIRECTORY-051"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-087"
+      ],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-089",
+      "title": "Provision a working team in one act: memories, opening conversation, budget, goals, deliverables and a checker",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "A team plan provisions and starts its agents with everything they need and holds them to a budget; deliverables are met only when a checker accepts the evidence.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T19:55:21+10:00",
+        "quote": "I want you to be able to provision new agents so we can provision them off with the right memories, with the right few-shot kind of prompting to start it off, and to be able to send them off to do work without having to know that they've got a budget, know that they've got reminders, know that it's actually going to happen, know that things are actually being checked. So I could say, Waffles, we need a team to work on this. And you could provision them, give them a certain budget, and we can start to budget out things properly.",
+        "context": "Said before bed; the goal of the Lys agent work."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-119"
+        ],
+        "briefs": [
+          "DIRECTORY-052"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-087",
+        "RM-088"
+      ],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-090",
+      "title": "Go back to the previous build after an upgrade that succeeded, and one build stamp for every binary",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "An install that upgraded and then misbehaves returns to the build it ran before with one command; the four binaries take their build stamp from one shared build script.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-28T20:25:00+10:00",
+        "quote": "You can start on all of that, you can refresh as well.",
+        "context": "Tom asked at 19:47 for his live install to be updated tonight. Waffles' review of DIRECTORY-045's first round (card/DIRECTORY-045 ca11e605) found two gaps: upgrade returns to the previous build only when the upgrade itself fails, and the build stamp is four byte-identical build.rs files held equal by a test."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [],
+        "briefs": [
+          "DIRECTORY-053"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand. Follows DIRECTORY-045."
+    },
+    {
+      "id": "RM-091",
+      "title": "Install Lys by downloading and opening an app, with no terminal",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Lys.app for macOS: open it, watch the install on a Lys page, finish first-run setup, and Lys runs at login; update and uninstall from Lys.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T19:10:00+10:00",
+        "quote": "how is an average person supposed to do it?",
+        "context": "Tom's standing rule of that evening: Lys is the only sign-in for everything and an average person sets it up with no terminal. Found missing by Waffles at 20:22 while reviewing an installer draft."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-120"
+        ],
+        "briefs": [
+          "DIRECTORY-054"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-084"
+      ],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-092",
+      "title": "A service's exit lock is opened only in the service's own process, so no other process ever carries a copy of it",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "A service's exit lock is opened and taken in the service's own process by a holder command, so no process the starter starts can carry a copy of it.",
+      "provenance": {
+        "requested_by": "archie",
+        "date": "2026-09-28T20:40:00+10:00",
+        "quote": "",
+        "context": "Found while landing the combined identity landing: the exit watch race on the landing gate, and the review of the sign-in provider's link-audit sender."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-121"
+        ],
+        "briefs": [
+          "DIRECTORY-057"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-093",
+      "title": "A receipt's checkpoint is signed by the service, so inclusion in it proves the act is in the log",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "The receipts route answers its checkpoint signed by the service key, and one function verifies a receipt answer against a pinned key.",
+      "provenance": {
+        "requested_by": "archie",
+        "date": "2026-09-28T20:40:00+10:00",
+        "quote": "",
+        "context": "Found while landing the combined identity landing: the exit watch race on the landing gate, and the review of the sign-in provider's link-audit sender."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [],
+        "briefs": [
+          "DIRECTORY-058"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
     }
   ]
 }
