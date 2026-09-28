@@ -1414,20 +1414,26 @@
     },
     {
       "id": "ADR-107",
-      "title": "A Claude Code import builds its session under a staging name and publishes it once",
-      "status": "decided",
+      "title": "The given statement is a lys/attestation/v2 over the RFC 8785 bytes of lys.given's data, its hash kept in the render manifest, written only when render-launch is given a key",
+      "status": "proposed",
       "scope": "home",
-      "date": "2026-09-27",
-      "decided_by": "The home line's lead, answering the survey of the repeated-work card; recorded with HOME-020",
-      "context": "Every imported entry went through Session::append_entry, which syncs the line, syncs the index row and writes the head through a temporary file, a rename and a directory sync: about five syncs per record, though the import sets the head once at its end. Appending in place with no sync until the end cannot be repaired by the existing reconcile: a crash can leave a torn or zero-filled last line that Index::scan refuses as Malformed, so the session will not open, a head still at the header, and a re-import refused as Exists; and the original bytes are never rewritten (P1), so a torn tail cannot be trimmed.",
-      "decision": "The import command builds its new session under the staging name `<id>.jsonl.importing` beside `sessions/<id>.jsonl`, holding `<id>.lock` throughout: the header and every entry line are written to the staging file with no sync, and the index rows and the head are kept in memory. It then publishes once, in this order: one sync of the staging file; the index written whole to `<id>.index.jsonl` through a temporary file, synced and renamed; the head written once to `<id>.head` through a temporary file, synced and renamed; one sync of the sessions directory; the staging file renamed to `<id>.jsonl`; one more sync of the sessions directory. A crash before the rename leaves no session under the final name, so a re-import is not refused as Exists; the next import of that id and the next open of that session file, each holding the lock, remove the staging file and, when `<id>.jsonl` is absent, the `<id>.index.jsonl` and `<id>.head` a part-way publish left. Rejected: appending in place and leaving a session that refuses by name after a crash; extending reconcile to trim an unsynced tail.",
+      "date": "2026-09-28",
+      "decided_by": "The lead's rulings on the given-statement card, with the lead's answers of 28 September on where the hash is recorded, the refusal message and the certificate check; the canonical form and the statement's keeping chosen by HOME-022's author and proposed with that brief",
+      "context": "CONFORMANCE row 6.5 asks that what an agent was given be a signed statement checked with lys verify --attestation. The lys.given entry records the hashes of the documents a session was given and no hash of itself, lys-core's attestation signs SHA-256 of a payload, and a signed form is frozen from its first signature, so the bytes signed have to be named so a stranger can rebuild them with standard tooling, and the hash has to sit in a record a stranger reading the session can find.",
+      "decision": "The given statement is lys-core's existing lys/attestation/v2 over the RFC 8785 (JSON Canonicalization Scheme) bytes of the lys.given entry's data. The SHA-256 of those bytes, the given hash, is recorded in every render's manifest block as given_sha256 and printed in the render-launch report; the template_render event keeps the shape ADR-012 decided and names the manifest by hash. The statement is written only when render-launch is given a key: kept as a block named by a lys.given_statement entry hung under the lys.given entry, and as given-statement.cose and given-data.json under --out for lys verify. Rejected: serialising the record in struct field order, which a stranger cannot rebuild without the Rust type; signing the 64-hex hash string, whose attested hash would be SHA-256 of the hex and not the given hash; adding the given hash to the template_render event's detail, which changes the shape ADR-012 decided; recording it only in the report, where a stranger reading the session cannot find it; keeping the COSE bytes inline as hex in the entry rather than as a block; and adding the file's path to lys verify's one failure message, which would change the published lys for every user.",
       "quote": "",
       "consequences": [
         "docs/design/home/RECORD.md states the staged import's rule beside the per-append durability order, which is unchanged for every other append.",
         "Only an import into a session it creates is staged; import_claude_code given a session that is already open keeps append_entry's per-entry syncs, since a rename cannot publish a session that already exists.",
         "Reconcile is not extended and no session file is trimmed, rewritten or truncated; recovering a session whose last line a crash tore is its own decision.",
         "A staging file does not end in `.jsonl`, so Home::session_ids never lists it as a session.",
-        "The block store's two syncs per new block are unchanged and are not part of the import's bounded count; they are counted beside it."
+        "The block store's two syncs per new block are unchanged and are not part of the import's bounded count; they are counted beside it.",
+        "The RFC 8785 form of lys.given's data is a wire contract from the first signature; changing it means a new statement type alongside, never a mutation.",
+        "Every render manifest carries given_sha256, keyed or not; the template_render event and the lys.given entry are unchanged.",
+        "A render with no key writes the lys.given entry as HOME-003 records it and no statement, and says unsigned.",
+        "The statement signs what a session was given, not which session: equal lys.given data gives equal payloads, and the tie to a session is the lys.given_statement entry's unsigned place under its lys.given entry.",
+        "The statement is checked with the unchanged lys verify; which key signed is checked by comparing its signer public key with an expected key until row 6.1 supplies a certificate over the home's key for lys verify --cert.",
+        "The start statement and the role-move statement are later statements over the START launch record and the ROLES version record, written when those records land."
       ],
       "supersedes": [],
       "superseded_by": ""
