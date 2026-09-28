@@ -1,3 +1,4 @@
+import { ReviewProfile } from './ReviewProfile';
 /** An agent's recorded provisioning is versioned explicitly; a saved profile is not a runtime application receipt. */
 import { useState } from 'react';
 import type { FormEvent } from 'react';
@@ -9,7 +10,7 @@ import { useRoleChange } from '../roles/useRoleChange';
 import { ChangeStatus } from '../roles/ChangeStatus';
 
 interface Server { name: string; url: string }
-export interface ProvisioningProfile { version: number; operation: string; model_access: string[]; tools: string[]; skills: string[]; mcp_servers: Server[]; instructions: string; note: string; set_by: string; set_at: number }
+export interface ProvisioningProfile { reviewed_by?: string | null; reviewed_at?: number | null; self_reviewed?: boolean; version: number; operation: string; model_access: string[]; tools: string[]; skills: string[]; mcp_servers: Server[]; instructions: string; note: string; set_by: string; set_at: number }
 export interface ProvisioningAnswer { agent: string; recorded?: { operation: string; version: number } | null; profile: ProvisioningProfile | null; versions: { version: number; set_by: string; set_at: number; note: string }[]; enforced: boolean }
 const pathOf = (id: string) => '/agents/' + encodeURIComponent(id) + '/provisioning';
 const lines = (data: FormData, name: string) => field(data, name).split('\n').map((line) => line.trim()).filter(Boolean);
@@ -32,6 +33,7 @@ export function Provisioning({ id }: { id: string }) {
         <h3>MCP servers</h3>{answer.profile.mcp_servers.length ? <ul>{answer.profile.mcp_servers.map((server) => <li key={server.name}>{server.name} · {server.url}</li>)}</ul> : <p>None recorded.</p>}
         <h3>Instructions</h3><p style={{ whiteSpace: 'pre-wrap' }}>{answer.profile.instructions || 'None recorded.'}</p>
       </section> : <p>No provisioning profile has been recorded.</p>}
+      {authority.status === 'ok' && answer.profile ? <ReviewProfile key={id + ':' + revision} agent={id} person={authority.data.me.person.id} profile={answer.profile} changed={(message) => { setNotice(message); setRevision((value) => value + 1); }} /> : null}
       {authority.status === 'ok' && authority.data.people.scope === 'directory' ? <ProfileEditor key={id + ':' + revision} id={id} person={authority.data.me.person.id} profile={answer.profile} changed={() => { setNotice('Provisioning profile recorded.'); setRevision((value) => value + 1); }} /> : null}
       {answer.versions.length ? <details className="card"><summary>Profile history ({answer.versions.length})</summary>{answer.versions.map((version) => <p key={version.version}>Version {version.version} · {clock(version.set_at)} · {version.note}</p>)}</details> : null}
     </>} />
