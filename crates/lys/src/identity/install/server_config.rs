@@ -30,7 +30,7 @@ pub const SESSION_SECONDS: u64 = 28_800;
 /// and a trailing slash, exactly as its discovery document states it.
 pub fn issuer(config: &DeploymentConfig) -> String {
     format!(
-        "{}/auth/v1",
+        "{}/auth/v1/",
         config.issuer.public_origin.trim_end_matches('/')
     )
 }
