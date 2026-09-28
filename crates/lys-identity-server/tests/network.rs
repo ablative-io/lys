@@ -142,6 +142,7 @@ fn the_machines_are_read_back_from_one_file_as_they_were_kept() -> TestResult {
         runtime: Some("norn".to_owned()),
         slots: 4,
         may_run: Vec::new(),
+        may_run_roles: Vec::new(),
         may_reach: vec!["git.example.test".to_owned()],
         named_by: "person-a".to_owned(),
         named_at: 5,

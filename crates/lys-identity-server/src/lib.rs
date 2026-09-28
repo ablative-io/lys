@@ -7,6 +7,7 @@
 
 pub mod admission;
 mod agent_sight;
+pub mod agent_signature;
 pub mod certificates_api;
 mod certificates_issue;
 pub mod certificates_store;

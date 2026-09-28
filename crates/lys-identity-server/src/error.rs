@@ -1,13 +1,9 @@
 //! The mapping of every refusal to an HTTP answer, each by name.
 
-use axum::Json;
 use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
 
 use lys_identity::IdentityError;
 use lys_identity::grants::GrantError;
-
-use crate::error_status::{grant_status, identity_status};
 
 /// Everything the service refuses.
 #[derive(Debug, thiserror::Error)]
@@ -161,6 +157,12 @@ pub enum ServerError {
         /// The operation id.
         operation: String,
     },
+    /// The agent's profile holds no version by that number.
+    #[error("ProfileVersionUnknown: the agent's profile holds no version {version}")]
+    ProfileVersionUnknown {
+        /// The version asked for.
+        version: u32,
+    },
     /// The agent's latest profile version is not reviewed, so it is not started.
     #[error(
         "ProfileNotReviewed: version {version} of the agent's profile is not reviewed; review it before the agent is started"
@@ -247,6 +249,12 @@ pub enum ServerError {
         "LaunchRecordMissing: the agent has no provisioning profile to start it from: set its profile first"
     )]
     LaunchRecordMissing,
+    /// An agent's signed request was refused, naming the check that refused it.
+    #[error("AgentSignatureRefused: {reason}")]
+    AgentSignatureRefused {
+        /// Which check refused it.
+        reason: &'static str,
+    },
     /// The agent is not active, so it is not started.
     #[error("AgentNotActive: the agent is {state} and only an active agent is started")]
     AgentNotActive {
@@ -418,85 +426,5 @@ impl ServerError {
     pub fn name(&self) -> String {
         let text = self.to_string();
         text.split(':').next().unwrap_or_default().to_owned()
-    }
-
-    fn status(&self) -> StatusCode {
-        match self {
-            Self::NotSignedIn => StatusCode::UNAUTHORIZED,
-            Self::NotAdmitted { .. }
-            | Self::NoPerson
-            | Self::SetupRequired
-            | Self::Withheld { .. }
-            | Self::MachineNotForAgent
-            | Self::ReviewerOnly => StatusCode::FORBIDDEN,
-            Self::AgentNotVisible
-            | Self::GrantNotVisible
-            | Self::SessionUnknown
-            | Self::RequestUnknown
-            | Self::MachineUnknown
-            | Self::LaunchRecordMissing
-            | Self::RuntimeSessionUnknown
-            | Self::RoleUnknown
-            | Self::RoleVersionUnknown
-            | Self::HolderUnknown
-            | Self::ServiceAccountUnknown
-            | Self::TeamUnknown
-            | Self::TeamMemberUnknown
-            | Self::CertificateUnknown { .. } => StatusCode::NOT_FOUND,
-            Self::RequestDecided { .. }
-            | Self::RequestHeld { .. }
-            | Self::RequestReused { .. }
-            | Self::MachineReused { .. }
-            | Self::RoleReused { .. }
-            | Self::RoleHeld { .. }
-            | Self::HoldingOver { .. }
-            | Self::HoldingChanged
-            | Self::ProvisioningChanged { .. }
-            | Self::ProvisioningReused { .. }
-            | Self::CertificateReused { .. }
-            | Self::CertificateWithdrawn { .. }
-            | Self::MachineRetired
-            | Self::AgentNotActive { .. }
-            | Self::ProfileNotReviewed { .. }
-            | Self::MachineCannotReach { .. }
-            | Self::MachineWithoutRuntime
-            | Self::LaunchUnrenderable { .. }
-            | Self::RuntimeSessionStarted { .. }
-            | Self::RuntimeSessionStopped { .. }
-            | Self::RuntimeReportReused { .. }
-            | Self::ServiceAccountReused { .. }
-            | Self::ServiceAccountRetired { .. }
-            | Self::ServiceAccountOwnerRetired { .. }
-            | Self::TeamReused { .. }
-            | Self::TeamRetired { .. }
-            | Self::TeamMemberHeld
-            | Self::TeamMemberAbsent
-            | Self::GrantNotDue { .. }
-            | Self::ReviewReused { .. } => StatusCode::CONFLICT,
-            Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
-            Self::SignInFailed { .. } | Self::SecretsUnavailable { .. } => StatusCode::BAD_GATEWAY,
-            Self::ConfigInvalid { .. }
-            | Self::DirectoryUnavailable { .. }
-            | Self::RequestsUnavailable { .. }
-            | Self::NetworkUnavailable { .. }
-            | Self::RolesUnavailable { .. }
-            | Self::MemoryUnavailable { .. }
-            | Self::ProvisioningUnavailable { .. }
-            | Self::CertificatesUnavailable { .. }
-            | Self::RuntimeUnavailable { .. }
-            | Self::ServiceAccountsUnavailable { .. }
-            | Self::TeamsUnavailable { .. }
-            | Self::ReviewsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
-            Self::SecretsRefused { status, .. } => *status,
-            Self::Identity(error) => identity_status(error),
-            Self::Grant(error) => grant_status(error),
-        }
-    }
-}
-
-impl IntoResponse for ServerError {
-    fn into_response(self) -> Response {
-        let body = serde_json::json!({ "refusal": self.name(), "reason": self.to_string() });
-        (self.status(), Json(body)).into_response()
     }
 }

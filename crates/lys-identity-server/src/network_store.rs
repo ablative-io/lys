@@ -44,6 +44,9 @@ pub struct Machine {
     pub slots: u32,
     /// The agents that may run on it.
     pub may_run: Vec<String>,
+    /// The roles whose holders may run on it, by role id.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub may_run_roles: Vec<String>,
     /// The hosts an agent on it may reach.
     pub may_reach: Vec<String>,
     /// The person who named it.
