@@ -18,7 +18,7 @@ pub fn routes() -> Router<Arc<AppState>> {
 }
 
 /// Only an origin may leave the service: never URL credentials, paths or queries.
-fn origin(value: &str, name: &str) -> Result<String, ServerError> {
+pub(crate) fn origin(value: &str, name: &str) -> Result<String, ServerError> {
     let url = Url::parse(value).map_err(|error| ServerError::ConfigInvalid {
         reason: format!("the {name} endpoint cannot be shown: its URL is invalid: {error}"),
     })?;

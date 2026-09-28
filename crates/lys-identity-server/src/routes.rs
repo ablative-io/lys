@@ -126,7 +126,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
             store.profiles().len()
         ));
     }
-    Ok(router(Arc::new(AppState {
+    let state = Arc::new(AppState {
         directory: Mutex::new(directory),
         oidc: Oidc::discover(config).await?,
         sessions: Sessions::new(config.session_seconds, config.secure_cookie),
@@ -152,7 +152,9 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         roles: roles.map(Mutex::new),
         provisioning: provisioning.map(Mutex::new),
         say,
-    })))
+    });
+    let configuration = crate::configuration_api::routes(config).with_state(Arc::clone(&state));
+    Ok(router(state).merge(configuration))
 }
 
 /// Open the directory `config` names, creating its log when the log's

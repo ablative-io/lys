@@ -1,3 +1,4 @@
+import { EffectiveSettings } from './EffectiveSettings';
 import type { ReactNode } from 'react';
 import { useParams } from 'react-router';
 import { useShell } from '../../shell/ShellContext';
@@ -19,7 +20,7 @@ function Row({ t, d, children }: { t: string; d: string; children: ReactNode }) 
   );
 }
 
-/** Configuration. Layout is the shell's own and works; the rest has no server yet. */
+/** Layout preferences and the administrator's effective startup configuration. */
 export function Settings() {
   const shell = useShell();
   const { sec = 'layout' } = useParams();
@@ -51,9 +52,7 @@ export function Settings() {
               </Row>
             </>
           ) : (
-            <div className="empty-note">
-              <span className="open-q">not built yet</span> This section&apos;s settings have no server yet.
-            </div>
+            <EffectiveSettings section={sec} />
           )}
         </div>
       </div>
