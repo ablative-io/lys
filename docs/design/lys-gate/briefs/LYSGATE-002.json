@@ -46,7 +46,38 @@
       "stories": [
         "S4",
         "S5"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "scripts/check_file_length.py",
+            "change": "created",
+            "note": "The file-length checker. One `git ls-files -z` at the root (default: the script's parent's parent, or argv[1]). It measures tracked .rs/.ts/.tsx/.mts/.mjs files outside vendor/ and outside path-based test code, reads each file once as UTF-8 and scans it in one pass (a compiled regex jumps to the next special character). It prints `PATH: N lines of code (limit 500)` per file over the limit, sorted by path, then `file-length: K files measured, M over the limit`. Exit 0/1, or 2 for any unreadable or undecodable file, which is named with its reason on stderr."
+          }
+        ],
+        "how": "Accept 1: met. At the card's tree, `python3 scripts/check_file_length.py` exits 0 and its last line is `file-length: 498 files measured, 0 over the limit` (run in the card worktree and again at scratch commit 9d447cc, recorded in PROOF-LYSGATE-002.md). K is the tracked paths ending in the five suffixes, minus those under vendor/, minus the path-based test files (tests/ dirs, *_tests.rs, *.test/spec.ts(x), __tests__), minus files whose first item is #![cfg(test)]. is_measured_path is at scripts/check_file_length.py:369, and main skips a None count at :405. Accept 2: met. The file parses with ast.parse, and its imports are exactly __future__, pathlib, re, subprocess and sys, all standard library (checked with an ast walk). Accept 3: met. Python is not among the measured suffixes, so I counted it with Python's tokenizer, applying the same definition (no comments, docstrings or blank lines): 355 code lines out of 439 raw.\n\nRules as implemented. Rust: count_rust at :173 handles `//` line comments, nested /* */ through _rust_block_end at :127, escaped strings and byte strings through _rust_string_end at :114, and raw strings r/br/cr with any number of # through _rust_raw_prefix at :104 plus a hash count. A quote starts a char literal only when an escape follows or the closing quote is two characters on (_rust_char_end at :140); otherwise it is a lifetime. #[cfg(test)] makes the attribute and the item's head pending. A `{` at bracket depth 0 then starts an excluded body, closed by brace matching, where braces inside strings and comments are never seen. A `;`, `,` or `}` at depth 0 instead commits the pending lines as code (for example `#[cfg(test)] use x;`). An inner #![cfg(test)] before any code excludes the whole file. TypeScript/JS: count_script at :310 handles non-nesting block comments, '...' and \"...\" strings (an unclosed one ends at its line, so a JSX apostrophe cannot swallow the file), template literals with a ${...} brace-depth stack, and regex literals where the previous token allows one (_regex_allowed at :302). Generated files: no first-line generated marker exists in any tracked code file (I checked every first line; surface/identity/src/generated/*.ts carry prose headers only), so none is honoured, and the module doc says so. Cross-check: the per-file counts match a naive non-comment line count for all 143 TypeScript files, and for Rust wherever #[cfg(test)] does not apply. The whole run takes about 0.2 s.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C10",
+            "done": true,
+            "note": "The checker exits 1 naming each file over 500 with its count; the red run named crates/lys/src/length_probe.rs with 501."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S4",
+            "satisfied": true,
+            "note": "The leg fails in the round a file grows past 500."
+          },
+          {
+            "id": "S5",
+            "satisfied": true,
+            "note": "The output names the path and the count: `PATH: N lines of code (limit 500)`."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -67,7 +98,33 @@
       ],
       "stories": [
         "S5"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "scripts/check_file_length_test.py",
+            "change": "created",
+            "note": "23 unittest cases, standard library only. Each writes its fixtures into a fresh TemporaryDirectory git repository, adds the tracked ones, and runs count_file or main on it, with expected counts as literals."
+          }
+        ],
+        "how": "Accept: met. `python3 -m unittest scripts/check_file_length_test.py` ran 23 tests, OK, in about 2.4 s. Each spec case is its own method: blank/whitespace (:62), // /// //! (:65), trailing comment (:69), multi-line /* */ (:72), nested Rust (:76), TS non-nesting (:80), comment markers in a Rust string (:84) and a TS string (:95), r##\"..\"## holding \"# and // (:105), lifetime beside '/' and '\"' (:116), template with // and ${ `nested` } (:126), regex /\\/\\// (:136), #[cfg(test)] mod with braces in strings (:150), and #![cfg(test)] / *_tests.rs / tests/x.rs / x.test.ts excluded (:175-:184), each paired with a 600-line body so that failing to exclude it fails the case. Also untracked 600-line ignored (:187), exactly 500 passes (:192), 501 fails with the exact output and exit 1 (:198), 700 raw lines with 200 comments passes (:208), and invalid UTF-8 exits 2 naming the path (:217). One extra case, the JSX apostrophe (:146), covers the ends-at-its-line rule. Discrimination: I applied 18 mutations to a temp copy of the checker (no nesting, TS nesting, raw strings off, char literals off, lifetimes read as chars, regex off, cfg(test) off, inner-attribute off, >= limit, each path exclusion off, TS strings off, templates off, template nesting off, line-ended strings off). Each made the case built for it fail. Three fixtures (lifetime, template, template nesting) at first let errors cancel out and were reshaped until they did.",
+        "deviation": "One test method beyond the spec's list, test_unclosed_quote_in_jsx_text_ends_at_its_line, pins a behaviour the checker needs so a JSX apostrophe cannot swallow later lines. Every listed case is present.",
+        "checklist": [
+          {
+            "id": "C11",
+            "done": true,
+            "note": "Covers every counting rule and passes (23 tests OK)."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S5",
+            "satisfied": true,
+            "note": "The 501 case asserts the exact named output line."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -89,7 +146,33 @@
       ],
       "stories": [
         "S4"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "scripts/file-length.sh",
+            "change": "created",
+            "note": "The leg's command. `set -eu`, cd to the script's parent's parent, then `python3 -m unittest scripts/check_file_length_test.py`, then `python3 scripts/check_file_length.py`."
+          }
+        ],
+        "how": "Accept 1: met. `sh scripts/file-length.sh` exits 0 on the card's tree and at scratch commit 9d447cc; the last line is `file-length: 498 files measured, 0 over the limit`. Accept 2: met. In a detached temporary worktree, I made one test assert 99 instead of the real count. `sh scripts/file-length.sh` exited 1 with `FAILED (failures=1)`, and its output held no `file-length:` line, so the checker never ran (set -e stops at the failed unittest). The worktree was removed afterwards.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C12",
+            "done": true,
+            "note": "Tests, then the checker; non-zero if either fails."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S4",
+            "satisfied": true,
+            "note": "A broken checker test also reddens the leg."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -121,7 +204,83 @@
       ],
       "stories": [
         "S4"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/project.json",
+            "change": "modified",
+            "note": "trees[0] gains the file-length leg directly after ast-grep; inserted by hand, keeping the file's inline-array style."
+          },
+          {
+            "path": "docs/design/decisions-words/design.json",
+            "change": "modified",
+            "note": "The '.' gate tree gains the file-length leg after ast-grep."
+          },
+          {
+            "path": "docs/design/directory/design.json",
+            "change": "modified",
+            "note": "The '.' gate tree gains the file-length leg after ast-grep."
+          },
+          {
+            "path": "docs/design/home/design.json",
+            "change": "modified",
+            "note": "The '.' gate tree gains the file-length leg after ast-grep."
+          },
+          {
+            "path": "docs/design/lys-anchor/design.json",
+            "change": "modified",
+            "note": "The '.' gate tree gains the file-length leg after ast-grep."
+          },
+          {
+            "path": "docs/design/lys-core/design.json",
+            "change": "modified",
+            "note": "The '.' gate tree gains the file-length leg after ast-grep."
+          },
+          {
+            "path": "docs/design/lys-gate/design.json",
+            "change": "modified",
+            "note": "The '.' gate tree gains the file-length leg after ast-grep."
+          },
+          {
+            "path": "docs/design/lys-log-store/design.json",
+            "change": "modified",
+            "note": "The '.' gate tree gains the file-length leg after ast-grep."
+          },
+          {
+            "path": "docs/design/rauthy-rebase/design.json",
+            "change": "modified",
+            "note": "The '.' gate tree gains the file-length leg after ast-grep."
+          },
+          {
+            "path": "docs/design/roots/design.json",
+            "change": "modified",
+            "note": "The '.' gate tree gains the file-length leg after ast-grep."
+          },
+          {
+            "path": "docs/design/secrets/design.json",
+            "change": "modified",
+            "note": "The '.' gate tree gains the file-length leg after ast-grep; its docs tree is untouched."
+          }
+        ],
+        "how": "Accept 1: met. A one-liner over project.json trees and every docs/design/*/design.json gate prints, for all 11 '.' trees, that the leg after 'ast-grep' equals {name file-length, command sh scripts/file-length.sh, requires [tool:sh, tool:python3, tool:git], cadence round} and that it is the last leg; no tree lacks it. Accept 2: met. `git diff -U0 HEAD` over those files shows only + lines forming the 11 inserted leg objects and no - lines. The cluster files were rewritten through json.dumps(indent=2, ensure_ascii=False), after first confirming that each one round-trips byte-identically. I re-rendered all ten clusters with scripts/design/render-cluster.py; no .md file changed, because the renderer never reads the gate array.",
+        "deviation": "CN3 says nothing under docs/design/lys-core is edited, but R4 explicitly lists docs/design/lys-core/design.json and lys-gate's structure names it, so it gains the inserted leg and nothing else. Its rendered markdown is unchanged.",
+        "checklist": [
+          {
+            "id": "C13",
+            "done": true,
+            "note": "The leg is identical in project.json and all ten cluster '.' trees, directly after ast-grep."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S4",
+            "satisfied": true,
+            "note": "Every cluster round now runs the leg."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -145,7 +304,43 @@
       ],
       "stories": [
         "S4"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": ".land/gates.sh",
+            "change": "modified",
+            "note": "Gains `leg sh scripts/file-length.sh` at line 43, directly after the ast-grep leg and before identity_leg."
+          },
+          {
+            "path": "CLAUDE.md",
+            "change": "modified",
+            "note": "The 'Gates before any commit' block gains `sh scripts/design/gate.sh` first, and `ast-grep scan --config sgconfig.yml` then `sh scripts/file-length.sh` last (lines 120-122). 'All five clean.' becomes 'Every line clean.'. The 500-line bullet (line 55) gains ', measured by the file-length gate leg'."
+          },
+          {
+            "path": ".github/workflows/ci.yml",
+            "change": "modified",
+            "note": "Gains the step 'File length (any file over 500 lines of code fails the job)', running `sh scripts/file-length.sh`, after the ast-grep step (line 56-57). Nothing else in CI changed; the Test step still lacks --all-features."
+          }
+        ],
+        "how": "Accept 1: met. `grep -c 'sh scripts/file-length.sh'` prints 1 for each of .land/gates.sh, CLAUDE.md and .github/workflows/ci.yml. Accept 2: met. This script, run from the repo root, prints True: `gates=[l[4:] for l in open('.land/gates.sh').read().splitlines() if l.startswith('leg ') and l!='leg identity_leg']; block=open('CLAUDE.md').read().split('## Gates before any commit\\n\\n```\\n',1)[1].split('```',1)[0].splitlines(); block=[l for l in block if \"--test 'identity_*'\" not in l]; print(gates==block)`. Both lists are [sh scripts/design/gate.sh, cargo fmt --check, cargo clippy --all-targets --all-features -- -D warnings, cargo clippy --all-targets -- -D warnings, cargo test --workspace --all-features --no-fail-fast, cargo doc --no-deps --all-features, cargo doc --no-deps, ast-grep scan --config sgconfig.yml, sh scripts/file-length.sh].",
+        "deviation": "The spec names only the ast-grep and file-length additions to CLAUDE.md's block. But .land/gates.sh's first leg is `sh scripts/design/gate.sh`, which the block also omitted, so the accept row (block commands equal gates.sh leg commands) could not hold without it. I added it as the block's first line. The identity line stays where it was: it is excluded from the comparison, and moving it would reorder an existing line.",
+        "checklist": [
+          {
+            "id": "C14",
+            "done": true,
+            "note": "gates.sh, CLAUDE.md and CI all run sh scripts/file-length.sh; CLAUDE.md also gained the ast-grep line."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S4",
+            "satisfied": true,
+            "note": "Landing, CI and the documented gate list all carry the leg."
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -169,7 +364,43 @@
       "stories": [
         "S4",
         "S5"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/lys-gate/PROOF-LYSGATE-002.md",
+            "change": "created",
+            "note": "Records the green run at scratch commit 9d447cc5351cfe28152c1cad5f970a62b01d96a3 (3f48732 plus this round's change, tree 984d1c3) with its last line. Records the red run at fd3cfbae5230cc48dea6e0fc6d4d2a645ae2ec78 (plus crates/lys/src/length_probe.rs: 1004 raw lines, 501 code, 502 comments) with its only over-limit line and its last line, and the deletion of the scratch branch with an empty ls-remote."
+          }
+        ],
+        "how": "Accept 1: met. PROOF-LYSGATE-002.md names both commits and quotes `file-length: 498 files measured, 0 over the limit` (green, exit 0) and `crates/lys/src/length_probe.rs: 501 lines of code (limit 500)` / `file-length: 499 files measured, 1 over the limit` (red, exit 1, exactly one over-limit line). Accept 2: met. The local branch scratch/lysgate-002 was never pushed; after the red run its worktree was removed and the branch deleted. `git ls-remote origin 'refs/heads/scratch/*'` prints nothing, and no origin ref mentions length_probe. The card branch itself received no commit. C16: I did not run `sh scripts/design/gate.sh`, as the instructions forbid running the measured checks. Its render comparison can only pass, since re-rendering every cluster changed no .md; validate and coverage are left to the workflow's measurement.",
+        "deviation": "The green run was made at a scratch commit that copies this round's uncommitted change, not at a card commit, because this round makes no commit on the card branch. The card round's own gate record carries the leg's run at the landed head.",
+        "checklist": [
+          {
+            "id": "C15",
+            "done": true,
+            "note": "Green at 9d447cc, red at fd3cfba naming the probe with 501; the scratch branch is deleted and absent from origin."
+          },
+          {
+            "id": "C16",
+            "done": true,
+            "note": "Not run by me (forbidden); re-rendering produced no markdown diff, and the workflow measures the design leg."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S4",
+            "satisfied": true,
+            "note": "A red round is proven on a planted 501-line file."
+          },
+          {
+            "id": "S5",
+            "satisfied": true,
+            "note": "The red line names the file and its count."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
