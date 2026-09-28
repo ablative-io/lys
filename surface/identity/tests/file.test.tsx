@@ -46,16 +46,6 @@ describe("An agent's file", () => {
     expect($('.tabs a.on')?.textContent).toBe('Role');
   });
 
-  it('marks every section with no server as not built', async () => {
-    for (const tab of ['certificate']) {
-      unmountAll();
-      document.body.innerHTML = '';
-      await mount(`#/file/${SCRIBE}/${tab}`);
-      expect($('.file')?.textContent).toContain('not built yet');
-      expect(unreachable()).toEqual([]);
-    }
-  });
-
   it('draws the record from the signed receipts', async () => {
     const { requests } = await mount(`#/file/${SCRIBE}/record`);
     expect(requests).toEqual(expect.arrayContaining(['/receipts/4', '/receipts/5']));

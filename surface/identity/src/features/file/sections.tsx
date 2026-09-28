@@ -1,3 +1,4 @@
+import { AgentCertificates } from './AgentCertificates';
 import { RuntimeSessions } from '../runtime/RuntimeSessions';
 import { AgentMemory } from './AgentMemory';
 import { AgentCredentials } from './AgentCredentials';
@@ -208,7 +209,7 @@ export function TabBody({ tab, data, reload }: { tab: string; data: FileData; re
       return person ? (
         <div className="card"><div className="sec">People sign in; they are not issued certificates here.</div></div>
       ) : (
-        <NotBuilt>The capability certificate and its log entry are not issued from this service yet (conformance 6.1 to 6.5).</NotBuilt>
+        <AgentCertificates id={data.x.id} />
       );
     case 'record':
       return <Record data={data} />;
