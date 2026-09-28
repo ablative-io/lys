@@ -197,13 +197,13 @@
     },
     {
       "id": "ADR-012",
-      "title": "The context record is a lys.given custom entry of document hashes, never copies",
-      "status": "proposed",
-      "scope": "home",
-      "date": "",
-      "decided_by": "",
-      "context": "Step 4 of the identity platform is what a session was given, not only what it did. When the launch template renders a Claude Code session, nothing records which instruction documents that session was given, in what versions or order. Stage 6 will later sign over whatever shape this record takes, and the repository's wire-format rule freezes a shape once anything is signed under it, so the shape is decided on purpose now rather than left to the first implementation (docs/design/home/briefs/HOME-002.json).",
-      "decision": "The context record is one lys.given custom entry, appended after the render event, whose data is the harness name, the Claude Code version the load order was measured on, the kinds as two lists, resolved (claude_md_chain, user_claude_md, memory_index, appended_instructions, mcp_config, environment_names) and unlisted (claude_md_imports and claude_rules, which this entry does not list and a later entry at the first request records), the config directory as its path and its source (template or home), the documents in the measured order each as kind, path, byte length and SHA-256, and the names of the environment variables the template set. It is not a copy of each document into the block store, and not a content-bearing record, because the entry must hold no content under home P7 and CN3. It is unsigned and unencrypted now, and because it names hashes only, signing and encryption at rest can be added later without changing what is recorded.",
+      "title": "Done on a carded row means judged by the chain, never merely merged",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-26",
+      "decided_by": "Waffles, ruling of 07:08 on 26 September 2026 in the Cambium channel; applied to HOME-002 by the lead who owns the card",
+      "context": "HOME-001's rows R1 to R11 were built by hand and reached lys main before the rule that every carded row goes through its board's chain. The seven step 5 cards carrying them sat in review with no chain fields, and two of the rows (R7, R10) have no code on main. Setting those cards done because the code is merged would say the chain judged code it never saw, and in two cases code that does not exist.",
+      "decision": "A carded row built before the chain is brought under it by a proof card that runs the chain's whole judgement over the code as found and changes none of it; its card is set done only on a green landing of that proof with no finding on the rows it carries, and only when its rows have code at the commit measured. Rejected: setting the cards done because their code is on main, and counting a landing that records a finding as green.",
       "quote": "",
       "consequences": [
         "RECORD.md's list of lys.harness_event kinds grows to six; the five existing kinds and the 512-byte data cap do not change.",
@@ -214,26 +214,31 @@
         "RECORD.md carries lys.given's data shape beside the other lys custom entries.",
         "A later change to the shape is a new custom type or version alongside, never a mutation of lys.given, once anything is signed over it.",
         "Settings, hook output, plugin skill and agent listings and output styles are recorded by later cards as further kinds on this same entry shape.",
-        "A check of a file against the record is by hash only, and prints neither file."
+        "A check of a file against the record is by hash only, and prints neither file.",
+        "HOME-002 lands the proof with findings recorded one per line, each carded, and leaves the seven cards in review while any finding stands on their rows.",
+        "A card carrying a row with no code at the commit measured (HOME-001 R7, R10) stays in review marked not built until that row is built through the chain.",
+        "Every other row built before the chain needs its own proof card before its card can be done."
       ],
       "supersedes": [],
       "superseded_by": ""
     },
     {
       "id": "ADR-013",
-      "title": "The context record is a lys.given custom entry of document hashes, never copies",
-      "status": "proposed",
-      "scope": "home",
-      "date": "",
-      "decided_by": "",
-      "context": "Step 4 of the identity platform is what a session was given, not only what it did. When the launch template renders a Claude Code session, nothing records which instruction documents that session was given, in what versions or order. Stage 6 will later sign over whatever shape this record takes, and the repository's wire-format rule freezes a shape once anything is signed under it, so the shape is decided on purpose now rather than left to the first implementation (docs/design/home/briefs/HOME-003.json).",
-      "decision": "The context record is one lys.given custom entry, appended after the render event, whose data is the harness name, the Claude Code version the load order was measured on, the kinds as two lists, resolved (claude_md_chain, user_claude_md, memory_index, appended_instructions, mcp_config, environment_names) and unlisted (claude_md_imports and claude_rules, which this entry does not list and a later entry at the first request records), the config directory as its path and its source (template or home), the documents in the measured order each as kind, path, byte length and SHA-256, and the names of the environment variables the template set. It is not a copy of each document into the block store, and not a content-bearing record, because the entry must hold no content under home P7 and CN3. It is unsigned and unencrypted now, and because it names hashes only, signing and encryption at rest can be added later without changing what is recorded.",
+      "title": "lys is measured by ast-grep under the estate's four sweep rules",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-26",
+      "decided_by": "the lead who owns the HOME-002 card, answering its survey",
+      "context": "The chain's judgement includes ast-grep, and lys had no sgconfig.yml; with no rules a scan passes on anything, a control that never fires read as a pass.",
+      "decision": "lys's ast-grep rule set is the estate's sweep rules (mod-rs-declarations-only, no-let-underscore-on-results, no-lint-bypass-attributes, no-std-mutex-in-async), added as sgconfig.yml and rules/ast-grep byte-identical to cambium's, as configuration and not crate code. Rejected: a copy of one repository's whole sgconfig.yml with its repository-specific rules, and a new rule set written for lys.",
       "quote": "",
       "consequences": [
         "RECORD.md carries lys.given's data shape beside the other lys custom entries.",
         "A later change to the shape is a new custom type or version alongside, never a mutation of lys.given, once anything is signed over it.",
         "Settings, hook output, plugin skill and agent listings and output styles are recorded by later cards as further kinds on this same entry shape.",
-        "A check of a file against the record is by hash only, and prints neither file."
+        "A check of a file against the record is by hash only, and prints neither file.",
+        "What the four rules report on lys code is a finding, recorded as its own line and carded; mod.rs files carrying logic are reported by a check, not by an author's eye.",
+        "The rule set is not yet a leg of .land/gates.sh; wiring it into the gate is its own unit."
       ],
       "supersedes": [],
       "superseded_by": ""
