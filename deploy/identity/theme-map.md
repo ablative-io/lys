@@ -2,7 +2,7 @@
 
 Both Rauthy client themes are dark only, from the estate colour tokens (ADR-021),
 with each client wearing its own product accent (ADR-010). The mapping itself is
-`deploy/identity/rauthy-themes.json`; `crates/lys/src/identity/themes.rs` reads and
+`deploy/identity/rauthy-themes.json`; `crates/lys-install/src/themes.rs` reads and
 validates it, and `lys identity configure` applies it.
 
 ## Source

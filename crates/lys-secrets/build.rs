@@ -6,12 +6,14 @@
 //! no git tree to read, or whose manifest the tree it finds does not track
 //! (an exported tree unpacked inside some other repository), says
 //! `not built from a git commit`: never an empty or invented value. The
-//! stamp is taken again when HEAD, the branch it names, or the index moves.
+//! stamp is taken again when HEAD, the branch it names, or the index moves,
+//! and, in a repository with no commit yet, when anything in its git folder
+//! does.
 //!
 //! The same file stands in `crates/lys`, `crates/lys-identity-server`,
-//! `crates/lys-secrets` and `crates/lys-home`, byte for byte; a test holds
-//! them equal. It uses the standard library only, so a crate built from an
-//! exported tree builds it the same way.
+//! `crates/lys-secrets`, `crates/lys-home` and `crates/lys-app`, byte for
+//! byte; a test holds them equal. It uses the standard library only, so a
+//! crate built from an exported tree builds it the same way.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -40,12 +42,8 @@ fn git(dir: &Path, args: &[&str]) -> Option<String> {
 /// The stamp for a crate whose manifest is in `dir`, with the files whose
 /// change should take it again.
 fn stamp(dir: &Path) -> (String, Vec<String>) {
-    let tracked = git(dir, &["ls-files", "--error-unmatch", "Cargo.toml"]).is_some();
-    let commit = git(dir, &["rev-parse", "HEAD"])
-        .filter(|commit| commit.len() == 40 && commit.bytes().all(|b| b.is_ascii_hexdigit()));
-    let Some(commit) = commit.filter(|_| tracked) else {
-        return (NO_COMMIT.to_string(), Vec::new());
-    };
+    // Watched whether or not there is a commit yet, so a tree built before
+    // its first commit, or before its manifest is tracked, is stamped again.
     let mut watched = Vec::new();
     let mut paths = vec![
         "HEAD".to_string(),
@@ -56,11 +54,28 @@ fn stamp(dir: &Path) -> (String, Vec<String>) {
         paths.push(branch);
     }
     for path in paths {
-        let args = ["rev-parse", "--path-format=absolute", "--git-path", path.as_str()];
+        let args = [
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            path.as_str(),
+        ];
         if let Some(found) = git(dir, &args) {
             watched.push(found);
         }
     }
+    let tracked = git(dir, &["ls-files", "--error-unmatch", "Cargo.toml"]).is_some();
+    let commit = git(dir, &["rev-parse", "HEAD"])
+        .filter(|commit| commit.len() == 40 && commit.bytes().all(|b| b.is_ascii_hexdigit()));
+    let Some(commit) = commit.filter(|_| tracked) else {
+        // A repository with no commit yet has no branch file or index to
+        // watch, and its first commit leaves HEAD's file as it was: the
+        // whole git folder is watched until a commit exists.
+        let unborn = git(dir, &["rev-parse", "--verify", "-q", "HEAD"]).is_none();
+        let folder = git(dir, &["rev-parse", "--path-format=absolute", "--git-dir"]);
+        watched.extend(folder.filter(|_| unborn));
+        return (NO_COMMIT.to_string(), watched);
+    };
     let dirty = git(dir, &["status", "--porcelain"]).is_some_and(|changes| !changes.is_empty());
     let value = if dirty {
         format!("{commit}; dirty")

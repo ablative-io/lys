@@ -157,6 +157,8 @@ export const SERVICE: Record<string, Route> = {
   '/receipts/4': ok(RECEIPTS[4]),
   '/receipts/5': ok(RECEIPTS[5]),
   '/me': ok(ME),
+  // The account screen's Uninstall control is the administrator's; uninstall.test.tsx answers it as one.
+  '/uninstall': refused(403, 'NotAdmitted', 'only the configured administrator may do this in step 1'),
   '/roles': ok({ roles: [] }),
   '/teams': ok({ teams: [] }),
   '/runtime/found': ok({ sessions: [] }),

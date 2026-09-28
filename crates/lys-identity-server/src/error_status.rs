@@ -144,6 +144,7 @@ impl ServerError {
             | Self::ServiceAccountsUnavailable { .. }
             | Self::TeamsUnavailable { .. }
             | Self::StopsUnavailable { .. }
+            | Self::UninstallUnavailable { .. }
             | Self::SignInProvidersUnavailable { .. }
             | Self::ReviewsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,

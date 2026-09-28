@@ -156,6 +156,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let configured = crate::configuration_api::routes(config)
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())
+        .merge(crate::uninstall_api::routes())
         .with_state(Arc::clone(&state));
     let starts = start::routes(start_service(config, &state)?);
     let api = router(state).merge(configured).merge(starts);

@@ -8,6 +8,7 @@ import { keyable } from '../../shell/keyable';
 import { useShell } from '../../shell/ShellContext';
 import { useNavigate } from 'react-router';
 import { Gate } from '../signin/Gate';
+import { Uninstall } from '../account/Uninstall';
 
 interface YouData {
   me: MeView;
@@ -132,6 +133,7 @@ function Page({ data, reload }: { data: YouData; reload: () => void }) {
             <div className="note" style={{ marginTop: 6 }}>View the secrets you can access, their permissions and their activity. Secret values are never displayed here.</div>
             <a className="btn" style={{ marginTop: 8 }} href="#/secrets">Open secrets</a>
           </div>
+          <Uninstall />
         </div>
       </div>
     </div>

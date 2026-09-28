@@ -14,7 +14,8 @@ pub mod hex;
 pub mod inspect;
 pub mod key;
 pub mod log;
-pub mod output;
 pub mod pem;
 pub mod seal;
 pub mod verify;
+
+pub use lys_install::output;

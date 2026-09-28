@@ -17,28 +17,19 @@ path = "src/main.rs"
 
 [dependencies]
 lys-core.workspace = true
+lys-install.workspace = true
 lys-log-store.workspace = true
 base64.workspace = true
 chrono.workspace = true
 clap.workspace = true
-rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-sha2.workspace = true
 thiserror.workspace = true
-# Typed deployment configuration for `lys identity`, read from TOML.
+# The identity test fixtures read the deployment configuration as TOML.
 toml.workspace = true
 # Read-only X.509 field extraction for `lys inspect cert`; verification stays
 # in lys-core, which speaks DER and owns every trust decision.
 x509-parser.workspace = true
-# Generated deployment credentials are wiped from memory when dropped.
-zeroize.workspace = true
-
-# `lys identity install` waits on events: a service's log through kqueue or
-# inotify, and its exit through the release of the lock it holds.
-[target.'cfg(unix)'.dependencies]
-mio.workspace = true
-rustix.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

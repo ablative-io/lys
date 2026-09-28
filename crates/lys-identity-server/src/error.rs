@@ -372,6 +372,13 @@ pub enum ServerError {
         /// Why.
         reason: String,
     },
+    /// Lys cannot be uninstalled from its screens: the install keeps no
+    /// uninstall helper, or the helper could not be started.
+    #[error("UninstallUnavailable: {reason}")]
+    UninstallUnavailable {
+        /// Why, and what to do instead.
+        reason: String,
+    },
     /// The operation id already names an emergency stop sent in other words.
     #[error(
         "StopReused: operation `{operation}` already names an emergency stop in other words: send this stop under a new operation id"
