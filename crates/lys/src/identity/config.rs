@@ -13,6 +13,7 @@ use serde::Deserialize;
 
 use super::error::{ErrorKind, IdentityError, IdentityResult};
 
+mod bring_forward;
 mod validate;
 
 use validate::{
@@ -139,9 +140,7 @@ pub struct Clients {
     pub platform: Client,
     /// The one app client installed beside the platform's, themed with the
     /// app accent the theme mapping declares, when a configuration names it.
-    /// An install written before the app client had its name keeps it under
-    /// `cambium`, and is read as that same client.
-    #[serde(default, alias = "cambium")]
+    #[serde(default)]
     pub app: Option<Client>,
 }
 
@@ -174,9 +173,11 @@ fn refuse(kind: ErrorKind, resource: &str, detail: impl Into<String>) -> Identit
 }
 
 impl DeploymentConfig {
-    /// Reads and validates the configuration at `path`.
+    /// Reads and validates the configuration at `path`, first bringing a
+    /// file an earlier build wrote forward to this build's shape and writing
+    /// it back, so an install is never refused for the build it began on.
     pub fn load(path: &Path) -> IdentityResult<Self> {
-        let text = std::fs::read_to_string(path).map_err(|error| {
+        let read = std::fs::read_to_string(path).map_err(|error| {
             IdentityError::new(
                 ErrorKind::ConfigUnreadable,
                 "read configuration",
@@ -185,6 +186,14 @@ impl DeploymentConfig {
             )
             .at(path)
         })?;
+        let text = match bring_forward::bring_forward(&read).map_err(|error| error.at(path))? {
+            Some(brought) => {
+                Self::parse(&brought, PathBuf::new()).map_err(|error| error.at(path))?;
+                bring_forward::write_back(path, &brought)?;
+                brought
+            }
+            None => read,
+        };
         let base = path
             .parent()
             .filter(|parent| !parent.as_os_str().is_empty())
