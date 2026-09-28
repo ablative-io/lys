@@ -5,6 +5,8 @@ use std::path::Path;
 
 use axum::Router;
 use axum::routing::get;
+use identity_contract::harness::{GRANT_MODEL, Service};
+use serde_json::Value;
 
 use super::{cache_control, content_type, serving};
 
@@ -84,6 +86,71 @@ async fn without_the_page_the_root_says_what_to_run() -> Result<(), Box<dyn Erro
     let answer = reqwest::get(format!("{base}/")).await?;
     assert_eq!(answer.status(), 404);
     assert!(answer.text().await?.contains("lys identity install"));
+    Ok(())
+}
+
+const PAGE: &str = "<html>the screens</html>";
+
+/// The whole service, serving the screens in `surface` when one is given.
+async fn whole(surface: Option<&Path>) -> Result<Service, Box<dyn Error>> {
+    let served = surface.map(Path::to_path_buf);
+    let (service, ()) = Service::start_adjusted(
+        GRANT_MODEL,
+        None,
+        None,
+        None,
+        move |config| config.surface_dir = served,
+        |_| Ok(()),
+    )
+    .await?;
+    Ok(service)
+}
+
+/// The status and the body text `path` is answered with.
+async fn text(service: &Service, path: &str) -> Result<(u16, String), Box<dyn Error>> {
+    let answer = reqwest::get(format!("{}{path}", service.base)).await?;
+    Ok((answer.status().as_u16(), answer.text().await?))
+}
+
+#[tokio::test]
+async fn an_unknown_api_path_is_refused_by_name_never_the_page() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    std::fs::write(dir.path().join("index.html"), PAGE)?;
+    let service = whole(Some(dir.path())).await?;
+
+    let (status, body) = text(&service, "/api/health-unknown").await?;
+    assert_eq!(status, 404);
+    assert!(!body.contains(PAGE));
+    let refusal: Value = serde_json::from_str(&body)?;
+    assert_eq!(refusal["refusal"], "NotAnApiRoute");
+    assert_eq!(refusal["error"], "/api/health-unknown is not an API route");
+
+    let (status, body) = text(&service, "/api/authority").await?;
+    assert_eq!(status, 200);
+    assert_eq!(body, crate::admission::AUTHORITY);
+
+    let (status, body) = text(&service, "/people").await?;
+    assert_eq!(status, 200);
+    assert_eq!(body, PAGE);
+
+    let (status, body) = text(&service, "/health").await?;
+    assert_eq!(status, 200);
+    assert_eq!(body, PAGE);
+
+    let (status, body) = text(&service, "/assets/missing.js").await?;
+    assert_eq!(status, 404);
+    assert!(!body.contains(PAGE));
+    Ok(())
+}
+
+#[tokio::test]
+async fn without_the_screens_an_unknown_path_is_refused_alike() -> Result<(), Box<dyn Error>> {
+    let service = whole(None).await?;
+    let (status, body) = text(&service, "/health-unknown").await?;
+    assert_eq!(status, 404);
+    let refusal: Value = serde_json::from_str(&body)?;
+    assert_eq!(refusal["refusal"], "NotAnApiRoute");
+    assert_eq!(refusal["error"], "/health-unknown is not an API route");
     Ok(())
 }
 

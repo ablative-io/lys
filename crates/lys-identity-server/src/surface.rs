@@ -6,26 +6,45 @@
 //! file is absent. A path without one is a screen route the page itself
 //! reads, so it is answered with the page. A path that steps outside the
 //! directory is never read.
+//!
+//! Every path under `/api` is the API's, and one it has no route for is
+//! refused by [`not_an_api_route`], never answered with the page, whether or
+//! not the screens are served. Paths outside `/api` stay the page's (ADR-129).
 
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
-use axum::Router;
-use axum::extract::{Path as UrlPath, State};
+use axum::extract::{OriginalUri, Path as UrlPath, State};
 use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
+use axum::{Json, Router};
 
 /// The page every screen route is answered with.
 pub const PAGE: &str = "index.html";
 
 /// `api` under `/api`, and the screens in `dir` at the root.
+///
+/// `api` is nested as a service, so every path under `/api` is routed to it
+/// whole and its own fallback answers the ones it does not know. Nested as a
+/// router, its fallback would stand behind the screens' `/{*path}` route,
+/// which would answer those paths with the page.
 pub fn serving(dir: PathBuf, api: Router) -> Router {
     let screens = Router::new()
         .route("/", get(page))
         .route("/{*path}", get(file))
         .with_state(Arc::<Path>::from(dir));
-    Router::new().nest("/api", api).merge(screens)
+    Router::new().nest_service("/api", api).merge(screens)
+}
+
+/// The API's answer to a path it has no route for: 404, and a refusal whose
+/// error names the path as not an API route.
+pub async fn not_an_api_route(OriginalUri(uri): OriginalUri) -> Response {
+    let body = serde_json::json!({
+        "refusal": "NotAnApiRoute",
+        "error": format!("{} is not an API route", uri.path()),
+    });
+    (StatusCode::NOT_FOUND, Json(body)).into_response()
 }
 
 async fn page(State(dir): State<Arc<Path>>) -> Response {

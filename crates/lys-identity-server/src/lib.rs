@@ -21,6 +21,7 @@ pub mod file_stores;
 pub mod grant_contract;
 mod grant_sight;
 pub mod grants;
+pub mod health_api;
 pub mod launch_api;
 pub mod launch_template;
 pub mod link_audit_api;

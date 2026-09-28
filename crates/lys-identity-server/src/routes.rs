@@ -234,6 +234,8 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::resources_api::routes())
         .merge(crate::secrets_api::routes())
         .merge(crate::sessions_api::routes())
+        .merge(crate::health_api::routes())
+        .fallback(crate::surface::not_an_api_route)
         .with_state(state)
 }
 
