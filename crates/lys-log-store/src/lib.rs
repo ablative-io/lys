@@ -6,6 +6,12 @@
 //! says what a log needs from storage, a [`FileLeafStore`] that provides it from
 //! a directory, and the [`Log`] that maintains the RFC 6962 tree over either.
 //!
+//! A log owner that folds its log into state starts through [`start`]: it
+//! resumes a [`FrontierLog`] from the owner's signed [`Snapshot`] and reads
+//! only the leaves after it, or reads the whole log when the snapshot is
+//! refused, and says which in its [`Start`]. The tree resumes from the
+//! snapshot's [`Frontier`], so no leaf before it is read or hashed.
+//!
 //! ```no_run
 //! use lys_log_store::{FileLeafStore, Log};
 //!
@@ -51,10 +57,21 @@
 
 pub mod error;
 pub mod file;
+pub mod frontier;
+pub mod frontier_log;
 pub mod log;
+pub mod snapshot;
+pub mod start;
 pub mod store;
 
 pub use error::{StoreError, StoreResult};
 pub use file::FileLeafStore;
+pub use frontier::Frontier;
+pub use frontier_log::{FrontierLog, Tail};
 pub use log::{Log, validate_origin};
+pub use snapshot::{SNAPSHOT_FORMAT, Snapshot, SnapshotRefusal, seal, unseal};
+pub use start::{Start, Started, start};
 pub use store::{LeafStore, PinnedRoot};
+
+#[cfg(test)]
+mod test_store;

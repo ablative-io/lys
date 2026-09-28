@@ -15,6 +15,8 @@
 //!   is never counted as a leaf.
 //! - `state.json` — the pinned `(tree_size, root)`, rewritten atomically after
 //!   every append.
+//! - `snapshot.bin` — the log owner's signed snapshot, if one was written,
+//!   replaced atomically in the same way.
 //!
 //! This layout is **local state, not a wire contract**: nothing durable is
 //! signed under it and it may change between lys versions. The format marker
@@ -73,6 +75,7 @@ use leaves::{
 };
 
 mod left_behind;
+mod snapshot_slot;
 
 pub use left_behind::LeftBehind;
 
@@ -371,6 +374,14 @@ impl LeafStore for FileLeafStore {
         write_state(&self.dir, pin)?;
         self.pinned = pin;
         Ok(())
+    }
+
+    fn snapshot(&self) -> StoreResult<Option<Vec<u8>>> {
+        snapshot_slot::read(&self.dir)
+    }
+
+    fn put_snapshot(&mut self, bytes: &[u8]) -> StoreResult<()> {
+        snapshot_slot::write(&self.dir, bytes)
     }
 }
 

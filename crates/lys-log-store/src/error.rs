@@ -232,6 +232,20 @@ pub enum StoreError {
         extent: u64,
     },
 
+    /// A stored frontier does not have one subtree root per set bit of its
+    /// size, so it is not the frontier of any tree of that size.
+    #[error(
+        "a frontier for tree size {size} holds {nodes} subtree roots, but a tree of that size has {expected}"
+    )]
+    FrontierMalformed {
+        /// The tree size the frontier claims.
+        size: u64,
+        /// The number of subtree roots it holds.
+        nodes: usize,
+        /// The number of set bits of `size`.
+        expected: u32,
+    },
+
     /// The log refused further use because an earlier append failed partway.
     ///
     /// An append writes the leaf durably and *then* advances the pin. If the
