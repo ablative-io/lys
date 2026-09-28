@@ -244,6 +244,8 @@ pub fn kind(answer: &Answer) -> &'static str {
         Answer::Matched { .. } => "matched",
         Answer::Ended { .. } => "ended",
         Answer::Status { .. } => "status",
+        Answer::Judged { .. } => "judged",
+        Answer::Collected { .. } => "collected",
         Answer::Refused { .. } => "refused",
     }
 }
