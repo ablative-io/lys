@@ -68,6 +68,23 @@ pub struct Config {
     /// answer `SecretsUnavailable`.
     #[serde(default)]
     pub secrets: Option<crate::secrets_api::SecretsSettings>,
+    /// The directory the access requests are kept in, created when it does
+    /// not exist. Without it the request routes answer `RequestsUnavailable`.
+    #[serde(default)]
+    pub requests_dir: Option<PathBuf>,
+    /// The file the machines are kept in, created at the first machine
+    /// named. Without it the network routes answer `NetworkUnavailable`.
+    #[serde(default)]
+    pub network_file: Option<PathBuf>,
+    /// The file the roles are kept in, created at the first role made.
+    /// Without it the role routes answer `RolesUnavailable`.
+    #[serde(default)]
+    pub roles_file: Option<PathBuf>,
+    /// The file the provisioning profiles are kept in, created at the first
+    /// profile set. Without it the provisioning routes answer
+    /// `ProvisioningUnavailable`.
+    #[serde(default)]
+    pub provisioning_file: Option<PathBuf>,
 }
 
 /// The permission model as its file writes it: a version, and each relation

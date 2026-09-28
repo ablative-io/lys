@@ -121,7 +121,7 @@ fn answering(
 
 /// Whether the grant stands at `at`: nothing on its ancestry is revoked, and
 /// `at` is within every window on it.
-fn stands(book: &GrantBook, record: &GrantRecord, at: u64) -> bool {
+pub(crate) fn stands(book: &GrantBook, record: &GrantRecord, at: u64) -> bool {
     book.lineage(record.grant().id()).is_ok_and(|lineage| {
         unrevoked(book, &lineage).is_ok() && within_window(book, &lineage, at).is_ok()
     })

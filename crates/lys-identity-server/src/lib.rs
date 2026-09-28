@@ -7,17 +7,32 @@
 
 pub mod admission;
 pub mod config;
+pub mod connections_api;
 pub mod dev_seed;
 pub mod error;
 pub mod grant_contract;
 mod grant_sight;
 pub mod grants;
 pub mod link_audit_api;
+pub mod network_api;
+pub mod network_store;
 pub mod oidc;
+pub mod provisioning_api;
+pub mod provisioning_store;
 pub mod read_api;
 pub mod read_views;
 pub mod receipts_api;
+pub mod requests_api;
+pub mod requests_decide;
+mod requests_state;
+pub mod requests_store;
+pub mod requests_views;
+pub mod resources_api;
 pub mod reviews_api;
+pub mod roles_api;
+pub mod roles_records;
+pub mod roles_store;
+pub mod roles_views;
 pub mod routes;
 pub mod secrets_api;
 pub mod secrets_sign;
@@ -29,4 +44,4 @@ mod spicedb_http;
 
 pub use config::Config;
 pub use error::ServerError;
-pub use routes::{AppState, router, service};
+pub use routes::{AppState, Say, router, service, service_saying};

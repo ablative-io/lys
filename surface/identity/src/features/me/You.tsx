@@ -8,7 +8,6 @@ import { keyable } from '../../shell/keyable';
 import { useShell } from '../../shell/ShellContext';
 import { useNavigate } from 'react-router';
 import { Gate } from '../signin/Gate';
-import { NotBuilt } from '../file/sections';
 
 interface YouData {
   me: MeView;
@@ -37,7 +36,7 @@ function SignInIdentity({ login, current }: { login: Login; current: boolean }) 
       <span>
         {providerName(login.provider)} <span className="note">{current ? 'signs you in · this session' : 'signs you in'}</span>
       </span>
-      <span className="mono dim">{login.subject}</span>
+      <details><summary>Account details</summary><span className="mono dim">{login.subject}</span></details>
     </div>
   );
 }
@@ -111,7 +110,7 @@ function Page({ data, reload }: { data: YouData; reload: () => void }) {
               <SignInIdentity key={login.provider + ' ' + login.subject} login={login} current={same(login)} />
             ))}
             <div className="note" style={{ marginTop: 6 }}>
-              Several sign-in providers per person needs our fork of the sign-in service. <span className="open-q">not decided</span>
+              These are the sign-in accounts linked to your identity.
             </div>
           </div>
           <div className="card" id="service-accounts">
@@ -127,13 +126,12 @@ function Page({ data, reload }: { data: YouData; reload: () => void }) {
                 </div>
               ))
             ) : (
-              <NotBuilt>The directory records no service accounts yet (conformance 1.3), so none is listed.</NotBuilt>
+              <p className="note">Service-account connections are not available in this installation yet.</p>
             )}
           </div>
           <div className="card">
-            <h2>Your personal secrets</h2>
-            <NotBuilt>The secrets store is SECRETS-002.</NotBuilt>
-            <div className="note" style={{ marginTop: 6 }}>Yours alone. An agent uses one only through a virtual credential you issue.</div>
+            <h2>Secrets available to you</h2>
+            <div className="note" style={{ marginTop: 6 }}>View the secrets you can access, their permissions and their activity. Secret values are never displayed here.</div>
             <a className="btn" style={{ marginTop: 8 }} href="#/secrets">Open secrets</a>
           </div>
         </div>

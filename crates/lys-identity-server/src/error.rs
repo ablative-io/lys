@@ -82,6 +82,121 @@ pub enum ServerError {
         /// The broker's words.
         reason: String,
     },
+    /// The access requests are not configured, or their file could not be read or written.
+    #[error("RequestsUnavailable: {reason}")]
+    RequestsUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// The request is not one the caller may see: none is kept by that id, or it is another's.
+    #[error("RequestUnknown: no access request by that id is visible to the signed-in caller")]
+    RequestUnknown,
+    /// The request was already decided, another way.
+    #[error("RequestDecided: access request `{request}` is already decided")]
+    RequestDecided {
+        /// The request.
+        request: String,
+    },
+    /// An approval of the request is being settled, and this is not that approval.
+    #[error(
+        "RequestHeld: an approval of access request `{request}` by {by} is being settled, and until it is only that approval is taken"
+    )]
+    RequestHeld {
+        /// The request.
+        request: String,
+        /// The person whose approval is being settled.
+        by: String,
+    },
+    /// The operation id already names a request asked in other words.
+    #[error(
+        "RequestReused: operation `{request}` already names an access request asked in other words"
+    )]
+    RequestReused {
+        /// The operation id.
+        request: String,
+    },
+    /// The machines cannot be read or written.
+    #[error("NetworkUnavailable: {reason}")]
+    NetworkUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// No machine is kept by that id.
+    #[error("MachineUnknown: no machine is kept by that id")]
+    MachineUnknown,
+    /// The operation id already names a machine named in other words.
+    #[error("MachineReused: operation `{machine}` already names a machine named in other words")]
+    MachineReused {
+        /// The operation id.
+        machine: String,
+    },
+    /// The provisioning profiles cannot be read or written.
+    #[error("ProvisioningUnavailable: {reason}")]
+    ProvisioningUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// The profile is no longer at the version the change was set over.
+    #[error(
+        "ProvisioningChanged: the profile is at version {latest}, not the version this change was set over: read the profile again and set the change over version {latest}"
+    )]
+    ProvisioningChanged {
+        /// The latest version kept.
+        latest: u32,
+    },
+    /// The operation id already names a profile version set in other words.
+    #[error(
+        "ProvisioningReused: operation `{operation}` already names a profile version set in other words: set this change under a new operation id"
+    )]
+    ProvisioningReused {
+        /// The operation id.
+        operation: String,
+    },
+    /// The roles cannot be read or written.
+    #[error("RolesUnavailable: {reason}")]
+    RolesUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// No role is kept by that id.
+    #[error("RoleUnknown: no role is kept by that id")]
+    RoleUnknown,
+    /// The role has no version by that number.
+    #[error("RoleVersionUnknown: the role has no version by that number")]
+    RoleVersionUnknown,
+    /// The identity holds no holding of the role, or the directory does not know it.
+    #[error(
+        "HolderUnknown: no such holder: the directory does not know the identity, or it has no holding of the role"
+    )]
+    HolderUnknown,
+    /// The operation id already names a role, a version or a holding made in other words.
+    #[error(
+        "RoleReused: operation `{operation}` already names a role, a version or a holding made in other words"
+    )]
+    RoleReused {
+        /// The operation id.
+        operation: String,
+    },
+    /// The holder already holds the role.
+    #[error("RoleHeld: `{holder}` already holds the role: end that holding or let it lapse first")]
+    RoleHeld {
+        /// The holder.
+        holder: String,
+    },
+    /// The holding is over, so it is not moved.
+    #[error(
+        "HoldingOver: the holding is {state} and is never renewed or moved: assign the role again"
+    )]
+    HoldingOver {
+        /// `lapsed` or `ended`.
+        state: &'static str,
+    },
+    /// The holding is not the one the change was asked of, or not where it
+    /// was when the change was asked.
+    #[error(
+        "HoldingChanged: the holding is not as it was when this change was asked: read the role again and ask the change of the holding as it stands"
+    )]
+    HoldingChanged,
     /// The directory's worker could not be reached.
     #[error("DirectoryUnavailable: {reason}")]
     DirectoryUnavailable {
@@ -104,14 +219,32 @@ impl ServerError {
             | Self::NoPerson
             | Self::SetupRequired
             | Self::Withheld { .. } => StatusCode::FORBIDDEN,
-            Self::AgentNotVisible | Self::GrantNotVisible | Self::SessionUnknown => {
-                StatusCode::NOT_FOUND
-            }
+            Self::AgentNotVisible
+            | Self::GrantNotVisible
+            | Self::SessionUnknown
+            | Self::RequestUnknown
+            | Self::MachineUnknown
+            | Self::RoleUnknown
+            | Self::RoleVersionUnknown
+            | Self::HolderUnknown => StatusCode::NOT_FOUND,
+            Self::RequestDecided { .. }
+            | Self::RequestHeld { .. }
+            | Self::RequestReused { .. }
+            | Self::MachineReused { .. }
+            | Self::RoleReused { .. }
+            | Self::RoleHeld { .. }
+            | Self::HoldingOver { .. }
+            | Self::HoldingChanged
+            | Self::ProvisioningChanged { .. }
+            | Self::ProvisioningReused { .. } => StatusCode::CONFLICT,
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. } | Self::SecretsUnavailable { .. } => StatusCode::BAD_GATEWAY,
-            Self::ConfigInvalid { .. } | Self::DirectoryUnavailable { .. } => {
-                StatusCode::SERVICE_UNAVAILABLE
-            }
+            Self::ConfigInvalid { .. }
+            | Self::DirectoryUnavailable { .. }
+            | Self::RequestsUnavailable { .. }
+            | Self::NetworkUnavailable { .. }
+            | Self::RolesUnavailable { .. }
+            | Self::ProvisioningUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),

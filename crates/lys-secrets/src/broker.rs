@@ -25,6 +25,8 @@ use crate::store::{EntryClass, SecretStore};
 mod accounts;
 mod admit;
 mod folded;
+mod held;
+pub use held::HeldHandle;
 mod inflight;
 mod lineage;
 mod oauth_grants;

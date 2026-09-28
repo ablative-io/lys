@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RAIL } from '../src/shell/railItems';
 import { $, $$, click, mount, press, unreachable } from './harness';
-import { unmountAll } from './harness';
 
 describe('shell (conformance 9.1)', () => {
   it('draws the rail item for item, each screen a deep link', async () => {
@@ -70,16 +69,6 @@ describe('shell (conformance 9.1)', () => {
     await press('ArrowUp', {}, input);
     await press('Enter', {}, input);
     expect(location.hash).toMatch(/^#\/file\/person-/);
-  });
-
-  it('shows every unbuilt screen as not built, with the mock-up heading', async () => {
-    for (const view of ['roles', 'requests', 'reviews', 'secrets', 'connections', 'network', 'sessions']) {
-      unmountAll();
-      document.body.innerHTML = '';
-      await mount('#/' + view);
-      expect($('.empty-note')?.textContent).toContain('not built yet');
-      expect(unreachable()).toEqual([]);
-    }
   });
 
   it('keeps every control reachable by keyboard on Configuration (9.3)', async () => {

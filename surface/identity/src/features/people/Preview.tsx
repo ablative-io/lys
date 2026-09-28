@@ -1,3 +1,5 @@
+import { RoleSummary } from '../roles/AssignedRoles';
+import type { RolesLoad } from '../roles/AssignedRoles';
 import { useShell } from '../../shell/ShellContext';
 import type { Entry } from './directory';
 import type { Load } from '../../api';
@@ -6,7 +8,7 @@ import type { DirectoryReach } from './reach';
 import { Pill } from './Pill';
 
 /** The selected row, without leaving the list. */
-export function Preview({ x, reach }: { x: Entry; reach: Load<DirectoryReach> }) {
+export function Preview({ x, reach, roles }: { x: Entry; roles: RolesLoad; reach: Load<DirectoryReach> }) {
   const shell = useShell();
   const person = x.person;
   const agent = x.kind === 'agent';
@@ -25,7 +27,9 @@ export function Preview({ x, reach }: { x: Entry; reach: Load<DirectoryReach> })
           </>
         ) : null}
       </div>
-      <div className="section-h" style={{ marginTop: 6 }}>Reaches</div>
+      <div className="section-h" style={{ marginTop: 6 }}>Roles</div>
+      <RoleSummary load={roles} id={x.id} />
+      <div className="section-h">Reaches</div>
       <div className="note">
         <Reach load={reach} id={x.id} />
       </div>

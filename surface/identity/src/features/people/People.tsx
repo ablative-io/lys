@@ -12,6 +12,8 @@ import { Reach, readDirectoryReach } from './reach';
 import type { DirectoryReach } from './reach';
 import type { Load } from '../../api';
 import { Preview } from './Preview';
+import { readRoles, RoleSummary } from '../roles/AssignedRoles';
+import type { RolesLoad } from '../roles/AssignedRoles';
 
 const NOT_YET = (
   <span className="open-q" title="Its server does not exist yet">
@@ -62,6 +64,7 @@ function Stat({ n, l, warn }: { n: number | null; l: string; warn?: boolean }) {
 
 function List({ all, scope }: { all: Entry[]; scope: Scope }) {
   const reach = useLoad(readDirectoryReach, 'directory-reach');
+  const roles = useLoad(readRoles, 'directory-roles');
   const shell = useShell();
   const navigate = useNavigate();
   const list = all.filter((x) => shell.filterKind === 'all' || x.kind === shell.filterKind);
@@ -91,24 +94,24 @@ function List({ all, scope }: { all: Entry[]; scope: Scope }) {
             </thead>
             <tbody>
               {list.map((x, i) => (
-                <Row key={x.id} x={x} reach={reach} i={i} cursor={cursor} open={() => navigate('/file/' + x.id)} />
+                <Row key={x.id} x={x} roles={roles} reach={reach} i={i} cursor={cursor} open={() => navigate('/file/' + x.id)} />
               ))}
             </tbody>
           </table>
           {list.length ? null : <div className="dim" style={{ marginTop: 10 }}>No one here yet.</div>}
           <p className="note" style={{ marginTop: 8 }}>j and k move, Enter opens. Hover a row to preview it.</p>
-          <p className="note">Reach is checked by the permission service for visible resources. Role is not recorded by the directory yet.</p>
+          <p className="note">Reach is checked by the permission service for visible resources. Roles show each current assignment and its held version; they do not grant access.</p>
           {scope === 'personal' ? (
             <p className="note">Your own records: you and the agents that answer to you. A directory administrator sees everyone through the directory&apos;s own routes.</p>
           ) : null}
         </div>
-        <div className="preview">{sel ? <Preview x={sel} reach={reach} /> : null}</div>
+        <div className="preview">{sel ? <Preview x={sel} roles={roles} reach={reach} /> : null}</div>
       </div>
     </>
   );
 }
 
-function Row({ x, reach, i, cursor, open }: { x: Entry; reach: Load<DirectoryReach>; i: number; cursor: number; open: () => void }) {
+function Row({ x, roles, reach, i, cursor, open }: { x: Entry; roles: RolesLoad; reach: Load<DirectoryReach>; i: number; cursor: number; open: () => void }) {
   const shell = useShell();
   return (
     <tr
@@ -122,7 +125,7 @@ function Row({ x, reach, i, cursor, open }: { x: Entry; reach: Load<DirectoryRea
     >
       <td>{x.display_name}</td>
       <td><span className={'kind ' + x.kind}>{x.kind}</span></td>
-      <td className="sec"><span className="dim">—</span></td>
+      <td className="sec"><RoleSummary load={roles} id={x.id} /></td>
       <td><span className={'dot s-' + x.state} />{x.state}</td>
       <td className="sec">
         {x.person ? (

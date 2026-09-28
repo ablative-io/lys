@@ -1,3 +1,7 @@
+import { AgentCredentials } from './AgentCredentials';
+import { Provisioning } from '../provisioning/Provisioning';
+import { PersonCredentials, PersonSessions } from './PersonSecurity';
+import { AssignedRoles } from '../roles/AssignedRoles';
 import { api, useLoad } from '../../api';
 import type { ReceiptAnswer } from '../../generated';
 import { Gate } from '../signin/Gate';
@@ -27,22 +31,13 @@ function Profile({ data }: { data: FileData }) {
   return (
     <div className="grid2">
       <div>
-        <div className="card">
-          <h2>Responsibilities</h2>
-          <NotBuilt>The directory records no role for {x.display_name}. Responsibilities, goals and professional practice come from the role, which waits on its ADR (conformance 4.1).</NotBuilt>
-        </div>
+        <AssignedRoles id={x.id} />
       </div>
       <div>
         <div className="card">
           <dl className="facts">
             <dt>Kind</dt>
             <dd><span className={'kind ' + x.kind}>{x.kind}</span></dd>
-            <dt>Role</dt>
-            <dd>
-              {agent?.role ?? <span className="dim">—</span>}
-              {agent?.version != null ? <span className="ver">v{agent.version}</span> : null}{' '}
-              {agent?.role ? null : <span className="note">not recorded yet</span>}
-            </dd>
             <dt>Answers to</dt>
             <dd>
               {x.person ? (
@@ -116,7 +111,7 @@ function Access({ data, reload }: { data: FileData; reload: () => void }) {
             >
               Grant access
             </button>
-            <button className="btn" data-act="toast" onClick={() => shell.toast('Temporary access goes through Requests, which is not built yet')}>Temporary access…</button>
+            <button className="btn" data-act="temporary-access" onClick={() => mineToGive && passable.length ? shell.openDrawer(<Delegate w={w} source={passable[0]} to={x.id} done={reload} />) : shell.toast(mineToGive ? 'You hold nothing you may pass on to an agent' : `Only the person ${name} answers to gives it access`)}>Temporary access…</button>
           </div>
         ) : null}
       </div>
@@ -215,13 +210,13 @@ export function TabBody({ tab, data, reload }: { tab: string; data: FileData; re
     case 'access':
       return <Access data={data} reload={reload} />;
     case 'provisioning':
-      return person ? <div className="dim">A person has no provisioning profile. Their own tools are their own.</div> : <NotBuilt>Provisioning profiles (model access, tools, skills, MCP servers, instructions) have no server yet.</NotBuilt>;
+      return person ? <div className="dim">A person has no provisioning profile. Their own tools are their own.</div> : <Provisioning id={data.x.id} />;
     case 'memory':
       return <NotBuilt>Memories and the home have no server here yet: what each memory came from, who can see it, and the last context given.</NotBuilt>;
     case 'credentials':
-      return <Table title="Handles" note="An agent holds a handle, never the credential. Dropping the handle ends its use." heads={['Handle', 'Behind it', 'Value', 'Lease', 'Use', '']} why="Handles come from the secrets broker (SECRETS-002)." />;
+      return person ? <PersonCredentials id={data.x.id} /> : <AgentCredentials id={data.x.id} />;
     case 'sessions':
-      return <Table title="Sessions" note="As the runtimes report them. Stopped only when the runtime confirms it." heads={['Where', 'Runtime', 'Acting for', 'Started', 'Status', 'Context given']} why="Sessions come from runtime reports naming a launch record (conformance 5.4 to 5.6)." />;
+      return person ? <PersonSessions id={data.x.id} /> : <Table title="Sessions" note="As the runtimes report them. Stopped only when the runtime confirms it." heads={['Where', 'Runtime', 'Acting for', 'Started', 'Status', 'Context given']} why="Sessions come from runtime reports naming a launch record (conformance 5.4 to 5.6)." />;
     case 'certificate':
       return person ? (
         <div className="card"><div className="sec">People sign in; they are not issued certificates here.</div></div>

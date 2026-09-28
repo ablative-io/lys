@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { API, api } from '../../api';
+import { API, api, useLoad } from '../../api';
 import type { Load, Refused } from '../../api';
 
 export function Loading() {
@@ -13,30 +13,22 @@ export function Loading() {
 
 /** Sign-in, through the service's configured issuer. The service keeps the session. */
 export function SignIn() {
-  const [authority, setAuthority] = useState('');
-  useEffect(() => {
-    let live = true;
-    api.authority().then(
-      (text) => live && setAuthority(text),
-      () => live && setAuthority(''),
-    );
-    return () => {
-      live = false;
-    };
-  }, []);
+  const authority = useLoad(api.authority, 'sign-in-authority');
   return (
     <div className="page">
       <div className="eyebrow">Identity</div>
       <h1>Sign in</h1>
-      <p className="sub">People sign in. Agents never sign in; they are registered.</p>
+      <p className="sub">Use your account to open the directory and manage your access.</p>
       <a className="btn primary" href={API + '/login'}>
         Sign in
       </a>
-      {authority ? (
-        <div className="empty-note" style={{ marginTop: 18, maxWidth: 640 }}>
-          {authority}
-        </div>
-      ) : null}
+      <details style={{ marginTop: 18, maxWidth: 640 }}>
+        <summary>Advanced: how access is managed</summary>
+        <p>People sign in. Agents are registered by a person responsible for them.</p>
+        {authority.status === 'loading' ? <p>Reading access details…</p>
+          : authority.status === 'ok' ? <p>{authority.data}</p>
+          : <p role="status">Access details are unavailable: {authority.refused.refusal.refusal} — {authority.refused.refusal.reason}</p>}
+      </details>
     </div>
   );
 }
