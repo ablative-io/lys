@@ -252,6 +252,20 @@
           "ruling": { "type": "string" }
         }
       }
+    },
+    "shared_rows": {
+      "type": "array",
+      "description": "WRITTEN BY THE LEDGER — each checklist or story row this brief claims that an open brief or draft branch of the cluster already claimed when the brief was written: the row, the branch and the brief there. Recorded and told, never a stop, unless the words say the rows are this brief's alone.",
+      "items": {
+        "type": "object",
+        "required": ["row", "branch", "brief"],
+        "additionalProperties": false,
+        "properties": {
+          "row": { "type": "string", "pattern": "^[CS]\\d+$" },
+          "branch": { "type": "string" },
+          "brief": { "type": "string" }
+        }
+      }
     }
   }
 }

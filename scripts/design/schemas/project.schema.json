@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Project Setup",
-  "description": "The per-project setup a design directory carries beside its two ledgers: the working trees of this project with the exact command lines each is measured by, and the named directories of the other projects in the estate. An author copies the trees array verbatim into a new cluster design's gate array, so a cluster is measured by the project's own command lines and never by a guess. Absent or malformed, it is refused by name — there is no default.",
+  "description": "The per-project setup a design directory carries beside its two ledgers: the working trees of this project with the exact command lines each is measured by, the named directories of the other projects in the estate, and optionally the remote each of them is fetched from. An author copies the trees array verbatim into a new cluster design's gate array, so a cluster is measured by the project's own command lines and never by a guess. Absent or malformed, it is refused by name — there is no default.",
   "type": "object",
   "required": ["trees", "roots"],
   "additionalProperties": false,
@@ -81,6 +81,28 @@
     "roots": {
       "type": "object",
       "description": "The other projects in the estate, as name to absolute directory. A survey reads them to answer what a change here means for them. The keys are project names chosen by the people who own them, so the map cannot be written as named properties here; each value is an absolute directory, checked by the ledger when it reads this document."
+    },
+    "repositories": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "pattern": "^(https://|ssh://|git@|file://)[^\\s]+$" },
+      "description": "Optional. The other projects in the estate, as name to the remote URL any node fetches them from, for a survey that runs where no root exists. Absent is read as none. Each value starts https://, ssh://, git@ or file:// and holds no whitespace, checked by the ledger when it reads this document."
+    },
+    "gate_host": {
+      "type": "string",
+      "enum": ["quiet", "shared"],
+      "description": "Optional. Which kind of machine this repository's landing gate runs on. \"quiet\" routes the gate to the quiet queue, served by one idle machine that runs one gate at a time, for a repository whose tests measure timing and need a machine nothing else is loading. \"shared\" routes it to the shared queue, served by the machines that run several gates side by side. Absent is read as shared."
+    },
+    "gate_needs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "open_files": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The number of files one process of the gate must be able to hold open at once. The gate worker raises its soft limit to this before any leg runs when the hard limit allows, never lowers a higher one, and refuses the gate as gate_needs_unmet when the machine cannot give it."
+        }
+      },
+      "description": "Optional. What this repository's landing gate needs of the machine that runs it, read by the gate worker from the gated commit before any leg runs. It names only needs the worker knows; open_files is the one it knows now. Absent, or an empty object, is read as no need."
     }
   }
 }

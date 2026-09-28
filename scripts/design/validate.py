@@ -140,6 +140,13 @@ def validate(value, schema: dict, path: str, errors: list[str]) -> None:
         allowed = ", ".join(json.dumps(v) for v in schema["enum"])
         errors.append(f"{loc(path)}: value {json.dumps(value)} not one of [{allowed}]")
 
+    if "minimum" in schema and isinstance(value, (int, float)) and not isinstance(value, bool):
+        if value < schema["minimum"]:
+            errors.append(
+                f"{loc(path)}: value {json.dumps(value)} is below "
+                f"the minimum {json.dumps(schema['minimum'])}"
+            )
+
     if "pattern" in schema and isinstance(value, str):
         if not re.search(schema["pattern"], value):
             errors.append(
@@ -234,7 +241,8 @@ def machine_paths(document, schema_name: str) -> list[str]:
 
     A landed brief is exempt: its requirement paths are part of the record
     a round measured and are kept as written, so a document carrying an
-    execution block is read for its shape alone.
+    execution block is read for its shape alone. A member of the wrong shape
+    is skipped here, never read: the schema check already names it.
     """
     if not isinstance(document, dict):
         return []
@@ -248,10 +256,16 @@ def machine_paths(document, schema_name: str) -> list[str]:
                 if isinstance(entry, dict):
                     errors.extend(machine_path(f"{field}/{index}/path", entry.get("path")))
     if schema_name == BRIEF_SCHEMA and not document.get("execution"):
-        for index, req in enumerate(document.get("requirements", []) or []):
-            files = req.get("files", {}) if isinstance(req, dict) else {}
+        requirements = document.get("requirements")
+        for index, req in enumerate(requirements if isinstance(requirements, list) else []):
+            files = req.get("files") if isinstance(req, dict) else None
+            if not isinstance(files, dict):
+                continue
             for change in ("create", "modify", "delete"):
-                for spot, value in enumerate(files.get(change, []) or []):
+                entries = files.get(change)
+                if not isinstance(entries, list):
+                    continue
+                for spot, value in enumerate(entries):
                     errors.extend(
                         machine_path(
                             f"requirements/{index}/files/{change}/{spot}",
