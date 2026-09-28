@@ -1200,6 +1200,76 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The signed entry log",
+      "items": [
+        {
+          "id": "C45",
+          "text": "lys-home depends on lys-core, lys-log-store and lys-identity, and the home-entry leaf (session id, entry id, kind, SHA-256 of the entry line, tag lys/home-entry/v1), the home-entry-copy leaf (those four, the parent session id, the parent leaf's index and the parent entry's position, tag lys/home-entry-copy/v1) and the home checkpoint leaf (tag lys/home-checkpoint/v1) are typed payloads of the identity event envelope, written in docs/design/identity/IDENTITY-EVENTS.md.",
+          "done": false
+        },
+        {
+          "id": "C46",
+          "text": "On a home that logs its entries, every lys.call, lys.harness_event and lys.open entry appended to a session through append_entry, append_beside or append_under appends exactly one leaf to the home's log at log/ under the home, signed with the Ed25519 key of the agent log/agent names through lys_core::attestation::sign_attestation, and no other entry kind appends a leaf.",
+          "done": false
+        },
+        {
+          "id": "C47",
+          "text": "No leaf and no file under the home's log directory carries a byte of transcript content: a byte scan of every file under it for a fixture message's text finds nothing.",
+          "done": false
+        },
+        {
+          "id": "C48",
+          "text": "lys-home log-enable starts a home's log with one checkpoint leaf naming each session of the home with its entry count and the SHA-256 of its file as they stand, and a log never holds a second checkpoint.",
+          "done": false
+        },
+        {
+          "id": "C49",
+          "text": "A failed leaf append is refused naming the entry id, the entry is never reported as recorded, the session is marked pending by log/pending/<session id>.json naming the session and the entry, every further append to it is refused until the pending leaf is written, and the leaf is written first at the session's next open or by lys-home verify --repair.",
+          "done": false
+        },
+        {
+          "id": "C50",
+          "text": "Ingesting a call_id already recorded adds no leaf, and writes the entry's one leaf when the log holds none for it.",
+          "done": false
+        },
+        {
+          "id": "C51",
+          "text": "lys-home verify --home <dir> --session <id> checks every logged entry line against its one leaf under the agent identity's public key and the pre-log history against the checkpoint, prints one JSON report of counts and hashes, and otherwise exits 1 naming the first entry, or the session for the checkpoint, that fails.",
+          "done": false
+        },
+        {
+          "id": "C52",
+          "text": "docs/design/home/RECORD.md records the three leaf formats (home-entry, home-entry-copy and checkpoint), their tags, the log's place in the home, the pending marker and the order of line against leaf.",
+          "done": false
+        },
+        {
+          "id": "C53",
+          "text": "The adversarial review of the three leaf formats (forgery, cross-protocol confusion, replay, a leaf under another key, guessing a short line from its hash) is recorded in docs/design/identity/IDENTITY-EVENTS.md before any durable byte is signed under them.",
+          "done": false
+        },
+        {
+          "id": "C54",
+          "text": "A home that never ran log-enable appends every entry as before, with no leaf and no log; lys-home log-enable --agent names the home's agent in log/agent, and is refused by name, creating nothing, when --agent is missing or the identity crate holds no key for that agent.",
+          "done": false
+        },
+        {
+          "id": "C55",
+          "text": "On a home that logs its entries and whose agent's key the identity crate does not hold, a lys.call, lys.harness_event or lys.open append is refused before its line is written, naming the home and the entry kind and the act that answers it, with nothing written.",
+          "done": false
+        },
+        {
+          "id": "C56",
+          "text": "lys-home open opens a sealed envelope with open_and_verify, writes the plaintext to --out, created new with mode 0600 on Unix, and appends one lys.open entry (the envelope's SHA-256, the sender's public key and the --out path) to the named session with its leaf; an existing --out is refused by name, and a failed open gives lys open's one failure message and writes no plaintext, entry or leaf.",
+          "done": false
+        },
+        {
+          "id": "C57",
+          "text": "A fork on a logging home gives each lys.call, lys.harness_event and lys.open line it copies its own leaf under the child session id, tagged as a copy and naming the parent session id, the parent entry's position and the parent leaf's index, or the checkpoint leaf's index when the parent entry predates the checkpoint, and is never refused for such a line; the child whose copies name parent leaves verifies without the parent's files, and verify refuses a copy whose parent leaf is absent or differs, and a copy naming the checkpoint whose parent line is absent or differs.",
+          "done": false
+        }
+      ]
     }
   ]
 }

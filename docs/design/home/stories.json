@@ -1358,6 +1358,38 @@
           "text": "As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it."
         }
       ]
+    },
+    {
+      "name": "Agent",
+      "role": "Keeps a history a stranger can verify",
+      "stories": [
+        {
+          "id": "S24",
+          "text": "As an agent, I want each call and each harness event of my session signed into a log under my own identity, so that a stranger can verify my history without trusting the home's files."
+        },
+        {
+          "id": "S25",
+          "text": "As an agent whose home held entries before logging began, I want those entries covered by one signed checkpoint, so that my earlier history can be told apart from tampering."
+        },
+        {
+          "id": "S28",
+          "text": "As an agent, I want each sealed record I open through my home recorded as an entry with its own signed leaf, naming the envelope by hash and never its content, so that a stranger can see what I opened without learning what it said."
+        }
+      ]
+    },
+    {
+      "name": "Reviewer",
+      "role": "Verifies a session against its log",
+      "stories": [
+        {
+          "id": "S26",
+          "text": "As the reviewer, I want one command that checks a session's entry lines against the log and names the first entry that fails, so that tampering is found by entry rather than suspected."
+        },
+        {
+          "id": "S27",
+          "text": "As the reviewer, I want a failed log append refused with its entry named and the session held until the leaf is written, so that no entry is ever reported as recorded without its leaf."
+        }
+      ]
     }
   ]
 }

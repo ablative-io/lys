@@ -391,13 +391,13 @@
     },
     {
       "id": "ADR-019",
-      "title": "A forward failure is answered by the pass-through example, never by the shared forward.rs",
+      "title": "A home entry's leaf is a typed payload of the identity event envelope, signed by the agent's own key after its durable line",
       "status": "decided",
       "scope": "home",
       "date": "2026-09-27",
-      "decided_by": "Waffles, owning lead of the secrets line, on 27 September 2026 at 12:30, as a technical decision under Tom's word of 12:12 that a choice with a technical answer is the leads' to make",
-      "context": "ADR-001 places the broker inside the door, built in Rust. SECRETS-002 named door-owned files in the cambium checkout while its design's CN4 refused to let those proposals make Cambium a required runtime, and left the broker's host open. Every code row's files wait on which repository they sit in, and ADR-004 requires every project to stand alone. This entry amends ADR-001 rather than superseding it: ADR-001's handle model stands, and only where the broker is built moves, so supersedes stays empty and ADR-001's text is unchanged. Decided on 27 September 2026: the broker lives in lys as crates/lys-secrets and Cambium consumes it; ADR-001's handle model is unchanged, and the reason is ADR-004, that every project stands alone.",
-      "decision": "forward.rs stays byte-faithful: when it fails before any upstream response it returns an error to its caller naming the kind (refused, reset, or broken before the status line) and synthesises nothing. The pass-through example maps that error to 502 Bad Gateway with an empty body and writes 502 in its call line; when the upstream breaks after its status and headers have gone to the client, the example closes the client connection and its call line records that status and the duration up to the break. No error text, header value or body byte is written anywhere on either path. Rejected: the 502 inside forward.rs, which would change lys-proxy's observable behaviour.",
+      "decided_by": "The lead of the home line, answering the signed entry log survey; recorded with HOME-008",
+      "context": "lys.call and lys.harness_event entries were lines in a session file with nothing signed and no log. Signing them freezes a wire format from its first signature, and several forks had to be settled first: which key signs, which envelope carries the payload, what happens when the leaf fails after the line is durable, how entries written before the log are told from tampering, and whether a person can run the check.",
+      "decision": "Each lys.call and lys.harness_event entry appends one leaf to one log the home keeps under its agent's identity: a typed payload of the identity event envelope (DIRECTORY-003 R2), tagged lys/home-entry/v1, carrying the session id, the entry id, the kind and the SHA-256 of the entry's line, signed through sign_attestation with the agent identity's own Ed25519 key as the identity crate holds it. The line is written first and never removed; a failed leaf append is refused naming the entry, marks the session pending and refuses further appends until the leaf is written at the next open or by verify --repair. The log starts with one checkpoint leaf, tagged lys/home-checkpoint/v1, naming each session with its entry count and file SHA-256. lys-home gains a verify subcommand. Rejected: a second envelope for home entries; a home key, a person's key or a stand-in key; writing the leaf before the line; a best-effort append that lets the session continue past an unlogged line; a per-entry backfill; verification as a library function only; and recording opens in the published lys open.",
       "quote": "",
       "consequences": [
         "Amends ADR-001's placement of the broker inside the door; ADR-001's handle model is unchanged and its entry is not edited.",
@@ -410,27 +410,33 @@
         "CN4 of the secrets design is answered by this entry once it is decided; SECRETS-002's open reading of the host is closed by SECRETS-003 without editing SECRETS-002.",
         "lys-proxy keeps R10's own behaviour and records partial or unrecorded as its spec says.",
         "A test on forward.rs asserts the error kind on a refused connection and that no response bytes are invented; a test on the example asserts the 502.",
-        "If the rule is ever wanted for lys-proxy too, it is a change to R10's contract, stated there, not a change made under the example."
+        "If the rule is ever wanted for lys-proxy too, it is a change to R10's contract, stated there, not a change made under the example.",
+        "Both payloads are reviewed adversarially with the envelope before any durable byte is signed under them, and are frozen from their first signature; a change is a new version alongside.",
+        "The card waits for DIRECTORY-003 R2 and for lys-log-store 0.3.0.",
+        "lys open stays the verifier and writes nothing.",
+        "Entries of other kinds (lys.given, lanterns, forks, messages) are not signed by this."
       ],
       "supersedes": [],
       "superseded_by": ""
     },
     {
       "id": "ADR-020",
-      "title": "A lease is a broker record under the audit log, not a signed format",
+      "title": "The home's non-goal on signing narrows to anchoring",
       "status": "decided",
-      "scope": "secrets",
-      "date": "2026-09-26",
-      "decided_by": "The lead's answers to the secrets survey; recorded with SECRETS-003",
-      "context": "SECRETS-002 R9 puts a lease's time window in the signed delegation, but lys/delegation/v1 has no not_after by design (crates/lys-core/src/delegation/mod.rs:218-221), and DIRECTORY-006 R1 puts the time window in the lys-identity grant. A signed lease format would freeze wire bytes that strangers verify.",
-      "decision": "The lease is a broker record under the audit log: it counts uses, time and spend against a grant and is read only by the broker, so nothing a stranger verifies changes. The limit on a lease's time is the window of the lys-identity grant it counts against (DIRECTORY-006 R1): the lease's own not_after never extends past it. Rejected: a signed lease format, a new version beside lys/delegation/v1 with its own adversarial review; and reading the window as one the signed delegation keeps, which v1 cannot carry.",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The signed entry log request; recorded with HOME-008",
+      "context": "The home design held anchoring, signing and receipts into a lys log out of scope until asked for. Signing lys.call entries, lys.harness_event entries and sealed-record opens into a lys log under the identity has now been asked for, with anchoring, encryption at rest and Haematite named out of scope.",
+      "decision": "Signing into a lys log is in scope for lys.call entries, lys.harness_event entries and sealed-record opens, and for nothing else; anchoring stays out of scope. Rejected: keeping the whole non-goal, and widening signing to every entry kind.",
       "quote": "",
       "consequences": [
         "No new signed format and no new version beside lys/delegation/v1 is written for the lease.",
         "v1's lack of not_after is recorded as a fact; the lys-identity grant's window is the limit a lease is checked against.",
         "These criteria wait on the grant's window, defined by DIRECTORY-006 R1 and enforced at admission by DIRECTORY-006 R4: SECRETS-002 R9 acceptance criteria 5, 8 (SEC_LEASE_ATTENUATION) and 10 (SEC_PROVISIONAL_EXPIRY), SECRETS-002 R7 acceptance criterion 8 (SEC_REINSTATE_CURRENT's expired handle), and SECRETS-003 R3's lease-window refusal leg.",
         "A window carried in a signed delegation stays open, as SECRETS-002 records it, and would be a new version alongside v1.",
-        "A lease a stranger verifies offline, if a later row needs one, is a new brief with its own adversarial review."
+        "A lease a stranger verifies offline, if a later row needs one, is a new brief with its own adversarial review.",
+        "The home design's first non-goal names anchoring and every other entry kind, not signing as such.",
+        "lys.given stays unsigned (ADR-013)."
       ],
       "supersedes": [],
       "superseded_by": ""
