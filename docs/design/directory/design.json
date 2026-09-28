@@ -84,7 +84,8 @@
     "ADR-115",
     "ADR-122",
     "ADR-126",
-    "ADR-127"
+    "ADR-127",
+    "ADR-128"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -4419,6 +4420,136 @@
       "path": "docs/design/directory/briefs/DIRECTORY-061.md",
       "note": "the SpiceDB cancel brief",
       "brief": "DIRECTORY-061"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_policy.rs",
+      "note": "One Lys policy becomes a bound containment plan; DIRECTORY-062 R1.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment.rs",
+      "note": "One Lys policy becomes a bound containment plan; DIRECTORY-062 R1.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/tests/containment_policy.rs",
+      "note": "One Lys policy becomes a bound containment plan; DIRECTORY-062 R1.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-identity-server/src/containment_policy.rs",
+      "note": "One Lys policy becomes a bound containment plan; DIRECTORY-062 R1.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/containment_policy.rs",
+      "note": "One Lys policy becomes a bound containment plan; DIRECTORY-062 R1.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_macos.rs",
+      "note": "macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_egress.rs",
+      "note": "macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/tests/containment_macos.rs",
+      "note": "macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/tests/containment_egress.rs",
+      "note": "macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_linux.rs",
+      "note": "Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_helper.rs",
+      "note": "Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/tests/containment_linux.rs",
+      "note": "Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys/src/cli/containment.rs",
+      "note": "Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_audit.rs",
+      "note": "Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_audit_macos.rs",
+      "note": "Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_audit_linux.rs",
+      "note": "Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/tests/containment_audit.rs",
+      "note": "Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-identity-server/src/containment_api.rs",
+      "note": "The agent page states the sandbox and the evidence; DIRECTORY-062 R5.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/containment.rs",
+      "note": "The agent page states the sandbox and the evidence; DIRECTORY-062 R5.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "surface/identity/src/features/file/AgentContainment.tsx",
+      "note": "The agent page states the sandbox and the evidence; DIRECTORY-062 R5.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "surface/identity/tests/agent-containment.test.tsx",
+      "note": "The agent page states the sandbox and the evidence; DIRECTORY-062 R5.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "scripts/identity-gates/containment-macos.sh",
+      "note": "A person watches real native denials and an allowed control; DIRECTORY-062 R6.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "scripts/identity-gates/containment-linux.sh",
+      "note": "A person watches real native denials and an allowed control; DIRECTORY-062 R6.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/tests/containment_probe.rs",
+      "note": "A person watches real native denials and an allowed control; DIRECTORY-062 R6.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "surface/identity/tests/acceptance/containment.spec.ts",
+      "note": "A person watches real native denials and an allowed control; DIRECTORY-062 R6.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "docs/design/directory/PROOF-CONTAINMENT.md",
+      "note": "A person watches real native denials and an allowed control; DIRECTORY-062 R6.",
+      "brief": "DIRECTORY-062"
     }
   ],
   "inventory": [

@@ -1860,6 +1860,25 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-128",
+      "title": "The runner applies OS containment from the same Lys policy and reports native denials",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-29",
+      "decided_by": "Tom via Waffles at 07:14 and 07:16 Melbourne; recorded by Chippy",
+      "context": "DIRECTORY-051 creates Lys-owned hooks and refusal recording at the tool boundary. A shell can execute outside a tool hook. OS confinement and source-backed denial reporting are separate capabilities. Linux Landlock network rules apply to ports, not destination hostnames (https://docs.kernel.org/userspace-api/landlock.html). Native audit availability is an explicit host capability (https://www.kernel.org/doc/html/latest/admin-guide/LSM/landlock.html). Apple describes sandbox denial diagnostics and inherited helper restrictions (https://developer.apple.com/documentation/security/discovering-and-diagnosing-app-sandbox-violations).",
+      "decision": "Compile one Lys policy into Seatbelt on macOS and Landlock with a private network namespace on Linux. A policy-bound egress service enforces hostnames while OS rules prevent direct bypass. A runner applies containment before untrusted exec and records its policy digest and session incarnation. Native kernel events feed the same authenticated refusal stream as051, with distinct provenance from tool and proxy denials. Missing enforcement or required audit support refuses launch; gaps are visible and end affected sessions through the existing ownership mechanism. A writable outside-root fixture that succeeds without confinement is the filesystem control. Never infer sandbox enforcement from a failure to write /etc/x. Both native platforms require real tests and receipts.",
+      "quote": "",
+      "consequences": [
+        "The card is11VnzLRp and the handwritten implementation brief isDIRECTORY-062, after051.",
+        "A narrowly privileged host setup or audit helper may be required; its authenticated policy-bound interface and installation are part of the card, not a request for users to disable OS security.",
+        "Only safe OS interfaces are allowed; if supported interfaces cannot deliver the policy or evidence, report the specific capability and stop that start.",
+        "Hostname enforcement and kernel network isolation have separate receipts and neither substitutes for the other."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

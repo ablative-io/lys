@@ -384,3 +384,12 @@
 - [ ] **C422** — No SpiceDB connect, write or read in Lys waits on a clock, and a cancelled call returns at once (DIRECTORY-061 R1).
 - [ ] **C423** — Every grants section runs off the async workers, and a request that leaves ends its SpiceDB wait and lets the grants lock go (DIRECTORY-061 R2).
 - [ ] **C424** — A section that takes the grants lock after its request left calls no SpiceDB (DIRECTORY-061 R2).
+
+## Native process containment (DIRECTORY-062)
+
+- [ ] **C425** — One Lys policy becomes a bound containment plan (DIRECTORY-062 R1).
+- [ ] **C426** — macOS applies Seatbelt before the harness can run (DIRECTORY-062 R2).
+- [ ] **C427** — Linux applies Landlock and a network namespace before exec (DIRECTORY-062 R3).
+- [ ] **C428** — Kernel evidence feeds the existing refusal stream (DIRECTORY-062 R4).
+- [ ] **C429** — The agent page states the sandbox and the evidence (DIRECTORY-062 R5).
+- [ ] **C430** — A person watches real native denials and an allowed control (DIRECTORY-062 R6).

@@ -76,6 +76,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - ADR-122 — Install provisions the audit agent and separate authenticated transport — Install provisions private stable sender material and a separate TLS-only authority key. Browser setup, after creating the real administrator, completes sender enrolment and login binding through one recoverable intent. The capability authority and event signer never sign TLS certificates. The Rauthy sender verifies chain, hostname and pinned server key before HTTP. DIRECTORY-045 R5 swaps public trust/configuration/mounts with binaries and preserves private credentials. Cross-repository source builds are ordered; activation requires matched artifacts.
 - ADR-126 — Applications have connector identities; people register them with explicit permission — An application connector is its own third identity and grant-holder kind. Apps do not act as agents and do not use service accounts, which are accounts people use to service things. Only a signed-in person with an explicit ordinary register_app grant registers an app. The super administrator may grant that permission to a person; an agent, connector or service account cannot register, even if presented with such a grant. Approval creates a connector identity and binds the app to it. No app authority is implicit in approval, binding or ownership of a kind prefix: every permission is an explicit grant with a chain tracing to the super administrator. Own-kind checks, schema acts, batch and which use that connector identity and the ordinary grant engine. Extend IdentityId, grant admission and the permission-store holder, plus event and snapshot representation with compatibility tests. Preserve historical person/agent bytes and signatures; version a representation when necessary, never rewrite history or coerce identities. This supersedes DIRECTORY-048 wording allowing a service account or connector holding register_app to register, and forbids a separate registrar credential as substitute authority.
 - ADR-127 — A SpiceDB wait ends on its answer, its close or its caller, and grants sections run off the async workers — Keep RelationshipStore synchronous. Run each grants section under spawn_blocking inside a cancel scope owned by the handler's future. Every SpiceDB exchange uses a non-blocking socket and waits in poll(2) on that socket and the scope's wake pipe, with no timeout, and dropping the handler's future cancels the scope, which wakes the poll so the call returns. A section that gets the grants lock after its request left returns before it opens GrantState or calls SpiceDB. The SpiceDB endpoint must be a socket address, so no name lookup is ever waited on. WAIT and the three socket timeouts go with no clock in their place. Making the SpiceDB store and the grant authority async with a tokio Mutex was weighed and not taken, because it changes the lys-identity core trait and every grant act for the same result.
+- ADR-128 — The runner applies OS containment from the same Lys policy and reports native denials — Compile one Lys policy into Seatbelt on macOS and Landlock with a private network namespace on Linux. A policy-bound egress service enforces hostnames while OS rules prevent direct bypass. A runner applies containment before untrusted exec and records its policy digest and session incarnation. Native kernel events feed the same authenticated refusal stream as051, with distinct provenance from tool and proxy denials. Missing enforcement or required audit support refuses launch; gaps are visible and end affected sessions through the existing ownership mechanism. A writable outside-root fixture that succeeds without confinement is the filesystem control. Never infer sandbox enforcement from a failure to write /etc/x. Both native platforms require real tests and receipts.
 
 ## Goals
 
@@ -979,6 +980,32 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/tests/spicedb_cancel.rs` | a SpiceDB wait ends when its request leaves | DIRECTORY-061 |
 | `docs/design/directory/briefs/DIRECTORY-061.json` | the SpiceDB cancel brief | DIRECTORY-061 |
 | `docs/design/directory/briefs/DIRECTORY-061.md` | the SpiceDB cancel brief | DIRECTORY-061 |
+| `crates/lys-runner/src/containment_policy.rs` | One Lys policy becomes a bound containment plan; DIRECTORY-062 R1. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment.rs` | One Lys policy becomes a bound containment plan; DIRECTORY-062 R1. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_policy.rs` | One Lys policy becomes a bound containment plan; DIRECTORY-062 R1. | DIRECTORY-062 |
+| `crates/lys-identity-server/src/containment_policy.rs` | One Lys policy becomes a bound containment plan; DIRECTORY-062 R1. | DIRECTORY-062 |
+| `crates/lys-identity-server/tests/containment_policy.rs` | One Lys policy becomes a bound containment plan; DIRECTORY-062 R1. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_macos.rs` | macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_egress.rs` | macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_macos.rs` | macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_egress.rs` | macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_linux.rs` | Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_helper.rs` | Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_linux.rs` | Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys/src/cli/containment.rs` | Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_audit.rs` | Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_audit_macos.rs` | Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_audit_linux.rs` | Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_audit.rs` | Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4. | DIRECTORY-062 |
+| `crates/lys-identity-server/src/containment_api.rs` | The agent page states the sandbox and the evidence; DIRECTORY-062 R5. | DIRECTORY-062 |
+| `crates/lys-identity-server/tests/containment.rs` | The agent page states the sandbox and the evidence; DIRECTORY-062 R5. | DIRECTORY-062 |
+| `surface/identity/src/features/file/AgentContainment.tsx` | The agent page states the sandbox and the evidence; DIRECTORY-062 R5. | DIRECTORY-062 |
+| `surface/identity/tests/agent-containment.test.tsx` | The agent page states the sandbox and the evidence; DIRECTORY-062 R5. | DIRECTORY-062 |
+| `scripts/identity-gates/containment-macos.sh` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
+| `scripts/identity-gates/containment-linux.sh` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_probe.rs` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
+| `surface/identity/tests/acceptance/containment.spec.ts` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
+| `docs/design/directory/PROOF-CONTAINMENT.md` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
 
 ## Inventory
 

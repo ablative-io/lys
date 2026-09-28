@@ -1,0 +1,289 @@
+{
+  "id": "DIRECTORY-062",
+  "cluster": "directory",
+  "title": "Every runner-owned agent is contained by the operating system and its denials are visible",
+  "depends_on": [
+    "DIRECTORY-051"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C425",
+    "C426",
+    "C427",
+    "C428",
+    "C429",
+    "C430"
+  ],
+  "stories": [
+    "S170",
+    "S171"
+  ],
+  "design_anchor": [
+    "ADR-128"
+  ],
+  "purpose": "Tom's sandboxing request, relayed by Waffles at 07:14 Melbourne on 29 September 2026, card 11VnzLRp. DIRECTORY-051 owns policy and tool-boundary enforcement. This card extends that same authority to the process boundary, so an agent's shell cannot bypass it. Waffles corrected the /etc/x demonstration at 07:16: an ordinary permission failure is not proof of sandbox enforcement. Use a writable outside-root control and authentic OS denial evidence.",
+  "task": "Apply Seatbelt on macOS and Landlock plus a network namespace on Linux before any runner-owned agent executes. Bind enforcement to the same Lys policy, deliver native denials to the existing refusal page, and prove both platforms with visible controlled probes.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "One Lys policy becomes a bound containment plan",
+      "spec": "Behavioural. Extend DIRECTORY-051's Lys-owned enforcement policy with its process-containment projection. The server derives that projection from the same policy and granted authority, never from a runner-local allow list or an agent's settings. The plan names the agent, runner, session incarnation, policy revision and digest, isolated home and workspace, declared read-only runtime inputs, allowed destination hosts and required enforcement/reporting capabilities. The authenticated runner verifies the binding before launch and records the exact plan it enforces. Reject a missing or stale plan, a mismatched session/runner, or an unsupported policy operation by name before the agent runs. Interpret writable roots as directory objects, not string prefixes. Temporary files and caches belong beneath those roots. Keep credentials, policy inputs, audit transport and runner control endpoints inaccessible to the agent except through their existing explicitly granted interfaces. A capability probe reports actual OS enforcement and audit support. An unsupported host or missing privilege produces containment_unavailable naming the missing capability, with no uncontained fallback. A tightened policy stops the affected session through the existing runner lifetime mechanism and obtains its exit evidence before launching under a replacement plan. A policy update never silently leaves a session on a revoked grant. Record unavailable, prepared, enforced, ending and ended states from evidence, and never call prepared enforced.",
+      "acceptance": [
+        "A plan carries the same revision and digest as the DIRECTORY-051 policy used for the session.",
+        "A modified plan signed by no admitted authority is refused before a child is spawned.",
+        "A plan bound to another runner or session incarnation is refused before a child is spawned.",
+        "A stale policy revision is refused before a child is spawned.",
+        "An unsupported capability returns containment_unavailable naming that capability and the child-spawn counter remains zero.",
+        "A policy tightening records the old session exit before a replacement session is reported enforced.",
+        "A sibling path sharing a textual prefix with the workspace receives no writable-root permission."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-runner/src/containment_policy.rs",
+          "crates/lys-runner/src/containment.rs",
+          "crates/lys-runner/tests/containment_policy.rs",
+          "crates/lys-identity-server/src/containment_policy.rs",
+          "crates/lys-identity-server/tests/containment_policy.rs"
+        ],
+        "modify": [
+          "crates/lys-runner/src/lib.rs",
+          "crates/lys-runner/src/protocol.rs",
+          "crates/lys-runner/src/session.rs",
+          "crates/lys-runner/src/state.rs",
+          "crates/lys-identity-server/src/lib.rs",
+          "crates/lys-identity-server/src/runner_api.rs",
+          "crates/lys-identity-server/src/runner_sessions.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C425"
+      ],
+      "stories": [
+        "S170"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "macOS applies Seatbelt before the harness can run",
+      "spec": "Behavioural. Compile the bound plan to a Seatbelt profile and launch the harness through the platform sandbox entry point from the runner's PTY path. The first untrusted instruction, its shell tools and all descendants run under that profile. Deny writes outside the isolated home and workspace. Allow only the declared runtime reads and required PTY/stdio operations. Close inherited descriptors that could provide a write, network or control bypass. The agent cannot replace the profile or launch an unsandboxed helper. A narrowly owned egress service evaluates destination host names from the same policy, including name resolution, redirects and each new connection. Seatbelt permits network access only to that service's bound endpoint; direct IPv4/IPv6, alternative proxies, resolver traffic and local sockets cannot bypass it. This avoids treating a shared IP address as proof of an allowed hostname. Runtime dependencies and the egress endpoint are explicitly part of the bound plan, not blanket file or network exceptions. Kernel denial collection is R4. Refuse launch if this OS cannot enforce the profile or supply its required evidence. A backend probe may check feature support, but a test double cannot establish native Seatbelt enforcement. Apply the existing runner's process ownership and cancellation rules during preparation, start, rotation, stop and restart.",
+      "acceptance": [
+        "On macOS the same writable outside-root fixture succeeds without the sandbox and is denied inside it.",
+        "A write inside the isolated workspace succeeds under Seatbelt.",
+        "A descendant shell is subject to the same outside-root denial.",
+        "A symlink from the workspace to the outside fixture does not permit writing the target.",
+        "An inherited writable descriptor to the outside fixture is not available to the harness.",
+        "A direct connection to the controlled denied endpoint is refused by Seatbelt.",
+        "An allowed hostname succeeds through the egress service.",
+        "A denied hostname sharing an address with an allowed hostname is refused by the egress policy.",
+        "Removing the Seatbelt entry point causes a named start refusal with no harness execution."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-runner/src/containment_macos.rs",
+          "crates/lys-runner/src/containment_egress.rs",
+          "crates/lys-runner/tests/containment_macos.rs",
+          "crates/lys-runner/tests/containment_egress.rs"
+        ],
+        "modify": [
+          "crates/lys-runner/src/containment.rs",
+          "crates/lys-runner/src/lib.rs",
+          "crates/lys-runner/src/pty.rs",
+          "crates/lys-runner/src/session/lifecycle.rs",
+          "crates/lys-runner/Cargo.toml",
+          "Cargo.toml",
+          "Cargo.lock"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C426"
+      ],
+      "stories": [
+        "S170"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Linux applies Landlock and a network namespace before exec",
+      "spec": "Behavioural. A single-threaded launch helper enters a private user/mount/network isolation setup, drops inherited capabilities, sets no_new_privs, applies Landlock filesystem restrictions from the bound plan, and only then execs the harness. It admits only the plan's writable directory objects and declared read-only runtime inputs. The network namespace has no direct host or external route. Its only permitted network path reaches the R2 egress service, which enforces the same hostname policy. Landlock's port rules are not a hostname allow list. Restrict namespace escape, mounts, inherited sockets/descriptors and IPC paths that could ask an unrestricted process to act for the agent. The helper's privileged setup, where required by the host, accepts only authenticated runner requests tied to the plan and exact child incarnation, never arbitrary commands or caller-selected policy files. Installation configures those narrowly required privileges and audit access explicitly. Missing host support refuses the start; it does not omit Landlock, the namespace or auditing. Query the running kernel's Landlock ABI and required rights instead of assuming support from a version string. Denial reporting requires kernel audit support and Landlock logging for subsequent execs. Retain every required restriction; do not intersect away unsupported rights and call that complete. The helper waits on an authenticated readiness handshake so an agent is not reported running before confinement succeeds. Failure or cancellation during setup obtains child exit evidence and removes only that session's owned setup resources.",
+      "acceptance": [
+        "On Linux the writable outside-root fixture succeeds without isolation and is denied by Landlock inside it.",
+        "A write inside the allowed workspace succeeds under Landlock.",
+        "A child exec retains the filesystem and network restrictions.",
+        "A symlink or rename attempt cannot provide access to the outside fixture.",
+        "A direct IPv4 connection to the denied endpoint fails inside the network namespace.",
+        "A direct IPv6 connection to the denied endpoint fails inside the network namespace.",
+        "An alternative DNS or proxy path cannot reach the denied endpoint.",
+        "A missing required Landlock right refuses the start with no harness execution.",
+        "Missing namespace or kernel-audit permission refuses the start by name.",
+        "Cancellation before readiness produces a child-exit record and no running-session receipt."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-runner/src/containment_linux.rs",
+          "crates/lys-runner/src/containment_helper.rs",
+          "crates/lys-runner/tests/containment_linux.rs",
+          "crates/lys/src/cli/containment.rs"
+        ],
+        "modify": [
+          "crates/lys-runner/src/containment.rs",
+          "crates/lys-runner/src/lib.rs",
+          "crates/lys-runner/src/pty.rs",
+          "crates/lys-runner/src/session/lifecycle.rs",
+          "crates/lys-runner/Cargo.toml",
+          "crates/lys/src/cli.rs",
+          "crates/lys/src/cli/runner.rs",
+          "crates/lys/src/identity/install.rs",
+          "Cargo.toml",
+          "Cargo.lock"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C427"
+      ],
+      "stories": [
+        "S170"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Kernel evidence feeds the existing refusal stream",
+      "spec": "Behavioural. Collect native denial events using the host's authenticated OS audit/log source: macOS sandbox violation records and Linux Landlock audit plus namespace network-filter audit records. Where the namespace drops network traffic, install a policy-bound reject/log path so the denial is observable, rather than inferring it from a hung curl. Attribute events using OS process lifetime evidence and the runner's admitted descendant lineage, not a reusable PID alone or an agent-supplied label. Bind each report to agent, session incarnation, policy digest, native source event identity, action/resource and timestamp. Feed DIRECTORY-051's authoritative refusal store and cursor delivery. Preserve kernel filesystem/network denials and egress-policy denials as different named sources; a proxy refusal is not a kernel report. A Bash exit status, stderr string or agent explanation is never kernel evidence. Keep native source cursors and deduplication durable across reconnect/reopen with checkpoint-plus-tail reads. If a native source cannot provide complete coverage, loses events, or becomes inaccessible, emit an explicit reporting-gap state and end affected sessions through the runner; never answer an empty all-clear or synthesize a missing event. At start, establish audit capability before untrusted execution. Filter to this runner's admitted processes and safe resource descriptions; no secrets, other users' events or full command credentials enter records. Failure to persist a refusal is visible as evidence unavailable and cannot turn a denial into permission.",
+      "acceptance": [
+        "A real macOS filesystem denial produces one refusal with the native event identity and the correct session incarnation.",
+        "A real Linux Landlock denial produces one refusal with the native event identity and the correct session incarnation.",
+        "A denied direct network probe produces a native network refusal rather than a parsed command error.",
+        "Replaying the same source event after reopening adds no duplicate refusal.",
+        "An event from a reused PID outside the admitted process lifetime is not attributed to the old agent.",
+        "A kernel-log gap marks reporting incomplete and records the affected session ending.",
+        "A forged terminal line resembling a kernel denial creates no refusal.",
+        "An event containing a secret-bearing command does not persist or display that secret.",
+        "A restart reads no refusal event before its verified checkpoint."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-runner/src/containment_audit.rs",
+          "crates/lys-runner/src/containment_audit_macos.rs",
+          "crates/lys-runner/src/containment_audit_linux.rs",
+          "crates/lys-runner/tests/containment_audit.rs"
+        ],
+        "modify": [
+          "crates/lys-runner/src/lib.rs",
+          "crates/lys-runner/src/state.rs",
+          "crates/lys-runner/src/protocol.rs",
+          "crates/lys-runner/src/refusals.rs",
+          "crates/lys-runner/tests/refusals.rs",
+          "crates/lys-identity-server/src/refusals_api.rs",
+          "crates/lys-identity-server/src/refusals_store.rs",
+          "crates/lys-identity-server/tests/refusals.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C428"
+      ],
+      "stories": [
+        "S171"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "The agent page states the sandbox and the evidence",
+      "spec": "Behavioural. Add a plain containment section to the existing agent page beside DIRECTORY-051's refusal list. It names the OS backend, applied policy revision, allowed write locations and destination hosts, the enforcement state and audit coverage. Explain unavailable or ending states with the actual capability or failure and the person authorized to change the relevant policy. Do not offer an unsandboxed start switch or imply ordinary grants can override an unavailable OS protection. The server exposes these states from runner receipts, not from a browser calculation or profile checkbox. Read visibility and streamed updates use the existing agent authorization boundary. Each refusal links to its applied policy and distinguishes kernel, egress and tool-boundary sources in plain language. Changes arrive through existing push/cursor delivery. The UI keeps the same components, typography, keyboard access and reduced-motion behavior as the agent page. Runtime state must remain truthful after a reconnect, a stop, an audit gap or a policy change.",
+      "acceptance": [
+        "The agent page shows enforced only after the matching runner readiness receipt.",
+        "The page displays the native backend and applied policy digest returned by the server.",
+        "A missing capability is shown by name on the page.",
+        "A reporting gap is visible beside the refusal list.",
+        "A user without access to the agent cannot read its containment state or streamed changes.",
+        "Reconnecting resumes the cursor without duplicate denial rows.",
+        "Keyboard navigation reaches policy details and the refusal source explanation."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/containment_api.rs",
+          "crates/lys-identity-server/tests/containment.rs",
+          "surface/identity/src/features/file/AgentContainment.tsx",
+          "surface/identity/tests/agent-containment.test.tsx"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/lib.rs",
+          "crates/lys-identity-server/src/routes.rs",
+          "crates/lys-identity-server/src/runner_api.rs",
+          "surface/identity/src/features/file/IdentityFile.tsx",
+          "surface/identity/src/features/file/AgentRefusals.tsx",
+          "surface/identity/src/features/file/sections.tsx",
+          "surface/identity/src/api.ts"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C429"
+      ],
+      "stories": [
+        "S171"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "A person watches real native denials and an allowed control",
+      "spec": "Evidence. Provide a repeatable demonstration on scratch macOS and Linux installations using the real runner, native containment and a deterministic shell harness, with no model call. The same user first writes a harmless named outside-root fixture successfully without containment; inside the sandbox the agent's Bash touch of that fixture fails, an allowed workspace touch succeeds, and curl to a controlled denied network destination fails. Both denied acts appear live on that agent's page with OS provenance. Do not use /etc/x as proof: ordinary filesystem permissions alone can deny it, as Waffles corrected at 07:16 Melbourne. The denied host is a test-owned listener outside the allowed egress path, not a public or sensitive endpoint. Record each attempted case and its actual receipt, so zero attempts cannot pass. Register required native macOS and Linux containment legs in the repository gate declarations, routed to matching capable venues. Neither platform is proven by cross-compilation, a mocked event, a tool hook or a test on the other platform. Missing capability is a failed/blocked leg, never an ignored test or green result. The card is complete only when both native legs and the ordinary full battery pass on the same commit. The demonstration report records commit, OS/kernel and runtime capabilities, applied policy digest, control result, each denial's source identity, screen evidence and cleanup of owned fixtures. No production policy, host /etc path or real user's files are changed for the test.",
+      "acceptance": [
+        "The macOS native leg records a successful unsandboxed write to the outside-root fixture.",
+        "The macOS native leg records a denied sandboxed write to that same fixture.",
+        "The macOS native leg records a successful sandboxed write inside the workspace.",
+        "The macOS native leg records a kernel denial for the controlled direct network probe.",
+        "The Linux native leg records the corresponding outside-root control and sandbox denial as separate results.",
+        "The Linux native leg records a successful allowed workspace write.",
+        "The Linux native leg records a native denial for the controlled direct network probe.",
+        "The real browser receives both denied acts through the authenticated refusal route on each platform.",
+        "The browser shows the source identity of each native refusal.",
+        "The report names every attempted case and both native leg receipts at the exact card commit.",
+        "An unavailable native capability makes its leg fail by name.",
+        "Every owned test fixture is removed after the probe."
+      ],
+      "files": {
+        "create": [
+          "scripts/identity-gates/containment-macos.sh",
+          "scripts/identity-gates/containment-linux.sh",
+          "crates/lys-runner/tests/containment_probe.rs",
+          "surface/identity/tests/acceptance/containment.spec.ts",
+          "docs/design/directory/PROOF-CONTAINMENT.md"
+        ],
+        "modify": [
+          "docs/design/project.json",
+          "docs/design/directory/design.json",
+          ".land/gates.sh",
+          "surface/identity/vite.config.ts",
+          "surface/identity/package.json"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C430"
+      ],
+      "stories": [
+        "S171"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT start before DIRECTORY-051 is complete and green and its actual policy, refusal and harness integration is in the base tree. Recheck every touched file against that exact prerequisite head.",
+    "SHALL NOT implement a second authority policy in the runner, proxy or browser.",
+    "SHALL NOT fall back to an uncontained process, omit unsupported rights or claim audit coverage from command output.",
+    "SHALL NOT add a timeout, deadline, polling loop, watchdog or timer. Native event waits end on source events or cancellation.",
+    "SHALL NOT add unsafe, lint suppressions, ignored tests or underscore renames. Use reviewed safe OS interfaces and named helpers.",
+    "SHALL NOT modify live host firewall or namespace rules outside the per-session resources owned by the admitted plan.",
+    "SHALL NOT treat a PID alone as process identity or claim a requested stop as a confirmed exit.",
+    "SHALL NOT change any existing signed wire bytes in place. Version new protocol members where the existing signed contract requires it.",
+    "SHALL NOT count physical lines instead of ADR-111 code lines, grow grants.rs, or evade the file-length gate.",
+    "SHALL NOT claim either native platform passed when its matching venue or required kernel evidence is unavailable."
+  ],
+  "verification": [
+    "The full card and landing chain, including Jev, fmt, both strict Clippy configurations, workspace tests, documentation, ast-grep, surface and file-length legs, passes on the exact integrated head.",
+    "Both named native containment legs pass on that same head and their machine receipts are included in PROOF-CONTAINMENT.md.",
+    "The real-browser containment acceptance passes against scratch services and real native enforcement on both platforms."
+  ]
+}

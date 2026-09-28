@@ -602,6 +602,20 @@
           "text": "As a person whose request is waiting on the permission service, I want my request to end when I leave it, and nobody else's request held behind mine."
         }
       ]
+    },
+    {
+      "name": "Person running an agent under a policy",
+      "role": "Operates and inspects a runner-owned session",
+      "stories": [
+        {
+          "id": "S170",
+          "text": "As the person responsible for an agent, I want its operating-system sandbox to enforce the same policy as Lys, so a shell or child process cannot bypass my limits."
+        },
+        {
+          "id": "S171",
+          "text": "As a person watching an agent, I want to see its actual sandbox and OS-backed refusals, so I can distinguish enforced restrictions from missing coverage."
+        }
+      ]
     }
   ]
 }

@@ -1495,6 +1495,41 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Native process containment (DIRECTORY-062)",
+      "items": [
+        {
+          "id": "C425",
+          "text": "One Lys policy becomes a bound containment plan (DIRECTORY-062 R1).",
+          "done": false
+        },
+        {
+          "id": "C426",
+          "text": "macOS applies Seatbelt before the harness can run (DIRECTORY-062 R2).",
+          "done": false
+        },
+        {
+          "id": "C427",
+          "text": "Linux applies Landlock and a network namespace before exec (DIRECTORY-062 R3).",
+          "done": false
+        },
+        {
+          "id": "C428",
+          "text": "Kernel evidence feeds the existing refusal stream (DIRECTORY-062 R4).",
+          "done": false
+        },
+        {
+          "id": "C429",
+          "text": "The agent page states the sandbox and the evidence (DIRECTORY-062 R5).",
+          "done": false
+        },
+        {
+          "id": "C430",
+          "text": "A person watches real native denials and an allowed control (DIRECTORY-062 R6).",
+          "done": false
+        }
+      ]
     }
   ]
 }
