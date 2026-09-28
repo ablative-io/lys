@@ -57,6 +57,20 @@ Documents only. THE SYSTEM SHALL add docs/design/identity/LIFECYCLE-CONTRACT.md 
 **Stories:**
 - S18 (Administrator, Suspends, reinstates and retires identities, and reads why a check refused) — As the administrator, I want the screen to show an identity's state and the record that put it there, for a retired identity exactly as for a live one, so that I can answer why a check refused from the record and not from memory.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Leg 1: I ran the leg's greps by hand; they print 4, 0 and 1. The states table is in section 1, and the sentence 'provisioned is a view (has any grant, has a handle) and not a state' follows it. Leg 2: the greps print 5, 6 (at least 1 needed) and 1. The transition table is in section 2, and 'no policy causes a transition' appears on one line only, in its closing paragraph. Leg 3: each of the seven phrases prints 1. 'takes effect at the next check' and 'a refresh is a check' are in section 6, as are 'nothing in this contract calls Rauthy to revoke' and 'never rolled back'. 'readable exactly as a live identity' is in section 7. 'never reactivated' is in the retired row of section 1 and in section 7. 'folded from the log and never set directly' is in section 4. Leg 4: '^| lifecycle_' prints 6, one per row of the section 9 table, and the refusal-name alternation prints 8. Leg 5: this change touches only docs/design/identity/LIFECYCLE-CONTRACT.md. git status shows only that file, and nothing under briefs, LIFECYCLE-STATES, IDENTITY-EVENTS, DIRECTORY-CONTRACT, crates, deploy, surface or vendor is modified. docs/design/identity has no design.json, so scripts/design/gate.sh does not measure the new file as a cluster, and nothing gate.sh reads was changed. I did not run gate.sh; the workflow measures it.
+- Deviation: Leg 5 spells its diff against 1756688cc08169bef4a9ac37b9b079efb9e38b18. main has moved on since that base, with DIRECTORY-003, DIRECTORY-006 and others landed, so that literal command now prints 785 files of other briefs' landed work whatever R1 does. I read the leg as its words 'on the R1 commit' say: the R1 commit's own diff touches none of those paths, and it does not. Separately, CN1 as written confines documents to docs/design/directory/ and docs/design/decisions.json, but R1's own files entry creates docs/design/identity/LIFECYCLE-CONTRACT.md. I followed the requirement's file entry. The document also records one fact from the landed state: IDENTITY-EVENTS.md records register as its own change kinds, not as a lifecycle transition. The document states this only as an input to that document's review and asks no edit of it.
+- Files changed:
+  - created: `docs/design/identity/LIFECYCLE-CONTRACT.md` — The lifecycle contract in the ten sections R1 orders: the states table plus the sentence that provisioned is a view; the transition table with who may cause each and the no-policy statement; the record rule; the fold rule (ADR-027); the check rule; the next-check rule (ADR-028); the retired rule (CN21); what the screen shows; the six-row refusal table; and the inputs IDENTITY-EVENTS.md must carry for DIRECTORY-003's review. It decides nothing new and fixes no encoding.
+- Checklist delivery:
+  - [x] C36 — A test run by a round leg searches the leg's complete output for every secret value the runtime received, asserts how many it searched for, and finds none. — R1 is documents only. No leg of R1 runs a test, and the document carries no secret, token or key value. The item rides on R1's rows, and they are met.
+- Story delivery:
+  - [x] S18 (Administrator, Suspends, reinstates and retires identities, and reads why a check refused) — As the administrator, I want the screen to show an identity's state and the record that put it there, for a retired identity exactly as for a live one, so that I can answer why a check refused from the record and not from memory. — Section 8 fixes what the screen shows per identity: the state, its actions, and the record that put it there. Section 7 says a retired identity is read exactly as a live one. Delivering the typed read the screen consumes is R6's, which is blocked.
+
 ### R2: Admit a transition only from the actor the table names, and refuse every other actor by name
 
 WHEN a transition of an identity is requested with an attested actor, THE SYSTEM SHALL admit the request only when the actor may cause it under R1's transition table: for register, an administrator (the person's own first sign-in registers nobody in step 1, DIRECTORY-003 R1, and this row admits it for nobody); for activate, suspend, reinstate and retire, an administrator, or, when the identity is an agent, its responsible person as the agent's registration record names them (DIRECTORY-003 R1). Every other actor SHALL be refused lifecycle_actor_not_permitted, whose message names the transition, the identity and the act that answers, that the administrator or the agent's responsible person cause it, and nothing SHALL be appended. The rule lives in crates/lys-identity/src/lifecycle/causes.rs and runs before DIRECTORY-003 R5's table check and before the append; it reads the responsible person from the identity's registration record and never from the request. A request whose actor is not an attested person SHALL be refused the same way: no policy actor exists in this brief. In step 1 the server admits only the configured administrator (P9, DIRECTORY-003 R3), so the responsible-person leg is exercised at the crate level with attested test actors and is reached from the server only when step 2's admission arrives; this row SHALL NOT change any admission of the server. The actor of a permitted request is recorded in the transition's audit record as the service attests them (docs/design/identity/briefs/IDENTITY-001.json:41): the administrator or a person, never a signature the actor did not make. No wall clock: every time value the tests need is injected through crates/lys-identity/tests/lifecycle_support/mod.rs, which also holds the fixture log builder and the attested test actors and is never compiled into the library. Estimate: 3 hours.
@@ -81,6 +95,18 @@ WHEN a transition of an identity is requested with an attested actor, THE SYSTEM
 
 **Stories:**
 - S16 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request.
+
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by the brief's own blocker 4, and no leg is met. That blocker says: if crates/lys-identity/src already holds a module named lifecycle, the brief is revised under CN9 before R2 or R3 is dispatched. That module exists: crates/lys-identity/src/lifecycle.rs is DIRECTORY-003's, exports LifecycleState and Transition, and lib.rs:18 declares it. Two consequences follow. First, creating crates/lys-identity/src/lifecycle/mod.rs beside it is a Rust ambiguity error (E0761). Second, the only other way to host lifecycle/causes.rs is to edit DIRECTORY-003's lifecycle.rs, which lies outside this row's wall. The act that answers is a brief revision that names R2's files beside the landed module, reviewed by the lead. Separately, the landed server already refuses and gates by state in places (launch_api.rs:193, agent_signature.rs:92, stop_api.rs:225), and the revision should reconcile those too.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C37 — .land/gates.sh is unchanged and no round-cadence leg is added. — No code was written, so nothing was delivered for this row. .land/gates.sh is unchanged and no round-cadence leg was added.
+- Story delivery:
+  - [ ] S16 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request. — The row is blocked, so no refusal code was written.
 
 ### R3: Answer the state only by folding the identity's transition records, and set it nowhere
 
@@ -108,6 +134,18 @@ THE SYSTEM SHALL answer an identity's lifecycle state only by folding that ident
 **Stories:**
 - S16 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request.
 
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by the same blocker as R2, and no leg is met. The landed lifecycle.rs module means R3's lifecycle/fold.rs and lifecycle/state.rs cannot be created without a CN9 revision. Two more things need that revision. The state type R3 would create in state.rs already exists as LifecycleState in lifecycle.rs. And the projection's state field is filled by the landed replay at crates/lys-identity/src/projection.rs:237 (record.state = *to). The 'one line named by revision' that fills that field from the fold has not been named. rg 'fn set_state|fn set_lifecycle' crates/lys-identity/src prints nothing, so that half of the blocker is clear.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C38 — The state is answered only by folding the identity's transition records in log order over a type of exactly four values; nothing sets a state; a record the table refuses makes the read refuse lifecycle_fold_invalid at its coordinate; reads never write the log (d009_r3_ac1 to d009_r3_ac5). — Blocked until the CN9 revision names the fold's files beside the landed lifecycle.rs and the line that fills the projection's state.
+- Story delivery:
+  - [ ] S16 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request. — The row is blocked.
+
 ### R4: Answer an access check as the conjunction, state first, so a suspended or retired identity fails by state alone
 
 THE SYSTEM SHALL answer an access check, whether this identity may perform this action on this resource now, in crates/lys-identity/src/lifecycle/gate.rs as the conjunction in this order: (a) the identity's folded state (R3) is active, else refuse by state, lifecycle_unknown_identity for an identity with no record (act: register it), lifecycle_not_active for registered (act: activate it), lifecycle_suspended for suspended (act: reinstate it), lifecycle_retired for retired (act: none; make a new identity); (b) the grant exists; and (c) the grant is fresh, (b) and (c) both answered by DIRECTORY-006 R4's permission decision (crates/lys-identity/src/grants/permission.rs, its GRANT_FRESHNESS mechanism, docs/design/directory/briefs/DIRECTORY-006.json:140) against the clock that decision names, injected, and passed through with the refusal names that decision gives. WHILE the state leg refuses, THE SYSTEM SHALL NOT ask the grant question: a suspended or retired identity fails every check by state alone, whatever grants it holds, and the grant answerer is called zero times. A check SHALL NOT consult Rauthy, and SHALL ask SpiceDB only through the grant leg. An answered check SHALL commit no event and append nothing. The gate is called from the permission decision by one added line at its entry (the file is DIRECTORY-006 R4's; the line is named by revision, blocked_by), so that in step 1, where nothing answers a permission check (CN11), nothing calls the gate; this row adds no other caller and no route. The grant answerer and the clock SHALL be traits the caller injects; the tests inject a counting answerer and a fixed clock through crates/lys-identity/tests/lifecycle_support/mod.rs, and no code of this row reads a wall clock. Estimate: 3 hours.
@@ -134,6 +172,18 @@ THE SYSTEM SHALL answer an access check, whether this identity may perform this 
 **Stories:**
 - S17 (Directory administrator, Resolves a refused act) — As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.
 
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by blocker 5, and no leg is met. The gate needs R3's fold, which is blocked. Also, the blocker's own check fails: rg -n 'fresh' crates/lys-identity/src/grants/permission.rs prints nothing, because the landed freshness decision is crates/lys-identity/src/grants/authority.rs:340 (fn fresh), not permission.rs. The one-line hook 'at the decision's entry' has therefore not been named by revision, and permission.rs, the file the brief names for it, holds no decision to hook. The act that answers is a CN9 revision naming the landed decision file and its line.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C39 — An access check is the conjunction, active and grant exists and grant fresh, state first: a registered, suspended, retired or unknown identity is refused by state with the grant answerer called zero times, the grant legs pass through DIRECTORY-006 R4's decision with its names, and an answered check appends nothing (d009_r4_ac1 to d009_r4_ac5). — Blocked on R3 and on the hook point being named by revision.
+- Story delivery:
+  - [ ] S17 (Directory administrator, Resolves a refused act) — As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched. — The row is blocked.
+
 ### R5: Make a suspension take effect at the next check, where a refresh is a check, and revoke nothing at Rauthy
 
 WHEN the directory service resolves a Rauthy-authenticated session to a registered identity, at sign-in and at every refresh of that session, THE SYSTEM SHALL fold the identity's state first (R3) and refuse a suspended identity lifecycle_suspended (act: reinstate it) and a retired identity lifecycle_retired (act: none; make a new identity), by name, before any grant question is asked and before any session is admitted or renewed, in crates/lys-identity-server/src/lifecycle_gate.rs, called by one added line at the resolution point of DIRECTORY-003's OIDC session handling, whose file is named by revision before dispatch (blocked_by). A suspension or retirement SHALL take effect at the next check and not before: THE SYSTEM SHALL NOT call Rauthy to revoke, end or invalidate a session, SHALL NOT keep a list of sessions to end, and SHALL NOT roll back an action admitted before the transition; a session that outlives a suspension is refused at its next refresh and at every access check before that (R4), by state, whatever grants it holds. A refresh is a check of state alone: an active identity holding no grant is admitted at refresh, and a suspended identity holding a fresh grant is refused at refresh with the grant answerer called zero times. Rauthy stays the source of the sign-in event: this row reads the session Rauthy authenticated and never creates, ends or edits one, and no fork file is touched (ADR-009). This row is the step-2 enforcement the step-1 recording waited for (CN11, ADR-011): once it lands, the directory service refuses a suspended or retired identity's sign-in and refresh on state, and the sign-in-refusal receipt of the receipt brief, where landed, carries the state refusal as its reason; this row itself appends nothing and leaves no receipt. An at-once revocation of the Rauthy session would be a later revision of the suspend transition and is not this row (ADR-028). No wall clock: the row takes its time from the clock the landed server injects, and the tests inject theirs. Estimate: 3 hours.
@@ -156,6 +206,18 @@ WHEN the directory service resolves a Rauthy-authenticated session to a register
 
 **Stories:**
 - S17 (Directory administrator, Resolves a refused act) — As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.
+
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by blocker 6, and no leg is met. The brief requires a revision naming the file of crates/lys-identity-server/ where a Rauthy session resolves to an identity at sign-in and at refresh, before R5 is dispatched. No revision names it. The landed server finishes sign-in in crates/lys-identity-server/src/oidc.rs:98 and keeps sessions in crates/lys-identity-server/src/session.rs, and no refresh path exists anywhere in crates/lys-identity-server/src (rg 'refresh' prints nothing). So where the refresh check goes is a design question for the revision, not something to assume. R5 also stands on R3 and R4, which are blocked.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C40 — At sign-in and at every refresh the directory service refuses a suspended or retired identity by name before any grant question, calls Rauthy to revoke nothing, rolls back no admitted action, and admits an active identity at refresh whatever grants it holds (d009_r5_ac1 to d009_r5_ac5). — Blocked until the session resolution point, and a refresh point, are named by revision.
+- Story delivery:
+  - [ ] S17 (Directory administrator, Resolves a refused act) — As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched. — The row is blocked.
 
 ### R6: Expose the typed read the screen consumes: the state, the record that put it there, the history, a retired identity readable as a live one
 
@@ -180,6 +242,18 @@ THE SYSTEM SHALL expose, through the standalone identity server, one typed read 
 
 **Stories:**
 - S18 (Administrator, Suspends, reinstates and retires identities, and reads why a check refused) — As the administrator, I want the screen to show an identity's state and the record that put it there, for a retired identity exactly as for a live one, so that I can answer why a check refused from the record and not from memory.
+
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by blocker 8, and no leg is met. That blocker says the brief is revised before R6 is dispatched to say which receipt the record field carries. crates/lys-receipt does not exist on this tree, so the field would be DIRECTORY-003 R2's receipt, and that revision has not been made. R6 also reads the fold of R3, which is blocked. crates/lys-identity-server/src/routes.rs is already 498 lines against the 500-line limit, so the revision should also say where R6's route lines fit.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C41 — One typed read answers an identity's state, the record that put it there, the actions available in that state, its full history and provisioned as a view, and one typed list is filterable by state and kind; a retired identity reads exactly as a live one and no operation deletes, hides, redacts or truncates a record (d009_r6_ac1 to d009_r6_ac5). — Blocked on R3 and on the record-field revision.
+- Story delivery:
+  - [ ] S18 (Administrator, Suspends, reinstates and retires identities, and reads why a check refused) — As the administrator, I want the screen to show an identity's state and the record that put it there, for a retired identity exactly as for a live one, so that I can answer why a check refused from the record and not from memory. — The typed read is not built, so this row does not satisfy it; R1's contract fixes what the read must answer.
 
 ## Boundaries
 

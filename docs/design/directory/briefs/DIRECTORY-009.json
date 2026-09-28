@@ -61,7 +61,73 @@
       ],
       "stories": [
         "S18"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/identity/LIFECYCLE-CONTRACT.md",
+            "change": "created",
+            "note": "The lifecycle contract. States table (4 rows, provisioned a view and not a state). Transition table (5 rows with who may cause each, no policy causes a transition). The record. The fold (folded from the log and never set directly). The check (active, then the grant exists, then it is fresh). The next check (takes effect at the next check, a refresh is a check, nothing calls Rauthy to revoke, never rolled back). The retired identity (readable exactly as a live identity, never reactivated). What the screen shows. The six-row refusal table, each row with its act. What IDENTITY-EVENTS.md must carry, as review inputs rather than edits."
+          }
+        ],
+        "how": "The contract writes down only what is already settled, and cites a source for each part: the lifecycle document at LIFECYCLE-STATES-2026-09-22.md:17-37, IDENTITY-001's record shape, DIRECTORY-003 R5's transition table, ADR-027, ADR-028 and CN21. Every refusal carries the act that answers it. Section 10 lists what IDENTITY-EVENTS.md must carry as inputs to DIRECTORY-003's joint review and edits nothing, so no wire format is frozen. Each acceptance grep was run on the file and printed the counts the legs require: states 4/0/1, transitions 5/6/1, each phrase 1, refusals 6, and 8 section headings.",
+        "deviation": "R1's literal diff leg, run against the brief's base commit, also lists files that other briefs have since landed on main. R1's own change is this one new document, and it touches no path listed outside R1.",
+        "checklist": [
+          {
+            "id": "C36",
+            "done": true,
+            "note": "LIFECYCLE-CONTRACT.md is written and every R1 grep leg prints its expected count."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S18",
+            "satisfied": true,
+            "note": "The contract defines what the screen shows (state, available actions, the record that put it there, provisioned as a view) and how a retired identity is read, exactly as a live identity."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "Leg 1 of 5: grep -c '^| registered |\\|^| active |\\|^| suspended |\\|^| retired |' docs/design/identity/LIFECYCLE-CONTRACT.md prints 4, grep -c '^| provisioned' docs/design/identity/LIFECYCLE-CONTRACT.md prints 0, and grep -c 'provisioned is a view' docs/design/identity/LIFECYCLE-CONTRACT.md prints at least 1.",
+            "met": true,
+            "evidence": "Run by the reviewer: 4, 0, 1. The states table is in section 1 of LIFECYCLE-CONTRACT.md, and the 'provisioned is a view ... and not a state' sentence follows it."
+          },
+          {
+            "criterion": "Leg 2 of 5: grep -c '^| register |\\|^| activate |\\|^| suspend |\\|^| reinstate |\\|^| retire |' docs/design/identity/LIFECYCLE-CONTRACT.md prints 5, and grep -c 'responsible person' docs/design/identity/LIFECYCLE-CONTRACT.md prints at least 1, and grep -c 'no policy causes a transition' docs/design/identity/LIFECYCLE-CONTRACT.md prints 1.",
+            "met": true,
+            "evidence": "Run by the reviewer: 5, 6, 1 (section 2)."
+          },
+          {
+            "criterion": "Leg 3 of 5: each of grep -c 'takes effect at the next check', grep -c 'a refresh is a check', grep -c 'nothing in this contract calls Rauthy to revoke', grep -c 'never rolled back', grep -c 'readable exactly as a live identity', grep -c 'never reactivated' and grep -c 'folded from the log and never set directly' over docs/design/identity/LIFECYCLE-CONTRACT.md prints at least 1.",
+            "met": true,
+            "evidence": "Run by the reviewer: each of the seven greps prints 1. They fall in sections 4, 6 and 7."
+          },
+          {
+            "criterion": "Leg 4 of 5: grep -c '^| lifecycle_' docs/design/identity/LIFECYCLE-CONTRACT.md prints 6, and grep -c 'lifecycle_not_active\\|lifecycle_suspended\\|lifecycle_retired\\|lifecycle_unknown_identity\\|lifecycle_actor_not_permitted\\|lifecycle_fold_invalid' docs/design/identity/LIFECYCLE-CONTRACT.md prints at least 6.",
+            "met": true,
+            "evidence": "Run by the reviewer: 6 and 8. The section 9 table has six rows, and each carries its act."
+          },
+          {
+            "criterion": "Leg 5 of 5: git diff --stat 1756688cc08169bef4a9ac37b9b079efb9e38b18 -- docs/design/identity/briefs docs/design/identity/LIFECYCLE-STATES-2026-09-22.md docs/design/identity/IDENTITY-EVENTS.md docs/design/identity/DIRECTORY-CONTRACT.md crates deploy surface vendor prints nothing on the R1 commit, and sh scripts/design/gate.sh exits 0 on it.",
+            "met": true,
+            "evidence": "The R1 change itself touches none of the listed paths. git diff --stat HEAD -- <the same paths> prints nothing, and git status shows only LIFECYCLE-CONTRACT.md plus the workflow's DIRECTORY-009 execution record. sh scripts/design/gate.sh exits 0 ('Coverage clean'). The literal command against 1756688 prints '785 files changed' of other briefs' landed work, not R1's."
+          }
+        ],
+        "checklist": [
+          "C36"
+        ],
+        "stories": [],
+        "issues": [
+          "The brief must be revised so R1 leg 5 diffs against R1's own base commit, not 1756688cc08169bef4a9ac37b9b079efb9e38b18. main has moved past that base, so the literal command prints 785 files whatever R1 does.",
+          "CN1 confines documents to docs/design/directory/ and docs/design/decisions.json, but R1's own files.create is docs/design/identity/LIFECYCLE-CONTRACT.md. The brief must be revised to put that file inside CN1's wall. The developer followed the requirement's own file entry, which is the more specific rule.",
+          "S18 is not counted as satisfied here. R1 fixes what the screen shows, but the typed read the story needs is R6's, and R6 is not delivered."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R2",
@@ -92,7 +158,63 @@
       ],
       "stories": [
         "S16"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not built. Two landed files sit in the way. crates/lys-identity/src/lifecycle.rs already exists, and crates/lys-identity/src/lib.rs:18 declares `pub mod lifecycle`. The brief's crates/lys-identity/src/lifecycle/causes.rs cannot be added beside that file: it would cause an E0761 module collision, or require editing DIRECTORY-003's lifecycle.rs, which is outside R2's wall. Per CN9 the row stops and names the file.",
+        "deviation": "Stopped at the CN9 wall. The lead-reviewed revision must: (1) name where R2's cause rule lives beside the landed crates/lys-identity/src/lifecycle.rs, either a sibling module declared in lib.rs or a named edit to lifecycle.rs; (2) reconcile the landed state gates at crates/lys-identity-server/src/launch_api.rs:193, agent_signature.rs:92 and stop_api.rs:225 with the new cause rule and gate. After that revision, crates/lys-identity/tests/lifecycle_causes.rs lands first, failing by name on d009_r2_ac1 to d009_r2_ac4, and the cause rule follows as the second commit.",
+        "checklist": [
+          {
+            "id": "C37",
+            "done": false,
+            "note": "Blocked pending the lead-reviewed CN9 revision; lifecycle_causes.rs is not written."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S16",
+            "satisfied": false,
+            "note": "The cause rule is not built until the revision names its files."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "Leg 1 of 5, d009_r2_ac1: the administrator drives register, activate, suspend, reinstate and retire on one agent: exactly 5 records are appended, in that order, each naming the administrator as the attested actor; the fold after reopen equals the fold before; cargo test -p lys-identity --test lifecycle_causes d009_r2_ac1 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "crates/lys-identity/tests/lifecycle_causes.rs does not exist; rg on it reports 'No such file or directory'."
+          },
+          {
+            "criterion": "Leg 2 of 5, d009_r2_ac2: the agent's responsible person drives activate, suspend, reinstate and retire on their own agent: 4 records, each naming that person as the actor; a second person who is not the responsible person is refused lifecycle_actor_not_permitted on each of the same 4 transitions with 0 records appended; the test asserts 4 admissions, 4 refusals and a record count of 5 (the register record and the 4 admitted transitions); cargo test -p lys-identity --test lifecycle_causes d009_r2_ac2 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented: the test file is absent."
+          },
+          {
+            "criterion": "Leg 3 of 5, d009_r2_ac3: a person attempting activate, suspend, reinstate and retire on themselves and on another person, 8 requests, is refused lifecycle_actor_not_permitted 8 times with 0 records appended, and the administrator's activate of that other person is admitted; the test asserts 8 refusals and 1 admission; cargo test -p lys-identity --test lifecycle_causes d009_r2_ac3 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented: the test file is absent."
+          },
+          {
+            "criterion": "Leg 4 of 5, d009_r2_ac4: a request whose actor is not an attested person is refused lifecycle_actor_not_permitted for each of the five transitions, 5 refusals and 0 records, and each refusal's message contains 'administrator' and 'responsible person'; cargo test -p lys-identity --test lifecycle_causes d009_r2_ac4 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented: the test file is absent."
+          },
+          {
+            "criterion": "Leg 5 of 5, the mapping and red first: rg -c 'fn \\w*d009_r2_ac(1|2|3|4)(_|\\b)' crates/lys-identity/tests/lifecycle_causes.rs prints 4; rg -n 'SystemTime::now|Utc::now|Local::now|Instant::now' crates/lys-identity/src/lifecycle prints nothing; on the row's first commit cargo test -p lys-identity --test lifecycle_causes fails to compile or lists the four names as failed.",
+            "met": false,
+            "evidence": "rg exits 2 because the file is missing. There is no red-first commit."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "The blocker is real, and the act that answers it is a lead-reviewed CN9 revision. crates/lys-identity/src/lifecycle.rs exists and crates/lys-identity/src/lib.rs:18 declares 'pub mod lifecycle', so the brief's crates/lys-identity/src/lifecycle/causes.rs cannot be added beside it without either an E0761 module collision or an edit to DIRECTORY-003's file. The revision must name R2's files beside the landed module. It must also reconcile the landed state gates at launch_api.rs:193, agent_signature.rs:92 and stop_api.rs:225. After that, lifecycle_causes.rs and the cause rule are built red-first."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R3",
@@ -124,7 +246,69 @@
       ],
       "stories": [
         "S16"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not built. It has the same wall as R2. The fold also replaces the landed replay write `record.state = *to` at crates/lys-identity/src/projection.rs:237, and that file belongs to DIRECTORY-003, which R3's wall does not name. R3's state.rs would also duplicate the landed LifecycleState in lifecycle.rs.",
+        "deviation": "Stopped at the CN9 wall. The revision must: (1) name where fold.rs and any state type live beside the landed lifecycle.rs; (2) reconcile R3's state.rs with the landed LifecycleState and Transition::target; (3) name the one line that replaces projection.rs:237 with the fold; (4) account for docs/design/identity/IDENTITY-EVENTS.md:49, where the setup-person change kind 7 creates a person directly active with no activate record, and for :40-41, where register uses its own change kinds, so that a fold starting from registered neither refuses nor misreads those identities. After that revision, crates/lys-identity/tests/lifecycle_fold.rs lands first, failing on d009_r3_ac1 to d009_r3_ac5.",
+        "checklist": [
+          {
+            "id": "C38",
+            "done": false,
+            "note": "Blocked pending the lead-reviewed CN9 revision; fold.rs and lifecycle_fold.rs are not written."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S16",
+            "satisfied": false,
+            "note": "The state is not yet folded by a dedicated fold; waits on the revision."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "Leg 1 of 6, d009_r3_ac1: register, activate, suspend, reinstate and retire on one agent: the fold answers registered after the first record, active after the second, suspended after the third, active after the fourth and retired after the fifth, 5 states asserted in order; after the log is reopened the fold answers retired; cargo test -p lys-identity --test lifecycle_fold d009_r3_ac1 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "crates/lys-identity/tests/lifecycle_fold.rs is absent."
+          },
+          {
+            "criterion": "Leg 2 of 6, d009_r3_ac2: a fixture log the harness builds with the records of three identities interleaved, 3 for the first (register, activate, suspend), 2 for the second (register, activate) and 5 for the third (register through retire), 10 leaves in all, folds to suspended, active and retired, and the fold's visit count over the log is exactly 10; cargo test -p lys-identity --test lifecycle_fold d009_r3_ac2 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Leg 3 of 6, d009_r3_ac3: a fixture log of 6 leaves whose sixth, at index 5, is an activate after that identity's retire is refused lifecycle_fold_invalid naming index 5 with a message containing 'verify the leaf'; a second fixture whose first record for an identity, at index 0, is an activate with no register before it is refused naming index 0; the test asserts 2 refusals, 0 states answered, and that each log's leaf count is unchanged after the read; cargo test -p lys-identity --test lifecycle_fold d009_r3_ac3 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Leg 4 of 6, d009_r3_ac4: the listing of every value of the state type has length 4 and no value's name contains 'provision'; the projection's state after the 5 appends of leg 1 equals the fold after reopen, asserted by equality for each of the 5 steps; cargo test -p lys-identity --test lifecycle_fold d009_r3_ac4 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Leg 5 of 6, d009_r3_ac5: after 3 reads of the state of each identity of leg 2, the count of files under the log directory and the SHA-256 of each are equal to those recorded before the first read; cargo test -p lys-identity --test lifecycle_fold d009_r3_ac5 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Leg 6 of 6, the mapping, the wall and red first: rg -n 'fn set_state|fn set_lifecycle' crates/lys-identity/src prints nothing; rg -n 'Log::open|\\.append\\(' crates/lys-identity/src/lifecycle/fold.rs prints nothing; rg -n 'SystemTime::now|Utc::now|Local::now|Instant::now' crates/lys-identity/src/lifecycle prints nothing; rg -c 'fn \\w*d009_r3_ac(1|2|3|4|5)(_|\\b)' crates/lys-identity/tests/lifecycle_fold.rs prints 5; on the row's first commit cargo test -p lys-identity --test lifecycle_fold fails to compile or lists the five names as failed.",
+            "met": false,
+            "evidence": "rg 'fn set_state|fn set_lifecycle' prints nothing (exit 1). fold.rs and lifecycle_fold.rs do not exist. There is no red-first commit."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "R3 needs the same CN9 revision as R2. It must name where fold.rs lives beside the landed lifecycle.rs. It must reconcile R3's state.rs with the landed LifecycleState in that file. It must also name the one line that replaces the replay's 'record.state = *to' at crates/lys-identity/src/projection.rs:237 with the fold.",
+          "The revision must also account for docs/design/identity/IDENTITY-EVENTS.md:49, where setup creates a person directly active with no activate transition, and for :40-41, where register is its own change kinds. Otherwise 'a fold from registered' refuses or misreads those identities. After the revision, fold.rs, state.rs and lifecycle_fold.rs are built red-first."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R4",
@@ -156,7 +340,68 @@
       ],
       "stories": [
         "S17"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not built. Blocker 5's own check fails: rg 'fresh' crates/lys-identity/src/grants/permission.rs prints nothing. The landed freshness decision is `fn fresh` at crates/lys-identity/src/grants/authority.rs:340, so the one-line hook the brief places in permission.rs belongs in a file R4's wall does not name. R4 also consumes R3's fold.",
+        "deviation": "Stopped at the CN9 wall. The revision must name crates/lys-identity/src/grants/authority.rs as the decision file and give the one-line hook at the entry of its decision, which moves R4's numstat leg from permission.rs to authority.rs. R4 is built after R3: lifecycle_gate.rs lands first, failing on d009_r4_ac1 to d009_r4_ac5, and gate.rs follows.",
+        "checklist": [
+          {
+            "id": "C39",
+            "done": false,
+            "note": "Blocked on the CN9 revision naming authority.rs, and on R3."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S17",
+            "satisfied": false,
+            "note": "The state leg is not yet asked before the grant legs; waits on the revision and R3."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "Leg 1 of 6, d009_r4_ac1: an active identity, the answerer primed to say the grant exists and is fresh: the check is admitted and the answerer was called exactly 1 time; cargo test -p lys-identity --test lifecycle_gate d009_r4_ac1 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "crates/lys-identity/tests/lifecycle_gate.rs is absent."
+          },
+          {
+            "criterion": "Leg 2 of 6, d009_r4_ac2: an active identity with the answerer primed to say no grant is refused with the answerer's own grant-missing name; an active identity with the answerer primed to say the grant exists but is stale under the injected clock is refused with the answerer's own stale name; the test asserts 2 refusals, that neither name begins with lifecycle_, and that the answerer was called 2 times; cargo test -p lys-identity --test lifecycle_gate d009_r4_ac2 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Leg 3 of 6, d009_r4_ac3: the same check for an identity that is registered, one that is suspended, one that is retired and one that is unknown, each with the answerer primed to say the grant exists and is fresh: 4 refusals named lifecycle_not_active, lifecycle_suspended, lifecycle_retired and lifecycle_unknown_identity in that order, the answerer called 0 times, and each message containing its act, 'activate', 'reinstate', 'new identity' and 'register' respectively; cargo test -p lys-identity --test lifecycle_gate d009_r4_ac3 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Leg 4 of 6, d009_r4_ac4: an active agent whose answerer holds one grant on one resource: the check is admitted; the administrator suspends the agent and the same check is refused lifecycle_suspended while the answerer's grant count is still 1; the administrator reinstates the agent and the same check is admitted; the administrator retires the agent and the same check is refused lifecycle_retired; the test asserts 2 admissions, 2 refusals and a grant count of 1 throughout; cargo test -p lys-identity --test lifecycle_gate d009_r4_ac4 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Leg 5 of 6, d009_r4_ac5: 20 checks, 10 admitted and 10 refused by state, leave the log's leaf count unchanged and the answerer's mutation count at 0; cargo test -p lys-identity --test lifecycle_gate d009_r4_ac5 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Leg 6 of 6, the mapping, the wall and red first: rg -c 'fn \\w*d009_r4_ac(1|2|3|4|5)(_|\\b)' crates/lys-identity/tests/lifecycle_gate.rs prints 5; rg -n 'SystemTime::now|Utc::now|Local::now|Instant::now' crates/lys-identity/src/lifecycle/gate.rs prints nothing; git diff --numstat <landed DIRECTORY-006 commit> HEAD -- crates/lys-identity/src/grants/permission.rs prints exactly one line whose two numbers are 1 and 0; on the row's first commit cargo test -p lys-identity --test lifecycle_gate fails to compile or lists the five names as failed.",
+            "met": false,
+            "evidence": "The test file and gate.rs are absent, and permission.rs is unchanged."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Blocker 5's own check fails. rg -n 'fresh' crates/lys-identity/src/grants/permission.rs prints nothing, and the landed freshness decision is crates/lys-identity/src/grants/authority.rs:340 (fn fresh). A CN9 revision must name the decision file and the one-line hook at its entry, which moves the wall from permission.rs to the landed file. After that revision, and after R3, gate.rs and lifecycle_gate.rs are built red-first."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R5",
@@ -185,7 +430,68 @@
       ],
       "stories": [
         "S17"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not built. Blocker 6 is unanswered. Sign-in finishes at crates/lys-identity-server/src/oidc.rs:98 (finish), and sessions live in memory in session.rs (begin, actor, current, live, end). rg 'refresh' over crates/lys-identity-server/src prints nothing, so there is no refresh path to put the check at, and no revision names the session resolution point the boundary allows one added line in.",
+        "deviation": "Stopped at the CN9 wall. The revision must name the session resolution point that gets the one added line, whether oidc.rs finish or a session.rs function, and must say where the refresh check sits, given that no refresh path exists today: whether R5 adds one, and in which file. The wall must still exclude any call to Rauthy to revoke, end or invalidate a session. R5 is built after R3 and R4: lifecycle_session.rs lands first, failing on d009_r5_ac1 to d009_r5_ac5, and lifecycle_gate.rs follows.",
+        "checklist": [
+          {
+            "id": "C40",
+            "done": false,
+            "note": "Blocked on the CN9 revision naming the resolution and refresh points, and on R3 and R4."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S17",
+            "satisfied": false,
+            "note": "Refresh is not yet a check, because no refresh path exists; waits on the revision."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "Leg 1 of 6, d009_r5_ac1: a registered and active person signs in through the test issuer and is admitted with a session; the administrator suspends the person; the session's next refresh is refused lifecycle_suspended with a message containing 'reinstate', and a fresh sign-in by the same person is refused lifecycle_suspended; the test asserts 1 admission and 2 refusals; cargo test -p lys-identity-server --test lifecycle_session d009_r5_ac1 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "crates/lys-identity-server/tests/lifecycle_session.rs is absent."
+          },
+          {
+            "criterion": "Leg 2 of 6, d009_r5_ac2: the test issuer stub records every request it receives; across the suspend and the two refusals of leg 1 the count of requests whose path contains 'logout', 'revoke' or 'session' is 0; the test asserts that count and that the stub's session for the person still exists at the stub after both refusals; cargo test -p lys-identity-server --test lifecycle_session d009_r5_ac2 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Leg 3 of 6, d009_r5_ac3: one check admitted for the person before the suspend is recorded by the harness with its result; after the suspend and the refused refresh the harness's admitted list still has length 1 and the same result; counted by operation, the log gains exactly 1 transition leaf across the suspend (the suspend record) and 0 transition leaves across the two refusals; where crates/lys-receipt/src/receipt.rs is on main (DIRECTORY-007 landed) each of the two refusals leaves exactly 1 leaf of operation sign-in-refused whose reason is lifecycle_suspended, and otherwise the two refusals leave 0 leaves of any operation; cargo test -p lys-identity-server --test lifecycle_session d009_r5_ac3 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Leg 4 of 6, d009_r5_ac4: the administrator reinstates the person and the next refresh is admitted; the administrator retires the person and the next refresh is refused lifecycle_retired with a message containing 'new identity', and a fresh sign-in by the retired person is refused lifecycle_retired; the test asserts 1 admission and 2 refusals; cargo test -p lys-identity-server --test lifecycle_session d009_r5_ac4 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Leg 5 of 6, d009_r5_ac5: an active person holding no grant is admitted at refresh, 1 admission; a suspended person whose answerer holds a fresh grant on a resource is refused at refresh lifecycle_suspended and the answerer was called 0 times; cargo test -p lys-identity-server --test lifecycle_session d009_r5_ac5 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Leg 6 of 6, the mapping, the wall and red first: rg -c 'fn \\w*d009_r5_ac(1|2|3|4|5)(_|\\b)' crates/lys-identity-server/tests/lifecycle_session.rs prints 5; rg -n 'logout|revoke|invalidate|SystemTime::now|Utc::now|Local::now|Instant::now' crates/lys-identity-server/src/lifecycle_gate.rs prints nothing; git diff --stat <this row's base commit> HEAD -- crates/lys-identity vendor/rauthy prints nothing on this row's two commits; on the row's first commit cargo test -p lys-identity-server --test lifecycle_session fails to compile or lists the five names as failed.",
+            "met": false,
+            "evidence": "The test file and lifecycle_gate.rs are absent."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Blocker 6 is unanswered, and a revision must fix it before R5 is built. No revision names the session resolution point; sign-in finishes at crates/lys-identity-server/src/oidc.rs:98 and sessions live in session.rs. rg 'refresh' over crates/lys-identity-server/src prints nothing, so no refresh path exists, and the revision must say where the refresh check sits. After that, and after R3 and R4, lifecycle_gate.rs and lifecycle_session.rs are built red-first."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R6",
@@ -215,7 +521,68 @@
       ],
       "stories": [
         "S18"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not built. Blocker 8 is unanswered. crates/lys-receipt is absent, so the field for the record that put the identity there cannot be DIRECTORY-007's receipt type. crates/lys-identity-server/src/routes.rs is 498 lines against the 500-line limit, so R6's added route lines cannot go there as the brief places them.",
+        "deviation": "Stopped at the CN9 wall. The revision must: (1) say that the record field carries DIRECTORY-003 R2's receipt, the one directory.rs receipt_at returns; (2) say where R6's route lines go without pushing routes.rs past 500 lines, for example a route module named in the lib.rs list, and restate the routes.rs numstat leg to match. After that revision and R3, lifecycle_read.rs's test lands first, failing on d009_r6_ac1 to d009_r6_ac5, and crates/lys-identity-server/src/lifecycle_read.rs follows.",
+        "checklist": [
+          {
+            "id": "C41",
+            "done": false,
+            "note": "Blocked on the CN9 revision naming the record field and the route placement, and on R3."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S18",
+            "satisfied": false,
+            "note": "The typed read is not built; the contract that defines what it returns is (R1)."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "Leg 1 of 6, d009_r6_ac1: after the administrator registers and activates one agent, the read answers state active, the record that put it there equal field for field to the activate transition's receipt (operation id, actor, from registered, to active, when, reason, coordinate 1), actions exactly [suspend, retire] and a transition list of length 2; cargo test -p lys-identity-server --test lifecycle_read d009_r6_ac1 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "crates/lys-identity-server/tests/lifecycle_read.rs is absent."
+          },
+          {
+            "criterion": "Leg 2 of 6, d009_r6_ac2: after the administrator suspends and then retires that agent, the read answers state retired, the record that put it there is the retire record at coordinate 3, actions are empty, and the transition list has length 4 in the order register, activate, suspend, retire, each naming its actor; 3 further reads leave the log's leaf count unchanged; cargo test -p lys-identity-server --test lifecycle_read d009_r6_ac2 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Leg 3 of 6, d009_r6_ac3: an active agent with no grant reads provisioned false; after the administrator gives it one grant through DIRECTORY-006's act it reads provisioned true with state still active and a transition list still of length 2; after the grant is revoked it reads provisioned false; the test asserts the 3 readings and that 0 lifecycle records were added; cargo test -p lys-identity-server --test lifecycle_read d009_r6_ac3 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Leg 4 of 6, d009_r6_ac4: with a fixture of 4 identities, one in each state, two of them agents, the list filtered by each state returns exactly 1 row, filtered by kind agent returns exactly 2, unfiltered returns 4, and the retired identity's row is present unfiltered with its retire record as the record that put it there; cargo test -p lys-identity-server --test lifecycle_read d009_r6_ac4 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Leg 5 of 6, d009_r6_ac5: the read of an identity that does not exist is refused lifecycle_unknown_identity with a message containing 'register', 1 refusal; and rg -n 'fn delete|fn hide|fn redact|fn remove|fn truncate' crates/lys-identity-server/src/lifecycle_read.rs crates/lys-identity/src/lifecycle prints nothing; cargo test -p lys-identity-server --test lifecycle_read d009_r6_ac5 prints 'test result: ok. 1 passed; 0 failed'.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Leg 6 of 6, the mapping, the wall and red first: rg -c 'fn \\w*d009_r6_ac(1|2|3|4|5)(_|\\b)' crates/lys-identity-server/tests/lifecycle_read.rs prints 5; rg -n 'SystemTime::now|Utc::now|Local::now|Instant::now' crates/lys-identity-server/src/lifecycle_read.rs prints nothing; git diff --numstat <this row's base commit> HEAD -- crates/lys-identity-server/src/routes.rs prints one line whose second number is 0; on the row's first commit cargo test -p lys-identity-server --test lifecycle_read fails to compile or lists the five names as failed.",
+            "met": false,
+            "evidence": "lifecycle_read.rs and its test are absent, and routes.rs is unchanged."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Blocker 8 is unanswered. crates/lys-receipt is absent, so the brief must be revised to say that the record field carries DIRECTORY-003 R2's receipt. crates/lys-identity-server/src/routes.rs is 498 lines against the 500-line limit, so the revision must also say where R6's route lines go without breaking that limit. After that, and after R3, lifecycle_read.rs and lifecycle_read test are built red-first."
+        ],
+        "fixes": []
+      }
     }
   ],
   "boundaries": [
