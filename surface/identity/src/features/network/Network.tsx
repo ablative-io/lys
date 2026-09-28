@@ -4,6 +4,7 @@ import { api, Refused, request, useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
 import { clock } from '../file/time';
 import { AddMachine } from './AddMachine';
+import type { RoleChoice } from './AddMachine';
 import type { Machine, NetworkView } from './contract';
 
 function Retire({ machine, changed }: { machine: Machine; changed: () => void }) {
@@ -29,6 +30,9 @@ export function Network() {
   const refresh = (message?: string) => { if (message) setNotice(message); setRevision((value) => value + 1); };
   const load = useLoad(() => request<NetworkView>('/network'), 'network:' + revision);
   const authority = useLoad(async () => ({ people: await api.people(), me: await api.me() }), 'network-authority');
+  const roles = useLoad(() => request<{ roles: RoleChoice[] }>('/roles'), 'network-roles');
+  const known = roles.status === 'ok' ? roles.data.roles : [];
+  const roleName = (id: string) => known.find((role) => role.id === id)?.name ?? id;
   const admin = authority.status === 'ok' && authority.data.people.scope === 'directory';
   return <div className="page"><div className="head"><div><div className="eyebrow">Runtime</div><h1>Network</h1><p className="sub">Machines, their declared runtimes and the access recorded for them.</p></div><button className="btn" onClick={() => refresh()}>Refresh network</button></div>
     {notice ? <p role="status">{notice}</p> : null}
@@ -38,13 +42,15 @@ export function Network() {
         <h2>{machine.name} <span className="note">{machine.kind} · {machine.state === 'retired' ? 'Retired' : 'Registered'}</span></h2>
         <p>Runtime: {machine.runtime ?? 'none recorded'} · Agent slots: {machine.slots}</p>
         <h3>Permitted agents</h3>{machine.may_run.length ? <ul>{machine.may_run.map((agent) => <li key={agent.id}><a href={'#/file/' + agent.id}>{agent.display_name}</a> · {agent.state}</li>)}</ul> : <p>None recorded.</p>}
+        <h3>Permitted roles</h3>{machine.may_run_roles.length ? <ul>{machine.may_run_roles.map((role) => <li key={role}><a href={'#/roles/' + role}>{roleName(role)}</a></li>)}</ul> : <p>None recorded.</p>}
         <h3>Permitted hosts</h3><p>{machine.may_reach.join(', ') || 'None recorded.'}</p>
         <p className="note">Last runtime report: {machine.last_report_at === null ? 'none received' : clock(machine.last_report_at)}.</p>
         <details><summary>Record details</summary><p>{machine.id} · Recorded {clock(machine.named_at)} by {machine.named_by}.</p></details>
         {admin && machine.state !== 'retired' ? <Retire machine={machine} changed={refresh} /> : null}
       </section>)}
     </>} />
-    {admin && authority.status === 'ok' && load.status === 'ok' ? <AddMachine person={authority.data.me.person.id} agents={authority.data.people.people.flatMap((person) => person.agents)} changed={refresh} /> : null}
+    {admin && authority.status === 'ok' && load.status === 'ok' ? <AddMachine person={authority.data.me.person.id} agents={authority.data.people.people.flatMap((person) => person.agents)} roles={known} changed={refresh} /> : null}
+    {admin && roles.status === 'refused' ? <p className="why-not">Roles cannot be offered for placement. {roles.refused.refusal.refusal}: {roles.refused.message}</p> : null}
     {authority.status === 'refused' ? <p className="why-not">{authority.refused.refusal.refusal}: {authority.refused.message}</p> : null}
   </div>;
 }
