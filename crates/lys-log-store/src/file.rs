@@ -53,6 +53,38 @@
 //! honest strength for a property whose failure needs a crash to observe, and
 //! which is a different and weaker axis of independence than the crate's Merkle
 //! cross-checks, where two separately written implementations disagree or agree.
+//!
+//! # What open does and never does
+//!
+//! [`FileLeafStore::open`] reads `log.json` and `state.json`, flushes
+//! `leaves/` (on the targets where `fsync_dir` flushes a directory; see
+//! Durability), counts the 20-digit leaf names and returns a writable handle.
+//! The count starts at the pin: the leaf just below it must be a file, each
+//! name past it is one lookup, and a name one past the last is a gap and
+//! refused as [`StoreError::Corrupt`]. When the leaf below the pin is not a
+//! file, the whole folder is listed and the names must be contiguous from 0.
+//! [`FileLeafStore::audit_leaves`] lists the whole folder on request.
+//!
+//! [`FileLeafStore::open_read_only`] performs the same checks in the same order
+//! without the flush, and creates, writes, renames, links and removes nothing.
+//! It refuses a store exactly one leaf past its pin with
+//! [`StoreError::RepairPending`], and otherwise returns a handle whose
+//! `put_leaf` and `pin` refuse with [`StoreError::ReadOnly`].
+//!
+//! Neither open reads leaf bytes, repairs a store or advances the pin: the
+//! one-leaf repair of an interrupted append is [`Log::open`]'s, over a writable
+//! handle. Neither open counts a dot-prefixed name as a leaf. An open **never
+//! deletes**, renames or changes a leftover temporary file — it is skipped,
+//! not tidied away — and the store's own are named by
+//! [`FileLeafStore::leftover_temporaries`], which lists them when asked so
+//! that neither open pays for a listing.
+//!
+//! [`FileLeafStore::leaf`](LeafStore::leaf) serves bytes it has not checked. A
+//! leaf is proven whole only through [`Log::open`], which rebuilds the tree
+//! from every stored leaf and compares it against the pinned root, so every
+//! reader that wants a proven leaf goes through [`Log::open`].
+//!
+//! [`Log::open`]: crate::Log::open
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -123,6 +155,9 @@ pub struct FileLeafStore {
     /// The temporary names this handle could not remove after a link, in the
     /// order it met them.
     left_behind: Vec<LeftBehind>,
+    /// Set on a handle from [`FileLeafStore::open_read_only`], whose
+    /// `put_leaf` and `pin` refuse with [`StoreError::ReadOnly`].
+    read_only: bool,
 }
 
 /// The two steps after a leaf is linked, kept as functions so that a test can
@@ -190,6 +225,7 @@ impl FileLeafStore {
             pinned,
             durability_uncertain: None,
             left_behind: Vec::new(),
+            read_only: false,
         })
     }
 
@@ -207,27 +243,7 @@ impl FileLeafStore {
     /// `log.json`/`state.json`, an unexpected entry in `leaves/`, or a gap in
     /// the index set, and [`StoreError::Io`] on filesystem failure.
     pub fn open(dir: &Path) -> StoreResult<Self> {
-        let config_path = dir.join("log.json");
-        if !config_path.exists() {
-            return Err(StoreError::NotInitialized {
-                path: dir.to_path_buf(),
-            });
-        }
-        let config: LogConfig = parse_state_file(dir, &config_path, "log.json")?;
-        if config.format != LOG_DIR_FORMAT {
-            return Err(StoreError::Corrupt {
-                path: dir.to_path_buf(),
-                reason: format!(
-                    "log.json format is {:?}, expected {LOG_DIR_FORMAT:?}",
-                    config.format
-                ),
-            });
-        }
-        let state: LogState = parse_state_file(dir, &dir.join("state.json"), "state.json")?;
-        let pinned = PinnedRoot {
-            tree_size: state.tree_size,
-            root: decode_pinned_root(dir, &state.root_hash)?,
-        };
+        let (config, pinned) = read_identity(dir)?;
         // A leaf name linked just before a crash may not yet be durable; the
         // flush makes every name counted below one that survives.
         fsync_dir(&dir.join("leaves"))?;
@@ -238,7 +254,73 @@ impl FileLeafStore {
             pinned,
             durability_uncertain: None,
             left_behind: Vec::new(),
+            read_only: false,
         })
+    }
+
+    /// Opens the store at `dir` for a reader: the checks of
+    /// [`FileLeafStore::open`] in the same order, without flushing `leaves/`
+    /// and without creating, writing, renaming, linking or removing any file.
+    ///
+    /// The handle's `put_leaf` and `pin` refuse with [`StoreError::ReadOnly`].
+    /// A store holding exactly one leaf past its pin is an interrupted append
+    /// that only a writable open repairs, so it is refused rather than served
+    /// at the pinned head. That is decided from the count and `state.json`
+    /// alone; no leaf bytes are read. Over any other count, `Log::open`
+    /// accepts a tree that matches the pin and refuses any other with
+    /// [`StoreError::PinMismatch`] without pinning.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::RepairPending`] if the store holds exactly one leaf past
+    /// its pin, and otherwise the errors of [`FileLeafStore::open`]:
+    /// [`StoreError::NotInitialized`], [`StoreError::Corrupt`] and
+    /// [`StoreError::Io`].
+    pub fn open_read_only(dir: &Path) -> StoreResult<Self> {
+        let (config, pinned) = read_identity(dir)?;
+        let extent = probed_extent(dir, pinned.tree_size)?;
+        if pinned.tree_size.checked_add(1) == Some(extent) {
+            return Err(StoreError::RepairPending {
+                path: dir.to_path_buf(),
+                pinned_size: pinned.tree_size,
+                extent,
+            });
+        }
+        Ok(Self {
+            dir: dir.to_path_buf(),
+            origin: config.origin,
+            extent,
+            pinned,
+            durability_uncertain: None,
+            left_behind: Vec::new(),
+            read_only: true,
+        })
+    }
+
+    /// The store's own leftover temporary leaf files in `leaves/`, by name in
+    /// lexical order: each a `.<pid>-<20-digit index>-<sequence>.tmp` that a
+    /// write left behind. Listed when asked, not at open, so that opening
+    /// costs the same however long the log is.
+    ///
+    /// None is counted toward the extent and none is removed, renamed or
+    /// changed. A dot-prefixed name of any other form is not reported.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::Io`] if `leaves/` cannot be read.
+    pub fn leftover_temporaries(&self) -> StoreResult<Vec<String>> {
+        list_leftover_temporaries(&self.dir)
+    }
+
+    /// Refuses `operation` with [`StoreError::ReadOnly`] on a read-only handle.
+    fn refuse_if_read_only(&self, operation: &'static str) -> StoreResult<()> {
+        if self.read_only {
+            return Err(StoreError::ReadOnly {
+                path: self.dir.clone(),
+                operation,
+            });
+        }
+        Ok(())
     }
 
     /// Reads every name in `leaves/` and checks it is exactly `0..extent`.
@@ -365,6 +447,7 @@ impl LeafStore for FileLeafStore {
     }
 
     fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
+        self.refuse_if_read_only("write a leaf")?;
         self.put_leaf_with(
             index,
             |file| file.write_all(bytes),
@@ -378,6 +461,7 @@ impl LeafStore for FileLeafStore {
     }
 
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()> {
+        self.refuse_if_read_only("pin")?;
         if pin.tree_size < self.pinned.tree_size {
             return Err(StoreError::PinWentBackwards {
                 pinned: self.pinned.tree_size,
@@ -406,6 +490,74 @@ impl LeafStore for FileLeafStore {
     fn put_snapshot(&mut self, bytes: &[u8]) -> StoreResult<()> {
         snapshot_slot::write(&self.dir, bytes)
     }
+}
+
+/// Reads `log.json` and `state.json` and returns the store's identity and pin:
+/// the checks both opens share, in the order they make them.
+fn read_identity(dir: &Path) -> StoreResult<(LogConfig, PinnedRoot)> {
+    let config_path = dir.join("log.json");
+    if !config_path.exists() {
+        return Err(StoreError::NotInitialized {
+            path: dir.to_path_buf(),
+        });
+    }
+    let config: LogConfig = parse_state_file(dir, &config_path, "log.json")?;
+    if config.format != LOG_DIR_FORMAT {
+        return Err(StoreError::Corrupt {
+            path: dir.to_path_buf(),
+            reason: format!(
+                "log.json format is {:?}, expected {LOG_DIR_FORMAT:?}",
+                config.format
+            ),
+        });
+    }
+    let state: LogState = parse_state_file(dir, &dir.join("state.json"), "state.json")?;
+    let pinned = PinnedRoot {
+        tree_size: state.tree_size,
+        root: decode_pinned_root(dir, &state.root_hash)?,
+    };
+    Ok((config, pinned))
+}
+
+/// The names in `leaves/` of the store's temporary-leaf form, in lexical
+/// order. Reads the directory listing only: no entry is opened, removed or
+/// renamed.
+fn list_leftover_temporaries(dir: &Path) -> StoreResult<Vec<String>> {
+    let leaves_dir = dir.join("leaves");
+    let unreadable = |source| StoreError::Io {
+        context: format!("failed to read leaves directory {}", leaves_dir.display()),
+        source,
+    };
+    let mut names = Vec::new();
+    for entry in std::fs::read_dir(&leaves_dir).map_err(unreadable)? {
+        let name = entry.map_err(unreadable)?.file_name();
+        if let Some(name) = name.to_str()
+            && is_leaf_temp_name(name)
+        {
+            names.push(name.to_string());
+        }
+    }
+    names.sort_unstable();
+    Ok(names)
+}
+
+/// Whether `name` has the form `leaves::leaf_temp_name` gives: a dot, decimal
+/// digits, a dash, [`LEAF_NAME_WIDTH`] decimal digits, a dash, decimal digits
+/// and `.tmp`.
+fn is_leaf_temp_name(name: &str) -> bool {
+    let digits = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
+    let Some(inner) = name
+        .strip_prefix('.')
+        .and_then(|rest| rest.strip_suffix(".tmp"))
+    else {
+        return false;
+    };
+    let parts: Vec<&str> = inner.split('-').collect();
+    matches!(
+        parts.as_slice(),
+        &[pid, index, sequence]
+            if digits(pid) && digits(index) && index.len() == LEAF_NAME_WIDTH && digits(sequence)
+    )
 }
 
 /// Serializes a local-state struct as pretty JSON with a trailing newline.

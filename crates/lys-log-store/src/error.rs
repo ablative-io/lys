@@ -273,6 +273,42 @@ pub enum StoreError {
         #[source]
         source: serde_json::Error,
     },
+
+    /// A write was refused because the store was opened read-only.
+    ///
+    /// A reader's handle never changes the evidence it reads: every act that
+    /// would write a file is refused by name before anything is touched.
+    #[error(
+        "refusing to {operation} in the log store at {}: it was opened read-only",
+        path.display()
+    )]
+    ReadOnly {
+        /// The store's directory.
+        path: PathBuf,
+        /// The act that was refused, e.g. "write a leaf" or "pin".
+        operation: &'static str,
+    },
+
+    /// A read-only open was refused because the store holds exactly one leaf
+    /// past its pin.
+    ///
+    /// That is the shape an append interrupted between storing its leaf and
+    /// advancing the pin leaves behind, and repairing it is a write, so only a
+    /// writable open performs it. Whether the extra leaf is a clean interrupted
+    /// append or sits over a damaged prefix is decided by that writable open,
+    /// which repairs or refuses with [`StoreError::PinMismatch`].
+    #[error(
+        "refusing to open the log store at {} read-only: it holds {extent} leaves but its pin is at tree size {pinned_size}, an interrupted append that only a writable open repairs",
+        path.display()
+    )]
+    RepairPending {
+        /// The store's directory.
+        path: PathBuf,
+        /// The pinned tree size.
+        pinned_size: u64,
+        /// The number of leaves counted.
+        extent: u64,
+    },
 }
 
 /// Convenience alias for `Result<T, StoreError>`.

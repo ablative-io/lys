@@ -58,7 +58,48 @@
       "stories": [
         "S1",
         "S2"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-log-store/src/error.rs",
+            "change": "modified",
+            "note": "StoreError gains ReadOnly { path, operation } and RepairPending { path, pinned_size, extent }. Each variant and each field is documented and the messages are exactly as specified. They are appended after Serialize, so no existing line changes, and #[non_exhaustive] is kept."
+          },
+          {
+            "path": "crates/lys-log-store/src/file_tests.rs",
+            "change": "modified",
+            "note": "Adds the_read_only_refusals_name_the_store_and_the_refused_act."
+          }
+        ],
+        "how": "Row 1 (ReadOnly Display): the error.rs #[error] attribute is 'refusing to {operation} in the log store at {}: it was opened read-only' with path.display(). file_tests.rs asserts the exact string. Row 2 (RepairPending Display): the attribute gives the exact specified text. It is asserted in the same test. Row 3: both assertions are in file::tests::the_read_only_refusals_name_the_store_and_the_refused_act. Row 4: the two variants are inserted between Serialize's closing '},' and the enum's closing '}', so git diff shows additions only. Neither variant carries or prints a leaf index.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C1",
+            "done": true,
+            "note": "ReadOnly { path: PathBuf, operation: &'static str }, documented."
+          },
+          {
+            "id": "C2",
+            "done": true,
+            "note": "RepairPending { path, pinned_size, extent }, documented."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S1",
+            "satisfied": true,
+            "note": "The refusal is a named variant."
+          },
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": "RepairPending names the pending repair."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -87,7 +128,53 @@
       "stories": [
         "S1",
         "S2"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-log-store/src/file.rs",
+            "change": "modified",
+            "note": "open's log.json and state.json checks are extracted unchanged into the private read_identity, which open and open_read_only both call. New pub fn open_read_only runs read_identity and then probed_extent, with no fsync_dir and no write. It returns RepairPending when extent == pinned+1, and otherwise a handle with read_only: true."
+          },
+          {
+            "path": "crates/lys-log-store/src/file_tests.rs",
+            "change": "modified",
+            "note": "Adds open_read_only_refuses_a_store_one_leaf_past_its_pin_and_changes_no_byte and open_read_only_on_an_uninitialized_dir_is_not_initialized. Adds a tree_bytes helper that snapshots every file under the store, dotfiles included."
+          },
+          {
+            "path": "crates/lys-log-store/src/log_tests.rs",
+            "change": "modified",
+            "note": "Adds a_log_opens_over_a_read_only_store_at_its_pin_and_changes_no_byte and a_read_only_store_two_leaves_past_its_pin_is_refused_without_a_write, plus a tree_bytes helper."
+          }
+        ],
+        "how": "Row 1: file_tests.rs open_read_only_refuses_a_store_one_leaf_past_its_pin_and_changes_no_byte uses create then put_leaf(0) with no pin. It asserts RepairPending { path == D, pinned_size: 0, extent: 1 } and that tree_bytes is equal before and after. The check is `pinned.tree_size.checked_add(1) == Some(extent)` in open_read_only in file.rs. Row 2: open_read_only_on_an_uninitialized_dir_is_not_initialized. read_identity returns NotInitialized first, exactly as open did. Row 3: log_tests.rs a_log_opens_over_a_read_only_store_at_its_pin_and_changes_no_byte asserts len 2, recovered_to None and tree_bytes unchanged. Row 4: a_read_only_store_two_leaves_past_its_pin_is_refused_without_a_write restores the creation-time state.json. It asserts extent 2, PinMismatch { pinned_size: 0, rebuilt_size: 2 } and tree_bytes unchanged. Log::open does not call pin on a mismatch, so the ReadOnly refusal is never reached. Row 5: open_read_only calls read_identity (parse_state_file, decode_pinned_root) and probed_extent (with contiguous_extent), and none of them calls fsync_dir, sync_dir, write_state or write_durably. open's behaviour is unchanged: the same checks run in the same order, then the flush, then probed_extent. The LeafStore trait is untouched.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C3",
+            "done": true,
+            "note": "Same checks and order as open, minus the flush; no file is written."
+          },
+          {
+            "id": "C4",
+            "done": true,
+            "note": "RepairPending at extent == pin+1, with a byte-for-byte check before and after."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S1",
+            "satisfied": true,
+            "note": ""
+          },
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": ""
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -112,7 +199,43 @@
       ],
       "stories": [
         "S1"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-log-store/src/file.rs",
+            "change": "modified",
+            "note": "New private refuse_if_read_only(operation). It is called first in LeafStore::put_leaf ('write a leaf') and in LeafStore::pin ('pin'), ahead of every existing check. put_leaf_with and the helpers after it are unchanged."
+          },
+          {
+            "path": "crates/lys-log-store/src/file_tests.rs",
+            "change": "modified",
+            "note": "Adds a_read_only_handle_refuses_a_leaf_write_and_changes_no_byte and a_read_only_handle_refuses_a_pin_and_changes_no_byte, with pin_over and store_pinned_over helpers."
+          }
+        ],
+        "how": "Row 1: a_read_only_handle_refuses_a_leaf_write_and_changes_no_byte calls put_leaf(1, leaf-1) and put_leaf(0, leaf-X). Both return ReadOnly { path == D, operation: \"write a leaf\" }, so index 0 does not return LeafAlreadyWritten, because the refusal comes before put_leaf_with. extent stays 1 and tree_bytes is unchanged. Row 2: a_read_only_handle_refuses_a_pin_and_changes_no_byte calls pin at tree_size 2 and at 0. Both return ReadOnly { operation: \"pin\" }, not PinWentBackwards. pinned() equals the pin held before, there is no state.json.tmp, and tree_bytes is unchanged. Row 3: no existing test in file_tests.rs was edited. Handles from create and open set read_only: false, so main's behaviour is kept. Drift check by reasoning: removing either refusal lets the write through, which only its own test observes.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C5",
+            "done": true,
+            "note": ""
+          },
+          {
+            "id": "C6",
+            "done": true,
+            "note": ""
+          }
+        ],
+        "stories": [
+          {
+            "id": "S1",
+            "satisfied": true,
+            "note": ""
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -134,7 +257,33 @@
       ],
       "stories": [
         "S3"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-log-store/src/log_tests.rs",
+            "change": "modified",
+            "note": "Adds a_writable_open_repairs_a_store_one_leaf_past_its_pin."
+          }
+        ],
+        "how": "Row 1: the test appends leaf-0, saves state.json, appends leaf-1 and restores the saved state.json. A FileLeafStore::open handle shows extent 2 and pinned tree_size 1, and is dropped. Log::open(FileLeafStore::open) then gives len 2 and recovered_to Some(2). open_read_only afterwards gives extent 2 and pinned tree_size 2. open_read_only is not called before the repair. Row 2: crash_recovery_repairs_exactly_one_interrupted_append_and_reports_it is untouched, and log.rs is unchanged.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C7",
+            "done": true,
+            "note": ""
+          }
+        ],
+        "stories": [
+          {
+            "id": "S3",
+            "satisfied": true,
+            "note": "Only the leaf store's part: the writable repair is held by a test."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -159,7 +308,38 @@
       ],
       "stories": [
         "S4"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-log-store/src/file.rs",
+            "change": "modified",
+            "note": "New pub fn leftover_temporaries(&self) -> StoreResult<Vec<String>>. It calls the private list_leftover_temporaries, which reads the leaves/ listing, keeps the names that pass is_leaf_temp_name and sorts them. is_leaf_temp_name accepts '.' + digits + '-' + 20 digits + '-' + digits + '.tmp'. No entry is opened, removed or renamed."
+          },
+          {
+            "path": "crates/lys-log-store/src/file_tests.rs",
+            "change": "modified",
+            "note": "Adds leftover_temporaries_names_the_stores_own_temporary_files, leftover_temporaries_are_in_lexical_order and leftover_temporaries_is_empty_without_one_of_the_stores_form."
+          }
+        ],
+        "how": "Row 1: leftover_temporaries_names_the_stores_own_temporary_files. open and open_read_only both give extent 1 and [\".4242-00000000000000000001-0.tmp\"], and afterwards the file still holds 'partial'. Row 2: leftover_temporaries_are_in_lexical_order asserts the .17 name before the .4242 name, which sort_unstable on String gives. Row 3: leftover_temporaries_is_empty_without_one_of_the_stores_form checks a create handle (empty), then open with no leftover (empty, extent 1), then with .DS_Store added (empty, extent 1). Row 4: the two existing leftover tests are unchanged. Temporary names are never counted: probed_extent looks only at 20-digit names, and contiguous_extent still skips dot-names. The trait, Log, state.json, log.json and the leaf files are unchanged.",
+        "deviation": "The spec asks for leftover_temporaries(&self) -> &[String], filled in when open reads leaves/. On current main, neither open reads the leaves/ listing in the usual case: commit 33d9068 (after the brief's base a426b9a) made open find the extent from the pin forward, one lookup per unpinned leaf. It lists the folder only when the leaf below the pin is missing. Collecting the names at open would bring back a full listing on every open, which breaks CLAUDE.md's rule that opening a store costs the same however long its log is. So the accessor lists leaves/ when it is called, and returns StoreResult<Vec<String>> so that a failed read is a named Io error rather than a silent empty list. The tests call .unwrap() on the result and compare the same values the rows name. Every other clause is kept: lexical order, only the store's form, empty for a create handle, never counted, never modified.",
+        "checklist": [
+          {
+            "id": "C10",
+            "done": true,
+            "note": "Lexical order, none counted, none changed. The accessor lists when called rather than at open; see deviation."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S4",
+            "satisfied": true,
+            "note": ""
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -184,7 +364,43 @@
       "stories": [
         "S5",
         "S3"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-log-store/src/log_tests.rs",
+            "change": "modified",
+            "note": "Adds a_torn_leaf_inside_the_pinned_prefix_is_refused_with_both_trees and a_torn_leaf_just_past_the_pin_is_repaired_and_reported."
+          }
+        ],
+        "how": "Row 1: the first test appends three leaves, records the root and tears leaf 1 to 'lea'. It asserts PinMismatch { pinned_size 3, pinned_root == base64 of the root after the third append, rebuilt_size 3, rebuilt_root == base64 of reconstruct_from_raw_leaves over [leaf-0, lea, leaf-2] }. It also asserts the exact Display text and that state.json is byte-identical. Row 2: the second test appends two leaves and writes leaves/00000000000000000002 = 'lea' by hand. The first reopen gives recovered_to Some(3) and len 3. The second gives None and len 3. Row 3: log.rs is not modified.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C8",
+            "done": true,
+            "note": ""
+          },
+          {
+            "id": "C9",
+            "done": true,
+            "note": ""
+          }
+        ],
+        "stories": [
+          {
+            "id": "S5",
+            "satisfied": true,
+            "note": "Held with R2 and R3."
+          },
+          {
+            "id": "S3",
+            "satisfied": true,
+            "note": "Only the leaf store's part."
+          }
+        ]
+      }
     },
     {
       "id": "R7",
@@ -209,7 +425,38 @@
       ],
       "stories": [
         "S6"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-log-store/src/file.rs",
+            "change": "modified",
+            "note": "Module doc gains '# What open does and never does' after Durability. Layout and Durability are unchanged."
+          }
+        ],
+        "how": "Row 1: file.rs has the line '//! # What open does and never does'. The section names FileLeafStore::open_read_only, StoreError::RepairPending, StoreError::ReadOnly and FileLeafStore::leftover_temporaries. It says an open '**never deletes**', renames or changes a leftover temporary file. It says [`FileLeafStore::leaf`](LeafStore::leaf) 'serves bytes it has not checked' and a leaf 'is proven whole only through [`Log::open`]'. It also says neither open reads leaf bytes, repairs a store, advances the pin or counts a dot-prefixed name, and that the one-leaf repair belongs to Log::open. Row 2: the Layout and Durability lines are untouched, since the section is added after them. The flush sentence is qualified as holding 'on the targets where fsync_dir flushes a directory; see Durability'. Row 3: every intra-doc link resolves in both feature shapes: Log::open by a reference definition to crate::Log::open, and the others through file.rs's own imports. Row 4: the brief's grep count for file.rs is 376 lines of code.",
+        "deviation": "The spec says open 'counts the 20-digit leaf names and requires them to be contiguous from 0'. Current main's open (commit 33d9068) counts from the pin forward and refuses a gap just past the extent. It requires contiguity from 0 only when the leaf below the pin is missing, and audit_leaves is the whole-folder check. The section says that, so the doc does not claim more than the code does. The section also says leftover_temporaries lists when asked; see R5's deviation.",
+        "checklist": [
+          {
+            "id": "C11",
+            "done": true,
+            "note": ""
+          },
+          {
+            "id": "C12",
+            "done": true,
+            "note": ""
+          }
+        ],
+        "stories": [
+          {
+            "id": "S6",
+            "satisfied": true,
+            "note": ""
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
