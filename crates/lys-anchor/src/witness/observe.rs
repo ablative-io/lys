@@ -11,7 +11,11 @@
 //!    one, and against nothing else. The witness compares two things it
 //!    personally holds; it fetches nothing, trusts nothing the submitter said
 //!    about its own history, and reaches past its own two observations by no
-//!    route at all.
+//!    route at all. The projection is the caller's, kept in memory between
+//!    calls: it is folded forward over the leaves recorded since it last
+//!    folded, never rebuilt, so an observation costs the leaves recorded since
+//!    the previous one plus the note itself — each parsed once — and not the
+//!    whole log.
 //! 3. **Report.** The [`Observation`] goes to the caller. Nothing from step 2
 //!    enters a signed artifact, and nothing from step 2 can undo step 1.
 //!
@@ -60,6 +64,16 @@ use super::report::{Observation, Relation};
 /// [`Relation::Unrelated`] for any size increase, because a witness with no
 /// proof holds no proof.
 ///
+/// `projection` is the caller's kept memory of this anchor's leaves. Before the
+/// comparison it is folded forward to the leaves recorded before this note, and
+/// after it the note itself is folded in from the body already parsed for the
+/// comparison, so it leaves this call folded over the whole log. A projection
+/// that has folded more leaves than precede the note cannot unfold, so it is
+/// discarded and folded again from index 0. It is only this anchor's memory if
+/// it was folded from this anchor: keep one projection per anchor. Start one
+/// with [`WitnessProjection::default`], which folds the whole log on the first
+/// call, or over an existing log with a rebuild.
+///
 /// `context` is what the caller established about the submitter and is passed
 /// straight to the admission policy, exactly as [`Anchor::submit`] would — this
 /// path establishes nothing extra and asserts nothing extra.
@@ -74,10 +88,11 @@ use super::report::{Observation, Relation};
 ///
 /// Exactly [`Anchor::submit`]'s: the admission refusal, which carries nothing,
 /// and storage or receipt failures. When any of them occurs **nothing was
-/// recorded and no comparison was made**. This function contributes no refusal
-/// of its own.
+/// recorded, no comparison was made, and `projection` is unchanged**. This
+/// function contributes no refusal of its own.
 pub fn observe<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy>(
     anchor: &mut Anchor<S, K, P>,
+    projection: &mut WitnessProjection,
     note: &[u8],
     consistency_proof: Option<&[u8]>,
     context: SubmitterContext<'_>,
@@ -87,15 +102,16 @@ pub fn observe<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy>(
     let recorded = anchor.submit(Submission { statement: note }, context)?;
 
     // 2. CHECK — on durable state, against the leaves recorded before this one.
-    let comparison = checkpoint_in_leaf(note).and_then(|body| {
-        WitnessProjection::rebuild_prefix(anchor, recorded.leaf_index)
-            .latest(body.origin())
-            .cloned()
-            .map(|previous| {
-                let relation = relate(&previous, &body, consistency_proof);
-                (previous, relation)
-            })
+    //    The note is the leaf verbatim, so parsing it here is parsing the leaf
+    //    at `leaf_index`, and the body is folded in without a second parse.
+    projection.fold_to(anchor, recorded.leaf_index);
+    let body = checkpoint_in_leaf(note);
+    let comparison = body.as_ref().and_then(|body| {
+        let previous = projection.latest(body.origin())?.clone();
+        let relation = relate(&previous, body, consistency_proof);
+        Some((previous, relation))
     });
+    projection.fold_parsed(recorded.leaf_index, body.as_ref());
 
     // 3. REPORT.
     let (previous, relation) = match comparison {

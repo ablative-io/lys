@@ -311,6 +311,110 @@ fn open_leaves_a_leftover_temporary_file_byte_identical() {
     assert_eq!(std::fs::read(&leftover).unwrap(), b"half a leaf");
 }
 
+/// A store at `dir` with origin `example.com/log` and one leaf of bytes `a`
+/// appended through [`crate::Log::append`].
+fn one_leaf_log(dir: &Path) {
+    FileLeafStore::create(dir, "example.com/log").unwrap();
+    let mut log = crate::Log::open(FileLeafStore::open(dir).unwrap()).unwrap();
+    log.append(b"a").unwrap();
+}
+
+#[test]
+fn open_reports_a_leftover_temporary_file_and_does_not_count_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    one_leaf_log(&dir);
+    let leftover = dir.join("leaves").join(".4242-00000000000000000001-0.tmp");
+    std::fs::write(&leftover, b"partial").unwrap();
+    let store = FileLeafStore::open(&dir).unwrap();
+    assert_eq!(store.extent(), 1);
+    assert_eq!(
+        store.leftover_temporaries(),
+        [".4242-00000000000000000001-0.tmp".to_string()]
+    );
+    assert_eq!(std::fs::read(&leftover).unwrap(), b"partial");
+}
+
+#[test]
+fn open_reports_no_leftover_temporary_file_when_there_is_none() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    one_leaf_log(&dir);
+    let store = FileLeafStore::open(&dir).unwrap();
+    assert!(store.leftover_temporaries().is_empty());
+    assert_eq!(store.extent(), 1);
+}
+
+#[test]
+fn open_reports_leftover_temporary_files_in_lexical_order() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    one_leaf_log(&dir);
+    // Written in the reverse of lexical order, so a listing returned in
+    // creation or directory order cannot pass by coincidence.
+    let names = [
+        ".4242-00000000000000000001-1.tmp",
+        ".17-00000000000000000001-0.tmp",
+    ];
+    for name in names {
+        std::fs::write(dir.join("leaves").join(name), b"partial").unwrap();
+    }
+    let store = FileLeafStore::open(&dir).unwrap();
+    assert_eq!(
+        store.leftover_temporaries(),
+        [
+            ".17-00000000000000000001-0.tmp".to_string(),
+            ".4242-00000000000000000001-1.tmp".to_string(),
+        ]
+    );
+    assert_eq!(store.extent(), 1);
+}
+
+#[test]
+fn open_does_not_report_a_dotfile_outside_the_temporary_form() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    one_leaf_log(&dir);
+    std::fs::write(dir.join("leaves").join(".DS_Store"), b"finder").unwrap();
+    let store = FileLeafStore::open(&dir).unwrap();
+    assert!(store.leftover_temporaries().is_empty());
+    assert_eq!(store.extent(), 1);
+}
+
+#[test]
+fn the_temporary_form_is_exactly_what_leaf_temp_name_writes() {
+    // The recogniser's second party is the writer: every name the writer can
+    // make is recognised, and each near miss is refused on one axis alone.
+    let written = [
+        leaf_temp_name(0, 0, 0),
+        leaf_temp_name(u32::MAX, u64::MAX, u64::MAX),
+        leaf_temp_name(4242, 1, 7),
+    ];
+    for name in &written {
+        assert!(is_leaf_temp_name(name), "{name}");
+    }
+    let near_misses = [
+        "4242-00000000000000000001-0.tmp",
+        ".4242-00000000000000000001-0",
+        ".-00000000000000000001-0.tmp",
+        ".4242-0000000000000000001-0.tmp",
+        ".4242-000000000000000000001-0.tmp",
+        ".4242-00000000000000000001-.tmp",
+        ".4242-00000000000000000001-0-1.tmp",
+        ".4a42-00000000000000000001-0.tmp",
+        ".4242-0000000000000000000x-0.tmp",
+        ".4242-00000000000000000001-x.tmp",
+        ".DS_Store",
+        ".tmp",
+    ];
+    let refused = near_misses
+        .iter()
+        .filter(|name| !is_leaf_temp_name(name))
+        .count();
+    assert_eq!(refused, near_misses.len());
+    assert_eq!((written.len(), near_misses.len()), (3, 12));
+}
+
 /// A post-link step that always fails, naming the path it was given.
 fn refuse(path: &Path) -> std::io::Result<()> {
     Err(std::io::Error::other(format!(

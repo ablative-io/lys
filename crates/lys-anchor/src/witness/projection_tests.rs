@@ -244,3 +244,103 @@ fn two_origins_are_two_memories() {
     );
     assert_ne!(first.tree_size(), second.tree_size());
 }
+
+// ---------------------------------------------------------------------------
+// the fold position, and folding forward from it
+// ---------------------------------------------------------------------------
+
+/// A witness anchor holding the genesis leaf, three ordinary statements, a
+/// checkpoint note from [`CHILD_ORIGIN`] at size 3, and two more ordinary
+/// statements: seven leaves, with the checkpoint at index 4.
+fn seven_leaves(dir: &TempDir) -> Anchor<FileLeafStore, FileSigner, AcceptAll> {
+    let mut anchor = witness_anchor(dir.path());
+    let mut child = Child::new(CHILD_ORIGIN);
+    child.grow(2);
+    assert_eq!(child.tree_size(), 3);
+    for n in 0..3 {
+        record(&mut anchor, format!("ordinary statement {n}").as_bytes());
+    }
+    record(&mut anchor, &child.checkpoint());
+    for n in 3..5 {
+        record(&mut anchor, format!("ordinary statement {n}").as_bytes());
+    }
+    assert_eq!(anchor.tree_size(), 7);
+    anchor
+}
+
+#[test]
+fn folding_forward_parses_only_the_leaves_past_the_fold_position() {
+    let dir = TempDir::new().unwrap();
+    let anchor = seven_leaves(&dir);
+
+    let mut projection = WitnessProjection::rebuild_prefix(&anchor, 4);
+    assert_eq!(projection.folded(), 4);
+    assert!(
+        projection.latest(CHILD_ORIGIN).is_none(),
+        "positive control: the checkpoint at index 4 is past a four-leaf prefix"
+    );
+
+    let before = parse_count();
+    projection.fold_to(&anchor, 7);
+    assert_eq!(parse_count() - before, 3, "indices 4, 5 and 6 only");
+    assert_eq!(projection.folded(), 7);
+
+    let rebuilt = WitnessProjection::rebuild(&anchor);
+    assert_eq!(
+        projection.latest(CHILD_ORIGIN),
+        rebuilt.latest(CHILD_ORIGIN)
+    );
+    assert_eq!(projection.latest(CHILD_ORIGIN).unwrap().tree_size, 3);
+}
+
+#[test]
+fn a_rebuild_parses_every_leaf_once() {
+    let dir = TempDir::new().unwrap();
+    let anchor = seven_leaves(&dir);
+    let before = parse_count();
+    let projection = WitnessProjection::rebuild(&anchor);
+    assert_eq!(parse_count() - before, 7);
+    assert_eq!(projection.folded(), 7);
+}
+
+#[test]
+fn folding_to_fewer_leaves_than_folded_starts_again_from_index_zero() {
+    let dir = TempDir::new().unwrap();
+    let anchor = seven_leaves(&dir);
+    let mut projection = WitnessProjection::rebuild(&anchor);
+    assert!(
+        projection.latest(CHILD_ORIGIN).is_some(),
+        "positive control: the whole-log fold holds the checkpoint, so an empty result below is a discard"
+    );
+
+    projection.fold_to(&anchor, 2);
+    assert_eq!(projection.folded(), 2);
+    assert!(projection.is_empty());
+    assert_eq!(projection, WitnessProjection::rebuild_prefix(&anchor, 2));
+}
+
+#[test]
+fn successive_forward_folds_keep_the_last_recorded_not_the_largest() {
+    let dir = TempDir::new().unwrap();
+    let mut anchor = witness_anchor(dir.path());
+    let mut child = Child::new(CHILD_ORIGIN);
+    child.grow(4);
+    assert_eq!(child.tree_size(), 5);
+    let mut projection = WitnessProjection::default();
+
+    record(&mut anchor, &child.checkpoint());
+    projection.fold_to(&anchor, anchor.tree_size());
+    assert_eq!(
+        projection.latest(CHILD_ORIGIN).unwrap().tree_size,
+        5,
+        "positive control: the first fold holds the larger checkpoint"
+    );
+
+    record(
+        &mut anchor,
+        &child.checkpoint_stating(3, flip_root(child.root())),
+    );
+    projection.fold_to(&anchor, anchor.tree_size());
+    assert_eq!(projection.latest(CHILD_ORIGIN).unwrap().tree_size, 3);
+    assert_eq!(projection.folded(), anchor.tree_size());
+}

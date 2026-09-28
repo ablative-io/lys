@@ -8,6 +8,7 @@
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -39,6 +40,21 @@ const KINDS: [&str; 4] = [
 
 type Outcome = Result<(), Box<dyn std::error::Error>>;
 type Fallible<T> = Result<T, Box<dyn std::error::Error>>;
+
+/// Held by every test for its whole body. A child spawned by one test thread
+/// inherits every open descriptor of this process between its fork and its
+/// exec, so a session lock another test thread held and just dropped stays
+/// held by that child for the moment, and the next open of the session is
+/// refused as `SessionHeld`. The lock is advisory and per open file, which is
+/// what the record promises; so these tests, which both hold sessions in this
+/// process and spawn the binary, run one at a time.
+static SERIAL: Mutex<()> = Mutex::new(());
+
+/// Take [`SERIAL`]; a test that failed while holding it has already reported
+/// its own failure, so the poison is not a second one.
+fn serially() -> MutexGuard<'static, ()> {
+    SERIAL.lock().unwrap_or_else(PoisonError::into_inner)
+}
 
 fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
@@ -211,6 +227,7 @@ fn rendered(fixture: &mut Fixture) -> Fallible<(PathBuf, Value)> {
 
 #[test]
 fn the_first_render_records_four_documents_in_order_under_the_render_event() -> Outcome {
+    let serial = serially();
     let mut fixture = Fixture::new()?;
     let (out, report) = rendered(&mut fixture)?;
     let records = fixture.records()?;
@@ -268,11 +285,13 @@ fn the_first_render_records_four_documents_in_order_under_the_render_event() -> 
     assert_eq!(kinds.iter().filter(|k| **k == "user_claude_md").count(), 0);
     assert_eq!(record.harness, "claude-code");
     assert_eq!(record.harness_version, "2.1.283");
+    drop(serial);
     Ok(())
 }
 
 #[test]
 fn two_renders_give_equal_lists_and_one_changed_byte_changes_exactly_one_hash() -> Outcome {
+    let serial = serially();
     let mut fixture = Fixture::new()?;
     rendered(&mut fixture)?;
     rendered(&mut fixture)?;
@@ -362,11 +381,13 @@ fn two_renders_give_equal_lists_and_one_changed_byte_changes_exactly_one_hash() 
             assert!(entry.get(key).is_some(), "{key}");
         }
     }
+    drop(serial);
     Ok(())
 }
 
 #[test]
 fn given_check_refuses_with_status_2_naming_the_id_the_path_or_the_file() -> Outcome {
+    let serial = serially();
     let mut fixture = Fixture::new()?;
     rendered(&mut fixture)?;
     let records = fixture.records()?;
@@ -418,12 +439,14 @@ fn given_check_refuses_with_status_2_naming_the_id_the_path_or_the_file() -> Out
         "{}",
         stderr(&not_given)
     );
+    drop(serial);
     Ok(())
 }
 
 #[test]
 fn the_rendering_process_s_config_dir_is_never_read_and_home_dot_claude_is_the_fallback() -> Outcome
 {
+    let serial = serially();
     let mut fixture = Fixture::new()?;
     // A template setting no CLAUDE_CONFIG_DIR, a process CLAUDE_CONFIG_DIR
     // naming a directory with its own memory index and CLAUDE.md, and a
@@ -510,6 +533,7 @@ fn the_rendering_process_s_config_dir_is_never_read_and_home_dot_claude_is_the_f
         data["environment"],
         json!(["LYS_FIXTURE_MODE", "LYS_FIXTURE_TOKEN"])
     );
+    drop(serial);
     Ok(())
 }
 
@@ -517,6 +541,7 @@ fn the_rendering_process_s_config_dir_is_never_read_and_home_dot_claude_is_the_f
 #[test]
 fn an_unreadable_claude_md_fails_the_render_by_path_with_no_given_entry() -> Outcome {
     use std::os::unix::fs::PermissionsExt;
+    let serial = serially();
     let mut fixture = Fixture::new()?;
     rendered(&mut fixture)?;
     let claude_md = fixture.claude_md();
@@ -537,5 +562,6 @@ fn an_unreadable_claude_md_fails_the_render_by_path_with_no_given_entry() -> Out
     assert_eq!(session.customs_everywhere("lys.harness_event")?.len(), 1);
     assert_eq!(session.head()?, Some("e4"));
     drop(session);
+    drop(serial);
     Ok(())
 }

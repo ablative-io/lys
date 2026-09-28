@@ -3,12 +3,21 @@
 //!
 //! # Invariants
 //!
-//! - **Derived, rebuildable, and never authoritative.** Nothing here is stored.
-//!   A projection is a fold over leaves the anchor already holds, recomputed on
-//!   demand, and discarding one loses nothing: the leaves are the record and
-//!   this is a view of them. That is exactly the standing the storage pin has,
-//!   and for the same reason — a cached summary that could disagree with the
-//!   log would be a second copy of the truth, and the log would stop being it.
+//! - **Derived, rebuildable, and never authoritative.** Nothing here is
+//!   written to storage. A projection is a fold over leaves the anchor already
+//!   holds, kept in memory by its caller, and discarding one loses nothing: the
+//!   leaves are the record and this is a view of them. That is exactly the
+//!   standing the storage pin has, and for the same reason — a cached summary
+//!   that could disagree with the log would be a second copy of the truth, and
+//!   the log would stop being it.
+//! - **It folds forward from where it stopped.** A projection records how many
+//!   of the anchor's leaves it has folded, and [`WitnessProjection::fold_to`]
+//!   parses only the leaves past that position. A kept projection therefore
+//!   costs each observation the leaves recorded since the last one, not the
+//!   whole log. Folding forward from `n` is the same fold as rebuilding over
+//!   `0..m`, because the anchor is append-only: leaves below `n` do not change.
+//!   A projection asked to fold to fewer leaves than it already holds has no
+//!   way to unfold, so it discards what it holds and folds again from index 0.
 //! - **It refuses nothing and holds no `&mut Anchor`.** Every entry point here
 //!   takes `&Anchor`. There is no path from a projection to an append, to a
 //!   refusal, or to a signature.
@@ -97,6 +106,8 @@ pub struct OriginState {
 /// `lys-core`'s `verify_note`, which returns the body it verified, and the
 /// tests hold the two against each other.
 pub fn checkpoint_in_leaf(leaf: &[u8]) -> Option<CheckpointBody> {
+    #[cfg(test)]
+    PARSES.with(|parses| parses.set(parses.get() + 1));
     let text = std::str::from_utf8(leaf).ok()?;
     // The LAST blank line, matching Go's `bytes.LastIndex` and `lys-core`'s
     // note parser: the body keeps its trailing newline and the signature block
@@ -105,16 +116,33 @@ pub fn checkpoint_in_leaf(leaf: &[u8]) -> Option<CheckpointBody> {
     CheckpointBody::parse(text.get(..=split)?).ok()
 }
 
+#[cfg(test)]
+thread_local! {
+    /// How many times [`checkpoint_in_leaf`] ran on this thread, so the tests
+    /// can count parses on the parse path rather than infer them from timing.
+    /// Per thread, so tests running in parallel do not count each other's.
+    static PARSES: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// The number of [`checkpoint_in_leaf`] calls made on this thread so far.
+#[cfg(test)]
+pub(crate) fn parse_count() -> u64 {
+    PARSES.with(std::cell::Cell::get)
+}
+
 /// What a witness remembers about the logs whose checkpoints it has recorded.
 ///
 /// Built by folding the anchor's own leaves; see the [module docs](self) for
 /// the fold rule, for why nothing here is authoritative, and for what an
-/// unverified parse costs.
-#[derive(Clone, Debug, Default)]
+/// unverified parse costs. [`Default`] is the projection that has folded
+/// nothing, which [`fold_to`](Self::fold_to) grows from index 0.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct WitnessProjection {
     /// Ordered so iteration is stable across rebuilds — a report that lists
     /// origins in hash order would differ run to run for no reason.
     latest: BTreeMap<String, OriginState>,
+    /// How many of the anchor's leaves, from index 0, have been folded.
+    folded: u64,
 }
 
 impl WitnessProjection {
@@ -128,35 +156,86 @@ impl WitnessProjection {
     /// Folds the anchor's first `leaves` leaves — indices `0..leaves` — into a
     /// projection.
     ///
-    /// This is what the observation path uses, with `leaves` set to the index
-    /// the note was just recorded at, so the comparison is against everything
-    /// the witness recorded **before** this submission and never against the
-    /// submission itself. Passing a `leaves` above the log's size is not an
-    /// error and folds what exists; the log is the bound.
+    /// Passing a `leaves` above the log's size is not an error and folds what
+    /// exists; the log is the bound. The result's [`folded`](Self::folded) is
+    /// the number of leaves folded.
     pub fn rebuild_prefix<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy>(
         anchor: &Anchor<S, K, P>,
         leaves: u64,
     ) -> Self {
-        let mut latest = BTreeMap::new();
-        for index in 0..leaves.min(anchor.tree_size()) {
-            let Some(leaf) = anchor.leaf_bytes(index) else {
-                continue;
-            };
-            let Some(body) = checkpoint_in_leaf(leaf) else {
-                continue;
-            };
-            // Ascending index, so a later entry replaces an earlier one and the
-            // survivor is the last recorded — not the largest.
-            latest.insert(
-                body.origin().to_string(),
-                OriginState {
-                    origin: body.origin().to_string(),
-                    tree_size: body.tree_size(),
-                    root: body.root_hash(),
-                },
-            );
+        let mut projection = Self::default();
+        projection.fold_to(anchor, leaves);
+        projection
+    }
+
+    /// Folds the anchor's leaves from [`folded`](Self::folded) up to `leaves`,
+    /// or up to the anchor's size if that is smaller, and records that bound as
+    /// the new fold position.
+    ///
+    /// The leaves are folded in ascending index under the same rule as
+    /// [`rebuild_prefix`](Self::rebuild_prefix), so the last recorded state
+    /// wins and the result equals `rebuild_prefix(anchor, leaves)`. No leaf
+    /// below the fold position is parsed again — unless the position is
+    /// already past the bound, in which case the projection cannot unfold, so
+    /// it discards what it holds and folds from index 0.
+    ///
+    /// This is what the observation path uses, with `leaves` set to the index
+    /// the note was just recorded at, so the comparison is against everything
+    /// the witness recorded **before** this submission and never against the
+    /// submission itself.
+    pub fn fold_to<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy>(
+        &mut self,
+        anchor: &Anchor<S, K, P>,
+        leaves: u64,
+    ) {
+        let bound = leaves.min(anchor.tree_size());
+        if self.folded > bound {
+            *self = Self::default();
         }
-        Self { latest }
+        for index in self.folded..bound {
+            if let Some(body) = anchor.leaf_bytes(index).and_then(checkpoint_in_leaf) {
+                self.remember(&body);
+            }
+        }
+        self.folded = bound;
+    }
+
+    /// Folds the leaf at `index` from a body its caller already parsed out of
+    /// it, or from `None` when [`checkpoint_in_leaf`] read nothing there, so
+    /// the leaf is not parsed a second time.
+    ///
+    /// Only the next leaf can be folded this way. For any other `index` this
+    /// does nothing, and the next [`fold_to`](Self::fold_to) parses the leaf
+    /// itself — a skipped shortcut costs one parse, where a misplaced one would
+    /// put a state in the projection at the wrong position.
+    pub(super) fn fold_parsed(&mut self, index: u64, body: Option<&CheckpointBody>) {
+        if index != self.folded {
+            return;
+        }
+        if let Some(body) = body {
+            self.remember(body);
+        }
+        self.folded = index.saturating_add(1);
+    }
+
+    /// Records `body` as the latest state for its origin. Called in ascending
+    /// index, so a later entry replaces an earlier one and the survivor is the
+    /// last recorded — not the largest.
+    fn remember(&mut self, body: &CheckpointBody) {
+        self.latest.insert(
+            body.origin().to_string(),
+            OriginState {
+                origin: body.origin().to_string(),
+                tree_size: body.tree_size(),
+                root: body.root_hash(),
+            },
+        );
+    }
+
+    /// How many of the anchor's leaves, from index 0, this projection has
+    /// folded. The next [`fold_to`](Self::fold_to) parses from this index.
+    pub fn folded(&self) -> u64 {
+        self.folded
     }
 
     /// What this witness last recorded for `origin`, or `None` if it has

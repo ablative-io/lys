@@ -57,14 +57,18 @@
 use lys_log_store::FileLeafStore;
 use tempfile::TempDir;
 
-use crate::admission::{AcceptAll, SubmitterContext};
+use crate::AnchorConfig;
+use crate::admission::{AcceptAll, MaxSize, SubmitterContext};
 use crate::anchor::Anchor;
+use crate::error::AnchorError;
 use crate::keys::FileSigner;
 use crate::wire::Submission;
 
+use super::super::projection::parse_count;
 use super::super::report::Relation;
 use super::super::report::fixture::{
-    CHILD_ORIGIN, Child, OTHER_CHILD_ORIGIN, flip_root, witness_anchor,
+    CHILD_ORIGIN, Child, OTHER_CHILD_ORIGIN, WITNESS_GENESIS, WITNESS_ORIGIN, flip_root,
+    witness_anchor,
 };
 use super::*;
 
@@ -76,21 +80,38 @@ fn staged() -> (TempDir, Anchor<FileLeafStore, FileSigner, AcceptAll>) {
     (dir, anchor)
 }
 
-/// Observes `note` with no consistency proof, under no established identity.
+/// Observes `note` with no consistency proof, under no established identity,
+/// through a projection rebuilt over the whole log for this call.
 fn see(
     anchor: &mut Anchor<FileLeafStore, FileSigner, AcceptAll>,
     note: &[u8],
 ) -> super::super::report::Observation {
-    observe(anchor, note, None, SubmitterContext::Unidentified).unwrap()
+    let mut projection = WitnessProjection::rebuild(anchor);
+    observe(
+        anchor,
+        &mut projection,
+        note,
+        None,
+        SubmitterContext::Unidentified,
+    )
+    .unwrap()
 }
 
-/// Observes `note` with `proof`.
+/// Observes `note` with `proof`, through a projection rebuilt for this call.
 fn see_with(
     anchor: &mut Anchor<FileLeafStore, FileSigner, AcceptAll>,
     note: &[u8],
     proof: &[u8],
 ) -> super::super::report::Observation {
-    observe(anchor, note, Some(proof), SubmitterContext::Unidentified).unwrap()
+    let mut projection = WitnessProjection::rebuild(anchor);
+    observe(
+        anchor,
+        &mut projection,
+        note,
+        Some(proof),
+        SubmitterContext::Unidentified,
+    )
+    .unwrap()
 }
 
 // ---------------------------------------------------------------------------
@@ -494,8 +515,15 @@ fn the_receipt_is_byte_identical_whatever_the_relation() {
     let mut compared = 0;
     let mut with_a_memory = 0;
     for (step, (bytes, proof, expect_previous)) in script.into_iter().enumerate() {
-        let witnessed =
-            observe(&mut witness, bytes, proof, SubmitterContext::Unidentified).unwrap();
+        let mut projection = WitnessProjection::rebuild(&witness);
+        let witnessed = observe(
+            &mut witness,
+            &mut projection,
+            bytes,
+            proof,
+            SubmitterContext::Unidentified,
+        )
+        .unwrap();
         let recorded = plain
             .submit(
                 Submission { statement: bytes },
@@ -532,4 +560,179 @@ fn the_receipt_is_byte_identical_whatever_the_relation() {
     }
     assert_eq!(compared, 7, "every scripted input must have been compared");
     assert_eq!(with_a_memory, 5, "five steps must have found a memory");
+}
+
+// ---------------------------------------------------------------------------
+// rule: a kept projection costs only the leaves recorded since the last call
+// ---------------------------------------------------------------------------
+
+/// Submits `bytes` through the plain path, as a statement nobody witnesses.
+fn submit(anchor: &mut Anchor<FileLeafStore, FileSigner, AcceptAll>, bytes: &[u8]) {
+    anchor
+        .submit(
+            Submission { statement: bytes },
+            SubmitterContext::Unidentified,
+        )
+        .unwrap();
+}
+
+/// Observes `note` with no proof through the kept `projection`, returning the
+/// observation and how many parses it cost.
+fn see_kept(
+    anchor: &mut Anchor<FileLeafStore, FileSigner, AcceptAll>,
+    projection: &mut WitnessProjection,
+    note: &[u8],
+) -> (super::super::report::Observation, u64) {
+    let before = parse_count();
+    let observed = observe(
+        anchor,
+        projection,
+        note,
+        None,
+        SubmitterContext::Unidentified,
+    )
+    .unwrap();
+    (observed, parse_count() - before)
+}
+
+/// Asserts that `projection` has folded the whole log and holds what a rebuild
+/// over the same anchor holds for both child origins.
+fn assert_matches_a_rebuild(
+    anchor: &Anchor<FileLeafStore, FileSigner, AcceptAll>,
+    projection: &WitnessProjection,
+) {
+    assert_eq!(projection.folded(), anchor.tree_size());
+    let rebuilt = WitnessProjection::rebuild(anchor);
+    for origin in [CHILD_ORIGIN, OTHER_CHILD_ORIGIN] {
+        assert_eq!(
+            projection.latest(origin),
+            rebuilt.latest(origin),
+            "{origin}"
+        );
+    }
+}
+
+#[test]
+fn a_kept_projection_parses_only_what_was_recorded_since_the_last_observe() {
+    let (_dir, mut anchor) = staged();
+    let mut child = Child::new(CHILD_ORIGIN);
+    let other = Child::with_seed(OTHER_CHILD_ORIGIN, b"lys-anchor-increment-7-other-key");
+    child.grow(1);
+    assert_eq!(child.tree_size(), 2);
+    submit(&mut anchor, &child.checkpoint());
+    for n in 0..254 {
+        submit(&mut anchor, format!("ordinary statement {n}").as_bytes());
+    }
+    assert_eq!(anchor.tree_size(), 256);
+
+    let before = parse_count();
+    let mut projection = WitnessProjection::rebuild(&anchor);
+    assert_eq!(
+        parse_count() - before,
+        256,
+        "positive control: the counter sees every parse of a rebuild"
+    );
+
+    child.grow(1);
+    let (seen, parses) = see_kept(&mut anchor, &mut projection, &child.checkpoint());
+    assert_eq!(parses, 1, "only the note itself");
+    assert_eq!(seen.previous.unwrap().tree_size, 2);
+    assert_matches_a_rebuild(&anchor, &projection);
+
+    let (seen, parses) = see_kept(&mut anchor, &mut projection, &other.checkpoint());
+    assert_eq!(parses, 1, "only the note itself");
+    assert!(seen.previous.is_none());
+    assert_matches_a_rebuild(&anchor, &projection);
+
+    for n in 0..3 {
+        submit(&mut anchor, format!("later statement {n}").as_bytes());
+    }
+    child.grow(1);
+    let (seen, parses) = see_kept(&mut anchor, &mut projection, &child.checkpoint());
+    assert_eq!(parses, 4, "the three statements since, and the note");
+    assert_eq!(seen.previous.unwrap().tree_size, 3);
+    assert_matches_a_rebuild(&anchor, &projection);
+}
+
+#[test]
+fn a_kept_projection_follows_a_rollback() {
+    let (_dir, mut anchor) = staged();
+    let mut child = Child::new(CHILD_ORIGIN);
+    child.grow(4);
+    assert_eq!(child.tree_size(), 5);
+    let mut projection = WitnessProjection::default();
+
+    let (first, first_parses) = see_kept(&mut anchor, &mut projection, &child.checkpoint());
+    assert_eq!(first_parses, 2, "the genesis leaf, then the note");
+    assert_ne!(
+        first.relation,
+        Some(Relation::Rollback),
+        "positive control: a first sighting is not a rollback"
+    );
+    let rolled_back = child.checkpoint_stating(3, flip_root(child.root()));
+    let (second, second_parses) = see_kept(&mut anchor, &mut projection, &rolled_back);
+    assert_eq!(second.relation, Some(Relation::Rollback));
+    assert_eq!(second_parses, 1, "only the note itself");
+    assert_eq!(projection.latest(CHILD_ORIGIN).unwrap().tree_size, 3);
+    assert_matches_a_rebuild(&anchor, &projection);
+}
+
+#[test]
+fn a_kept_projection_folds_past_a_note_that_is_not_a_checkpoint() {
+    let (_dir, mut anchor) = staged();
+    let child = Child::new(CHILD_ORIGIN);
+    submit(&mut anchor, &child.checkpoint());
+    let mut projection = WitnessProjection::rebuild(&anchor);
+    assert!(
+        projection.latest(CHILD_ORIGIN).is_some(),
+        "positive control: the projection holds a memory the statement could be compared to"
+    );
+
+    let (seen, parses) = see_kept(&mut anchor, &mut projection, b"not a checkpoint note");
+    assert_eq!(parses, 1);
+    assert!(seen.previous.is_none());
+    assert_eq!(projection.folded(), anchor.tree_size());
+}
+
+#[test]
+fn a_refused_observe_leaves_the_kept_projection_unchanged() {
+    let dir = TempDir::new().unwrap();
+    let key = dir.path().join("witness.key");
+    std::fs::write(&key, b"lys-anchor-kept-projection-test!").unwrap();
+    let store = FileLeafStore::create(dir.path(), WITNESS_ORIGIN).unwrap();
+    let mut anchor = Anchor::create(
+        store,
+        WITNESS_GENESIS,
+        FileSigner::load(&key).unwrap(),
+        MaxSize::new(8),
+        AnchorConfig::unconfigured(),
+    )
+    .unwrap();
+    let note = Child::new(CHILD_ORIGIN).checkpoint();
+    assert!(note.len() > 8, "the note must be longer than the limit");
+    let short: &[u8] = b"short";
+    anchor
+        .submit(
+            Submission { statement: short },
+            SubmitterContext::Unidentified,
+        )
+        .unwrap();
+    let mut projection = WitnessProjection::default();
+    projection.fold_to(&anchor, 1);
+    let folded = projection.folded();
+    assert_ne!(
+        folded,
+        anchor.tree_size(),
+        "positive control: the projection is behind the log, so an unchanged position is not a fold that ran and stopped"
+    );
+
+    let refused = observe(
+        &mut anchor,
+        &mut projection,
+        &note,
+        None,
+        SubmitterContext::Unidentified,
+    );
+    assert!(matches!(refused, Err(AnchorError::NotAdmitted)));
+    assert_eq!(projection.folded(), folded);
 }

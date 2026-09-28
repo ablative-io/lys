@@ -12,7 +12,9 @@
 //!   flushed, and only then linked to its final name by an operation that
 //!   refuses to replace an existing leaf. A leaf name therefore never refers
 //!   to a torn or unflushed file, and a leftover temporary file from a crash
-//!   is never counted as a leaf.
+//!   is never counted as a leaf. Opening the store names every such leftover
+//!   through [`FileLeafStore::leftover_temporaries`] and leaves it untouched:
+//!   skipping a file in silence would hide what an interrupted append left.
 //! - `state.json` — the pinned `(tree_size, root)`, rewritten atomically after
 //!   every append.
 //!
@@ -105,6 +107,9 @@ pub struct FileLeafStore {
     /// The leaf whose directory flush failed on this handle, if any. While set,
     /// every append is refused until the store is reopened.
     durability_uncertain: Option<u64>,
+    /// Names in `leaves/` of the store's temporary-leaf form found at open, in
+    /// lexical order.
+    leftover_temporaries: Vec<String>,
 }
 
 /// The two steps after a leaf is linked, kept as functions so that a test can
@@ -129,6 +134,7 @@ impl std::fmt::Debug for FileLeafStore {
             .field("dir", &self.dir)
             .field("origin", &self.origin)
             .field("extent", &self.extent)
+            .field("leftover_temporaries", &self.leftover_temporaries)
             .finish_non_exhaustive()
     }
 }
@@ -171,6 +177,7 @@ impl FileLeafStore {
             extent: 0,
             pinned,
             durability_uncertain: None,
+            leftover_temporaries: Vec::new(),
         })
     }
 
@@ -212,18 +219,35 @@ impl FileLeafStore {
         // A leaf name linked just before a crash may not yet be durable; the
         // flush makes every name counted below one that survives.
         fsync_dir(&dir.join("leaves"))?;
+        let (extent, leftover_temporaries) = scan_leaves(dir)?;
         Ok(Self {
             dir: dir.to_path_buf(),
             origin: config.origin,
-            extent: contiguous_extent(dir)?,
+            extent,
             pinned,
             durability_uncertain: None,
+            leftover_temporaries,
         })
     }
 
     /// The directory this store occupies.
     pub fn dir(&self) -> &Path {
         &self.dir
+    }
+
+    /// The names of the temporary leaf files found in `leaves/` when this
+    /// store was opened, in lexical order; empty when there were none, and
+    /// always empty for a store just created.
+    ///
+    /// A temporary leaf file is what an append interrupted before its link
+    /// leaves behind: a name of the form `.<pid>-<20-digit index>-<sequence>.tmp`.
+    /// None of them is a leaf, none counts toward the extent, and open neither
+    /// removes nor changes any of them. They are returned so the caller can say
+    /// they were skipped — a library that printed them would have decided for
+    /// its caller where that goes, and one that said nothing would skip them in
+    /// silence. A dot-prefixed name of any other form is not reported.
+    pub fn leftover_temporaries(&self) -> &[String] {
+        &self.leftover_temporaries
     }
 
     /// Path of the leaf file for `index`.
@@ -589,19 +613,42 @@ fn remove_file(path: &Path) -> std::io::Result<()> {
     std::fs::remove_file(path)
 }
 
-/// Enumerates `leaves/` and returns the contiguous extent.
+/// Whether `name` has the form [`leaf_temp_name`] gives: a dot, one or more
+/// decimal digits, a dash, [`LEAF_NAME_WIDTH`] decimal digits, a dash, one or
+/// more decimal digits, and `.tmp`.
+fn is_leaf_temp_name(name: &str) -> bool {
+    let Some(inner) = name
+        .strip_prefix('.')
+        .and_then(|rest| rest.strip_suffix(".tmp"))
+    else {
+        return false;
+    };
+    let digits = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
+    let mut parts = inner.split('-');
+    match (parts.next(), parts.next(), parts.next(), parts.next()) {
+        (Some(pid), Some(index), Some(sequence), None) => {
+            digits(pid) && index.len() == LEAF_NAME_WIDTH && digits(index) && digits(sequence)
+        }
+        _ => false,
+    }
+}
+
+/// Enumerates `leaves/` and returns the contiguous extent and the leftover
+/// temporary leaf names, sorted.
 ///
-/// Entries beginning with `.` are ignored — they can never be leaf names,
-/// which are exactly 20 digits, so ignoring them cannot mask a missing or
-/// extra leaf. Any other unexpected entry is corruption. The index set must be
-/// exactly `0..n`.
-fn contiguous_extent(dir: &Path) -> StoreResult<u64> {
+/// Entries beginning with `.` are not leaves — they can never be leaf names,
+/// which are exactly 20 digits, so skipping them cannot mask a missing or
+/// extra leaf. Those of the [`is_leaf_temp_name`] form are collected so the
+/// caller can report them; every other one is ignored as before. Any other
+/// unexpected entry is corruption. The index set must be exactly `0..n`.
+fn scan_leaves(dir: &Path) -> StoreResult<(u64, Vec<String>)> {
     let leaves_dir = dir.join("leaves");
     let entries = std::fs::read_dir(&leaves_dir).map_err(|source| StoreError::Io {
         context: format!("failed to read leaves directory {}", leaves_dir.display()),
         source,
     })?;
     let mut indices: Vec<u64> = Vec::new();
+    let mut temporaries: Vec<String> = Vec::new();
     for entry in entries {
         let entry = entry.map_err(|source| StoreError::Io {
             context: format!("failed to read leaves directory {}", leaves_dir.display()),
@@ -612,6 +659,9 @@ fn contiguous_extent(dir: &Path) -> StoreResult<u64> {
             return Err(invalid_leaf_entry(dir, &name.to_string_lossy()));
         };
         if name.starts_with('.') {
+            if is_leaf_temp_name(name) {
+                temporaries.push(name.to_string());
+            }
             continue;
         }
         if name.len() != LEAF_NAME_WIDTH || !name.bytes().all(|b| b.is_ascii_digit()) {
@@ -636,10 +686,12 @@ fn contiguous_extent(dir: &Path) -> StoreResult<u64> {
             });
         }
     }
-    u64::try_from(indices.len()).map_err(|_source| StoreError::Corrupt {
+    let extent = u64::try_from(indices.len()).map_err(|_source| StoreError::Corrupt {
         path: dir.to_path_buf(),
         reason: format!("{} leaves is more than u64 can index", indices.len()),
-    })
+    })?;
+    temporaries.sort_unstable();
+    Ok((extent, temporaries))
 }
 
 /// Builds the corruption error for an unexpected `leaves/` entry.

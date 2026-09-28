@@ -12,6 +12,10 @@
 //! structured field. So [`lys_log_store::Log`] *returns* the fact and this layer
 //! prints it. The one thing neither may do is drop it: a silently repaired log
 //! is indistinguishable from one that never needed repairing.
+//!
+//! The leftover temporary leaf files [`FileLeafStore::open`] skipped are
+//! handled the same way: the store returns their names and this layer prints
+//! them, once, on stderr — never on stdout, where a `--json` consumer reads.
 
 use std::path::Path;
 
@@ -34,8 +38,9 @@ pub fn init(dir: &Path, origin: &str) -> CliResult<()> {
     Ok(())
 }
 
-/// Opens and integrity-verifies the log directory at `dir`, reporting an
-/// interrupted append that was repaired.
+/// Opens and integrity-verifies the log directory at `dir`, reporting the
+/// leftover temporary leaf files the store skipped and an interrupted append
+/// that was repaired.
 ///
 /// # Errors
 ///
@@ -43,11 +48,27 @@ pub fn init(dir: &Path, origin: &str) -> CliResult<()> {
 /// [`CliError::LogDirInvalid`] with the specific discrepancy on an integrity
 /// failure, and [`CliError::Io`] on filesystem failure.
 pub fn open(dir: &Path) -> CliResult<LogStore> {
-    let log = Log::open(FileLeafStore::open(dir)?).map_err(|err| integrity_failure(dir, err))?;
+    let store = FileLeafStore::open(dir)?;
+    if let Some(line) = leftover_temporaries_line(store.leftover_temporaries()) {
+        eprintln!("{line}");
+    }
+    let log = Log::open(store).map_err(|err| integrity_failure(dir, err))?;
     if let Some(tree_size) = log.recovered_to() {
         eprintln!("recovered interrupted append: state advanced to {tree_size}");
     }
     Ok(log)
+}
+
+/// The stderr line naming the leftover temporary leaf files a store skipped at
+/// open, in the order given, or `None` when there were none.
+fn leftover_temporaries_line(names: &[String]) -> Option<String> {
+    if names.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "ignored leftover temporary leaf files: {}",
+        names.join(", ")
+    ))
 }
 
 /// Attaches the log directory to an integrity failure that carries no path.
