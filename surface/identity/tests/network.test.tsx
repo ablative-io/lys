@@ -6,9 +6,8 @@ import { ADA, OWN, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Machine, NameMachine } from '../src/features/network/contract';
 
 beforeEach(() => sessionStorage.clear());
-const machine: Machine = { id: 'op-' + 'a'.repeat(32), name: 'Workshop laptop', kind: 'laptop', runtime: null, slots: 0, may_run: [], may_run_roles: [], may_reach: [], named_by: ADA, named_at: 1790000000, state: 'in_use', retired_at: null, last_report_at: null };
-const ROLE = 'op-' + 'b'.repeat(32);
-const routes = { ...SERVICE, '/network': ok({ machines: [machine], reports_served: false }), '/roles': ok({ roles: [{ id: ROLE, name: 'Builder' }] }) };
+const machine: Machine = { id: 'op-' + 'a'.repeat(32), name: 'Workshop laptop', kind: 'laptop', runtime: null, slots: 0, may_run: [], may_reach: [], named_by: ADA, named_at: 1790000000, state: 'in_use', retired_at: null, last_report_at: null };
+const routes = { ...SERVICE, '/network': ok({ machines: [machine], reports_served: false }) };
 const button = (label: string) => [...document.querySelectorAll('button')].find((value) => value.textContent === label) ?? null;
 function input(name: string, value: string) {
   const element = $('[name="' + name + '"]');
@@ -36,7 +35,7 @@ describe('Network', () => {
     input('name', 'Lab'); input('kind', 'server'); input('hosts', 'API.EXAMPLE.TEST\napi.example.test');
     await submit();
     expect(posted).toHaveLength(1);
-    expect(posted[0]).toEqual({ path: '/network/machines', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), name: 'Lab', kind: 'server', runtime: null, slots: 0, may_run: [], may_run_roles: [], may_reach: ['api.example.test'] } });
+    expect(posted[0]).toEqual({ path: '/network/machines', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), name: 'Lab', kind: 'server', runtime: null, slots: 0, may_run: [], may_reach: ['api.example.test'] } });
     expect(text()).toContain('Machine recorded.');
   });
   it('keeps an unknown registration across remount and sends only its original request', async () => {
@@ -55,16 +54,6 @@ describe('Network', () => {
     await click($('form input[type="checkbox"]')); input('runtime', 'Norn'); input('slots', '2');
     await click($('input[name="agent"][value="' + SCRIBE + '"]')); await submit();
     expect(posted[0].body).toMatchObject({ runtime: 'Norn', slots: 2, may_run: [SCRIBE] });
-  });
-  it('records the roles whose holders may run on the machine and shows them by name', async () => {
-    const { posted } = await mount('#/network', { ...routes, 'POST /network/machines': (body) => ok(recorded(body as NameMachine)) });
-    input('name', 'Lab'); input('kind', 'server');
-    await click($('form input[type="checkbox"]')); input('runtime', 'Norn'); input('slots', '1');
-    await click($('input[name="role"][value="' + ROLE + '"]')); await submit();
-    expect(posted[0].body).toMatchObject({ may_run: [], may_run_roles: [ROLE] });
-    unmountAll(); document.body.innerHTML = '';
-    await mount('#/network', { ...routes, '/network': ok({ machines: [{ ...machine, may_run_roles: [ROLE] }], reports_served: false }) });
-    expect(text()).toContain('Builder');
   });
   it('requires confirmation for idempotent retirement and does not claim a process was stopped', async () => {
     const { posted } = await mount('#/network', { ...routes, ['POST /network/machines/' + machine.id + '/retire']: ok({ ...machine, state: 'retired' }) });
