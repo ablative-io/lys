@@ -2,6 +2,7 @@
 //! relation a grant names, and a sealed record's class.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use lys_secrets::{Relation, SecretsError};
 
@@ -34,12 +35,12 @@ pub struct PermissionSource {
 impl PermissionSource {
     pub fn grants(&self, layout: &Layout) -> Result<Grants, SecretsError> {
         Ok(match &self.directory_config {
-            Some(config) => Grants::Directory(SpiceGrants::from_directory(
+            Some(config) => Grants::Directory(Arc::new(SpiceGrants::from_directory(
                 config,
                 &self.use_action,
                 &self.read_action,
                 [&self.lend_action, &self.member_action],
-            )?),
+            )?)),
             None => Grants::File(FileGrants::new(layout.grants())),
         })
     }

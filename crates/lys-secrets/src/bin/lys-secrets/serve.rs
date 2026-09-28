@@ -3,6 +3,14 @@
 //! the one header its route names, and the request goes to the one upstream
 //! the secret is bound to. The credential never reaches the holder: every
 //! occurrence of it in the upstream's answer is replaced before it returns.
+//!
+//! No async worker waits on the broker. Its work, which takes its lock and
+//! writes its audit log, runs on the blocking pool ([`on_broker`]). The
+//! permission source, which may be a remote engine, is asked before the
+//! broker is taken: a use's questions are read under the lock, the lock is
+//! let go, the source answers them holding nothing, and the answers go to
+//! the admission and, asked again, to the forward boundary. So a slow answer
+//! holds up its own call and no other route.
 
 use std::sync::{Arc, Mutex, PoisonError};
 
@@ -12,20 +20,29 @@ use axum::extract::{Request, State};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use lys_secrets::{
-    Admitted, Broker, HandleToken, Presentation, Secret, SecretsError, from_hex, request_digest,
+    Admitted, Ask, Broker, Checked, HandleToken, PermissionCheck, Presentation, Secret,
+    SecretsError, Settled, from_hex, request_digest,
 };
 
 use crate::files::{Layout, Route};
+use crate::redact::{Redactor, capped};
 use crate::spice::Grants;
 
 pub(crate) const MAX_BODY: usize = 16 * 1024 * 1024;
-const REDACTED: &[u8] = b"[redacted]";
+
+/// A refusal and the status it answers with.
+type Refused = (StatusCode, SecretsError);
+
+/// A permission source asked with no lock held.
+pub(crate) type Permissions = Arc<dyn PermissionCheck + Send + Sync>;
 
 pub(crate) struct Shared {
     pub(crate) broker: Mutex<Broker<Grants>>,
     pub(crate) layout: Layout,
     pub(crate) client: reqwest::Client,
     pub(crate) window: Mutex<lys_secrets::ServiceWindow>,
+    /// The permission source the broker holds, asked before it is taken.
+    pub(crate) permissions: Permissions,
 }
 
 pub fn serve(mut broker: Broker<Grants>, layout: Layout, listen: &str) -> Result<(), SecretsError> {
@@ -34,6 +51,13 @@ pub fn serve(mut broker: Broker<Grants>, layout: Layout, listen: &str) -> Result
         println!("lys-secrets {failure}");
     }
     broker.report_snapshots_to(Box::new(|failure| println!("lys-secrets {failure}")));
+    if let Err(error) = layout.routes() {
+        println!("lys-secrets routes: {error}");
+    }
+    if let Err(error) = layout.services() {
+        println!("lys-secrets services: {error}");
+    }
+    let permissions: Permissions = Arc::new(broker.permissions().clone());
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -46,6 +70,7 @@ pub fn serve(mut broker: Broker<Grants>, layout: Layout, listen: &str) -> Result
         layout,
         client: reqwest::Client::new(),
         window: Mutex::new(lys_secrets::ServiceWindow::new()),
+        permissions,
     });
     runtime.block_on(async move {
         let listener = tokio::net::TcpListener::bind(listen)
@@ -87,6 +112,44 @@ pub fn serve(mut broker: Broker<Grants>, layout: Layout, listen: &str) -> Result
                 source,
             })
     })
+}
+
+/// Runs `work` on the broker on the blocking pool, so no async worker waits
+/// on the broker's lock or its disk.
+pub(crate) async fn on_broker<T, F>(shared: &Arc<Shared>, work: F) -> Result<T, SecretsError>
+where
+    T: Send + 'static,
+    F: FnOnce(&mut Broker<Grants>) -> T + Send + 'static,
+{
+    let shared = Arc::clone(shared);
+    blocking(move || {
+        let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
+        work(&mut broker)
+    })
+    .await
+}
+
+/// Runs `work` on the blocking pool.
+async fn blocking<T, F>(work: F) -> Result<T, SecretsError>
+where
+    T: Send + 'static,
+    F: FnOnce() -> T + Send + 'static,
+{
+    tokio::task::spawn_blocking(work)
+        .await
+        .map_err(|error| SecretsError::Io {
+            context: "running broker work off the async workers".to_owned(),
+            source: std::io::Error::other(error.to_string()),
+        })
+}
+
+/// The permission source's answers to `asks`, asked on the blocking pool
+/// with no lock held.
+async fn ask(shared: &Shared, asks: &[Ask]) -> Result<Checked, SecretsError> {
+    let permissions = Arc::clone(&shared.permissions);
+    let asks = asks.to_vec();
+    let answered = blocking(move || Checked::answer(&asks, permissions.as_ref()));
+    answered.await
 }
 
 fn refusal(status: StatusCode, error: &SecretsError) -> Response {
@@ -155,10 +218,12 @@ async fn next_account(State(shared): State<Arc<Shared>>, request: Request) -> Re
                 )
             })?;
         let (token, presentation) = signed(&parts, &body)?;
-        let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
-        broker
-            .next_account_for(&token, &presentation)
-            .map_err(|error| (StatusCode::FORBIDDEN, error))
+        on_broker(&shared, move |broker| {
+            broker.next_account_for(&token, &presentation)
+        })
+        .await
+        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error))?
+        .map_err(|error| (StatusCode::FORBIDDEN, error))
     };
     match asked.await {
         Ok(account) => (StatusCode::OK, format!("now {account}\n")).into_response(),
@@ -166,26 +231,26 @@ async fn next_account(State(shared): State<Arc<Shared>>, request: Request) -> Re
     }
 }
 
-async fn forward(
-    shared: &Shared,
-    request: Request,
-) -> Result<Response, (StatusCode, SecretsError)> {
+pub(crate) async fn forward(shared: &Arc<Shared>, request: Request) -> Result<Response, Refused> {
     let bad = |error: SecretsError| (StatusCode::BAD_REQUEST, error);
+    let internal = |error: SecretsError| (StatusCode::INTERNAL_SERVER_ERROR, error);
     let (parts, body) = request.into_parts();
     let path = parts.uri.path().trim_start_matches('/');
     let (secret, rest) = path.split_once('/').unwrap_or((path, ""));
-    let routes = shared
+    let route = shared
         .layout
         .routes()
-        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error))?;
-    let route = routes.get(secret).cloned().ok_or_else(|| {
-        (
-            StatusCode::NOT_FOUND,
-            SecretsError::SecretUnknown {
-                name: secret.to_owned(),
-            },
-        )
-    })?;
+        .map_err(internal)?
+        .get(secret)
+        .map(Arc::clone)
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                SecretsError::SecretUnknown {
+                    name: secret.to_owned(),
+                },
+            )
+        })?;
     let body = axum::body::to_bytes(body, MAX_BODY)
         .await
         .map_err(|error| {
@@ -204,10 +269,18 @@ async fn forward(
             })
         })?,
     };
-    let admitted = {
-        let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
-        broker.admit_use(&token, &presentation, reserve)
-    }
+    let (token, asks) = on_broker(shared, move |broker| {
+        let asks = broker.asks_for(&token);
+        (token, asks)
+    })
+    .await
+    .map_err(internal)?;
+    let checked = ask(shared, &asks).await.map_err(internal)?;
+    let admitted = on_broker(shared, move |broker| {
+        broker.admit_use_checked(&token, &presentation, reserve, &checked)
+    })
+    .await
+    .map_err(internal)?
     .map_err(|error| (StatusCode::FORBIDDEN, error))?;
     let ticket = match admitted {
         Admitted::Fresh(ticket) => ticket,
@@ -219,17 +292,21 @@ async fn forward(
                 .into_response());
         }
     };
-    let ticket = {
-        let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
-        broker.at_forward_boundary(ticket)
-    }
+    let checked = ask(shared, &asks).await.map_err(internal)?;
+    let ticket = on_broker(shared, move |broker| {
+        broker.at_forward_boundary_checked(ticket, &checked)
+    })
+    .await
+    .map_err(internal)?
     .map_err(|error| (StatusCode::FORBIDDEN, error))?;
     let rest = rest.to_owned();
-    let called = match ticket.oauth() {
-        Err(error) => Err((StatusCode::INTERNAL_SERVER_ERROR, error)),
+    let reserved = ticket.reserved().unwrap_or(0);
+    let oauth = ticket.oauth();
+    let (ticket, called) = match oauth {
+        Err(error) => (Some(ticket), Err(internal(error))),
         Ok(None) => {
             let credential = ticket.credential();
-            call_upstream(
+            let called = call_upstream(
                 shared,
                 &route,
                 parts,
@@ -238,42 +315,56 @@ async fn forward(
                 credential,
                 &[credential],
             )
-            .await
+            .await;
+            (Some(ticket), called)
         }
-        Ok(Some(grant)) => match crate::oauth_proxy::live(shared, &ticket, grant).await {
-            Err(error) => Err(error),
-            Ok((grant, retired)) => {
-                let mut tokens = grant.tokens();
-                tokens.extend(retired.iter());
-                call_upstream(
-                    shared,
-                    &route,
-                    parts,
-                    &rest,
-                    body,
-                    grant.access_token(),
-                    &tokens,
-                )
-                .await
-            }
-        },
+        Ok(Some(grant)) => {
+            let (ticket, lived) = crate::oauth_proxy::live(shared, ticket, grant).await;
+            let called = match lived {
+                Err(error) => Err(error),
+                Ok((grant, retired)) => {
+                    let mut tokens = grant.tokens();
+                    tokens.extend(retired.iter());
+                    call_upstream(
+                        shared,
+                        &route,
+                        parts,
+                        &rest,
+                        body,
+                        grant.access_token(),
+                        &tokens,
+                    )
+                    .await
+                }
+            };
+            (ticket, called)
+        }
     };
-    let reserved = ticket.reserved().unwrap_or(0);
-    {
-        let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
-        match &called {
-            Ok((_, Some(reported))) => broker.settle(ticket, *reported),
-            Ok((_, None)) => broker.settle_unmetered(ticket),
-            Err(_) => broker.settle_failed(ticket, reserved),
-        }
-    }
-    .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error))?;
-    called.map(|(response, _reported)| response)
+    let Some(ticket) = ticket else {
+        return called.map(|answered| answered.0);
+    };
+    let settled = match &called {
+        Ok((_, Some(spent))) => Settled::Spent(*spent),
+        Ok((_, None)) => Settled::Unmetered,
+        Err(_) => Settled::Failed(reserved),
+    };
+    let checked = match settled {
+        Settled::Failed(_) => Checked::default(),
+        Settled::Spent(_) | Settled::Unmetered => ask(shared, &asks).await.map_err(internal)?,
+    };
+    on_broker(shared, move |broker| {
+        broker.settle_checked(ticket, settled, &checked)
+    })
+    .await
+    .map_err(internal)?
+    .map_err(internal)?;
+    called.map(|answered| answered.0)
 }
 
 /// Sends the request upstream with the credential in the route's header,
 /// and answers the redacted response and the spend the upstream reported in
-/// the route's spend header, when it names one.
+/// the route's spend header, when it names one. An answer past
+/// [`MAX_BODY`] is refused `AnswerTooLarge`.
 async fn call_upstream(
     shared: &Shared,
     route: &Route,
@@ -282,7 +373,8 @@ async fn call_upstream(
     body: Bytes,
     credential: &Secret,
     hidden: &[&Secret],
-) -> Result<(Response, Option<u64>), (StatusCode, SecretsError)> {
+) -> Result<(Response, Option<u64>), Refused> {
+    let redactor = Redactor::new(hidden);
     let mut header_value = route.prefix.as_bytes().to_vec();
     header_value.extend_from_slice(credential.expose());
     let header_value = Secret::new(header_value);
@@ -292,13 +384,11 @@ async fn call_upstream(
         .map(|query| format!("?{query}"))
         .unwrap_or_default();
     let url = format!("{}/{rest}{query}", route.upstream.trim_end_matches('/'));
+    let carried = route.header.to_ascii_lowercase();
     let mut outgoing = HeaderMap::new();
     for (name, value) in &parts.headers {
         let lowered = name.as_str();
-        if lowered.starts_with("lys-")
-            || lowered == "host"
-            || lowered == route.header.to_ascii_lowercase()
-        {
+        if lowered.starts_with("lys-") || lowered == "host" || lowered == carried {
             continue;
         }
         outgoing.insert(name.clone(), value.clone());
@@ -335,7 +425,7 @@ async fn call_upstream(
                 StatusCode::BAD_GATEWAY,
                 SecretsError::Encoding {
                     context: "upstream call",
-                    reason: redact_text(&error.to_string(), hidden),
+                    reason: redactor.redact_text(&error.to_string()),
                 },
             )
         })?;
@@ -348,64 +438,18 @@ async fn call_upstream(
         .and_then(|text| text.trim().parse::<u64>().ok());
     let mut headers = HeaderMap::new();
     for (name, value) in upstream.headers() {
-        if hidden
-            .iter()
-            .any(|secret| contains(value.as_bytes(), secret.expose()))
-        {
+        if redactor.contains(value.as_bytes()) {
             continue;
         }
         headers.insert(name.clone(), value.clone());
     }
     headers.remove("content-length");
     headers.remove("transfer-encoding");
-    let answer: Bytes = upstream.bytes().await.map_err(|error| {
-        (
-            StatusCode::BAD_GATEWAY,
-            SecretsError::Encoding {
-                context: "upstream answer",
-                reason: redact_text(&error.to_string(), hidden),
-            },
-        )
-    })?;
-    let answer = hidden.iter().fold(answer.to_vec(), |text, secret| {
-        redact(&text, secret.expose())
-    });
-    let mut response = Response::new(Body::from(answer));
+    let answer = capped(upstream, MAX_BODY, &redactor)
+        .await
+        .map_err(|error| (StatusCode::BAD_GATEWAY, error))?;
+    let mut response = Response::new(Body::from(redactor.redact(&answer)));
     *response.status_mut() = status;
     *response.headers_mut() = headers;
     Ok((response, reported))
-}
-
-fn contains(haystack: &[u8], needle: &[u8]) -> bool {
-    !needle.is_empty()
-        && haystack
-            .windows(needle.len())
-            .any(|window| window == needle)
-}
-
-fn redact(haystack: &[u8], needle: &[u8]) -> Vec<u8> {
-    if needle.is_empty() {
-        return haystack.to_vec();
-    }
-    let mut out = Vec::with_capacity(haystack.len());
-    let mut at = 0;
-    while at < haystack.len() {
-        if haystack[at..].starts_with(needle) {
-            out.extend_from_slice(REDACTED);
-            at += needle.len();
-        } else {
-            out.push(haystack[at]);
-            at += 1;
-        }
-    }
-    out
-}
-
-fn redact_text(text: &str, hidden: &[&Secret]) -> String {
-    let redacted = hidden
-        .iter()
-        .fold(text.as_bytes().to_vec(), |text, secret| {
-            redact(&text, secret.expose())
-        });
-    String::from_utf8_lossy(&redacted).into_owned()
 }

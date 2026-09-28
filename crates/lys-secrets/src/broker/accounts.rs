@@ -82,7 +82,7 @@ impl<P: PermissionCheck> Broker<P> {
     ) -> Result<String, SecretsError> {
         let checked = self.presented(token, presentation).and_then(|record| {
             self.live(record, presentation)?;
-            self.permitted(record)?;
+            self.permitted(record, None)?;
             Ok(record.secret.clone())
         });
         match checked {

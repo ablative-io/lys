@@ -2,15 +2,25 @@
 //! standard input, grant and revoke its use, issue and drop handles, sign a
 //! presentation as an agent, read the audit log, and serve the proxy.
 
+#![warn(clippy::await_holding_lock)]
+
 mod args;
 mod callers;
 mod cli;
 mod files;
 mod manage;
 mod oauth_proxy;
+mod redact;
+#[cfg(test)]
+mod redact_tests;
 mod serve;
+#[cfg(test)]
+mod serve_tests;
 mod spice;
 mod view;
+#[cfg(test)]
+mod view_tests;
+mod watched;
 
 use std::io::{Read, Write};
 use std::process::ExitCode;
