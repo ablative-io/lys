@@ -1,15 +1,24 @@
 import { pendingGrantKey, readPendingGrant } from './pendingGrant';
 import { useRef, useState } from 'react';
-import { Refused, api, operationId } from '../../api';
+import { Refused, api, operationId, useLoad } from '../../api';
 import type { DelegateBody, Grant, PassOn } from '../../generated/grants';
 import { keyable } from '../../shell/keyable';
 import { useShell } from '../../shell/ShellContext';
 import { day } from '../file/time';
+import { readRoles } from '../roles/AssignedRoles';
 import { CannotGive } from './CannotGive';
 import { grantNo, nameOf, onText, passText, relationsOf, withinPassOn } from './model';
 import type { GrantWorld } from './model';
+import type { Role } from '../roles/contract';
 
 const DAY = 86400;
+
+/** The lease choice that binds the grant's end to one of the agent's role holdings. */
+const ASSIGNMENT = 'assignment:';
+
+/** The recipient's role holdings that end on a date, so a grant may end with one (conformance 4.5). */
+const roleHoldings = (roles: Role[], holder: string) => roles.flatMap((role) => role.holders.flatMap((h) =>
+  h.holder === holder && h.state === 'holding' && h.ends_at !== null ? [{ assignment: h.assignment, role: role.name, ends_at: h.ends_at }] : []));
 
 type Outcome =
   | { at: 'editing' }
@@ -43,8 +52,14 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
   const onward = source.pass_on.kind === 'to' && source.pass_on.recipients.includes('agent');
   const ends = source.window.ends_at;
   const now = Math.floor(Date.now() / 1000);
+  const roles = useLoad(readRoles, 'delegate-roles:' + recipient);
+  const holdings = roles.status === 'ok' ? roleHoldings(roles.data.roles, recipient) : [];
+  const chosen = holdings.find((h) => ASSIGNMENT + h.assignment === lasts);
+  const leaseKnown = !lasts.startsWith(ASSIGNMENT) || chosen !== undefined;
+  const noLater = (end: number) => (ends === null ? end : Math.min(ends, end));
   const endFor = (choice: string): number | null => {
-    if (choice === '7 days') return ends === null ? now + 7 * DAY : Math.min(ends, now + 7 * DAY);
+    if (choice === '7 days') return noLater(now + 7 * DAY);
+    if (chosen) return noLater(chosen.ends_at);
     return ends;
   };
 
@@ -122,7 +137,9 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         <label htmlFor="dLease">Lasts</label>
         <select id="dLease" value={lasts} onChange={(e) => setLasts(e.target.value)}>
           <option>7 days</option>
-          <option disabled title="not built yet">ends with assignment</option>
+          {holdings.length === 0
+            ? <option disabled title={roles.status === 'ok' ? 'the agent holds no role with an end date' : roles.status === 'loading' ? 'reading the agent\'s roles' : roles.refused.refusal.reason}>ends with assignment</option>
+            : holdings.map((h) => <option key={h.assignment} value={ASSIGNMENT + h.assignment}>ends with {h.role} assignment ({day(h.ends_at)})</option>)}
           <option>no end</option>
         </select>
       </div>
@@ -154,7 +171,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
       ) : null}
       {pending.kind === 'damaged' ? <p role="alert">The retained grant request could not be read. Sending is blocked until its original outcome is established.</p> : null}
       <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button className="btn primary" data-act="delegatedo" disabled={outcome.at === 'sending' || pending.kind === 'damaged' || !recipient || !relation} onClick={give}>
+        <button className="btn primary" data-act="delegatedo" disabled={outcome.at === 'sending' || pending.kind === 'damaged' || !recipient || !relation || !leaseKnown} onClick={give}>
           {pending.kind === 'held' ? 'Check original grant' : 'Give'}
         </button>
         <button className="btn" data-act="close" onClick={shell.closeAll}>Cancel</button>
