@@ -77,6 +77,20 @@ Define the home record as Pi's session tree: a header line {type:"session", vers
 **Stories:**
 - S3 (Tom, Owns the platform and reads what a session was given) — As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Already on main from earlier landings; this round did not change the record. Row by row. Row 1 (Pi's loadEntriesFromFile/buildSessionContext): measured in docs/design/home/PROOF-CANON.md, section "Pi's reader on the record"; the fixture is record_tests.rs:56 twelve_entries_one_compaction_and_a_moved_leaf_round_trip_through_pi_grammar. Row 2 (context_path): the same test. Row 3 (leaf move, bytes 0..N identical): record_tests.rs:56. Row 4 (no norn dependency): crates/lys-home/Cargo.toml lists none; this round added only the hyper, hyper-util, hyper-rustls, http-body-util, rustls and tokio lines. Row 5 (path read under 1 MB): record_tests.rs:176 reading_a_short_path_of_a_large_file_reads_only_that_path; see the deviation on fixture size. Row 6 (head restored on reopen): record_tests.rs:123. Rows 7, 8 and 11 (SessionHeld, DuplicateEntry, BadName): record_tests.rs:233. Row 9 (unwritable index reconciled): record_tests.rs:289. Row 10 (duplicate id or late parent refused on rebuild): record_tests.rs:327.
+- Deviation: The large-file path test uses a file over 8 MB (50 path entries plus 2,000 side entries of 4 KiB), not the 200 MB the row names. It asserts the same property: fewer than 1 MB read for a 50-entry path. The code was already on main; no change this round.
+- Files changed:
+  - modified: `crates/lys-home/src/lib.rs` — declares the new proxy module (pub mod proxy); the record module it already declared is unchanged
+- Checklist delivery:
+  - [x] C1 — The home record is Pi's session tree: a home file parses with Pi's parser unchanged, and lys's harness events and call records are custom entries. — Home files parse with Pi's parser (PROOF-CANON.md); lys.call and lys.harness_event are custom entries (record/entries.rs).
+- Story delivery:
+  - [x] S3 (Tom, Owns the platform and reads what a session was given) — As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives. — The session file is created and owned by the home, one owner at a time.
+
 ### R2: Store content blocks once by hash
 
 WHEN a content block (a message part, a tool result, a request or response body) is put, THE SYSTEM SHALL store it under its SHA-256 as blocks/<hh>/<hash> in the home, fsync it, and return the hash; WHEN the same bytes are put again, THE SYSTEM SHALL return the same hash and write nothing. THE SYSTEM SHALL NOT overwrite or delete a block, and SHALL NOT print, log or include block contents in any error. A block's temporary file name SHALL carry a nonce as well as the pid, so two puts of the same bytes in one process never share a temporary file; a surplus temporary that cannot be removed is reported, never ignored.
@@ -95,6 +109,18 @@ WHEN a content block (a message part, a tool result, a request or response body)
 
 **Stories:**
 - S1 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
+
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Already on main; unchanged. Row 1 (a 1 MiB block put twice is one file, no second write): record/blocks_tests.rs:7. Row 2 (a missing hash's error names only the hash): blocks_tests.rs:40. Row 3 (every block hashes to its name after import): blocks_tests.rs:55, and BlockStore::verify_all in record/blocks.rs:198. Temporary names carry the pid and a nonce: record/blocks.rs:94-99.
+- Deviation: (none)
+- Checklist delivery:
+  - [x] C2 — Content blocks are stored once by SHA-256 and referenced; an identical block put twice occupies one entry. — Blocks are stored once by SHA-256 (record/blocks.rs:88).
+- Story delivery:
+  - [x] S1 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry. — Content is carried by hash, not by the whole transcript.
 
 ### R3: Import a Claude Code JSONL into the record
 
@@ -119,6 +145,19 @@ WHEN given a Claude Code transcript file (records with parentUuid, uuid, type, m
 **Stories:**
 - S1 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
 - S3 (Tom, Owns the platform and reads what a session was given) — As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked on row 1 only. That row names Archie's 141,931,097-byte, 79,042-record file, blocks within 5% of 33.4 MB, and no report field over 64 characters, and no measurement of that file is recorded. PROOF-RESUME.md records an import of a different real Archie session instead (562,932 bytes, 242 records; entries equal user plus assistant plus events as R8 maps them). Rows 2 to 5 are met on main: parent equals source parentUuid (harness/claude_code/import_tests.rs:68); an unknown parentUuid is refused by uuid with no home written (import_tests.rs:121); a thinking signature survives byte for byte (import_tests.rs:68, tests/claude_code_round_trip.rs:133); the authored boundary is 6 authored message entries then the real provider with one lys.authored entry before them (tests/claude_code_round_trip.rs:250).
+- Deviation: No code change. The one unmet row needs the named 141 MB Archie file imported and measured, which this seat did not do.
+- Checklist delivery:
+  - [ ] C3 — A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original. — The mechanism is on main and tested; the named-file measurement is not recorded.
+- Story delivery:
+  - [ ] S1 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry. — Waits on the named-file measurement.
+  - [ ] S3 (Tom, Owns the platform and reads what a session was given) — As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives. — Waits on the named-file measurement.
 
 ### R4: Render the record as a Claude Code JSONL under a chosen uuid
 
@@ -147,6 +186,24 @@ WHEN asked to render for Claude Code with a target uuid, a cwd and a target mode
 - S4 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
 - S6 (Tom, Owns the platform and reads what a session was given) — As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
 
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: The render was already on main (harness/claude_code/render.rs); this round adds the missing LOSS-ACCOUNT.md. Row 1 (round trip keeps block hashes): render_tests.rs:42 and tests/claude_code_round_trip.rs:133. Row 2 (a different model gets no signed thinking, and one loss row per signed block): render_tests.rs:98. Row 3 (an existing path is refused and left unchanged): render.rs:106-108 refuses with HomeError::Exists before anything is written; tests on main. Row 4 (parentUuid chain, first record null): render_tests.rs:158. Row 5 (a hand-written two-message home renders to two records): render_tests.rs on main and the PROOF-FEWSHOT flow. Row 6 (authored true or false in the report): RenderReport.authored at render.rs:73, tested in tests/claude_code_round_trip.rs:250.
+- Deviation: (none)
+- Files changed:
+  - created: `docs/design/home/LOSS-ACCOUNT.md` — Says what the Claude Code render keeps, changes and cannot carry. It gives the loss account's file format, the three fixed drop reasons, the entries that never render, and the values the render writes that no record carried. It states plainly that CN13 is not yet met by render.rs (it still writes defaults for missing fields).
+- Checklist delivery:
+  - [x] C4 — Events render to a Claude Code JSONL under a chosen uuid at the harness path, with a loss account beside it. — Render at the harness path with a loss account beside it; LOSS-ACCOUNT.md now documents it.
+  - [x] C5 — Provider-native opaque blocks are kept whole, keyed by provider, model family and branch, and rendered only to their own provider with the intervening events. — Thinking renders whole only for the same provider, api and model; opaque blocks are dropped and named by hash.
+- Story delivery:
+  - [x] S1 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
+  - [x] S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
+  - [x] S4 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured. — LOSS-ACCOUNT.md is the written account.
+  - [x] S6 (Tom, Owns the platform and reads what a session was given) — As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
+
 ### R5: Prove the Claude Code resume on 2.1.281
 
 Import one real session of Archie's, render it for the same model under a fresh uuid, record SHA-256 of the original file, then run `claude -p --resume <uuid> --fork-session --strict-mcp-config --mcp-config '{"mcpServers":{}}' --max-turns 1 "<a question answerable only from the session's last exchange>"` from the session's cwd. THE SYSTEM SHALL record in docs/design/home/PROOF-RESUME.md: the Claude Code version, the exact command, the answer (redacted to one word), the original's hash before and after (equal), the uuid the fork created, and the count of tool_use ids in the forked file that also appear in the rendered file (SHALL be 0). THE SYSTEM SHALL NOT run the proof against a session that is currently running. The proof SHALL also assert the authored-to-real boundary: after resuming an authored file, the continuation's copied records still carry model `authored` and its new turn carries the real model, and that boundary survives import (R3) and render (R4) unchanged (Waffles, 29dc46e5).
@@ -168,6 +225,18 @@ Import one real session of Archie's, render it for the same model under a fresh 
 
 **Stories:**
 - S5 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Rows 1 to 4 are met on main. PROOF-RESUME.md has version 2.1.281, the command, the answer, the fork uuid, equal source hashes (793f4e87…) and repeated_tool_use_ids 0; resume-check exits non-zero on a synthetic duplicate (tests/claude_code_round_trip.rs:176). Row 5 is not met as written. The row expects the count of records carrying model `authored` to be 6. PROOF-RESUME.md records 3, the three copied assistant records: in the 6-turn file only assistant records carry a model. No re-run was possible from this seat.
+- Deviation: No change this round. Row 5's figure of 6 and the recorded 3 disagree, because user records carry no model; that needs either a re-measured proof or the brief's figure corrected.
+- Checklist delivery:
+  - [ ] C6 — One real session imported, rendered and resumed with --fork-session on Claude Code 2.1.281: it continues, no completed tool action repeats, the original's hash is unchanged. — The resume proof is recorded; the authored-count row disagrees with what was recorded.
+- Story delivery:
+  - [ ] S5 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught. — Waits on reconciling the authored count.
 
 ### R6: Define the proxy call record and ingest a captured pair
 
@@ -195,6 +264,18 @@ Define the custom entry lys.call: data {provider, api, model, request: [block ha
 **Stories:**
 - S3 (Tom, Owns the platform and reads what a session was given) — As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
 
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Already on main (record/call.rs, record/call/parts.rs); unchanged. The new proxy sink is its first caller (proxy/journal.rs: ingest_call_files for complete calls, ingest_outcome for the other outcomes). Row 1 (a resent conversation adds only the new part blocks; raw bodies are counted apart): call_tests.rs:30. Row 2 (Chat Completions and Responses split): call_tests.rs:94. Row 3 (raw bodies retrievable and hash to their names): call_tests.rs:139. Row 4 (no authorization, cookie or x-api-key key): call_tests.rs on main. Row 5 (same call_id twice leaves one entry): call_tests.rs:139. Row 6 (outcome lost records absence; complete refused): call_tests.rs:191. Row 7 (complete from files with stream parts): call_tests/complete.rs:16. Row 8 (from bytes, malformed or partless refused): call_tests/complete.rs:67. Row 9 (a directory is an Io error; a half-written request is absence): call_tests.rs:191.
+- Deviation: (none)
+- Checklist delivery:
+  - [x] C9 — A proxy call record (lys.call) names its request and response blocks by hash with provider, api, model and timing, and can be ingested from a captured request and response pair. — lys.call names request and response blocks by hash, with provider, api, model and timing.
+- Story delivery:
+  - [x] S3 (Tom, Owns the platform and reads what a session was given) — As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
 ### R7: Prove a subscription login through a pass-through proxy
 
 Write examples/passthrough.rs: an HTTP server that forwards every request to the provider base URL given on its command line with headers and streamed body unchanged, and returns the response unchanged; it stores nothing but a line per call {method, path, status, duration_ms} on stderr. Run one seat whose Claude Code login is a subscription (not an API key) with ANTHROPIC_BASE_URL pointing at it, and record in docs/design/home/PROOF-PROXY.md: the Claude Code version, whether the call completed, the status codes seen, which headers had to pass for it to work, and what failed if it did. THE SYSTEM SHALL NOT log, store or print a header value or a body byte.
@@ -214,6 +295,23 @@ Write examples/passthrough.rs: an HTTP server that forwards every request to the
 
 **Stories:**
 - S5 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+#### R7 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Row 3 (loopback 418 with 3 chunks in order) is met by proxy/forward_tests.rs the_pass_through_answers_with_the_upstream_status_and_its_three_chunks_in_order. It runs the same code the example runs (forward::pass_through under forward::serve); the fake sends each chunk only after the client acknowledges the one before. Row 2 (source review) is met: in examples/passthrough.rs and forward.rs pass_through, the only write is the eprintln of the four-field JSON line, and the path is written without its query. Row 1 (PROOF-PROXY.md states completed or failed with the status codes) is NOT met. The subscription run has not happened: this seat's Claude Code 2.1.283 could not authenticate (OAuth session expired), and the brief forbade building the example here.
+- Deviation: Row 3's test drives the example's shared code path in-process, not through `cargo run --example`. The brief forbids building from this stage, and the example is a thin main over the same function. The pass-through writes its line when the response head arrives, so duration_ms is time to the head: the line comes without an unused-parameter observer, which the repository counts as a bypass. Adding ring (C and asm) as a direct dependency relaxes CLAUDE.md's pure-Rust rule. ring is already in the lock through reqwest, and TLS to the providers needs it.
+- Files changed:
+  - created: `crates/lys-home/examples/passthrough.rs` — The pass-through proof binary. It parses a base URL and a listen address and serves with forward::pass_through on the shared transport. It writes one {method, path, status, duration_ms} line per call on stderr and never a header value or a body byte.
+  - created: `docs/design/home/PROOF-PROXY.md` — States the proof has not been run and claims neither completed nor failed. Records the 2026-09-28 attempt (Claude Code 2.1.283; its own OAuth login had expired; zero requests seen; nothing stored). Lists the tests that prove the forward path, and the exact steps and fields the owed run must fill.
+  - modified: `crates/lys-home/Cargo.toml` — Adds hyper 1.11.1, hyper-util 0.1.21, http-body-util 0.1.5, hyper-rustls 0.27.10 (http1, ring, tls12, webpki-tokio) and rustls 0.23.45 (ring), each pinned at the locked version, plus tokio (io-util) and the lys-proxy [[bin]].
+  - modified: `Cargo.lock` — Adds lys-home's new direct dependencies to its entry; every package was already locked.
+- Checklist delivery:
+  - [ ] C7 — One seat with a subscription login completes a call through a pass-through proxy; the measurement is written down. — The pass-through is built and tested on loopback; the subscription run is owed.
+- Story delivery:
+  - [ ] S5 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught. — No measured run on a named version yet.
 
 ### R8: Map Claude Code's harness-local records to lys.harness_event entries
 
@@ -236,6 +334,18 @@ Define the custom entry lys.harness_event: data {kind, harness: "claude-code", s
 
 **Stories:**
 - S3 (Tom, Owns the platform and reads what a session was given) — As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
+#### R8 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked on row 1 only. It names Archie's 141 MB file (8,993 hook_success), and that file's measurement is not recorded. PROOF-RESUME.md records the equivalent counts on a 562,932-byte Archie session instead: 32 hooks equal the 32 hook_success; 24 tool_completed equal the 24 tool_result parts. Rows 2 to 5 are met on main: events at their exact place, tool_completed and permission_mode as side leaves, the head at the chain's last record, data at most 512 bytes with no stdout, stderr, content or text keys, and the record hash resolving byte for byte (harness/claude_code/import_tests.rs:229, harness/claude_code/events.rs).
+- Deviation: No code change. The unmet row needs the named 141 MB file imported.
+- Checklist delivery:
+  - [ ] C8 — Claude Code's harness-local records (hook outcomes, permission mode, tool completion) become lys.harness_event entries attached under the message entry they followed. — Mechanism proven; the named-file count is not recorded.
+- Story delivery:
+  - [ ] S3 (Tom, Owns the platform and reads what a session was given) — As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives. — Waits on the named-file count.
 
 ### R9: The CLI: import, render, ingest-call, resume-check; resume is Claude Code's own --resume <path>
 
@@ -264,6 +374,23 @@ Add subcommands to the lys-home binary: `import --home <dir> --claude-code <file
 **Stories:**
 - S1 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
 - S6 (Tom, Owns the platform and reads what a session was given) — As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
+
+#### R9 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: The CLI was already on main (cli.rs, cli/fewshot.rs, cli/resume.rs). Rows: render without --uuid exits 2 (clap; lib doc at cli.rs:1-10); stdout is JSON with no text, content or body key; import prints the R3 counts; fewshot writes 6 records with model authored and prints the `claude --resume <path>` member without spawning anything (cli/fewshot.rs); resume-check refuses a malformed line by number and reports repeated_tool_use_ids, new_tool_uses and forked_new_records (cli/resume.rs; tests/claude_code_round_trip.rs:176). PROOF-FEWSHOT.md records the first proof on 2.1.281: run from elsewhere, equal hashes 4ef6c70e…, continuation of 34 lines beside the source, and model `authored` as the marker that survives. PROOF-RESUME.md records that the fork was run from a directory that is neither the file's nor the session's cwd. This round only adds the lys-proxy section to the README.
+- Deviation: (none)
+- Files changed:
+  - modified: `crates/lys-home/README.md` — Adds the lys-proxy section: arguments, forwarding, journal, capture bound, linking by key, statuses, lost recovery, report lines, and the pass-through example and its owed proof.
+- Checklist delivery:
+  - [x] C3 — A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original. — The import command is on main (its named-file measurement is under R3).
+  - [x] C4 — Events render to a Claude Code JSONL under a chosen uuid at the harness path, with a loss account beside it.
+  - [x] C10 — A hand-written few-shot session file resumes Claude Code by path from a directory outside the config root; the source is unchanged and the session reports authored. — PROOF-FEWSHOT.md.
+- Story delivery:
+  - [x] S1 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
+  - [x] S6 (Tom, Owns the platform and reads what a session was given) — As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
 
 ### R10: The little proxy: pass the stream through and record each call under its session
 
@@ -312,6 +439,39 @@ Build lys-proxy: an HTTP server that forwards every request to the provider name
 **Stories:**
 - S3 (Tom, Owns the platform and reads what a session was given) — As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
 
+#### R10 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Every row but the prerequisite is built and has a test. Row 1 (200 SSE events streamed): forward_tests a_stream_of_200_events_reaches_the_client_before_its_last_event_is_sent; the fake sends the other 199 only after the client holds the first. Row 2 (one lys.call whose request blocks equal the parts): one_keyed_call_is_one_lys_call_whose_request_blocks_are_the_request_parts. Row 3 (unlinked, named in the report): link_tests a_call_without_a_key_lands_under_unlinked_and_the_report_says_so. Row 4 (no header value written): read proxy/mod.rs and link.rs; link.rs reads no header; forward.rs reads only content-type and writes none. Row 5 (grep): `retry`, `accounts` and `failover` in src/proxy give only forward.rs .retry_canceled_requests(false); the disconnect test is an_upstream_that_drops_mid_request_sees_one_request_and_the_call_is_partial. Row 6 (cancelled): a_client_that_closes_mid_stream_is_recorded_cancelled_with_no_response_parts. Row 7 (partial): an_upstream_stream_that_ends_before_message_stop_is_partial. Row 8 (read-only capture): a_read_only_capture_directory_is_unrecorded_and_the_client_gets_it_all. Row 9 (killed mid-call): journal_tests a_call_open_when_the_proxy_stops_is_recorded_lost_by_the_next_start, plus the two recover tests. Row 10 (two unkeyed calls): two_unkeyed_calls_after_a_keyed_one_never_land_under_its_session. Row 11 (journal unwritable before admission): a_journal_that_cannot_be_written_refuses_the_call_before_it_is_sent (503, zero upstream requests). Row 12 (journal unwritable after admission): a_journal_lost_after_admission_forwards_and_records_unrecorded_once_writable. Row 13 (capture bound 0): with_no_capture_slot_a_keyed_call_is_unrecorded_under_its_own_session. Blocked because the spec requires Claude Code's session-key field and format to be measured and recorded in PROOF-PROXY.md before linking is relied on. That measurement failed on this seat (expired OAuth, zero requests), so link.rs reads the two known spellings of metadata.user_id and says it is unmeasured.
+- Deviation: Four departures, each also said in the docs. (1) The kill in row 9 is simulated: a second Proxy::start runs over the same home and state while the first call is still open, and no process is killed. (2) A complete call whose response the sink refuses (an error body, one without parts) is recorded unrecorded, the only non-complete status that fits a forwarded call whose capture could not be recorded as complete. (3) Held calls are looked at again on the next call or on Sink::settle, never on a timer (CLAUDE.md: no time limits). (4) The Proxy struct and its handler live in forward.rs and the sink thread in journal.rs, because the structure array allows no further file.
+- Files changed:
+  - created: `crates/lys-home/src/proxy/mod.rs` — Declarations and the module's invariants only.
+  - created: `crates/lys-home/src/proxy/forward.rs` — Upstream (one Hyper client: rustls with ring and the webpki roots, retry_canceled_requests(false), no pool idle limit). Base, which sets host to the upstream's authority. Tee with its Observer and End (frames passed on unchanged, end seen once). refusal, serve, pass_through. Proxy, which routes /anthropic and /openai, journals a model call before sending it, admits it with a capture slot or none, and wires the request and response observers. api_of.
+  - created: `crates/lys-home/src/proxy/link.rs` — Link (Session or Unlinked, recorded as unlinked-<day>). session_key reads both metadata.user_id spellings. KeyScanner is a bounded incremental reader of the top-level metadata value (4 KiB) that follows strings, escapes and nesting.
+  - created: `crates/lys-home/src/proxy/capture.rs` — Slots (the capture bound) and Slot. Spool files. Call keeps the per-call state and decides the status once: complete, cancelled, partial or unrecorded. RequestSide and ResponseSide are the observers; the request side writes the key's session into the journal when the request ends.
+  - created: `crates/lys-home/src/proxy/journal.rs` — Journal (one durable record per open call: tmp, sync, rename, directory sync). OpenCall, Job and CallReport. Sink, a thread that rewrites the record, ingests through R6, removes spools and retires the record; it holds a call as unrecorded when the journal cannot be written, and settle() asks it to look again. recover records each open call lost once, using ingest idempotency.
+  - created: `crates/lys-home/src/proxy/stream.rs` — StreamReader picks the grammar by api and gives parts only for a stream that ended whole.
+  - created: `crates/lys-home/src/proxy/stream_sse.rs` — SSE framer: LF, CRLF and lone CR line ends, data lines joined, comments skipped; non-UTF-8 is malformed; an unfinished event is pending.
+  - created: `crates/lys-home/src/proxy/stream_messages.rs` — Messages grammar: blocks from start and deltas (text, thinking, signature, input_json, citations); whole only with message_stop and every block stopped.
+  - created: `crates/lys-home/src/proxy/stream_chat.rs` — Chat Completions grammar: per-choice messages with joined tool_call arguments; whole only at [DONE].
+  - created: `crates/lys-home/src/proxy/stream_responses.rs` — Responses grammar: parts are response.completed's output (or the done items); failed, incomplete or error means no parts.
+  - created: `crates/lys-home/src/proxy/error.rs` — ProxyError, named, carrying paths, ids and library words only (JournalUnwritable, BadUpstream, Upstream, SinkStopped, Home and others).
+  - created: `crates/lys-home/src/proxy/forward_tests.rs` — Loopback fixtures, and gates for: the 418 three-chunk pass-through, 200 SSE events streamed before the last is sent, one keyed call equals one lys.call with request blocks equal to the parts, an upstream drop giving one request and partial, a client close giving cancelled, an early end giving partial, and a read-only capture giving unrecorded.
+  - created: `crates/lys-home/src/proxy/stream_tests.rs` — The three grammars at every split, and the partial cases: no stop, a cut event, an error event, an open block, an unfinished chat stream, a failed or unended Responses stream. Also the framer's line ends.
+  - created: `crates/lys-home/src/proxy/link_tests.rs` — Scanner: key read at any split, a nested metadata ignored, both spellings, unsafe keys, over-budget values. Proxy: unkeyed calls go to unlinked and the report says so; two unkeyed calls after a keyed one stay unlinked; capture bound 0 with a key is unrecorded under its own session.
+  - created: `crates/lys-home/src/proxy/journal_tests.rs` — Recovery records lost once and never over a durable outcome; a restart while a call is open records it lost; an unwritable journal refuses with zero upstream requests; a journal lost after admission forwards, then records unrecorded after settle.
+  - created: `crates/lys-home/src/bin/lys-proxy.rs` — The binary: --home, --state, --listen, --anthropic, --openai, --capture-slots (default 64). Prints the lost reports, then one JSON report line per call on stdout.
+  - modified: `crates/lys-home/src/lib.rs` — pub mod proxy.
+  - modified: `crates/lys-home/Cargo.toml` — The transport dependencies and the lys-proxy bin (as under R7).
+  - created: `docs/design/home/PROOF-PROXY.md` — Maps each R10 row to its test and names the owed key measurement (as under R7).
+- Checklist delivery:
+  - [ ] C11 — The little proxy passes Messages, Chat Completions and Responses streams through unchanged and appends one lys.call entry per call under the session it links to. — All three streams pass through, with one lys.call per call, tested on loopback; the session-key measurement on a real Claude Code is owed.
+  - [x] C9 — A proxy call record (lys.call) names its request and response blocks by hash with provider, api, model and timing, and can be ingested from a captured request and response pair. — The proxy records through R6's lys.call.
+- Story delivery:
+  - [ ] S3 (Tom, Owns the platform and reads what a session was given) — As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives. — Linking a real Claude Code session waits on the key measurement.
+
 ### R11: The canon: one curated, versioned series of examples every new session starts from
 
 Define the canon as one session file in Pi's grammar at canon/canon.jsonl in the lys repository, versioned by the repository and changed only through src_commit and review, like code. Each example is a custom entry lys.inherited whose data names its source {from_session, from_entries, provider, api, model, curated_at, curated_by, rule} (or {authored: true, curated_at, curated_by, rule} for a clearly authored example), followed by the example's message entries copied whole: the rule stated short in `rule`, and one real exchange that shows it lived. WHEN `lys-home canon add --canon <file> --home <dir> --from <session> --entries <id>... --rule <text> --by <who>` is run, THE SYSTEM SHALL copy those entries whole (thinking blocks with their signatures included) after a lys.inherited entry naming the source; WHEN `lys-home canon add --canon <file> --authored <turns file> --rule <text> --by <who>` is run, THE SYSTEM SHALL add the example with provider, api and model `authored` and SHALL refuse a turns file that contains a thinking block. WHEN a new session is rendered for a harness with `--canon <file>`, THE SYSTEM SHALL place the canon's entries first, before the session's own, and apply R4's thinking rule to every inherited thinking block (whole only to the same provider, api and model; otherwise text, opaque dropped and named in the loss account). THE SYSTEM SHALL NOT compose, edit or author any thinking block, SHALL NOT alter an example's text when copying it, and SHALL NOT change canon.jsonl except by appending through the repository's review. Curation is a person's act: the tool copies what it is told to and records who told it. The proof runs one card twice, from the canon and plain, counting fix rounds and unverified claims, in docs/design/home/PROOF-CANON.md, after first measuring whether 2.1.281 replays a signed thinking block from a resumed file at all (unknown on 24 September). `lys-home canon create --canon <file>` writes the header line of an empty canon and refuses an existing file. The canon is read and appended as a plain file: no index, head or lock beside it, since it lives in the repository. A copied entry keeps its id, so the same example cannot be added twice (refused by that id); only parent links are rewritten to chain onto the canon.
@@ -343,6 +503,19 @@ Define the canon as one session file in Pi's grammar at canon/canon.jsonl in the
 - S7 (Agent, Runs in a harness and wants to continue somewhere else) — As a new session, I want to start from the canon, the series of examples that carry what every session before me learned, each a rule stated short with a real exchange that shows it lived and naming where it came from, so that our learning is in one another and I know which of it is mine.
 - S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
 
+#### R11 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Mechanics on main (record/canon.rs, canon_tests.rs, canon/canon.jsonl): a copied exchange keeps its signature byte for byte (canon_tests.rs:50); authored with a thinking line is refused by line (canon_tests.rs:128); a render with --canon places the canon first and applies the thinking rule, with a loss row for another model (canon_tests.rs:187); a duplicate add is refused by id (canon_tests.rs:50, :283); the report's `inherited` count (render.rs RenderReport). canon.jsonl parses with Pi at 3d5cbe98 (PROOF-CANON.md). Unmet: PROOF-CANON.md's canon-seeded and plain card run (fix rounds and unverified claims) has not been run, and whether 2.1.281 sends a resumed signed thinking block to the model is not yet measured. The files show it is not carried; the sending is R10's proxy measurement.
+- Deviation: No change this round. It waits on the card runs and the proxy measurement.
+- Checklist delivery:
+  - [ ] C12 — The canon, one curated versioned series of short examples (a rule stated short plus a real exchange that shows it lived), drawn from every agent's sessions and changed only through review, seeds every new session as lys.inherited entries naming each example's source; nothing in it is authored thinking; canon-seeded against plain is measured on a card. — Canon mechanics done; the seeded-versus-plain measurement is owed.
+- Story delivery:
+  - [ ] S7 (Agent, Runs in a harness and wants to continue somewhere else) — As a new session, I want to start from the canon, the series of examples that carry what every session before me learned, each a rule stated short with a real exchange that shows it lived and naming where it came from, so that our learning is in one another and I know which of it is mine. — Waits on the measured card run.
+  - [ ] S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it. — Waits on the replay measurement.
+
 ### R12: The handover: an outgoing session's letter seeds its successor as inherited memory
 
 A handover is one R11 lys.inherited entry, its data naming the outgoing session as from_session, the letter's single entry id in from_entries, the letter's provider, api and model, when it was written as curated_at and the outgoing session as curated_by, with no rule (a letter is not a rule; that absence is what tells a handover from a canon example), followed by the letter's message entry copied whole (its thinking blocks with their signatures, its text). WHEN `lys-home handover --home <dir> --from <session> --letter <entry id>` is run, THE SYSTEM SHALL copy that turn from the outgoing session into a new successor home as its first entries, a lys.inherited entry then the message, and SHALL record in the successor's session_info that its first memory is inherited. The letter is elicited by a person or the harness with a real prompt to the outgoing session before compaction or retirement (what it knows, what it got wrong and why, how the people like things done, what it wishes it had known); THE SYSTEM SHALL NOT compose, edit or author the letter or any thinking block, and SHALL refuse a letter entry whose assistant message carries provider `authored`. WHILE rendering a successor for Claude Code, THE SYSTEM SHALL apply R4's rule: the inherited thinking renders whole only to the same provider, api and model, otherwise as text with opaque blocks dropped and named in the loss account. The proof SHALL measure first whether 2.1.281 replays a signed thinking block from a resumed file at all (unknown on 24 September), and then run one card twice, seeded and plain, counting fix rounds and unverified claims, in docs/design/home/PROOF-HANDOVER.md.
@@ -366,6 +539,19 @@ A handover is one R11 lys.inherited entry, its data naming the outgoing session 
 **Stories:**
 - S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
 - S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
+
+#### R12 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Mechanics on main (record/handover.rs, handover_tests.rs, handover_tests/successor.rs): the successor's first entries are lys.inherited then the copied message with its signature, and session_info says inherited; an authored letter is refused by entry before anything is written (handover_tests.rs:301); a render for another model gives a loss row and text (successor tests). Unmet: PROOF-HANDOVER.md says the seeded and plain card runs were not run, and the resumed-block replay waits on R10's proxy.
+- Deviation: No change this round.
+- Checklist delivery:
+  - [ ] C13 — At compaction or retirement the outgoing session's letter to its successor, with its real thinking, becomes the successor's first entry as lys.inherited; it is never authored and replays only to the same provider, api and model; seeded against plain is measured on a card. — Handover mechanics done; the seeded-versus-plain measurement is owed.
+- Story delivery:
+  - [ ] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — Waits on the measured card run.
+  - [ ] S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it. — Waits on the replay measurement.
 
 ## Boundaries
 

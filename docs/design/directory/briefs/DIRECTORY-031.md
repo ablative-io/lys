@@ -77,18 +77,21 @@ Structural. Write docs/design/identity/CAPABILITY-CLAIM.md as the design round's
 **Dev (recorded):**
 
 - Status: implemented
-- How: The draft states the claim format, its placement and its verifier's refusals as prose a second party can check against. It proposes .2.1 under the .2 family arc and leaves .1 and .2 themselves unused. In this round the design leg failed only because the rendered brief markdown lagged its JSON. Re-rendering it fixes the cause, and gate.sh exits 0.
-- Deviation: I ran scripts/design/render-cluster.py and scripts/design/gate.sh to fix the failed design leg and to confirm the fix. I also ran git fetch plus read-only git show and cat-file on origin/main to re-run the brief's blocked_by checks. I ran no cargo command and made no commit.
+- How: Checked row by row against the tree.
+- Headings: CAPABILITY-CLAIM.md's ten second-level headings are, in order, Transport … Status (grep '^## ').
+- Literal strings: every required string is present, and claim_expired and claim_not_yet_valid each count 0.
+- Hex vectors: the three claim vectors (84, 38 and 55 bytes) and the AKI vector 30168014324be2dea8bc44461b0233e51fa48902ed6b1cc6 are in the Encoding and Issuer key identifier sections. The AKI vector was recomputed independently: the pure-Python Ed25519 public key for seed 0x07 is ea4a6c63…, and the SHA-256 of its SPKI starts 324be2dea8bc…. The draft still states that the fingerprint is new and is not the SHA-256 of a certificate's DER.
+- WIRE-FORMATS.md: against f6f18d3~1, `git diff --numstat` gives 4 added and 2 deleted. Both ratification sentences are in the new wording (lines 3 and 210). D1 to D6 are byte-identical (lines 202-207). The pointer line (line 44) names docs/design/identity/CAPABILITY-CLAIM.md. D7 carries lys/agent-capability/v1, 1.3.6.1.4.1.66364.2.1 and PROPOSED, and does not carry RATIFIED.
+- PEN-REGISTRATION.md: +1/-1. The .2 row (line 63) contains `.2.1`, `lys/agent-capability/v1`, `family arc` and the purpose words, and its last cell is still `Reserved`.
+- crates/: `git diff --stat -- crates/` prints nothing.
+- Deviation: R1 was already on main before this round, so it was verified rather than written. This round edited R1's files, which the brief allows only through R2's amend-and-repeat rule, and D7 was corrected with the draft because it carried the same wrong citation. The brief's own Purpose and Task text still says 'RFC 7093 section 2, method 1'. That text is wrong about the RFC while its pinned bytes are right. I did not edit the brief. Its wording needs a brief revision before ratification. CN1 reads 'nothing outside docs/design/directory/…', but R1's and R2's own file lists name docs/design/identity and WIRE-FORMATS.md, and I followed the requirements' file lists.
 - Files changed:
-  - created: `docs/design/identity/CAPABILITY-CLAIM.md` — The draft of lys/agent-capability/v1 under the proposed OID 1.3.6.1.4.1.66364.2.1. It covers the deterministic CBOR (keys 1 content type, 2 holder, 3 grants; each grant has 1 id and 2 not-before, and 3 not-after only when the window has an end; grants sorted by id, no duplicates) and the RFC 7093 method 1 Authority Key Identifier. It gives verify_agent_capability's refusal order and the pinned vectors. Unchanged this round.
-  - modified: `docs/design/WIRE-FORMATS.md` — The two ratification sentences are replaced, a pointer to the draft is added, and a D7 PROPOSED row is added. D1 to D6 are byte-identical. Unchanged this round.
-  - modified: `docs/PEN-REGISTRATION.md` — Only the .2 row changed. It now names .2.1 as proposed for lys/agent-capability/v1 and keeps its stated purpose, including 'allocated when the agent-identity design lands'. The status cell stays Reserved. Unchanged this round.
-  - modified: `docs/design/directory/briefs/DIRECTORY-031.md` — Re-rendered from DIRECTORY-031.json after the workflow wrote this round's review blocks, so the design gate's byte comparison passes.
-  - modified: `docs/design/directory/briefs/DIRECTORY-031.json` — Holds the dev and review blocks the workflow wrote. I did not edit it by hand.
+  - modified: `docs/design/identity/CAPABILITY-CLAIM.md` — The proposal, already on main from f6f18d3, amended from R2's review. A1: the issuer-key fingerprint is now defined by its bytes, the leftmost 160 bits of the SHA-256 of the whole DER SPKI, as rcgen 0.13 writes it. The text says this is RFC 7093 method 4 truncated, not method 1, and pins the method 1 value fe812c12… for the 0x07 key as refused. A2: step 2 compares the whole AKI value byte for byte against 30168014 followed by the fingerprint, and names the refusal for duplicate extensions. A3: a text key 1 other than v1 is claim_version_unknown whatever the other members are. All pinned vectors are unchanged.
+  - modified: `docs/design/WIRE-FORMATS.md` — Only R1's own D7 row changes: its description no longer calls the identifier RFC 7093 method 1 and states the SPKI-hash construction. The row is still PROPOSED. Against the pre-R1 base f6f18d3~1 the file is still +4/-2, and D1 to D6 are untouched.
 - Checklist delivery:
-  - [x] C249 — docs/design/identity/CAPABILITY-CLAIM.md proposes lys/agent-capability/v1 under the proposed OID 1.3.6.1.4.1.66364.2.1, alongside the unchanged .1 extension transport, stating its transport, assertion, encoding, issuer key identifier (the 20-byte RFC 7093 method 1 keyid, a new issuer-key fingerprint), scope, verifier check, rendering consumer, revocation, issuer and anchor, and status; docs/design/WIRE-FORMATS.md carries it as PROPOSED and both of its ratification sentences name the owning lead with a second reader, with D1 to D6 unchanged; and the .2 row of docs/PEN-REGISTRATION.md keeps .2 a family arc and records .2.1 for the typed capability claim. — The draft is written and the pointers are added. The .2 row stays Reserved and D7 stays PROPOSED.
+  - [x] C249 — docs/design/identity/CAPABILITY-CLAIM.md proposes lys/agent-capability/v1 under the proposed OID 1.3.6.1.4.1.66364.2.1, alongside the unchanged .1 extension transport, stating its transport, assertion, encoding, issuer key identifier (the 20-byte RFC 7093 method 1 keyid, a new issuer-key fingerprint), scope, verifier check, rendering consumer, revocation, issuer and anchor, and status; docs/design/WIRE-FORMATS.md carries it as PROPOSED and both of its ratification sentences name the owning lead with a second reader, with D1 to D6 unchanged; and the .2 row of docs/PEN-REGISTRATION.md keeps .2 a family arc and records .2.1 for the typed capability claim. — The proposal and its PROPOSED D7 row are on main. Both ratification sentences name the owning lead with a second reader, D1 to D6 are unchanged, and the .2 row records .2.1 as Reserved. The draft is amended per R2.
 - Story delivery:
-  - [x] S114 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a stranger verifying lys artifacts, I want the capability claim format specified, attacked and ratified before anything is signed under it, with every shipped format left byte-identical, so that no historical verification breaks. — A stranger can read the proposed format, its OID and its refusals in the draft before any code exists.
+  - [ ] S114 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a stranger verifying lys artifacts, I want the capability claim format specified, attacked and ratified before anything is signed under it, with every shipped format left byte-identical, so that no historical verification breaks. — The format is specified and attacked but not ratified. S114 also rides on R2's commit record and on R3.
 
 **Review (recorded):**
 
@@ -138,12 +141,20 @@ WHEN R1's draft is complete, THE SYSTEM SHALL have it reviewed adversarially by 
 **Dev (recorded):**
 
 - Status: blocked
-- How: Not done. The review needs a committed draft to cite by commit id, and a reviewer who is not the draft's author.
-- Deviation: Blocked on two things. First, the draft reaches a commit only through the chain (src_pr, src_land), and this round forbids me from committing. Second, the review must be written by a party other than the draft's author. I wrote the draft, and a subagent of this session is the same party, so writing CAPABILITY-CLAIM-REVIEW.md here would fail the acceptance. The fix is the chain landing R1 and then dispatching the review to an independent reviewer.
+- How: Acceptance rows:
+- Parties: the review names the reviewer (this round-1 session) and the author (the R1 drafting session that reached main in f6f18d3), and states that the independence is of session, not of model.
+- The 19 required entries are 1 to 19. Entries 1 to 18 each carry hex and a named refusal. For example, forgery is a certificate signed by the 0x0b key and refused certificate_chain_invalid, and operator JSON 7b22… is refused claim_malformed (text-string length 27 with 15 bytes following).
+- Entry 19, the timing oracle, names the AKI, holder, grant and instant comparisons and verify_certificate_chain_at, and gives for each why both operands are public.
+- Further entries: 20, the RFC 7093 method 1 identifier fe812c…; 21, AKI with extra fields; 22, a BER long-form AKI; 23, duplicate extensions, which x509-parser 0.16 allows at parse and decode_extension refuses; 24, the self-describe tag and a non-shortest length; 25, refusal precedence under v2.
+- Outcomes: all 25 entries record `defeated`. Entries 20, 22 and 25 found draft defects, which were amended (A1 to A3) and then repeated.
+- Commit record: NOT MET. The review records the reviewed commit 737461d, but the draft at 737461d is not byte-identical to the amended draft landing with the review. The commit that holds the amended draft does not exist until this round lands, so the review names the blob id and says the commit is recorded once it exists. A one-line follow-up naming the landing commit satisfies the row. That is the only blocking row.
+- Deviation: The reviewer is a separate Claude session from the draft's author, not a different model or person. The review says so. The draft was amended under the rule to amend and repeat, so the recorded reviewed commit cannot yet match the landed draft. The attack bytes come from a pure-Python builder and were not run through lys-core, because this brief forbids running builds and tests. Their independence from lys is of authorship, not platform, and the review says that too.
+- Files changed:
+  - created: `docs/design/identity/CAPABILITY-CLAIM-REVIEW.md` — The adversarial review. It names both parties, the reviewed commit 737461d and amendments A1 to A3 with the amended draft's blob id 148b7307…. It holds the 19 required entries and 6 further ones, each with its attack hex (certificates hand-built and signed), the named refusal and the outcome `defeated`, plus a timing-oracle entry covering the four comparisons and the signature check.
 - Checklist delivery:
-  - [ ] C250 — docs/design/identity/CAPABILITY-CLAIM-REVIEW.md records an adversarial review of the draft by a party other than its author, holding at least the forgery, cross-format confusion, malleability, transposition, issuer substitution, downgrade, replay and expiry attacks, each built as bytes and defeated by a named refusal of the draft, and a timing-oracle entry that, for each comparison the verifier makes, builds a timing attack and names what defeats it or states why both operands are public. — Waiting for the draft to land and for an independent reviewer.
+  - [ ] C250 — docs/design/identity/CAPABILITY-CLAIM-REVIEW.md records an adversarial review of the draft by a party other than its author, holding at least the forgery, cross-format confusion, malleability, transposition, issuer substitution, downgrade, replay and expiry attacks, each built as bytes and defeated by a named refusal of the draft, and a timing-oracle entry that, for each comparison the verifier makes, builds a timing attack and names what defeats it or states why both operands are public. — Every other part is in place. It waits only on the review naming the commit that holds the amended draft.
 - Story delivery:
-  - [ ] S114 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a stranger verifying lys artifacts, I want the capability claim format specified, attacked and ratified before anything is signed under it, with every shipped format left byte-identical, so that no historical verification breaks. — No review yet.
+  - [ ] S114 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a stranger verifying lys artifacts, I want the capability claim format specified, attacked and ratified before anything is signed under it, with every shipped format left byte-identical, so that no historical verification breaks. — Not yet ratified; R3 is outstanding.
 
 **Review (recorded):**
 
@@ -185,12 +196,12 @@ WHEN the ratification of lys/agent-capability/v1 and of its OID 1.3.6.1.4.1.6636
 **Dev (recorded):**
 
 - Status: blocked
-- How: Not done. The D7 and .2 status flips wait for the landed review and a recorded ratification.
-- Deviation: Blocked. The check `git show origin/main:docs/design/identity/CAPABILITY-CLAIM-REVIEW.md` exits 128, and the card records no ratification by the owning lead with a second reader. The boundaries forbid flipping to RATIFIED or `In use (.2.1)` before then. D7 still reads PROPOSED and the .2 row still reads Reserved.
+- How: Blocked by its precondition. No ratification by the owning lead with a second reader is recorded on the card, and R2's review is not on main (`git show origin/main:docs/design/identity/CAPABILITY-CLAIM-REVIEW.md` would fail). R3 writes no ratifier or reason the card does not carry, so nothing was changed.
+- Deviation: (none)
 - Checklist delivery:
-  - [ ] C251 — Once the owning lead and a second reader have ratified lys/agent-capability/v1 on the card, the format's row in docs/design/WIRE-FORMATS.md's decision log reads RATIFIED with the date, both names and the reasons the card records, and the .2 row of docs/PEN-REGISTRATION.md reads In use (.2.1), with no other line of either file changed. — Waiting for R2 and the ratification record.
+  - [ ] C251 — Once the owning lead and a second reader have ratified lys/agent-capability/v1 on the card, the format's row in docs/design/WIRE-FORMATS.md's decision log reads RATIFIED with the date, both names and the reasons the card records, and the .2 row of docs/PEN-REGISTRATION.md reads In use (.2.1), with no other line of either file changed. — No ratification is recorded.
 - Story delivery:
-  - [ ] S114 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a stranger verifying lys artifacts, I want the capability claim format specified, attacked and ratified before anything is signed under it, with every shipped format left byte-identical, so that no historical verification breaks. — The format is not ratified.
+  - [ ] S114 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a stranger verifying lys artifacts, I want the capability claim format specified, attacked and ratified before anything is signed under it, with every shipped format left byte-identical, so that no historical verification breaks. — Waits on the ratification.
 
 **Review (recorded):**
 
@@ -240,12 +251,12 @@ Define in crates/lys-identity/src/capability/claim.rs the claim of lys/agent-cap
 **Dev (recorded):**
 
 - Status: blocked
-- How: Not done.
-- Deviation: Blocked on R3. At origin/main 412bc52, the grep for a D row with lys/agent-capability/v1 and RATIFIED prints 0. The boundaries also forbid signing or freezing anything under the format before ratification. DIRECTORY-006's grants/types.rs and the lys-identity crate now exist on main, so R3 is the only blocker left for R4.
+- How: Blocked: R3 is not on main. WIRE-FORMATS.md has no RATIFIED lys/agent-capability/v1 row and PEN-REGISTRATION.md has no `In use (.2.1)`, and the brief forbids encoding the claim before ratification. No crate file was touched.
+- Deviation: (none)
 - Checklist delivery:
-  - [ ] C252 — lys-identity encodes the claim of holder id and every grant held at issuance, each with its grant id and its window as it stood then, the list empty when the agent held none and a grant's end absent when it has none, to the vectors pinned in the draft, refuses every non-canonical, unordered, duplicated, unknown-member, missing-member and trailing-byte payload with claim_malformed, and refuses another content type with claim_version_unknown. — Waiting for R3.
+  - [ ] C252 — lys-identity encodes the claim of holder id and every grant held at issuance, each with its grant id and its window as it stood then, the list empty when the agent held none and a grant's end absent when it has none, to the vectors pinned in the draft, refuses every non-canonical, unordered, duplicated, unknown-member, missing-member and trailing-byte payload with claim_malformed, and refuses another content type with claim_version_unknown. — Waits on R3.
 - Story delivery:
-  - [ ] S113 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want to read from an agent's certificate what it was granted at issuance and have a holder, a grant or an instant outside that refused, so that a signed claim is never taken as checked when nothing checked it. — No codec yet.
+  - [ ] S113 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want to read from an agent's certificate what it was granted at issuance and have a holder, a grant or an instant outside that refused, so that a signed claim is never taken as checked when nothing checked it. — Waits on R3.
 
 **Review (recorded):**
 
@@ -292,12 +303,12 @@ WHEN the admitted operator (DIRECTORY-003 R3) calls POST /identity/agents/{agent
 **Dev (recorded):**
 
 - Status: blocked
-- How: Not done.
-- Deviation: Blocked. The brief's own DIRECTORY-003 execution-record check at origin/main prints 'not landed at 412bc5234c2eaff103a77c724094c148b9436a5a' and exits 1. The card branch is also based on 7b53625, which has none of the identity crates.
+- How: Not dispatched. The code rows follow R1 to R3 in order, and R5 needs its DIRECTORY-003 execution-record check to print `landed at`, which was not run. Running it is a gate step before dispatch. No code was built in this round.
+- Deviation: (none)
 - Checklist delivery:
-  - [ ] C253 — The operator enrols one Ed25519 public key per agent, keyed by the agent's directory id and held beside the agent record, once, as one signed directory event; a second enrolment is refused and no key is taken from an issuance call. — Waiting for DIRECTORY-003's execution record to read landed.
+  - [ ] C253 — The operator enrols one Ed25519 public key per agent, keyed by the agent's directory id and held beside the agent record, once, as one signed directory event; a second enrolment is refused and no key is taken from an issuance call. — Not dispatched.
 - Story delivery:
-  - [ ] S115 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want my agent issued one certificate listing the grants it holds and naming its holder, against a key enrolled for it, so that it carries proof of those grants from its first spawn and a lost key or an expired certificate can be replaced. — No enrolment yet.
+  - [ ] S115 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want my agent issued one certificate listing the grants it holds and naming its holder, against a key enrolled for it, so that it carries proof of those grants from its first spawn and a lost key or an expired certificate can be replaced. — Not dispatched.
 
 **Review (recorded):**
 
@@ -363,12 +374,12 @@ THE SYSTEM SHALL hold the directory's issuer key only inside the directory servi
 **Dev (recorded):**
 
 - Status: blocked
-- How: Not done.
-- Deviation: Blocked on R4 and R5, and on DIRECTORY-013. crates/lys-identity/src/revocation/append.rs and fold.rs are absent at origin/main. deploy/identity/config.example.toml is now present on main.
+- How: Blocked on R4 and R5, on R3 being on main, and on DIRECTORY-013's revocation append and fold (crates/lys-identity/src/revocation/ is absent from this tree).
+- Deviation: (none)
 - Checklist delivery:
-  - [ ] C254 — When the operator calls the directory's issuance route with an active agent's certificate-signing request, the directory issues that enduring agent a certificate, subject its directory id, carrying exactly one lys/agent-capability/v1 claim listing every grant it holds at issuance, an empty list when it holds none, under an issuer key held in the service's custody and named in the certificate's Authority Key Identifier by its 20-byte issuer-key fingerprint so that `openssl verify -CAfile` finds the issuer, for the window asked for or the configured default of 30 days and never past the configured maximum of 90 days, appended to the certificate log as the revocation card's issuance leaf, as one directory event naming the certificate it follows; it refuses an agent that is not active, an agent holding a current certificate, one not expired, not under a replaced key and not held revoked by the revocation fold (naming it and its expiry), an agent with no enrolled key (agent_key_not_enrolled), a request whose key does not match the enrolled key (key_mismatch) and an issuance whose leaf is not appended; nothing issues when a grant is given. — Waiting for R4, R5 and DIRECTORY-013.
+  - [ ] C254 — When the operator calls the directory's issuance route with an active agent's certificate-signing request, the directory issues that enduring agent a certificate, subject its directory id, carrying exactly one lys/agent-capability/v1 claim listing every grant it holds at issuance, an empty list when it holds none, under an issuer key held in the service's custody and named in the certificate's Authority Key Identifier by its 20-byte issuer-key fingerprint so that `openssl verify -CAfile` finds the issuer, for the window asked for or the configured default of 30 days and never past the configured maximum of 90 days, appended to the certificate log as the revocation card's issuance leaf, as one directory event naming the certificate it follows; it refuses an agent that is not active, an agent holding a current certificate, one not expired, not under a replaced key and not held revoked by the revocation fold (naming it and its expiry), an agent with no enrolled key (agent_key_not_enrolled), a request whose key does not match the enrolled key (key_mismatch) and an issuance whose leaf is not appended; nothing issues when a grant is given. — Blocked.
 - Story delivery:
-  - [ ] S115 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want my agent issued one certificate listing the grants it holds and naming its holder, against a key enrolled for it, so that it carries proof of those grants from its first spawn and a lost key or an expired certificate can be replaced. — No issuance yet.
+  - [ ] S115 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want my agent issued one certificate listing the grants it holds and naming its holder, against a key enrolled for it, so that it carries proof of those grants from its first spawn and a lost key or an expired certificate can be replaced. — Blocked.
 
 **Review (recorded):**
 
@@ -431,12 +442,12 @@ WHEN the admitted operator calls POST /identity/agents/{agent_id}/key/replacemen
 **Dev (recorded):**
 
 - Status: blocked
-- How: Not done.
-- Deviation: Blocked on R5 and R6.
+- How: Blocked on R5 and R6.
+- Deviation: (none)
 - Checklist delivery:
-  - [ ] C255 — Replacing an agent's enrolled key is one audited directory event naming the old and new key, never an overwrite; an old key that is not the enrolled one is refused with key_replacement_mismatch, and a certificate under the replaced key is no longer current. — Waiting for R5 and R6.
+  - [ ] C255 — Replacing an agent's enrolled key is one audited directory event naming the old and new key, never an overwrite; an old key that is not the enrolled one is refused with key_replacement_mismatch, and a certificate under the replaced key is no longer current. — Blocked.
 - Story delivery:
-  - [ ] S115 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want my agent issued one certificate listing the grants it holds and naming its holder, against a key enrolled for it, so that it carries proof of those grants from its first spawn and a lost key or an expired certificate can be replaced. — No key replacement yet.
+  - [ ] S115 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want my agent issued one certificate listing the grants it holds and naming its holder, against a key enrolled for it, so that it carries proof of those grants from its first spawn and a lost key or an expired certificate can be replaced. — Blocked.
 
 **Review (recorded):**
 
@@ -490,12 +501,12 @@ WHEN verify_agent_capability is given a certificate's DER, a set of trusted issu
 **Dev (recorded):**
 
 - Status: blocked
-- How: Not done.
-- Deviation: Blocked on R3, R4 and R6. `git diff --stat 14e834a -- crates/` still prints nothing, so crates/lys-core and crates/lys are untouched.
+- How: Blocked on R4 and R6 and on R3 being on main. The verifier must not read a claim in a format that is not yet ratified.
+- Deviation: (none)
 - Checklist delivery:
-  - [ ] C256 — verify_agent_capability finds the signing key in a set of trusted issuer keys before it reads the claim and refuses an Authority Key Identifier that is absent or names another key (issuer_key_mismatch), a malformed claim, an unknown version, a holder other than the subject, a grant the claim does not list, and an instant outside the certificate's own window, each by a named refusal, with the refusal legs counted; a listed grant's window is never checked as live. — Waiting for R3, R4 and R6.
+  - [ ] C256 — verify_agent_capability finds the signing key in a set of trusted issuer keys before it reads the claim and refuses an Authority Key Identifier that is absent or names another key (issuer_key_mismatch), a malformed claim, an unknown version, a holder other than the subject, a grant the claim does not list, and an instant outside the certificate's own window, each by a named refusal, with the refusal legs counted; a listed grant's window is never checked as live. — Blocked.
 - Story delivery:
-  - [ ] S113 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want to read from an agent's certificate what it was granted at issuance and have a holder, a grant or an instant outside that refused, so that a signed claim is never taken as checked when nothing checked it. — No verifier yet.
+  - [ ] S113 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want to read from an agent's certificate what it was granted at issuance and have a holder, a grant or an instant outside that refused, so that a signed claim is never taken as checked when nothing checked it. — Blocked.
 
 **Review (recorded):**
 

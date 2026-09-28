@@ -76,6 +76,18 @@ Structural. crates/lys-home/Cargo.toml gains lys-core, lys-log-store and lys-ide
 **Stories:**
 - S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. None of the acceptance rows is met, because nothing was written. The brief's first blocker needs DIRECTORY-003 R2 landed 'with the home-entry, home-entry-copy and home checkpoint payloads reviewed with its envelope before any durable byte is signed'. The envelope has landed: crates/lys-identity/src/lib.rs and docs/design/identity/IDENTITY-EVENTS.md are both in the tree. But IDENTITY-EVENTS.md (76 lines) holds no home payload and no review of one; `grep -n home` finds nothing. The envelope as landed is a service-signed `lys/identity-event/v1` COSE_Sign1 with a closed `Change` enum (crates/lys-identity/src/signer.rs:1-14, crates/lys-identity/src/event.rs:117 onward). R1 instead wants the leaf's COSE bytes made by `lys_core::attestation::sign_attestation` under an agent key. That is a second signing shape inside 'the same envelope', and the envelope's owner has to settle it, not this card. The second blocker, lys-log-store 0.3.0, is also unmet: the workspace Cargo.toml:17 still says 0.2.0. The task says to 'Build after both blockers land', so the Cargo.toml, Cargo.lock, leaf.rs, home_payloads.rs and lib.rs changes were not made.
+- Deviation: Not built, because both blocker checks in the brief fail on this tree. The brief itself says to build only after they land.
+- Checklist delivery:
+  - [ ] C45 — A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id. — Not built: the brief is blocked.
+- Story delivery:
+  - [ ] S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it. — Not built: the brief is blocked.
+
 ### R2: Keep one signed log for the home, name its agent, and append a leaf to it
 
 crates/lys-home/src/record/entry_log.rs holds the home's log at log/ under the home root, a lys-log-store FileLeafStore behind lys-log-store's Log, one log for every session of the home. The home's agent is named by the file log/agent under the home root, which holds the agent identity as given to log-enable (R3) followed by one newline and nothing else; a session finds its home, and so its log, from its own file's place in the home (sessions/<id>.jsonl under the home root). WHEN a leaf is appended, THE SYSTEM SHALL read the agent from log/agent, sign the payload with the Ed25519 key the identity crate (DIRECTORY-003 R2) holds for that agent identity, through lys_core::attestation::sign_attestation, and append the leaf as one log leaf. IF log/ exists and log/agent does not, THEN THE SYSTEM SHALL refuse with a message beginning `home <home> logs its entries and names no agent in log/agent`, and write no leaf. WHEN asked whether the log holds a leaf for a session and entry id, THE SYSTEM SHALL answer from the leaves in the log alone, with that leaf's index when it does. THE SYSTEM SHALL NOT sign with any key but the named agent identity's, SHALL NOT infer the agent from the home's path, SHALL NOT make, generate or store a key of its own, SHALL NOT write a leaf's coordinate into any session file, SHALL NOT hold the log's leaves in memory beyond what lys-log-store's Log holds, and SHALL NOT put key material in any Debug output, error or report. record/mod.rs declares entry_log and, under cfg(test), entry_log_tests in this requirement.
@@ -98,6 +110,18 @@ crates/lys-home/src/record/entry_log.rs holds the home's log at log/ under the h
 
 **Stories:**
 - S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
+
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. R2 says to sign 'with the Ed25519 key the identity crate (DIRECTORY-003 R2) holds for that agent identity', and the identity crate holds no such key. Its only Ed25519Identity uses are the directory service's own key: `sign_event(event, service_key)` at signer.rs:98 and `load_service_key` at signer.rs:210. The rest of the crate (directory.rs, log.rs, restart.rs, grants/*) uses that same service key. It has no per-agent key store and no lookup. The identity server only resolves an agent's certified public keys (crates/lys-identity-server/src/agent_signature.rs:115 `certified_keys`), and lys-secrets holds only the broker's store and audit keys (crates/lys-secrets/src/keys.rs:1-3). The boundary forbids 'no generated or stand-in key' and R2 forbids 'make, generate or store a key of its own'. Any implementation now would have to invent exactly that. The log side is also blocked: F-BV2vqP (lys-log-store 0.3.0, Log not holding every leaf) has not landed. lys-log-store's Log still keeps `leaves: Vec<Vec<u8>>` (crates/lys-log-store/src/log.rs:59-65), and the version is 0.2.0.
+- Deviation: Not built. There is no identity-crate agent key to sign with, and lys-log-store 0.3.0 has not landed.
+- Checklist delivery:
+  - [ ] C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads. — Not built: the brief is blocked.
+- Story delivery:
+  - [ ] S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it. — Not built: the brief is blocked.
 
 ### R3: Enable logging on a home, writing the checkpoint leaf
 
@@ -125,6 +149,19 @@ lys-home log-enable --home <dir> --agent <agent identity>. A home logs its entri
 
 **Stories:**
 - S25 (Developer, Works on lys-home's code beside the record module) — As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved.
+
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by R2. log-enable must check that 'the identity crate holds a key for the agent named by --agent' and sign the checkpoint with it, and the identity crate has no such holding. It also depends on the R1 checkpoint payload, which has not been reviewed.
+- Deviation: Not built: it depends on R1 and R2, which are blocked.
+- Checklist delivery:
+  - [ ] C48 — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it. — Not built: the brief is blocked.
+  - [ ] C54 — The line bytes of the multi_result fixture imported through the import command hash, under SHA-256 after each fresh 32-hex id is replaced by its order of first appearance and the header timestamp by a fixed token, to the value the same test gives at the parent commit. — Not built: the brief is blocked.
+- Story delivery:
+  - [ ] S25 (Developer, Works on lys-home's code beside the record module) — As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved. — Not built: the brief is blocked.
 
 ### R4: Append one leaf for every lys.call, lys.harness_event and lys.open line of a logging home
 
@@ -156,6 +193,20 @@ The hook is one call into the entry log made at the end of each of the four writ
 **Stories:**
 - S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
 
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by R1 to R3. The hook into Session::append_entry, append_beside, append_under and append_copied has nothing to append to until the entry log and a signing key exist. Adding it without them would put an unsigned or stand-in-signed leaf on disk, which the boundaries forbid.
+- Deviation: Not built: it depends on R1 to R3, which are blocked.
+- Checklist delivery:
+  - [ ] C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads. — Not built: the brief is blocked.
+  - [ ] C54 — The line bytes of the multi_result fixture imported through the import command hash, under SHA-256 after each fresh 32-hex id is replaced by its order of first appearance and the header timestamp by a fixed token, to the value the same test gives at the parent commit. — Not built: the brief is blocked.
+  - [ ] C57 — A fork on a logging home gives each lys.call, lys.harness_event and lys.open line it copies its own leaf under the child session id, tagged as a copy and naming the parent session id, the parent entry's position and the parent leaf's index, or the checkpoint leaf's index when the parent entry predates the checkpoint, and is never refused for such a line; the child whose copies name parent leaves verifies without the parent's files, and verify refuses a copy whose parent leaf is absent or differs, and a copy naming the checkpoint whose parent line is absent or differs. — Not built: the brief is blocked.
+- Story delivery:
+  - [ ] S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it. — Not built: the brief is blocked.
+
 ### R5: Refuse an append to a logging home whose agent key is absent, before its line is written
 
 IF an entry whose customType is lys.call, lys.harness_event or lys.open is to be appended to a session of a home that logs its entries and the identity crate holds no key for the agent log/agent names (an agent it does not know included), THEN THE SYSTEM SHALL refuse before the line is written with a message beginning `home <home> logs its entries and the identity crate holds no key for its agent: refused <kind>` and ending `hold the agent's key in the identity crate for this home`, and write no line, no index row, no head and no leaf. IF log/agent is missing, THEN THE SYSTEM SHALL refuse the same append before its line with R2's message and write nothing. THE SYSTEM SHALL NOT write an unlogged lys.call, lys.harness_event or lys.open line to a session of a logging home, SHALL NOT sign with any other key in its place, and SHALL NOT carry content in the refusal.
@@ -174,6 +225,18 @@ IF an entry whose customType is lys.call, lys.harness_event or lys.open is to be
 
 **Stories:**
 - S27 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the cost bounds proved by counters and the unchanged record proved by a hash, so that the change is checked without trusting a timing.
+
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. The refusal is defined by whether 'the identity crate holds no key for the agent log/agent names', and the identity crate has no API that holds agent keys (see R2).
+- Deviation: Not built: it depends on the missing identity-crate agent key holding.
+- Checklist delivery:
+  - [ ] C55 — On a home that logs its entries and whose agent's key the identity crate does not hold, a lys.call, lys.harness_event or lys.open append is refused before its line is written, naming the home and the entry kind and the act that answers it, with nothing written. — Not built: the brief is blocked.
+- Story delivery:
+  - [ ] S27 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the cost bounds proved by counters and the unchanged record proved by a hash, so that the change is checked without trusting a timing. — Not built: the brief is blocked.
 
 ### R6: Refuse a failed append by entry and hold the session until its leaf is written
 
@@ -199,6 +262,18 @@ The pending marker of a session is the file log/pending/<session id>.json under 
 **Stories:**
 - S27 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the cost bounds proved by counters and the unchanged record proved by a hash, so that the change is checked without trusting a timing.
 
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by R2 and R4. The pending marker records a leaf append that failed, and there is no leaf append yet.
+- Deviation: Not built: it depends on R2 and R4, which are blocked.
+- Checklist delivery:
+  - [ ] C49 — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before. — Not built: the brief is blocked.
+- Story delivery:
+  - [ ] S27 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the cost bounds proved by counters and the unchanged record proved by a hash, so that the change is checked without trusting a timing. — Not built: the brief is blocked.
+
 ### R7: Keep re-ingest idempotent and reconcile a missing leaf
 
 WHEN ingest_call, ingest_call_files or ingest_outcome finds its call id already recorded, THE SYSTEM SHALL check the log for that entry's leaf, append it if the log holds none, and report already_recorded as today. THE SYSTEM SHALL NOT append a second leaf for an entry the log already holds and SHALL NOT write a second lys.call line.
@@ -216,6 +291,18 @@ WHEN ingest_call, ingest_call_files or ingest_outcome finds its call id already 
 
 **Stories:**
 - S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
+
+#### R7 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by R2 and R4. Reconciling on re-ingest needs the entry log's leaf lookup and its append.
+- Deviation: Not built: it depends on R2 and R4, which are blocked.
+- Checklist delivery:
+  - [ ] C50 — The canon keeps the id set load builds, and adding an example refuses a repeated id by that set, never by walking the loaded entries. — Not built: the brief is blocked.
+- Story delivery:
+  - [ ] S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it. — Not built: the brief is blocked.
 
 ### R8: Open a sealed record through the home and record the open
 
@@ -244,6 +331,18 @@ lys-home open --home <dir> --session <id> --key <recipient key file> --sender-pu
 
 **Stories:**
 - S28 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent whose session was imported from Claude Code, I want it rendered as a Codex thread that Codex resumes, with every text, tool call and tool result carried whole, so that I continue on Codex knowing what the session knew rather than a clipped summary of it.
+
+#### R8 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. lys-home open must refuse unless the identity crate holds the agent's key (R5) and must append a signed lys.open leaf (R4). Neither is possible without the blocked R2.
+- Deviation: Not built: it depends on R2, R4 and R5, which are blocked.
+- Checklist delivery:
+  - [ ] C56 — lys-home open opens a sealed envelope with open_and_verify, writes the plaintext to --out, created new with mode 0600 on Unix, and appends one lys.open entry (the envelope's SHA-256, the sender's public key and the --out path) to the named session with its leaf; an existing --out is refused by name, and a failed open gives lys open's one failure message and writes no plaintext, entry or leaf. — Not built: the brief is blocked.
+- Story delivery:
+  - [ ] S28 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent whose session was imported from Claude Code, I want it rendered as a Codex thread that Codex resumes, with every text, tool call and tool result carried whole, so that I continue on Codex knowing what the session knew rather than a clipped summary of it. — Not built: the brief is blocked.
 
 ### R9: Verify a session against the log and the checkpoint
 
@@ -274,6 +373,18 @@ Verify reads the session through SessionReader and the log, and writes nothing. 
 **Stories:**
 - S26 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want a disk error while a session opens reported as that error, so that a failing disk is seen and never papered over by a rebuilt index.
 
+#### R9 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by R1 to R4: verify checks leaves that nothing can yet write. One thing to fix in the re-brief: crates/lys-home/src/record/verify.rs and verify_tests.rs already exist. They hold the strict home verification of HOME-004 and HOME-019 (ship and fetch reasons index_missing and the rest). The brief lists them as 'file create', but design.json assigns that same path to HOME-004, HOME-008 and HOME-019. The session-against-log verify therefore has to go beside the existing code in that file, not replace it.
+- Deviation: Not built: it depends on R1 to R4. Also noted: verify.rs is listed as 'file create' but already exists.
+- Checklist delivery:
+  - [ ] C51 — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt. — Not built: the brief is blocked.
+- Story delivery:
+  - [ ] S26 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want a disk error while a session opens reported as that error, so that a failing disk is seen and never papered over by a rebuilt index. — Not built: the brief is blocked.
+
 ### R10: Give lys-home a verify subcommand
 
 lys-home verify --home <dir> --session <id> [--repair]. WHEN every check of R9 passes, THE SYSTEM SHALL print one JSON object on stdout with exactly the fields command (`verify`), then session, entries, logged, leaves (home-entry and home-entry-copy leaves whose session is this session), checkpoint (an object of entries and file_sha256), log_size and log_root (lowercase hex) as R9's result carries them, and exit 0. WHEN --repair is given and the session is pending, THE SYSTEM SHALL write the pending leaf first, then verify, and the report SHALL carry repaired with the count of leaves it wrote. IF verification refuses, THEN THE SYSTEM SHALL exit 1 with R9's message on stderr and print nothing on stdout. THE SYSTEM SHALL NOT write any file without --repair and SHALL NOT print any line content.
@@ -292,6 +403,18 @@ lys-home verify --home <dir> --session <id> [--repair]. WHEN every check of R9 p
 
 **Stories:**
 - S26 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want a disk error while a session opens reported as that error, so that a failing disk is seen and never papered over by a rebuilt index.
+
+#### R10 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by R9: the verify subcommand wraps it.
+- Deviation: Not built: it depends on R9, which is blocked.
+- Checklist delivery:
+  - [ ] C51 — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt. — Not built: the brief is blocked.
+- Story delivery:
+  - [ ] S26 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want a disk error while a session opens reported as that error, so that a failing disk is seen and never papered over by a rebuilt index. — Not built: the brief is blocked.
 
 ### R11: Run the words' tests through the command line
 
@@ -326,6 +449,25 @@ crates/lys-home/tests/entry_log.rs drives the lys-home binary on a fresh tempora
 - S25 (Developer, Works on lys-home's code beside the record module) — As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved.
 - S26 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want a disk error while a session opens reported as that error, so that a failing disk is seen and never papered over by a rebuilt index.
 
+#### R11 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. The end-to-end test needs 'agent-fixture' to have its key held by the identity crate, and no such holding exists. The prelog fixture could be written, but it has to come from lys-home at the base commit on the lys main the blockers land on, which is not this tree.
+- Deviation: Not built: it depends on R2 to R10 and on the blockers landing.
+- Checklist delivery:
+  - [ ] C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads. — Not built: the brief is blocked.
+  - [ ] C47 — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left. — Not built: the brief is blocked.
+  - [ ] C48 — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it. — Not built: the brief is blocked.
+  - [ ] C50 — The canon keeps the id set load builds, and adding an example refuses a repeated id by that set, never by walking the loaded entries. — Not built: the brief is blocked.
+  - [ ] C51 — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt. — Not built: the brief is blocked.
+  - [ ] C54 — The line bytes of the multi_result fixture imported through the import command hash, under SHA-256 after each fresh 32-hex id is replaced by its order of first appearance and the header timestamp by a fixed token, to the value the same test gives at the parent commit. — Not built: the brief is blocked.
+- Story delivery:
+  - [ ] S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it. — Not built: the brief is blocked.
+  - [ ] S25 (Developer, Works on lys-home's code beside the record module) — As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved. — Not built: the brief is blocked.
+  - [ ] S26 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want a disk error while a session opens reported as that error, so that a failing disk is seen and never papered over by a rebuilt index. — Not built: the brief is blocked.
+
 ### R12: Record the formats and their adversarial review
 
 docs/design/home/RECORD.md gains a section on the signed entry log: the log at log/ under the home and log/agent naming its agent, the three tags and their fields, which entry kinds are logged (lys.call, lys.harness_event and lys.open) and what a lys.open entry's data holds, a fork's copy leaf, naming the parent entry's leaf or, for a parent entry from before the checkpoint, the checkpoint leaf and the entry's position, log-enable and what a home that never ran it does, the line-then-leaf order, the pending marker at log/pending/<session id>.json and its retry, the checkpoint, and how verify reads them; its opening sentence that nothing is signed is corrected to name what is. docs/design/identity/IDENTITY-EVENTS.md, which the DIRECTORY-003 R2 blocker brings and which this requirement modifies only after it lands, records the adversarial review of the three payloads, held jointly with the review of the envelope DIRECTORY-003 R2 lands, covering a forged leaf, a leaf signed by another key, cross-protocol confusion among the three tags and with the envelope's other payloads, a replayed leaf for another entry or session (a copy leaf offered for its parent's entry included), and guessing a short line from its SHA-256, each with the attack tried and why it fails. THE SYSTEM SHALL NOT sign a durable byte under any of the three tags before that review is recorded, and SHALL NOT change the rules those documents already state for other formats.
@@ -345,6 +487,19 @@ docs/design/home/RECORD.md gains a section on the signed entry log: the log at l
 
 **Stories:**
 - S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
+
+#### R12 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. The adversarial review is to be 'held jointly with the review of the envelope DIRECTORY-003 R2 lands', and no such joint review has been held. Whether the home payloads are signed by the service-key envelope (signer.rs) or by an agent key through lys-core attestation v2 is still open (see R1), and a review record written before that is settled would review a format nobody has decided. Updating RECORD.md to say entries are signed would be false while nothing signs them.
+- Deviation: Not built: the joint review with the envelope has not been held, and RECORD.md cannot truthfully say entries are signed.
+- Checklist delivery:
+  - [ ] C52 — context_path moves entries out of the path it read, customs reads only the path's entries of the custom type asked for, and the render's assistant arm and the importer's assistant content iterate a content array by reference, with no rendered or recorded byte changed. — Not built: the brief is blocked.
+  - [ ] C53 — One function, uuid_string, writes every uuid's 8-4-4-4-12 form: the fewshot's ids are 16 random bytes with the version nibble 4 and the variant nibble 8 set, formatted by it, and every render hash pinned in the tree is unchanged. — Not built: the brief is blocked.
+- Story delivery:
+  - [ ] S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it. — Not built: the brief is blocked.
 
 ## Boundaries
 

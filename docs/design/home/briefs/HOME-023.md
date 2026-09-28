@@ -61,6 +61,18 @@ Add sgconfig.yml at the repository root, whose only key is ruleDirs naming rules
 **Stories:**
 - S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked, and no acceptance row is met. The requirement says to create sgconfig.yml and four rule files, but main already has sgconfig.yml (ruleDirs: rules/ast-grep) and rules/ast-grep with mod-rs-declarations-only.yml, no-let-underscore-on-results.yml, no-lint-bypass-attributes.yml and no-unwrap-expect-panic-outside-tests.yml. Tom added them in 2fec935 for LYSCORE-003 R8, which deliberately left out no-std-mutex-in-async and changed the Cambium rules (vendor/** is ignored and the messages name CLAUDE.md). I compared them with the Cambium checkout at /Users/deanwhiting/lane/cambium, commit df4dca5de6899df89b06b94cdeeec3619877fc1d. `git show df4dca5:rules/ast-grep/<name>.yml | cmp -` differs at line 4 for mod-rs-declarations-only, line 5 for no-let-underscore-on-results and line 4 for no-lint-bypass-attributes. no-std-mutex-in-async.yml is missing here. Meeting row 1 (`ls` lists exactly the four) and row 2 (byte-identical) would mean overwriting three rule files another brief landed and deleting no-unwrap-expect-panic-outside-tests.yml. That deletion is outside R7's allowed diff and reverses LYSCORE-003 R8. The lead has to rule on which rule set lys keeps before this can be built.
+- Deviation: I did not create or overwrite the rule set. The brief's premise (no rule set on main) is false at the card base, and following it would undo LYSCORE-003 R8.
+- Checklist delivery:
+  - [ ] C14 — A Claude Code launch template schema in docs/design/home names its five slots (transcript, mcp, env, secrets, instructions), and a template with a slot outside them is refused by that slot's name with nothing written. — Blocked: the rule set on main conflicts with the one the brief specifies.
+- Story delivery:
+  - [ ] S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed. — Blocked with R1.
+
 ### R2: Open the proof with the commit measured and the tools it was measured with
 
 Create docs/design/home/PROOF-CHAIN.md. Its opening section SHALL name the commit measured, 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff, in full; the rustc and cargo version strings the pinned toolchain reports; ast-grep's version string; the SHA-256 of sgconfig.yml and of each rule file; that every per-file Jev verdict came from the jev_ask workflow, with R3's cause text as the question it answered; and that every check ran in the one-build queue under the load guard, one build at a time. It SHALL state that src_land's Jev verdict on this card's landing judges the landing diff (the proof, the rule set and the design rows) and is not a verdict on the crate, and that the per-file verdicts of R3 are the crate's. WHEN main moves past 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff before the card lands, THE SYSTEM SHALL keep 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff as the commit measured, and SHALL NOT remeasure at the landing base or name any other commit as the one measured. THE SYSTEM SHALL NOT write transcript content, block content or body content into the document; paths, commands, exit statuses, counts, hashes, verdict words and line numbers only.
@@ -82,6 +94,18 @@ Create docs/design/home/PROOF-CHAIN.md. Its opening section SHALL name the commi
 **Stories:**
 - S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
 
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked, and no acceptance row is met. The opening section has to carry the SHA-256 of the rule set R1 settles, the ast-grep version the proof's scan ran under (ast-grep is installed at ~/.cargo/bin/ast-grep, but running the scan is forbidden to this seat), and a statement that every per-file verdict came from jev_ask. None of those can be written truthfully until R1 and R3 exist. I found nothing matching jev_ask or jev_verdict under ~/.aion/src, ~/.aion/authoring or ~/.aion/config.toml, the Argus MCP server failed to connect this session, and no jev binary is on PATH. An opening section that attests to measurements nobody made would be false, so no document was created.
+- Deviation: PROOF-CHAIN.md was not created, because a proof whose measured sections are missing could be read as a proof.
+- Checklist delivery:
+  - [ ] C15 — The home keeps each template it renders as an object under templates/ named by its SHA-256, written once and never rewritten. — Blocked: depends on R1's rule set and on a reachable jev_ask.
+- Story delivery:
+  - [ ] S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed. — Blocked.
+
 ### R3: Ask Jev about every file of crates/lys-home, one file at a time
 
 WHEN the proof is built, THE SYSTEM SHALL ask Jev once for each of the 25 paths `git ls-tree -r --name-only 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff crates/lys-home` lists, through the jev_ask workflow, with part = the path, change = the output of `git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff -- <path>` (the whole file as a diff against the empty tree), and cause = this text with <path> replaced by the path exactly as `git ls-tree` prints it, which already begins crates/lys-home/: "<path> as it stands on lys main at commit 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff was written for brief HOME-001 (docs/design/home/briefs/HOME-001.json) before the chain judged it. The cause: the coding standards in the repository's CLAUDE.md, and the HOME-001 requirement rows whose files name this path, hold for this file as found." THE SYSTEM SHALL write one line per path in the proof's Jev section: the path, the verdict word (patched, solved, unsure or not_asked, as jev_ask answers it), the patched probability when jev_ask returns one, held, and the reason. A patched verdict is a finding (R6). The Jev check's outcome SHALL be pass when all 25 lines carry a verdict and none is patched, finding when at least one is patched, and incomplete when at least one is not_asked, with each not_asked path named. THE SYSTEM SHALL NOT ask Jev about the crate as one change, SHALL NOT cut a file below whole-file boundaries, SHALL NOT omit a path, SHALL NOT alter the cause text beyond the path, and SHALL NOT record a not_asked line as any other verdict.
@@ -101,6 +125,18 @@ WHEN the proof is built, THE SYSTEM SHALL ask Jev once for each of the 25 paths 
 
 **Stories:**
 - S9 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every file of lys-home judged by Jev on its own, with the verdict recorded beside its path, so that a verdict on the landing diff is never read as a verdict on the crate.
+
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked, and no acceptance row is met. `git ls-tree -r --name-only 0073b966… crates/lys-home` lists 25 paths, which matches the brief. The jev_ask workflow can't be reached from this seat: there is no jev_ask or jev_verdict definition under ~/.aion, the Argus MCP is disconnected, and there is no jev on PATH. The brief's own blocked_by says the OpenRouter key has to be found before the build starts. I won't record verdicts I didn't obtain, and recording all 25 as not_asked would be premature while the seat that can call jev_ask hasn't been tried.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C16 — lys-home render-launch writes the rendered JSONL, its loss account, an MCP configuration file, an environment file and an appended-instructions file into one directory, and a second render of the same template and session writes files with identical SHA-256. — Blocked: jev_ask can't be reached.
+- Story delivery:
+  - [ ] S9 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every file of lys-home judged by Jev on its own, with the verdict recorded beside its path, so that a verdict on the landing diff is never read as a verdict on the crate. — Blocked.
 
 ### R4: Run fmt, clippy pedantic, tests, ast-grep and the gate over the crate as found, and record each
 
@@ -125,6 +161,18 @@ THE SYSTEM SHALL run each check below and record in the proof's checks section i
 **Stories:**
 - S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
 
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked, and no acceptance row is met. R4's measurement is running cargo fmt --all -- --check, both clippy legs, cargo test --workspace --all-features and sh .land/gates.sh in a clean checkout of 0073b966, plus ast-grep scan at the card head. The dev instructions for this round say: 'Run none of them, and run no other build, format, lint or test command.' I also found no earlier measurement of 0073b966 under ~/.aion/logs or ~/.aion/data to cite. Writing exit statuses and test counts without running them would be fabrication. This needs a venue allowed to run the measurement: the one-build queue under the load guard, per Tom's 06:24 26 September ruling.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C17 — The launch line in render-launch's report resumes the rendered file by path with --fork-session and the template's flags, and the tool never runs it. — Blocked: the measurement commands are forbidden to this seat.
+- Story delivery:
+  - [ ] S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed. — Blocked.
+
 ### R5: Record which HOME-001 rows have their files at the commit, and which rows each of the seven cards carries
 
 THE SYSTEM SHALL read docs/design/home/briefs/HOME-001.json at 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff and write a row table in the proof: for each of R1 to R11, every path its create and modify arrays name, each marked present or absent by `git cat-file -e 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff:<path>`, and the row's state: built when every named path, code and document alike, is present; not built when a named path under crates/lys-home is absent; partly present when every named path under crates/lys-home is present and a named path outside it is absent. A partly present row is not built, and each of its absent paths is a row table finding (R6). THE SYSTEM SHALL write a card table: for each of the seven step 5 cards that carry HOME-001's rows, the card's id as the board gives it, the HOME-001 rows it carries, and each row's state. THE SYSTEM SHALL NOT mark a row from the design's structure array alone, SHALL NOT edit HOME-001.json, and SHALL NOT mark a row built while a path it names is absent, and SHALL NOT record card UzVQkTaU as carrying rows other than the board gives, which include R3 and R4.
@@ -145,6 +193,18 @@ THE SYSTEM SHALL read docs/design/home/briefs/HOME-001.json at 0073b9660f00ecd3c
 
 **Stories:**
 - S11 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want a card set done only when the chain judged its rows' code and found nothing, so that done never means merely merged.
+
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Row table facts are established but not written; the card table is blocked. Reading HOME-001.json at 0073b966 and running `git cat-file -e` on each create and modify path gives: R1, R2, R3, R5, R6, R8, R9 and R11 have every path present, so they are built. R4 is partly present, with docs/design/home/LOSS-ACCOUNT.md absent. R7 is not built, with crates/lys-home/examples/passthrough.rs and docs/design/home/PROOF-PROXY.md absent. R10 is not built, with 16 lys-home paths absent, including src/proxy/mod.rs and src/bin/lys-proxy.rs, plus PROOF-PROXY.md. HOME-001 at 0073b966 also has an R12, which the brief's R1-to-R11 scope leaves out: it is not built, with src/record/handover.rs and PROOF-HANDOVER.md absent. The lead should decide whether R12 belongs in the row table. The seven card ids and the rows each carries, apart from UzVQkTaU carrying R3 and R4, are only on the Cambium board, which isn't reachable from here. The document isn't written, so no acceptance row is met.
+- Deviation: The row table facts are reported here rather than written, because the proof they belong in is blocked (R2 to R4). The brief doesn't cover HOME-001's R12.
+- Checklist delivery:
+  - [ ] C19 — Every render appends one lys.harness_event of kind template_render beside the context path, naming the template hash, the session head hash and a manifest block of the written paths, and the head does not move. — Blocked: the card table needs the board, and the proof document is blocked.
+- Story delivery:
+  - [ ] S11 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want a card set done only when the chain judged its rows' code and found nothing, so that done never means merely merged. — Blocked.
 
 ### R6: Write every finding a named check reports as its own line, and keep the author's observations apart
 
@@ -168,6 +228,18 @@ WHEN a named check reports something (a Jev verdict of patched, an ast-grep matc
 **Stories:**
 - S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone.
 
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked, and no acceptance row is met. The findings section depends on the check outputs from R3 and R4, which weren't produced. The one finding known without running anything is the row table finding: docs/design/home/LOSS-ACCOUNT.md is absent, holding R4. The absent files on R7, R10 and possibly R12 are not findings under R6, because those rows' code is absent too. Nothing was written.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C18 — A use-only secret is written as its handle and never its value, and a template marking a secret readable is refused naming secret_reader_unbuilt and SECRETS-002. — Blocked on R3 and R4.
+- Story delivery:
+  - [ ] S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone. — Blocked.
+
 ### R7: Land only the proof, the rule set and the design rows, with the crate untouched
 
 Render the home cluster with render-cluster.py so docs/design/home/briefs/HOME-002.md, DESIGN.md, CHECKLIST.md and USER-STORIES.md equal what the JSON renders to. The card's diff from its merge base with main SHALL hold only these paths: docs/design/home/PROOF-CHAIN.md, sgconfig.yml, the four rules/ast-grep files, docs/design/home/briefs/HOME-002.json and HOME-002.md, docs/design/home/design.json, checklist.json, stories.json, DESIGN.md, CHECKLIST.md, USER-STORIES.md, docs/design/roadmap.json and docs/design/decisions.json. THE SYSTEM SHALL NOT change any byte under crates/, SHALL NOT edit HOME-001.json or HOME-001.md, and SHALL NOT change .land/gates.sh or docs/design/project.json.
@@ -190,6 +262,18 @@ Render the home cluster with render-cluster.py so docs/design/home/briefs/HOME-0
 **Stories:**
 - S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
 
+#### R7 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked, and no acceptance row is met. R7 says to render docs/design/home/briefs/HOME-002.md and lists HOME-002.json and HOME-002.md in the allowed diff. At the card base, HOME-002.json is a different brief ('Launch a Claude Code session from its home through a kept template'), while this brief is on disk as HOME-023.json. design.json's structure entries still name HOME-002 at around lines 528 to 673. Rendering under HOME-002 would overwrite another brief. The lead has to fix the id first. With R1 to R6 blocked, there is nothing to land either.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C20 — PROOF-LAUNCH.md records the launch measured on the installed Claude Code version: template hash, written paths and hashes, launch line, the rendered file unchanged, where the continuation landed; never transcript content. — Blocked: HOME-002 id collision and nothing to land.
+- Story delivery:
+  - [ ] S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed. — Blocked.
+
 ### R8: Land through src_pr and src_land, then set the seven cards by the rule and card each finding
 
 WHEN the card is landed, THE SYSTEM SHALL land it through src_pr and then src_land, and the landing is green only when src_land's Jev verdict is solved or unsure and every leg of .land/gates.sh reports status 0. WHEN the landing is green, the proof's findings section holds zero lines and no check's outcome is incomplete, THE SYSTEM SHALL set to done each of the seven cards whose every row R5 records built, each naming the landing commit, and SHALL leave in review each card that carries a row R5 records not built, whose not built state the proof's card table (R5) records. IF the proof's findings section holds any line, THEN THE SYSTEM SHALL leave all seven cards in review and SHALL file one card on the step 5 board per finding line, its words taken from that line, filing in todo each finding card whose line reads `holds none of the seven`. THE SYSTEM SHALL NOT set done a card that carries a row R5 records partly present, so card UzVQkTaU stays in review while the finding naming docs/design/home/LOSS-ACCOUNT.md is open; SHALL NOT set a card done on a landing that is not green; SHALL NOT move any card other than the seven and the finding cards it files; and SHALL NOT file a card from a line under `Observed, not measured`.
@@ -208,6 +292,18 @@ WHEN the card is landed, THE SYSTEM SHALL land it through src_pr and then src_la
 
 **Stories:**
 - S11 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want a card set done only when the chain judged its rows' code and found nothing, so that done never means merely merged.
+
+#### R8 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked, and no acceptance row is met. Landing through src_pr and src_land, and moving or filing cards on the step 5 board, come after this developer round and need a proof to land. None exists, because of the blocks on R1 to R7. No card was moved or filed.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C21 — The card lands through src_pr and src_land with Jev and the gate; the seven cards are set done only on a green landing with no finding, a card carrying a partly present row stays in review, and one card is filed per finding line. — Blocked: no proof to land.
+- Story delivery:
+  - [ ] S11 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want a card set done only when the chain judged its rows' code and found nothing, so that done never means merely merged. — Blocked.
 
 ## Boundaries
 

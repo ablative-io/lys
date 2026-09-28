@@ -63,6 +63,23 @@ Add a module given_path beside given.rs with one enum naming what became of a pa
 - S32 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every compaction in a session to say by ids, counts and hashes what it could not keep, so that a summary is never taken for the whole of what was said.
 - S33 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want to list a session's compactions with a check that every summarised entry and block is still held, so that I can prove on a compacted session that the original is all still there.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Every row is covered in given_path_tests.rs by the_ten_shapes_canonicalise_by_the_record_s_rule. Row 1, symlinked directory B/link/w/CLAUDE.md gives Canonical B/real/w/CLAUDE.md: met (through_link case). Row 2, `..` gives Canonical: met (dotted case). Row 3, `B/real/c/` gives Canonical B/real/c and serde_json writes the string without the slash: met (slashed case, comparing serde_json::to_string output). Row 4, symlinked CLAUDE.md is named at its link: met (last case, the file replaced by a symlink to B/real/t/target.md). Row 5, `B/gone/c/` is Unresolved byte for byte: met (compared as encoded bytes). Row 6, `CLAUDE.md/x` is Unresolved: met, because symlink_metadata answers NotADirectory. Row 7, absent.md is Unresolved: met. Row 8, dangling symlink is Canonical at its link: met. Row 9, `instructions.md` is Relative: met. Row 10, B/locked with mode 0o000 gives HomeError::Io whose context is CANONICALISING, whose path is the given path, and whose Display contains both: met. Row 11, cases == 10 is asserted at the end: met. The code is given_path.rs: canonical_dir at line 69, canonical_document at line 79, unresolved_or_refused at line 98.
+- Deviation: (none)
+- Files changed:
+  - created: `crates/lys-home/src/harness/claude_code/given_path.rs` — GivenPath enum {Canonical, Unresolved, Relative}; canonical_dir resolves a directory whole with std::fs::canonicalize; canonical_document canonicalises the parent, keeps the final name and lstat()s the joined entry; a final component of `..` or the root falls back to canonical_dir; a relative path is returned unchanged; NotFound/NotADirectory give Unresolved with the path as given; any other failure gives HomeError::Io with context CANONICALISING (`canonicalising a given path`) and the given path. It never reads a file's bytes.
+  - created: `crates/lys-home/src/harness/claude_code/given_path_tests.rs` — One test builds the ten shapes under a canonicalised tempdir with symlinks it makes itself, and asserts cases == 10.
+  - modified: `crates/lys-home/src/harness/claude_code/mod.rs` — Declares `pub mod given_path` and the cfg(test) `given_path_tests`.
+- Checklist delivery:
+  - [ ] C71 — A compact_boundary record followed by its isCompactSummary user record imports as a lys.harness_event for the boundary and one Pi compaction entry under the summary record's uuid, the child of the boundary's entry, whose firstKeptEntryId is the earliest in file order of compactMetadata.preservedMessages.uuids when that list is non-empty, otherwise the first record whose parent is the summary record, and the empty string when there is none, so its context path is the compaction alone and the pair renders back, and whose tokensBefore is compactMetadata.preTokens; the summary record is not a message entry. — Every R1 acceptance row is met. C71's text, though, describes the compaction importer (compact_boundary and isCompactSummary), which nothing in this brief builds. I am not claiming that behaviour. The brief's checklist ids appear to be carried over from another design (ADR-029 in design.json is the lys.loss decision).
+- Story delivery:
+  - [ ] S32 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every compaction in a session to say by ids, counts and hashes what it could not keep, so that a summary is never taken for the whole of what was said. — S32 is about compaction loss accounting. This change does not deliver it, even though every R1 row is met.
+  - [ ] S33 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want to list a session's compactions with a check that every summarised entry and block is still held, so that I can prove on a compacted session that the original is all still there. — S33 is about listing compactions. This change does not deliver it, even though every R1 row is met.
+
 ### R2: Resolve and record the given documents at canonical paths
 
 WHEN resolve_given resolves a session's documents, THE SYSTEM SHALL canonicalise the working directory as a directory path before walking the CLAUDE.md chain and walk the ancestors of the result; SHALL canonicalise the config directory as a directory path and record the result as config_dir.path; SHALL build the user CLAUDE.md and the memory index under the canonical config directory; SHALL record every absolute document's path as the R1 document canonicalisation of the path it was read at; and SHALL compare a chain position with the user CLAUDE.md on their canonical paths, so `D/.claude/CLAUDE.md` is still listed once, first, as user_claude_md. WHEN the working directory or the config directory is unresolved, THE SYSTEM SHALL use it as given and continue. THE SYSTEM SHALL compute the memory index's slug with projects_slug from the working directory exactly as given. THE SYSTEM SHALL NOT canonicalise the paths of the two written files, SHALL NOT resolve a document's final component, SHALL NOT change the measured order, SHALL NOT list an absent position, and SHALL NOT change projects_slug. IF canonicalising any path fails for a reason other than not existing, THEN THE SYSTEM SHALL fail the resolution with R1's refusal, and render-launch SHALL refuse with its existing refusal status 1, with no lys.given entry written.
@@ -91,6 +108,23 @@ WHEN resolve_given resolves a session's documents, THE SYSTEM SHALL canonicalise
 
 **Stories:**
 - S32 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every compaction in a session to say by ids, counts and hashes what it could not keep, so that a summary is never taken for the whole of what was said.
+
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1, symlinked cwd lists B/real/w/CLAUDE.md: met by a_working_directory_through_a_symlink_records_the_chain_at_its_canonical_path in given_tests.rs. Row 2, `..` cwd lists exactly 2 chain documents under B, in order: met by a_working_directory_with_dot_dot_walks_only_the_canonical_chain. Row 3, `B/real/c/` config serialises as B/real/c and the user file is listed at B/real/c/CLAUDE.md: met by a_config_directory_with_a_trailing_slash_records_without_it. Row 4, config B/link/.claude gives exactly 2 absolute documents, the user file first, and the chain does not repeat it: met by a_config_through_a_symlink_is_still_listed_once_as_the_user_file. The code comparing canonical paths is `absolute` in given.rs, with listed_once set to the user file's recorded path. Row 5, `B/gone/c/` is kept byte for byte with no user or memory documents: met by a_config_directory_that_does_not_exist_is_recorded_as_given. Row 6, the slug comes from B/link/w and a MEMORY.md under the canonical slug is not listed: met by the_memory_index_slug_is_taken_from_the_working_directory_as_given. Row 7, a symlinked CLAUDE.md is listed at its link: met by a_symlinked_claude_md_is_named_at_its_link_and_written_files_stay_relative. Row 8, the written files are listed at instructions.md and mcp.json: met by the same test. Row 9, a locked cwd gives HomeError::Io with the operation and the path: met by a_working_directory_that_cannot_be_searched_is_refused_by_operation_and_path. Row 10, render-launch with a locked cwd exits 1, stderr names the operation and the path, and 0 lys.given entries exist: met by a_path_that_cannot_be_searched_is_refused_by_render_launch_and_given_check in tests/given_record.rs, which asserts records().len() == 0 before any other render. Row 11: paths.rs is untouched (git diff --stat shows no change to it).
+- Deviation: none on R2's rows. The walk from R2's spec lists a chain position only when its canonical path is not the listed user CLAUDE.md, and checks that before the read so one file is still read once.
+- Files changed:
+  - modified: `crates/lys-home/src/harness/claude_code/given.rs` — resolve_given canonicalises the working directory with canonical_dir before walking its ancestors. It canonicalises config_dir.path in place, which is what gets recorded. Every absolute document is recorded at canonical_document of the path it was read at (the new `absolute` helper). A chain position is compared with the listed user CLAUDE.md on canonical paths before it is read. The slug is still projects_slug(cwd) on cwd as given. The written files are measured under out and recorded relative. Module and function docs state the rule.
+  - modified: `crates/lys-home/src/harness/claude_code/given_tests.rs` — Existing tests now build their paths from the canonicalised tempdir. Eight new unix tests cover the symlinked cwd, the `..` cwd, the trailing-slash config, the symlinked config on the chain, the missing config, the memory slug taken from the cwd as given, the symlinked CLAUDE.md plus the relative written files, and the locked cwd.
+  - modified: `crates/lys-home/tests/given_record.rs` — The fixture is built from the canonicalised tempdir. New render_in and set_config helpers, and a test that render-launch with a locked --cwd exits 1 and writes no lys.given entry.
+- Checklist delivery:
+  - [ ] C72 — A legacy summary record imports as a Pi compaction entry whose firstKeptEntryId is the entry its leafUuid names, never the compaction's own id. — Every R2 row is met. C72 describes compaction import through the legacy summary record, which is outside this brief. Not claimed.
+  - [ ] C73 — A compaction whose first kept entry is not on record is refused with an error naming that uuid. — Every R2 row is met. C73 describes refusing a compaction whose first kept entry is missing, which is outside this brief. Not claimed.
+- Story delivery:
+  - [ ] S32 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every compaction in a session to say by ids, counts and hashes what it could not keep, so that a summary is never taken for the whole of what was said. — S32 is compaction loss accounting, which this change does not deliver.
 
 ### R3: Compare canonical paths in given-check and name unresolved paths in both reports
 
@@ -121,6 +155,24 @@ WHEN given-check looks for the listed document, THE SYSTEM SHALL compare the R1 
 - S32 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every compaction in a session to say by ids, counts and hashes what it could not keep, so that a summary is never taken for the whole of what was said.
 - S33 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want to list a session's compactions with a check that every summarised entry and block is still held, so that I can prove on a compacted session that the original is all still there.
 
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1, --path B/link/w/CLAUDE.md exits 0 matches with `path` echoed and unresolved []: met by given_check_compares_canonical_paths_and_names_what_is_unresolved in tests/given_record.rs. Row 2, the `..` --path matches: met, same test. Row 3, an entry appended with B/link/w/CLAUDE.md, the way a pre-change record holds it (via GivenRecord::append_under), matches --path B/real/w/CLAUDE.md: met. Row 4, B/gone/CLAUDE.md with a --file of equal bytes matches with unresolved [B/gone/CLAUDE.md], de-duplicated: met. Row 5, --path B/gone/../gone/CLAUDE.md exits 2 with empty stdout and stderr naming the path: met through the `refused` helper. Row 6, `given` reports ["B/gone/c/"] and []: met by given_names_each_record_s_unresolved_paths_as_recorded. Row 7, the absent.md record reports [absent.md]: met, same test. Row 8, a locked --path exits 2 with empty stdout and stderr naming the operation and the path: met by the second half of a_path_that_cannot_be_searched_is_refused_by_render_launch_and_given_check. Row 9, --path instructions.md matches the render's instructions.md: met. Row 10, the data keys are exactly the six: met, asserted over the session line's data object. No existing report field changed. The comparison is in check() in cli/given.rs and the listing is in ListedRecord::new.
+- Deviation: (none)
+- Files changed:
+  - modified: `crates/lys-home/src/cli/given.rs` — given-check canonicalises --path and each listed path with canonical_document and compares the results; relative and unresolved paths compare as written. It reads --file at its canonical path, or as given when unresolved. It reports `unresolved`: --path, then the listed path, each only if unresolved, without repeats. `given` gives each ListedRecord an `unresolved` field: config_dir.path, then the absolute documents, each checked at listing time. Canonicalisation errors propagate (exit 2 for given-check). The module docs and the --path help are updated.
+  - modified: `crates/lys-home/tests/given_record.rs` — Adds given_check_compares_canonical_paths_and_names_what_is_unresolved, given_names_each_record_s_unresolved_paths_as_recorded, and the locked given-check half of a_path_that_cannot_be_searched_is_refused_by_render_launch_and_given_check.
+- Checklist delivery:
+  - [ ] C73 — A compaction whose first kept entry is not on record is refused with an error naming that uuid. — Every R3 row is met. C73 describes compaction behaviour outside this brief. Not claimed.
+  - [ ] C74 — Directly after each compaction entry the importer appends one lys.loss custom entry whose parent is the compaction and whose data holds only ids, counts, byte counts and SHA-256 hashes, with the keys RECORD.md sets down, first_kept among them, null when nothing is kept. — Every R3 row is met. C74 describes lys.loss entries after compaction, which are outside this brief. Not claimed.
+  - [ ] C75 — A lys.loss entry's span is the root-to-first-kept path from the root or the previous compaction to the entry before the first kept one; its three SHA-256s are over those entries' source lines in file order, and side-leaf and sidechain entries hanging from the span are counted by number only. — Every R3 row is met. C75 describes the lys.loss span hashes, which are outside this brief. Not claimed.
+- Story delivery:
+  - [ ] S32 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every compaction in a session to say by ids, counts and hashes what it could not keep, so that a summary is never taken for the whole of what was said. — S32 is compaction loss accounting, which this change does not deliver.
+  - [ ] S33 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want to list a session's compactions with a check that every summarised entry and block is still held, so that I can prove on a compacted session that the original is all still there. — S33 is listing compactions, which this change does not deliver.
+
 ### R4: Prove with one fixture test that the three shapes record and compare as one path
 
 Add one test to crates/lys-home/tests/given_record.rs that builds, under a temporary directory canonicalised as `B`, a real directory `B/real` holding `w/CLAUDE.md` and `c/CLAUDE.md`, and a symlink `B/link` to `B/real` made by the test, with no memory index file. It renders the fixture session with render-launch once as the reference (--cwd `B/real/w`, CLAUDE_CONFIG_DIR `B/real/c`) and once for each of three shapes: the symlinked directory (--cwd `B/link/w`, CLAUDE_CONFIG_DIR `B/link/c`), the `..` path (--cwd `B/real/w/../w`, CLAUDE_CONFIG_DIR `B/real/c/../c`), and the trailing slash (--cwd `B/real/w`, CLAUDE_CONFIG_DIR `B/real/c/`). Then it runs given-check on the reference entry for `B/real/w/CLAUDE.md` with --path in the symlinked and the `..` shapes. The existing test functions of the file keep their assertions, and the fixture builds their expectations from its temporary directory canonicalised. The test SHALL NOT depend on a symlink the platform provides, and SHALL NOT compare a render against itself.
@@ -140,6 +192,20 @@ Add one test to crates/lys-home/tests/given_record.rs that builds, under a tempo
 
 **Stories:**
 - S32 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every compaction in a session to say by ids, counts and hashes what it could not keep, so that a summary is never taken for the whole of what was said.
+
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1, each shape's config_dir and documents serialise to the same bytes as the reference, and the reference's config_dir.path is B/real/c: met in three_shapes_of_one_directory_record_and_compare_as_one_path, which compares serde_json::to_vec of each key read from the raw session line. Row 2, `compared == 3` is asserted: met. Row 3, the two given-checks (link and `..`) each exit 0 matches, and `checks == 2` is asserted: met. Row 4: the five earlier tests (two in the file, three in given_record/refusals.rs) keep their assertions unchanged. Only the fixture's base became the canonicalised tempdir, and refusals.rs is untouched. Row 5, the new test is listed as passed: this is my belief, not something I ran. Each shape is a separate render, asserted with assert_ne on the given ids, so no render is compared with itself. The symlink is made by the test.
+- Deviation: (none)
+- Files changed:
+  - modified: `crates/lys-home/tests/given_record.rs` — Adds three_shapes_of_one_directory_record_and_compare_as_one_path. The fixture gains Fixture::under_real (B/real/w and B/real/c each with a CLAUDE.md, no memory index), Fixture::link (makes the B/link symlink), given_in (renders with a given cwd and config and returns the entry's data as the session file holds it) and base (the canonicalised tempdir). All paths are built from base.
+- Checklist delivery:
+  - [ ] C76 — A compact_boundary whose logicalParentUuid names no record in the file imports, and its lys.loss entry names that uuid as unresolved. — Every R4 row is met. C76 describes an unresolved logicalParentUuid in compaction import, which is outside this brief. Not claimed.
+- Story delivery:
+  - [ ] S32 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every compaction in a session to say by ids, counts and hashes what it could not keep, so that a summary is never taken for the whole of what was said. — S32 is compaction loss accounting, which this change does not deliver.
 
 ### R5: State the canonicalisation rule in RECORD.md and render the cluster
 
@@ -163,6 +229,20 @@ Extend the lys.given paragraph of docs/design/home/RECORD.md to state: every abs
 
 **Stories:**
 - S33 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want to list a session's compactions with a check that every summarised entry and block is still held, so that I can prove on a compacted session that the original is all still there.
+
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1, the paragraph contains `canonicalised`, `link position`, `unresolved` and `trailing slash`, and names instructions.md and mcp.json as the exemption: met, in the text added after 'every path but the two written files is absolute' in RECORD.md. Row 2, it states the slug is computed from the working directory as given: met, last sentence of the added text. Row 3, `Data is exactly {harness, harness_version, kinds, config_dir, documents, environment}` is untouched: met. Row 4: I ran scripts/design/render-cluster.py docs/design/home and it changed no rendered file, so DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/HOME-010.md already match their JSON. I believe gate.sh exits 0 but did not run it. The paragraph still says the same about the order, the kinds, the absent positions and the entry's place under the render event.
+- Deviation: The brief lists docs/design/home/briefs/HOME-010.md as created and DESIGN.md, CHECKLIST.md and USER-STORIES.md as modified. HOME-010.md already existed on this branch, and render-cluster.py reproduced all four byte for byte, so none of them changed. Also: the verification step `grep -rn 'canonicalize' crates/lys-home/src | grep -v '_tests.rs'` also prints crates/lys-home/src/record/lock.rs:114. That line was already there before this change (it is in HEAD) and is not given-path code, so the grep will not show given_path.rs alone.
+- Files changed:
+  - modified: `docs/design/home/RECORD.md` — The lys.given paragraph now states the rule. Every absolute path is canonicalised before it is recorded or compared. The config and working directories are canonicalised whole. A document keeps its own name under a canonicalised parent, so it is recorded at its link position. instructions.md and mcp.json are the exemption. Only the config directory can carry a trailing slash, and canonicalisation removes it. A path that does not exist is recorded as given and named in `unresolved` by `given` and `given-check`, and the data keeps its six fields. Any other failure is refused by path and operation. given-check canonicalises both paths at check time. The slug is computed from the working directory as given.
+- Checklist delivery:
+  - [ ] C77 — Two imports of the compaction fixture into two homes give lys.loss lines equal byte for byte once id, parentId, timestamp and data.compaction_id are masked. — Every R5 row is met. C77 describes byte-equal lys.loss lines across two imports, which is outside this brief. Not claimed.
+- Story delivery:
+  - [ ] S33 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want to list a session's compactions with a check that every summarised entry and block is still held, so that I can prove on a compacted session that the original is all still there. — S33 is listing compactions, which this change does not deliver.
 
 ## Boundaries
 

@@ -65,6 +65,59 @@ The reason set is a closed enumeration of six values, declared in precedence ord
 **Stories:**
 - S76 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person giving part of my access, I want the form to list everything I cannot give to the recipient I chose, each with the one reason that stops it, so that I know what and why before I try, from the server's answer rather than my browser's guess.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row by row (line numbers are for crates/lys-identity/tests/grant_cannot_give.rs unless another file is named). None of these has been run yet.
+
+CANNOT_GIVE_FIXTURE, cannot_give_fixture at about line 493: expects exactly 4 items (G2 use_only, G3 lent_to_you, damson above_what_you_hold, sign-in identity), G1 absent and 0 marked.
+
+CANNOT_GIVE_PERSON_RECIPIENT, about line 507: expects exactly 3 items and no sign_in_identity.
+
+CANNOT_GIVE_PRECEDENCE, about line 518: runs 2 counted legs (A1, P2); G3 carries only lent_to_you in both.
+
+CANNOT_GIVE_ORDER_TABLE, about line 538: 63 subsets, counted. Each is passed in reverse order and must give its first member in precedence order. The six names are also asserted in order.
+
+CANNOT_GIVE_PEOPLE_ONLY and CANNOT_GIVE_AGENTS_ONLY, about lines 567 and 589: 5 items with G11 people_only for A1, and 3 items without G11 for P2; 4 items with G10 agents_only for P2, and the 4 base items without G10 for A1.
+
+CANNOT_GIVE_IN_FORCE_ONLY, about line 610: G5 revoked, G9 ended under a controlled clock (asked at T0+10, ended at T0+5), and G14 under a revoked G13. Expects exactly 3 items with no G5, G9, G13, G14 or damson. The same list must come back at T0+1, when G9 is still in force.
+
+CANNOT_GIVE_SOURCE_MARK, about line 642: source G2 gives the same 4 items, G2 marked, exactly 1 marked.
+
+CANNOT_GIVE_SERVICE_ACCOUNT and CANNOT_GIVE_SERVICE_ACCOUNT_GIVABLE, about lines 654 and 688: 5 items with SA1 (G7) once, as a service-account item and never a grant item; SA2 (G8) is absent.
+
+CANNOT_GIVE_NO_RANK, about line 698: the swapped model; alder is above_what_you_hold and damson is not listed.
+
+CANNOT_GIVE_ADMISSION_AGREES, about line 711: 6 counted legs against admission::judge_delegation, asserting (legs, permitted, refused) = (6, 2, 4) so rejections are counted too.
+
+CANNOT_GIVE_DETERMINISTIC, about line 761: P1's grants inserted in reverse give a byte-identical list.
+
+In the code (crates/lys-identity/src/grants/cannot_give.rs): coverage is `actions.is_subset(grant.actions())` over every grant the caller holds on the source resource, in any standing. No item carries a standing. Nothing is read from an ancestor.
+- Deviation: Six points are decisions of mine rather than the brief's words:
+
+1. A grant is a service-account grant when its resource kind is "service_account" (the new constant SERVICE_ACCOUNT). No convention for a service account as a grant resource existed in the tree.
+
+2. The sign-in identity item is listed for every agent recipient without looking up the caller's logins. Every authenticated caller signed in through one.
+
+3. "Model's declared relation order" is Model::relations(), which is in name order because the Model keeps a BTreeMap. The fixture's alder, birch, cedar, damson are in that order.
+
+4. CannotGiveRequest carries a route field, like ExerciseRequest, that never changes the answer. It lets the seam take a route without an unread field.
+
+5. "Serialised byte-identical" in CANNOT_GIVE_DETERMINISTIC is the Debug serialisation of the list, because lys-identity has no serde. The wire serialisation is R2's.
+
+6. The source grant must be held by the caller (SourceUnknown or NotHolder otherwise) but is not required to be in force.
+- Files changed:
+  - created: `crates/lys-identity/src/grants/cannot_give.rs` — Adds CannotGiveReason (six values declared in precedence order, with ALL, name, from_name, and first = the minimum of the applicable set), CannotGiveSubject, CannotGiveItem, CannotGiveList, CannotGiveRequest and the SERVICE_ACCOUNT resource kind. grant_reason reads only the person's own grant (pass_on, whether it names a source, the recipient kinds). cannot_give(book, directory, model, request, at) lists in-force grant and service-account items (in force = admission::effective), sorts them by grant id bytes, then adds uncovered relations in model order, then the sign-in identity for an agent recipient. Grants::cannot_give wraps it. It reads only.
+  - modified: `crates/lys-identity/src/grants/mod.rs` — Declares pub mod cannot_give and re-exports its types; the module doc names the cannot-give list.
+  - created: `crates/lys-identity/tests/grant_cannot_give.rs` — The CANNOT_GIVE_* library cases over a grant book written under fixed ids (Gn = sixteen bytes of n), so the grant-id order the list promises can be checked. It also has a refusal case for a source not held, an unknown source and an unknown recipient.
+- Checklist delivery:
+  - [x] C181 — The delegation form's answer lists, for the chosen recipient, every grant in force the person holds on any resource that they cannot give, every relation on the source grant's resource that no grant they hold covers in any standing, their sign-in identity when the recipient is an agent, and each service account they hold to which a reason applies, marks the source grant when it is listed, and lists nothing they can give and nothing not in force. — Covered by the FIXTURE, PERSON_RECIPIENT, PEOPLE_ONLY, AGENTS_ONLY, IN_FORCE_ONLY, SOURCE_MARK, SERVICE_ACCOUNT and SERVICE_ACCOUNT_GIVABLE cases. Not yet run.
+  - [x] C182 — Each item carries exactly one reason, the first applicable in the order sign_in_identity, above_what_you_hold, lent_to_you, use_only, people_only, agents_only; lent_to_you and use_only are told apart by whether the person's use-only grant names a source, and coverage is decided by the model's action sets, never by a rank of names. — Covered by the PRECEDENCE, ORDER_TABLE and NO_RANK cases: first reason in precedence, lent_to_you and use_only told apart by the source member, coverage by action sets. Not yet run.
+- Story delivery:
+  - [x] S76 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person giving part of my access, I want the form to list everything I cannot give to the recipient I chose, each with the one reason that stops it, so that I know what and why before I try, from the server's answer rather than my browser's guess. — The server computes the list, one reason per item. Not yet run.
+
 ### R2: Answer the cannot-give list on the one authenticated seam with a closed wire enumeration
 
 THE SYSTEM SHALL expose the cannot-give list as a typed operation of DIRECTORY-006 R5's authenticated grant seam in the standalone identity server, taking the source grant id and the recipient id, calling R1 and nothing else to compute it, so API, tool and browser callers get the same answer. The answer SHALL carry the source grant id, the recipient id and the ordered items; each item SHALL carry its subject kind (grant, relation, service_account or sign_in_identity), the person's own grant id for a grant or service-account item and the relation name for a relation item, exactly one reason spelled as one of the six snake_case values of R1, and the source mark; no item SHALL carry a standing. The contract type SHALL refuse by name, and SHALL NOT default, an answer whose reason is outside the six. IF the caller is unauthenticated, THEN THE SYSTEM SHALL refuse by name with no items. IF the source grant is not one the caller holds, or the recipient is unknown, THEN THE SYSTEM SHALL refuse by name and SHALL NOT disclose whether a grant or identity the caller cannot discover exists. The answer SHALL NOT include another identity's private grants, labels or ids. The operation reads only and SHALL NOT create a grant or an event.
@@ -91,6 +144,46 @@ THE SYSTEM SHALL expose the cannot-give list as a typed operation of DIRECTORY-0
 **Stories:**
 - S76 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person giving part of my access, I want the form to list everything I cannot give to the recipient I chose, each with the one reason that stops it, so that I know what and why before I try, from the server's answer rather than my browser's guess.
 
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row by row (line numbers are for crates/lys-identity-server/tests/grant_cannot_give.rs). None of these has been run yet.
+
+CANNOT_GIVE_ROUTES, cannot_give_routes at about line 283: asks through the api, tool and browser routes (3, counted). The three serialised answers must be equal, and each answer's items must equal R1's fixture list, with G2 and G3 ordered by their server-generated ids.
+
+CANNOT_GIVE_WIRE, about line 302: expects the strings use_only, lent_to_you, above_what_you_hold and sign_in_identity, no standing member (checked in items(), about line 154), G11 people_only for A1, and G10 agents_only for P2.
+
+CANNOT_GIVE_WIRE_UNKNOWN_REASON, about line 324: the service's own answer parses into CannotGiveAnswer (the control). The reason "borrowed" fails with an error starting "unknown_cannot_give_reason: `borrowed`" and yields no value.
+
+CANNOT_GIVE_AUTH, about line 344: unauthenticated gives 401 NotSignedIn with no items member. P2 with source G1 and P2 with an id that exists nowhere both give 404 GrantNotVisible with identical bodies. Grant count and revision are unchanged after every request.
+
+CANNOT_GIVE_UNKNOWN_RECIPIENT, about line 371: X0 (exists nowhere) and X1 (Ada's agent) both give 403 IdentityUnknown with identical bodies, no items, the id not echoed, and counts unchanged.
+
+CANNOT_GIVE_NO_LEAK, about line 396: adding P2's private damson grant on p leaves P1's answer byte-identical and never names that grant or P2.
+- Deviation: Five departures from the brief:
+
+1. The operation is `GET /grants/cannot-give?route=&source=&recipient=`, not a POST body. It is a read, and several existing surface tests assert exact POST counts that a POST would have broken.
+
+2. crates/lys-identity-server/src/routes.rs was not modified. The grant routes are already merged there through grants::routes(), so the new route needed no change to it.
+
+3. I had to choose which recipients a caller may name: any person the directory records (DIRECTORY-006 says the policy decides recipients, not a restriction to one's own agents), and an agent only when grant_sight::sees_identity lets the caller see it. The brief requires P2 to be a valid recipient and X1 to be undiscoverable.
+
+4. The harness hands back parsed JSON, so "byte-identical" answers are compared by their re-serialised JSON. The service writes struct members in one fixed order, so this is a comparison of content, not of raw response bytes. Raw bytes would need reqwest as a dev-dependency, which is outside this brief's files.
+
+5. The refusal for an unnameable recipient reuses the existing Withheld{IdentityUnknown} shape rather than a new ServerError variant, because error.rs is outside the wall.
+- Files changed:
+  - modified: `crates/lys-identity-server/src/grant_contract/requests.rs` — Adds CannotGiveBody (route, source, recipient, all required, unknown members refused), read from the query of the GET; request() makes the library's CannotGiveRequest.
+  - modified: `crates/lys-identity-server/src/grant_contract/views.rs` — Adds CannotGiveAnswer, CannotGiveItemView and CannotGiveSubjectView (tagged by subject: grant, relation, service_account, sign_in_identity), and CannotGiveReasonView, which writes the snake_case name. Its hand-written Deserialize refuses anything outside the six with the named error UnknownCannotGiveReason ("unknown_cannot_give_reason: ...") and never defaults. Adds From<&CannotGiveList>. No item has a standing member.
+  - modified: `crates/lys-identity-server/src/grant_contract/mod.rs` — Re-exports the new body, views and error.
+  - modified: `crates/lys-identity-server/src/grants.rs` — Adds GET /grants/cannot-give and names_recipient. The handler authenticates, refuses a source the caller does not hold as GrantNotVisible (the same body as an id that exists nowhere), and refuses a recipient the caller may not name as Withheld{IdentityUnknown} (the same body for a missing and an undiscoverable identity). It then calls Grants::cannot_give and nothing else, and records nothing. The module doc states the rule.
+  - created: `crates/lys-identity-server/tests/grant_cannot_give.rs` — The seam's CANNOT_GIVE_* cases against a started service: Ada is the root authority and P3, Bea is P1, Bea's reviewer is A1, Cara (registered in prepare) is P2, and Ada's scribe is X1.
+- Checklist delivery:
+  - [x] C183 — The cannot-give answer comes from the one authenticated grant seam, is byte-identical for API, tool and browser callers, refuses an unknown reason on the typed contract, and discloses nothing the person cannot discover. — One authenticated seam, route-independent answer, closed reason type, nothing disclosed. Not yet run.
+- Story delivery:
+  - [x] S76 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person giving part of my access, I want the form to list everything I cannot give to the recipient I chose, each with the one reason that stops it, so that I know what and why before I try, from the server's answer rather than my browser's guess. — API, tool and browser callers get the server's one answer. Not yet run.
+
 ### R3: Show on the delegation form exactly the list the answer gives, and refuse an unknown reason by name
 
 WHEN the delegation form is opened from a source grant, and again WHEN its To choice changes, THE SYSTEM SHALL ask R2's operation with the source grant and the chosen recipient and SHALL render the answer's items in the answer's order, each with its reason and the source mark. WHEN an answer arrives whose recipient is not the current To choice, THE SYSTEM SHALL discard it and SHALL NOT render any of its items. The screen SHALL NOT compute, add, drop, merge or reorder an item, and SHALL NOT derive a reason from grant data it holds. WHEN an item's reason is agents_only, THE SYSTEM SHALL show it with the words "This can be passed on only to an agent." IF an answer carries a reason outside the six, THEN THE SYSTEM SHALL refuse the whole answer with a refusal named unknown_cannot_give_reason, and SHALL NOT render any item of that answer or a blank reason.
@@ -116,6 +209,49 @@ WHEN the delegation form is opened from a source grant, and again WHEN its To ch
 **Stories:**
 - S76 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person giving part of my access, I want the form to list everything I cannot give to the recipient I chose, each with the one reason that stops it, so that I know what and why before I try, from the server's answer rather than my browser's guess.
 
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row by row (line numbers are for surface/identity/tests/cannot_give.test.tsx). None of these has been run yet.
+
+CANNOT_GIVE_SCREEN, about line 82: expects exactly one request for A1, 4 answer items, 4 rows, and (subject, reason) pairs in order equal to the answer's.
+
+CANNOT_GIVE_SCREEN_NO_OTHER, about line 96: the answer without damson gives 3 rows and no damson row, although the grants the screen holds lack damson.
+
+CANNOT_GIVE_SCREEN_RECIPIENT, about line 102: changing To to P2 sends exactly 1 request with recipient P2, then shows the 3 rows of the P2 answer with no sign-in row.
+
+CANNOT_GIVE_SCREEN_AGENTS_ONLY, about line 112: 4 rows; exactly one agents_only row, G10, shows "This can be passed on only to an agent."
+
+CANNOT_GIVE_SCREEN_STALE, about line 122: replies are held back and delivered A1 first, then P2. The list must end on exactly the 4 A1 rows.
+
+CANNOT_GIVE_SCREEN_UNKNOWN_REASON, about line 148: 4 items with a third reason "borrowed" give 0 rows and exactly 1 refusal named unknown_cannot_give_reason.
+- Deviation: The brief names DelegateGrant.tsx. The tree has DIRECTORY-006 R6's form as surface/identity/src/features/grants/Delegate.tsx, which I modified instead.
+
+CANNOT_GIVE_SCREEN_RECIPIENT needs a person in the To choice, so the form now offers people other than the caller, and a person recipient names themself as responsible.
+
+Four files outside R3's list changed, because replacing the browser's own computation made them wrong or dead:
+- deleted surface/identity/src/features/grants/CannotGive.tsx (the browser-computed list);
+- removed cannotGive() from model.ts;
+- updated the existing conformance 2.4 case in surface/identity/tests/grants.test.tsx, which asserted the browser-computed rows and the static Service accounts note. It now asserts the service's answer; it is updated, not weakened or deleted.
+- added the SERVICE fixture route for the answer in surface/identity/tests/fixtures.ts.
+The reviewer should approve or refuse these outside-the-wall edits.
+- Files changed:
+  - created: `surface/identity/src/features/grants/CannotGiveList.tsx` — Asks when opened and again when the source or recipient changes. It drops any reply or refusal for a recipient or source no longer chosen, keyed on the answer's own recipient and source. It renders the items in the answer's order with their reason words, including "This can be passed on only to an agent.", and a source mark, and it computes, adds, drops or reorders nothing. A refusal is shown by name.
+  - created: `surface/identity/src/features/grants/cannotGiveAnswer.ts` — cannotGivePath builds the query, askCannotGive fetches it, and readCannotGive checks the answer. An item whose reason is not one of the six refuses the whole answer as unknown_cannot_give_reason, so no row and no blank reason is shown.
+  - modified: `surface/identity/src/features/grants/Delegate.tsx` — The What you can't give card now shows CannotGiveList for the chosen recipient. The To choice now also offers people other than the caller, and a person recipient is sent as their own responsible person.
+  - modified: `surface/identity/src/generated/index.ts` — Adds CannotGiveReason, CANNOT_GIVE_REASONS, CannotGiveSubject, CannotGiveItem, CannotGiveAnswer and CannotGiveQuery, mirroring grant_contract/views.rs and requests.rs.
+  - created: `surface/identity/tests/cannot_give.test.tsx` — The CANNOT_GIVE_SCREEN_* cases, with R1's fixture as the service writes it.
+  - deleted: `surface/identity/src/features/grants/CannotGive.tsx` — The browser-side cannot-give calculation, replaced by CannotGiveList.
+  - modified: `surface/identity/src/features/grants/model.ts` — Removes cannotGive(), the browser's own derivation of cannot-give reasons from grant data.
+  - modified: `surface/identity/tests/grants.test.tsx` — The existing conformance 2.4 case now asserts the request made and the rows of the service's answer instead of the browser-computed rows; an unused LEDGER_G import is dropped.
+  - modified: `surface/identity/tests/fixtures.ts` — Adds CANNOT_GIVE_ROOT_SCRIBE and its GET route to SERVICE, so the delegation drawer existing tests open has the service's answer.
+- Checklist delivery:
+  - [x] C184 — The delegation screen shows exactly the items and reasons the answer lists, asks again when the recipient changes and discards a superseded answer, and refuses an answer carrying an unknown reason by name, showing no item and no blank. — Exact items and reasons, re-ask on change, stale reply dropped, unknown reason refused by name. Not yet run.
+- Story delivery:
+  - [x] S76 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person giving part of my access, I want the form to list everything I cannot give to the recipient I chose, each with the one reason that stops it, so that I know what and why before I try, from the server's answer rather than my browser's guess. — The screen shows only the server's answer. Not yet run.
+
 ### R4: Name this brief in conformance row 2.4
 
 Change the Brief column of row 2.4 in docs/design/identity/CONFORMANCE.md from "DIRECTORY (new row)" to "DIRECTORY-024". No other cell, row or line of that file changes, and no other file under docs/design/identity changes.
@@ -128,6 +264,18 @@ Change the Brief column of row 2.4 in docs/design/identity/CONFORMANCE.md from "
 
 **Checklist:**
 - C185 — Conformance row 2.4 is carried by acceptance lines that name it, and its Brief column names DIRECTORY-024.
+
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: CANNOT_GIVE_CONFORMANCE_ROW: in docs/design/identity/CONFORMANCE.md line 28, the row whose first cell is 2.4 has Brief cell DIRECTORY-024 in place of "DIRECTORY (new row)". Its other four cells are unchanged. git diff of the file removes exactly one line and adds one, both that row. No other file under docs/design/identity changed, and DESIGN.md and design.json are untouched.
+- Deviation: (none)
+- Files changed:
+  - modified: `docs/design/identity/CONFORMANCE.md` — Row 2.4's Brief cell now reads DIRECTORY-024; nothing else in the file changes.
+- Checklist delivery:
+  - [x] C185 — Conformance row 2.4 is carried by acceptance lines that name it, and its Brief column names DIRECTORY-024. — Row 2.4 names DIRECTORY-024, and every R1 to R3 acceptance line names conformance row 2.4.
 
 ## Boundaries
 

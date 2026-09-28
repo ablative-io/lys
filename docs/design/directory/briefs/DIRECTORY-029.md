@@ -89,9 +89,21 @@ Structure: a start request names exactly three members, the agent, the profile v
 
 **Dev (recorded):**
 
-- Status: blocked
-- How: Not built. Needs crates/lys-identity/src/start/ (DIRECTORY-003's crate) and DIRECTORY-011's enduring agent record. ls crates shows lys, lys-anchor, lys-anchor-cli, lys-core, lys-home and lys-log-store, with no lys-identity.
-- Deviation: Blocked on DIRECTORY-003 and DIRECTORY-011. Creating the crate here would put a file outside this brief's wall, and resolving agents without DIRECTORY-011's record would fake an owner's record.
+- Status: implemented
+- How: Row 1 met: request.rs:41 from_members parses the three members, tested in tests/start_request.rs three_members_parse_into_a_start_request. Rows 2 and 3 met: an extra member is refused first, naming it, and the words contain 'executable' or 'working_directory'; record_count stays 0 and checks_run stays 0 (test an_executable_or_a_working_directory_in_the_request_is_refused). Row 4 met: a request without machine is refused as start_member_missing and the words contain 'machine' (a_request_without_its_machine_is_refused). Row 5 met: give.rs:172 give_request resolves the agent (request.rs:97) before admission and the checks. agent-fixture-missing is refused with checks_run 0, record_count 0, no signed events, the fixture's agent count still 1 and its bytes unchanged (an_agent_with_no_record_is_refused_and_nothing_is_written). Row 6 met: every_refusal builds all 14 variants, asserts the count is 14 and that the names equal REFUSAL_NAMES (error.rs:104). The test checks that Display, Debug and JSON do not contain fixture-credential-value-1f3a, and counts 14 checked. Every record a start keeps names AgentRecord.id, the enduring id (give.rs, record.agent = agent.id). DIRECTORY-011's record is read through the AgentRecords seam only; in production it is the directory projection.
+- Deviation: (none)
+- Files changed:
+  - created: `crates/lys-identity/src/start/mod.rs` — Declares the start module's submodules and re-exports, and states the module's invariants: nothing runs a process, no credential value, no faked owner record, no agent or session record written.
+  - created: `crates/lys-identity/src/start/request.rs` — StartRequest with exactly three members (agent, profile_version, machine). from_members refuses a member outside the three as start_field_not_allowed and a missing one as start_member_missing. Also holds the AgentRecords seam and resolve(), which refuses an unknown agent as agent_unknown.
+  - created: `crates/lys-identity/src/start/error.rs` — The Refusal enum: 14 variants, stable names in REFUSAL_NAMES, words that name the check, and no field that could hold a credential value. Also Refused, StartError, and the hand-written JSON the route and the CLI answer.
+  - created: `crates/lys-identity/tests/start_request.rs` — Tests for R1: parsing, the executable and working_directory refusals, the missing machine, agent_unknown with zero check runs and zero records, and all 14 refusals with a redaction check.
+  - modified: `crates/lys-identity/src/lib.rs` — Declares pub mod start.
+- Checklist delivery:
+  - [x] C234 — A start request names only the agent, the profile version and the machine; the command given reads env LYS_AGENT_ID=<agent id> LYS_LAUNCH_RECORD=<launch record id> LYS_CREDENTIAL_IDS=<comma-separated credential ids> before the reviewed profile version's own executable and its recorded arguments, unchanged and in order, with the recorded working directory, each value shell-quoted and refused by name outside its id grammar; it is not a lys subcommand, and a request that sets the executable or the working directory is refused by name. — Only three members are allowed, and the executable and working directory are refused by name. The command's shape is delivered in R9 and R11.
+  - [x] C241 — A start resolves its agent to the enduring agent record the provision brief DIRECTORY-011 keeps and is refused by name, writing nothing, when there is none; a start never creates or changes an agent record and writes no session record, and a start of an agent already running is given as a new launch record naming the same agent, whose session record the report makes in the sessions brief's store. — An unknown agent is refused before anything else runs and nothing is written. R11 covers the start of a running agent, which keeps a new record and writes no session record.
+- Story delivery:
+  - [x] S107 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want the command I am given to run the executable in the working directory that were reviewed, so that no start request can change what runs. — No request member can set the executable or the working directory.
+  - [x] S108 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want starting my agent again while it runs to become a second session of the same agent, so that starting never makes another agent and never changes the one I registered. — A start only reads the agent record; R11 shows a second start of a running agent becomes a new launch record for the same agent.
 
 **Review (recorded):**
 
@@ -130,9 +142,16 @@ WHEN a start, a start given again or a withdrawal is asked for an agent, THE SYS
 
 **Dev (recorded):**
 
-- Status: blocked
-- How: Not built. The authority step needs DIRECTORY-003's crate and the step-1 admission from DIRECTORY-003 and DIRECTORY-005.
-- Deviation: Blocked on DIRECTORY-003 and DIRECTORY-005.
+- Status: implemented
+- How: Row 1 met: admit (authority.rs:32) answers Admitted{caller: admin-fixture} (test the_admitted_administrator_is_admitted). Row 2 met: person-fixture-1, the recorded responsible person, is admitted once the admission fixture admits them (the_responsible_person_the_admission_admits_is_admitted). A third test shows the same person is refused while step 1's admission does not admit them. Row 3 met: person-fixture-2 gets start_right_missing, the words contain 'agent-fixture-1' and 'start', the checks list is empty, checks_run is 0 and record_count is 0 (anyone_else_is_refused_naming_the_agent_and_the_right). Row 4 met: with a fixture grant held by person-fixture-2, the answer is still start_right_missing, because no seam a start reads carries a grant (a_grant_held_by_anyone_else_admits_nothing). The same admit() guards give_again and withdraw (give.rs, withdrawal.rs:72). In production, crates/lys-identity-server/src/start.rs's Directory admits only the configured administrator, as step 1 does.
+- Deviation: (none)
+- Files changed:
+  - created: `crates/lys-identity/src/start/authority.rs` — The Admission seam and admit(): admits the directory administrator, or the recorded responsible person only when the admission admits them; anyone else is refused as start_right_missing, naming the agent. No grant input exists.
+  - created: `crates/lys-identity/tests/start_authority.rs` — Tests the administrator, the admitted responsible person, the responsible person the admission does not admit, anyone else (zero check runs, zero records) and a fixture grant that still refuses.
+- Checklist delivery:
+  - [x] C238 — Only the agent's responsible person and a directory administrator (in step 1, the admitted administrator) have a working Start; anyone else is refused by name, naming the agent and the right they lack. — Only the administrator, or an admitted responsible person, is admitted; anyone else is refused by name, naming the agent and the right.
+- Story delivery:
+  - [x] S106 (Person without the right to start, Opens an agent file that is not theirs to start) — As a person who is neither the agent's responsible person nor a directory administrator, I want a refusal naming the agent and the right I lack, so that I know why there is no working Start for me. — The refusal words name the agent and the right to start it.
 
 **Review (recorded):**
 
@@ -173,9 +192,19 @@ WHEN an admitted start is asked, THE SYSTEM SHALL run five named checks, each re
 
 **Dev (recorded):**
 
-- Status: blocked
-- How: Not built. The five-check run and the live lifecycle read need DIRECTORY-003's lifecycle record and crate.
-- Deviation: Blocked on DIRECTORY-003.
+- Status: implemented
+- How: Row 1 met: active::check (active.rs:21) passes on Active (the_agent_is_active_passes_on_active). Row 2 met: suspended is refused as agent_not_active; the words contain 'the agent is active' and 'suspended', the JSON has no command, and record_count is 0 (a_suspended_agent_is_refused_and_no_command_is_given). Row 3 met: registered fails and the words contain 'registered'. Row 4 met: with the review, role-machines, handle and egress records absent, give is refused with exactly 4 check_record_missing refusals, in order naming Ink1H1Os, Ink1H1Os, SECRETS-002 and row 8.5; record_count is 0 (four_missing_owner_records_are_four_named_refusals). Row 5 met: Check::ALL has 5 entries in the brief's order, and a passing start reports those 5 in order; checks_run is 5 (the_start_runs_exactly_five_checks_in_order). run (checks.rs:130) never substitutes a pass: each seam's None becomes Check::record_missing. In production the lifecycle state is read live from the directory projection (server start.rs, Directory impl of Lifecycles).
+- Deviation: (none)
+- Files changed:
+  - created: `crates/lys-identity/src/start/checks.rs` — The Check enum with Check::ALL in order, names and owning cards; CheckReport and Checked; run() runs all five checks against their seams and returns every result by name.
+  - created: `crates/lys-identity/src/start/active.rs` — The Lifecycles seam and the agent-is-active check: passes only on active, fails as agent_not_active naming the state, and answers check_record_missing when there is no lifecycle record.
+  - created: `crates/lys-identity/tests/start_checks.rs` — Tests active passing, suspended refused with no command and zero records, registered failing, four missing owner records giving four named refusals, and exactly five checks in order.
+- Checklist delivery:
+  - [x] C230 — Before a command is given the five named checks run (the agent is active, its profile version is reviewed, the machine is allowed for the role, its virtual credentials are valid, the machine may reach what the profile needs), a failed check names itself in words, and no command is given (CONFORMANCE 5.2). — The five named checks run before any command; a failure names its check; no command is given.
+  - [x] C231 — While a check's owning record does not exist, a start is refused by name, naming the check and the card that makes the record (Ink1H1Os, SECRETS-002, network row 8.5), and nothing is faked to let it through. — A missing owner record is refused naming the check and the card; nothing defaults.
+- Story delivery:
+  - [x] S109 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent's start command given only after its checks pass, so that I never start an agent that is not active, reviewed, allowed on the machine, credentialed and able to reach what it needs. — A command is given only after all five checks pass.
+  - [x] S99 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want each failed check named in words, so that I know what to fix before a command can be given. — Each failed check is named in words.
 
 **Review (recorded):**
 
@@ -214,9 +243,18 @@ THE SYSTEM SHALL check that the requested profile version has a review on record
 
 **Dev (recorded):**
 
-- Status: blocked
-- How: Not built. The review check needs DIRECTORY-003's crate and Ink1H1Os's review record.
-- Deviation: Blocked on DIRECTORY-003 and Ink1H1Os.
+- Status: implemented
+- How: Row 1 met: pv-fixture-1 passes (a_reviewed_version_passes). Row 2 met: pv-fixture-2 is refused as profile_version_not_reviewed and the words contain 'pv-fixture-2'. Row 3 met: with no record, check_record_missing with words containing 'its profile version is reviewed' and 'Ink1H1Os' (profile_review.rs:30). As the requirement says, it is blocked on Ink1H1Os by that name: the production seam in server start.rs, NotLanded("Ink1H1Os"), answers that the record does not exist, so every production start is refused by name and nothing is faked.
+- Deviation: (none)
+- Files changed:
+  - created: `crates/lys-identity/src/start/profile_review.rs` — The ProfileReviews seam, which reads Ink1H1Os's review record, and the check: passes only on Review::Reviewed, refuses as profile_version_not_reviewed, and answers check_record_missing naming Ink1H1Os.
+  - created: `crates/lys-identity/tests/start_profile_review.rs` — Tests the three acceptance rows against a review-record fixture.
+- Checklist delivery:
+  - [x] C230 — Before a command is given the five named checks run (the agent is active, its profile version is reviewed, the machine is allowed for the role, its virtual credentials are valid, the machine may reach what the profile needs), a failed check names itself in words, and no command is given (CONFORMANCE 5.2). — The check runs as the second of the five.
+  - [x] C231 — While a check's owning record does not exist, a start is refused by name, naming the check and the card that makes the record (Ink1H1Os, SECRETS-002, network row 8.5), and nothing is faked to let it through. — No record gives check_record_missing naming Ink1H1Os.
+- Story delivery:
+  - [x] S109 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent's start command given only after its checks pass, so that I never start an agent that is not active, reviewed, allowed on the machine, credentialed and able to reach what it needs. — An unreviewed version gives no command.
+  - [x] S99 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want each failed check named in words, so that I know what to fix before a command can be given. — The failure names the profile version.
 
 **Review (recorded):**
 
@@ -253,9 +291,18 @@ THE SYSTEM SHALL check that the requested machine is one of the machines the age
 
 **Dev (recorded):**
 
-- Status: blocked
-- How: Not built. The role-machines check needs DIRECTORY-003's crate and Ink1H1Os's role machines record.
-- Deviation: Blocked on DIRECTORY-003 and Ink1H1Os.
+- Status: implemented
+- How: Row 1 met: machine-fixture-1 passes for an agent holding role-fixture-builder (machine_role.rs:31). Row 2 met: machine-fixture-2 is refused and the words contain 'machine-fixture-2' and 'role-fixture-builder'. Row 3 met: no record gives check_record_missing with 'the machine is allowed for the role' and 'Ink1H1Os'. No other source of machines exists. Blocked on Ink1H1Os by that name for production, as the requirement states: the production seam answers that the record does not exist.
+- Deviation: (none)
+- Files changed:
+  - created: `crates/lys-identity/src/start/machine_role.rs` — The RoleMachines seam, which reads the roles card's role machines, and the check: refuses as machine_not_allowed_for_role naming the machine and the roles, and answers check_record_missing naming Ink1H1Os.
+  - created: `crates/lys-identity/tests/start_machine_role.rs` — Tests the three acceptance rows.
+- Checklist delivery:
+  - [x] C230 — Before a command is given the five named checks run (the agent is active, its profile version is reviewed, the machine is allowed for the role, its virtual credentials are valid, the machine may reach what the profile needs), a failed check names itself in words, and no command is given (CONFORMANCE 5.2). — The third of the five checks.
+  - [x] C231 — While a check's owning record does not exist, a start is refused by name, naming the check and the card that makes the record (Ink1H1Os, SECRETS-002, network row 8.5), and nothing is faked to let it through. — Missing record refused naming Ink1H1Os.
+- Story delivery:
+  - [x] S109 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent's start command given only after its checks pass, so that I never start an agent that is not active, reviewed, allowed on the machine, credentialed and able to reach what it needs. — A machine not allowed gives no command.
+  - [x] S99 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want each failed check named in words, so that I know what to fix before a command can be given. — Names the machine and the role.
 
 **Review (recorded):**
 
@@ -301,9 +348,21 @@ THE SYSTEM SHALL check that the agent holds valid virtual credentials, reading t
 
 **Dev (recorded):**
 
-- Status: blocked
-- How: Not built. HandleRecords and the door client need crates/lys-identity (DIRECTORY-003) and crates/lys-identity-server (DIRECTORY-005), and need SECRETS-002 R1 to fix the door's handle read shape.
-- Deviation: Blocked on DIRECTORY-003, DIRECTORY-005 and SECRETS-002 R1.
+- Status: implemented
+- How: Row 1 met: credentials.rs:59 HandleRecords has one method returning HandleAnswer. start_credentials.rs the_seam_answers_ids_and_validity_and_never_a_value reads the source and asserts HeldCredential's fields are exactly id and valid, and that HandleAnswer has no value, secret, token or credential field. Row 2 met: vc-fixture-1 active passes with exactly ['vc-fixture-1']. Row 3 met: revoked gives virtual_credentials_not_valid with 'agent-fixture-1'. Row 4 met: no record gives check_record_missing with 'its virtual credentials are valid' and 'SECRETS-002'. Row 5 met: the fixture keeps fixture-credential-value-1f3a beside the id, and no Debug, words or JSON output contains it (no_output_of_the_check_holds_the_value_kept_beside_it). Rows 6 to 9 met in crates/lys-identity-server/tests/door_handles.rs the_client_reads_the_doors_handle_records: active gives 1 id valid; revoked gives not valid and the check answers virtual_credentials_not_valid; 404 gives RecordMissing and check_record_missing with 'SECRETS-002'; an answer with a value field gives credential_value_in_answer with words containing 'vc-fixture-1' and 'value' and no ids. Neither the words nor Debug contain the value, the check answers credential_value_in_answer, and each of the 4 cases ran (2 requests each). The seam is wired into the route in R12. Blocked on SECRETS-002 by that name: the door's endpoint shape is taken from SECRETS-002 R1 as named in the brief, and the example is the person-run verification against the real door.
+- Deviation: Three changes from the brief. (1) HandleAnswer has a fourth answer, Unreadable{reason}, for a door that cannot be reached or answers an unexpected status. Folding transport failures into 'record missing' would be a silent failure, so the check surfaces it as StartError::Unavailable, which is not one of the 14 refusals, and gives no command. (2) SECRETS-002 has not landed, so the exact read shape is this client's reading of the brief: {holder, handles:[{id, state}]}, 404 for no record, and 'active' meaning valid. Any member beside id and state is refused as a possible value, which fails closed. (3) The client is hand-written over std::net rather than reqwest, so the synchronous seam works inside a spawn_blocking route and inside std-only tests. It has no timeout, per CLAUDE.md.
+- Files changed:
+  - created: `crates/lys-identity/src/start/credentials.rs` — HeldCredential {id, valid}; HandleAnswer (Held, RecordMissing, ValueInAnswer{record, field}, Unreadable{reason}); the HandleRecords trait with its one method; and the check, which hands on valid ids only.
+  - created: `crates/lys-identity/tests/start_credentials.rs` — A source-reading test of the seam's types, pass and handed-on ids, revoked, record missing, the value never appearing in any output, and credential_value_in_answer.
+  - created: `crates/lys-identity-server/src/door_handles.rs` — DoorHandles: a std-only HTTP/1.1 client of GET /secrets/handles?holder=<agent>. It takes ids and states only, treats 404 as record missing, and refuses an answer with any member beside id and state as ValueInAnswer, naming the handle and the member. Failures never quote the body. It also defines the credential_id grammar and report() for the example.
+  - created: `crates/lys-identity-server/tests/door_handles.rs` — A local std stub in the door's read shape. Four cases (active, revoked, missing, value) run through the client and through the check built over it; each case served exactly 2 requests and the case count is 4. Also tests the unconfigured client.
+  - created: `crates/lys-identity-server/examples/door_handles.rs` — cargo run -p lys-identity-server --example door_handles -- <door address> <agent> prints the credential count and each id with its validity, never a value. It depends only on this crate.
+- Checklist delivery:
+  - [x] C230 — Before a command is given the five named checks run (the agent is active, its profile version is reviewed, the machine is allowed for the role, its virtual credentials are valid, the machine may reach what the profile needs), a failed check names itself in words, and no command is given (CONFORMANCE 5.2). — The fourth of the five checks.
+  - [x] C231 — While a check's owning record does not exist, a start is refused by name, naming the check and the card that makes the record (Ink1H1Os, SECRETS-002, network row 8.5), and nothing is faked to let it through. — No record gives check_record_missing naming SECRETS-002.
+- Story delivery:
+  - [x] S109 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent's start command given only after its checks pass, so that I never start an agent that is not active, reviewed, allowed on the machine, credentialed and able to reach what it needs. — No valid credential means no command.
+  - [x] S99 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want each failed check named in words, so that I know what to fix before a command can be given. — The refusal names the agent.
 
 **Review (recorded):**
 
@@ -346,9 +405,18 @@ THE SYSTEM SHALL check that every destination the requested profile version need
 
 **Dev (recorded):**
 
-- Status: blocked
-- How: Not built. The egress check needs DIRECTORY-003's crate. Network row 8.5 has no card yet and needs one first.
-- Deviation: Blocked on DIRECTORY-003 and on network row 8.5, which has no card.
+- Status: implemented
+- How: Row 1 met: needs 'model providers' and 'mcp-fixture', both listed, passes (egress.rs:30). Row 2 met: only 'model providers' listed gives egress_not_reachable with words containing 'mcp-fixture'. Row 3 met: no egress record gives check_record_missing with 'the machine may reach what the profile needs' and 'row 8.5'. Open egress is never assumed. Blocked on network row 8.5 by that name for production: the production seam NotLanded("network row 8.5") answers that the record does not exist, so no production start passes every check.
+- Deviation: (none)
+- Files changed:
+  - created: `crates/lys-identity/src/start/egress.rs` — The ProfileNeeds and EgressLists seams and the check: egress_not_reachable names each unreachable destination. A missing egress record gives check_record_missing naming network row 8.5; missing profile needs gives the same, naming Ink1H1Os.
+  - created: `crates/lys-identity/tests/start_egress.rs` — Tests the three acceptance rows.
+- Checklist delivery:
+  - [x] C230 — Before a command is given the five named checks run (the agent is active, its profile version is reviewed, the machine is allowed for the role, its virtual credentials are valid, the machine may reach what the profile needs), a failed check names itself in words, and no command is given (CONFORMANCE 5.2). — The fifth of the five checks.
+  - [x] C231 — While a check's owning record does not exist, a start is refused by name, naming the check and the card that makes the record (Ink1H1Os, SECRETS-002, network row 8.5), and nothing is faked to let it through. — No record gives check_record_missing naming row 8.5.
+- Story delivery:
+  - [x] S109 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent's start command given only after its checks pass, so that I never start an agent that is not active, reviewed, allowed on the machine, credentialed and able to reach what it needs. — An unreachable destination means no command.
+  - [x] S99 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want each failed check named in words, so that I know what to fix before a command can be given. — Each destination is named.
 
 **Review (recorded):**
 
@@ -381,14 +449,10 @@ Structure: append one sentence to the spec of DIRECTORY-005 R1 and the same sent
 **Dev (recorded):**
 
 - Status: implemented
-- How: DIRECTORY-005's step-1 wording names Start as the one working control under DIRECTORY-029, which carves Start out of the statement that no agent-file control works in step 1. This round's gate failure was a stale render of DIRECTORY-029.md. python3 scripts/design/render-cluster.py docs/design/directory regenerated it, and the gate now passes. No other rendered file changed.
-- Deviation: The same render failure will come back each round. The workflow writes dev and review blocks into DIRECTORY-029.json after the answer and does not re-render. That is a chain defect outside this brief's files, so it is named here rather than fixed.
-- Files changed:
-  - modified: `docs/design/directory/briefs/DIRECTORY-005.json` — R1's spec and the step-1 boundary now say that under DIRECTORY-029, Start on the agent file is the one control working in step 1, for the admitted administrator, and every other grant, launch-profile, secret and memory control stays not working. acceptance/2 is aligned to match (unchanged this round).
-  - modified: `docs/design/directory/briefs/DIRECTORY-005.md` — Re-rendered from the JSON (unchanged this round).
-  - modified: `docs/design/directory/briefs/DIRECTORY-029.md` — Re-rendered from DIRECTORY-029.json after the workflow wrote its round-2 dev and review blocks, so the design gate's byte-identical render check passes. sh scripts/design/gate.sh exits 0.
+- How: All three rows are met by what is already on main. docs/design/directory/briefs/DIRECTORY-005.json requirements/0/spec and the boundary 'No grant, launch, secret or memory control is presented as working in step 1.' each already end with 'Under DIRECTORY-029, Start on the agent file is the one control that works in step 1, for the admitted administrator; every other grant, launch-profile, secret and memory control stays not working in step 1.' requirements/0/acceptance/2 already reads 'no control for permissions, secrets or memory is presented as working' and 'Under DIRECTORY-029, the Start control is the one that brief gives...', and does not contain 'launch' (checked by reading the JSON). DIRECTORY-005.md line 101 and the acceptance line carry the same text. The render check is left to the gate.
+- Deviation: No edit was made. The amendment R8 asks for was already on main, landed with commit f6f18d3 ('every brief written on the brief and card branches joins main'). Editing again would change nothing or double the sentence, so both files are left unchanged. Against this branch's base, the diff R8's first row measures is empty; the three strings already match the brief's wording.
 - Checklist delivery:
-  - [ ] C239 — The Start drawer and the unconfirmed notice are built on DIRECTORY-005's surface, and DIRECTORY-005's R1 and boundary name Start as the one control that works in step 1. — The DIRECTORY-005 wording half is done. The drawer half belongs to R13, which is blocked on surface/ (DIRECTORY-005).
+  - [x] C239 — The Start drawer and the unconfirmed notice are built on DIRECTORY-005's surface, and DIRECTORY-005's R1 and boundary name Start as the one control that works in step 1. — DIRECTORY-005 R1 and its boundary name Start as the one control that works in step 1 (already on main). The drawer is in R13.
 
 **Review (recorded):**
 
@@ -428,9 +492,17 @@ The executable and the working directory a command runs are fields of the review
 
 **Dev (recorded):**
 
-- Status: blocked
-- How: Not built. The ProfileVersionRecords seam needs DIRECTORY-003's crate and Ink1H1Os's profile version record. The rg check for 'struct ProfileVersion' is vacuous over the missing directory and is not claimed.
-- Deviation: Blocked on DIRECTORY-003 and Ink1H1Os.
+- Status: implemented
+- How: Row 1 met: the_seam_declares_exactly_three_reads reads profile_command.rs:16 and finds exactly [executable, arguments, working_directory]. Row 2 met: no_profile_version_record_is_defined_here reads every file in src/start and finds 0 lines with 'struct ProfileVersion'. Row 3 met: a start with pv-fixture-1 reads 'fixture-exec', ['--fixture-arg','two words'] and 'fixture-cwd'. Row 4 met: with no working directory, the start is refused as profile_version_field_missing, the words contain 'working directory' and 'Ink1H1Os', and record_count is 0. The fields never come from the request (R1 refuses them), the machine, a default or the mock-up: give.rs reads them only through the seam, or copies them from a kept record on start-again. AMENDMENT carried by this dev record, to the roles card Ink1H1Os: the executable, the recorded arguments (in order) and the working directory are fields of Ink1H1Os's profile version record, added there and never in a copy this card keeps. Until that record lands, this requirement stays blocked on Ink1H1Os by that name. The production seam NotLanded("Ink1H1Os") answers every field as missing. The implementation of ProfileVersionRecords over the landed record, and any manifest it needs, are to be named by revising the brief when it lands. No Cargo dependency on a roles-card type was taken.
+- Deviation: (none)
+- Files changed:
+  - created: `crates/lys-identity/src/start/profile_command.rs` — The ProfileVersionRecords trait (executable, arguments, working_directory, and nothing else), ProfileCommand, and read(), which refuses a missing field as profile_version_field_missing naming the field and Ink1H1Os.
+  - created: `crates/lys-identity/tests/start_profile_command.rs` — A source test that the trait has exactly 3 reads; a scan of src/start finding no 'struct ProfileVersion'; the fixture start reading exe, args and wd exactly; and the missing working directory refused with zero records.
+- Checklist delivery:
+  - [x] C234 — A start request names only the agent, the profile version and the machine; the command given reads env LYS_AGENT_ID=<agent id> LYS_LAUNCH_RECORD=<launch record id> LYS_CREDENTIAL_IDS=<comma-separated credential ids> before the reviewed profile version's own executable and its recorded arguments, unchanged and in order, with the recorded working directory, each value shell-quoted and refused by name outside its id grammar; it is not a lys subcommand, and a request that sets the executable or the working directory is refused by name. — The command's executable, arguments and working directory come only from the reviewed profile version.
+- Story delivery:
+  - [x] S103 (Operator, Installs and runs the standalone identity product) — As the operator, I want a kept launch record for every command given, so that I can give the same start again without looking inside a running process. — The launch record copies the fields, so a start can be given again from it (R11).
+  - [x] S107 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want the command I am given to run the executable in the working directory that were reviewed, so that no start request can change what runs. — What runs is the reviewed executable in the reviewed directory.
 
 **Review (recorded):**
 
@@ -482,9 +554,23 @@ Structure: a launch record is one signed directory event (P4) of a kind added to
 
 **Dev (recorded):**
 
-- Status: blocked
-- How: Not built. The launch record events and state derivation need DIRECTORY-003's crate and IDENTITY-EVENTS.md, which is still absent, and d5055cc1's verified report. The ruling that lys/session-start/v1 is not defined here still stands.
-- Deviation: Blocked on DIRECTORY-003 and d5055cc1.
+- Status: implemented
+- How: Row 1 met (CONFORMANCE 5.6): L1 with no report reads unconfirmed (tests/start_state.rs with_no_report_a_record_reads_unconfirmed; derive at state.rs:504). Row 2 met (CONFORMANCE 5.5): a verified report naming agent-fixture-1 and L1 reads Running{sess-fixture-1}. Row 3 met: a report naming agent-fixture-2 leaves it unconfirmed. Row 4 met: an unverified report leaves it unconfirmed (both in a_report_naming_another_agent_or_not_verified_leaves_it_unconfirmed, case count 2). Row 5 met: with L1 and L2 kept and a report naming only L2, L2 reads running and L1 unconfirmed. Row 6 met: standing (state.rs:545) answers Some(L1). Row 7 met: admin-fixture withdraws L1, which reads withdrawn; the withdrawal names admin-fixture at 42, and standing answers None. Row 8 met: person-fixture-2 is refused start_right_missing, L1 stays unconfirmed, and withdrawal_count is 0. Row 9 met: a report after the withdrawal reads running with the withdrawal by admin-fixture beside it (also in the JSON). Row 10 met: running L1 does not stand. Row 11 met: across unconfirmed, withdrawn, start-again and running, no name, words or JSON contains 'not started' or 'not_started' (compared lowercased). Row 12 met: the sessions fixture's Debug bytes and the agent records' bytes are identical before and after the withdrawals and the start-again. Nothing in the module writes either: both are read-only seams. SESSION-START RULING carried by this dev record: the sessions brief of run d5055cc1 (currently drafted as DIRECTORY-015) adds the launch record id to lys/session-start/v1 before its tag freezes. Its signed message then holds five things: the tag, the agent's directory id, the directory's identifier, the launch record id (which the agent reads from LYS_LAUNCH_RECORD) and the directory-issued challenge. This card does not define that message, and R10 stays blocked on d5055cc1 by that name. The production SessionReports is NotLanded("d5055cc1"): no report exists, so every record reads unconfirmed and never running.
+- Deviation: The brief says each kind is 'a kind added to IDENTITY-EVENTS.md' as a signed directory event. Making them new change kinds inside lys/identity-event/v1 would mean changing crates/lys-identity/src/event.rs and encoding.rs, which are outside this brief's wall, and adding kinds to a frozen envelope. So they are two new COSE_Sign1 kinds with their own content types (application/vnd.lys.launch-record.v1+cbor and application/vnd.lys.launch-withdrawal.v1+cbor), signed by the directory service key and kept on their own log (origin lys/identity/launch-records, snapshot domain lys/identity/launch-records-state/v1). Both are written in IDENTITY-EVENTS.md. The launch record also carries the recorded arguments (key 6), so a render never needs to re-read the profile version. The doc records both kinds as proposed and awaiting the joint review: this is a cryptographic format change that needs the adversarial review CLAUDE.md requires before any durable signature, and that review is not recorded yet.
+- Files changed:
+  - created: `crates/lys-identity/src/start/launch_record.rs` — LaunchRecord (id, agent, machine, executable, arguments, working directory, profile version, credential ids, given by, given at, copied from) with a canonical CBOR body. Also the COSE_Sign1 envelope with its own content types, LaunchEvent::seal, verify_launch_event (strict re-encoding, one refusal for every failure), and the launch-record id grammar.
+  - created: `crates/lys-identity/src/start/state.rs` — LaunchRecords: the signed log of launch records and withdrawals. It opens from its snapshot, whose state is every leaf checked to fold to the log's tree, and reads only the entries after it. Snapshots are written by count and after a rebuild; a refusal is named and logged. Also the SessionReports seam, Reading/LaunchState, derive(), state_of() and standing().
+  - created: `crates/lys-identity/src/start/withdrawal.rs` — The Withdrawal kind with its canonical body, and withdraw(): resolves the agent, admits the caller or refuses start_right_missing, keeps one signed withdrawal, and answers the derived state.
+  - created: `crates/lys-identity/tests/start_state.rs` — Every R10 acceptance row, over a real signed store and a sessions-record fixture.
+  - modified: `docs/design/identity/IDENTITY-EVENTS.md` — Adds 'Launch records and withdrawals (DIRECTORY-029)': status (proposed, awaiting joint review), both content types, both bodies key by key, strict reading, the log and its snapshot domain, and the derivation with the session-start ruling.
+- Checklist delivery:
+  - [x] C235 — An agent shows as running only when its verified signed report names its launch record, and copying the command changes no state (CONFORMANCE 5.5). — Running only on a verified report naming the record and its agent. The copy that changes no state is in R13.
+  - [x] C236 — With no report a start reads unconfirmed, never not started; the screen says the request stands and warns against asking elsewhere, and a second start for the agent is refused as start_unconfirmed (CONFORMANCE 5.6). — Unconfirmed, never 'not started'; standing() drives R11's start_unconfirmed.
+  - [x] C237 — A withdrawal by the giver or anyone holding the same right records who and when and that the request no longer stands, never that the agent did not start, and a report arriving afterwards shows running with the withdrawal beside it. — A withdrawal records who and when, that the request no longer stands, and never that the agent did not start; a report after it reads running with the withdrawal beside it.
+- Story delivery:
+  - [x] S100 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent shown as running only when its own signed report names the command I was given, so that copying a command is never mistaken for a start. — Only the agent's verified report naming the launch record makes it running.
+  - [x] S101 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want an unanswered start shown as unconfirmed with its request standing, so that I do not ask elsewhere and start the agent twice. — Unconfirmed words say the request stands and warn against asking elsewhere.
+  - [x] S102 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want to withdraw a start request I no longer want, so that the record says the request no longer stands without claiming the agent did not start. — The withdrawal names who and when, and never claims no start.
 
 **Review (recorded):**
 
@@ -548,9 +634,25 @@ WHEN every check passes, THE SYSTEM SHALL keep a launch record (R10) naming the 
 
 **Dev (recorded):**
 
-- Status: blocked
-- How: Not built. Launch record keeping, command rendering, start again and start_unconfirmed need R1–R10 and DIRECTORY-003's crate and directory store.
-- Deviation: Blocked on R1–R7, R9 and R10 and their dependencies.
+- Status: implemented
+- How: Row 1 met: one record with machine-fixture-1, fixture-exec, fixture-cwd, pv-fixture-1, ['vc-fixture-1'], given by admin-fixture (a_start_keeps_exactly_one_launch_record_naming_what_it_gave). Row 2 met: in the same test, the agent record's bytes are unchanged, the count is 1 and the record names agent-fixture-1. Row 3 met (CONFORMANCE 5.3): the command split by shell_words is exactly ['env','LYS_AGENT_ID=agent-fixture-1','LYS_LAUNCH_RECORD=<id>','LYS_CREDENTIAL_IDS=vc-fixture-1,vc-fixture-2','fixture-exec','--fixture-arg','two words']. The working directory is fixture-cwd, and neither value appears in the command or the answer JSON. Row 4 met: exe, args (in order) and wd equal pv-fixture-1's; the first word is 'env', never 'lys'. Row 5 met: 'vc-fixture;1' is refused as command_value_outside_grammar with 'LYS_CREDENTIAL_IDS', no command, and record_count 0 (command.rs:39). Row 6 met: render(record) twice is byte-identical and equals the given command. Row 7 met: after reopening the store, the record reads back field for field. Row 8 met (CONFORMANCE 5.4): with L1 withdrawn, give_again keeps L2 with a different id and copied_from L1, and the five fields are equal. Row 9 met: while L1 stands, a start on machine-fixture-2 is refused start_unconfirmed; the words contain L1's id, 'wait for its report' and 'withdraw', and the count stays 1. Row 10 met: after withdrawing L1, a start on machine-fixture-2 is given and the count is 2. Row 11 met: with L1 running (sess-fixture-1), a start keeps L2 for agent-fixture-1, and L1 still reads running. Row 12 met: the sessions fixture's bytes are unchanged, the agent record count is 1 and its bytes are unchanged. Row 13 met: after L2's report (sess-fixture-2), L1 is tied to sess-fixture-1 and L2 to sess-fixture-2. Row 14 met: none of the 3 signed events contains fixture-credential-value-1f3a. Also: a_restart_reads_only_the_entries_after_the_snapshot opens with a snapshot every 2 entries and asserts Start::Resumed{size:2, replayed:1}, per CLAUDE.md's rule that a restart reads only the entries after its snapshot. The session credential's form stays with RM-029 and is not asserted.
+- Deviation: give_again copies the machine, executable, arguments, working directory and profile version from the kept record. It takes the credential ids from the fresh credentials check, so a credential revoked since the kept start is never named on a new command. With the fixtures unchanged, the ids equal the kept record's, which is what the acceptance row compares.
+- Files changed:
+  - created: `crates/lys-identity/src/start/give.rs` — Owners, which bundles every seam, and Given with its JSON. give() and give_again() run parse, resolve, admit, start_unconfirmed via standing(), the five checks, the profile-version fields and the id grammars, then keep one launch record and render the command from it.
+  - created: `crates/lys-identity/src/start/command.rs` — The three assignments (LYS_AGENT_ID, LYS_LAUNCH_RECORD, LYS_CREDENTIAL_IDS), Grammars, check_grammar (command_value_outside_grammar naming the assignment), render (env, the three ids, the executable, the recorded args, each POSIX shell-quoted), and shell_quote.
+  - created: `crates/lys-identity/tests/start_launch_record.rs` — Every R11 acceptance row, with a POSIX word splitter, plus a restart test that counts the entries a restart reads.
+- Checklist delivery:
+  - [x] C232 — No credential value is on the command line or the clipboard, and a test reads both (CONFORMANCE 5.3). — No value on the command line; tested with two planted values. The clipboard is covered in R13.
+  - [x] C233 — A launch record naming the machine, the executable, the working directory, the profile version and the credential ids is kept for every command given, reads back after a restart, and a start given again from it is a new record naming the one it was copied from (CONFORMANCE 5.4). — Kept for every command, reads back after reopening, and start-again makes a new record naming its source.
+  - [x] C234 — A start request names only the agent, the profile version and the machine; the command given reads env LYS_AGENT_ID=<agent id> LYS_LAUNCH_RECORD=<launch record id> LYS_CREDENTIAL_IDS=<comma-separated credential ids> before the reviewed profile version's own executable and its recorded arguments, unchanged and in order, with the recorded working directory, each value shell-quoted and refused by name outside its id grammar; it is not a lys subcommand, and a request that sets the executable or the working directory is refused by name. — Exact env shape, recorded exe and args in order, shell-quoted, with the grammar refusal. It is never a lys command.
+  - [x] C236 — With no report a start reads unconfirmed, never not started; the screen says the request stands and warns against asking elsewhere, and a second start for the agent is refused as start_unconfirmed (CONFORMANCE 5.6). — start_unconfirmed while a record stands; given again once it is withdrawn or running.
+  - [x] C241 — A start resolves its agent to the enduring agent record the provision brief DIRECTORY-011 keeps and is refused by name, writing nothing, when there is none; a start never creates or changes an agent record and writes no session record, and a start of an agent already running is given as a new launch record naming the same agent, whose session record the report makes in the sessions brief's store. — A running agent's new start keeps a new record only; no session or agent record is written.
+- Story delivery:
+  - [x] S109 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent's start command given only after its checks pass, so that I never start an agent that is not active, reviewed, allowed on the machine, credentialed and able to reach what it needs. — The record is kept only after all checks pass.
+  - [x] S101 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want an unanswered start shown as unconfirmed with its request standing, so that I do not ask elsewhere and start the agent twice. — A second start is refused while one stands.
+  - [x] S103 (Operator, Installs and runs the standalone identity product) — As the operator, I want a kept launch record for every command given, so that I can give the same start again without looking inside a running process. — Give-again from a kept record reads no running process.
+  - [x] S104 (Reviewer, Reviews a brief before any of its rows is dispatched) — As a reviewer, I want a test that reads the command line and the clipboard and finds no credential value, so that giving a command never discloses a secret. — The command-line test reads for both values. The clipboard test is in R13.
+  - [x] S108 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want starting my agent again while it runs to become a second session of the same agent, so that starting never makes another agent and never changes the one I registered. — A second session of the same agent; the agent record is unchanged.
 
 **Review (recorded):**
 
@@ -618,8 +720,20 @@ The start route in crates/lys-identity-server/src/start.rs, mounted from crates/
 **Dev (recorded):**
 
 - Status: blocked
-- How: Not built. The routes need DIRECTORY-005's crates/lys-identity-server/src/routes.rs, and the start-command CLI needs DIRECTORY-002 R2's crates/lys/src/identity. Both are absent. The no-spawn scan and the rg checks would be vacuous over missing files and are not claimed.
-- Deviation: Blocked on DIRECTORY-005 and DIRECTORY-002 R2.
+- How: BLOCKED on crates/lys/src/main.rs, which is outside this brief's wall. The CLI answer 'lys identity start-command' is a new IdentityCommand variant in crates/lys/src/identity/cli.rs. main.rs matches IdentityCommand exhaustively (main.rs:46-64), so the variant cannot compile without a dispatch arm there. An undispatched crates/lys/src/identity/start.rs would be dead code in a binary crate and fail clippy -D warnings. Per the wall rule, the CLI part stops here, and the brief needs a revision adding crates/lys/src/main.rs before crates/lys/src/identity/start.rs, crates/lys/src/identity/mod.rs, crates/lys/src/identity/cli.rs and crates/lys/tests/identity_start.rs are written. No HTTP-client dependency is needed: DIRECTORY-002's identity group already has crates/lys/src/identity/loopback_http.rs (use parse_response, not exchange, which takes a timeout). So Cargo.toml, crates/lys/Cargo.toml and Cargo.lock are unchanged. Rows met on the route side: row 1 (a_passing_start_answers_a_command_and_runs_nothing: 200 with command, working directory fixture-cwd and a launch- id; the marker file is absent). Row 3 (a_suspended_agent_is_refused_by_name_with_no_command: 409 naming agent_not_active with 'the agent is active', no command). Row 5 (withdraw answers withdrawn by admin-fixture; start-again answers L2 != L1 with copied_from L1; no marker). Row 6 (state reads unconfirmed, then withdrawn, then running with the withdrawal after a report). Row 7, route half: the route bodies for agent_unknown, start_right_missing, agent_not_active and start_unconfirmed are byte-identical to the library's error.to_json() for the same inputs, 4 compared. crates/lys-identity-server/src/start.rs holds none of the forbidden strings. Row 8, for the 17 existing files: count read equals count listed, and there are 0 spawning lines. Row 9: the scanner finds exactly 1 line in the fixture text. Row 10: the route answer has no fixture-credential-value-1f3a. Row 11: routes.rs gives DoorHandles as the HandleRecords, and start.rs names nothing from door_handles (the_route_holds_no_start_logic_and_reads_the_door_through_the_seam). Not met, because of the block: rows 2 and 4 (CLI stdout byte-identical to the route body), row 7's CLI half, row 8's CLI file, and row 12 (cli.rs subcommand).
+- Deviation: Three more deviations. (1) crates/lys-identity-server/src/lib.rs is also outside the wall, so door_handles and start are declared from routes.rs with #[path] and are public as lys_identity_server::routes::door_handles and ::start. (2) No configuration field names the door or a launch-record directory, and crates/lys-identity-server/src/config.rs is outside the wall. So production builds DoorHandles::unconfigured(), which answers that no handle record exists and names SECRETS-002, and keeps launch records at log_dir's sibling 'launch-records'. A config field for each is a follow-up revision. (3) The route answers 409 for a refusal, 403 for start_right_missing, 404 for agent_unknown or an unknown launch record, and 503 when the store is unavailable. These status codes are presentation only; the bodies are the library's bytes.
+- Files changed:
+  - created: `crates/lys-identity-server/src/start.rs` — StartService, the Callers seam and StartOwners (boxed seams), plus routes(): POST /agents/{id}/start, POST /launch-records/{id}/start-again, POST /launch-records/{id}/withdraw and GET /launch-records/{id}/state. Each runs the library in spawn_blocking and answers its JSON bytes as they came. Also holds the production directory-backed owners (caller, admission, agent records, lifecycle), the NotLanded owners and directory_service().
+  - modified: `crates/lys-identity-server/src/routes.rs` — Declares door_handles and start as modules with #[path]. start_service() gives the start route door_handles::DoorHandles as its HandleRecords, keeps launch records in launch-records beside the directory log, and merges start::routes into the API in service_saying.
+  - created: `crates/lys-identity-server/tests/start.rs` — Route tests over thread-safe fixtures on a real listener: a passing start with a marker-writing executable (/bin/sh fixture-exec), the suspended refusal, withdraw / start-again / state, byte-identity of 4 refusals with the library's own JSON, and source reads of start.rs and routes.rs.
+  - created: `crates/lys-identity/tests/start_no_spawn.rs` — Reads the 17 start files that exist (16 library files and the route), asserts the count read equals the count listed and that no line names a spawning API. Also asserts every library start file is listed (16) and that the scanner fires on a spawning line.
+- Checklist delivery:
+  - [ ] C229 — No start path in the library, the route or the CLI spawns a process, and a test that reads the start files and gives a start with a marker-writing executable proves it (CONFORMANCE 5.1). — The library and route files are proven by the scan and the marker test. The CLI start file does not exist because of the main.rs block.
+  - [x] C232 — No credential value is on the command line or the clipboard, and a test reads both (CONFORMANCE 5.3). — The route answer holds no credential value, and the command-line test is in R11. The CLI's own stdout test is blocked with the CLI.
+  - [ ] C240 — The start route gives, gives again, withdraws and reads a start through the library and holds no start logic of its own, and the CLI answer lys identity start-command, the one subcommand this card adds to DIRECTORY-002's identity group, prints exactly what the route answers for the same three inputs and starts nothing. — The route gives, gives again, withdraws and reads through the library. The start-command subcommand is blocked on crates/lys/src/main.rs.
+- Story delivery:
+  - [x] S104 (Reviewer, Reviews a brief before any of its rows is dispatched) — As a reviewer, I want a test that reads the command line and the clipboard and finds no credential value, so that giving a command never discloses a secret. — Command-line and route answers are read for values (R11, R12). The clipboard is in R13.
+  - [x] S105 (Reviewer, Reviews a brief before any of its rows is dispatched) — As a reviewer, I want a test that fails if any start path spawns a process, so that lys stays a product that checks, gives and records and never runs an agent. — start_no_spawn.rs fails if any existing start file names a spawning API, and the marker test proves no run.
 
 **Review (recorded):**
 
@@ -683,9 +797,30 @@ WHEN the admitted administrator, or the agent's responsible person once step 1's
 
 **Dev (recorded):**
 
-- Status: blocked
-- How: Not built. The Start drawer and the unconfirmed notice need surface/identity, which DIRECTORY-005 creates. surface/ is absent.
-- Deviation: Blocked on DIRECTORY-005.
+- Status: implemented
+- How: Row 1 met: as the administrator, Start is enabled and the drawer lists the five data-check names equal to START_CHECKS in R3's order (tests/start.test.tsx 'gives the administrator an enabled Start...'). Row 2 met: in the personal scope, Start is disabled and the text contains 'agent-fixture-1' and 'start'. Row 3 met (CONFORMANCE 5.3): Copy writes exactly the shown command. navigator.clipboard.readText() returns it, and neither of the 2 values is in the clipboard, the command or the page (checked count 2). Row 4 met (CONFORMANCE 5.5): Copy adds 0 requests, only 1 POST was ever sent, and the notice still reads unconfirmed/'Unconfirmed'. Row 5 met: suspended shows 'the agent is active' failed, with no data-command and no Copy. Row 6 met (CONFORMANCE 5.6): the notice contains 'Unconfirmed', 'The request stands', 'could start it twice', 'wait for its report' and 'withdraw'. Row 7 met: after withdrawing, it reads withdrawn; after a report it reads running with 'withdrawn by admin-fixture' beside it. Row 8 met: every reached page (more than 10 collected) is checked for 'not started', case-insensitive. Row 9 met: none of the files I added under surface/identity/src contains 'Simulate'. None of these frontend checks has been run here (no node_modules; running checks was out of scope for this round).
+- Deviation: Three deviations. (1) surface/identity/src/features/file/IdentityFile.tsx is outside the wall, so the working Start and its drawer sit on the agent file's start address, #/file/<id>/start, added in routes.tsx. The file header's existing 'Start…' link still points at the pre-existing provisioning start flow. Changing it to #/file/<id>/start needs a revision naming IdentityFile.tsx. (2) No browser runner (Playwright) is installed in surface/identity. tests/acceptance/start.spec.ts therefore holds the acceptance fixtures, and tests/start.test.tsx runs them under vitest/jsdom, with a clipboard installed on navigator so readText() reads what the page wrote. vite.config.ts only includes tests/**/*.test.tsx and is outside the wall. (3) The verification step 'rg -n -i not started ... surface/identity/src finds 0 lines' finds one pre-existing line outside the wall: surface/identity/src/features/runtime/StartAgent.tsx:33 'This has not started the agent.' It needs a revision to reword; my files contain none.
+- Files changed:
+  - created: `surface/identity/src/features/start/StartDrawer.tsx` — StartPage (route) and StartDrawer. The administrator (directory scope) gets an enabled Start that opens the drawer: profile version, machine, the five checks by name with the directory's own words, and on a pass only the command, working directory, Copy, launch-record facts and the notice. Anyone else gets a disabled Start and the refusal naming the agent and the right.
+  - created: `surface/identity/src/features/start/StartNotice.tsx` — ask(), which reads the start route's JSON as it came, and StartNotice: Unconfirmed / The request stands / could start it twice / wait for its report / withdraw it first, with read-state and withdraw controls. Shows withdrawn, and running with the withdrawal beside it.
+  - created: `surface/identity/tests/start.test.tsx` — vitest/jsdom tests of every R13 acceptance row, including navigator.clipboard.readText() on an installed clipboard, zero requests on Copy, and a check of every reached page for 'not started'.
+  - created: `surface/identity/tests/acceptance/start.spec.ts` — The acceptance fixtures (the library-shaped given, refused and state answers), installClipboard() and saysNotStarted(), used by tests/start.test.tsx.
+  - modified: `surface/identity/src/routes.tsx` — Adds /file/:id/start to StartPage ahead of /file/:id/:tab?.
+  - modified: `surface/identity/src/generated/index.ts` — Adds START_CHECKS, StartCheck, LaunchRecordView, LaunchStateName, StartGiven, StartRefusal, StartRefused, StartFailure and LaunchStateView, mirroring the library's JSON writers.
+- Checklist delivery:
+  - [x] C232 — No credential value is on the command line or the clipboard, and a test reads both (CONFORMANCE 5.3). — The clipboard test reads navigator.clipboard.readText() and finds no value.
+  - [x] C235 — An agent shows as running only when its verified signed report names its launch record, and copying the command changes no state (CONFORMANCE 5.5). — Copy sends nothing and the state stays unconfirmed; running shows only from the state the route derives.
+  - [x] C236 — With no report a start reads unconfirmed, never not started; the screen says the request stands and warns against asking elsewhere, and a second start for the agent is refused as start_unconfirmed (CONFORMANCE 5.6). — The notice wording is as required; 'not started' never appears on the pages reached.
+  - [x] C237 — A withdrawal by the giver or anyone holding the same right records who and when and that the request no longer stands, never that the agent did not start, and a report arriving afterwards shows running with the withdrawal beside it. — Withdraw from the notice shows withdrawn, and later running with the withdrawal beside it.
+  - [x] C238 — Only the agent's responsible person and a directory administrator (in step 1, the admitted administrator) have a working Start; anyone else is refused by name, naming the agent and the right they lack. — No enabled Start for anyone but the administrator, with the refusal naming the agent and the right.
+  - [x] C239 — The Start drawer and the unconfirmed notice are built on DIRECTORY-005's surface, and DIRECTORY-005's R1 and boundary name Start as the one control that works in step 1. — Built on DIRECTORY-005's surface at the agent file's start address; see deviation (1) about the header link.
+- Story delivery:
+  - [x] S99 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want each failed check named in words, so that I know what to fix before a command can be given. — Each check's result is shown in the directory's words.
+  - [x] S100 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent shown as running only when its own signed report names the command I was given, so that copying a command is never mistaken for a start. — Running is shown only from the derived state.
+  - [x] S101 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want an unanswered start shown as unconfirmed with its request standing, so that I do not ask elsewhere and start the agent twice. — Unconfirmed, the request stands, and a warning against asking elsewhere.
+  - [x] S102 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want to withdraw a start request I no longer want, so that the record says the request no longer stands without claiming the agent did not start. — The withdraw control, with who and when shown.
+  - [x] S104 (Reviewer, Reviews a brief before any of its rows is dispatched) — As a reviewer, I want a test that reads the command line and the clipboard and finds no credential value, so that giving a command never discloses a secret. — The clipboard is read for both values.
+  - [x] S106 (Person without the right to start, Opens an agent file that is not theirs to start) — As a person who is neither the agent's responsible person nor a directory administrator, I want a refusal naming the agent and the right I lack, so that I know why there is no working Start for me. — The refusal names the agent and the right.
 
 **Review (recorded):**
 

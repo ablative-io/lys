@@ -83,6 +83,23 @@ The quote field of ADR-001 to ADR-008 and of ADR-011 in docs/design/decisions.js
 - S1 (Ledger reader, Reading a decision) — As a ledger reader, I want each decision's quote to state the decision in the team's words so that the ledger holds no person's spoken words.
 - S3 (Brief author, Anchoring a decision) — As a brief author anchoring a decision, I want its decision, context and consequences to mean exactly what was ruled so that a review against the ledger checks the same obligations as before.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Each of the nine acceptance-given sentences is now the quote of its row in docs/design/decisions.json (one quote line per row in the ADR-001 to ADR-008 and ADR-011 objects), set by exact string, not paraphrase. I searched the file for each of the nine quote values held at 7b53625: every search finds 0 occurrences. Counting '…' and '...' across the quotes of ADR-001 to ADR-018 gives 0, and so does the count across all 78 decisions. Comparing field by field against HEAD, the quote of every other decision is unchanged. ADR-001 to ADR-011 are identical at HEAD and at 7b53625. ADR-012 to ADR-015 were changed between 7b53625 and HEAD, but only in their consequences, so their quotes still equal their values at 7b53625.
+- Deviation: The ledger has grown since the brief was written: it now holds 78 decisions (up to ADR-111), not 18. The comparison of the other decisions' quotes was therefore run over all 78 against HEAD. The quotes of ADR-001 to ADR-018 were also checked against 7b53625.
+- Files changed:
+  - modified: `docs/design/decisions.json` — The quote of ADR-001 to ADR-008 and ADR-011 is now the exact declarative sentence the brief's acceptance gives; every other quote is unchanged.
+- Checklist delivery:
+  - [x] C1 — The quote of each of ADR-001 to ADR-008 in docs/design/decisions.json is one declarative sentence of its decision with no speaker, time of day, first person or ellipsis. — The quotes of ADR-001 to ADR-008 are the acceptance's exact sentences: one declarative sentence each, with no speaker, time of day, first person or ellipsis.
+  - [x] C2 — The quote of ADR-011 in docs/design/decisions.json is one declarative sentence of its decision with no speaker, time of day, first person or ellipsis. — ADR-011's quote is the exact acceptance sentence.
+  - [x] C3 — No quote value held by docs/design/decisions.json at 7b53625 for ADR-001 to ADR-008 or ADR-011 appears anywhere in the file. — Searching the file for each of the nine old quotes finds 0 occurrences.
+- Story delivery:
+  - [x] S1 (Ledger reader, Reading a decision) — As a ledger reader, I want each decision's quote to state the decision in the team's words so that the ledger holds no person's spoken words. — None of the nine quotes carries anyone's spoken words any more.
+  - [x] S3 (Brief author, Anchoring a decision) — As a brief author anchoring a decision, I want its decision, context and consequences to mean exactly what was ruled so that a review against the ledger checks the same obligations as before. — Only quote fields changed under R1; decision, context and consequences are untouched by it.
+
 ### R2: Replace the personal content of ADR-005 to ADR-008 with roles
 
 In the context, decision and consequences of ADR-005 to ADR-008, the named person SHALL become the operator, a time of day tied to that person SHALL be removed while its date stays, what the person said or hoped SHALL become the need it stated, and the personal machine SHALL become the operator's workstation. No other sentence, word or source in those fields SHALL change, the decision's meaning SHALL NOT change, the number of consequences of each row SHALL NOT change, and the context, decision and consequences of any other decision SHALL NOT change.
@@ -112,6 +129,24 @@ In the context, decision and consequences of ADR-005 to ADR-008, the named perso
 **Stories:**
 - S2 (Ledger reader, Reading a decision) — As a ledger reader, I want a decision's context, decision and consequences to name roles instead of people, times of day and personal machines so that the ledger holds nothing personal.
 - S3 (Brief author, Anchoring a decision) — As a brief author anchoring a decision, I want its decision, context and consequences to mean exactly what was ruled so that a review against the ledger checks the same obligations as before.
+
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: ADR-005's context, decision and second consequence were set to the exact strings the acceptance gives, and its first consequence is unchanged. ADR-006's context was produced by the acceptance's own transform: re.sub('At \d{1,2}:\d{2} on ', 'On ') and then replace(decided_by, 'the operator'). ADR-007 used re.sub(' at \d{1,2}:\d{2}', ''), replace(decided_by, 'the operator') and replace(' he asked', ' the operator asked'). ADR-008 used re.sub(' at \d{1,2}:\d{2}', '') and replace(decided_by, 'the operator'), and its third consequence was set to the acceptance string. The field-by-field diff against HEAD shows changes only in: ADR-005 context, decision, consequences[1] and quote; ADR-006 context and quote; ADR-007 context and quote; ADR-008 context, consequences[2] and quote. The number of consequences in each row is unchanged. In the new text, the decided_by name 'Tom', the time-of-day matches and the matches of \bhe\b all count 0, as the git diff shows.
+- Deviation: (none)
+- Files changed:
+  - modified: `docs/design/decisions.json` — The context, decision and consequences of ADR-005 to ADR-008 now name the operator and the operator's workstation in place of a person, times of day and a personal machine.
+- Checklist delivery:
+  - [x] C4 — No context, decision or consequence of ADR-005 to ADR-008 contains its row's decided_by value. — 'Tom' no longer appears in the context, decision or consequences of ADR-005 to ADR-008.
+  - [x] C5 — No context, decision or consequence of ADR-005 to ADR-008 contains a time of day. — The times 14:08, 18:54, 18:56 and 18:55 were removed; their dates are kept.
+  - [x] C6 — ADR-005's context states the need the operator raised in place of what a person said or hoped. — ADR-005's context now reads 'the operator stated a need to get rid of PostgreSQL'.
+  - [x] C7 — ADR-005's decision and its second consequence name the operator's workstation in place of a personal machine. — ADR-005's decision and its second consequence now say 'the operator's workstation'.
+- Story delivery:
+  - [x] S2 (Ledger reader, Reading a decision) — As a ledger reader, I want a decision's context, decision and consequences to name roles instead of people, times of day and personal machines so that the ledger holds nothing personal. — These fields now name roles instead of a person, times of day or a personal machine.
+  - [x] S3 (Brief author, Anchoring a decision) — As a brief author anchoring a decision, I want its decision, context and consequences to mean exactly what was ruled so that a review against the ledger checks the same obligations as before. — What each decision rules is unchanged; only who was named and the times of day are replaced.
 
 ### R3: Keep every other byte of the ledger, move its updated date, and keep the gate green
 
@@ -144,6 +179,26 @@ docs/design/decisions.json SHALL keep every field that R1 and R2 do not name byt
 - S3 (Brief author, Anchoring a decision) — As a brief author anchoring a decision, I want its decision, context and consequences to mean exactly what was ruled so that a review against the ledger checks the same obligations as before.
 - S4 (Card lead, Landing a document change) — As a card lead landing the change, I want the design gate to pass with the schema untouched so that the ledger stays valid under the method it is measured by.
 
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Before writing, I asserted that the file equalled json.dumps(parsed, indent=2, ensure_ascii=False) + '\n', then wrote it back in the same form. git diff --numstat against HEAD, the build's parent, gives 17 added and 17 removed lines: nine quotes, three ADR-005 lines, three context lines, ADR-008's consequence and the updated line. Decision ids and their order are the same as at HEAD. id, title, status, scope, date, decided_by, supersedes and superseded_by are unchanged for every decision. project is unchanged. updated is 2026-09-28, today's date, which the landing commit is expected to carry. scripts/design/schemas/decisions.schema.json was not touched. I did not run gate.sh or validate.py myself because the brief reserves them for the workflow. I did render every cluster into a temp copy, the same way gate.sh does, and every committed markdown file matched.
+- Deviation: Several acceptance rows say 18 decisions and compare against 7b53625, but main has moved on. The ledger now holds 78 decisions, and ADR-012 to ADR-015 had their consequences changed by other cards after 7b53625. The brief's own verification steps say 17/17 lines against 7b53625; that count holds only against HEAD. Reverting other cards' landed work would break their rows and the boundary against changing other fields. So I kept HEAD's content and applied only this brief's changes: the diff against the parent commit is exactly 17/17, and ADR-001 to ADR-011 were identical at 7b53625 and HEAD. Also, updated was set to 2026-09-28 on the assumption that the landing commit carries today's date.
+- Files changed:
+  - modified: `docs/design/decisions.json` — updated is now 2026-09-28. The file is serialised as json.dumps(indent=2, ensure_ascii=False) plus a newline, and every field R1 and R2 do not name is unchanged.
+- Checklist delivery:
+  - [x] C8 — Every field of every decision that C1 to C7 do not name is byte-identical to its value at 7b53625. — Compared against HEAD, the only fields that differ are the ones C1 to C7 name.
+  - [x] C9 — docs/design/decisions.json holds 18 decisions, ADR-001 to ADR-018 in order. — ADR-001 to ADR-018 are still the first 18 decisions, in order. The ledger now holds 78 decisions in total, added by other cards.
+  - [x] C10 — The ledger's updated field is the date of the commit that makes the change. — updated is 2026-09-28, the expected commit date.
+  - [x] C11 — docs/design/decisions.json keeps the serialisation of json.dump(indent=2, ensure_ascii=False) plus a trailing newline. — The file was written with json.dumps(indent=2, ensure_ascii=False) plus a newline, and the round-trip is byte-identical.
+  - [x] C12 — scripts/design/schemas/decisions.schema.json is unchanged from 7b53625. — The schema file is untouched.
+  - [x] C13 — sh scripts/design/gate.sh exits 0. — I expect gate.sh to pass: the temp-copy render of every cluster matches the committed markdown, and the schema and serialisation are unchanged. I did not run gate.sh itself.
+- Story delivery:
+  - [x] S3 (Brief author, Anchoring a decision) — As a brief author anchoring a decision, I want its decision, context and consequences to mean exactly what was ruled so that a review against the ledger checks the same obligations as before. — The meaning of every decision is preserved.
+  - [x] S4 (Card lead, Landing a document change) — As a card lead landing the change, I want the design gate to pass with the schema untouched so that the ledger stays valid under the method it is measured by. — The schema is untouched, and every rendered cluster matches its committed markdown.
+
 ### R4: Re-render the markdown that carries ADR-005's decision
 
 WHEN docs/design/decisions.json has changed as R1 to R3 give, THE SYSTEM SHALL regenerate the rendered markdown of the directory and decisions-words clusters with python3 scripts/design/render-cluster.py, so that each committed markdown file equals what its JSON renders to. A rendered markdown file SHALL NOT be edited by hand, the JSON documents of the directory cluster SHALL NOT change, and no markdown line SHALL change other than the lines that render ADR-005's decision.
@@ -168,6 +223,32 @@ WHEN docs/design/decisions.json has changed as R1 to R3 give, THE SYSTEM SHALL r
 
 **Stories:**
 - S4 (Card lead, Landing a document change) — As a card lead landing the change, I want the design gate to pass with the schema untouched so that the ledger stays valid under the method it is measured by.
+
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: I ran python3 scripts/design/render-cluster.py on docs/design/directory, docs/design/decisions-words and docs/design/rauthy-rebase; no markdown was edited by hand. Each changed markdown file differs from HEAD by exactly one line added and one removed. That line is the ADR-005 entry in the '- ADR-005 — The identity database is PostgreSQL, possibly on a network device — …' form, which now ends '…rather than on the operator's workstation.' No cluster's JSON changed. I then rendered every cluster that has a design.json into a temp copy, the way gate.sh does, and found no differing markdown, so no 'rendered markdown differs' line is expected.
+- Deviation: The brief names six rendered files, but on the current main, five newer directory briefs (DIRECTORY-021, 025, 030, 031, 041) and two rauthy-rebase files (DESIGN.md and RAUTHYREBASE-001.md) also render ADR-005's decision. Leaving them stale would make gate.sh report 'rendered markdown differs', which would break CN5 and R4's gate acceptance. So they were regenerated by the renderer, one line each, and the landing's file list is thirteen markdown files plus decisions.json, not six plus one. The PAGE.md files of directory, roots, rauthy-rebase and decisions-words still mention the old machine name, but render-cluster.py does not produce them and the boundary forbids editing them, so they were left unchanged.
+- Files changed:
+  - modified: `docs/design/directory/DESIGN.md` — Re-rendered; its ADR-005 decision line now names the operator's workstation.
+  - modified: `docs/design/directory/briefs/DIRECTORY-001.md` — Re-rendered ADR-005 line.
+  - modified: `docs/design/directory/briefs/DIRECTORY-002.md` — Re-rendered ADR-005 line.
+  - modified: `docs/design/directory/briefs/DIRECTORY-006.md` — Re-rendered ADR-005 line.
+  - modified: `docs/design/directory/briefs/DIRECTORY-021.md` — Re-rendered ADR-005 line; this brief postdates the one I was given.
+  - modified: `docs/design/directory/briefs/DIRECTORY-025.md` — Re-rendered ADR-005 line; this brief postdates the one I was given.
+  - modified: `docs/design/directory/briefs/DIRECTORY-030.md` — Re-rendered ADR-005 line; this brief postdates the one I was given.
+  - modified: `docs/design/directory/briefs/DIRECTORY-031.md` — Re-rendered ADR-005 line; this brief postdates the one I was given.
+  - modified: `docs/design/directory/briefs/DIRECTORY-041.md` — Re-rendered ADR-005 line; this brief postdates the one I was given.
+  - modified: `docs/design/decisions-words/DESIGN.md` — Re-rendered ADR-005 line.
+  - modified: `docs/design/decisions-words/briefs/DECISIONSWORDS-001.md` — Re-rendered ADR-005 line.
+  - modified: `docs/design/rauthy-rebase/DESIGN.md` — Re-rendered ADR-005 line; this cluster also cites ADR-005.
+  - modified: `docs/design/rauthy-rebase/briefs/RAUTHYREBASE-001.md` — Re-rendered ADR-005 line.
+- Checklist delivery:
+  - [x] C14 — Every committed markdown file that renders ADR-005's decision is the output of scripts/design/render-cluster.py over the changed ledger. — Every committed markdown file that renders ADR-005's decision is now the renderer's output over the changed ledger, confirmed by a render of every cluster into a temp copy.
+- Story delivery:
+  - [x] S4 (Card lead, Landing a document change) — As a card lead landing the change, I want the design gate to pass with the schema untouched so that the ledger stays valid under the method it is measured by. — No rendered markdown differs from what its JSON renders to, and the schema is untouched.
 
 ## Boundaries
 

@@ -58,6 +58,19 @@ scripts/design/render-brief.py is replaced by the bytes of scripts/render-brief.
 **Stories:**
 - S14 (Design gate maintainer, Keeps the repository's rendered documents what its renderer makes of their JSON) — As the maintainer of the design gate, I want the renderer in this repository to stay the method's copy and every rendered brief to be what it makes of its JSON, so that no .md disagrees with the script that made it and a card finished through the chain never turns the gate red.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. None of the acceptance rows can be met. The spec requires the bytes of the method's scripts/render-brief.py at the main commit where the blocker check first prints '6 True True True True True 1'. No such commit exists. Running the blocker check from the repository root prints '0 True False False False False 1'. On the method's main, scripts/render-brief.py was last changed at f77ef422613a3f577facfa869f8f6c356716ad27 and has neither is_bare_id nor render_list_field. The method's render-lists card is only a brief, on branch brief/render-lists/99b64201-00c2-4fd8-ba9a-35e884a14fe7 (commit a252f20), with no build and no PR. Row by row: the gh api | cmp row has no <L> to name. The '--no-resolve | grep -c' row would print 0 on the current copy. The blocker check on the lys copy would print '0 True False False False False 1'. The 'from __future__ import annotations' row already prints 1 on the current copy, since f77ef42 carried that line, but the requirement also needs the rule. The SOURCE.md row has no <L7> to record. The diff row stays unmet because nothing was changed. Writing is_bare_id or render_list_field into scripts/design/render-brief.py in lys is forbidden by the boundary 'SHALL NOT write the prose-list rule into scripts/design/render-brief.py by hand'. Changing the method's repository is also forbidden. It unblocks when the method's card lands the rule on design-system main; then the build copies the file at that commit and records its first seven hex characters in scripts/design/SOURCE.md.
+- Deviation: No files were changed. The brief was dispatched while its blocked_by check still failed, and the brief's own words say 'the brief is not dispatched until this check ... prints 6 True True True True True 1'.
+- Checklist delivery:
+  - [ ] C31 — scripts/design/render-brief.py is byte-identical to the design-system method's scripts/render-brief.py at the method commit that lands the prose-list rule, and scripts/design/SOURCE.md names that commit for render-brief.py. — There is no method commit carrying the rule to copy from.
+  - [ ] C33 — A list field whose entries are all bare ids (ADR-, RM-, C, S and brief ids) renders on one ', '-joined line exactly as before, and render-brief.py states the rule that tells the two kinds of list apart in the docstring of is_bare_id, which render_list_field applies to every list field. — The rule and its docstring must come from the method's file, which does not carry them yet.
+- Story delivery:
+  - [ ] S14 (Design gate maintainer, Keeps the repository's rendered documents what its renderer makes of their JSON) — As the maintainer of the design gate, I want the renderer in this repository to stay the method's copy and every rendered brief to be what it makes of its JSON, so that no .md disagrees with the script that made it and a card finished through the chain never turns the gate red. — Blocked on the method's card landing first.
+
 ### R2: Prove prose lists render one entry per line and bare-id lists stay on one line
 
 WHEN render() of scripts/design/render-brief.py renders a brief whose blocked_by holds two multi-sentence entries, THE SYSTEM SHALL emit the line '> **Blocked by:**' followed by exactly two lines, each '> - ' followed by one entry byte for byte, in the JSON's order, and SHALL NOT join, drop, reorder, trim or reword any entry. WHEN render() renders a brief whose depends_on entries are all bare ids, THE SYSTEM SHALL emit them on one line as '> **Depends on:** ' followed by the ids joined by ', ', exactly as before this change, and SHALL NOT render them as list items. WHEN render() renders a list field in which at least one entry is not a bare id, THE SYSTEM SHALL render every entry of that field as a list item, the bare ids among them included, and SHALL NOT treat an entry that begins with an id and continues with prose as a bare id. scripts/design/tests/test_render_brief.py is a stdlib unittest file that loads scripts/design/render-brief.py by its path relative to the test file, calls render() on brief dictionaries built in the test with no lookups, and runs its cases when executed as python3 scripts/design/tests/test_render_brief.py. Each case asserts the presence of every line it looks up with a unittest assertion before using its position, so a missing line is a test failure and not an error. The test SHALL NOT read any brief under docs/design, SHALL NOT depend on a package outside the standard library, and SHALL NOT pass when it runs no case.
@@ -82,6 +95,20 @@ WHEN render() of scripts/design/render-brief.py renders a brief whose blocked_by
 **Stories:**
 - S13 (Brief reader, Reads a rendered brief before it is dispatched or built) — As a reader of a rendered brief, I want each blocker and each other prose entry on its own line in the order the brief gives them, so that I can tell where one entry ends and the next begins.
 
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. scripts/design/tests/test_render_brief.py was not created. Its three cases test render() on lys's copied renderer, and the current copy joins every list with ', '. The prose case and the mixed case would fail, so 'Ran 3 tests ... OK' cannot be met. The three mutation rows edit is_bare_id and render_list_field in scripts/design/render-brief.py, and neither function exists in the current copy. Adding the test now would also turn the design leg red once R3 wires it in. It unblocks with R1.
+- Deviation: The test file was not created because it depends on R1's copied bytes, and nothing it would test exists yet.
+- Checklist delivery:
+  - [ ] C32 — A brief's blocked_by, and any other list field whose entries are not all bare ids, renders as its label followed by one Markdown list item per entry, in JSON order, each item's text byte-equal to its entry. — The renderer does not yet render prose lists one entry per line; it waits on R1.
+  - [ ] C33 — A list field whose entries are all bare ids (ADR-, RM-, C, S and brief ids) renders on one ', '-joined line exactly as before, and render-brief.py states the rule that tells the two kinds of list apart in the docstring of is_bare_id, which render_list_field applies to every list field. — Waits on R1.
+  - [ ] C35 — scripts/design/tests/test_render_brief.py proves a two-entry prose blocked_by renders two list items byte-equal to their entries and a bare-id list renders on one line, and scripts/design/gate.sh runs it so the design leg fails when it fails. — The test was not written; it would fail against the pre-rule renderer.
+- Story delivery:
+  - [ ] S13 (Brief reader, Reads a rendered brief before it is dispatched or built) — As a reader of a rendered brief, I want each blocker and each other prose entry on its own line in the order the brief gives them, so that I can tell where one entry ends and the next begins. — Blocked on the method's card.
+
 ### R3: Run the renderer test in the design leg
 
 WHEN sh scripts/design/gate.sh runs, THE SYSTEM SHALL run python3 scripts/design/tests/test_render_brief.py and SHALL exit non-zero when that test exits non-zero, beside the validate, coverage and render checks it already makes, and whether or not any of those checks passes. gate.sh SHALL NOT drop, reorder or weaken any check it makes today, SHALL NOT discard the test's output, and SHALL NOT treat a missing test file as a pass.
@@ -100,6 +127,18 @@ WHEN sh scripts/design/gate.sh runs, THE SYSTEM SHALL run python3 scripts/design
 
 **Stories:**
 - S14 (Design gate maintainer, Keeps the repository's rendered documents what its renderer makes of their JSON) — As the maintainer of the design gate, I want the renderer in this repository to stay the method's copy and every rendered brief to be what it makes of its JSON, so that no .md disagrees with the script that made it and a card finished through the chain never turns the gate red.
+
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. scripts/design/gate.sh was not changed. Making it run a test that does not exist would make the gate exit 1, and running R2's test against the pre-rule renderer would also fail it. Either way the design leg would turn red before the rule exists. Both mutation rows and both diff rows depend on R1 and R2. It unblocks with R1 and R2.
+- Deviation: gate.sh was not changed, to keep the design leg green while the rule is missing upstream.
+- Checklist delivery:
+  - [ ] C35 — scripts/design/tests/test_render_brief.py proves a two-entry prose blocked_by renders two list items byte-equal to their entries and a bare-id list renders on one line, and scripts/design/gate.sh runs it so the design leg fails when it fails. — Waits on R2.
+- Story delivery:
+  - [ ] S14 (Design gate maintainer, Keeps the repository's rendered documents what its renderer makes of their JSON) — As the maintainer of the design gate, I want the renderer in this repository to stay the method's copy and every rendered brief to be what it makes of its JSON, so that no .md disagrees with the script that made it and a card finished through the chain never turns the gate red. — Blocked on the method's card.
 
 ### R4: Re-render every rendered brief and pass the design gate
 
@@ -138,6 +177,19 @@ print(n, bad)" prints two numbers, the second 0 and the first at least 11 (the t
 **Stories:**
 - S13 (Brief reader, Reads a rendered brief before it is dispatched or built) — As a reader of a rendered brief, I want each blocker and each other prose entry on its own line in the order the brief gives them, so that I can tell where one entry ends and the next begins.
 - S14 (Design gate maintainer, Keeps the repository's rendered documents what its renderer makes of their JSON) — As the maintainer of the design gate, I want the renderer in this repository to stay the method's copy and every rendered brief to be what it makes of its JSON, so that no .md disagrees with the script that made it and a card finished through the chain never turns the gate red.
+
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. With the current renderer, re-rendering every cluster produces the old joined blocked_by lines, which are byte-identical to the committed files. DIRECTORY-006.md therefore still has '> **Blocked by:** ' followed by six joined entries, and the row expecting '6 True False' cannot be met. The all-briefs row would fail at lines.index('> **Blocked by:**'). The row expecting 'Ran 3 tests' needs R2 and R3. The rendered brief .md files were left untouched, because hand-editing them would make gate.sh's render cmp fail. It unblocks with R1 to R3.
+- Deviation: No brief .md files were re-rendered because the renderer they depend on has not landed upstream.
+- Checklist delivery:
+  - [ ] C34 — Every brief markdown that render-brief.py produces from a brief JSON in a cluster with a design.json is re-rendered in the same change, sh scripts/design/gate.sh exits 0, and docs/design/identity/briefs/IDENTITY-001.md and CONTEXT-001.md are unchanged. — Nothing to re-render until R1 lands.
+- Story delivery:
+  - [ ] S13 (Brief reader, Reads a rendered brief before it is dispatched or built) — As a reader of a rendered brief, I want each blocker and each other prose entry on its own line in the order the brief gives them, so that I can tell where one entry ends and the next begins. — Blocked on the method's card.
+  - [ ] S14 (Design gate maintainer, Keeps the repository's rendered documents what its renderer makes of their JSON) — As the maintainer of the design gate, I want the renderer in this repository to stay the method's copy and every rendered brief to be what it makes of its JSON, so that no .md disagrees with the script that made it and a card finished through the chain never turns the gate red. — Blocked on the method's card.
 
 ## Boundaries
 

@@ -48,6 +48,27 @@ WHEN the test the_same_bytes_put_twice_occupy_one_block_and_the_second_put_write
 **Stories:**
 - S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the proof that a second put writes nothing to hold on a filesystem with coarse timestamps and on a loaded host without the suite waiting on a clock, so that a passing store gate means the store wrote nothing and never that the tick was too coarse to see a write.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Each acceptance row, with its evidence (not yet run):
+(1) No sleep: the std::thread::sleep line that was at blocks_tests.rs:22 is removed, and a grep for sleep in the file prints nothing.
+(2) set_modified count at least 1: blocks_tests.rs:18-20 defines shard = store.root().join(&first.hash.as_str()[..2]), file = shard.join(first.hash.as_str()) and the pinned instant. Lines 21-24 loop over [&shard, &file] and call std::fs::File::open(p).unwrap().set_modified(pinned).
+(3) Read-back before the second put: inside that loop, the test asserts std::fs::metadata(p).unwrap().modified().unwrap() == pinned for both paths.
+(4) After the second put: the test asserts files() == count, then the shard's mtime == pinned, then the file's mtime == pinned, then count == 1.
+(5) first.new, !second.new and second.hash == first.hash are all still asserted.
+(6) The workflow runs the named cargo test.
+(7) blocks.rs is unchanged.
+- Deviation: (none)
+- Files changed:
+  - modified: `crates/lys-home/src/record/blocks_tests.rs` — the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing no longer sleeps. It pins the shard directory's and the block file's modification times to one fixed instant and reads them back. After the second put it asserts both times are unchanged and the shard's entry count is the same.
+- Checklist delivery:
+  - [x] C95 — The block store's gate proves a second put of the same bytes writes nothing without elapsed time: before the second put it pins the shard directory's and the block file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock. — The test pins both paths, reads them back, asserts they are unchanged after the second put and checks the entry count, with no clock.
+- Story delivery:
+  - [x] S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the proof that a second put writes nothing to hold on a filesystem with coarse timestamps and on a loaded host without the suite waiting on a clock, so that a passing store gate means the store wrote nothing and never that the tick was too coarse to see a write. — The proof no longer depends on how coarse the filesystem's timestamps are or how busy the host is.
+
 ### R2: Pin the template shard and template file modification times in the template store's gate instead of sleeping
 
 WHEN the test a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing has put the launch template fixture once, THE SYSTEM SHALL, before the second put, take the entry count of the template shard directory <home>/templates/<first two hex digits of the hash>, set the modification time of that shard directory and of the template file <home>/templates/<hh>/<hash> to the instant std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000) with std::fs::File::set_modified, read each back with std::fs::metadata(..).modified() and assert each equals that instant; WHEN the second put of the same bytes returns, THE SYSTEM SHALL assert the shard directory's and the template file's modification times each still equal that instant and the shard's entry count equals the count taken before the second put. THE SYSTEM SHALL NOT sleep, SHALL NOT read the current time, SHALL NOT drop any assertion the test makes today (the root absent before the first put, first.new, first.hash == Hash::of(bytes), the stored bytes, path_of, !second.new, second.hash == first.hash, the shard holding exactly 1 entry, contains, get, and the missing-hash error naming the hash), SHALL NOT rename, split, ignore or add a timeout to the test, SHALL NOT change any other test in templates_tests.rs, and SHALL NOT change crates/lys-home/src/record/templates.rs.
@@ -69,6 +90,27 @@ WHEN the test a_template_is_kept_once_under_its_hash_and_a_second_put_writes_not
 
 **Stories:**
 - S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the proof that a second put writes nothing to hold on a filesystem with coarse timestamps and on a loaded host without the suite waiting on a clock, so that a passing store gate means the store wrote nothing and never that the tick was too coarse to see a write.
+
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Each acceptance row, with its evidence (not yet run):
+(1) No sleep: the sleep that was at templates_tests.rs:31 is removed.
+(2) Pinning: templates_tests.rs:30 sets shard = path.parent().unwrap() and line 31 takes count = read_dir(shard).count(). Lines 33-36 loop over [shard, path.as_path()] and call File::open(p).set_modified(pinned).
+(3) Read-back before the second put: inside that loop, the test asserts metadata(p).modified() == pinned for each path.
+(4) After the second put: the test asserts the shard's mtime == pinned, the file's mtime == pinned, read_dir(shard).count() == count, and count == 1.
+(5) Every earlier assertion is kept: the store root is absent before the first put, first.new, the hash equality, the stored bytes, path_of, !second.new, second.hash == first.hash, contains, get, and the missing-hash error naming the hash.
+(6) The workflow runs the named cargo test.
+(7) templates.rs is unchanged.
+- Deviation: (none)
+- Files changed:
+  - modified: `crates/lys-home/src/record/templates_tests.rs` — a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing no longer sleeps. It takes the shard's entry count, pins the shard directory's and the template file's modification times and reads them back. After the second put it asserts both times and the entry count are unchanged, and that the count is 1.
+- Checklist delivery:
+  - [x] C96 — The template store's gate proves a second put of the same template writes nothing without elapsed time: before the second put it pins the template shard directory's and the template file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock. — The test pins both paths, reads them back, asserts they are unchanged after the second put and checks the entry count, with no clock.
+- Story delivery:
+  - [x] S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the proof that a second put writes nothing to hold on a filesystem with coarse timestamps and on a loaded host without the suite waiting on a clock, so that a passing store gate means the store wrote nothing and never that the tick was too coarse to see a write. — The template store's proof no longer depends on elapsed time.
 
 ## Boundaries
 

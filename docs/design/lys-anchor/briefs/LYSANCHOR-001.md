@@ -56,6 +56,21 @@ Structure: crates/lys-anchor/Cargo.toml's [dependencies] table gains chrono.work
 **Stories:**
 - S3 (Developer, Embeds RecognisedCertificate in code that must judge admission at a known instant) — As a developer, I want to ask RecognisedCertificate whether a submission is admitted at an instant I name, given the same submitter context admit takes, so that I can judge admission without reading the clock.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1, met: crates/lys-anchor/Cargo.toml line 71 is `chrono.workspace = true`, directly after the [dependencies] header and before [dev-dependencies]. It is the only line of that form. Row 2, met: in Cargo.lock the lys-anchor dependencies are base64 0.22.1, chrono, lys-core, lys-log-store, serde_json, sha2, tempfile, thiserror 2.0.19. Row 3, met: git diff --stat shows 1 insertion and 0 deletions for crates/lys-anchor/Cargo.toml. Row 4, met: the root Cargo.toml is untouched and the workspace chrono entry at line 38 is unchanged.
+- Deviation: (none)
+- Files changed:
+  - modified: `crates/lys-anchor/Cargo.toml` — [dependencies] now lists chrono.workspace = true, the workspace's existing chrono 0.4 entry, as the first line of the table
+  - modified: `Cargo.lock` — The lys-anchor package's dependency list now includes "chrono", the already-resolved 0.4.45
+- Checklist delivery:
+  - [x] C1 — crates/lys-anchor/Cargo.toml lists chrono.workspace = true under [dependencies], and no other dependency is added. — One added line under [dependencies]; nothing else added or changed.
+- Story delivery:
+  - [x] S3 (Developer, Embeds RecognisedCertificate in code that must judge admission at a known instant) — As a developer, I want to ask RecognisedCertificate whether a submission is admitted at an instant I name, given the same submitter context admit takes, so that I can judge admission without reading the clock. — chrono is available, so admit_at can take DateTime<Utc>.
+
 ### R2: Add RecognisedCertificate::admit_at and route admit through it with the present
 
 Structure: RecognisedCertificate gains a public, documented inherent method admit_at taking &self, the submission (&Submission<'_>), the submitter context (&SubmitterContext<'_>) and the instant (chrono DateTime<Utc>), returning Result<(), NotAdmitted>. Behaviour: WHEN admit_at is called, THE SYSTEM SHALL match the context's three arms with no wildcard arm, SHALL return Err(NotAdmitted) for Unidentified, SHALL take the credential from AssertedBySubmitter's bytes and from AuthenticatedByTransport's peer certificate alike, SHALL verify the credential with lys_core::ca::verify_certificate_chain_at against the configured issuer public key at the given instant, and, only after that verification succeeds and only where a subject allow-list is configured, SHALL return Err(NotAdmitted) for a subject key outside it; otherwise it SHALL return Ok(()). WHEN AdmissionPolicy::admit is called on a RecognisedCertificate, THE SYSTEM SHALL return what admit_at returns for the same submission and context at Utc::now(). IF any check refuses, THEN THE SYSTEM SHALL return the one fieldless NotAdmitted. THE SYSTEM SHALL NOT read the clock inside admit_at, SHALL NOT collapse the context's provenance before the call or add an accessor that does, SHALL NOT change admit's parameter types or return type, SHALL NOT change the AdmissionPolicy trait, SHALL NOT add Default or a defaulting constructor, SHALL NOT add a field to NotAdmitted, and SHALL NOT read any certificate extension. certificate.rs's module doc, its issued_by doc and its admit doc are rewritten to say the certificate is judged at the instant its caller names, the present when called through admit, and to name verify_certificate_chain_at; they SHALL NOT say 'right now' or 'currently'.
@@ -81,6 +96,23 @@ Structure: RecognisedCertificate gains a public, documented inherent method admi
 **Stories:**
 - S3 (Developer, Embeds RecognisedCertificate in code that must judge admission at a known instant) — As a developer, I want to ask RecognisedCertificate whether a submission is admitted at an instant I name, given the same submitter context admit takes, so that I can judge admission without reading the clock.
 - S4 (Operator, Serves a live anchor) — As an operator of a live anchor, I want each live submission still judged at the present, so that adding admit_at changes nothing a live request sees.
+
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1, met: certificate.rs line 214 has `pub fn admit_at(&self, _submission: &Submission<'_>, context: &SubmitterContext<'_>, at: DateTime<Utc>) -> Result<(), NotAdmitted>`, the only such line. Row 2, met in source, not run: admit_at's /// doc (lines 196-213) has an # Errors section. Its intra-doc links point at public items ([`AdmissionPolicy::admit`], [`NotAdmitted`]); the module doc links [`AdmissionPolicy::admit`], which is in scope through the existing `use`. The cargo doc 0-warning half was not run, per the instructions. Row 3, met: `grep -nw verify_certificate_chain` matches nothing. The only `verify_certificate_chain_at(` call is at line 232 inside admit_at: `verify_certificate_chain_at(credential, &self.issuer_public_key, at)`. Row 4, met: grep -c 'Utc::now()' prints 1, at line 270 inside the AdmissionPolicy impl: `self.admit_at(submission, context, Utc::now())`. Doc prose says 'the present' so the grep count stays exact. Row 5, met: admit's signature is still (&self, &Submission<'_>, &SubmitterContext<'_>) -> Result<(), NotAdmitted>. Row 6, met: lines 225-229 match Unidentified => return Err(NotAdmitted), AssertedBySubmitter(bytes) => *bytes and AuthenticatedByTransport(peer) => peer.certificate(), with no _ arm. Row 7, met: grep -nE 'right now|currently' prints nothing. Row 8, met: no file under crates/lys-core, and neither policy.rs, context.rs nor anchor/append.rs, is modified (git diff --stat lists only the four intended files). admit_at reads no clock and no extension. NotAdmitted, the trait and the constructors are untouched.
+- Deviation: The statement parameter of admit_at is bound as `_submission`, because the policy never reads the statement. This is the same binding the base admit impl carried, moved rather than added: admit now binds `submission` and passes it on, so the workspace's count of underscore-prefixed bindings is unchanged. It is disclosed here because the brief bars adding one.
+- Files changed:
+  - modified: `crates/lys-anchor/src/admission/certificate.rs` — Imports chrono::{DateTime, Utc} and verify_certificate_chain_at. Adds a public, documented RecognisedCertificate::admit_at with an # Errors section: it matches the three SubmitterContext arms with no wildcard, verifies the credential at the caller's instant, then checks the subject allow-list. AdmissionPolicy::admit now delegates to admit_at at Utc::now(). The module, issued_by and admit docs say the certificate is judged at the instant its caller names (the present through admit) and name verify_certificate_chain_at.
+- Checklist delivery:
+  - [x] C2 — RecognisedCertificate has a public, documented admit_at taking the submission, the SubmitterContext and a DateTime<Utc>, which verifies the chain and validity window at that instant through lys_core::ca::verify_certificate_chain_at. — admit_at at certificate.rs:214, verifying through verify_certificate_chain_at at :232.
+  - [x] C3 — RecognisedCertificate's AdmissionPolicy::admit keeps its signature and calls admit_at with Utc::now(). — admit keeps its signature and calls self.admit_at(submission, context, Utc::now()) at :270.
+  - [x] C4 — certificate.rs's docs say a certificate is judged at the instant its caller names, and none says 'right now' or 'currently'. — Module doc item 1, the 'What the chain check covers' section, issued_by and admit docs rewritten; no 'right now' or 'currently' remains.
+- Story delivery:
+  - [x] S3 (Developer, Embeds RecognisedCertificate in code that must judge admission at a known instant) — As a developer, I want to ask RecognisedCertificate whether a submission is admitted at an instant I name, given the same submitter context admit takes, so that I can judge admission without reading the clock. — admit_at takes the same submission and context as admit, plus the instant.
+  - [x] S4 (Operator, Serves a live anchor) — As an operator of a live anchor, I want each live submission still judged at the present, so that adding admit_at changes nothing a live request sees. — admit is admit_at at Utc::now(), with the same checks in the same order, so a live request is judged exactly as before.
 
 ### R3: Judge the expiry test at two named instants with no sleep
 
@@ -109,6 +141,24 @@ WHEN an_expired_certificate_is_refused runs, THE SYSTEM SHALL issue the same cer
 **Stories:**
 - S1 (Operator, Runs the workspace's gate on a shared, loaded build host) — As an operator running the gate on a loaded host, I want the expired-certificate test to finish without waiting on the clock, so that the suite stays fast and its outcome does not depend on load.
 - S2 (Reviewer, Checks that the certificate gate's tests can tell a correct gate from a broken one) — As a reviewer, I want the expiry refusal and its positive control judged at explicit instants, so that the refusal still proves the chain verification consults the validity window.
+
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1, met: grep -rnE 'thread::sleep|tokio::time::sleep' crates/lys-anchor prints nothing (checked). Row 2, met: the test body (from certificate_tests.rs:185) calls policy.admit_at twice, admit zero times, and contains no Utc::now(). Row 3, met: the first assertion is admit_at(&statement(), &asserted(&short_lived.der_bytes), issued_at + TimeDelta::milliseconds(500)) == Ok(()), where issued_at = short_lived.expires_at - TimeDelta::seconds(1). Row 4, met: the second assertion is admit_at(..., issued_at + TimeDelta::seconds(2)) == Err(NotAdmitted). Row 5, not run, per the instructions: there is no sleep and there are two in-memory verifications, so the test should finish well under a second. The instants hold because lys-core's validity_window truncates notAfter to whole seconds and notBefore is issued_at at whole-second DER precision, so expires_at − 1 s equals notBefore. Row 6, reasoned, not run, per the instructions: given Utc::now(), the positive control still passes (now is inside the one-second window just after issuance) and the refusal assertion fails. The other 18 admission tests already go through admit, which is Utc::now(), so they are unaffected and exactly one test fails, at its Err(NotAdmitted) assertion. Row 7, met: grep -c 'waits for a certificate to expire' prints 0. Row 8, met: the diff touches only the module-doc bullet, the use block (the added chrono import) and the test body; context_tests.rs and trivial_tests.rs are untouched. Row 9, not run: 19 admission tests are expected to pass, since only this test changed.
+- Deviation: Rows 5, 6 and 9 need cargo runs, and the brief says to run no build or test command. They are argued from source here and left to the workflow's gate. I did not perform the drift injection, so there is nothing to revert.
+- Files changed:
+  - modified: `crates/lys-anchor/src/admission/certificate_tests.rs` — Adds `use chrono::TimeDelta;`. The 'The passage of time' module-doc bullet now describes judging at two named instants. an_expired_certificate_is_refused issues the same one-second certificate, takes issued_at = expires_at − 1 s, asserts admit_at at issued_at + 500 ms is Ok(()) and then admit_at at issued_at + 2 s is Err(NotAdmitted). There is no sleep.
+- Checklist delivery:
+  - [x] C5 — an_expired_certificate_is_refused contains no sleep and asserts Ok(()) from admit_at at an instant inside the one-second window and Err(NotAdmitted) at issuance plus 2 seconds. — No sleep; Ok(()) at issuance + 500 ms, Err(NotAdmitted) at issuance + 2 s.
+  - [x] C6 — grep -rnE 'thread::sleep|tokio::time::sleep' crates/lys-anchor prints nothing. — The grep prints nothing.
+  - [x] C7 — certificate_tests.rs's module doc describes the expiry case as judged at named instants, not as waiting for expiry. — The bullet now reads 'The passage of time, at named instants' and describes two named instants, with nothing about waiting.
+  - [x] C8 — The other 18 admission tests are byte-unchanged and pass. — The other 18 tests are byte-unchanged; passing is left to the gate.
+- Story delivery:
+  - [x] S1 (Operator, Runs the workspace's gate on a shared, loaded build host) — As an operator running the gate on a loaded host, I want the expired-certificate test to finish without waiting on the clock, so that the suite stays fast and its outcome does not depend on load. — The 2100 ms sleep is gone and the outcome no longer depends on host load.
+  - [x] S2 (Reviewer, Checks that the certificate gate's tests can tell a correct gate from a broken one) — As a reviewer, I want the expiry refusal and its positive control judged at explicit instants, so that the refusal still proves the chain verification consults the validity window. — The positive control and the refusal are both judged at explicit instants, so the refusal still requires the window to be consulted.
 
 ## Boundaries
 

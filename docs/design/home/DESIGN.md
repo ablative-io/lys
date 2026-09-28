@@ -292,14 +292,14 @@ The given statement (HOME-018, ADR-072). CONFORMANCE row 6.5 asks for three sign
 | `crates/lys-home/src/harness/codex/mod.rs` | the Codex profile: module declarations only | HOME-009 |
 | `crates/lys-home/src/harness/codex/rollout.rs` | translate, the one entry point: the context-path walk, the session_meta and marker lines, the placing of carried sidechains and a forked child's prompt, the rollout's path and write, and the call to the side leaf | HOME-009 |
 | `crates/lys-home/src/harness/codex/rollout_tests.rs` | tests of the rollout's layout, lines and thread id | HOME-009 |
-| `crates/lys-home/src/harness/codex/loss.rs` | the loss account: kept, changed and lost by entry id, part index and the importer's block hash, and every entry off the context path | HOME-004 |
-| `crates/lys-home/src/harness/codex/loss_tests.rs` | gates on the account: every hash found in the block store, every entry and part once | HOME-004 |
-| `crates/lys-home/src/harness/codex/translate.rs` | render-codex's work: version check, existing path refused, both files written, the codex_translation side leaf | HOME-004 |
-| `crates/lys-home/src/harness/codex/translate_tests.rs` | gates on the refusals writing nothing, and the side leaf leaving the head | HOME-004 |
-| `crates/lys-home/src/cli/codex.rs` | the render-codex subcommand, split out of cli.rs | HOME-004 |
+| `crates/lys-home/src/harness/codex/loss.rs` | the loss account: kept, changed and lost by entry id, part index and the importer's block hash, and every entry off the context path | HOME-033 |
+| `crates/lys-home/src/harness/codex/loss_tests.rs` | gates on the account: every hash found in the block store, every entry and part once | HOME-033 |
+| `crates/lys-home/src/harness/codex/translate.rs` | render-codex's work: version check, existing path refused, both files written, the codex_translation side leaf | HOME-033 |
+| `crates/lys-home/src/harness/codex/translate_tests.rs` | gates on the refusals writing nothing, and the side leaf leaving the head | HOME-033 |
+| `crates/lys-home/src/cli/codex.rs` | the render-codex subcommand, split out of cli.rs | HOME-033 |
 | `crates/lys-home/tests/codex_translation.rs` | the translation proved through the public entry point | HOME-009 |
-| `crates/lys-home/tests/fixtures/codex/claude-code.jsonl` | the fixture Claude Code file, synthetic, in the measured part shapes, carrying the recorded rollout's conversation | HOME-004 |
-| `crates/lys-home/tests/fixtures/codex/claude-code-losses.jsonl` | the second fixture Claude Code file, synthetic: thinking, redacted thinking, long tool input and result, images, a sidechain, harness events, meta and authored records | HOME-004 |
+| `crates/lys-home/tests/fixtures/codex/claude-code.jsonl` | the fixture Claude Code file, synthetic, in the measured part shapes, carrying the recorded rollout's conversation | HOME-033 |
+| `crates/lys-home/tests/fixtures/codex/claude-code-losses.jsonl` | the second fixture Claude Code file, synthetic: thinking, redacted thinking, long tool input and result, images, a sidechain, harness events, meta and authored records | HOME-033 |
 | `crates/lys-home/tests/fixtures/codex/rollout-0.156.0.jsonl` | the recorded Codex 0.156.0 fixture rollout's conversation items | HOME-009 |
 | `docs/design/home/design.json` | the cluster design, the source DESIGN.md renders from |  |
 | `docs/design/home/briefs/HOME-008.json` | the given-statement brief: the given hash, the signed given statement at render, checked offline with lys verify | HOME-008 |
@@ -411,6 +411,7 @@ The given statement (HOME-018, ADR-072). CONFORMANCE row 6.5 asks for three sign
 | `crates/lys-home/src/launch.rs` | touched by HOME-035 R4: Rendering a launch moves data once and hashes what it writes as it writes | HOME-035 |
 | `crates/lys-home/src/given.rs` | touched by HOME-035 R4: Rendering a launch moves data once and hashes what it writes as it writes | HOME-035 |
 | `crates/lys-home/src/record/call/parts.rs` | touched by HOME-035 R5: Call parts are borrowed and each body file read once | HOME-035 |
+| `docs/design/home/briefs/HOME-033.json` | the first draft of the Codex translation brief, written as HOME-004 and renumbered; HOME-009 is the translation that landed | HOME-033 |
 
 ## Inventory
 

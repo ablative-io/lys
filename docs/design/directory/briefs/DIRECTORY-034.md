@@ -82,10 +82,12 @@ WHEN an authenticated caller asks GET /grants/resources, THE SYSTEM SHALL answer
 **Dev (recorded):**
 
 - Status: blocked
-- How: Not implemented. GET /grants/resources and GRAPH_RESOURCES consume DIRECTORY-006's grants API, and that has not landed. On origin/main 1841018, crates/lys-identity-server/src/grants.rs and tests/grant_explanations.rs exist, but grep GRANT_EXPLAIN on that test file exits 1, so DIRECTORY-006's landed check exits 1.
-- Deviation: This corrects the earlier record: crates/lys-identity-server is present on main; the blocker is the failing landed check, not a missing crate. The design gate went red last round because the workflow wrote new blocks into the JSON after the render. This round's blocks will make the md stale the same way unless it is rendered again after they are recorded.
-- Files changed:
-  - modified: `docs/design/directory/briefs/DIRECTORY-034.md` — Re-rendered with scripts/design/render-brief.py from the current DIRECTORY-034.json; sh scripts/design/gate.sh exits 0 on this tree.
+- How: Blocked; no acceptance row is met. The DIRECTORY-006 landed check exits 1 on this tree: grep -q 'GRANT_EXPLAIN' crates/lys-identity-server/tests/grant_explanations.rs fails. The Boundaries forbid dispatch until it exits 0 on lys main. blocked_by item 3 requires reconciling R1 against the landed server first. The server serves GET /grants/model (surface/identity/src/api.ts:80), but its type (surface/identity/src/generated/grants.ts:131-134) carries only version and relations, not resources with parents, withheld marks or declared actions. So R1 would add a route, but that decision belongs to the reviewer's revision. CN1 (documents only) also forbids creating crates/lys-identity-server/src/grant_resources.rs. CN9: stopped and named.
+- Deviation: Nothing was implemented, because the brief's own blocked_by conditions and CN1 forbid starting.
+- Checklist delivery:
+  - [ ] C274 — A read-only route in the identity server serves the permission model's resources with their parents, declared actions and model version, recording nothing; a caller sees a resource only where they hold a grant on it or on an ancestor, a directory administrator sees every resource, pass-on authority widens nothing, and a hidden parent is served as withheld without its name. — Blocked: DIRECTORY-006 landed check exits 1; R1 reconciliation not yet revised
+- Story delivery:
+  - [ ] S121 (Graph viewer, Looks at who can reach what on the access graph) — As a person signed in to the directory, I want to see what I may see as a graph, with my own reach drawn from Access's answers and the recorded containment and responsible people, so that what the graph shows is what the directory would decide. — Blocked
 
 **Review (recorded):**
 
@@ -133,8 +135,13 @@ WHEN an Access answer arrives for a question the graph asked, THE SYSTEM SHALL b
 **Dev (recorded):**
 
 - Status: blocked
-- How: Not implemented. Re-verified on origin/main 1841018: surface/identity and surface/identity/src/generated/index.ts exist. DIRECTORY-005's landed check exits 1 (no ID001_STANDALONE and no ID001_SCREEN_REFUSAL under surface/identity). DIRECTORY-006's exits 1 (no GRANT_EXPLAIN and no GRANT_SCREEN). graphModel.ts, GraphScreen.tsx and graph.test.tsx wait on both.
-- Deviation: This corrects the earlier record: surface/identity is present on main; the blocker is the two failing landed checks.
+- How: Blocked; no acceptance row is met. surface/identity/tests/graph.test.tsx, which R2 says it creates, already exists with tests for the landed graph at surface/identity/src/features/access/Graph.tsx. That graph is routed at surface/identity/src/routes.tsx:32. Whether it gets replaced or moved to features/graph/ needs a brief revision (CN9). No gate leg runs a frontend test (blocked_by item 4), so these accept rows would be measured by nothing. CN1 also forbids the files.
+- Deviation: Nothing was implemented; see how.
+- Checklist delivery:
+  - [ ] C273 — Every grant edge and every reachability the graph draws equals an Access answer from the real evaluator for the same question, over every identity, resource and declared action of a fixture directory: paths as returned, a no as Access's reason, a does not stand edge only for a grant a forward refusal names, with Access's reason, a grant Access no longer returns gone on the next draw, standing never inferred, and an outage shown as a named refusal. — Blocked
+- Story delivery:
+  - [ ] S121 (Graph viewer, Looks at who can reach what on the access graph) — As a person signed in to the directory, I want to see what I may see as a graph, with my own reach drawn from Access's answers and the recorded containment and responsible people, so that what the graph shows is what the directory would decide. — Blocked
+  - [ ] S123 (Graph viewer, Looks at who can reach what on the access graph) — As a reviewer of conformance row 8.3, I want tests that compare every drawn edge with the real evaluator and prove the graph module holds no rule, so that the graph cannot drift from Access unnoticed. — Blocked
 
 **Review (recorded):**
 
@@ -179,8 +186,12 @@ WHEN the graph opens with no node chosen, THE SYSTEM SHALL show, in surface/iden
 **Dev (recorded):**
 
 - Status: blocked
-- How: Not implemented. recordEdges.ts, the three toggles, the withheld mark, graph-directory.ts, graph.spec.ts and the .gitignore line depend on DIRECTORY-005 and DIRECTORY-006. Both landed checks exit 1 on origin/main 1841018.
-- Deviation: (none)
+- How: Blocked; no acceptance row is met. It depends on R1's route and R2's module, both blocked. The DIRECTORY-005 landed check (ID001_STANDALONE) exits 1, and no frontend test command is named by any gate leg (blocked_by item 4).
+- Deviation: Nothing was implemented; see how.
+- Checklist delivery:
+  - [ ] C275 — Before any question the graph shows the people, agents and resources the person may see, with containment edges from the served parents, a parent withheld mark where the parent is withheld, answers-to edges from the records and no grant edge, under three toggles: Grants, Containment and Who answers for whom, none of which asks Access again. — Blocked
+- Story delivery:
+  - [ ] S121 (Graph viewer, Looks at who can reach what on the access graph) — As a person signed in to the directory, I want to see what I may see as a graph, with my own reach drawn from Access's answers and the recorded containment and responsible people, so that what the graph shows is what the directory would decide. — Blocked
 
 **Review (recorded):**
 
@@ -224,8 +235,13 @@ WHEN the person chooses a person or agent node, THE SYSTEM SHALL, in surface/ide
 **Dev (recorded):**
 
 - Status: blocked
-- How: Not implemented. The chosen-node questions (paged GET /grants, POST /grants/why, POST /grants/who with continuation) go through DIRECTORY-006's generated module. That module's landed check exits 1 on origin/main 1841018.
-- Deviation: (none)
+- How: Blocked; no acceptance row is met. It depends on R2 and R3, and blocked_by's Access-route reconciliation (item 6) has not been recorded by a revision.
+- Deviation: Nothing was implemented; see how.
+- Checklist delivery:
+  - [ ] C276 — Choosing a person or agent draws the forward answer for each resource and action its visible grants carry, choosing a resource draws the reverse answer, an administrator holding the reverse question's visibility permission sees the whole directory, a reverse question the person may not ask is refused by name, no hidden grant is drawn or hinted at, and an incomplete reverse answer is marked incomplete. — Blocked
+- Story delivery:
+  - [ ] S121 (Graph viewer, Looks at who can reach what on the access graph) — As a person signed in to the directory, I want to see what I may see as a graph, with my own reach drawn from Access's answers and the recorded containment and responsible people, so that what the graph shows is what the directory would decide. — Blocked
+  - [ ] S122 (Graph viewer, Looks at who can reach what on the access graph) — As a directory administrator holding the visibility permission, I want to ask the graph who can reach a resource and see Access's answer with its model version and the time it was drawn, so that I can review reach without the screen inventing any of it. — Blocked
 
 **Review (recorded):**
 
@@ -270,8 +286,13 @@ THE SYSTEM SHALL show, in surface/identity/src/features/graph/GraphScreen.tsx, o
 **Dev (recorded):**
 
 - Status: blocked
-- How: Not implemented. The per-edge model version, the mixed-version line, the draw time, the refresh-only redraw and the deterministic layout are built on R2 to R4, which are blocked.
-- Deviation: (none)
+- How: Blocked; no acceptance row is met. It depends on R2 to R4.
+- Deviation: Nothing was implemented; see how.
+- Checklist delivery:
+  - [ ] C277 — Every grant and does not stand edge shows the model version of the Access answer it came from and every containment edge that of the resource route's answer, a draw of mixed versions names each above the graph, the draw time shows beside the version, and the graph asks Access again only on navigation, reload or its refresh control. — Blocked
+- Story delivery:
+  - [ ] S121 (Graph viewer, Looks at who can reach what on the access graph) — As a person signed in to the directory, I want to see what I may see as a graph, with my own reach drawn from Access's answers and the recorded containment and responsible people, so that what the graph shows is what the directory would decide. — Blocked
+  - [ ] S122 (Graph viewer, Looks at who can reach what on the access graph) — As a directory administrator holding the visibility permission, I want to ask the graph who can reach a resource and see Access's answer with its model version and the time it was drawn, so that I can review reach without the screen inventing any of it. — Blocked
 
 **Review (recorded):**
 
@@ -324,8 +345,12 @@ WHEN the location is #/graph/<id> for an identity or resource id, THE SYSTEM SHA
 **Dev (recorded):**
 
 - Status: blocked
-- How: Not implemented. The #/graph deep links and the Show in graph links change files that DIRECTORY-005 and DIRECTORY-006 own. Under CN9 those edits need reconciling against both landed manifests, and neither landed check exits 0 on origin/main 1841018.
-- Deviation: This corrects the earlier record: surface/identity exists on main, so these files will be reconciled against their landed state rather than described as absent.
+- How: Blocked; no acceptance row is met. Two modify paths do not exist: surface/identity/src/features/grants/YouGrants.tsx (the You page is surface/identity/src/features/me/You.tsx) and surface/identity/src/features/grants/GrantExplanation.tsx (the grants folder has Answer.tsx, CannotGive.tsx, check.ts, CheckBox.tsx, Delegate.tsx, GrantCard.tsx, IssueRoot.tsx, model.ts, pendingGrant.ts and Revoke.tsx). surface/identity/src/features/people/Preview.tsx:44 already carries a Show in graph link, and routes.tsx:32 already routes /graph/:id? to access/Graph. blocked_by item 5 requires these paths to be written into R6 by a revision before dispatch (CN9).
+- Deviation: Nothing was implemented; see how.
+- Checklist delivery:
+  - [ ] C278 — The graph is reached by the deep links #/graph and #/graph/<id> and by a Show in graph link on each screen present at build time that shows one identity (the directory's preview drawer, the identity record screen and the You page) and on the grant explanation, whose link opens the graph on the holder's node with that grant's edge selected, none on sign-in or the delegation form, with no rail entry or g h shortcut of its own. — Blocked: the landed paths differ from R6's modify list
+- Story delivery:
+  - [ ] S121 (Graph viewer, Looks at who can reach what on the access graph) — As a person signed in to the directory, I want to see what I may see as a graph, with my own reach drawn from Access's answers and the recorded containment and responsible people, so that what the graph shows is what the directory would decide. — Blocked
 
 **Review (recorded):**
 
@@ -370,8 +395,12 @@ The test surface/identity/tests/graph_boundary.test.ts (GRAPH_BOUNDARY) starts f
 **Dev (recorded):**
 
 - Status: blocked
-- How: Not implemented. GRAPH_BOUNDARY and its five drift injections need the graph module from R2 to R6, which is blocked.
-- Deviation: (none)
+- How: Blocked; no acceptance row is met. It depends on the graph module from R2 to R6. The blocked_by item 7 reconciliation is not recorded. The existing graph (surface/identity/src/features/access/Graph.tsx:3-6) imports ../../api and ../grants/*, which this walk refuses, so how the existing screen is dealt with needs a revision.
+- Deviation: Nothing was implemented; see how.
+- Checklist delivery:
+  - [ ] C272 — The graph module under surface/identity/src/features/graph/ imports nothing from the permission engine except the generated Access client (its other imports are only React, the surface's router package, the shell modules the test lists by file name, the surface's stylesheets and its own files, followed transitively, the surface's API client refused by name wherever it is reached), declares none of the mock-up's rule functions and references no mutation, and a test that counts what it checked proves it (conformance 8.3). — Blocked
+- Story delivery:
+  - [ ] S123 (Graph viewer, Looks at who can reach what on the access graph) — As a reviewer of conformance row 8.3, I want tests that compare every drawn edge with the real evaluator and prove the graph module holds no rule, so that the graph cannot drift from Access unnoticed. — Blocked
 
 **Review (recorded):**
 
@@ -417,8 +446,15 @@ The fixture surface/identity/tests/fixtures/graph-directory.ts (created by R3) i
 **Dev (recorded):**
 
 - Status: blocked
-- How: Not implemented. GRAPH_EVERY_PAIR, GRAPH_REVOKED, GRAPH_EXPIRED, GRAPH_VERSION and GRAPH_OUTAGE run against the real DIRECTORY-006 evaluator and the built graph. Both landed checks exit 1 on origin/main 1841018.
-- Deviation: (none)
+- How: Blocked; no acceptance row is met. It depends on R1 and R3. blocked_by item 6 (that revoked and expired grants are still listed and named by /grants/why refusals) is not reconciled, and no frontend test command exists in any gate leg.
+- Deviation: Nothing was implemented; see how.
+- Checklist delivery:
+  - [ ] C273 — Every grant edge and every reachability the graph draws equals an Access answer from the real evaluator for the same question, over every identity, resource and declared action of a fixture directory: paths as returned, a no as Access's reason, a does not stand edge only for a grant a forward refusal names, with Access's reason, a grant Access no longer returns gone on the next draw, standing never inferred, and an outage shown as a named refusal. — Blocked
+  - [ ] C276 — Choosing a person or agent draws the forward answer for each resource and action its visible grants carry, choosing a resource draws the reverse answer, an administrator holding the reverse question's visibility permission sees the whole directory, a reverse question the person may not ask is refused by name, no hidden grant is drawn or hinted at, and an incomplete reverse answer is marked incomplete. — Blocked
+  - [ ] C277 — Every grant and does not stand edge shows the model version of the Access answer it came from and every containment edge that of the resource route's answer, a draw of mixed versions names each above the graph, the draw time shows beside the version, and the graph asks Access again only on navigation, reload or its refresh control. — Blocked
+- Story delivery:
+  - [ ] S122 (Graph viewer, Looks at who can reach what on the access graph) — As a directory administrator holding the visibility permission, I want to ask the graph who can reach a resource and see Access's answer with its model version and the time it was drawn, so that I can review reach without the screen inventing any of it. — Blocked
+  - [ ] S123 (Graph viewer, Looks at who can reach what on the access graph) — As a reviewer of conformance row 8.3, I want tests that compare every drawn edge with the real evaluator and prove the graph module holds no rule, so that the graph cannot drift from Access unnoticed. — Blocked
 
 **Review (recorded):**
 

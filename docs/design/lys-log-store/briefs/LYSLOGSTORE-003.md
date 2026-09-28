@@ -72,6 +72,23 @@ StoreError gains two variants, each with a /// doc and each field documented. Re
 - S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
 - S2 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a store left mid-append to be refused by name when I open it for reading so that I learn a repair is pending instead of performing one.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1 (ReadOnly Display): the error.rs #[error] attribute is 'refusing to {operation} in the log store at {}: it was opened read-only' with path.display(). file_tests.rs asserts the exact string. Row 2 (RepairPending Display): the attribute gives the exact specified text. It is asserted in the same test. Row 3: both assertions are in file::tests::the_read_only_refusals_name_the_store_and_the_refused_act. Row 4: the two variants are inserted between Serialize's closing '},' and the enum's closing '}', so git diff shows additions only. Neither variant carries or prints a leaf index.
+- Deviation: (none)
+- Files changed:
+  - modified: `crates/lys-log-store/src/error.rs` — StoreError gains ReadOnly { path, operation } and RepairPending { path, pinned_size, extent }. Each variant and each field is documented and the messages are exactly as specified. They are appended after Serialize, so no existing line changes, and #[non_exhaustive] is kept.
+  - modified: `crates/lys-log-store/src/file_tests.rs` — Adds the_read_only_refusals_name_the_store_and_the_refused_act.
+- Checklist delivery:
+  - [x] C1 — StoreError has a documented ReadOnly variant carrying the store's directory and the refused act. — ReadOnly { path: PathBuf, operation: &'static str }, documented.
+  - [x] C2 — StoreError has a documented RepairPending variant carrying the store's directory, the pinned tree size and the extent. — RepairPending { path, pinned_size, extent }, documented.
+- Story delivery:
+  - [x] S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence. — The refusal is a named variant.
+  - [x] S2 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a store left mid-append to be refused by name when I open it for reading so that I learn a repair is pending instead of performing one. — RepairPending names the pending repair.
+
 ### R2: Open a store for reading, and refuse one that is one leaf past its pin
 
 FileLeafStore gains a public, documented inherent constructor open_read_only(dir: &Path) -> StoreResult<FileLeafStore>, the open for a reader, whose # Errors section names StoreError::RepairPending. WHEN open_read_only is called, THE SYSTEM SHALL perform every check FileLeafStore::open performs, in the same order and with the same errors (NotInitialized, Corrupt, Io), and SHALL count the named leaves as FileLeafStore::open does. It SHALL NOT flush leaves/ or any other directory, and SHALL NOT create, write, rename, link or remove any file. IF the counted extent equals the pinned tree size plus one, THEN THE SYSTEM SHALL return StoreError::RepairPending with path the store's directory, pinned_size the pinned tree size and extent the counted extent, and SHALL NOT return a handle. It SHALL decide this from the count and state.json alone and SHALL NOT read leaf bytes: RepairPending says a leaf stands one past the pin, and whether that is a clean interrupted append or a damaged prefix is decided by a writable open, which repairs or refuses with PinMismatch as it does on main. WHEN the counted extent is any other value, THE SYSTEM SHALL return the handle, over which Log::open accepts a tree that matches the pin and refuses any other with PinMismatch without calling pin. The LeafStore trait SHALL NOT gain a method, and FileLeafStore::open's behaviour SHALL NOT change.
@@ -96,6 +113,24 @@ FileLeafStore gains a public, documented inherent constructor open_read_only(dir
 - S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
 - S2 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a store left mid-append to be refused by name when I open it for reading so that I learn a repair is pending instead of performing one.
 
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1: file_tests.rs open_read_only_refuses_a_store_one_leaf_past_its_pin_and_changes_no_byte uses create then put_leaf(0) with no pin. It asserts RepairPending { path == D, pinned_size: 0, extent: 1 } and that tree_bytes is equal before and after. The check is `pinned.tree_size.checked_add(1) == Some(extent)` in open_read_only in file.rs. Row 2: open_read_only_on_an_uninitialized_dir_is_not_initialized. read_identity returns NotInitialized first, exactly as open did. Row 3: log_tests.rs a_log_opens_over_a_read_only_store_at_its_pin_and_changes_no_byte asserts len 2, recovered_to None and tree_bytes unchanged. Row 4: a_read_only_store_two_leaves_past_its_pin_is_refused_without_a_write restores the creation-time state.json. It asserts extent 2, PinMismatch { pinned_size: 0, rebuilt_size: 2 } and tree_bytes unchanged. Log::open does not call pin on a mismatch, so the ReadOnly refusal is never reached. Row 5: open_read_only calls read_identity (parse_state_file, decode_pinned_root) and probed_extent (with contiguous_extent), and none of them calls fsync_dir, sync_dir, write_state or write_durably. open's behaviour is unchanged: the same checks run in the same order, then the flush, then probed_extent. The LeafStore trait is untouched.
+- Deviation: (none)
+- Files changed:
+  - modified: `crates/lys-log-store/src/file.rs` — open's log.json and state.json checks are extracted unchanged into the private read_identity, which open and open_read_only both call. New pub fn open_read_only runs read_identity and then probed_extent, with no fsync_dir and no write. It returns RepairPending when extent == pinned+1, and otherwise a handle with read_only: true.
+  - modified: `crates/lys-log-store/src/file_tests.rs` — Adds open_read_only_refuses_a_store_one_leaf_past_its_pin_and_changes_no_byte and open_read_only_on_an_uninitialized_dir_is_not_initialized. Adds a tree_bytes helper that snapshots every file under the store, dotfiles included.
+  - modified: `crates/lys-log-store/src/log_tests.rs` — Adds a_log_opens_over_a_read_only_store_at_its_pin_and_changes_no_byte and a_read_only_store_two_leaves_past_its_pin_is_refused_without_a_write, plus a tree_bytes helper.
+- Checklist delivery:
+  - [x] C3 — FileLeafStore::open_read_only performs FileLeafStore::open's checks and returns a handle without flushing leaves/ or writing any file. — Same checks and order as open, minus the flush; no file is written.
+  - [x] C4 — FileLeafStore::open_read_only on a store exactly one leaf past its pin returns StoreError::RepairPending and every file under the store directory holds the same bytes before and after. — RepairPending at extent == pin+1, with a byte-for-byte check before and after.
+- Story delivery:
+  - [x] S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
+  - [x] S2 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a store left mid-append to be refused by name when I open it for reading so that I learn a repair is pending instead of performing one.
+
 ### R3: Refuse a leaf write and a pin on a read-only handle
 
 WHEN put_leaf is called on a handle returned by FileLeafStore::open_read_only, THE SYSTEM SHALL return StoreError::ReadOnly with path the store's directory and operation `write a leaf` before any other check, SHALL NOT create, write, link, remove or flush any file, and SHALL NOT advance the extent. WHEN pin is called on such a handle, THE SYSTEM SHALL return StoreError::ReadOnly with path the store's directory and operation `pin` before PinWentBackwards and PinRootChanged are checked, SHALL NOT write state.json or state.json.tmp, and SHALL NOT change pinned(). A handle returned by FileLeafStore::open or FileLeafStore::create SHALL keep main's put_leaf and pin behaviour, and the leaf write SHALL NOT otherwise change.
@@ -116,6 +151,22 @@ WHEN put_leaf is called on a handle returned by FileLeafStore::open_read_only, T
 **Stories:**
 - S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
 
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1: a_read_only_handle_refuses_a_leaf_write_and_changes_no_byte calls put_leaf(1, leaf-1) and put_leaf(0, leaf-X). Both return ReadOnly { path == D, operation: "write a leaf" }, so index 0 does not return LeafAlreadyWritten, because the refusal comes before put_leaf_with. extent stays 1 and tree_bytes is unchanged. Row 2: a_read_only_handle_refuses_a_pin_and_changes_no_byte calls pin at tree_size 2 and at 0. Both return ReadOnly { operation: "pin" }, not PinWentBackwards. pinned() equals the pin held before, there is no state.json.tmp, and tree_bytes is unchanged. Row 3: no existing test in file_tests.rs was edited. Handles from create and open set read_only: false, so main's behaviour is kept. Drift check by reasoning: removing either refusal lets the write through, which only its own test observes.
+- Deviation: (none)
+- Files changed:
+  - modified: `crates/lys-log-store/src/file.rs` — New private refuse_if_read_only(operation). It is called first in LeafStore::put_leaf ('write a leaf') and in LeafStore::pin ('pin'), ahead of every existing check. put_leaf_with and the helpers after it are unchanged.
+  - modified: `crates/lys-log-store/src/file_tests.rs` — Adds a_read_only_handle_refuses_a_leaf_write_and_changes_no_byte and a_read_only_handle_refuses_a_pin_and_changes_no_byte, with pin_over and store_pinned_over helpers.
+- Checklist delivery:
+  - [x] C5 — put_leaf on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and every file under the store directory holds the same bytes before and after.
+  - [x] C6 — pin on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and every file under the store directory holds the same bytes before and after.
+- Story delivery:
+  - [x] S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
+
 ### R4: Hold the writable repair of a store one leaf past its pin
 
 WHEN a store one leaf past its pin, the state FileLeafStore::open_read_only refuses with RepairPending under R2, is opened with FileLeafStore::open and Log::open, THE SYSTEM SHALL repair it exactly as main does: adopt the one leaf past the pin, pin it, and report it through recovered_to. This requirement adds a test to crates/lys-log-store/src/log_tests.rs. It SHALL NOT change Log::open, reconcile_with_pin or the one-leaf repair. The test SHALL establish the interrupted append through a FileLeafStore::open handle and SHALL NOT call open_read_only before the repair, so that R2's test alone holds the RepairPending refusal and R2's byte-for-byte check alone holds that the refusal leaves the store unchanged.
@@ -132,6 +183,20 @@ WHEN a store one leaf past its pin, the state FileLeafStore::open_read_only refu
 
 **Stories:**
 - S3 (Witness operator, Runs a witness anchor that observes other logs' checkpoints) — As a witness operator, I want each observation to cost only the leaves recorded since the previous one, so that the witness stays usable as its own log grows.
+
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1: the test appends leaf-0, saves state.json, appends leaf-1 and restores the saved state.json. A FileLeafStore::open handle shows extent 2 and pinned tree_size 1, and is dropped. Log::open(FileLeafStore::open) then gives len 2 and recovered_to Some(2). open_read_only afterwards gives extent 2 and pinned tree_size 2. open_read_only is not called before the repair. Row 2: crash_recovery_repairs_exactly_one_interrupted_append_and_reports_it is untouched, and log.rs is unchanged.
+- Deviation: (none)
+- Files changed:
+  - modified: `crates/lys-log-store/src/log_tests.rs` — Adds a_writable_open_repairs_a_store_one_leaf_past_its_pin.
+- Checklist delivery:
+  - [x] C7 — A store one leaf past its pin, the state a read-only open refuses with RepairPending, is repaired by FileLeafStore::open followed by Log::open, which reports recovered_to as Some of the extent.
+- Story delivery:
+  - [x] S3 (Witness operator, Runs a witness anchor that observes other logs' checkpoints) — As a witness operator, I want each observation to cost only the leaves recorded since the previous one, so that the witness stays usable as its own log grows. — Only the leaf store's part: the writable repair is held by a test.
 
 ### R5: Name the leftover temporary leaf files an open skipped
 
@@ -153,6 +218,21 @@ WHEN FileLeafStore::open or FileLeafStore::open_read_only reads leaves/, THE SYS
 **Stories:**
 - S4 (Log operator, Opens a log store, including after a crash) — As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove.
 
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1: leftover_temporaries_names_the_stores_own_temporary_files. open and open_read_only both give extent 1 and [".4242-00000000000000000001-0.tmp"], and afterwards the file still holds 'partial'. Row 2: leftover_temporaries_are_in_lexical_order asserts the .17 name before the .4242 name, which sort_unstable on String gives. Row 3: leftover_temporaries_is_empty_without_one_of_the_stores_form checks a create handle (empty), then open with no leftover (empty, extent 1), then with .DS_Store added (empty, extent 1). Row 4: the two existing leftover tests are unchanged. Temporary names are never counted: probed_extent looks only at 20-digit names, and contiguous_extent still skips dot-names. The trait, Log, state.json, log.json and the leaf files are unchanged.
+- Deviation: The spec asks for leftover_temporaries(&self) -> &[String], filled in when open reads leaves/. On current main, neither open reads the leaves/ listing in the usual case: commit 33d9068 (after the brief's base a426b9a) made open find the extent from the pin forward, one lookup per unpinned leaf. It lists the folder only when the leaf below the pin is missing. Collecting the names at open would bring back a full listing on every open, which breaks CLAUDE.md's rule that opening a store costs the same however long its log is. So the accessor lists leaves/ when it is called, and returns StoreResult<Vec<String>> so that a failed read is a named Io error rather than a silent empty list. The tests call .unwrap() on the result and compare the same values the rows name. Every other clause is kept: lexical order, only the store's form, empty for a create handle, never counted, never modified.
+- Files changed:
+  - modified: `crates/lys-log-store/src/file.rs` — New pub fn leftover_temporaries(&self) -> StoreResult<Vec<String>>. It calls the private list_leftover_temporaries, which reads the leaves/ listing, keeps the names that pass is_leaf_temp_name and sorts them. is_leaf_temp_name accepts '.' + digits + '-' + 20 digits + '-' + digits + '.tmp'. No entry is opened, removed or renamed.
+  - modified: `crates/lys-log-store/src/file_tests.rs` — Adds leftover_temporaries_names_the_stores_own_temporary_files, leftover_temporaries_are_in_lexical_order and leftover_temporaries_is_empty_without_one_of_the_stores_form.
+- Checklist delivery:
+  - [x] C10 — FileLeafStore::leftover_temporaries returns the store's temporary-leaf names in lexical order, none counted toward the extent and none changed. — Lexical order, none counted, none changed. The accessor lists when called rather than at open; see deviation.
+- Story delivery:
+  - [x] S4 (Log operator, Opens a log store, including after a crash) — As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove.
+
 ### R6: Hold Log::open's refusal of a torn pinned prefix, and its repair of a torn leaf past the pin, under tests
 
 IF a leaf at an index below the pinned tree size is torn short after it was named, THEN THE SYSTEM SHALL return StoreError::PinMismatch from Log::open, carrying the pin's tree size and base64 root and the tree size and base64 root the stored leaves rebuild to. THE SYSTEM SHALL NOT name a leaf index in that error, SHALL NOT pin, and SHALL NOT write state.json. WHEN the stored leaves are exactly one more than the pinned tree size and the pinned-size prefix rebuilds to the pinned root, THE SYSTEM SHALL adopt the extra leaf whatever its bytes, pin it and report it through recovered_to, as main does. This requirement adds tests to crates/lys-log-store/src/log_tests.rs and changes no library code; it SHALL NOT change Log::open, reconcile_with_pin, or StoreError::PinMismatch's fields or message, and SHALL NOT add a per-leaf hash record.
@@ -173,6 +253,22 @@ IF a leaf at an index below the pinned tree size is torn short after it was name
 - S5 (Log inspector, Opens a log store to read it without changing it) — As a log inspector, I want a store I open read only to refuse every write, so that reading a store can never change it.
 - S3 (Witness operator, Runs a witness anchor that observes other logs' checkpoints) — As a witness operator, I want each observation to cost only the leaves recorded since the previous one, so that the witness stays usable as its own log grows.
 
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1: the first test appends three leaves, records the root and tears leaf 1 to 'lea'. It asserts PinMismatch { pinned_size 3, pinned_root == base64 of the root after the third append, rebuilt_size 3, rebuilt_root == base64 of reconstruct_from_raw_leaves over [leaf-0, lea, leaf-2] }. It also asserts the exact Display text and that state.json is byte-identical. Row 2: the second test appends two leaves and writes leaves/00000000000000000002 = 'lea' by hand. The first reopen gives recovered_to Some(3) and len 3. The second gives None and len 3. Row 3: log.rs is not modified.
+- Deviation: (none)
+- Files changed:
+  - modified: `crates/lys-log-store/src/log_tests.rs` — Adds a_torn_leaf_inside_the_pinned_prefix_is_refused_with_both_trees and a_torn_leaf_just_past_the_pin_is_repaired_and_reported.
+- Checklist delivery:
+  - [x] C8 — A torn leaf inside the pinned prefix is refused by Log::open with StoreError::PinMismatch carrying both trees, and state.json is unchanged.
+  - [x] C9 — A torn leaf just past the pin is adopted by the one-leaf repair and reported by recovered_to.
+- Story delivery:
+  - [x] S5 (Log inspector, Opens a log store to read it without changing it) — As a log inspector, I want a store I open read only to refuse every write, so that reading a store can never change it. — Held with R2 and R3.
+  - [x] S3 (Witness operator, Runs a witness anchor that observes other logs' checkpoints) — As a witness operator, I want each observation to cost only the leaves recorded since the previous one, so that the witness stays usable as its own log grows. — Only the leaf store's part.
+
 ### R7: Say in file.rs's module doc what open does and never does
 
 file.rs's module doc gains a section headed `# What open does and never does`. It SHALL state: FileLeafStore::open reads log.json and state.json, flushes leaves/, counts the 20-digit leaf names and requires them to be contiguous from 0, and returns a writable handle; FileLeafStore::open_read_only performs the same checks without the flush, refuses a store one leaf past its pin with StoreError::RepairPending, and returns a handle whose put_leaf and pin refuse with StoreError::ReadOnly; neither open reads leaf bytes, repairs a store or advances the pin, since the one-leaf repair is Log::open's over a writable handle; neither open counts a dot-prefixed name; neither open ever deletes, renames or changes a leftover temporary file, and both name the store's own through leftover_temporaries; FileLeafStore::leaf serves bytes it has not checked, a leaf is proven whole only through Log::open against the pinned root, and every reader that wants a proven leaf goes through Log::open. The existing Layout and Durability sections SHALL NOT be weakened or removed, and the section SHALL NOT claim that the leaves/ flush holds on targets where fsync_dir does nothing.
@@ -192,6 +288,21 @@ file.rs's module doc gains a section headed `# What open does and never does`. I
 
 **Stories:**
 - S6 (Log inspector, Opens a log store to read it without changing it) — As a log inspector, I want a read-only open of a store with an interrupted append to refuse and say that a repair is pending, so that I learn the store is past its pin without my open repairing it.
+
+#### R7 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1: file.rs has the line '//! # What open does and never does'. The section names FileLeafStore::open_read_only, StoreError::RepairPending, StoreError::ReadOnly and FileLeafStore::leftover_temporaries. It says an open '**never deletes**', renames or changes a leftover temporary file. It says [`FileLeafStore::leaf`](LeafStore::leaf) 'serves bytes it has not checked' and a leaf 'is proven whole only through [`Log::open`]'. It also says neither open reads leaf bytes, repairs a store, advances the pin or counts a dot-prefixed name, and that the one-leaf repair belongs to Log::open. Row 2: the Layout and Durability lines are untouched, since the section is added after them. The flush sentence is qualified as holding 'on the targets where fsync_dir flushes a directory; see Durability'. Row 3: every intra-doc link resolves in both feature shapes: Log::open by a reference definition to crate::Log::open, and the others through file.rs's own imports. Row 4: the brief's grep count for file.rs is 376 lines of code.
+- Deviation: The spec says open 'counts the 20-digit leaf names and requires them to be contiguous from 0'. Current main's open (commit 33d9068) counts from the pin forward and refuses a gap just past the extent. It requires contiguity from 0 only when the leaf below the pin is missing, and audit_leaves is the whole-folder check. The section says that, so the doc does not claim more than the code does. The section also says leftover_temporaries lists when asked; see R5's deviation.
+- Files changed:
+  - modified: `crates/lys-log-store/src/file.rs` — Module doc gains '# What open does and never does' after Durability. Layout and Durability are unchanged.
+- Checklist delivery:
+  - [x] C11 — file.rs's module doc has a section stating what open and open_read_only do and never do, including that neither deletes a leftover temporary file.
+  - [x] C12 — file.rs's module doc states that FileLeafStore::leaf serves bytes it has not checked and that a leaf is proven whole only through Log::open against the pinned root.
+- Story delivery:
+  - [x] S6 (Log inspector, Opens a log store to read it without changing it) — As a log inspector, I want a read-only open of a store with an interrupted append to refuse and say that a repair is pending, so that I learn the store is past its pin without my open repairing it.
 
 ## Boundaries
 

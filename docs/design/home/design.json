@@ -1012,27 +1012,27 @@
     {
       "path": "crates/lys-home/src/harness/codex/loss.rs",
       "note": "the loss account: kept, changed and lost by entry id, part index and the importer's block hash, and every entry off the context path",
-      "brief": "HOME-004"
+      "brief": "HOME-033"
     },
     {
       "path": "crates/lys-home/src/harness/codex/loss_tests.rs",
       "note": "gates on the account: every hash found in the block store, every entry and part once",
-      "brief": "HOME-004"
+      "brief": "HOME-033"
     },
     {
       "path": "crates/lys-home/src/harness/codex/translate.rs",
       "note": "render-codex's work: version check, existing path refused, both files written, the codex_translation side leaf",
-      "brief": "HOME-004"
+      "brief": "HOME-033"
     },
     {
       "path": "crates/lys-home/src/harness/codex/translate_tests.rs",
       "note": "gates on the refusals writing nothing, and the side leaf leaving the head",
-      "brief": "HOME-004"
+      "brief": "HOME-033"
     },
     {
       "path": "crates/lys-home/src/cli/codex.rs",
       "note": "the render-codex subcommand, split out of cli.rs",
-      "brief": "HOME-004"
+      "brief": "HOME-033"
     },
     {
       "path": "crates/lys-home/tests/codex_translation.rs",
@@ -1042,12 +1042,12 @@
     {
       "path": "crates/lys-home/tests/fixtures/codex/claude-code.jsonl",
       "note": "the fixture Claude Code file, synthetic, in the measured part shapes, carrying the recorded rollout's conversation",
-      "brief": "HOME-004"
+      "brief": "HOME-033"
     },
     {
       "path": "crates/lys-home/tests/fixtures/codex/claude-code-losses.jsonl",
       "note": "the second fixture Claude Code file, synthetic: thinking, redacted thinking, long tool input and result, images, a sidechain, harness events, meta and authored records",
-      "brief": "HOME-004"
+      "brief": "HOME-033"
     },
     {
       "path": "crates/lys-home/tests/fixtures/codex/rollout-0.156.0.jsonl",
@@ -1603,6 +1603,11 @@
       "path": "crates/lys-home/src/record/call/parts.rs",
       "note": "touched by HOME-035 R5: Call parts are borrowed and each body file read once",
       "brief": "HOME-035"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-033.json",
+      "note": "the first draft of the Codex translation brief, written as HOME-004 and renumbered; HOME-009 is the translation that landed",
+      "brief": "HOME-033"
     }
   ],
   "inventory": [
