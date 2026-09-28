@@ -33,6 +33,7 @@ pub mod append;
 pub mod error;
 pub mod fold;
 pub mod leaf;
+pub mod verify;
 
 pub use append::{append_attestation_entry, append_issuance, append_revocation};
 pub use error::{AppendOperation, LeafRefusal, RevocationError};
@@ -41,3 +42,4 @@ pub use leaf::{
     CertificateHash, CertificateLeaf, LEAF_DOMAIN_TAG, REVOCATION_DOMAIN_TAG, REVOCATION_LEAF_LEN,
     Revocation, revocation_signed_bytes,
 };
+pub use verify::{Evidence, Live, verify_certificate};
