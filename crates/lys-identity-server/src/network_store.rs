@@ -9,7 +9,13 @@
 //! A machine is named by the operation id it was named with, so naming it
 //! again in the same words answers the machine already kept, and the same
 //! operation in other words is refused.
+//!
+//! A machine's record names its runner, when it has one: Lys's own, another
+//! tool's socket speaking the runner protocol, or a runner on another
+//! machine that dials in with the machine's key. A machine with none is
+//! given its start command and nothing is run.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -17,6 +23,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
+use crate::runner_client::RunnerRecord;
 
 /// A machine's retirement.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -57,10 +64,14 @@ pub struct Machine {
     pub retired: Option<Retirement>,
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Kept {
     machines: Vec<Machine>,
+    /// Each machine's runner, by machine id; a machine named here has no
+    /// runner, and its start answers the command without running it.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    runners: BTreeMap<String, RunnerRecord>,
 }
 
 /// The machines, read from their file and written to it.
@@ -156,9 +167,9 @@ impl NetworkStore {
                 machine: machine.id,
             }),
             None => {
-                let mut machines = self.kept.machines.clone();
-                machines.push(machine);
-                self.write(Kept { machines })
+                let mut next = self.kept.clone();
+                next.machines.push(machine);
+                self.write(next)
             }
         }
     }
@@ -166,8 +177,9 @@ impl NetworkStore {
     /// Retire the machine `id`. A machine already retired stays as it was retired.
     pub fn retire(&mut self, id: &str, retirement: Retirement) -> Result<(), ServerError> {
         self.settle()?;
-        let mut machines = self.kept.machines.clone();
-        let machine = machines
+        let mut next = self.kept.clone();
+        let machine = next
+            .machines
             .iter_mut()
             .find(|machine| machine.id == id)
             .ok_or(ServerError::MachineUnknown)?;
@@ -175,7 +187,32 @@ impl NetworkStore {
             return Ok(());
         }
         machine.retired = Some(retirement);
-        self.write(Kept { machines })
+        self.write(next)
+    }
+
+    /// The runner the machine `id` names, none when it names none.
+    pub fn runner(&self, id: &str) -> Option<&RunnerRecord> {
+        self.kept.runners.get(id)
+    }
+
+    /// Name `runner` as the machine `id`'s runner, or none. A retired
+    /// machine takes no runner.
+    pub fn name_runner(
+        &mut self,
+        id: &str,
+        runner: Option<RunnerRecord>,
+    ) -> Result<(), ServerError> {
+        self.settle()?;
+        let machine = self.machine(id).ok_or(ServerError::MachineUnknown)?;
+        if machine.retired.is_some() {
+            return Err(ServerError::MachineRetired);
+        }
+        let mut next = self.kept.clone();
+        match runner {
+            Some(runner) => next.runners.insert(id.to_owned(), runner),
+            None => next.runners.remove(id),
+        };
+        self.write(next)
     }
 }
 

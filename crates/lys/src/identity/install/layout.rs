@@ -118,6 +118,11 @@ impl Layout {
         self.root.join("run")
     }
 
+    /// The runner's Unix socket, in the run folder.
+    pub fn runner_socket(&self) -> PathBuf {
+        self.run_dir().join("runner.sock")
+    }
+
     /// The directory service's data, one directory per store.
     pub fn data_dir(&self) -> PathBuf {
         self.root.join("data")

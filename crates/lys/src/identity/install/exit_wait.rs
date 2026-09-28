@@ -16,6 +16,12 @@
 //! not carry. The lock is the same event on every Unix: the kernel's own
 //! release of what the exiting process held.
 //!
+//! A watch holds the lock only for the instant it is granted, and releases
+//! it by name before its descriptor closes: a process another thread
+//! spawns at that instant inherits the descriptor until it runs its own
+//! program, and a lock released only by the close would read as the
+//! service still running for as long as that copy lived.
+//!
 //! Invariants: a service never closes its standard input while it runs (one
 //! that did would read as exited), and a process that inherits that input
 //! keeps the lock held until it too has exited. A pid file with no exit lock
@@ -53,7 +59,7 @@ pub fn hold(pid_file: &Path) -> IdentityResult<File> {
         .open(&path)
         .map_err(|error| refuse("take exit lock", error.to_string(), &path))?;
     let watch = ExitWatch { lock: file, path };
-    watch.wait()?;
+    watch.take()?;
     Ok(watch.lock)
 }
 
@@ -87,13 +93,26 @@ impl ExitWatch {
 #[cfg(unix)]
 impl ExitWatch {
     /// Whether the service has exited, answered at once without waiting.
+    /// A lock granted is released again at once.
     pub fn exited(&self) -> IdentityResult<bool> {
-        self.lock(FlockOperation::NonBlockingLockExclusive)
+        let exited = self.lock(FlockOperation::NonBlockingLockExclusive)?;
+        if exited {
+            self.lock(FlockOperation::Unlock)?;
+        }
+        Ok(exited)
     }
 
     /// Blocks until the service has exited: the kernel grants the lock the
-    /// moment the service's last descriptor of it closes.
+    /// moment the service's last descriptor of it closes, and it is
+    /// released again at once.
     pub fn wait(&self) -> IdentityResult<()> {
+        self.lock(FlockOperation::LockExclusive)?;
+        self.lock(FlockOperation::Unlock).map(drop)
+    }
+
+    /// Blocks until an earlier holder has exited and keeps the lock, for a
+    /// service about to be given it.
+    fn take(&self) -> IdentityResult<()> {
         self.lock(FlockOperation::LockExclusive).map(drop)
     }
 
@@ -125,6 +144,10 @@ impl ExitWatch {
 
     /// Blocks until the service has exited; an exit lock needs a Unix host.
     pub fn wait(&self) -> IdentityResult<()> {
+        self.exited().map(drop)
+    }
+
+    fn take(&self) -> IdentityResult<()> {
         self.exited().map(drop)
     }
 }

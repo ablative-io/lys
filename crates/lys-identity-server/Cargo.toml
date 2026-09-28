@@ -16,6 +16,7 @@ lys-core.workspace = true
 lys-home.workspace = true
 lys-identity.workspace = true
 lys-log-store.workspace = true
+lys-runner.workspace = true
 openidconnect.workspace = true
 rand.workspace = true
 reqwest.workspace = true

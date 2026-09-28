@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::io::{Read, Write};
-use std::net::{Ipv6Addr, SocketAddr, TcpListener};
+use std::net::{Ipv6Addr, SocketAddr, TcpListener, TcpStream};
 
 use super::*;
 
@@ -80,9 +80,44 @@ fn a_missing_port_is_the_scheme_default_never_a_digit_of_the_host() {
     );
 }
 
+/// A loopback address nothing listens on, held for as long as the test
+/// keeps it. The port is the local end of a live connection, so no other
+/// test can be given it while it is held and a connection to it is refused;
+/// a port freed by dropping a listener could be handed to a test running
+/// beside this one.
+struct Refusing {
+    address: SocketAddr,
+    listener: TcpListener,
+    near: TcpStream,
+    far: TcpStream,
+}
+
+impl Refusing {
+    fn hold() -> TestResult<Self> {
+        let listener = TcpListener::bind("127.0.0.1:0")?;
+        let near = TcpStream::connect(listener.local_addr()?)?;
+        let (far, _) = listener.accept()?;
+        Ok(Self {
+            address: near.local_addr()?,
+            listener,
+            near,
+            far,
+        })
+    }
+
+    /// Ends the held connection, once the test is done with the address.
+    fn close(self) -> TestResult {
+        assert_eq!(self.far.peer_addr()?, self.address);
+        self.near.shutdown(std::net::Shutdown::Both)?;
+        drop(self.listener);
+        Ok(())
+    }
+}
+
 #[test]
 fn every_resolved_address_is_tried_until_one_accepts() -> TestResult {
-    let refusing = TcpListener::bind("127.0.0.1:0")?.local_addr()?;
+    let held = Refusing::hold()?;
+    let refusing = held.address;
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let accepting = listener.local_addr()?;
     let stream = connect_any(&[refusing, accepting])?;
@@ -91,7 +126,7 @@ fn every_resolved_address_is_tried_until_one_accepts() -> TestResult {
         .err()
         .ok_or("a closed port accepted")?;
     assert!(refusal.starts_with(&refusing.to_string()), "{refusal}");
-    Ok(())
+    held.close()
 }
 
 #[test]
@@ -183,7 +218,8 @@ fn health_request() -> Request<'static> {
 
 #[test]
 fn a_refused_port_is_named_at_once_with_its_address_and_cause() -> TestResult {
-    let closed = TcpListener::bind("127.0.0.1:0")?.local_addr()?;
+    let held = Refusing::hold()?;
+    let closed = held.address;
     let failure = exchange(&authority("127.0.0.1", closed.port()), &health_request())
         .err()
         .ok_or("a closed port answered")?;
@@ -193,7 +229,7 @@ fn a_refused_port_is_named_at_once_with_its_address_and_cause() -> TestResult {
     };
     assert!(detail.starts_with(&closed.to_string()), "{detail}");
     assert!(detail.contains("refused"), "{detail}");
-    Ok(())
+    held.close()
 }
 
 #[test]

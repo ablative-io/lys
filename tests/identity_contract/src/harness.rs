@@ -13,7 +13,7 @@ use lys_identity_server::config::ConfiguredLogin;
 use lys_identity_server::secrets_api::SecretsSettings;
 use lys_identity_server::sign_in_providers::SignInProvidersSettings;
 use lys_identity_server::spicedb::SpiceDbSettings;
-use lys_identity_server::{Config, service};
+use lys_identity_server::{Config, Say, service, service_saying};
 use lys_log_store::{FileLeafStore, LeafStore, PinnedRoot, StoreError, StoreResult};
 
 use crate::fake_issuer::{CLIENT_ID, CLIENT_SECRET, FakeIssuer, Login};
@@ -284,6 +284,30 @@ impl Service {
         adjust: impl FnOnce(&mut Config) + Send,
         prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
     ) -> Result<(Self, T), Box<dyn Error>> {
+        Self::start_saying(
+            model,
+            spicedb,
+            secrets,
+            sign_in_providers,
+            adjust,
+            None,
+            prepare,
+        )
+        .await
+    }
+
+    /// Start the service as [`Service::start_adjusted`] does, saying each
+    /// line of its log to `say` when one is given, so a test reads every
+    /// line the service said.
+    pub async fn start_saying<T: Send>(
+        model: &str,
+        spicedb: Option<SpiceDbSettings>,
+        secrets: Option<SecretsSettings>,
+        sign_in_providers: Option<SignInProvidersSettings>,
+        adjust: impl FnOnce(&mut Config) + Send,
+        say: Option<Say>,
+        prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
+    ) -> Result<(Self, T), Box<dyn Error>> {
         let dir = tempfile::TempDir::new()?;
         secret_file(&dir.path().join("issuer.key"), &[3; 32])?;
         secret_file(&dir.path().join("service.key"), &[9; 32])?;
@@ -327,12 +351,16 @@ impl Service {
             reviews_dir: Some(dir.path().join("reviews")),
             sign_in_providers,
             surface_dir: None,
+            runner_socket: None,
         };
         adjust(&mut config);
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;
         let prepared = prepare(&config)?;
-        let app = service(&config).await?;
+        let app = match say {
+            Some(say) => service_saying(&config, say).await?,
+            None => service(&config).await?,
+        };
         tokio::spawn(async move { axum::serve(listener, app).await });
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())

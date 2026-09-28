@@ -16,8 +16,16 @@
 //! [`HandleRecords`] alone, whichever client the service is given. Nothing
 //! here runs the command, holds a process or puts a credential value in an
 //! answer.
+//!
+//! A service given a [`Launcher`] hands each given start to it, and the
+//! launcher asks the machine's runner, when the machine names one, to run
+//! it; the answer then carries the runner's word as its `runner` member. A
+//! machine that names no runner is answered the command as before. Every
+//! refusal of a start is the library's, unchanged.
 
+use std::future::Future;
 use std::path::Path;
+use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
@@ -38,7 +46,7 @@ use lys_identity::start::profile_review::{ProfileReviews, Review};
 use lys_identity::start::request::{AgentRecord, AgentRecords};
 use lys_identity::start::state::{SessionReport, SessionReports};
 use lys_identity::start::{
-    Grammars, LaunchRecords, Owners, StartError, give, give_again, state_of, withdraw,
+    Given, Grammars, LaunchRecords, Owners, StartError, give, give_again, state_of, withdraw,
 };
 use lys_identity::{AgentId, IdentityId, LifecycleState, LoginBinding};
 use serde_json::Value;
@@ -98,12 +106,26 @@ impl StartOwners {
     }
 }
 
+/// What a launcher answers: nothing when the machine names no runner, the
+/// runner's word when it ran the start, or a refusal by name.
+pub type Launched = Option<Result<Value, ServerError>>;
+
+/// A launcher's answer, once the runner has given it.
+pub type LaunchFuture<'a> = Pin<Box<dyn Future<Output = Launched> + Send + 'a>>;
+
+/// Where a given start is run: the runner the machine's record names.
+pub trait Launcher: Send + Sync {
+    /// Ask the runner of the machine `given` names to run it for `caller`.
+    fn launch<'a>(&'a self, given: &'a Given, caller: &'a str) -> LaunchFuture<'a>;
+}
+
 /// What the start route answers from.
 pub struct StartService {
     owners: StartOwners,
     callers: Box<dyn Callers>,
     launches: Mutex<LaunchRecords>,
     clock: fn() -> u64,
+    launcher: Option<Box<dyn Launcher>>,
 }
 
 impl StartService {
@@ -120,6 +142,16 @@ impl StartService {
             callers,
             launches: Mutex::new(launches),
             clock,
+            launcher: None,
+        }
+    }
+
+    /// The service handing each given start to `launcher`.
+    #[must_use]
+    pub fn with_launcher(self, launcher: Box<dyn Launcher>) -> Self {
+        Self {
+            launcher: Some(launcher),
+            ..self
         }
     }
 
@@ -177,25 +209,38 @@ where
         + Send
         + 'static,
 {
+    match answer_with(service, headers, act).await {
+        Ok(body) => json(StatusCode::OK, body),
+        Err(refused) => refused,
+    }
+}
+
+/// Run `act` as [`answer`] does, handing back what it made, or the answer
+/// that refuses it.
+async fn answer_with<F, T>(service: Shared, headers: &HeaderMap, act: F) -> Result<T, Response>
+where
+    F: FnOnce(&StartService, &mut LaunchRecords, &str) -> Result<T, StartError> + Send + 'static,
+    T: Send + 'static,
+{
     let Some(caller) = service.callers.caller(headers) else {
-        return named(
+        return Err(named(
             StatusCode::UNAUTHORIZED,
             "not_signed_in",
             "sign in to start an agent",
-        );
+        ));
     };
     let task = tokio::task::spawn_blocking(move || {
         let mut launches = service.launches();
         act(&service, &mut launches, &caller)
     });
     match task.await {
-        Ok(Ok(body)) => json(StatusCode::OK, body),
-        Ok(Err(error)) => json(status(&error), error.to_json()),
-        Err(failed) => named(
+        Ok(Ok(made)) => Ok(made),
+        Ok(Err(error)) => Err(json(status(&error), error.to_json())),
+        Err(failed) => Err(named(
             StatusCode::INTERNAL_SERVER_ERROR,
             "start_task_failed",
             &failed.to_string(),
-        ),
+        )),
     }
 }
 
@@ -234,17 +279,74 @@ async fn start(
             "a start request is a JSON object naming the profile version and the machine",
         );
     };
-    answer(service, &headers, move |service, launches, caller| {
-        give(
-            launches,
-            &service.owners(),
-            caller,
-            members,
-            (service.clock)(),
-        )
-        .map(|given| given.to_json())
-    })
-    .await
+    if service.launcher.is_none() {
+        return answer(service, &headers, move |service, launches, caller| {
+            give(
+                launches,
+                &service.owners(),
+                caller,
+                members,
+                (service.clock)(),
+            )
+            .map(|given| given.to_json())
+        })
+        .await;
+    }
+    let given = answer_with(
+        Arc::clone(&service),
+        &headers,
+        move |service, launches, caller| {
+            give(
+                launches,
+                &service.owners(),
+                caller,
+                members,
+                (service.clock)(),
+            )
+            .map(|given| (given, caller.to_owned()))
+        },
+    )
+    .await;
+    let (given, caller) = match given {
+        Ok(given) => given,
+        Err(refused) => return refused,
+    };
+    let body = given.to_json();
+    let Some(launcher) = service.launcher.as_ref() else {
+        return json(StatusCode::OK, body);
+    };
+    match launcher.launch(&given, &caller).await {
+        None => json(StatusCode::OK, body),
+        Some(ran) => ran_answer(&body, ran),
+    }
+}
+
+/// The given start's answer with the runner's word beside it: its
+/// `runner` member when it ran, or the runner's refusal by name, the start
+/// that was given beside it.
+fn ran_answer(body: &str, ran: Result<Value, ServerError>) -> Response {
+    let Ok(mut given) = serde_json::from_str::<Value>(body) else {
+        return named(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "start_unreadable",
+            "the given start does not read as JSON",
+        );
+    };
+    match ran {
+        Ok(runner) => {
+            given["runner"] = runner;
+            json(StatusCode::OK, given.to_string())
+        }
+        Err(refused) => {
+            let status = refused.status();
+            let body = serde_json::json!({
+                "error": refused.name(),
+                "words": refused.to_string(),
+                "given": given,
+            });
+            json(status, body.to_string())
+        }
+    }
 }
 
 async fn start_again(
@@ -465,10 +567,12 @@ pub fn directory_service(
             credential_id,
         },
     };
-    Ok(Arc::new(StartService::new(
+    let service = StartService::new(
         owners,
         Box::new(Directory(Arc::clone(state))),
         launches,
         crate::session::now,
-    )))
+    );
+    let runs = crate::runner_sessions::DirectoryLauncher(Arc::clone(state));
+    Ok(Arc::new(service.with_launcher(Box::new(runs))))
 }
