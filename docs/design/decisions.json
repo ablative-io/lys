@@ -1802,6 +1802,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-125",
+      "title": "An agent session's holder key is held by the runner, and a session proves itself by peer credentials and ancestry",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-28",
+      "decided_by": "Waffles, ruling on docs/design/directory/HOLDER-KEY-OPTIONS.md",
+      "context": "A broker handle is usable only with presentations signed by its holder key, and nothing gives an agent session one, so every handle an agent is launched with is unusable.",
+      "decision": "The runner makes one holder key per session in memory. A start becomes key, then issue, then spawn. The harness and lys mcp ask the runner for single presentations over its socket. The session is proved by peer credentials plus the process ancestry reaching the session's own root pid, checked on every connection, on macOS and Linux both, through a named maintained dependency and with no unsafe in Lys code.",
+      "quote": "Option A. The runner holds one key per session. A named refusal on macOS is out. The inherited descriptor is rejected.",
+      "consequences": [
+        "The broker gains a route that issues a handle bound to a named public key (SECRETS-008).",
+        "The runner gains a per-session key and a presentation act in a brief after DIRECTORY-050.",
+        "DIRECTORY-049 R7 and R8 depend on that brief."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

@@ -2458,6 +2458,31 @@
       },
       "depends_on": [],
       "notes": "Written by hand."
+    },
+    {
+      "id": "RM-100",
+      "title": "The broker issues a handle bound to a public key a service names, for a person's agent",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "POST /_lys/handles/issue on behalf of the person the grant is rooted in, so an agent session's handles are bound to the runner's per-session key.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-28T23:28:00+10:00",
+        "quote": "a SECRETS card for a broker route that issues a handle to a given public key",
+        "context": "Waffles's ruling on the holder-key options note."
+      },
+      "links": {
+        "cluster": "secrets",
+        "decisions": [
+          "ADR-125"
+        ],
+        "briefs": [
+          "SECRETS-008"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
     }
   ]
 }

@@ -42,6 +42,7 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 - ADR-095 — Ownership of a secret alone confers no revoke over the leases derived from it — The person acted for under a lease revokes it, and ownership of the secret the lease was issued from confers no revoke, over the owner revoking every credential derived from the secret, because who may revoke is a policy choice that ownership alone does not confer. Rejected: the owner revokes every credential derived from the secret.
 - ADR-112 — Lys hot paths do each piece of work once: no replay, no whole-state read for a sliver, no clone to read, no blocking on an async worker — Work on a request, append or open path is done once and scales with what the caller touches, not with history: lookups by index instead of scans, a checkpoint or cursor instead of a replay, a filtered read instead of the whole set, borrowed data instead of a clone made to read, one fsync per batch instead of per entry, and blocking I/O and std mutexes kept off async workers. Each fix is proved by counting the work done in a test that fails before it, never by a clock.
 - ADR-124 — A signing key is used inside the secrets broker, which signs typed members under a purpose's domain and never gives the key out — A secret may be sealed as a signing key with one purpose from a closed list. The broker signs for a live, admitted handle, builds the bytes to sign itself from typed members with the same function the verifier uses, and answers a COSE_Sign1 signature and the public key only.
+- ADR-125 — An agent session's holder key is held by the runner, and a session proves itself by peer credentials and ancestry — The runner makes one holder key per session in memory. A start becomes key, then issue, then spawn. The harness and lys mcp ask the runner for single presentations over its socket. The session is proved by peer credentials plus the process ancestry reaching the session's own root pid, checked on every connection, on macOS and Linux both, through a named maintained dependency and with no unsafe in Lys code.
 
 ## Goals
 
@@ -160,6 +161,12 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 | `crates/lys-identity-server/src/agent_signature.rs` | the agent request signature check | SECRETS-006 |
 | `crates/lys-secrets/tests/support/served.rs` | the served broker of the tests | SECRETS-006 |
 | `crates/lys-secrets/tests/support/leases.rs` | the leases fixture with its clock | SECRETS-006 |
+| `crates/lys-secrets/src/bin/lys-secrets/issue_route.rs` | the issue route | SECRETS-008 |
+| `crates/lys-secrets/src/broker/issuing.rs` | issue on behalf of a person | SECRETS-008 |
+| `crates/lys-secrets/src/error/issue.rs` | the issue refusals | SECRETS-008 |
+| `crates/lys-secrets/tests/issue_route.rs` | the issue route tests | SECRETS-008 |
+| `docs/design/secrets/briefs/SECRETS-008.json` | a service issues a handle to a named key | SECRETS-008 |
+| `docs/design/secrets/briefs/SECRETS-008.md` | its rendered markdown | SECRETS-008 |
 
 ## Inventory
 
