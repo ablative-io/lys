@@ -11,6 +11,7 @@ use lys_core::Ed25519Identity;
 use lys_identity::Directory;
 use lys_identity_server::config::ConfiguredLogin;
 use lys_identity_server::secrets_api::SecretsSettings;
+use lys_identity_server::sign_in_providers::SignInProvidersSettings;
 use lys_identity_server::spicedb::SpiceDbSettings;
 use lys_identity_server::{Config, service};
 use lys_log_store::{FileLeafStore, LeafStore, PinnedRoot, StoreError, StoreResult};
@@ -256,6 +257,19 @@ impl Service {
         secrets: Option<SecretsSettings>,
         prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
     ) -> Result<(Self, T), Box<dyn Error>> {
+        Self::start_setting(model, spicedb, secrets, None, prepare).await
+    }
+
+    /// Start the service as [`Service::start_asking`] does, setting the
+    /// sign-in providers through the issuer API `sign_in_providers` names,
+    /// when it names one.
+    pub async fn start_setting<T: Send>(
+        model: &str,
+        spicedb: Option<SpiceDbSettings>,
+        secrets: Option<SecretsSettings>,
+        sign_in_providers: Option<SignInProvidersSettings>,
+        prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
+    ) -> Result<(Self, T), Box<dyn Error>> {
         let dir = tempfile::TempDir::new()?;
         secret_file(&dir.path().join("issuer.key"), &[3; 32])?;
         secret_file(&dir.path().join("service.key"), &[9; 32])?;
@@ -297,6 +311,7 @@ impl Service {
             teams_dir: Some(dir.path().join("teams")),
             stops_dir: Some(dir.path().join("stops")),
             reviews_dir: Some(dir.path().join("reviews")),
+            sign_in_providers,
         };
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;

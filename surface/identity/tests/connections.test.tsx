@@ -13,8 +13,8 @@ const connections = {
 
 describe('Connections', () => {
   it('shows configured, local and absent integrations without claiming health', async () => {
-    const { requests, posted } = await mount('#/connections', { ...SERVICE, '/connections': ok(connections) });
-    expect($$('section.card')).toHaveLength(3);
+    const { requests, posted } = await mount('#/connections', { ...SERVICE, '/connections': ok(connections), '/sign-in-providers': ok({ providers: [], offered: ['google', 'microsoft', 'github'] }) });
+    expect($$('section.card:not([aria-label])')).toHaveLength(3);
     expect(text()).toContain('Local to Lys');
     expect(text()).toContain('Not configured');
     expect(text()).toContain('does not confirm that service is reachable');

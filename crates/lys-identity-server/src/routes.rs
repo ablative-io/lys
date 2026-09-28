@@ -65,6 +65,9 @@ pub struct AppState {
     pub teams: Option<Mutex<crate::teams_store::TeamStore>>,
     /// The emergency stops, when the configuration names their directory.
     pub stops: Option<Mutex<crate::stops_store::StopStore>>,
+    /// The issuer's administration API the sign-in providers are set
+    /// through, when the configuration names it.
+    pub sign_in_providers: Option<crate::sign_in_providers::SignInProviders>,
     /// The nonces agents' signed requests carried within the last minute.
     pub agent_nonces: crate::agent_signature::Nonces,
     /// Where the service says how a thing it keeps was started.
@@ -135,6 +138,11 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         reviews: reviews.map(Mutex::new),
         teams: teams.map(Mutex::new),
         stops: stops.map(Mutex::new),
+        sign_in_providers: config
+            .sign_in_providers
+            .as_ref()
+            .map(crate::sign_in_providers::SignInProviders::open)
+            .transpose()?,
         agent_nonces: Mutex::default(),
         say,
     });
@@ -184,6 +192,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::roles_api::routes())
         .merge(crate::requests_api::routes())
         .merge(crate::connections_api::routes())
+        .merge(crate::sign_in_providers::routes())
         .merge(crate::link_audit_api::routes())
         .merge(crate::network_api::routes())
         .merge(crate::provisioning_api::routes())
