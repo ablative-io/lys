@@ -121,7 +121,7 @@ fn the_bootstrap_api_key_grants_clients_providers_and_reads_of_secrets_and_users
         .iter()
         .filter_map(|entry| entry["group"].as_str())
         .collect();
-    assert_eq!(groups, ["Clients", "Secrets", "Users", "Providers"]);
+    assert_eq!(groups, ["Clients", "Secrets", "Users", "AuthProviders"]);
     assert_eq!(
         request["access"][1]["access_rights"],
         serde_json::json!(["read"])

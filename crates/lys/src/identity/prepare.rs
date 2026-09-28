@@ -154,7 +154,7 @@ pub fn bootstrap_api_key() -> String {
             {"group": "Clients", "access_rights": ["read", "create", "update"]},
             {"group": "Secrets", "access_rights": ["read"]},
             {"group": "Users", "access_rights": ["read"]},
-            {"group": "Providers", "access_rights": ["read", "create", "update"]},
+            {"group": "AuthProviders", "access_rights": ["read", "create", "update"]},
         ],
     });
     base64::engine::general_purpose::STANDARD.encode(request.to_string())
