@@ -38,6 +38,18 @@
 //! user CLAUDE.md and a chain position; it is listed once, as
 //! `user_claude_md`, in the user file's place, and not again on the chain.
 //!
+//! Every absolute path is canonicalised before it is walked or recorded
+//! (HOME-010, ADR-029, [`given_path`]): the working directory and the config
+//! directory whole, each document at its parent resolved with its own name
+//! kept, so one file reached through a symlinked directory, a `..` or a
+//! trailing slash records as one path, and the user CLAUDE.md is told from a
+//! chain position by the two canonical paths. A directory that does not
+//! exist is used as given. The two written files stay relative to the out
+//! directory, and the memory index's slug is taken from the working
+//! directory as given.
+//!
+//! [`given_path`]: crate::harness::claude_code::given_path
+//!
 //! A position whose file is absent is omitted. A file that exists and cannot
 //! be read fails the resolution by path and operation, since a document the
 //! harness would read must never be dropped from the record. Each document
@@ -53,6 +65,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::error::HomeError;
+use crate::harness::claude_code::given_path::{canonical_dir, canonical_document};
 use crate::harness::claude_code::launch::{INSTRUCTIONS_FILE, MCP_FILE};
 use crate::harness::claude_code::projects_slug;
 use crate::record::blocks::Hash;
@@ -201,42 +214,61 @@ pub struct Resolution {
 /// Resolve the documents a session started in `cwd` under `config_dir` is
 /// given, with the appended instructions and MCP configuration the render
 /// wrote under `out`. Reads only; never a byte kept.
+///
+/// Every absolute path is canonicalised by [`given_path`]'s rule before it
+/// is walked or recorded (HOME-010 R2): the working directory whole before
+/// the chain is walked, the config directory whole (recorded as
+/// `config_dir.path`), and every document at its parent resolved with its
+/// own name kept. A working or config directory that does not exist is used
+/// as given. The memory index's slug is taken from `cwd` exactly as given,
+/// and the two written files keep their paths relative to `out`.
+///
+/// [`given_path`]: crate::harness::claude_code::given_path
 pub fn resolve_given(
     cwd: &str,
-    config_dir: ConfigDir,
+    mut config_dir: ConfigDir,
     out: &Path,
 ) -> Result<Resolution, HomeError> {
-    let working = Path::new(cwd);
-    if !working.is_absolute() {
+    let given_working = Path::new(cwd);
+    if !given_working.is_absolute() {
         return Err(HomeError::NotAbsolute {
             what: "working directory",
-            shape: path_shape(working),
-            path: working.to_path_buf(),
+            shape: path_shape(given_working),
+            path: given_working.to_path_buf(),
         });
     }
+    let working = canonical_dir(given_working)?.into_path();
+    config_dir.path = canonical_dir(&config_dir.path)?.into_path();
     let mut documents = Vec::new();
     for (kind, name) in [
         (DocumentKind::AppendedInstructions, INSTRUCTIONS_FILE),
         (DocumentKind::McpConfig, MCP_FILE),
     ] {
-        document(kind, &out.join(name), Path::new(name), &mut documents)?;
+        if let Some((length, sha256)) = measure(&out.join(name))? {
+            documents.push(GivenDocument {
+                kind,
+                path: PathBuf::from(name),
+                length,
+                sha256,
+            });
+        }
     }
-    let user_claude_md = config_dir.path.join(CHAIN_FILES[0]);
-    document(
+    let user_claude_md = absolute(
         DocumentKind::UserClaudeMd,
-        &user_claude_md,
-        &user_claude_md,
+        &config_dir.path.join(CHAIN_FILES[0]),
+        None,
         &mut documents,
     )?;
     let mut chain: Vec<&Path> = working.ancestors().collect();
     chain.reverse();
     for dir in chain {
         for name in CHAIN_FILES {
-            let path = dir.join(name);
-            if path == user_claude_md {
-                continue;
-            }
-            document(DocumentKind::ClaudeMdChain, &path, &path, &mut documents)?;
+            absolute(
+                DocumentKind::ClaudeMdChain,
+                &dir.join(name),
+                user_claude_md.as_deref(),
+                &mut documents,
+            )?;
         }
     }
     let memory = config_dir
@@ -245,35 +277,59 @@ pub fn resolve_given(
         .join(projects_slug(cwd))
         .join("memory")
         .join("MEMORY.md");
-    document(DocumentKind::MemoryIndex, &memory, &memory, &mut documents)?;
+    absolute(DocumentKind::MemoryIndex, &memory, None, &mut documents)?;
     Ok(Resolution {
         config_dir,
         documents,
     })
 }
 
-/// Read the file at `read_at` once and add it as a document named `record_as`;
-/// an absent position is omitted, a present file that cannot be read is
-/// refused by path and operation.
-fn document(
+/// Add the absolute document read at `path` under its canonical path, and
+/// return that path; `None` when the position is absent, or when its
+/// canonical path is `listed_once`, the user CLAUDE.md already listed, so
+/// one file is never listed twice nor read twice.
+fn absolute(
     kind: DocumentKind,
-    read_at: &Path,
-    record_as: &Path,
+    path: &Path,
+    listed_once: Option<&Path>,
     into: &mut Vec<GivenDocument>,
-) -> Result<(), HomeError> {
-    let bytes = match std::fs::read(read_at) {
-        Ok(bytes) => bytes,
-        Err(e) if matches!(e.kind(), ErrorKind::NotFound | ErrorKind::NotADirectory) => {
-            return Ok(());
+) -> Result<Option<PathBuf>, HomeError> {
+    let mut recorded = None;
+    if let Some(listed) = listed_once {
+        let canonical = canonical_document(path)?.into_path();
+        if canonical == listed {
+            return Ok(None);
         }
-        Err(e) => return Err(HomeError::io("reading a given document", read_at, e)),
+        recorded = Some(canonical);
+    }
+    let Some((length, sha256)) = measure(path)? else {
+        return Ok(None);
+    };
+    let recorded = match recorded {
+        Some(canonical) => canonical,
+        None => canonical_document(path)?.into_path(),
     };
     into.push(GivenDocument {
         kind,
-        path: record_as.to_path_buf(),
-        length: bytes.len() as u64,
-        sha256: Hash::of(&bytes).as_str().to_owned(),
+        path: recorded.clone(),
+        length,
+        sha256,
     });
+    Ok(Some(recorded))
+}
+
+/// Read the file at `read_at` once for its length and SHA-256; an absent
+/// position is `None`, a present file that cannot be read is refused by
+/// path and operation.
+fn measure(read_at: &Path) -> Result<Option<(u64, String)>, HomeError> {
+    let bytes = match std::fs::read(read_at) {
+        Ok(bytes) => bytes,
+        Err(e) if matches!(e.kind(), ErrorKind::NotFound | ErrorKind::NotADirectory) => {
+            return Ok(None);
+        }
+        Err(e) => return Err(HomeError::io("reading a given document", read_at, e)),
+    };
+    let measured = (bytes.len() as u64, Hash::of(&bytes).as_str().to_owned());
     drop(bytes);
-    Ok(())
+    Ok(Some(measured))
 }

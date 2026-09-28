@@ -9,14 +9,24 @@
 //! an entry id or a listed path that is not in the session). Differs is an
 //! answer, not a refusal, and the status tells the two apart; the printed
 //! report is the same shape either way.
+//!
+//! Paths are compared canonical (HOME-010 R3, ADR-029): `given-check`
+//! canonicalises each listed path and the `--path` argument by the record's
+//! document rule at check time, so a record written before the rule, or a
+//! path reached through a symlinked directory or a `..`, compares by the one
+//! file it names; a relative or unresolved path compares as written, and
+//! `--file` is read at its canonical path. Both reports carry `unresolved`,
+//! the paths left as given because they do not exist; every other field
+//! echoes what it did before, and nothing is added to the entry's data.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::Args;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::error::HomeError;
+use crate::harness::claude_code::given_path::{canonical_dir, canonical_document};
 use crate::record::Home;
 use crate::record::blocks::Hash;
 use crate::record::given::GivenRecord;
@@ -49,7 +59,8 @@ pub struct GivenCheckArgs {
     /// The given entry's id, as `given` reports it.
     #[arg(long)]
     pub entry: String,
-    /// The document's path exactly as the entry lists it.
+    /// The document's path as the entry lists it, or another path to the
+    /// same file; both are compared canonicalised.
     #[arg(long)]
     pub path: PathBuf,
     /// The file on disk to check against it.
@@ -103,16 +114,40 @@ pub struct ListedRecord {
     /// The record.
     #[serde(flatten)]
     pub record: GivenRecord,
+    /// The record's config directory and then its absolute document paths,
+    /// each as recorded and only when it does not exist at listing time.
+    pub unresolved: Vec<PathBuf>,
+}
+
+impl ListedRecord {
+    /// The record listed under its entry id, with the paths of it that do
+    /// not exist now named as unresolved.
+    pub fn new(entry: String, record: GivenRecord) -> Result<Self, HomeError> {
+        let mut unresolved = Vec::new();
+        if canonical_dir(&record.config_dir.path)?.is_unresolved() {
+            unresolved.push(record.config_dir.path.clone());
+        }
+        for document in record.documents.iter().filter(|d| d.path.is_absolute()) {
+            if canonical_document(&document.path)?.is_unresolved() {
+                unresolved.push(document.path.clone());
+            }
+        }
+        Ok(Self {
+            entry,
+            record,
+            unresolved,
+        })
+    }
 }
 
 /// `given`: every `lys.given` entry of the session, in file order.
 pub fn list(args: &GivenArgs) -> Result<Value, HomeError> {
     let home = Home::open(&args.home)?;
     let session = home.open_session(&args.session)?;
-    let records: Vec<ListedRecord> = GivenRecord::read_all(&session)?
+    let records = GivenRecord::read_all(&session)?
         .into_iter()
-        .map(|(entry, record)| ListedRecord { entry, record })
-        .collect();
+        .map(|(entry, record)| ListedRecord::new(entry, record))
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(json!({
         "command": "given",
         "session": args.session,
@@ -129,16 +164,29 @@ pub fn check(args: &GivenCheckArgs) -> Result<Outcome, HomeError> {
     let session = home.open_session(&args.session)?;
     let entry = session.entry(&args.entry)?;
     let record = GivenRecord::from_entry(&entry)?;
-    let listed = record
-        .documents
-        .iter()
-        .find(|document| document.path == args.path)
-        .ok_or_else(|| HomeError::UnlistedDocument {
-            entry: args.entry.clone(),
-            path: args.path.clone(),
-        })?;
-    let bytes = std::fs::read(&args.file)
-        .map_err(|e| HomeError::io("reading the file to check", &args.file, e))?;
+    let wanted = canonical_document(&args.path)?;
+    let mut unresolved: Vec<&Path> = Vec::new();
+    if wanted.is_unresolved() {
+        unresolved.push(&args.path);
+    }
+    let mut found = None;
+    for document in &record.documents {
+        let listed = canonical_document(&document.path)?;
+        if listed.path() == wanted.path() {
+            found = Some((document, listed.is_unresolved()));
+            break;
+        }
+    }
+    let (listed, listed_unresolved) = found.ok_or_else(|| HomeError::UnlistedDocument {
+        entry: args.entry.clone(),
+        path: args.path.clone(),
+    })?;
+    if listed_unresolved && !unresolved.contains(&listed.path.as_path()) {
+        unresolved.push(&listed.path);
+    }
+    let file = canonical_document(&args.file)?;
+    let bytes = std::fs::read(file.path())
+        .map_err(|e| HomeError::io("reading the file to check", file.path(), e))?;
     let length = bytes.len() as u64;
     let sha256 = Hash::of(&bytes);
     drop(bytes);
@@ -155,6 +203,7 @@ pub fn check(args: &GivenCheckArgs) -> Result<Outcome, HomeError> {
         "answer": answer,
         "listed": {"kind": listed.kind, "length": listed.length, "sha256": listed.sha256},
         "on_disk": {"length": length, "sha256": sha256.as_str()},
+        "unresolved": unresolved,
     });
     Ok(Outcome {
         report,

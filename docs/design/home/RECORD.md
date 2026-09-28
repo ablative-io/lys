@@ -152,7 +152,25 @@ a later ship from the target carries the arrivals onward.
   within one directory, then `memory_index`
   (`<config>/projects/<slug>/memory/MEMORY.md`, the slug being every
   character outside ASCII letters and digits replaced by `-`); every path
-  but the two written files is absolute. A position whose file is absent is
+  but the two written files is absolute. Every absolute path is
+  canonicalised before it is recorded or compared (HOME-010, ADR-029): the
+  config directory, and the working directory before the chain is walked,
+  are canonicalised whole, every symlink and `..` resolved; a document's
+  path is its parent directory canonicalised with its own final name kept,
+  so a symlinked document is recorded at its link position and never at
+  its target. The two written files, instructions.md and mcp.json, stay
+  relative to the render's out directory and are the exemption, for the
+  reason given above. A document path is built by join and cannot carry a
+  trailing slash; the config directory can, and canonicalisation removes
+  it. A path that cannot be canonicalised because it does not exist is
+  recorded as given, and the `given` and `given-check` reports name it in
+  `unresolved`, while the entry's data keeps exactly its six fields; a
+  canonicalisation failure of any other kind (permission denied, a loop of
+  symlinks) is refused by path and operation, and no entry is written.
+  `given-check` canonicalises both the listed path and the `--path`
+  argument at check time, so records written before this rule compare
+  correctly. The memory index's slug is computed from the working
+  directory as given, not canonicalised. A position whose file is absent is
   omitted; when the config directory is `D/.claude` for a `D` on the chain,
   `D/.claude/CLAUDE.md` is listed once, as `user_claude_md`, in the user
   file's place and not again on the chain. The old order, `user_claude_md`,
