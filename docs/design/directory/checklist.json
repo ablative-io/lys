@@ -1305,6 +1305,21 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Go back after an upgrade, one build stamp (DIRECTORY-053)",
+      "items": [
+        {
+          "id": "C393",
+          "text": "`lys identity upgrade --back` returns a running install to the build kept in bin.previous (and surface.previous), stopped, swapped, started and waited on for ready exactly as an upgrade is, and records the build now running (DIRECTORY-053 R1).",
+          "done": false
+        },
+        {
+          "id": "C394",
+          "text": "Every Lys binary takes its build stamp from one shared build-support crate; no build.rs is copied (DIRECTORY-053 R2).",
+          "done": false
+        }
+      ]
     }
   ]
 }

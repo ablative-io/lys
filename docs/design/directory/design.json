@@ -2835,6 +2835,41 @@
       "path": "crates/lys-home/src/record/given.rs",
       "note": "DIRECTORY-052 R3: the given record lists a member's starting memories and opening conversation",
       "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade_back_tests.rs",
+      "note": "R1: `lys identity upgrade --back`",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys-build-stamp/Cargo.toml",
+      "note": "R2: One build stamp",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys-build-stamp/src/lib.rs",
+      "note": "R2: One build stamp",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys-build-stamp/tests/stamp.rs",
+      "note": "R2: One build stamp",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys-secrets/Cargo.toml",
+      "note": "R2: One build stamp",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys-home/Cargo.toml",
+      "note": "R2: One build stamp",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys/tests/version.rs",
+      "note": "R2: One build stamp",
+      "brief": "DIRECTORY-053"
     }
   ],
   "inventory": [

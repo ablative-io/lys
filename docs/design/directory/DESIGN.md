@@ -659,6 +659,13 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `surface/identity/src/features/team-plans/team-plans.css` | R5: Teams screen | DIRECTORY-052 |
 | `surface/identity/src/features/apps/SchemaBench.tsx` | R8: Build an app's permission template on a Lys screen | DIRECTORY-048 |
 | `crates/lys-home/src/record/given.rs` | DIRECTORY-052 R3: the given record lists a member's starting memories and opening conversation | DIRECTORY-052 |
+| `crates/lys/src/identity/upgrade_back_tests.rs` | R1: `lys identity upgrade --back` | DIRECTORY-053 |
+| `crates/lys-build-stamp/Cargo.toml` | R2: One build stamp | DIRECTORY-053 |
+| `crates/lys-build-stamp/src/lib.rs` | R2: One build stamp | DIRECTORY-053 |
+| `crates/lys-build-stamp/tests/stamp.rs` | R2: One build stamp | DIRECTORY-053 |
+| `crates/lys-secrets/Cargo.toml` | R2: One build stamp | DIRECTORY-053 |
+| `crates/lys-home/Cargo.toml` | R2: One build stamp | DIRECTORY-053 |
+| `crates/lys/tests/version.rs` | R2: One build stamp | DIRECTORY-053 |
 
 ## Inventory
 
