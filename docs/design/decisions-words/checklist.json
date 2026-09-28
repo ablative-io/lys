@@ -1,0 +1,95 @@
+{
+  "cluster": "decisions-words",
+  "sections": [
+    {
+      "name": "Quotes",
+      "items": [
+        {
+          "id": "C1",
+          "text": "The quote of each of ADR-001 to ADR-008 in docs/design/decisions.json is one declarative sentence of its decision with no speaker, time of day, first person or ellipsis.",
+          "done": false
+        },
+        {
+          "id": "C2",
+          "text": "The quote of ADR-011 in docs/design/decisions.json is one declarative sentence of its decision with no speaker, time of day, first person or ellipsis.",
+          "done": false
+        },
+        {
+          "id": "C3",
+          "text": "No quote value held by docs/design/decisions.json at 7b53625 for ADR-001 to ADR-008 or ADR-011 appears anywhere in the file.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Personal content",
+      "items": [
+        {
+          "id": "C4",
+          "text": "No context, decision or consequence of ADR-005 to ADR-008 contains its row's decided_by value.",
+          "done": false
+        },
+        {
+          "id": "C5",
+          "text": "No context, decision or consequence of ADR-005 to ADR-008 contains a time of day.",
+          "done": false
+        },
+        {
+          "id": "C6",
+          "text": "ADR-005's context states the need the operator raised in place of what a person said or hoped.",
+          "done": false
+        },
+        {
+          "id": "C7",
+          "text": "ADR-005's decision and its second consequence name the operator's workstation in place of a personal machine.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Ledger integrity",
+      "items": [
+        {
+          "id": "C8",
+          "text": "Every field of every decision that C1 to C7 do not name is byte-identical to its value at 7b53625.",
+          "done": false
+        },
+        {
+          "id": "C9",
+          "text": "docs/design/decisions.json holds 18 decisions, ADR-001 to ADR-018 in order.",
+          "done": false
+        },
+        {
+          "id": "C10",
+          "text": "The ledger's updated field is the date of the commit that makes the change.",
+          "done": false
+        },
+        {
+          "id": "C11",
+          "text": "docs/design/decisions.json keeps the serialisation of json.dump(indent=2, ensure_ascii=False) plus a trailing newline.",
+          "done": false
+        },
+        {
+          "id": "C12",
+          "text": "scripts/design/schemas/decisions.schema.json is unchanged from 7b53625.",
+          "done": false
+        },
+        {
+          "id": "C13",
+          "text": "sh scripts/design/gate.sh exits 0.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Rendered documents",
+      "items": [
+        {
+          "id": "C14",
+          "text": "Every committed markdown file that renders ADR-005's decision is the output of scripts/design/render-cluster.py over the changed ledger.",
+          "done": false
+        }
+      ]
+    }
+  ]
+}
