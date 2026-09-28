@@ -152,6 +152,32 @@ fn unavailable(what: impl std::fmt::Display) -> ServerError {
 }
 
 impl RequestStore<FileLeafStore> {
+    /// The access requests in the directory the configuration names, if it
+    /// names one, saying through `say` how the log was started and how many
+    /// requests it holds.
+    pub fn opened(
+        config: &crate::config::Config,
+        key: Arc<Ed25519Identity>,
+        say: &(dyn Fn(&str) + Send + Sync),
+    ) -> Result<Option<Self>, ServerError> {
+        let Some(dir) = config.requests_dir.as_deref() else {
+            return Ok(None);
+        };
+        let store = Self::open(dir, key)?;
+        if store.adopted() > 0 {
+            say(&format!(
+                "requests log pinned {} leaves written before leaves were pinned",
+                store.adopted()
+            ));
+        }
+        say(&format!(
+            "requests log {}, holding {} requests",
+            store.start(),
+            store.requests().count()
+        ));
+        Ok(Some(store))
+    }
+
     /// The requests kept in the directory `dir`, which is created when it
     /// does not exist, their snapshots signed by `key`.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {

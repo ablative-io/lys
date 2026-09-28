@@ -96,7 +96,7 @@ fn person(state: &AppState, headers: &HeaderMap) -> Result<String, ServerError> 
 }
 
 /// Asks the broker `path` on behalf of the session's person, with `body`.
-async fn ask(
+pub(crate) async fn ask(
     state: &AppState,
     headers: &HeaderMap,
     method: Method,

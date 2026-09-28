@@ -1532,6 +1532,7 @@ dependencies = [
  "axum",
  "identity-contract",
  "lys-core",
+ "lys-home",
  "lys-identity",
  "lys-log-store",
  "openidconnect",

@@ -189,7 +189,7 @@ fn settings(body: &SetBody) -> Result<Settings, ServerError> {
     })
 }
 
-fn with_provisioning<T>(
+pub(crate) fn with_provisioning<T>(
     state: &AppState,
     act: impl FnOnce(&mut ProvisioningStore) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
