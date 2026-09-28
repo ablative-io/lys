@@ -614,6 +614,14 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/surface.rs` | DIRECTORY-046 R4: Served screens never block an async worker and index.html is read once | DIRECTORY-046 |
 | `surface/identity/src/features/grants/check.ts` | DIRECTORY-046 R6: The grants screens ask for reach in one concurrent batch | DIRECTORY-046 |
 | `surface/identity/src/api.ts` | DIRECTORY-046 R7: The screens choose the right route first and fetch independent reads together | DIRECTORY-046 |
+| `crates/lys/src/identity/upgrade/render.rs` | R5: The configuration and compose files move with the binaries | DIRECTORY-045 |
+| `crates/lys/src/identity/upgrade/render_tests.rs` | R5: The configuration and compose files move with the binaries | DIRECTORY-045 |
+| `crates/lys/src/identity/install/server_config.rs` | R5: The configuration and compose files move with the binaries | DIRECTORY-045 |
+| `crates/lys/src/identity/upgrade/adopt.rs` | R6: The first move of an install made before this card | DIRECTORY-045 |
+| `crates/lys/src/identity/upgrade/adopt_tests.rs` | R6: The first move of an install made before this card | DIRECTORY-045 |
+| `crates/lys/src/identity/upgrade/intent.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
+| `crates/lys/src/identity/upgrade/intent_tests.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
+| `crates/lys/src/identity/upgrade/swap.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
 
 ## Inventory
 

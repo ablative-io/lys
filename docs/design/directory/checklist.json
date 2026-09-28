@@ -1031,7 +1031,7 @@
         },
         {
           "id": "C345",
-          "text": "`lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2).",
+          "text": "`lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2); the configuration and compose files move with the binaries, an install made before it is adopted, and an upgrade stopped part-way is finished or put back (DIRECTORY-045 R5 to R7).",
           "done": false
         },
         {
