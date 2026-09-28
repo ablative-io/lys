@@ -309,6 +309,96 @@
       "path": "crates/lys-core/src/merkle/tree.rs",
       "note": "touched by LYSLOGSTORE-005 R1: A hash-only proof tree built by streaming",
       "brief": "LYSLOGSTORE-005"
+    },
+    {
+      "path": "crates/lys-log-store/src/tiles.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/tiles_tests.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/file/tiles.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/tests/grant_faults.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/tests/grant_use_reports.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/tests/restart_snapshots.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_append.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/examples/restart_timing.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/proof_tree_tests.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/test_store.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/tile_proofs.rs",
+      "note": "R2: Proofs are built from the tiles they need",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/tile_proofs_tests.rs",
+      "note": "R2: Proofs are built from the tiles they need",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/src/restart.rs",
+      "note": "R2: Proofs are built from the tiles they need",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity-server/src/certificates_store.rs",
+      "note": "R2: Proofs are built from the tiles they need",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/tiles_adopt.rs",
+      "note": "R3: A log made before tiles gets them once",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/start.rs",
+      "note": "R3: A log made before tiles gets them once",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/tests/first_proof_reads_the_tail.rs",
+      "note": "R4: A gate test fails when a start or its first proof reads past the tail",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/receipt_after_restart.rs",
+      "note": "R4: A gate test fails when a start or its first proof reads past the tail",
+      "brief": "LYSLOGSTORE-006"
     }
   ],
   "inventory": [

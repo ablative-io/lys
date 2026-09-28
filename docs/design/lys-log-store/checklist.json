@@ -125,6 +125,31 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "A proof reads tiles, never the whole log (LYSLOGSTORE-006)",
+      "items": [
+        {
+          "id": "C21",
+          "text": "Every append writes its hashes into C2SP tiles before the pin (LYSLOGSTORE-006 R1).",
+          "done": false
+        },
+        {
+          "id": "C22",
+          "text": "Inclusion and consistency proofs read only the tiles they need, and the whole-log proof tree is gone (LYSLOGSTORE-006 R2).",
+          "done": false
+        },
+        {
+          "id": "C23",
+          "text": "A log made before tiles gets them once, and never again (LYSLOGSTORE-006 R3).",
+          "done": false
+        },
+        {
+          "id": "C24",
+          "text": "A gate test fails when a start or its first proof reads a leaf before the tail (LYSLOGSTORE-006 R4).",
+          "done": false
+        }
+      ]
     }
   ]
 }

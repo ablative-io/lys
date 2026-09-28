@@ -2360,6 +2360,31 @@
       },
       "depends_on": [],
       "notes": "Publish docs only after current landing settles; do not dispatch before named brief dependencies. No implementation completed."
+    },
+    {
+      "id": "RM-096",
+      "title": "A proof reads a few stored hash tiles and never a leaf, from the first request after a start",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Hash tiles beside the leaves, written before the pin; proofs read only the tiles they need; old logs get tiles once; a gate test fails when a start or first proof reads before the tail.",
+      "provenance": {
+        "requested_by": "archie",
+        "date": "2026-09-28T22:10:00+10:00",
+        "quote": "",
+        "context": "Found in the replay sweep Tom asked every lead for on 28 September: the first receipt after each restart read the whole log."
+      },
+      "links": {
+        "cluster": "lys-log-store",
+        "decisions": [
+          "ADR-123"
+        ],
+        "briefs": [
+          "LYSLOGSTORE-006"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
     }
   ]
 }

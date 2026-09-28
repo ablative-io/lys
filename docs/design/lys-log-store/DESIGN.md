@@ -129,6 +129,24 @@ The witness keeps its per-origin memory in memory, as ADR-100 records. WitnessPr
 | `docs/design/lys-log-store/briefs/LYSLOGSTORE-004.json` | the read-only open, its two refusals, the repair rule and the file store's module doc |  |
 | `crates/lys-log-store/src/frontier_log.rs` | touched by LYSLOGSTORE-005 R1: A hash-only proof tree built by streaming | LYSLOGSTORE-005 |
 | `crates/lys-core/src/merkle/tree.rs` | touched by LYSLOGSTORE-005 R1: A hash-only proof tree built by streaming | LYSLOGSTORE-005 |
+| `crates/lys-log-store/src/tiles.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-log-store/src/tiles_tests.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-log-store/src/file/tiles.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-identity/tests/grant_faults.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-identity/tests/grant_use_reports.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-identity/tests/restart_snapshots.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-identity/tests/revocation_append.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-log-store/examples/restart_timing.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-log-store/src/proof_tree_tests.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-log-store/src/test_store.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-log-store/src/tile_proofs.rs` | R2: Proofs are built from the tiles they need | LYSLOGSTORE-006 |
+| `crates/lys-log-store/src/tile_proofs_tests.rs` | R2: Proofs are built from the tiles they need | LYSLOGSTORE-006 |
+| `crates/lys-identity/src/restart.rs` | R2: Proofs are built from the tiles they need | LYSLOGSTORE-006 |
+| `crates/lys-identity-server/src/certificates_store.rs` | R2: Proofs are built from the tiles they need | LYSLOGSTORE-006 |
+| `crates/lys-log-store/src/tiles_adopt.rs` | R3: A log made before tiles gets them once | LYSLOGSTORE-006 |
+| `crates/lys-log-store/src/start.rs` | R3: A log made before tiles gets them once | LYSLOGSTORE-006 |
+| `crates/lys-log-store/tests/first_proof_reads_the_tail.rs` | R4: A gate test fails when a start or its first proof reads past the tail | LYSLOGSTORE-006 |
+| `crates/lys-identity-server/tests/receipt_after_restart.rs` | R4: A gate test fails when a start or its first proof reads past the tail | LYSLOGSTORE-006 |
 
 ## Inventory
 

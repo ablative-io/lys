@@ -34,3 +34,10 @@
 ## Proofs never hold the whole log
 
 - [ ] **C20** — A hash-only proof tree built by streaming (LYSLOGSTORE-005 R1), proved by a counting test that fails at the base.
+
+## A proof reads tiles, never the whole log (LYSLOGSTORE-006)
+
+- [ ] **C21** — Every append writes its hashes into C2SP tiles before the pin (LYSLOGSTORE-006 R1).
+- [ ] **C22** — Inclusion and consistency proofs read only the tiles they need, and the whole-log proof tree is gone (LYSLOGSTORE-006 R2).
+- [ ] **C23** — A log made before tiles gets them once, and never again (LYSLOGSTORE-006 R3).
+- [ ] **C24** — A gate test fails when a start or its first proof reads a leaf before the tail (LYSLOGSTORE-006 R4).

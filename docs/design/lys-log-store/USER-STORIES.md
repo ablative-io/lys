@@ -18,6 +18,8 @@
 
 **S4.** As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove.
 
+**S9.** As a log operator, I want the first proof after a restart to read a few stored hashes and never the whole log, so that restarting the service costs the same however long its history grows.
+
 ## Third-party verifier — Checks a leaf without lys
 
 ## Witness operator — Runs a witness anchor that observes other logs' checkpoints

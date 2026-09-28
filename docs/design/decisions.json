@@ -1765,6 +1765,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-123",
+      "title": "A log's proofs come from C2SP hash tiles stored beside its leaves",
+      "status": "decided",
+      "scope": "lys-log-store",
+      "date": "2026-09-28",
+      "decided_by": "Archie, asked by Waffles to brief it under Tom's replay rule",
+      "context": "The first proof after every start read every leaf to build a whole-log proof tree, and held it in memory. Tom's rule forbids a start or first request reading the whole history.",
+      "decision": "Every append writes its leaf hash, and every tile it completes, into C2SP tlog-tiles beside the leaves before it moves the pin. Proofs read only the tiles that hold their hashes. A log made before tiles is given them once. The tile layout is local state, and it is also the layout a static serving of the log would use.",
+      "quote": "",
+      "consequences": [
+        "The whole-log proof tree and its in-memory hashes are removed.",
+        "A missing or wrong tile is refused by name, never rebuilt quietly.",
+        "Serving the log as static tiles later needs no new storage."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
