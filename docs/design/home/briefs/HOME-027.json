@@ -386,5 +386,13 @@
     "git diff of crates/lys-home/Cargo.toml against the brief's base commit adds exactly the one line `regex.workspace = true` and removes none.",
     "The target session file from the R8 test, written out in the proof step, parses with Pi's parseSessionEntries at 3d5cbe98 through node, and its entry count equals the source's plus one (the command is written in PROOF-MOVE.md).",
     "git ls-files lists no .jsonl file outside crates/lys-home/tests/fixtures and canon/."
+  ],
+  "amendments": [
+    {
+      "date": "2026-09-28",
+      "by": "Waffles, from the requirement-by-requirement audit of main at d41fa4b by Apollo",
+      "subject": "Not built on 28 September; overlaps HOME-019",
+      "ruling": "Moving a home is HOME-019, 8 of 9 requirements on main; HOME-027 overlaps it and adds remote and tracked-secret refusals. It is not built on 28 September; its added refusals are to be carried as a HOME-019 amendment or a new brief when the remote move is taken up."
+    }
   ]
 }

@@ -321,6 +321,12 @@
       "by": "the lead of lys, answering the author's question on the boundary uuid's role",
       "subject": "The compact_boundary uuid comes from render-uuid/v2, alongside v1",
       "ruling": "ADR-016 is obeyed, not amended: render-uuid/v1's role list is closed at record, and a verifier of v1 must be able to name every role it meets, so compact_boundary cannot join v1. R6 defines render-uuid/v2, which carries v1's roles unchanged, byte for byte in derivation, and adds compact_boundary; the solution's role list names v2 beside v1. A render records in its report which version it used, and a file rendered under v1 keeps verifying under v1. A session with no compaction renders under v1 to the same bytes as before this brief; a session with a boundary renders under v2, and every derived uuid of a non-boundary record equals what v1 derives."
+    },
+    {
+      "date": "2026-09-28",
+      "by": "Waffles, from the requirement-by-requirement audit of main at d41fa4b by Apollo",
+      "subject": "Superseded by HOME-030",
+      "ruling": "The compaction import is built once, to HOME-030, the later design of the same work; HOME-008 is superseded and is not built."
     }
   ]
 }
