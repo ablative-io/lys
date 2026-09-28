@@ -16,6 +16,7 @@ use lys_core::Ed25519Identity;
 use super::config::DeploymentConfig;
 use super::error::{ErrorKind, IdentityError, IdentityResult};
 use super::prepare::{API_KEY_NAME, API_KEY_SECRET, read_secret};
+use super::private_files::Outcome;
 use super::rauthy::RauthyApi;
 use super::{configure, prepare, private_files};
 use crate::commands::output::Emitter;
@@ -103,7 +104,16 @@ fn administrator_subject(config: &DeploymentConfig) -> IdentityResult<String> {
     })
 }
 
-fn start_broker(layout: &Layout, emitter: &mut Emitter) -> IdentityResult<()> {
+/// How a start is reported: a process that was replaced was restarted.
+fn started_word(started: bool, replace: bool) -> &'static str {
+    match (started, replace) {
+        (true, true) => "restarted with its new configuration",
+        (true, false) => "started",
+        (false, _) => "already running",
+    }
+}
+
+fn start_broker(layout: &Layout, emitter: &mut Emitter, replace: bool) -> IdentityResult<()> {
     let program = services::sibling("lys-secrets")?;
     let log = layout.logs_dir().join("secrets.log");
     let pid = layout.run_dir().join("secrets.pid");
@@ -119,33 +129,25 @@ fn start_broker(layout: &Layout, emitter: &mut Emitter) -> IdentityResult<()> {
         &layout.service_config().display().to_string(),
     ]
     .map(str::to_string);
-    let started = services::start_detached(&program, &args, &log, &pid)?;
+    let started = services::start_detached(&program, &args, &log, &pid, replace)?;
     services::wait_answering(BROKER_PORT, "/", &pid, &log)?;
     emitter.note(&format!(
         "secrets broker {} on 127.0.0.1:{BROKER_PORT}",
-        if started {
-            "started"
-        } else {
-            "already running"
-        }
+        started_word(started, replace)
     ));
     Ok(())
 }
 
-fn start_service(layout: &Layout, emitter: &mut Emitter) -> IdentityResult<()> {
+fn start_service(layout: &Layout, emitter: &mut Emitter, replace: bool) -> IdentityResult<()> {
     let program = services::sibling("lys-identity-server")?;
     let log = layout.logs_dir().join("identity.log");
     let pid = layout.run_dir().join("identity.pid");
     let args = [layout.service_config().display().to_string()];
-    let started = services::start_detached(&program, &args, &log, &pid)?;
+    let started = services::start_detached(&program, &args, &log, &pid, replace)?;
     services::wait_answering(SERVICE_PORT, "/api/authority", &pid, &log)?;
     emitter.note(&format!(
         "identity service {} on {}",
-        if started {
-            "started"
-        } else {
-            "already running"
-        },
+        started_word(started, replace),
         Layout::service_url()
     ));
     Ok(())
@@ -213,9 +215,10 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
             error.to_string(),
         )
     })?;
-    private_files::write(&layout.service_config(), &encoded)?;
-    start_broker(&layout, &mut emitter)?;
-    start_service(&layout, &mut emitter)?;
+    let configuration = private_files::write(&layout.service_config(), &encoded)?;
+    let changed = configuration != Outcome::Unchanged;
+    start_broker(&layout, &mut emitter, changed)?;
+    start_service(&layout, &mut emitter, changed)?;
     emitter.field("open", "url", Layout::service_url());
     emitter.field(
         "administrator",

@@ -138,7 +138,8 @@ pub fn broker_init(layout: &Layout) -> IdentityResult<bool> {
     Ok(true)
 }
 
-/// Whether the process a pid file names is alive.
+/// Whether the process a pid file names is alive. A process that has exited
+/// but not yet been reaped (a zombie) counts as gone.
 pub fn alive(pid_file: &Path) -> bool {
     let Ok(text) = std::fs::read_to_string(pid_file) else {
         return false;
@@ -146,24 +147,53 @@ pub fn alive(pid_file: &Path) -> bool {
     let Ok(pid) = text.trim().parse::<u32>() else {
         return false;
     };
+    let Ok(output) = Command::new("ps")
+        .args(["-o", "stat=", "-p", &pid.to_string()])
+        .stderr(Stdio::null())
+        .output()
+    else {
+        return false;
+    };
+    let state = String::from_utf8_lossy(&output.stdout);
+    let state = state.trim();
+    !state.is_empty() && !state.starts_with('Z')
+}
+
+/// Stops the process a pid file names and waits until it is gone. `false`
+/// when none was alive.
+pub fn stop(pid_file: &Path) -> IdentityResult<bool> {
+    if !alive(pid_file) {
+        return Ok(false);
+    }
+    let pid = std::fs::read_to_string(pid_file)
+        .map_err(|error| refuse("stop", "service", error.to_string()).at(pid_file))?;
     Command::new("kill")
-        .args(["-0", &pid.to_string()])
+        .arg(pid.trim())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .is_ok_and(|status| status.success())
+        .map_err(|error| refuse("stop", "service", error.to_string()))?;
+    while alive(pid_file) {
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    Ok(true)
 }
 
 /// Starts `program` detached, its output appended to `log`, its pid kept in
-/// `pid_file`. A process the pid file already names alive is left alone.
+/// `pid_file`. A process the pid file already names alive is left alone,
+/// unless `replace` asks for it to be stopped and started afresh.
 pub fn start_detached(
     program: &Path,
     args: &[String],
     log: &Path,
     pid_file: &Path,
+    replace: bool,
 ) -> IdentityResult<bool> {
     if alive(pid_file) {
-        return Ok(false);
+        if !replace {
+            return Ok(false);
+        }
+        stop(pid_file)?;
     }
     let open = |path: &Path| -> IdentityResult<File> {
         OpenOptions::new()
