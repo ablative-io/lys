@@ -58,7 +58,27 @@
       ],
       "stories": [
         "S10"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked, and no acceptance row is met. The requirement says to create sgconfig.yml and four rule files, but main already has sgconfig.yml (ruleDirs: rules/ast-grep) and rules/ast-grep with mod-rs-declarations-only.yml, no-let-underscore-on-results.yml, no-lint-bypass-attributes.yml and no-unwrap-expect-panic-outside-tests.yml. Tom added them in 2fec935 for LYSCORE-003 R8, which deliberately left out no-std-mutex-in-async and changed the Cambium rules (vendor/** is ignored and the messages name CLAUDE.md). I compared them with the Cambium checkout at /Users/deanwhiting/lane/cambium, commit df4dca5de6899df89b06b94cdeeec3619877fc1d. `git show df4dca5:rules/ast-grep/<name>.yml | cmp -` differs at line 4 for mod-rs-declarations-only, line 5 for no-let-underscore-on-results and line 4 for no-lint-bypass-attributes. no-std-mutex-in-async.yml is missing here. Meeting row 1 (`ls` lists exactly the four) and row 2 (byte-identical) would mean overwriting three rule files another brief landed and deleting no-unwrap-expect-panic-outside-tests.yml. That deletion is outside R7's allowed diff and reverses LYSCORE-003 R8. The lead has to rule on which rule set lys keeps before this can be built.",
+        "deviation": "I did not create or overwrite the rule set. The brief's premise (no rule set on main) is false at the card base, and following it would undo LYSCORE-003 R8.",
+        "checklist": [
+          {
+            "id": "C14",
+            "done": false,
+            "note": "Blocked: the rule set on main conflicts with the one the brief specifies."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S10",
+            "satisfied": false,
+            "note": "Blocked with R1."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -84,7 +104,27 @@
       ],
       "stories": [
         "S10"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked, and no acceptance row is met. The opening section has to carry the SHA-256 of the rule set R1 settles, the ast-grep version the proof's scan ran under (ast-grep is installed at ~/.cargo/bin/ast-grep, but running the scan is forbidden to this seat), and a statement that every per-file verdict came from jev_ask. None of those can be written truthfully until R1 and R3 exist. I found nothing matching jev_ask or jev_verdict under ~/.aion/src, ~/.aion/authoring or ~/.aion/config.toml, the Argus MCP server failed to connect this session, and no jev binary is on PATH. An opening section that attests to measurements nobody made would be false, so no document was created.",
+        "deviation": "PROOF-CHAIN.md was not created, because a proof whose measured sections are missing could be read as a proof.",
+        "checklist": [
+          {
+            "id": "C15",
+            "done": false,
+            "note": "Blocked: depends on R1's rule set and on a reachable jev_ask."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S10",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -109,7 +149,27 @@
       ],
       "stories": [
         "S9"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked, and no acceptance row is met. `git ls-tree -r --name-only 0073b966… crates/lys-home` lists 25 paths, which matches the brief. The jev_ask workflow can't be reached from this seat: there is no jev_ask or jev_verdict definition under ~/.aion, the Argus MCP is disconnected, and there is no jev on PATH. The brief's own blocked_by says the OpenRouter key has to be found before the build starts. I won't record verdicts I didn't obtain, and recording all 25 as not_asked would be premature while the seat that can call jev_ask hasn't been tried.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C16",
+            "done": false,
+            "note": "Blocked: jev_ask can't be reached."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S9",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -137,7 +197,27 @@
       ],
       "stories": [
         "S10"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked, and no acceptance row is met. R4's measurement is running cargo fmt --all -- --check, both clippy legs, cargo test --workspace --all-features and sh .land/gates.sh in a clean checkout of 0073b966, plus ast-grep scan at the card head. The dev instructions for this round say: 'Run none of them, and run no other build, format, lint or test command.' I also found no earlier measurement of 0073b966 under ~/.aion/logs or ~/.aion/data to cite. Writing exit statuses and test counts without running them would be fabrication. This needs a venue allowed to run the measurement: the one-build queue under the load guard, per Tom's 06:24 26 September ruling.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C17",
+            "done": false,
+            "note": "Blocked: the measurement commands are forbidden to this seat."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S10",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -163,7 +243,27 @@
       ],
       "stories": [
         "S11"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Row table facts are established but not written; the card table is blocked. Reading HOME-001.json at 0073b966 and running `git cat-file -e` on each create and modify path gives: R1, R2, R3, R5, R6, R8, R9 and R11 have every path present, so they are built. R4 is partly present, with docs/design/home/LOSS-ACCOUNT.md absent. R7 is not built, with crates/lys-home/examples/passthrough.rs and docs/design/home/PROOF-PROXY.md absent. R10 is not built, with 16 lys-home paths absent, including src/proxy/mod.rs and src/bin/lys-proxy.rs, plus PROOF-PROXY.md. HOME-001 at 0073b966 also has an R12, which the brief's R1-to-R11 scope leaves out: it is not built, with src/record/handover.rs and PROOF-HANDOVER.md absent. The lead should decide whether R12 belongs in the row table. The seven card ids and the rows each carries, apart from UzVQkTaU carrying R3 and R4, are only on the Cambium board, which isn't reachable from here. The document isn't written, so no acceptance row is met.",
+        "deviation": "The row table facts are reported here rather than written, because the proof they belong in is blocked (R2 to R4). The brief doesn't cover HOME-001's R12.",
+        "checklist": [
+          {
+            "id": "C19",
+            "done": false,
+            "note": "Blocked: the card table needs the board, and the proof document is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S11",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -190,7 +290,27 @@
       ],
       "stories": [
         "S12"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked, and no acceptance row is met. The findings section depends on the check outputs from R3 and R4, which weren't produced. The one finding known without running anything is the row table finding: docs/design/home/LOSS-ACCOUNT.md is absent, holding R4. The absent files on R7, R10 and possibly R12 are not findings under R6, because those rows' code is absent too. Nothing was written.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C18",
+            "done": false,
+            "note": "Blocked on R3 and R4."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S12",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R7",
@@ -218,7 +338,27 @@
       ],
       "stories": [
         "S10"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked, and no acceptance row is met. R7 says to render docs/design/home/briefs/HOME-002.md and lists HOME-002.json and HOME-002.md in the allowed diff. At the card base, HOME-002.json is a different brief ('Launch a Claude Code session from its home through a kept template'), while this brief is on disk as HOME-023.json. design.json's structure entries still name HOME-002 at around lines 528 to 673. Rendering under HOME-002 would overwrite another brief. The lead has to fix the id first. With R1 to R6 blocked, there is nothing to land either.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C20",
+            "done": false,
+            "note": "Blocked: HOME-002 id collision and nothing to land."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S10",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R8",
@@ -243,7 +383,27 @@
       ],
       "stories": [
         "S11"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked, and no acceptance row is met. Landing through src_pr and src_land, and moving or filing cards on the step 5 board, come after this developer round and need a proof to land. None exists, because of the blocks on R1 to R7. No card was moved or filed.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C21",
+            "done": false,
+            "note": "Blocked: no proof to land."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S11",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
