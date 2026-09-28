@@ -1,7 +1,8 @@
 //! The runtime routes: a found session is reported by a signed-in identity
 //! and kept without an identity, stopped only with the runtime's
 //! confirmation, and listed to the administrator; an agent's session is
-//! reported only by the agent itself; each refusal is by name.
+//! reported by the agent, the person responsible for it or the
+//! administrator, and by no one else; each refusal is by name.
 
 use std::error::Error;
 
@@ -181,17 +182,23 @@ async fn a_found_session_is_kept_without_an_identity_and_stops_only_when_confirm
 }
 
 #[tokio::test]
-async fn only_the_agent_itself_reports_its_sessions() -> TestResult {
+async fn only_those_answering_for_the_agent_report_its_sessions() -> TestResult {
     let table = Table::set().await?;
     let agent = table.seeded.people[0].agents[0].id.to_string();
     let session = operation()?;
     let path = format!("/agents/{agent}/runtime/sessions/{session}/reports");
 
-    let by_person = table
+    let by_other = table
+        .service
+        .post(&path, Some(&table.bea), &table.body("starting", "")?)
+        .await?;
+    refused(&by_other, 403, "NotAdmitted");
+    let (status, by_administrator) = table
         .service
         .post(&path, Some(&table.ada), &table.body("starting", "")?)
         .await?;
-    refused(&by_person, 403, "NotAdmitted");
+    assert_eq!(status, 200, "{by_administrator}");
+    assert_eq!(by_administrator["shown"], "unconfirmed");
     let unheld = format!(
         "/agents/{}/runtime/sessions/{session}/reports",
         AgentId::generate()?
@@ -203,9 +210,9 @@ async fn only_the_agent_itself_reports_its_sessions() -> TestResult {
     refused(&unheld, 404, "AgentNotVisible");
 
     let listed = format!("/agents/{agent}/runtime/sessions");
-    let (status, none) = table.service.get(&listed, Some(&table.ada)).await?;
-    assert_eq!(status, 200, "{none}");
-    assert_eq!(none, json!({ "sessions": [] }));
+    let (status, held) = table.service.get(&listed, Some(&table.ada)).await?;
+    assert_eq!(status, 200, "{held}");
+    assert_eq!(held["sessions"].as_array().map(Vec::len), Some(1), "{held}");
     refused(
         &table.service.get(&listed, Some(&table.bea)).await?,
         404,
