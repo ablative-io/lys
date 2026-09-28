@@ -204,6 +204,11 @@ async fn only_the_person_responsible_or_the_administrator_stops_an_agent() -> Te
     let table = Table::set().await?;
     let body = json!({ "operation": operation()?, "reason": "leaked its key" });
     refused(
+        &table.service.post(&table.path(), None, &json!({})).await?,
+        401,
+        "NotSignedIn",
+    );
+    refused(
         &table
             .service
             .post(

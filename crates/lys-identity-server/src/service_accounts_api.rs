@@ -141,8 +141,8 @@ async fn create(
     headers: HeaderMap,
     body: Result<Json<CreateBody>, JsonRejection>,
 ) -> Result<Json<ServiceAccountView>, ServerError> {
-    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let actor = signed_in(&state, &headers)?;
+    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let administrator = state.admission.administrator(&actor).is_ok();
     let id = OperationId::from_str(&body.operation)?.to_string();
     let name = words("name", &body.name, NAME_MAX)?;
@@ -192,8 +192,8 @@ async fn retire(
     Path(id): Path<String>,
     body: Result<Json<RetireBody>, JsonRejection>,
 ) -> Result<Json<ServiceAccountView>, ServerError> {
-    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let actor = signed_in(&state, &headers)?;
+    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let administrator = state.admission.administrator(&actor).is_ok();
     let account = OperationId::from_str(&id)
         .ok()
