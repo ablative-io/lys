@@ -12,10 +12,10 @@
 //! command is answered; the session is that operation id. The same request
 //! sent again answers the start exactly as it was first answered, kept whole
 //! in that report, whatever has changed since; the same operation id naming
-//! any other report is refused. Only an active agent is started, and only on
-//! a machine whose egress list names every host its profile's servers are
-//! reached at, and only from a profile version someone answering for the
-//! agent reviewed.
+//! any other report is refused. Only an active agent is started, only on a
+//! machine that lists the agent or a role it holds and whose egress list
+//! names every host its profile's servers are reached at, and only from a
+//! profile version someone answering for the agent reviewed.
 //!
 //! The administrator and the person responsible for the agent are given
 //! the command. Each refusal is by name: an agent the directory does not
@@ -95,7 +95,7 @@ pub fn routes() -> Router<Arc<AppState>> {
 pub(crate) fn placed<'a>(
     store: &'a NetworkStore,
     id: &str,
-    agent: &str,
+    (agent, held): (&str, &[String]),
 ) -> Result<&'a Machine, ServerError> {
     let machine = store.machine(id).ok_or(ServerError::MachineUnknown)?;
     if machine.retired.is_some() {
@@ -104,7 +104,8 @@ pub(crate) fn placed<'a>(
     if machine.runtime.is_none() {
         return Err(ServerError::MachineWithoutRuntime);
     }
-    if !machine.may_run.iter().any(|named| named == agent) {
+    let by_role = machine.may_run_roles.iter().any(|role| held.contains(role));
+    if !by_role && !machine.may_run.iter().any(|named| named == agent) {
         return Err(ServerError::MachineNotForAgent);
     }
     Ok(machine)
@@ -205,8 +206,9 @@ async fn start_command(
                 version: version.number,
             });
         }
+        let held = crate::roles_api::held_roles(&state, &agent, now())?;
         let runtime = with_network(&state, |store| {
-            let machine = placed(store, &machine, &agent)?;
+            let machine = placed(store, &machine, (&agent, &held))?;
             reaches(machine, &version)?;
             machine
                 .runtime

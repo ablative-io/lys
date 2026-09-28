@@ -283,7 +283,10 @@ async fn report_agent(
         let agent = agent.to_string();
         let report = report(body, &session, Some(agent.clone()), asker.to_string())?;
         if report.state == Reported::Starting {
-            with_network(&state, |store| placed(store, &report.machine, &agent).map(drop))?;
+            let held = crate::roles_api::held_roles(&state, &agent, now())?;
+            with_network(&state, |store| {
+                placed(store, &report.machine, (&agent, &held)).map(drop)
+            })?;
         }
         let tracked = with_runtime(&state, |store| store.report(report))?;
         view(&state, &tracked).ok_or(ServerError::RuntimeSessionUnknown)
