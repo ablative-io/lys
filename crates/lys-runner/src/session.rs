@@ -11,6 +11,11 @@
 //! given its last byte, so a process it started that still holds the
 //! terminal keeps the session running until it too is gone.
 //!
+//! A session started with a guard holds its tool-boundary policy, how its
+//! harness is tracked, and its leader's start identity, read at spawn, which
+//! a peer's proof is checked against; each is held in memory for the life
+//! of the session's process, which ends with the runner.
+//!
 //! Each session's start and end are kept in the runner's record, so a
 //! runner started again reports every session it held. A session the record
 //! holds with no end was lost with the runner that held it: it is reported
@@ -23,18 +28,28 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, mpsc};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use portable_pty::MasterPty;
 
 use crate::error::RunnerError;
+use crate::judge::Policy;
+use crate::operations::Operations;
+use crate::peer::Leader;
 use crate::protocol::{Ended, EndedHow, Key, Launch, SessionView, StatusView};
+use crate::refusals::Desk;
 use crate::rotation::RotationState;
 use crate::scrollback::Scrollback;
 use crate::state::{Kept, KeptSession, StateFile};
+use crate::tracking::Tracking;
+use crate::tracking_store::Feed;
 
 mod lifecycle;
+
+pub use crate::refusal_log::AuditGap;
+pub use lifecycle::Collected;
+pub(crate) use lifecycle::Wake;
 
 /// The runner's own name, as `status` answers it.
 pub const RUNNER: &str = "lys-runner";
@@ -49,8 +64,8 @@ pub fn now_ms() -> u64 {
 }
 
 /// The live ends of a running process.
-struct Live {
-    writer: Box<dyn Write + Send>,
+pub(crate) struct Live {
+    pub(crate) writer: Box<dyn Write + Send>,
     master: Box<dyn MasterPty + Send>,
     pid: u32,
 }
@@ -58,7 +73,7 @@ struct Live {
 impl Live {
     /// End the process and everything it started, naming a failure in the
     /// runner's log: the exit, when it comes, is what answers.
-    fn end(&self, id: &str) {
+    pub(crate) fn end(&self, id: &str) {
         if let Err(error) = crate::pty::end_group(self.pid) {
             crate::error::said(&format!(
                 "session {id}: the process was already ending: {error}"
@@ -67,19 +82,37 @@ impl Live {
     }
 }
 
+/// What a session was started with beside its launch, and where its turns
+/// stand.
+#[derive(Debug, Clone, Default)]
+pub struct Guard {
+    /// The tool-boundary policy installed for the launch.
+    pub policy: Option<Policy>,
+    /// How its harness is tracked.
+    pub tracking: Option<Tracking>,
+    /// Its leader, as spawned.
+    pub leader: Option<Leader>,
+    /// Its bound working directory.
+    pub cwd: String,
+    /// Whether it is between turns, as its harness last said.
+    pub idle: bool,
+}
+
 /// One session.
 pub(crate) struct Session {
-    started_at: u64,
+    pub(crate) started_at: u64,
     pid: Option<u32>,
     columns: u16,
     rows: u16,
     scrollback: Scrollback,
-    ended: Option<Ended>,
-    live: Option<Live>,
+    pub(crate) ended: Option<Ended>,
+    pub(crate) live: Option<Live>,
     generation: u64,
-    launch: Option<Launch>,
-    rotation: Option<RotationState>,
-    ending: bool,
+    pub(crate) launch: Option<Launch>,
+    pub(crate) rotation: Option<RotationState>,
+    pub(crate) ending: bool,
+    pub(crate) guard: Guard,
+    pub(crate) follower: Option<mpsc::Sender<Wake>>,
 }
 
 impl Session {
@@ -115,7 +148,7 @@ impl Session {
         }
     }
 
-    fn live(&mut self, id: &str) -> Result<&mut Live, RunnerError> {
+    pub(crate) fn live(&mut self, id: &str) -> Result<&mut Live, RunnerError> {
         if self.ended.is_some() {
             return Err(RunnerError::refused(
                 "session_ended",
@@ -132,10 +165,13 @@ impl Session {
 }
 
 /// The table every thread shares.
-#[derive(Default)]
 pub(crate) struct Table {
-    sessions: BTreeMap<String, Session>,
+    pub(crate) sessions: BTreeMap<String, Session>,
     stopping: bool,
+    pub(crate) feed: Feed,
+    pub(crate) desk: Desk,
+    pub(crate) gaps: BTreeMap<String, AuditGap>,
+    pub(crate) operations: Operations,
 }
 
 /// The sessions a runner holds, and what wakes those waiting on them.
@@ -146,7 +182,7 @@ pub struct Sessions {
     scrollback: usize,
 }
 
-fn unknown(id: &str) -> RunnerError {
+pub(crate) fn unknown(id: &str) -> RunnerError {
     RunnerError::refused("session_unknown", format!("no session {id} is held"))
 }
 
@@ -190,7 +226,14 @@ impl Sessions {
         }
         let state = StateFile::open(state_dir)?;
         let found_at = now_ms();
-        let mut table = Table::default();
+        let mut table = Table {
+            sessions: BTreeMap::new(),
+            stopping: false,
+            feed: Feed::open(state_dir)?,
+            desk: Desk::default(),
+            gaps: BTreeMap::new(),
+            operations: Operations::open(state_dir)?,
+        };
         for kept in state.read()?.sessions {
             let ended = match kept.ended {
                 Some(ended) => ended,
@@ -215,6 +258,8 @@ impl Sessions {
                     launch: None,
                     rotation: None,
                     ending: false,
+                    guard: Guard::default(),
+                    follower: None,
                 },
             );
         }
@@ -277,6 +322,26 @@ impl Sessions {
     /// Start `launch` in its own pseudo-terminal, answering its process id
     /// and when it started.
     pub fn start(self: &Arc<Self>, launch: Launch) -> Result<(u32, u64), RunnerError> {
+        self.begin(launch, None, None)
+    }
+
+    /// Start `launch` as [`Sessions::start`] does, holding `policy` for its
+    /// judge and tracking its harness as `tracking` says. A tracking the
+    /// runner was not measured against is refused before anything runs, and
+    /// so is an executable that reports another version.
+    pub fn begin(
+        self: &Arc<Self>,
+        launch: Launch,
+        policy: Option<Policy>,
+        tracking: Option<Tracking>,
+    ) -> Result<(u32, u64), RunnerError> {
+        let launched = match &tracking {
+            Some(tracking) => {
+                tracking.checked()?;
+                Some(lifecycle::launched(&launch, tracking)?)
+            }
+            None => None,
+        };
         if !valid_id(&launch.session) {
             return Err(RunnerError::refused(
                 "session_invalid",
@@ -302,6 +367,7 @@ impl Sessions {
             ));
         }
         let id = launch.session.clone();
+        let cwd = lifecycle::bound_directory(&launch.directory);
         let mut session = Session {
             started_at: now_ms(),
             pid: None,
@@ -314,14 +380,53 @@ impl Sessions {
             launch: Some(launch),
             rotation,
             ending: false,
+            guard: Guard {
+                policy,
+                tracking,
+                leader: None,
+                cwd,
+                idle: true,
+            },
+            follower: None,
         };
         let pid = self.run(&id, &mut session, false)?;
         let started_at = session.started_at;
-        table.sessions.insert(id, session);
+        table.sessions.insert(id.clone(), session);
         self.persist(&table)?;
+        if let Some((executable, version)) = launched {
+            lifecycle::tracking_started(&mut table, &id, &executable, &version);
+        }
         drop(table);
         self.wake();
         Ok((pid, started_at))
+    }
+
+    /// Run `check` on the table each time it changes, until it answers, the
+    /// caller leaves, or the runner stops.
+    pub(crate) fn until_any<T>(
+        &self,
+        left: &AtomicBool,
+        mut check: impl FnMut(&mut Table) -> Option<T>,
+    ) -> Result<T, RunnerError> {
+        let mut table = self.lock();
+        loop {
+            if let Some(answer) = check(&mut table) {
+                return Ok(answer);
+            }
+            if left.load(Ordering::SeqCst) {
+                return Err(RunnerError::refused(
+                    "caller_left",
+                    "the caller closed the request",
+                ));
+            }
+            if table.stopping {
+                return Err(RunnerError::refused(
+                    "runner_stopping",
+                    "the runner is stopping",
+                ));
+            }
+            table = self.wait(table);
+        }
     }
 
     /// Type `bytes` into session `id`.
