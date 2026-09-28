@@ -306,3 +306,143 @@ signed and checked offline. The start statement (the START card 98qkhhCb)
 and the role-move statement (the ROLES card Ink1H1Os) are further units,
 written when the records they sign over land, and checking the signer
 against a trusted certificate comes with row 6.1's `--cert`.
+
+## The config directory through --settings (HOME-008)
+
+Measured 28 September 2026, 17:10 to 17:12 AEST, for the card HOME-026
+(written under its draft id HOME-008), on Dean's laptop, the machine the
+build runs on (`hostname` answers `Mac.modem`; macOS 26.6.2, arm64), with
+the lys-home binary built there from the brief's base 7b53625 by
+`cargo build -p lys-home --bin lys-home` (toolchain 1.97.1, from
+`rust-toolchain.toml`) in a detached worktree of that commit, and the Claude
+Code installed there. The question: the template's env slot reaches a
+launched session only through the settings file the launch line passes with
+`--settings`, and the method above set `CLAUDE_CONFIG_DIR` in the process
+environment instead, so it did not show that the template's value moves the
+config directory. Here the settings file is the only carrier of it.
+
+The scratch tree is `<scratch>`, a fresh directory on that machine; none
+of it is committed. The runner (`measure.py`, SHA-256
+`fcbc2b3e7ccc66717bfd36aa1992f4c2a15f2384ad07de0df609b3f2120343d1`) and the
+listener (`listener.py`, SHA-256
+`8483d4bafed5bb456bd9f7a7b462982034567efe39e7030f510e84e827c6ac83`) stay in
+the scratch tree beside it, since the design's structure names no path for
+them. Nothing here quotes a line of any document, a marker token or a
+variable's value: names, counts, statuses and hashes only.
+
+### The machines and the answer
+
+| host | `claude --version` | measured or cited | answer |
+| --- | --- | --- | --- |
+| Dean's laptop (`Mac.modem`), the machine the build runs on | `2.1.283 (Claude Code)` | measured here | yes |
+| the version `lys.given` entries have been rendered under since the context record landed (PROOF-LAUNCH.md, RECORD.md) | 2.1.283 | cited, not re-measured | yes |
+
+The version measured is 2.1.283, the version `MEASURED_VERSION` names and
+the version entries are rendered under, so the cited row's answer is the
+measured one and there is no finding of a version difference.
+`MEASURED_VERSION` stays 2.1.283.
+
+### The method
+
+1. A fresh scratch tree: a fixture home H with an empty `H/.claude`, a
+   directory C created for this measurement and named by no other file,
+   variable or setting, an empty working directory W, and a lys-home home
+   holding a copy of `crates/lys-home/tests/fixtures/launch/session.jsonl`
+   as the session `fixture`.
+2. H/.claude and C each hold a `CLAUDE.md` and a memory index at
+   `projects/<slug of W>/memory/MEMORY.md`, four files, each carrying one
+   marker token found in no other file. The tokens are kept in
+   `<scratch>/markers.json`.
+3. A template whose env slot sets `CLAUDE_CONFIG_DIR` to C and nothing
+   else; `mcp` `{"mcpServers": {}}`; no secret; a one-line fixture
+   instruction; flags `-p`, `Reply with the single word ok.`,
+   `--output-format`, `json`, `--max-turns`, `1`.
+4. `lys-home render-launch --home <scratch>/lyshome --session fixture
+   --template <scratch>/template.json --uuid
+   00000000-0000-4000-8000-000000000026 --cwd <scratch>/w --model
+   claude-fixture --version 2.1.283 --out <scratch>/out`, with only `PATH`,
+   `TMPDIR` and `HOME` (H) in its environment; exit 0.
+5. A local listener on 127.0.0.1 writes each request body to a file and
+   answers each `POST` with a fixed six-event stream.
+6. Three runs of the printed launch line, split into words as a POSIX shell
+   splits them and run in W with `claude` resolved on `PATH`, so the
+   launching process is `claude` itself and its environment is exactly the
+   ten variables below. The four files are rewritten before each run.
+7. After each run, each marker is counted in every request body captured
+   for that run. A document was read from C when only C's marker occurs,
+   and from H/.claude when only H's does; a run carrying neither marker of a
+   document gives no answer and counts toward none.
+
+The launch line as run:
+
+```text
+claude --resume <scratch>/out/00000000-0000-4000-8000-000000000026.jsonl --fork-session --mcp-config <scratch>/out/mcp.json --settings <scratch>/out/env.json --append-system-prompt-file <scratch>/out/instructions.md -p 'Reply with the single word ok.' --output-format json --max-turns 1
+```
+
+The launching environment's variable names, ten, and no other:
+`PATH`, `TMPDIR`, `TERM`, `LANG`, `HOME`, `ANTHROPIC_BASE_URL`,
+`ANTHROPIC_API_KEY`, `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
+`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`. `HOME` is H,
+`ANTHROPIC_BASE_URL` names the local listener, `ANTHROPIC_API_KEY` is a
+fixture string and the three telemetry-off variables are each `1`.
+`CLAUDE_CONFIG_DIR` is not among them.
+
+The settings file passed with `--settings` (`<scratch>/out/env.json`, as the
+render wrote it): member names `env`; its `env` member's variable names
+`CLAUDE_CONFIG_DIR`.
+
+The four marker files:
+
+| file | length | sha256 |
+| --- | --- | --- |
+| `C/CLAUDE.md` (template) | 78 | `8c661048ac83d266667be4e5d9f74c39bc96bf75a95b998bab9f432ad25c66b2` |
+| `H/.claude/CLAUDE.md` (home) | 78 | `0924b7add8fc830b6e88487f3e2d869cb1fa18af3ac8b45e3a7a2ba0f51bab46` |
+| `C/projects/<slug of W>/memory/MEMORY.md` (template) | 78 | `491e88b4178fb817a95c1e24c0e34d3bd0db21126fdc7621f0e1bf5ed89098a9` |
+| `H/.claude/projects/<slug of W>/memory/MEMORY.md` (home) | 78 | `e544c43754e8d88bf06852f8604853a4c2813561db49ad973333fd0d15510161` |
+
+### The runs
+
+Occurrences of each marker across the run's captured request bodies:
+
+| run | exit | requests captured | `CLAUDE.md` C marker | `CLAUDE.md` H marker | memory index C marker | memory index H marker | answer |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 0 | 1 (`POST /v1/messages?beta=true`) | 1 | 0 | 1 | 0 | both from C |
+| 2 | 0 | 1 (same) | 1 | 0 | 1 | 0 | both from C |
+| 3 | 0 | 1 (same) | 1 | 0 | 1 | 0 | both from C |
+
+Each run wrote 0 lines to stderr. Every run gave an answer; none was set
+aside.
+
+| document | read from |
+| --- | --- |
+| `CLAUDE.md` | template |
+| memory index | template |
+
+**Answer: yes.** On 2.1.283 a template's `CLAUDE_CONFIG_DIR`, delivered only
+through the settings file the launch line passes with `--settings`, moves the
+session's config directory: both documents were read from C and neither from
+H/.claude, in all three runs. The fork each run wrote agrees: 3 session
+files under `C/projects/<slug of W>/`, 0 under `H/.claude/projects/`.
+
+The base binary's own record of the same render agrees with the session:
+`lys-home given` on the fixture session lists one `lys.given` entry,
+`harness_version` 2.1.283, `config_dir` `{path: <scratch>/c, source:
+template}`, 4 documents, of which `user_claude_md` and `memory_index` lie
+under `<scratch>/c`, and `environment` `CLAUDE_CONFIG_DIR`.
+
+What the answer decides:
+
+- `lys.given` entries whose `config_dir.source` is `template` and whose
+  `harness_version` is 2.1.283 name the directory the session read its
+  `CLAUDE.md` and memory index from. They stand as written, and no
+  correction to any earlier section of this file is needed.
+- The record's shape does not change: no `lys.given.v2` is defined, and
+  nothing under `crates/` changes for this card. `MEASURED_VERSION` stays
+  2.1.283.
+- It does not measure any Claude Code version but 2.1.283, any template slot
+  but the env slot's `CLAUDE_CONFIG_DIR`, or any document but the user
+  `CLAUDE.md` and the memory index; a later version is re-measured before a
+  record rendered for it relies on this answer.
+
+A search of this file for each of the four marker tokens, taken from
+`<scratch>/markers.json`, finds 0 occurrences.

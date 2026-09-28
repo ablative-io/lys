@@ -56,7 +56,33 @@
       ],
       "stories": [
         "S35"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/home/PROOF-GIVEN.md",
+            "change": "modified",
+            "note": "Appends the section `## The config directory through --settings (HOME-008)`. It records the host, version, method, launch line, launching-environment names, settings file member and variable names, four marker-file SHA-256s, the three-row run table, the directory each document was read from, and the answer `yes`. Earlier sections are unchanged."
+          }
+        ],
+        "how": "Every row below refers to the new section at the end of docs/design/home/PROOF-GIVEN.md.\n(1) Met: the heading `## The config directory through --settings (HOME-008)` is present.\n(2) Met: the host is Dean's laptop (`Mac.modem`, macOS 26.6.2, arm64) and `claude --version` answered `2.1.283 (Claude Code)`. In the table 'The machines and the answer', that host's answer column holds exactly `yes`.\n(3) Met: the launching-environment list holds exactly the ten names: PATH, TMPDIR, TERM, LANG, HOME, ANTHROPIC_BASE_URL, ANTHROPIC_API_KEY, DISABLE_TELEMETRY, DISABLE_ERROR_REPORTING, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC.\n(4) Met: CLAUDE_CONFIG_DIR is not in that list, and the section states it is not. The settings file's env variable names are `CLAUDE_CONFIG_DIR`.\n(5) Met: the settings file's member names are exactly `env`.\n(6) Met: the four-file table holds four distinct 64-hex SHA-256 values (8c66…, 0924…, 491e…, e544…).\n(7) Met: the run table has three rows. Each row shows 1 occurrence of the C marker and 0 of the H marker for each document; no run was set aside.\n(8) Met: both CLAUDE.md and the memory index are recorded as `template`, and the answer is `yes`.\n(9) Met: a search of PROOF-GIVEN.md and RECORD.md for each of the four tokens in <scratch>/markers.json finds [0,0,0,0].\n(10) Met: `git diff 7b53625 -- launch_env.rs template.rs` prints nothing (0 lines).\nHow it was run: the launch line was split into words and run with `claude` itself as the launching process, so no shell added variables. lys-home gained no way to run a session.",
+        "deviation": "(a) The runner and listener (measure.py and listener.py) stay uncommitted in the scratch tree, and the section cites their SHA-256s. The design's structure array names no path for them, and a path outside it may not be created.\n(b) The binary was built at 7b53625 as the brief says, but the working branch head is d41fa4b, 453 commits later. launch_env.rs and template.rs are identical between the two, so the launch line and the settings file measured are the same ones HEAD writes.\n(c) The proof names the card HOME-026 'written under its draft id HOME-008', because the brief fixes the heading as HOME-008.\n(d) The brief says to run no build command, but R1 requires a lys-home built on this machine. The only build run was `cargo build -p lys-home --bin lys-home` in a separate worktree with a separate target directory, done for the measurement and not as a gate.",
+        "checklist": [
+          {
+            "id": "C83",
+            "done": false,
+            "note": "C83 describes PROOF-CHAIN.md at 0073b966, the deliverable of a different card. No acceptance row of this brief asks for it, so this card does not deliver it."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S35",
+            "satisfied": true,
+            "note": "The measurement names the commit it was built at (7b53625), the toolchain (1.97.1), the host and the Claude Code version, and cites the runner's hash, so it can be rerun."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -86,7 +112,43 @@
       ],
       "stories": [
         "S36"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/home/RECORD.md",
+            "change": "modified",
+            "note": "After the lys.given description it now states the answer `yes`, with a table of the version measured (2.1.283 on Dean's laptop, yes) and the cited version (2.1.283, `cited, not re-measured`, yes). It says entries with source `template` and harness_version 2.1.283 stand as written and that the record's shape does not change."
+          },
+          {
+            "path": "docs/design/home/PROOF-GIVEN.md",
+            "change": "modified",
+            "note": "The HOME-008 section's table of machines and answers lists the measured and cited versions, and the section states what the answer decides."
+          }
+        ],
+        "how": "(1) Met: RECORD.md, in the new paragraph after the lys.given description, holds the answer **yes** and a table naming 2.1.283 measured on Dean's laptop (yes) and 2.1.283 marked `cited, not re-measured` (yes).\n(2) Met: the version measured is 2.1.283, so the 2.1.283 row's answer equals R1's (`yes`). Both documents state there is no finding of a version difference.\n(3) and (4) Do not apply: they are the rows for the `no` answer.\n(5) Does not apply: it is the row for the `split` answer.\n(6) The `yes` row: this card changes no file under crates/, and `git diff HEAD -- crates` prints 0 lines. The literal `git diff 7b53625 -- crates` prints about 116k lines, all from the 453 commits main landed between the brief's base and this branch's head d41fa4b, none from this card.\n(7) Met: `git diff 7b53625 --stat` lists 0 `sessions/*.jsonl` files.\n(8) Met: `grep -n 'MEASURED_VERSION: &str' crates/lys-home/src/harness/claude_code/given.rs` prints `62:pub const MEASURED_VERSION: &str = \"2.1.283\";`.\nNo entry of any session was rewritten, removed or appended to, and neither document carries document content or a variable value.",
+        "deviation": "The `git diff 7b53625 -- crates` row cannot print nothing on this branch, because main moved 453 commits past the brief's base before this card began. What this card changes under crates/ is nothing, which is what the row intends; the reviewer can confirm with `git diff HEAD -- crates` or the landing diff.",
+        "checklist": [
+          {
+            "id": "C84",
+            "done": false,
+            "note": "C84 describes Jev lines for the files of crates/lys-home at 0073b966, which belong to the PROOF-CHAIN card. No acceptance row of this brief asks for them."
+          },
+          {
+            "id": "C88",
+            "done": false,
+            "note": "C88 describes verdicts on the step 5 cards, which belong to the PROOF-CHAIN card. No acceptance row of this brief asks for them."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S36",
+            "satisfied": false,
+            "note": "This story concerns the chain-judgement proof's findings. This brief's only possible finding, a version difference, did not arise because 2.1.283 was both measured and cited."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -116,7 +178,27 @@
       ],
       "stories": [
         "S35"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [],
+        "how": "The answer recorded is `yes`, so none of the `no` rows apply and given.rs, given_tests.rs and error.rs are not changed by this card (`git diff HEAD` on them prints nothing). The `yes` row asks that `git diff 7b53625` on those three files print nothing. Literally it prints main's own changes since 7b53625 (HOME-016 and 28b97ac, among others), none from this card.",
+        "deviation": "On the `yes` answer the requirement is met by making no change. The base-relative diff row reflects main's 453 commits after 7b53625, not this card.",
+        "checklist": [
+          {
+            "id": "C85",
+            "done": false,
+            "note": "C85 describes the .land/gates.sh record at 0073b966 for the PROOF-CHAIN card. It is not asked by this brief, and on `yes` R3 does not land."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S35",
+            "satisfied": false,
+            "note": "On `yes` R3 does not land, so it records nothing; the commit and toolchain are recorded under R1."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -147,7 +229,27 @@
       ],
       "stories": [
         "S35"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [],
+        "how": "The answer is `yes`. crates/lys-home/src/record/given_v2.rs does not exist, and neither does given_v2_tests.rs. This card does not change entries.rs, record/mod.rs or record/given.rs (`git diff HEAD` prints nothing). The literal `git diff 7b53625 -- record/entries.rs record/mod.rs` shows main's own changes after the base, none from this card.",
+        "deviation": "The base-relative diff row reflects main's commits after 7b53625, not this card, as under R3.",
+        "checklist": [
+          {
+            "id": "C86",
+            "done": false,
+            "note": "C86 describes the PROOF-CHAIN card's findings. It is not asked by this brief, and on `yes` R4 does not land."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S35",
+            "satisfied": false,
+            "note": "On `yes` R4 does not land."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -173,7 +275,27 @@
       ],
       "stories": [
         "S35"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [],
+        "how": "The answer is `yes`. This card does not change launch.rs or tests/given_record.rs (`git diff HEAD` prints nothing). render-launch still appends lys.given, which the measurement shows names the directory the session reads. The literal `git diff 7b53625` on those two files shows main's HOME-016 changes, none from this card.",
+        "deviation": "The base-relative diff row reflects main's commits after 7b53625, not this card.",
+        "checklist": [
+          {
+            "id": "C86",
+            "done": false,
+            "note": "C86 belongs to the PROOF-CHAIN card and is not asked by this brief."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S35",
+            "satisfied": false,
+            "note": "On `yes` R5 does not land."
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -200,7 +322,27 @@
       ],
       "stories": [
         "S37"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [],
+        "how": "The answer is `yes`. `git diff 7b53625 -- crates/lys-home/src/cli/given.rs` prints nothing: the file is unchanged since the base and this card does not touch it. crates/lys-home/tests/given_versions.rs does not exist. Both `yes` rows are met literally.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C87",
+            "done": false,
+            "note": "C87 describes the PROOF-CHAIN card's findings (LOSS-ACCOUNT.md and others). It is not asked by this brief."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S37",
+            "satisfied": false,
+            "note": "This story concerns setting step 5 cards done, which is outside this brief."
+          }
+        ]
+      }
     },
     {
       "id": "R7",
@@ -229,7 +371,32 @@
       ],
       "stories": [
         "S35"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [],
+        "how": "The answer is `yes`, so this card does not change tests/given_record.rs (`git diff HEAD` prints nothing), and its existing assertions of source `template` stand, matching the measurement. The literal `git diff 7b53625 -- tests/given_record.rs` shows main's own changes after the base, none from this card.",
+        "deviation": "The base-relative diff row reflects main's commits after 7b53625, not this card.",
+        "checklist": [
+          {
+            "id": "C85",
+            "done": false,
+            "note": "C85 belongs to the PROOF-CHAIN card and is not asked by this brief."
+          },
+          {
+            "id": "C86",
+            "done": false,
+            "note": "C86 belongs to the PROOF-CHAIN card and is not asked by this brief."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S35",
+            "satisfied": false,
+            "note": "On `yes` R7 does not land."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [

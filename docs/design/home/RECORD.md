@@ -170,6 +170,26 @@ a later ship from the target carries the arrivals onward.
   unencrypted and carries no document content; a render given a key signs
   its data as a separate `lys.given_statement`, and encryption at rest
   (stage 3) can be added later without changing what is recorded.
+  Whether a template's `CLAUDE_CONFIG_DIR` moves the session's config
+  directory, when it reaches the session only through the settings file the
+  launch line passes with `--settings`, was measured for HOME-026 (written
+  under its draft id HOME-008; PROOF-GIVEN.md, `## The config directory
+  through --settings (HOME-008)`): three runs of the printed launch line
+  with `CLAUDE_CONFIG_DIR` absent from the launching environment read both
+  the user `CLAUDE.md` and the memory index from the template's directory
+  and neither from `HOME/.claude`. The answer is **yes**, for every version
+  and host measured or cited:
+
+  | host | Claude Code version | measured or cited | answer |
+  | --- | --- | --- | --- |
+  | Dean's laptop (`Mac.modem`), the machine the build runs on | 2.1.283 | measured, 28 September 2026 | yes |
+  | the version `lys.given` entries have been rendered under since the context record landed (PROOF-LAUNCH.md, this file) | 2.1.283 | cited, not re-measured | yes |
+
+  The version measured is the version entries are rendered under, so there
+  is no finding of a version difference and `MEASURED_VERSION` stays
+  2.1.283. `lys.given` entries whose `config_dir.source` is `template` and
+  whose `harness_version` is 2.1.283 name the directory the session read
+  from; they stand as written, and the record's shape does not change.
 - `lys.given_statement` (HOME-018 R2, R3): `{given, statement}`. `given` is
   the id of the `lys.given` entry it signs, and it hangs under that entry,
   beside the context path, so the head does not move. `statement` is the
