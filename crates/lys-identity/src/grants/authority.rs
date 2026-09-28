@@ -10,6 +10,7 @@
 //! fresh as every change on the authority it rests on.
 
 use std::collections::BTreeSet;
+use std::num::NonZeroU64;
 
 use lys_core::Ed25519Identity;
 use lys_log_store::LeafStore;
@@ -31,6 +32,7 @@ use crate::id::{IdentityId, PersonId};
 use crate::log::Reopen;
 use crate::operation::OperationId;
 use crate::projection::Projection;
+use crate::restart::SNAPSHOT_EVERY;
 
 /// A request to exercise an action on a resource.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -128,8 +130,10 @@ fn delegation_matches(request: &DelegateRequest, grant: &Grant) -> bool {
 }
 
 impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
-    /// Open the grants over the grant log `reopen` gives, replaying every
-    /// event into the book and projecting what the relationships lack.
+    /// Open the grants over the grant log `reopen` gives from its signed
+    /// snapshot, reading only the leaves after it, fold every event into the
+    /// book, and project what the relationships lack. A snapshot is written
+    /// every [`SNAPSHOT_EVERY`] entries.
     pub fn open(
         reopen: Reopen<S>,
         key: Ed25519Identity,
@@ -137,7 +141,26 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         model: Model,
         root_authority: PersonId,
     ) -> Result<Self, GrantError> {
-        let (ledger, events) = GrantLedger::open(reopen, key.public_key_bytes())?;
+        Self::open_with(
+            reopen,
+            key,
+            relationships,
+            model,
+            root_authority,
+            SNAPSHOT_EVERY,
+        )
+    }
+
+    /// As [`Grants::open`], writing a snapshot every `every` entries.
+    pub fn open_with(
+        reopen: Reopen<S>,
+        key: Ed25519Identity,
+        relationships: R,
+        model: Model,
+        root_authority: PersonId,
+        every: NonZeroU64,
+    ) -> Result<Self, GrantError> {
+        let (ledger, events) = GrantLedger::open(reopen, &key, every)?;
         let mut grants = Self {
             model,
             root_authority,

@@ -21,7 +21,9 @@ pub mod profile;
 pub mod projection;
 pub mod provenance;
 pub mod receipt;
+pub mod restart;
 pub mod signer;
+mod snapshot_state;
 
 pub use binding::LoginBinding;
 pub use directory::Directory;
@@ -32,4 +34,5 @@ pub use lifecycle::{LifecycleState, Transition};
 pub use operation::OperationId;
 pub use profile::Profile;
 pub use provenance::{Actor, AuthMethod, Provenance};
+pub use restart::SNAPSHOT_EVERY;
 pub use signer::{SignedEvent, sign_event, verify_event};
