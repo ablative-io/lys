@@ -1,6 +1,7 @@
 /** Secrets navigation reaches each served route and never reads a credential value. */
 import { describe, expect, it } from 'vitest';
-import { $, choose, mount, text, unreachable } from './harness';
+import { act } from 'react';
+import { $, choose, mount, text, unreachable, settle } from './harness';
 import { SERVICE, ok } from './fixtures';
 
 const secret = { name: 'Calendar', class: 'oauth', owner: 'Tom', sequence: 2, upstream: 'never-render-upstream', header: 'never-render-header' };
@@ -33,4 +34,18 @@ describe('Secrets routes', () => {
     expect(text()).toContain('the team Operations');
     expect(text()).not.toContain('never-render-secret-value');
   });
+});
+
+
+it('sends the retained operation through the actual recipients API', async () => {
+  const { posted } = await mount('#/secrets/manage?secret=Calendar', { ...routes,
+    'POST /secrets/recipients': ok({ secret: 'Calendar', recipients: 'people_only', operation: 'wrong-operation-on-purpose', repeated: false }),
+  });
+  const form = [...document.querySelectorAll('form')].find((entry) => entry.textContent?.includes('Who it can be handed to'));
+  if (!form) throw new Error('No recipients form');
+  await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  await settle();
+  expect(posted).toHaveLength(1);
+  expect(posted[0]).toMatchObject({ body: { secret: 'Calendar', recipients: 'people_only', operation: expect.stringMatching(/^[A-Za-z0-9_-]{16,64}$/) } });
+  expect(text()).toContain('UnconfirmedAnswer');
 });

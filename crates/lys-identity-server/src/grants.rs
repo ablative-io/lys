@@ -121,9 +121,12 @@ pub(crate) fn with_grants<T>(
                 reason: "the configured administrator's login is bound to no person, so there is no root authority to judge a grant under",
             })?;
         let mut slot = state.grants.lock().unwrap_or_else(PoisonError::into_inner);
-        let grants = match &mut *slot {
-            Some(grants) => grants,
-            None => slot.insert(state.grant_setup.open(root)?),
+        let grants = if let Some(grants) = &mut *slot {
+            grants
+        } else {
+            let opened = state.grant_setup.open(root)?;
+            (state.say)(&format!("grant log {}", opened.ledger().start()));
+            slot.insert(opened)
         };
         act(Judged {
             directory: projection,

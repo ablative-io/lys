@@ -79,6 +79,8 @@ export type ScopeKind = 'personal' | 'team' | 'organisation';
 
 /** The answer to POST /secrets/scope. */
 export interface ScopeChanged {
+  operation: string;
+  repeated: boolean;
   secret: string;
   /** The new scope as the broker names it: `person/<id>`, `team/<name>` or `organisation/<name>`. */
   scope: string;
@@ -89,12 +91,15 @@ export type Recipients = 'anyone' | 'people_only';
 
 /** The answer to POST /secrets/recipients. */
 export interface RecipientsChanged {
+  operation: string;
+  repeated: boolean;
   secret: string;
   recipients: Recipients;
 }
 
 /** GET /secrets/settings: discoverable metadata only, never a secret value. */
 export interface SecretSettings {
+  last_operation: string | null;
   secret: string;
   scope: string | null;
   recipients: Recipients;
@@ -108,8 +113,8 @@ export const secretsApi = {
   grants: () => request<SecretGrantListing>('/secrets/grants'),
   audit: () => request<SecretAuditLog>('/secrets/audit'),
   revocation: (handle: string) => request<RevocationAnswer>('/secrets/revocation?handle=' + encodeURIComponent(handle)),
-  scope: (secret: string, kind: ScopeKind, name: string) =>
-    request<ScopeChanged>('/secrets/scope', { secret, scope: scopeText(kind, name) }),
-  recipients: (secret: string, recipients: Recipients) =>
-    request<RecipientsChanged>('/secrets/recipients', { secret, recipients }),
+  scope: (secret: string, kind: ScopeKind, name: string, operation: string) =>
+    request<ScopeChanged>('/secrets/scope', { secret, scope: scopeText(kind, name), operation }),
+  recipients: (secret: string, recipients: Recipients, operation: string) =>
+    request<RecipientsChanged>('/secrets/recipients', { secret, recipients, operation }),
 };

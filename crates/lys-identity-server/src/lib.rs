@@ -41,4 +41,4 @@ mod spicedb_http;
 
 pub use config::Config;
 pub use error::ServerError;
-pub use routes::{AppState, router, service, service_saying};
+pub use routes::{AppState, Say, router, service, service_saying};

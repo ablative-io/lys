@@ -139,12 +139,12 @@ describe('A settled owner change', () => {
   it('is not sent again until a field is edited', async () => {
     const store = memoryStore();
     const asked: string[] = [];
-    const change = (secret: string, recipients: string) => { asked.push(recipients); return Promise.resolve({ secret, recipients }); };
+    const change = (secret: string, recipients: string, operation: string) => { asked.push(recipients); return Promise.resolve({ secret, recipients, operation, repeated: false }); };
     const container = await show(<RecipientsChange secret="calendar" change={change} store={store} />);
     await submit(container);
     await submit(container);
     expect(asked).toEqual(['people_only']);
-    expect(container.textContent).toContain('calendar can now be handed to people only, never agents.');
+    expect(container.textContent).toContain('calendar: confirmed change to people only, never agents.');
     expect(store.entries.size).toBe(0);
     await type(container, 0, 'mailbox');
     await submit(container);
@@ -161,5 +161,99 @@ describe('A settled owner change', () => {
     expect(saveOf(container).disabled).toBe(false);
     await submit(container);
     expect(sent).toBe(2);
+  });
+});
+
+async function retryOriginal(container: HTMLElement): Promise<void> {
+  const button = [...container.querySelectorAll('button')].find((entry) => entry.textContent === 'Retry original change');
+  if (!button) throw new Error('No original-change retry offered');
+  await act(async () => button.click());
+  await settle();
+}
+
+describe('Owner operation receipts', () => {
+  it('retains the operation before sending and retries the exact request after remount', async () => {
+    const store = memoryStore();
+    const calls: unknown[] = [];
+    const first = await show(<RecipientsChange secret="calendar" store={store} change={(secret, recipients, operation) => {
+      calls.push({ secret, recipients, operation });
+      expect(store.getItem(pendingKey('recipients', secret))).toContain(operation);
+      return unanswered();
+    }} />);
+    await submit(first);
+    for (const root of roots.splice(0)) act(() => root.unmount());
+    const next = await show(<RecipientsChange secret="calendar" store={store} change={(secret, recipients, operation) => {
+      calls.push({ secret, recipients, operation });
+      return Promise.resolve({ secret, recipients, operation, repeated: true });
+    }} />);
+    await retryOriginal(next);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toEqual(calls[0]);
+    expect(store.entries.size).toBe(0);
+    expect(next.textContent).toContain('confirmed change');
+  });
+
+  it('does not accept matching values carrying a different operation id', async () => {
+    const store = memoryStore();
+    const container = await show(<RecipientsChange secret="calendar" store={store} change={(secret, recipients) =>
+      Promise.resolve({ secret, recipients, operation: 'a-different-operation', repeated: false })} />);
+    await submit(container);
+    expect(container.textContent).toContain('UnconfirmedAnswer');
+    expect(store.entries.size).toBe(1);
+    expect(saveOf(container).disabled).toBe(true);
+  });
+
+  it('does not erase an uncertain original when a retry receives a 403', async () => {
+    const store = memoryStore();
+    let count = 0;
+    const container = await show(<RecipientsChange secret="calendar" store={store} change={() => {
+      count += 1;
+      return count === 1 ? unanswered() : Promise.reject(new Refused(403, { refusal: 'NotOwner', reason: 'The current caller cannot check it' }));
+    }} />);
+    await submit(container);
+    const original = store.getItem(pendingKey('recipients', 'calendar'));
+    await retryOriginal(container);
+    expect(store.getItem(pendingKey('recipients', 'calendar'))).toBe(original);
+    expect(saveOf(container).disabled).toBe(true);
+  });
+
+  it('keeps legacy changes without operation ids held without inventing a retry', async () => {
+    const store = memoryStore();
+    store.setItem(pendingKey('recipients', 'calendar'), JSON.stringify({ asked: 'calendar handed to people only' }));
+    let count = 0;
+    const container = await show(<RecipientsChange secret="calendar" store={store} change={() => { count += 1; return unanswered(); }} />);
+    await submit(container);
+    expect(count).toBe(0);
+    expect([...container.querySelectorAll('button')].some((button) => button.textContent === 'Retry original change')).toBe(false);
+    expect(store.entries.size).toBe(1);
+  });
+
+  it('sends nothing when the request cannot be retained', async () => {
+    const store = memoryStore();
+    store.setItem = () => { throw new Error('storage full'); };
+    let count = 0;
+    const container = await show(<RecipientsChange secret="calendar" store={store} change={() => { count += 1; return unanswered(); }} />);
+    await submit(container);
+    expect(count).toBe(0);
+    expect(container.textContent).toContain('PendingNotRecorded');
+  });
+
+  it('retries a scope with its original kind and name after remount', async () => {
+    const store = memoryStore();
+    const calls: unknown[] = [];
+    const first = await show(<ScopeChange secret="calendar" store={store} change={(secret, kind, name, operation) => {
+      calls.push({ secret, kind, name, operation }); return unanswered();
+    }} />);
+    await type(first, 1, 'person-owner');
+    await submit(first);
+    for (const root of roots.splice(0)) act(() => root.unmount());
+    const next = await show(<ScopeChange secret="calendar" store={store} change={(secret, kind, name, operation) => {
+      calls.push({ secret, kind, name, operation });
+      return Promise.resolve({ secret, scope: 'person/' + name, operation, repeated: true });
+    }} />);
+    await retryOriginal(next);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toEqual(calls[0]);
+    expect(store.entries.size).toBe(0);
   });
 });

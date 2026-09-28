@@ -49,23 +49,26 @@ pub struct AppState {
     pub network: Option<Mutex<crate::network_store::NetworkStore>>,
     /// The roles, when the configuration names their file.
     pub roles: Option<Mutex<crate::roles_store::RolesStore>>,
+    /// Where the service says how a thing it keeps was started.
+    pub say: Say,
 }
+
+/// Where the service says how a thing it keeps was started.
+pub type Say = Arc<dyn Fn(&str) + Send + Sync>;
 
 type Shared = Arc<AppState>;
 
 /// Open the directory, discover the issuer and answer the service's routes,
 /// as `config` says. The log is created when its directory does not exist.
 pub async fn service(config: &Config) -> Result<Router, ServerError> {
-    service_saying(config, &|_| {}).await
+    service_saying(config, Arc::new(|_| {})).await
 }
 
 /// As `service`, saying through `say` how each thing kept was started: the
-/// directory log from its snapshot or from every leaf, and each store with
-/// what it read and how much it holds.
-pub async fn service_saying(
-    config: &Config,
-    say: &(dyn Fn(&str) + Sync),
-) -> Result<Router, ServerError> {
+/// directory log from its snapshot or from every leaf, each store with what
+/// it read and how much it holds, and the grant log when the grants are
+/// opened on their first use.
+pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
     let mut directory = open_directory(config)?;
     say(&format!("directory log {}", directory.log()?.start()));
     let requests = config
@@ -125,6 +128,7 @@ pub async fn service_saying(
         requests: requests.map(Mutex::new),
         network: network.map(Mutex::new),
         roles: roles.map(Mutex::new),
+        say,
     })))
 }
 

@@ -2,12 +2,14 @@
 
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::Arc;
 
 use lys_identity_server::{Config, ServerError, service_saying};
 
 async fn serve(config_path: PathBuf) -> Result<(), ServerError> {
     let config = Config::load(&config_path)?;
-    let app = service_saying(&config, &|line| println!("lys-identity-server {line}")).await?;
+    let say = Arc::new(|line: &str| println!("lys-identity-server {line}"));
+    let app = service_saying(&config, say).await?;
     let listener = tokio::net::TcpListener::bind(config.listen)
         .await
         .map_err(|error| ServerError::ConfigInvalid {
