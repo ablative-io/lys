@@ -2,10 +2,11 @@
 //! stopped, and the sessions screen reads what each runtime has reported.
 //!
 //! An agent's session is reported by the agent itself, as the directory
-//! resolves the signed-in caller, the same way its provisioning route admits
-//! it; no other identity reports in its place. The directory binds logins
-//! only to people, so until an agent has a credential this service accepts,
-//! no agent's report is admitted. A session a runtime sees that carries no identity is
+//! resolves the signed-in caller, or by the person responsible for the agent
+//! or the administrator, who already answer for it; no other identity
+//! reports in its place, and each report is kept under who delivered it. The
+//! directory binds logins only to people, so an agent reports for itself
+//! only once it has a credential this service accepts. A session a runtime sees that carries no identity is
 //! found: any identity the directory knows may report one, it is kept under
 //! who reported it, and it is never given an identity here.
 //!
@@ -254,16 +255,24 @@ async fn report_agent(
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let asker = caller(&state, &headers, directory)?;
-        if directory.record(IdentityId::Agent(agent)).is_none() {
+        let Some(record) = directory.record(IdentityId::Agent(agent)) else {
             return Err(ServerError::AgentNotVisible);
-        }
-        if asker != IdentityId::Agent(agent) {
+        };
+        let answers = match asker {
+            IdentityId::Agent(own) => own == agent,
+            IdentityId::Person(person) => {
+                record.responsible() == Some(person)
+                    || signed_in(&state, &headers)
+                        .is_ok_and(|actor| state.admission.administrator(&actor).is_ok())
+            }
+        };
+        if !answers {
             return Err(ServerError::NotAdmitted {
-                reason: "only the agent itself, signed in through a login bound to it, reports its sessions",
+                reason: "only the agent, the person responsible for it or the administrator reports its sessions",
             });
         }
         let agent = agent.to_string();
-        let report = report(body, &session, Some(agent.clone()), agent.clone())?;
+        let report = report(body, &session, Some(agent.clone()), asker.to_string())?;
         if report.state == Reported::Starting {
             with_network(&state, |store| placed(store, &report.machine, &agent).map(drop))?;
         }
