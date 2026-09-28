@@ -309,6 +309,356 @@
       "path": "crates/lys-core/src/merkle/tree.rs",
       "note": "touched by LYSLOGSTORE-005 R1: A hash-only proof tree built by streaming",
       "brief": "LYSLOGSTORE-005"
+    },
+    {
+      "path": "crates/lys-log-store/src/tiles.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/tiles_tests.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/file/tiles.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/tests/grant_faults.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/tests/grant_use_reports.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/tests/restart_snapshots.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_append.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/examples/restart_timing.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/proof_tree_tests.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/test_store.rs",
+      "note": "R1: Every append writes its hashes into tiles before the pin",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/tile_proofs.rs",
+      "note": "R2: Proofs are built from the tiles they need",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/tile_proofs_tests.rs",
+      "note": "R2: Proofs are built from the tiles they need",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/src/restart.rs",
+      "note": "R2: Proofs are built from the tiles they need",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity-server/src/certificates_store.rs",
+      "note": "R2: Proofs are built from the tiles they need",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/tiles_adopt.rs",
+      "note": "R3: A log made before tiles gets them once",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/start.rs",
+      "note": "R3: A log made before tiles gets them once",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/tests/first_proof_reads_the_tail.rs",
+      "note": "R4: A gate test fails when a start or its first proof reads past the tail",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/receipt_after_restart.rs",
+      "note": "R4: A gate test fails when a start or its first proof reads past the tail",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/tile_open.rs",
+      "note": "R1: A frontier log opens from its tiles",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-log-store/src/tile_open_tests.rs",
+      "note": "R1: A frontier log opens from its tiles",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/open.rs",
+      "note": "R2: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/genesis/constructors.rs",
+      "note": "R2: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/artifact.rs",
+      "note": "R2: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/checkpoint.rs",
+      "note": "R2: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/submit.rs",
+      "note": "R2: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/append.rs",
+      "note": "R2: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/witness/fixture.rs",
+      "note": "R2: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/status.rs",
+      "note": "R3: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/checkpoint.rs",
+      "note": "R3: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/append.rs",
+      "note": "R3: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/prove.rs",
+      "note": "R3: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/ca_log.rs",
+      "note": "R3: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-identity/src/revocation/append.rs",
+      "note": "R3: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-log-store/tests/no_open_reads_every_leaf.rs",
+      "note": "R5: A gate test fails when an open reads a leaf under the pin",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/audit.rs",
+      "note": "R4: lys log audit, the one read of every leaf",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/audit_tests.rs",
+      "note": "R4: lys log audit, the one read of every leaf",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/mod.rs",
+      "note": "R4: lys log audit, the one read of every leaf",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-log-store/src/origin.rs",
+      "note": "R1: A frontier log opens from its tiles",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-core/src/tlog/build_from_proof_tests.rs",
+      "note": "R2: Artifacts are built from a tile proof and a root",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-core/src/tlog/build.rs",
+      "note": "R2: Artifacts are built from a tile proof and a root",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-core/src/tlog/mod.rs",
+      "note": "R2: Artifacts are built from a tile proof and a root",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/append_tests.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/artifact_tests.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/checkpoint_tests.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/genesis.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/open_tests.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/status_tests.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/submit_tests.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/lib.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/tests/anchor_receipt_conformance/main.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/tests/checkpoint_note_conformance.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/tests/stranger_verification/main.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_fold.rs",
+      "note": "R4: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_history.rs",
+      "note": "R4: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_support/fixtures.rs",
+      "note": "R4: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_verify.rs",
+      "note": "R4: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/store_tests.rs",
+      "note": "R4: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/status_tests.rs",
+      "note": "R4: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/cli/log.rs",
+      "note": "R5: Reading every leaf is the audit, by name, and the whole-tree Log is gone",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/main.rs",
+      "note": "R5: Reading every leaf is the audit, by name, and the whole-tree Log is gone",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/tests/open_reads_no_leaf.rs",
+      "note": "R6: A gate test fails when an open reads a leaf under the pin",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/store_open_reads_the_tail.rs",
+      "note": "R6: A gate test fails when an open reads a leaf under the pin",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-secrets/src/audit.rs",
+      "note": "The broker's audit log, a frontier log that keeps tiles and logs their adoption.",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/src/lib.rs",
+      "note": "Declares the lys-identity modules, without checkpoints after LYSLOGSTORE-006.",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/recovery.rs",
+      "note": "GrantLedger, whose entries is the audit read of every leaf.",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/authority.rs",
+      "note": "Grants, whose events is the audit read of every leaf.",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/src/checkpoints.rs",
+      "note": "Removed by LYSLOGSTORE-006, as a receipt coordinate comes from the tiles.",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-anchor-cli/src/commands/anchor/submit.rs",
+      "note": "Its documentation links to Log name FrontierLog or lys log audit.",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/upward/fixture.rs",
+      "note": "Its documentation links to Log name FrontierLog or lys log audit.",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-log-store/src/frontier_log_tests.rs",
+      "note": "Its documentation links to Log name FrontierLog or lys log audit.",
+      "brief": "LYSLOGSTORE-007"
     }
   ],
   "inventory": [

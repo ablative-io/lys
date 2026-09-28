@@ -4,6 +4,7 @@
 
 use std::path::Path;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use lys_identity::grants::{Action, Resource};
@@ -147,16 +148,26 @@ impl SpiceGrants {
     }
 }
 
-/// The permission source the broker runs with.
-#[derive(Debug)]
+/// The permission source the broker runs with. A clone asks the same
+/// source: the proxy holds one to ask with no lock held.
+#[derive(Debug, Clone)]
 pub enum Grants {
     /// The broker's own grants file.
     File(crate::files::FileGrants),
     /// The Lys directory's grants, through its permission engine.
-    Directory(SpiceGrants),
+    Directory(Arc<SpiceGrants>),
 }
 
 impl Grants {
+    /// Runs `work`, one request's checks, with the grants file read at
+    /// most once. The directory's engine is asked afresh by every check.
+    pub fn pinned<T>(&self, work: impl FnOnce() -> T) -> T {
+        match self {
+            Self::File(file) => file.pinned(work),
+            Self::Directory(_) => work(),
+        }
+    }
+
     /// Every grant the broker can list, as (identity, secret, granted by).
     /// Directory grants are listed by the directory itself.
     pub fn list(&self) -> Result<Vec<crate::files::GrantView>, SecretsError> {

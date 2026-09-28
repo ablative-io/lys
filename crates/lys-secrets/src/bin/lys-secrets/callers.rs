@@ -3,7 +3,7 @@
 //! service vouches for, with the service's signature over that very
 //! request. Either way the route answers as that one identity.
 
-use std::sync::PoisonError;
+use std::sync::{Arc, PoisonError};
 
 use axum::http::StatusCode;
 use axum::http::request::Parts;
@@ -11,7 +11,7 @@ use lys_secrets::{Asker, AskerKind, OnBehalf, Recipients, SecretsError, request_
 use serde_json::Value;
 
 use crate::files::now_ms;
-use crate::serve::{Shared, signed};
+use crate::serve::{Shared, on_broker, signed};
 
 /// The identity a screen route acts for, and the service that vouched for
 /// it when one did.
@@ -82,14 +82,18 @@ fn header<'a>(parts: &'a Parts, name: &str) -> Option<&'a str> {
 /// The caller of the request whose head is `parts` and whose body is
 /// `body`. A request carrying `lys-service` is a screen service's; any
 /// other is a handle's.
-pub fn caller(shared: &Shared, parts: &Parts, body: &[u8]) -> Result<Caller, (StatusCode, String)> {
+pub async fn caller(
+    shared: &Arc<Shared>,
+    parts: &Parts,
+    body: &[u8],
+) -> Result<Caller, (StatusCode, String)> {
     if header(parts, "lys-service").is_some() {
         return on_behalf(shared, parts, body);
     }
     let (token, presentation) = signed(parts, body).map_err(|(_status, error)| refused(&error))?;
-    let broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
-    let identity = broker
-        .caller(&token, &presentation)
+    let identity = on_broker(shared, move |broker| broker.caller(&token, &presentation))
+        .await
+        .map_err(|error| refused(&error))?
         .map_err(|error| refused(&error))?;
     Ok(Caller {
         identity,

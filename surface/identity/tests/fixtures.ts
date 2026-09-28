@@ -91,15 +91,25 @@ export const LEDGER_G = 'grant-' + hex(32);
 export const SCRIBE_G = 'grant-' + hex(33);
 const at = (d: number, m: number) => new Date(2026, m - 1, d, 12, 0).getTime() / 1000;
 
-const grant = (g: Partial<Grant> & Pick<Grant, 'id' | 'holder' | 'relation' | 'actions' | 'pass_on' | 'source'>): Grant => ({
-  issuer: ADA, responsible: ADA, resource: { kind: 'project', id: 'identity' }, window: { starts_at: at(27, 9), ends_at: null },
-  model_version: 1, operation: 'op-' + hex(200), revoked: false, revoked_at: null, revoked_revision: null, last_use: { seen: false }, ...g,
-});
+/**
+ * A grant as the service answers it: none of these is revoked and each is held
+ * by an active identity on a chain admission admits, so each stands and its
+ * effective end is its own end.
+ */
+const grant = (g: Partial<Grant> & Pick<Grant, 'id' | 'holder' | 'relation' | 'actions' | 'pass_on' | 'source'>): Grant => {
+  const span = g.window ?? { starts_at: at(27, 9), ends_at: null };
+  return {
+    issuer: ADA, responsible: ADA, resource: { kind: 'project', id: 'identity' }, window: span,
+    model_version: 1, operation: 'op-' + hex(200), revoked: false, revoked_at: null, revoked_revision: null,
+    last_use: { seen: false, recorded: 0, source: 'reported' },
+    standing: { stands: true }, effective_ends_at: span.ends_at, ...g,
+  };
+};
 
 export const GRANTS: Grant[] = [
   grant({ id: ROOT_G, holder: ADA, relation: 'owner', actions: ['edit', 'grant', 'view'], pass_on: { kind: 'to', actions: ['edit', 'view'], recipients: ['agent'] }, source: null, window: { starts_at: at(27, 9), ends_at: at(27, 10) } }),
   grant({ id: LEDGER_G, holder: ADA, relation: 'viewer', actions: ['view'], pass_on: { kind: 'use_only' }, source: null, resource: { kind: 'project', id: 'ledger' } }),
-  grant({ id: SCRIBE_G, holder: SCRIBE, relation: 'viewer', actions: ['view'], pass_on: { kind: 'use_only' }, source: ROOT_G, window: { starts_at: at(27, 9), ends_at: at(4, 10) }, last_use: { seen: true, at: at(27, 9), route: 'tool', use_event: 5 } }),
+  grant({ id: SCRIBE_G, holder: SCRIBE, relation: 'viewer', actions: ['view'], pass_on: { kind: 'use_only' }, source: ROOT_G, window: { starts_at: at(27, 9), ends_at: at(4, 10) }, last_use: { seen: true, at: at(27, 9), route: 'tool', use_event: 5, recorded: 1, source: 'reported' } }),
 ];
 
 /**
@@ -171,4 +181,60 @@ export const SERVICE: Record<string, Route> = {
   'POST /grants/who': who,
   'POST /grants': (body) => ok({ operation: (body as { operation: string }).operation, grant: 'grant-' + hex(34), index: 3, receipt: { caller: ADA } }),
   [`/grants/cannot-give?route=browser&source=${ROOT_G}&recipient=${SCRIBE}`]: ok(CANNOT_GIVE_ROOT_SCRIBE),
+};
+
+// The second test person. Ada above is the first; Bea here is signed in through
+// her own session, holds her own grants and answers for her own agent, so a test
+// can switch the signed-in person and prove the personal data changed with it.
+// Nothing above is reused for her: every id, grant and end date is her own.
+
+/** Bea, active and signed in, with her one active agent. */
+export const BEA_PERSON = {
+  id: BEA,
+  display_name: 'Bea (test person)',
+  state: 'active' as const,
+  agents: [{ id: REVIEWER, display_name: 'Reviewer', state: 'active' as const }],
+};
+
+/** The directory as an administrator sees it with Bea active: both people. */
+export const BEA_DIRECTORY: PeopleView = { scope: 'directory', people: [DIRECTORY.people[0], BEA_PERSON] };
+
+/** Bea's own scope: herself and her agent, never Ada. */
+export const BEA_OWN: PeopleView = { scope: 'personal', people: [BEA_PERSON] };
+
+/** GET /me for Bea's session: her own person and her own sign-in account. */
+export const BEA_ME: MeView = {
+  person: { id: BEA, display_name: 'Bea (test person)', state: 'active' },
+  signed_in: { provider: ISSUER, subject: 'bea' },
+  sign_in_identities: [{ provider: ISSUER, subject: 'bea' }],
+  service_accounts: [],
+};
+
+export const BEA_ROOT_G = 'grant-' + hex(41);
+export const BEA_REVIEWER_G = 'grant-' + hex(42);
+
+/** 15 November 2026: Bea's inherited end, chosen to differ from Ada's 27 October. */
+export const BEA_ENDS = at(15, 11);
+
+/** Bea's grants: her root on project:ledger, and what her agent holds under it. */
+export const BEA_GRANTS: Grant[] = [
+  grant({
+    id: BEA_ROOT_G, issuer: BEA, holder: BEA, responsible: BEA, relation: 'editor', actions: ['edit', 'view'],
+    pass_on: { kind: 'to', actions: ['view'], recipients: ['agent'] }, source: null,
+    resource: { kind: 'project', id: 'ledger' }, window: { starts_at: at(27, 9), ends_at: BEA_ENDS },
+  }),
+  grant({
+    id: BEA_REVIEWER_G, issuer: BEA, holder: REVIEWER, responsible: BEA, relation: 'viewer', actions: ['view'],
+    pass_on: { kind: 'use_only' }, source: BEA_ROOT_G,
+    resource: { kind: 'project', id: 'ledger' }, window: { starts_at: at(27, 9), ends_at: BEA_ENDS },
+  }),
+];
+
+/** Every route answered for Bea's session: her /me, her scope, her grants. */
+export const BEA_SERVICE: Record<string, Route> = {
+  ...SERVICE,
+  '/me': ok(BEA_ME),
+  '/people': ok(BEA_OWN),
+  '/directory/people': ok(BEA_DIRECTORY),
+  '/grants': ok({ grants: BEA_GRANTS, revision: 9 }),
 };

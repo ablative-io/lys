@@ -218,6 +218,19 @@ impl DeploymentConfig {
         self.issuer.public_origin.starts_with("https://")
     }
 
+    /// Rauthy's `COOKIE_MODE`. A browser keeps a `Secure` cookie only over
+    /// TLS, so an origin served over plain http, which is accepted for a
+    /// loopback host alone, asks for the session cookie without that flag;
+    /// without it no session survives the sign-in. An https origin keeps
+    /// Rauthy's host-bound `Secure` cookie.
+    pub fn cookie_mode(&self) -> &'static str {
+        if self.public_tls() {
+            "host"
+        } else {
+            "danger-insecure"
+        }
+    }
+
     fn validate(&self) -> IdentityResult<()> {
         self.validate_deployment()?;
         validate_origin(&self.issuer.public_origin)?;

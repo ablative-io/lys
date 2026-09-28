@@ -15,6 +15,7 @@ use crate::secret::Secret;
 use crate::store::EntryClass;
 
 use super::admit::Admission;
+use super::checked::Checked;
 use super::{Broker, UseError, Used};
 
 const COMPLETED: &str = "completed";
@@ -56,6 +57,17 @@ impl Ticket {
     pub fn reserved(&self) -> Option<u64> {
         self.reserved
     }
+}
+
+/// How a forwarded call ended, for [`Broker::settle_checked`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Settled {
+    /// The upstream answered and reported what the call spent.
+    Spent(u64),
+    /// The upstream answered without reporting what it spent.
+    Unmetered,
+    /// The upstream never answered, with what the call may have spent.
+    Failed(u64),
 }
 
 /// What admission answers.
@@ -109,7 +121,7 @@ impl<P: PermissionCheck> Broker<P> {
         presentation: &Presentation,
         reserve: u64,
     ) -> Result<Admitted, UseError> {
-        self.admit_asked(token, presentation, None, reserve)
+        self.admit_use_as(token, presentation, reserve, (None, None))
     }
 
     /// Admits one call of `token` presented for the secret `asked`, as
@@ -127,23 +139,61 @@ impl<P: PermissionCheck> Broker<P> {
         asked: &str,
         reserve: u64,
     ) -> Result<Admitted, UseError> {
-        self.admit_asked(token, presentation, Some(asked), reserve)
+        self.admit_use_as(token, presentation, reserve, (Some(asked), None))
     }
 
-    fn admit_asked(
+    /// Admits one call of `token` as [`Broker::admit_use`] does, taking the
+    /// permission source's answers from `checked`, asked before the broker
+    /// was taken (see [`Broker::asks_for`]), where it holds them.
+    ///
+    /// # Errors
+    ///
+    /// As [`Broker::admit_use`].
+    pub fn admit_use_checked(
         &mut self,
         token: &HandleToken,
         presentation: &Presentation,
-        asked: Option<&str>,
         reserve: u64,
+        checked: &Checked,
+    ) -> Result<Admitted, UseError> {
+        self.admit_use_as(token, presentation, reserve, (None, Some(checked)))
+    }
+
+    /// Admits one call of `token` presented for the secret `asked`, as
+    /// [`Broker::admit_use_for`] does, taking the permission source's
+    /// answers from `checked` as [`Broker::admit_use_checked`] does.
+    ///
+    /// # Errors
+    ///
+    /// As [`Broker::admit_use_for`].
+    pub fn admit_use_for_checked(
+        &mut self,
+        token: &HandleToken,
+        presentation: &Presentation,
+        asked: &str,
+        reserve: u64,
+        checked: &Checked,
+    ) -> Result<Admitted, UseError> {
+        self.admit_use_as(token, presentation, reserve, (Some(asked), Some(checked)))
+    }
+
+    fn admit_use_as(
+        &mut self,
+        token: &HandleToken,
+        presentation: &Presentation,
+        reserve: u64,
+        (asked, checked): (Option<&str>, Option<&Checked>),
     ) -> Result<Admitted, UseError> {
         let operation = hex(&presentation.operation_id);
         let mark = self.request_mark(&presentation.request)?;
         let call = Some((operation.as_str(), mark.as_str()));
-        let admission = match self.admit(token, presentation, (&operation, &mark), reserve, asked) {
+        let record = self.find(token);
+        let bounds = (reserve, asked, checked);
+        let admitted = self.admit(record, presentation, (&operation, &mark), bounds);
+        let admission = match admitted {
             Ok(admission) => admission,
             Err(refusal) => {
-                let found = self.find(token).map(|record| {
+                let found = record.map(|record| {
                     (
                         record.id.clone(),
                         record.identity.clone(),
@@ -190,7 +240,7 @@ impl<P: PermissionCheck> Broker<P> {
         );
         let mut line = self.line(AuditKind::Use, subject, call, Some(used), "admitted");
         line.spend = reserved;
-        self.append(&line)?;
+        self.append_unanchored(&line)?;
         super::lineage::admitted(
             &mut self.handles,
             &id,
@@ -242,7 +292,7 @@ impl<P: PermissionCheck> Broker<P> {
     ///
     /// The audit log's refusals.
     pub fn settle(&mut self, ticket: Ticket, spent: u64) -> Result<(), SecretsError> {
-        self.settle_as(ticket, spent, COMPLETED)
+        self.settle_as(ticket, (spent, COMPLETED), None)
     }
 
     /// Settles a call whose upstream answered without reporting what it
@@ -254,7 +304,7 @@ impl<P: PermissionCheck> Broker<P> {
     /// The audit log's refusals.
     pub fn settle_unmetered(&mut self, ticket: Ticket) -> Result<(), SecretsError> {
         let reserved = ticket.reserved.unwrap_or(0);
-        self.settle_as(ticket, reserved, COMPLETED_UNMETERED)
+        self.settle_as(ticket, (reserved, COMPLETED_UNMETERED), None)
     }
 
     /// Settles a call whose upstream never answered, as `upstream_failed`,
@@ -264,10 +314,37 @@ impl<P: PermissionCheck> Broker<P> {
     ///
     /// The audit log's refusals.
     pub fn settle_failed(&mut self, ticket: Ticket, spent: u64) -> Result<(), SecretsError> {
-        self.settle_as(ticket, spent, UPSTREAM_FAILED)
+        self.settle_as(ticket, (spent, UPSTREAM_FAILED), None)
     }
 
-    fn settle_as(&mut self, ticket: Ticket, spent: u64, outcome: &str) -> Result<(), SecretsError> {
+    /// Settles a call as [`Broker::settle`], [`Broker::settle_unmetered`]
+    /// or [`Broker::settle_failed`] does, as `settled` says, taking the
+    /// permission source's answers from `checked`, asked after the call and
+    /// before the broker was taken, where it holds them.
+    ///
+    /// # Errors
+    ///
+    /// The audit log's refusals.
+    pub fn settle_checked(
+        &mut self,
+        ticket: Ticket,
+        settled: Settled,
+        checked: &Checked,
+    ) -> Result<(), SecretsError> {
+        let settlement = match settled {
+            Settled::Spent(spent) => (spent, COMPLETED),
+            Settled::Unmetered => (ticket.reserved.unwrap_or(0), COMPLETED_UNMETERED),
+            Settled::Failed(spent) => (spent, UPSTREAM_FAILED),
+        };
+        self.settle_as(ticket, settlement, Some(checked))
+    }
+
+    fn settle_as(
+        &mut self,
+        ticket: Ticket,
+        (spent, outcome): (u64, &str),
+        checked: Option<&Checked>,
+    ) -> Result<(), SecretsError> {
         let Ticket {
             handle,
             identity,
@@ -279,7 +356,7 @@ impl<P: PermissionCheck> Broker<P> {
         } = ticket;
         let settled = reserved.map(|_reserved| spent);
         let finished = outcome == COMPLETED || outcome == COMPLETED_UNMETERED;
-        let outcome = if finished && self.cut_off(&handle, &identity, &secret) {
+        let outcome = if finished && self.cut_off(&handle, (&identity, &secret), checked) {
             COMPLETED_AFTER_DROP
         } else {
             outcome

@@ -6,8 +6,9 @@
 //! `completed_after_drop`.
 
 use crate::error::SecretsError;
-use crate::permission::PermissionCheck;
+use crate::permission::{PermissionCheck, Relation};
 
+use super::checked::Checked;
 use super::{Broker, Ticket};
 
 /// The outcome of a call cancelled before it was forwarded.
@@ -23,7 +24,31 @@ impl<P: PermissionCheck> Broker<P> {
     ///
     /// `HandleDropped` for a cancelled call, and the audit log's refusals.
     pub fn at_forward_boundary(&mut self, ticket: Ticket) -> Result<Ticket, SecretsError> {
-        if !self.cut_off(&ticket.handle, &ticket.identity, &ticket.secret) {
+        self.boundary(ticket, None)
+    }
+
+    /// The forward boundary as [`Broker::at_forward_boundary`], taking the
+    /// permission source's answers from `checked`, asked again after
+    /// admission and before the broker was taken, where it holds them.
+    ///
+    /// # Errors
+    ///
+    /// As [`Broker::at_forward_boundary`].
+    pub fn at_forward_boundary_checked(
+        &mut self,
+        ticket: Ticket,
+        checked: &Checked,
+    ) -> Result<Ticket, SecretsError> {
+        self.boundary(ticket, Some(checked))
+    }
+
+    fn boundary(
+        &mut self,
+        ticket: Ticket,
+        checked: Option<&Checked>,
+    ) -> Result<Ticket, SecretsError> {
+        let subject = (ticket.identity.as_str(), ticket.secret.as_str());
+        if !self.cut_off(&ticket.handle, subject, checked) {
             return Ok(ticket);
         }
         let Ticket {
@@ -47,9 +72,17 @@ impl<P: PermissionCheck> Broker<P> {
 
     /// Whether the handle was dropped, or the access it was issued under
     /// revoked.
-    pub(super) fn cut_off(&self, handle: &str, identity: &str, secret: &str) -> bool {
+    pub(super) fn cut_off(
+        &self,
+        handle: &str,
+        (identity, secret): (&str, &str),
+        checked: Option<&Checked>,
+    ) -> bool {
         self.line_dropped(handle)
-            || self.within_scope(identity, secret).is_err()
-            || self.permissions.may_use(identity, secret).is_err()
+            || self.within_scope_as(identity, secret, checked).is_err()
+            || checked
+                .and_then(|checked| checked.get(Relation::Use, identity, secret))
+                .unwrap_or_else(|| self.permissions.may_use(identity, secret))
+                .is_err()
     }
 }

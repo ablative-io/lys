@@ -24,13 +24,10 @@ use crate::error::SecretsError;
 use super::ending::{self, EndAct, Ended};
 use super::owner::{self, Operations, Owners};
 use super::revocation::{self, Upstream, UpstreamRevocation};
-use super::{HandleRecord, ROTATING, lineage, records};
+use super::{Handles, ROTATING, lineage, records};
 
 const STATE_FORMAT: &str = "lys-secrets/broker-folded/v4";
 const CONTEXT: &str = "broker snapshot state";
-
-/// The handle records with what the log says of each.
-pub(super) type Handles = BTreeMap<String, HandleRecord>;
 
 /// What the log says of one lease.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -107,7 +104,7 @@ impl Folded {
     /// Sets every record of `handles` to what this state says of it, and to
     /// nothing where it says nothing.
     pub(super) fn lay_over(&self, handles: &mut Handles) {
-        for (id, record) in handles.iter_mut() {
+        handles.relay(|id, record| {
             let lease = self.leases.get(id).cloned().unwrap_or_default();
             record.used = lease.used;
             record.dropped = lease.dropped;
@@ -116,7 +113,7 @@ impl Folded {
             record.open = lease.open;
             record.ended = lease.ended;
             record.upstream = Upstream::restored(lease.upstream);
-        }
+        });
     }
 
     /// The state after `line`, over the records `handles`.

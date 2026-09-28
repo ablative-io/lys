@@ -116,7 +116,7 @@ fn sec3_oauth_refusals_reconnect_required() -> TestResult {
     broker.settle(reconnected, 0)?;
     let outcomes: Vec<String> = broker
         .audit()
-        .replay()?
+        .audit_every_line()?
         .into_iter()
         .filter(|recorded| recorded.line.kind == AuditKind::Refresh)
         .map(|recorded| recorded.line.outcome)
@@ -232,7 +232,7 @@ fn a_refreshed_grant_is_resealed_and_revocation_is_recorded() -> TestResult {
     assert!(!broker.confirm_upstream_revocation(&issued.id, "service-account-2")?);
     let outcomes: Vec<String> = broker
         .audit()
-        .replay()?
+        .audit_every_line()?
         .into_iter()
         .filter(|recorded| recorded.line.kind == AuditKind::Refresh)
         .map(|recorded| recorded.line.outcome)

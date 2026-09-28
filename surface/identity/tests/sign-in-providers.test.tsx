@@ -1,7 +1,7 @@
 /** The administrator sets Google, Microsoft or GitHub sign-in from Connections; the secret is sent once and never shown. */
 import { act } from 'react';
 import { describe, expect, it } from 'vitest';
-import { $, $$, choose, click, mount, settle, text } from './harness';
+import { $, $$, click, mount, settle, text } from './harness';
 import { SERVICE, ok, refused } from './fixtures';
 import type { ProvidersView } from '../src/features/connections/SignInProviders';
 
@@ -60,7 +60,7 @@ describe('Sign-in providers', () => {
       '/sign-in-providers': ok(none),
       'POST /sign-in-providers': refused(502, 'SignInProvidersRefused', 'the issuer answered 400: name is invalid'),
     });
-    await choose($('form[aria-label="Set a sign-in provider"] select'), 'microsoft');
+    await click($('[role="radiogroup"] [data-provider="microsoft"]'));
     expect($$('form[aria-label="Set a sign-in provider"] input')).toHaveLength(3);
     await input('form[aria-label="Set a sign-in provider"] input:not([type="password"])', 'app-id');
     await input('form[aria-label="Set a sign-in provider"] input[type="password"]', 'secret');

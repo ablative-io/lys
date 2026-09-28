@@ -1,0 +1,126 @@
+{
+  "id": "DIRECTORY-053",
+  "cluster": "directory",
+  "title": "Go back to the previous build after an upgrade that succeeded, and one build stamp for every binary",
+  "depends_on": [
+    "DIRECTORY-045"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C393",
+    "C394"
+  ],
+  "stories": [
+    "S159"
+  ],
+  "design_anchor": [],
+  "purpose": "DIRECTORY-045 upgrades a running install and returns to the previous build only when the upgrade itself fails. A build that starts ready and misbehaves an hour later has no way back but hand moves in the install folder, which an ordinary person cannot make. Its build stamp is also four byte-identical build.rs files that a test holds equal: one script copied four times, not one script. Amended 28 September 2026 21:05 by Waffles after Archie's read against the tree.",
+  "task": "Add `lys identity upgrade --back`, which returns the install to the build kept beside it through the same stop, swap, start and ready path as an upgrade; and move the build stamp into one build-support crate that each binary's build.rs calls. This brief builds on DIRECTORY-045 as re-driven with R5 to R7: config.previous/ and the intent record exist on the base, and --back exchanges configuration and compose with them. A round built on 045's first round, which had only bin/ and surface/, does not meet R1.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "`lys identity upgrade --back`",
+      "spec": "Behavioural. `lys identity upgrade --back` (the same verb, so there is one path) reads the version of every binary in bin/ and in bin.previous/ before stopping anything, and refuses by name when there is no bin.previous/ (nothing_to_return_to) or a version cannot be read. It then stops the broker and the service through their exit locks, exchanges bin/ with bin.previous/, the configuration and compose files with config.previous/ (DIRECTORY-045 R5) and surface/ with surface.previous/ when that exists, recreating any compose service whose definition changes (so the build it leaves becomes the one kept, and --back again returns to it), starts both and waits on their readiness events, and writes install/build.json. A failure on the way puts back what it moved, exactly as an upgrade does, and names the binary and its log. It never writes data/ or a credential, and it reads and honours an unfinished upgrade's intent record first (DIRECTORY-045 R7). The Build line on the account screen shows the build now running. Data is never rolled back. The data is judged by the set of kinds, never by a number. Every signed log the service or the broker folds (the directory, certificates, grants, requests, reviews, runtime, service accounts, stops, teams, and the broker's audit log in crates/lys-secrets/src/audit/codec.rs) declares its kinds in one list, each entry a code and a name written log.kind (for example team.renamed). The log's decoder matches against that list, so a kind cannot be decoded unless it is in it. The shape of a kinds list and of a registry, and the union and comparison of kind sets, live in lys-core, which every Lys crate already depends on. Each binary holds its own registry in its own crate: lys-identity-server for the directory and its service stores, lys-secrets for the audit log. A test in each of those crates fails when a store in that crate folds a signed log and is not in its registry. No new dependency between Lys crates is added; the lys command learns the kept build's set only from that build's --version line. Today the identity log has seven constants in crates/lys-identity/src/event.rs (mod wire at line 263) and decode_change in crates/lys-identity/src/encoding.rs (line 272) matches them one by one; the builder turns these, and every other log's codes, into the lists. Each build records the full set of kind names it can read in install/build.json and reports it in its --version detail from its own main.rs. A format number stays only as a label for people. Before stopping anything, --back compares sets: when the data holds a kind the kept build's set lacks, it refuses back_would_not_read, naming that kind as log.kind. Go-back reads no log: install/build.json keeps the union of every kind set any build installed there has recorded, and --back compares that union with the kept build's set and names the first kind in the union the kept build lacks. The union may name a kind nothing has written yet, so the refusal is on the safe side and says the data may hold that kind. The exchange never leaves an install without bin/. When both folders exist it is one atomic exchange through rustix 1.1 (already in the workspace with its fs feature): renameat_with and its exchange flag, on macOS and Linux alike, with no unsafe code. Where a step is a plain rename, a failure undoes the renames already finished before --back returns, and only then does the put-back run. A leftover from an exchange that was interrupted (bin.exchanging or its like) is recorded in the DIRECTORY-045 R7 intent record before the first rename. The next --back or upgrade finishes or undoes it from that record by itself, and never asks the person to move folders by hand. The failure line under --back begins \"going back failed\", not \"upgrade failed\". This round is built on DIRECTORY-045 as it lands, and it names the parts of 045 it uses, because run d4665913 was built without them. The configuration and compose files --back exchanges are the ones 045 R5 keeps in config.previous/ through crates/lys/src/identity/upgrade/render.rs. The intent record is install/upgrade.json as 045 R7 writes it through crates/lys/src/identity/upgrade/intent.rs. --back writes its own record there before its first stop, through that writer, naming the kind back beside the from and to builds and each step as it completes. The recovery 045 R7 gives every later upgrade, --back and install reads a back record and finishes or undoes it the same way. The kinds each binary reports come from the kind lists in the code and never from a copy written by hand. The registry of lys-identity-server lives in the new crates/lys-identity-server/src/kinds.rs and its main.rs prints it after the stamp line of 045 R1, as one line beginning `kinds ` followed by the sorted names. The registry of lys-secrets lives in the new crates/lys-secrets/src/bin/lys-secrets/kinds.rs and its main.rs prints it the same way. The lys command reads the kept build's set from those lines of the binaries in bin.previous/ and from nothing else. The exchange lives in the new crates/lys/src/identity/upgrade/exchange.rs. It exchanges bin/, the files of config.previous/ and surface/ with what is kept, and every rename it makes goes through one rename step it is given as an argument. The real step calls rustix. A test gives it a step that fails on a chosen call, with no cfg and no feature. When a rename fails, the exchange undoes every rename it finished, newest first, before it returns the failure, and only then does the put-back of the start run.",
+      "acceptance": [
+        "At the card's base, crates/lys/src/identity/upgrade/intent.rs and crates/lys/src/identity/upgrade/render.rs exist.",
+        "After an upgrade whose build changes a configuration key, --back leaves the configuration files byte-identical to the ones the earlier build ran with.",
+        "A --back that finds an unfinished upgrade's record in install/upgrade.json names it and finishes or undoes it before it stops anything.",
+        "After an upgrade that succeeded, --back leaves the earlier commit running, answering /api/authority with that build, and --back again returns to the newer one.",
+        "With no bin.previous/ it is refused nothing_to_return_to and nothing is stopped.",
+        "A start failure during --back leaves the build it began from running and names the binary and its log.",
+        "After an upgrade whose build writes a new event kind, --back is refused back_would_not_read naming that kind, and nothing is stopped.",
+        "A test that makes the second rename of the exchange fail leaves bin/ holding the build that was running, that build answers /api/authority, and no bin.exchanging is left.",
+        "A test that stops --back after its first rename, with install/upgrade.json then naming the kind back and that step, sees the next --back finish or undo the exchange from that record with no step by hand.",
+        "A failure during --back prints a line beginning \"going back failed\".",
+        "lys, lys-identity-server and lys-secrets each report the set of kind names they read in --version, and a kind added to any one log's list appears in that set with nothing else changed.",
+        "A test that adds a store folding a signed log without entering it in the registry fails.",
+        "After an upgrade whose build adds team.renamed, --back is refused back_would_not_read naming team.renamed, and nothing is stopped.",
+        "With a kind in build.json's union that the kept build lacks and that no log has written, --back is refused back_would_not_read with words that say the data may hold that kind, and no log was read.",
+        "The lys-identity-server binary the card builds, run with --version, prints a line beginning `kinds ` that names one kind for each of the seven change codes in crates/lys-identity/src/event.rs lines 272 to 284.",
+        "The lys-secrets binary the card builds, run with --version, prints a line beginning `kinds ` that names every kind the audit codec decodes.",
+        "With a rename step that fails on its second call, the exchange returns that failure and bin/ holds byte for byte what it held before.",
+        "With a rename step that fails on its third call, the exchange returns that failure and every folder it touched holds byte for byte what it held before.",
+        "With a rename step that fails on its second call, no folder whose name ends in exchanging is left under the install."
+      ],
+      "files": {
+        "create": [
+          "crates/lys/src/identity/upgrade_back_tests.rs",
+          "crates/lys/src/identity/upgrade/back.rs",
+          "crates/lys/src/identity/upgrade/exchange.rs",
+          "crates/lys/src/identity/upgrade/exchange_tests.rs",
+          "crates/lys-identity-server/src/kinds.rs",
+          "crates/lys-secrets/src/bin/lys-secrets/kinds.rs"
+        ],
+        "modify": [
+          "crates/lys/src/identity/upgrade.rs",
+          "crates/lys/src/identity/cli.rs",
+          "crates/lys/src/identity/error.rs",
+          "crates/lys/src/main.rs",
+          "crates/lys-identity-server/src/main.rs",
+          "crates/lys-identity/src/event.rs",
+          "crates/lys-identity/src/encoding.rs",
+          "crates/lys-identity/src/grants/events.rs",
+          "crates/lys-identity/src/revocation/leaf.rs",
+          "crates/lys-secrets/src/bin/lys-secrets/main.rs",
+          "crates/lys-secrets/src/audit/codec.rs",
+          "crates/lys/src/identity/upgrade/intent.rs",
+          "crates/lys/src/identity/upgrade/swap.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C393"
+      ],
+      "stories": [
+        "S159"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "One build stamp",
+      "spec": "Structural. A build-support crate, crates/lys-build-stamp, holds the one function that computes the stamp (head commit, `; dirty`, or `not built from a git commit`) and the rerun-if lines. Each of lys, lys-identity-server, lys-secrets and lys-home lists it under build-dependencies and its build.rs is one call. The byte-identity test is removed with the copies; the stamp's own tests (exported tree, fresh commit, dirty) move into the crate and run against it. The stamp's tests never run cargo and never set a target directory: they call the stamp function on a temporary git tree in each of its three states (exported tree, fresh commit, dirty). That each build.rs is the one call is proved by its own test, and each binary's version test proves the value reaches the binary. The stamp and its tests clear GIT_DIR, GIT_WORK_TREE and GIT_INDEX_FILE for every git call they make, so under a hook or a rebase they read and write only the tree they were given.",
+      "acceptance": [
+        "No two build.rs files in the workspace hold the stamp logic; each is one call.",
+        "The crate's tests prove the three stamp forms.",
+        "Every binary's --version still prints its name, version and commit.",
+        "No test in crates/lys-build-stamp runs cargo or sets CARGO_TARGET_DIR.",
+        "With GIT_DIR, GIT_WORK_TREE and GIT_INDEX_FILE set to another repository, the stamp of a temporary tree names that tree's commit, and the other repository is unchanged."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-build-stamp/Cargo.toml",
+          "crates/lys-build-stamp/src/lib.rs",
+          "crates/lys-build-stamp/tests/stamp.rs"
+        ],
+        "modify": [
+          "Cargo.toml",
+          "crates/lys/build.rs",
+          "crates/lys-identity-server/build.rs",
+          "crates/lys-secrets/build.rs",
+          "crates/lys-home/build.rs",
+          "crates/lys/Cargo.toml",
+          "crates/lys-identity-server/Cargo.toml",
+          "crates/lys-secrets/Cargo.toml",
+          "crates/lys-home/Cargo.toml",
+          "crates/lys/tests/version.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C394"
+      ],
+      "stories": [
+        "S159"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT change what an upgrade writes beyond bin/, bin.previous/, the configuration and compose files and config.previous/, the screens, the logs, the process files, install/upgrade.json and install/build.json; data is never rolled back.",
+    "SHALL NOT add a timeout, deadline, poll, #[allow], #[ignore] or any bypass.",
+    "SHALL NOT add a silent fallback: every failure is a named refusal."
+  ],
+  "verification": [
+    "The full Lys gate, ast-grep scan and surface checks exit 0 at the card's head, measured by the card round.",
+    "On a scratch install: upgrade to a newer build, --back, and read the older commit from /api/authority; --back again and read the newer one."
+  ]
+}

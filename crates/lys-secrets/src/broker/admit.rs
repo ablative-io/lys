@@ -6,9 +6,10 @@
 use crate::encoding::{Canonical, ct_eq, hex, sha256, unhex};
 use crate::error::{BoundsRefusal, SecretsError};
 use crate::handle::{HandleToken, Presentation, check_operation_id};
-use crate::permission::PermissionCheck;
+use crate::permission::{PermissionCheck, Relation};
 
-use super::{Broker, HandleRecord, PRESENTATION_SKEW_MS};
+use super::checked::Checked;
+use super::{Broker, HandleRecord, PRESENTATION_SKEW_MS, Work};
 
 pub(super) enum Admission {
     Retry(String),
@@ -36,17 +37,17 @@ impl<P: PermissionCheck> Broker<P> {
         Ok(hex(&sha256(&signature)))
     }
 
+    /// The handle `token` opens: one lookup by the token's digest, and one
+    /// comparison with the digest the found record holds.
     pub(super) fn find(&self, token: &HandleToken) -> Option<&HandleRecord> {
+        Work::count(&self.work.searches, 1);
         let presented = token.digest();
-        let mut found = None;
-        for record in self.handles.values() {
-            let held: Option<[u8; 32]> =
-                unhex(&record.digest).and_then(|bytes| bytes.try_into().ok());
-            if held.is_some_and(|held| ct_eq(&held, &presented)) {
-                found = Some(record);
-            }
-        }
-        found
+        let record = self.handles.by_digest(&presented)?;
+        Work::count(&self.work.compared, 1);
+        record
+            .held
+            .is_some_and(|held| ct_eq(&held, &presented))
+            .then_some(record)
     }
 
     /// The handle `token` names, when `presentation` is signed for it by the
@@ -58,7 +59,16 @@ impl<P: PermissionCheck> Broker<P> {
         token: &HandleToken,
         presentation: &Presentation,
     ) -> Result<&HandleRecord, SecretsError> {
-        let record = self.find(token).ok_or(SecretsError::HandleUnknown)?;
+        Self::signed_for(self.find(token), presentation)
+    }
+
+    /// `found`, when `presentation` is signed for it by the key it is bound
+    /// to.
+    fn signed_for<'a>(
+        found: Option<&'a HandleRecord>,
+        presentation: &Presentation,
+    ) -> Result<&'a HandleRecord, SecretsError> {
+        let record = found.ok_or(SecretsError::HandleUnknown)?;
         if presentation.attestation.is_none() {
             return Err(SecretsError::PresentationUnsigned {
                 handle: record.id.clone(),
@@ -126,16 +136,22 @@ impl<P: PermissionCheck> Broker<P> {
         }))
     }
 
-    /// Whether the handle's identity still holds the use relation.
-    pub(super) fn permitted(&self, record: &HandleRecord) -> Result<(), SecretsError> {
-        self.within_scope(&record.identity, &record.secret)
+    /// Whether the handle's identity still holds the use relation, taking
+    /// an answer from `checked` where it holds one.
+    pub(super) fn permitted(
+        &self,
+        record: &HandleRecord,
+        checked: Option<&Checked>,
+    ) -> Result<(), SecretsError> {
+        self.within_scope_as(&record.identity, &record.secret, checked)
             .map_err(|reason| SecretsError::PermissionDenied {
                 holder: record.identity.clone(),
                 secret: record.secret.clone(),
                 reason,
             })?;
-        self.permissions
-            .may_use(&record.identity, &record.secret)
+        checked
+            .and_then(|checked| checked.get(Relation::Use, &record.identity, &record.secret))
+            .unwrap_or_else(|| self.permissions.may_use(&record.identity, &record.secret))
             .map(|_permit| ())
             .map_err(|denied| SecretsError::PermissionDenied {
                 holder: record.identity.clone(),
@@ -144,15 +160,16 @@ impl<P: PermissionCheck> Broker<P> {
             })
     }
 
+    /// Admits a use of `found`, the handle the presented token opens, when
+    /// there is one.
     pub(super) fn admit(
         &self,
-        token: &HandleToken,
+        found: Option<&HandleRecord>,
         presentation: &Presentation,
         (operation, mark): (&str, &str),
-        reserve: u64,
-        asked: Option<&str>,
+        (reserve, asked, checked): (u64, Option<&str>, Option<&Checked>),
     ) -> Result<Admission, SecretsError> {
-        let record = self.presented(token, presentation)?;
+        let record = Self::signed_for(found, presentation)?;
         check_operation_id(&presentation.operation_id)?;
         if let Some((outcome, held)) = record.operations.get(operation) {
             if held != mark {
@@ -171,7 +188,7 @@ impl<P: PermissionCheck> Broker<P> {
         if let Some(asked) = asked {
             self.within_lease(record, asked)?;
         }
-        self.permitted(record)?;
+        self.permitted(record, checked)?;
         let reserved = match record.spend_cap {
             None => None,
             Some(_cap) if reserve == 0 => {

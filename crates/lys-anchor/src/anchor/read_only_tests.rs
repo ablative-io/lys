@@ -28,7 +28,7 @@
 use std::path::Path;
 
 use lys_core::checkpoint::{NoteVerifierKey, verify_checkpoint};
-use lys_log_store::FileLeafStore;
+use lys_log_store::{FileLeafStore, Log, StoreError};
 use tempfile::TempDir;
 
 use crate::AnchorConfig;
@@ -71,7 +71,7 @@ fn create_anchor(dir: &Path) -> Anchor<FileLeafStore, FileSigner, AcceptAll> {
 /// Opens the anchor at `dir` for reading, with no key and no policy.
 fn read_only(dir: &Path) -> ReadOnlyAnchor<FileLeafStore> {
     Anchor::open_read_only(
-        FileLeafStore::open(dir).unwrap(),
+        FileLeafStore::open_read_only(dir).unwrap(),
         AnchorConfig::unconfigured(),
     )
     .unwrap()
@@ -146,7 +146,7 @@ fn a_reader_refuses_a_log_with_no_genesis_leaf_exactly_as_open_does() {
     FileLeafStore::create(dir, ORIGIN).unwrap();
 
     match Anchor::open_read_only(
-        FileLeafStore::open(dir).unwrap(),
+        FileLeafStore::open_read_only(dir).unwrap(),
         AnchorConfig::unconfigured(),
     ) {
         Err(AnchorError::Genesis(GenesisError::NoGenesisLeaf { origin })) => {
@@ -175,4 +175,56 @@ fn reading_an_anchor_does_not_change_it() {
     }
 
     assert_eq!(read_only(dir).root(), before);
+}
+
+/// An anchor at `dir` with its genesis leaf, and a second leaf written behind
+/// it as an append interrupted before its pin. Returns the bytes of
+/// `state.json` as they stand.
+fn one_leaf_ahead_of_its_pin(dir: &Path) -> Vec<u8> {
+    drop(create_anchor(dir));
+    std::fs::write(
+        dir.join("leaves").join(format!("{:020}", 1)),
+        b"an append interrupted before its pin",
+    )
+    .unwrap();
+    std::fs::read(dir.join("state.json")).unwrap()
+}
+
+#[test]
+fn a_reader_is_refused_a_store_one_leaf_ahead_of_its_pin() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    let state = one_leaf_ahead_of_its_pin(dir);
+
+    match FileLeafStore::open_read_only(dir) {
+        Err(StoreError::RepairPending {
+            pinned_size: 1,
+            extent: 2,
+            ..
+        }) => {}
+        other => panic!("expected RepairPending at pin 1 and extent 2, got {other:?}"),
+    }
+
+    assert_eq!(std::fs::read(dir.join("state.json")).unwrap(), state);
+    let mut names: Vec<String> = std::fs::read_dir(dir.join("leaves"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert_eq!(names, ["00000000000000000000", "00000000000000000001"]);
+}
+
+#[test]
+fn a_writable_open_repairs_the_log_a_reader_was_refused() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    one_leaf_ahead_of_its_pin(dir);
+
+    {
+        let log = Log::open(FileLeafStore::open(dir).unwrap()).unwrap();
+        assert_eq!(log.recovered_to(), Some(2));
+        assert_eq!(log.store().pinned().tree_size, 2);
+    }
+
+    assert_eq!(read_only(dir).tree_size(), 2);
 }

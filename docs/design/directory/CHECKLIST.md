@@ -263,7 +263,7 @@
 - [ ] **C344** — Every Lys binary answers --version with its build commit (DIRECTORY-045 R1).
 - [ ] **C345** — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2); the configuration and compose files move with the binaries, an install made before it is adopted, and an upgrade stopped part-way is finished or put back (DIRECTORY-045 R5 to R7).
 - [ ] **C346** — The install and the server say which build is running (DIRECTORY-045 R3).
-- [ ] **C347** — Prove it on the live install (DIRECTORY-045 R4).
+- [ ] **C347** — Prove the upgrade on a scratch install in the round; the live install is upgraded and recorded after landing (DIRECTORY-045 R4).
 
 ## Hot paths do their work once (DIRECTORY-046)
 
@@ -277,23 +277,24 @@
 
 ## Lys is the only sign-in anyone sees (DIRECTORY-047)
 
-- [ ] **C355** — First run asks the person for the administrator's name, email and password on a Lys setup page; install fills nothing from the machine and has no default administrator (DIRECTORY-047 R1).
-- [ ] **C356** — Password sign-in happens on a Lys page at Lys's origin; the browser never reaches the issuer's pages (DIRECTORY-047 R2).
+- [ ] **C355** — First run asks for the administrator on Lys's setup page without machine defaults; Lys owns the password policy, writes it during preparation, and shows that same value (DIRECTORY-047 R1).
+- [ ] **C356** — Password sign-in stays on Lys; valid browser callbacks set a session and redirect 303 to /, proven with the current OIDC flow (DIRECTORY-047 R2).
 - [ ] **C357** — Every product, Cambium first, is a client of Lys at Lys's origin; no product configuration names the issuer (DIRECTORY-047 R3).
-- [ ] **C358** — Google, GitHub and Microsoft are set up inside Lys, which shows the exact address to paste and tests the provider on save (DIRECTORY-047 R4).
-- [ ] **C359** — A person changes their own email and password, and an administrator changes anyone's, on Lys screens; the issuer's admin site is not reachable from the host (DIRECTORY-047 R5).
+- [ ] **C358** — Provider setup shows the server-supplied redirect and checks the provider; the build uses a fake-provider round trip, and the landing lead verifies real Google after landing (DIRECTORY-047 R4).
+- [ ] **C359** — Account changes use Lys screens; reachable issuer admin paths explicitly refuse host browsers while required loopback calls work, and upgrade handles rights and recorded network choices before this card lands after 045 (DIRECTORY-047 R5).
 - [ ] **C360** — Nothing a person reads (screens, install output, refusals, page titles) names the issuer (DIRECTORY-047 R6).
 
 ## Every app registers with Lys through a published API (DIRECTORY-048)
 
-- [ ] **C361** — An app is registered through the API with its id, name, sign-in client and permission schema, and has no effect until an administrator approves it on a Lys screen (DIRECTORY-048 R1).
+- [ ] **C361** — Only a person holding an explicit register_app grant registers an app; approval creates its distinct application-connector identity and binding, and every app permission follows an explicit grant chain back to the super administrator (ADR-126, DIRECTORY-048 R1).
 - [ ] **C362** — An app's schema declares kinds under its own prefix, their actions, relations carrying actions and parent kinds; an invalid schema is refused naming the line of the fault (DIRECTORY-048 R2).
 - [ ] **C363** — An app cannot define, change or grant on another app's kinds; the refusal names the owning prefix (DIRECTORY-048 R2).
 - [ ] **C364** — A schema change that would strand standing grants is refused naming the relation and the count; a dry run answers the same without writing (DIRECTORY-048 R3).
 - [ ] **C365** — Lys's own model is the schema of the app 'lys'; existing grants and checks answer the same after the move (DIRECTORY-048 R4).
-- [ ] **C366** — Apps check many permissions in one call and list the resources a subject may act on (DIRECTORY-048 R5).
+- [ ] **C366** — Apps check many permissions and list permitted resources as their own application connector, under explicit grants and their own-kind boundary; neither binding nor prefix ownership grants authority (ADR-126, DIRECTORY-048 R5).
 - [ ] **C367** — One OpenAPI document, generated from the routes and types, describes every route; a route without an entry fails the build (DIRECTORY-048 R6).
 - [ ] **C368** — Lys holds no app's name or schema in code or configuration and makes no call to any app (DIRECTORY-048 R7).
+- [ ] **C386** — A person builds an app's whole permission template on the Apps screen from templates, tests it on example people and resources against the real check, and saves it; built and uploaded schemas are the same record (DIRECTORY-048 R8).
 
 ## Lys MCP server, secure and compact (DIRECTORY-049)
 
@@ -302,3 +303,123 @@
 - [ ] **C371** — Every MCP call runs the same handler and grant check as the HTTP route, as the caller; no MCP answer returns a secret's value (DIRECTORY-049 R3, R4).
 - [ ] **C372** — A destructive write through MCP needs the target's id repeated in confirm; every write leaves a receipt naming the caller and 'mcp' (DIRECTORY-049 R4, R6).
 - [ ] **C373** — An agent's launch renders 'lys mcp' into its MCP configuration, signing with its own certificate key held by handle (DIRECTORY-049 R7).
+
+## Lys runs and drives the agents it starts (DIRECTORY-050)
+
+- [ ] **C374** — Lys ships a runner that holds each started agent in its own pseudo-terminal in the background, surviving the screen closing (DIRECTORY-050 R1).
+- [ ] **C375** — A published runner protocol lets another tool be a machine's runner; Lys needs no particular runner (DIRECTORY-050 R2).
+- [ ] **C376** — Starting an agent on a machine with a runner runs it there and reports it running, from the screen, the API and the MCP (DIRECTORY-050 R3).
+- [ ] **C377** — A session can be typed into, sent keys, read, waited on for a pattern, resized and compacted through Lys, each under a grant and with a receipt (DIRECTORY-050 R4).
+- [ ] **C378** — A session that prints its usage-limit words moves to the next account in its list, by handle, never by value (DIRECTORY-050 R5).
+- [ ] **C379** — A message to an agent wakes its session; the emergency stop ends sessions through the runner and reports each confirmed (DIRECTORY-050 R6).
+- [ ] **C380** — A Sessions screen shows every running agent, its terminal read live, with type, keys and stop (DIRECTORY-050 R7).
+
+## Lys tracks tokens, context, time, budgets and goals (DIRECTORY-051)
+
+- [ ] **C381** — Lys installs its own session hooks/status line and incrementally follows the runner-local stream; usage is durable, authenticated and exported for optional Argus analytics (DIRECTORY-051 R1).
+- [ ] **C382** — Budgets for context, tokens and time are set on an agent, a team or a person, and inherited downward (DIRECTORY-051 R2).
+- [ ] **C383** — A reached budget compacts, stops or tells, as the budget says, once, with a receipt (DIRECTORY-051 R3).
+- [ ] **C384** — Goals on an agent carry a deadline and reminders delivered into its session (DIRECTORY-051 R4).
+- [ ] **C385** — Plain controls set and read budgets and goals and show reached or uncertain state; analytics stays in Argus (DIRECTORY-051 R5).
+- [ ] **C421** — Lys creates an editable tool-boundary policy and records runner/grant denials on the agent page; Codex pre-tool coverage is explicitly unavailable (DIRECTORY-051 R6).
+
+## Provision a working team in one act (DIRECTORY-052)
+
+- [ ] **C387** — A team plan names its purpose, total budget, deliverables with their evidence, and each member's profile, memories, opening conversation, budget share, goals and checker (DIRECTORY-052 R1).
+- [ ] **C388** — Provisioning a plan creates every agent, grant, home, budget and goal in one all-or-nothing act and starts them (DIRECTORY-052 R2).
+- [ ] **C389** — Each member starts with its chosen memories and its opening conversation already in its session (DIRECTORY-052 R3).
+- [ ] **C390** — A deliverable is met only when its checker accepts it with the named evidence; the team's spend is held to its total (DIRECTORY-052 R4).
+- [ ] **C391** — A Teams screen builds a plan from a template, provisions it, and shows each member's state, spend, goals and deliverables (DIRECTORY-052 R5).
+- [ ] **C392** — Accounts and secrets are stored once in the broker and assigned to members by handle; values are never shown again (DIRECTORY-052 R6).
+
+## Go back after an upgrade, one build stamp (DIRECTORY-053)
+
+- [ ] **C393** — `lys identity upgrade --back` returns a running install to the build kept in bin.previous (and surface.previous), stopped, swapped, started and waited on for ready exactly as an upgrade is, and records the build now running (DIRECTORY-053 R1).
+- [ ] **C394** — Every Lys binary takes its build stamp from one shared build-support crate; no build.rs is copied (DIRECTORY-053 R2).
+
+## Install Lys by opening an app (DIRECTORY-054)
+
+- [ ] **C395** — `lys package app` builds a signed, notarised Lys.app and disk image holding every Lys binary and the screens package, each stamped with its build; with no signing identity it is refused by name (DIRECTORY-054 R1).
+- [ ] **C396** — Opening Lys.app runs the install service in the process, shows each step on a Lys page in the browser in plain words, and hands over to first-run setup (DIRECTORY-054 R2).
+- [ ] **C397** — A missing or stopped container engine is a Lys page with what to do, and the install continues by itself when the engine appears, on its socket's event (DIRECTORY-054 R3).
+- [ ] **C398** — Lys starts at login, opening the app again opens Lys, a newer app upgrades through DIRECTORY-045, and uninstalling is a Lys screen that keeps data unless the person chooses otherwise (DIRECTORY-054 R4).
+- [ ] **C399** — On a fresh macOS account, a person goes from the downloaded disk image to signed in with no terminal process started and nothing naming the issuer (DIRECTORY-054 R5).
+
+## The exit lock lives in the service only (DIRECTORY-057)
+
+- [ ] **C400** — The three ways to keep the exit lock out of the starter are compared in ADR-121 and the holder command is chosen, with no unsafe code (DIRECTORY-057 R1).
+- [ ] **C401** — A holder command opens the exit lock, takes it and becomes the service by exec, keeping its pid; a program that cannot run is refused by name (DIRECTORY-057 R2).
+- [ ] **C402** — The starter never opens the exit lock; a service that ends at once beside other starts is seen ended every time (DIRECTORY-057 R3).
+
+## A receipt's checkpoint is signed (DIRECTORY-058)
+
+- [ ] **C403** — The receipts route answers its checkpoint as a note signed by the service key, signed at open, at each committed append and at each settle that adopts leaves, under the log's own origin (DIRECTORY-058 R1).
+- [ ] **C404** — One function verifies a receipt answer against a pinned key with a named refusal for each failure; a forged tree around a genuine event is refused (DIRECTORY-058 R2).
+
+## Installed audit sender
+
+- [ ] **C405** — The service completes sender enrolment as part of browser setup after install returns, resumes the original intent after interruption, and never requires another install invocation.
+- [ ] **C406** — Sender configuration and seed are private, stable, and mounted read-only without exposing the directory private key.
+- [ ] **C407** — A dedicated TLS-only authority key issues the receiver certificate, distinct from capability, event, receiver and sender keys; the receiver listens only on its declared restricted address.
+- [ ] **C408** — Generated sender configuration names separate TLS trust and receipt trust and a declared positive response-body bound.
+- [ ] **C409** — Scratch installation proves signed observation acceptance and named transport, identity and response refusals.
+- [ ] **C410** — DIRECTORY-045 R5 retains sender credentials and swaps/restores sender configuration, trust material and mounts with the chosen binaries.
+
+## Lys needs no app and every app can find it (DIRECTORY-059)
+
+- [ ] **C411** — A start reads its credentials from Lys's own broker, and no route reaches an app for them (DIRECTORY-059 R1).
+- [ ] **C412** — Lys writes a discovery record any app can find (DIRECTORY-059 R2).
+- [ ] **C413** — Any registered app reads Lys's people, seats and agents (DIRECTORY-059 R3).
+- [ ] **C414** — Signing out of Lys signs the person out at the issuer, and the issuer tells every registered app (DIRECTORY-059 R4).
+- [ ] **C415** — An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code (DIRECTORY-059 R5).
+
+## The runner holds each session's holder key (DIRECTORY-060)
+
+- [ ] **C418** — A runner session's handles are issued to a key the runner made for it in memory, before anything is spawned (DIRECTORY-060 R1).
+- [ ] **C419** — The runner signs a presentation only for a peer proved by credentials and ancestry to be the session the handle was issued to, on macOS and Linux (DIRECTORY-060 R2).
+- [ ] **C420** — The harness and lys mcp get every presentation from the runner and hold no key (DIRECTORY-060 R3).
+
+## A SpiceDB call ends on its answer or its caller (DIRECTORY-061)
+
+- [ ] **C422** — No SpiceDB connect, write or read in Lys waits on a clock, and a cancelled call returns at once (DIRECTORY-061 R1).
+- [ ] **C423** — Every grants section runs off the async workers, and a request that leaves ends its SpiceDB wait and lets the grants lock go (DIRECTORY-061 R2).
+- [ ] **C424** — A section that takes the grants lock after its request left calls no SpiceDB (DIRECTORY-061 R2).
+
+## Native process containment (DIRECTORY-062)
+
+- [ ] **C425** — One Lys policy becomes a bound containment plan (DIRECTORY-062 R1).
+- [ ] **C426** — macOS applies Seatbelt before the harness can run (DIRECTORY-062 R2).
+- [ ] **C427** — Linux applies Landlock and a network namespace before exec (DIRECTORY-062 R3).
+- [ ] **C428** — Kernel evidence feeds the existing refusal stream (DIRECTORY-062 R4).
+- [ ] **C429** — The agent page states the sandbox and the evidence (DIRECTORY-062 R5).
+- [ ] **C430** — A person watches real native denials and an allowed control (DIRECTORY-062 R6).
+
+## Unknown API paths and the health route (DIRECTORY-063)
+
+- [ ] **C431** — Every unknown path under /api answers 404 with a named JSON refusal, never the page (DIRECTORY-063 R1).
+- [ ] **C432** — GET /api/health answers that the service is serving, with its name and build, asking no other service (DIRECTORY-063 R2).
+
+## Managed context and goal delivery (DIRECTORY-064)
+
+- [ ] **C433** — One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1).
+- [ ] **C434** — Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2).
+- [ ] **C435** — Enforce context thresholds at the owned boundary (DIRECTORY-064 R3).
+- [ ] **C436** — Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4).
+- [ ] **C437** — Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5).
+- [ ] **C438** — Plain controls and a real managed-session proof (DIRECTORY-064 R6).
+
+## Placed and running runner builds (DIRECTORY-066)
+
+- [ ] **C445** — Place the runner binary without restarting a live runner (DIRECTORY-066 R1).
+- [ ] **C446** — Record running and placed builds as different facts (DIRECTORY-066 R2).
+- [ ] **C447** — Restart only through an explicit session-aware operation (DIRECTORY-066 R3).
+- [ ] **C448** — Show the same pending restart on the page and CLI (DIRECTORY-066 R4).
+
+## Codex policy and refusal coverage (DIRECTORY-065)
+
+- [ ] **C439** — Pin the actual Codex executable and its supported policy contract (DIRECTORY-065 R1).
+- [ ] **C440** — Render native Codex permissions from the bound Lys policy (DIRECTORY-065 R2).
+- [ ] **C441** — Bind Codex pre-tool policy checks to the existing Lys judge (DIRECTORY-065 R3).
+- [ ] **C442** — Record native Codex rejections with honest provenance (DIRECTORY-065 R4).
+- [ ] **C443** — The Codex agent page shows measured policy and refusal coverage (DIRECTORY-065 R5).
+- [ ] **C444** — Prove config enforcement and denial delivery through the real harness (DIRECTORY-065 R6).

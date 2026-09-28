@@ -125,6 +125,71 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "A proof reads tiles, never the whole log (LYSLOGSTORE-006)",
+      "items": [
+        {
+          "id": "C21",
+          "text": "Every append writes its hashes into C2SP tiles before the pin (LYSLOGSTORE-006 R1).",
+          "done": false
+        },
+        {
+          "id": "C22",
+          "text": "Inclusion and consistency proofs read only the tiles they need, and the whole-log proof tree is gone (LYSLOGSTORE-006 R2).",
+          "done": false
+        },
+        {
+          "id": "C23",
+          "text": "A log made before tiles gets them once, and never again (LYSLOGSTORE-006 R3).",
+          "done": false
+        },
+        {
+          "id": "C24",
+          "text": "A gate test fails when a start or its first proof reads a leaf before the tail (LYSLOGSTORE-006 R4).",
+          "done": false
+        },
+        {
+          "id": "C31",
+          "text": "A receipt's coordinate is read from the tiles and the growing checkpoints are removed (LYSLOGSTORE-006 R5).",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "No open reads every leaf (LYSLOGSTORE-007)",
+      "items": [
+        {
+          "id": "C25",
+          "text": "A frontier log opens from its tiles and reads no leaf under the pin (LYSLOGSTORE-007 R1).",
+          "done": false
+        },
+        {
+          "id": "C30",
+          "text": "Artifacts are built from a tile proof and a root, byte-for-byte as from a whole tree (LYSLOGSTORE-007 R2).",
+          "done": false
+        },
+        {
+          "id": "C26",
+          "text": "The anchor opens, creates, reads and proves through the frontier log and its tiles (LYSLOGSTORE-007 R3).",
+          "done": false
+        },
+        {
+          "id": "C27",
+          "text": "The lys log and ca log commands and the revocation appends run on the frontier log (LYSLOGSTORE-007 R4).",
+          "done": false
+        },
+        {
+          "id": "C28",
+          "text": "Only lys log audit reads every leaf, and the whole-tree Log is removed (LYSLOGSTORE-007 R5).",
+          "done": false
+        },
+        {
+          "id": "C29",
+          "text": "A gate test fails when any open reads a leaf under the pin (LYSLOGSTORE-007 R6).",
+          "done": false
+        }
+      ]
     }
   ]
 }

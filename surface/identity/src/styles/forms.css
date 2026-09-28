@@ -1,0 +1,43 @@
+/* Every form control in Lys: text boxes, selects, text areas and their labels,
+   drawn from the tokens, so no screen falls back to the browser's defaults. */
+.field { display: flex; flex-direction: column; gap: 6px; margin: 0 0 14px; font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.field .hint { font-weight: 400; color: var(--text-muted); }
+input:not([type=radio]):not([type=checkbox]), select, textarea {
+  font: inherit; font-size: 13px; color: var(--text-primary);
+  background: var(--surface-base); border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  padding: 8px 11px; min-height: 36px; width: 100%; max-width: 480px;
+  transition: border-color .12s ease, box-shadow .12s ease, background .12s ease;
+}
+input::placeholder, textarea::placeholder { color: var(--text-muted); }
+input:not([type=radio]):not([type=checkbox]):hover, select:hover, textarea:hover { border-color: rgba(255,255,255,.14); }
+input:not([type=radio]):not([type=checkbox]):focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+input:disabled, select:disabled, textarea:disabled { opacity: .55; cursor: not-allowed; }
+select {
+  appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' fill='none' stroke='%23a1a1aa' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 11px center;
+}
+select option { background: var(--surface-default); color: var(--text-primary); }
+input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; }
+.btn { cursor: pointer; min-height: 32px; transition: background .12s ease, border-color .12s ease, transform .08s ease; }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.primary:disabled { background: var(--accent-deep); }
+.btn.lg { padding: 9px 16px; font-size: 13px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--surface-hover); color: var(--text-secondary); }
+.pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--muted-dot); }
+.pill.ok { background: var(--ok-glow); color: var(--ok); }
+.pill.ok::before { background: var(--ok); }
+.notice { padding: 10px 12px; border-radius: var(--radius-md); font-size: 12.5px; margin: 12px 0 0; }
+.notice.ok { background: var(--ok-glow); color: var(--ok); }
+.notice.bad { background: rgba(248,113,113,.1); color: var(--danger); }
+.card > :first-child { margin-top: 0; }
+.card > :last-child { margin-bottom: 0; }
+.card p { margin: 0 0 10px; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; align-items: stretch; margin: 16px 0 22px; }
+.card-grid > .card { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.card-grid > .card h2 { margin: 0; font-size: 14px; }
+.card-grid > .card p { margin: 0; color: var(--text-secondary); }
+.card-grid > .card .pill { align-self: flex-start; margin-top: auto; }
+.stack > * + * { margin-top: 18px; }
+.stack > .actions { display: flex; gap: 8px; flex-wrap: wrap; }

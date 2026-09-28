@@ -62,7 +62,8 @@ impl<P: PermissionCheck> Broker<P> {
     /// the ticket's entry, and records the refresh. A refresh keeps the
     /// client the grant was consented to: one naming another client is
     /// refused, recorded, and reseals nothing, until the grant is
-    /// reconnected by name with [`Broker::reconnect_oauth`].
+    /// reconnected by name with [`Broker::reconnect_oauth`]. The anchor
+    /// moves at the call's settlement, the line that follows.
     ///
     /// # Errors
     ///
@@ -90,7 +91,8 @@ impl<P: PermissionCheck> Broker<P> {
         }
         self.store
             .replace(&self.store_key, &ticket.entry, &grant.to_sealed()?)?;
-        self.record(AuditKind::Refresh, subject, call, None, "refreshed")?;
+        let line = self.line(AuditKind::Refresh, subject, call, None, "refreshed");
+        self.append_unanchored(&line)?;
         Ok(())
     }
 

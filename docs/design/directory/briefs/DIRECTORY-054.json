@@ -1,0 +1,377 @@
+{
+  "id": "DIRECTORY-054",
+  "cluster": "directory",
+  "title": "Install Lys by downloading and opening an app, with no terminal",
+  "depends_on": [
+    "DIRECTORY-045",
+    "DIRECTORY-047",
+    "DIRECTORY-050",
+    "DIRECTORY-052",
+    "DIRECTORY-053",
+    "DIRECTORY-057"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C395",
+    "C396",
+    "C397",
+    "C398",
+    "C399"
+  ],
+  "stories": [
+    "S160"
+  ],
+  "design_anchor": [
+    "ADR-120"
+  ],
+  "purpose": "Tom, 28 September 2026 about 19:10: Lys is the only sign-in for everything, and \"how is an average person supposed to do it?\" Today the install is a terminal command that needs a container engine already running, and nothing packages Lys as something a person downloads. Amended 28 September 2026 21:05 by Waffles after Archie's read against the tree. Amended 29 September 2026 by Chippy after the final build 0972e9c2 ended incomplete: remove contradictory packaging and login-item words, state exact prospective file walls, and preserve the release and live proof obligations. This revision does not approve earlier out-of-wall edits retrospectively.",
+  "task": "Add Lys.app for macOS: a packaging command that builds a signed, notarised app and disk image; an app that runs the install in its own process with progress on a Lys page and hands over to first-run setup; guidance for the container engine; start at login, reopen, upgrade and uninstall; and a proof on a fresh macOS account that no terminal is ever needed.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Extract the install library without changing its behaviour",
+      "spec": "Structural. Move the install, configuration, credentials, health, exit watch, surface placement and upgrade implementation from the lys command into crates/lys-install. Both the existing CLI and the app use this library. Move each existing test with its implementation. Only module paths and the imports required by the move change in those tests. Preserve assertions, test names, inputs and operation order. The CLI stays a thin adapter with the same arguments, output and named refusals. The DIRECTORY-053 rollback and DIRECTORY-057 service-owned exit-lock changes are prerequisites and move with their tests. If either landed prerequisite adds a file outside this exact manifest, stop and obtain a reviewed file-wall revision before moving it. This requirement does not fix a timing assertion, add a wait or change exit-lock ownership. A source comparison of moved test bodies and a counted execution of those tests prove the move.",
+      "acceptance": [
+        "Every existing install test passes in its new home with only its module paths and imports changed.",
+        "A comparison of each moved test body against the prerequisite tree shows no changed assertion, input or operation order.",
+        "The test inventory records the old path, new path and test name for every moved test, and the executed count equals that inventory.",
+        "The existing CLI install, upgrade and rollback tests pass through the library adapter with their existing expected output and refusals."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-install/Cargo.toml",
+          "crates/lys-install/src/config.rs",
+          "crates/lys-install/src/config/validate.rs",
+          "crates/lys-install/src/config_tests.rs",
+          "crates/lys-install/src/configure.rs",
+          "crates/lys-install/src/configure_tests.rs",
+          "crates/lys-install/src/credentials.rs",
+          "crates/lys-install/src/credentials_tests.rs",
+          "crates/lys-install/src/error.rs",
+          "crates/lys-install/src/error_tests.rs",
+          "crates/lys-install/src/health.rs",
+          "crates/lys-install/src/install.rs",
+          "crates/lys-install/src/install/deployment.template.toml",
+          "crates/lys-install/src/install/detached.rs",
+          "crates/lys-install/src/install/exit_wait.rs",
+          "crates/lys-install/src/install/exit_wait_tests.rs",
+          "crates/lys-install/src/install/held_start.rs",
+          "crates/lys-install/src/install/held_start_tests.rs",
+          "crates/lys-install/src/install/layout.rs",
+          "crates/lys-install/src/install/server_config.rs",
+          "crates/lys-install/src/install/services.rs",
+          "crates/lys-install/src/install/start_race_tests.rs",
+          "crates/lys-install/src/install/surface.rs",
+          "crates/lys-install/src/install_tests.rs",
+          "crates/lys-install/src/lib.rs",
+          "crates/lys-install/src/loopback_http.rs",
+          "crates/lys-install/src/loopback_http_tests.rs",
+          "crates/lys-install/src/output.rs",
+          "crates/lys-install/src/output_tests.rs",
+          "crates/lys-install/src/prepare.rs",
+          "crates/lys-install/src/prepare_tests.rs",
+          "crates/lys-install/src/private_files.rs",
+          "crates/lys-install/src/rauthy.rs",
+          "crates/lys-install/src/themes.rs",
+          "crates/lys-install/src/themes_tests.rs",
+          "crates/lys-install/src/upgrade.rs",
+          "crates/lys-install/src/upgrade/back.rs",
+          "crates/lys-install/src/upgrade/exchange.rs",
+          "crates/lys-install/src/upgrade/exchange_tests.rs",
+          "crates/lys-install/src/upgrade_back_tests.rs",
+          "crates/lys-install/src/upgrade_tests.rs"
+        ],
+        "modify": [
+          "Cargo.lock",
+          "Cargo.toml",
+          "crates/lys/Cargo.toml",
+          "crates/lys/src/commands/mod.rs",
+          "crates/lys/src/identity/install.rs",
+          "crates/lys/src/identity/mod.rs",
+          "crates/lys/src/main.rs",
+          "deploy/identity/theme-map.md"
+        ],
+        "delete": [
+          "crates/lys/src/commands/output.rs",
+          "crates/lys/src/commands/output_tests.rs",
+          "crates/lys/src/identity/config.rs",
+          "crates/lys/src/identity/config/validate.rs",
+          "crates/lys/src/identity/config_tests.rs",
+          "crates/lys/src/identity/configure.rs",
+          "crates/lys/src/identity/configure_tests.rs",
+          "crates/lys/src/identity/credentials.rs",
+          "crates/lys/src/identity/credentials_tests.rs",
+          "crates/lys/src/identity/error.rs",
+          "crates/lys/src/identity/error_tests.rs",
+          "crates/lys/src/identity/health.rs",
+          "crates/lys/src/identity/install/deployment.template.toml",
+          "crates/lys/src/identity/install/detached.rs",
+          "crates/lys/src/identity/install/exit_wait.rs",
+          "crates/lys/src/identity/install/exit_wait_tests.rs",
+          "crates/lys/src/identity/install/held_start.rs",
+          "crates/lys/src/identity/install/held_start_tests.rs",
+          "crates/lys/src/identity/install/layout.rs",
+          "crates/lys/src/identity/install/server_config.rs",
+          "crates/lys/src/identity/install/services.rs",
+          "crates/lys/src/identity/install/start_race_tests.rs",
+          "crates/lys/src/identity/install/surface.rs",
+          "crates/lys/src/identity/install_tests.rs",
+          "crates/lys/src/identity/loopback_http.rs",
+          "crates/lys/src/identity/loopback_http_tests.rs",
+          "crates/lys/src/identity/prepare.rs",
+          "crates/lys/src/identity/prepare_tests.rs",
+          "crates/lys/src/identity/private_files.rs",
+          "crates/lys/src/identity/rauthy.rs",
+          "crates/lys/src/identity/themes.rs",
+          "crates/lys/src/identity/themes_tests.rs",
+          "crates/lys/src/identity/upgrade.rs",
+          "crates/lys/src/identity/upgrade/back.rs",
+          "crates/lys/src/identity/upgrade/exchange.rs",
+          "crates/lys/src/identity/upgrade/exchange_tests.rs",
+          "crates/lys/src/identity/upgrade_back_tests.rs",
+          "crates/lys/src/identity/upgrade_tests.rs"
+        ]
+      },
+      "checklist": [
+        "C396"
+      ],
+      "stories": [
+        "S160"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Opening the app installs and shows every step on a Lys page",
+      "spec": "Behavioural. Lys-app, when no install exists under the platform data root, serves a Lys-styled progress page on a loopback port it chooses, opens the default browser to it, and runs the install service as a library call (the same code as `lys identity install`, never a spawned shell or terminal). Each step appears as it happens in plain words (\"Preparing your directory\", \"Starting sign-in\"), with a failure shown in the same words and the one next thing to do. When the install is ready it hands the browser to the first-run setup page of DIRECTORY-047. Opening the app while an install is running shows that install's page, never a second install. The install library from R1 is the only install implementation used by lys and lys-app. An app opened from the disk image (a read-only, translocated path) refuses to install and says in plain words to move Lys to Applications first. The install's bin/ (DIRECTORY-045) keeps the running install independent of where the app sits. A launcher integration test holds the install at a named step barrier, opens a second launcher against the same scratch data root, and observes one install invocation and the same progress endpoint. It then releases the barrier. This tests the launcher entry path, not only its lock helper. Read failure for an existing screens file is a named I/O refusal, not not_found. The library extraction preserves every existing install, upgrade and rollback test and configuration value. Moved tests remain executable. No app publication is permitted while DIRECTORY-047 setup is absent from the candidate. The round uses a scratch install service and controlled provider fixtures. It does not operate Tom's live install or register a login item in the machine's real account.",
+      "acceptance": [
+        "Opening the app on a scratch install reaches the DIRECTORY-047 first-run setup page.",
+        "The recorded process tree for that opening contains no terminal started by Lys.",
+        "A failure at any install step shows that failure in plain words on the progress page.",
+        "The failed step presents its one next action.",
+        "The install can resume from the preserved state after that action.",
+        "In the scratch launcher integration test, a second open while the first install is held at its step barrier joins the same progress endpoint.",
+        "The second open starts no second install while that barrier holds.",
+        "The first install completes when the test releases the step barrier.",
+        "An existing but unreadable screens file produces its named I/O refusal.",
+        "An absent screens file still produces not_found."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-app/Cargo.toml",
+          "crates/lys-app/build.rs",
+          "crates/lys-app/src/bundle.rs",
+          "crates/lys-app/src/bundle_tests.rs",
+          "crates/lys-app/src/flow.rs",
+          "crates/lys-app/src/flow_tests.rs",
+          "crates/lys-app/src/launcher.rs",
+          "crates/lys-app/src/launcher_tests.rs",
+          "crates/lys-app/src/main.rs",
+          "crates/lys-app/src/main_tests.rs",
+          "crates/lys-app/src/progress.rs",
+          "crates/lys-app/src/progress_tests.rs",
+          "crates/lys-app/src/refusal.rs",
+          "crates/lys-app/src/server.rs",
+          "crates/lys-app/src/server_tests.rs",
+          "crates/lys-install/src/steps.rs",
+          "crates/lys-install/src/steps_tests.rs",
+          "surface/identity/src/features/install/InstallProgress.tsx",
+          "surface/identity/tests/install-progress.test.tsx"
+        ],
+        "modify": [
+          "Cargo.lock",
+          "Cargo.toml",
+          "crates/lys-install/src/install.rs",
+          "crates/lys-install/src/lib.rs",
+          "crates/lys-install/src/upgrade.rs",
+          "surface/identity/src/App.tsx"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C396"
+      ],
+      "stories": [
+        "S160"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "The container engine, guided in plain words",
+      "spec": "Behavioural. Before the install starts its services, a container engine that is missing or not running is shown on the progress page in plain words: what it is for, the official download for this Mac, and that the install continues by itself. The app waits on the engine's socket appearing and answering (a filesystem event on its known socket paths), never on a clock or a poll, and continues the install when it does. No page names the issuer.",
+      "acceptance": [
+        "With the engine stopped, the page shows the guidance.",
+        "Starting the engine continues the install with no further action in Lys.",
+        "No wait in lys-app reads a clock or loops on a sleep."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-app/src/engine.rs",
+          "crates/lys-app/src/engine_tests.rs",
+          "crates/lys-app/src/engine_wait.rs",
+          "crates/lys-app/src/engine_wait_tests.rs",
+          "crates/lys-install/src/install/engine_path.rs",
+          "crates/lys-install/src/install/engine_path_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-app/src/flow.rs",
+          "crates/lys-app/src/main.rs",
+          "crates/lys-install/src/install.rs",
+          "crates/lys-install/src/install/services.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C397"
+      ],
+      "stories": [
+        "S160"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Start at login, reopen, upgrade and uninstall",
+      "spec": "Behavioural. After a successful install the app registers Lys to start at login for this user through SMAppService, removed on uninstall. Opening the app when Lys is installed and running opens Lys's screens. When installed and stopped it starts it and then opens them. An app whose bundled build is newer than the install's runs the upgrade of DIRECTORY-045 with its progress on the page and its way back (DIRECTORY-053). An Uninstall control on the account screen of an administrator stops Lys, removes the login registration and the binaries, and keeps the data folder unless the person ticks to remove it after a confirmation that names what is lost. Start at login uses the system's login item service (SMAppService), so its definition stays inside the app bundle and nothing is written into the person's home outside Lys's own data path. The item runs `lys-app --at-login`, which starts the install's units and waits for the container engine as R3 does. The proof of this on Tom's own account waits for his word on this choice. Uninstall is carried out by a helper, `lys-app --uninstall`, started detached by the service before it answers, which outlives the service it stops and removes the binaries, the login item and, if ticked, the data folder, and records the result where the app shows it on next open. The server and the DIRECTORY-050 runner are started through that same login registration. A second home-directory LaunchAgent is not an allowed substitute in development or release mode. Tests use an explicit login-service double and measure registration, refused registration, unregister and repeated opens. No real login registration or restart on Dean's personal account is part of a card round.",
+      "acceptance": [
+        "The scratch login-service fixture invokes the registered entry point and observes the installed services starting.",
+        "Opening the newer app in a scratch upgrade fixture changes the served Build line to the new commit.",
+        "An uninstall without the remove-data tick preserves every recorded data file in the scratch fixture.",
+        "Reinstalling that scratch fixture reads the preserved identities rather than creating replacements.",
+        "The login-service double records one SMAppService registration for repeated successful opens.",
+        "A refused registration is shown by name.",
+        "A refused registration is never recorded as successful.",
+        "The login registration starts the installed server through the app entry point.",
+        "The same login registration starts the DIRECTORY-050 runner through that entry point.",
+        "Uninstall unregisters that entry point.",
+        "No home-directory LaunchAgents file is written by an install or uninstall test."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-app/src/login_item.rs",
+          "crates/lys-app/src/login_item_tests.rs",
+          "crates/lys-app/src/uninstall.rs",
+          "crates/lys-app/src/uninstall_tests.rs",
+          "crates/lys-identity-server/src/uninstall_api.rs",
+          "crates/lys-identity-server/src/uninstall_api_tests.rs",
+          "surface/identity/src/features/account/Uninstall.tsx",
+          "surface/identity/tests/uninstall.test.tsx"
+        ],
+        "modify": [
+          "crates/lys-app/src/flow.rs",
+          "crates/lys-app/src/main.rs",
+          "crates/lys-app/src/refusal.rs",
+          "crates/lys-identity-server/src/error.rs",
+          "crates/lys-identity-server/src/error_status.rs",
+          "crates/lys-identity-server/src/lib.rs",
+          "crates/lys-identity-server/src/routes.rs",
+          "surface/identity/src/features/me/You.tsx",
+          "surface/identity/tests/fixtures.ts"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C398"
+      ],
+      "stories": [
+        "S160"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "`lys package app` builds the app and disk image",
+      "spec": "Behavioural. `lys package app --out DIR` builds Lys.app (bundle id, Info.plist, icon) holding lys, lys-identity-server, lys-secrets and lys-home built for both arm64 and x86_64 from the same commit, the screens package, and lys-app as the bundle's executable, and a Lys.dmg with the app and an Applications link. Each binary's --version must name the same commit, or the packaging is refused naming the one that differs. It signs with the Developer ID named by a secret handle (DIRECTORY-052 R6, SECRETS), with the hardened runtime, and submits for notarisation, stapling the ticket. With no signing identity or a refused notarisation it fails naming which, and never produces an unsigned app under the release name. The app is one universal build holding arm64 and x86_64 binaries (lipo), so one download serves Apple and Intel processors. The release mode is the default. Only an explicit --development request builds a locally signed app under the name 'Lys (development)', never Lys.app or Lys.dmg. R2 to R4 are built and tested against that. Development mode is still universal, checks the build stamp on every binary, and verifies the local signature. It does not claim Developer ID signing, notarisation or Gatekeeper approval. Release mode with a missing identity refuses signing_identity_missing before a release artifact is published. Signing authority is resolved by the declared secret handle. A caller-supplied display name is not authority to use a signing credential. Release signing and the fresh-account proof need the declared Developer ID authority. Its absence never turns a development build into release evidence. R5 runs after the library, app, engine guidance and login integration of R1 to R4 exist. Its unit tests use tool doubles. Its real packaging acceptance uses those built executables, not substitute binaries. The build-stamp changes in this row are restricted to making every included executable report the same source commit. The card round proves release-mode command ordering, refusal propagation and artifact publication with explicit signing and notarisation doubles. It never needs Tom's Developer ID or produces a release claim from those doubles. Real release signing, notarisation and Gatekeeper measurement are the after-landing verification below, owned by the delivery lead. The development package proof remains a real scratch artifact.",
+      "acceptance": [
+        "The release packaging test records codesign --verify --deep --strict against the staged app in its tool double.",
+        "The release packaging test records spctl --assess against the staged app in its tool double.",
+        "The release packaging fixture records the source commit, artifact hash and notarisation result returned by its doubles.",
+        "Binaries built from two commits are refused naming the binary before a release artifact is published.",
+        "Release mode with no signing identity answers signing_identity_missing.",
+        "That refused release leaves neither Lys.app nor Lys.dmg published.",
+        "An explicit --development request with no Developer ID builds only Lys (development).",
+        "The development app local signature passes codesign --verify --deep --strict.",
+        "The development build claims neither notarisation nor Gatekeeper approval.",
+        "lipo -archs on every bundled binary in each packaging mode names arm64 and x86_64.",
+        "A signing-provider double records resolution of the declared secret handle.",
+        "An unknown signing handle is refused by name.",
+        "An inaccessible signing handle is refused by name.",
+        "Credential material appears in neither captured command output nor failure text."
+      ],
+      "files": {
+        "create": [
+          "crates/lys/src/package.rs",
+          "crates/lys/src/package_tests.rs",
+          "packaging/macos/Info.plist",
+          "packaging/macos/Lys.icns"
+        ],
+        "modify": [
+          "Cargo.lock",
+          "crates/lys-app/build.rs",
+          "crates/lys-home/build.rs",
+          "crates/lys-home/tests/version.rs",
+          "crates/lys-identity-server/build.rs",
+          "crates/lys-identity-server/tests/version.rs",
+          "crates/lys-secrets/build.rs",
+          "crates/lys-secrets/tests/version.rs",
+          "crates/lys/Cargo.toml",
+          "crates/lys/build.rs",
+          "crates/lys/src/cli.rs",
+          "crates/lys/src/commands/error.rs",
+          "crates/lys/src/commands/error_tests.rs",
+          "crates/lys/src/main.rs",
+          "crates/lys/tests/version.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C395"
+      ],
+      "stories": [
+        "S160"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Prepare the fresh-account proof and its evidence record",
+      "spec": "Structural. Write the after-landing procedure and the empty evidence record for the real fresh-account proof. The procedure names the exact landed commit and release artifact hash, the macOS virtual machine on Tom's Mac, the explicit authorisation before making that VM or registering a real login item, the initial absence of a Lys install, download and drag to Applications, first open, setup, sign-in, restart, upgrade and uninstall without data removal followed by reinstall. It records the screen capture, process tree and page-text scan. It names the expected no-terminal and no-issuer results. Until the delivery lead runs it, the record says not run and names the missing evidence. This requirement prepares the procedure. It never substitutes a written plan or unit test for the live proof. No account is created on Dean's personal laptop.",
+      "acceptance": [
+        "The procedure names the landed commit and release artifact hash that its operator must record.",
+        "The procedure enumerates download, first open, setup, sign-in, restart, upgrade and retained-data reinstall.",
+        "The evidence template names the screen recording, process tree and page-text scan.",
+        "An unperformed proof is explicitly marked not run in the evidence record.",
+        "The procedure places the recorded operator authorisation before any step that creates the VM account or registers a real login item."
+      ],
+      "files": {
+        "create": [
+          "docs/design/directory/reports/DIRECTORY-054-fresh-account.md",
+          "docs/design/directory/reports/DIRECTORY-054-open-items.md"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C399"
+      ],
+      "stories": [
+        "S160"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT start a terminal or ask the person to type a command, edit a file, choose a port or read a password file at any step.",
+    "SHALL NOT produce an unsigned app under the release name.",
+    "SHALL NOT name the issuer on any page.",
+    "SHALL NOT add a timeout, sleep, poll, #[allow], #[ignore] or any bypass.",
+    "SHALL NOT add a silent fallback: every failure is a named refusal shown in plain words.",
+    "SHALL NOT treat this prospective file-wall revision as evidence that prior out-of-wall edits were approved or that any runtime, signing or installation proof was performed."
+  ],
+  "verification": [
+    "The full Lys gate, ast-grep scan and surface checks exit 0 at the card head, measured by the card round.",
+    "After landing, Chippy as delivery lead builds the release with the authorised Developer ID and notary profile. Record the landed commit, app and disk-image hashes, successful codesign --verify --deep --strict, successful spctl --assess, notarisation and stapling. Never record credential material. Lack of signing authority leaves this step blocked and the installer not release-ready.",
+    "After landing and the required operator authorisation, Chippy runs the R6 procedure in the named macOS VM. The recorded run reaches signed in from the disk image.",
+    "The fresh-account process record holds no terminal started for the person.",
+    "The fresh-account page-text scan finds no issuer name.",
+    "In that authorised after-landing proof, register SMAppService and verify Lys is answering after the VM restarts without another user action.",
+    "Open the newer app and verify the Build line names the new commit.",
+    "Uninstall without removing data and reinstall, then verify the same people can sign in.",
+    "Keep the delivery card proof work open until every after-landing verification has evidence. Report implementation complete, landed, installed and release-ready separately. No distribution of a release artifact or claim that the installer is finished precedes the real release and fresh-account proofs."
+  ]
+}

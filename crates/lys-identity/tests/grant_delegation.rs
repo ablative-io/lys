@@ -20,7 +20,7 @@ const ROUTES: [Route; 3] = [Route::Browser, Route::Api, Route::Tool];
 const BOTH: [RecipientKind; 2] = [RecipientKind::Person, RecipientKind::Agent];
 
 #[test]
-fn grant_use_vs_lend_use_only_is_exercised_and_never_passed_on() -> TestResult {
+fn row_2_2_grant_use_vs_lend_use_only_is_exercised_and_never_passed_on() -> TestResult {
     let mut world = World::new()?;
     let (dana, tom, tom_agent) = (
         IdentityId::Person(world.dana),
@@ -75,7 +75,7 @@ fn grant_use_vs_lend_use_only_is_exercised_and_never_passed_on() -> TestResult {
 }
 
 #[test]
-fn grant_recipient_each_kind_is_permitted_or_refused_by_name() -> TestResult {
+fn row_2_2_grant_recipient_each_kind_is_permitted_or_refused_by_name() -> TestResult {
     let mut world = World::new()?;
     let (dana, tom, lee, tom_agent) = (
         IdentityId::Person(world.dana),
@@ -174,7 +174,8 @@ fn cycle() -> Result<HashMap<GrantId, Grant>, Box<dyn Error>> {
 }
 
 #[test]
-fn grant_ancestry_refuses_at_the_blocking_boundary_and_explains_a_permitted_chain() -> TestResult {
+fn row_2_1_row_2_3_grant_ancestry_refuses_at_the_blocking_boundary_and_explains_a_permitted_chain()
+-> TestResult {
     let mut world = World::new()?;
     let (dana, tom, tom_agent, dana_agent) = (
         IdentityId::Person(world.dana),
@@ -339,7 +340,8 @@ fn grant_ancestry_refuses_at_the_blocking_boundary_and_explains_a_permitted_chai
 }
 
 #[test]
-fn grant_agent_parity_routes_decide_alike_and_pass_on_decides_who_delegates() -> TestResult {
+fn row_2_2_grant_agent_parity_routes_decide_alike_and_pass_on_decides_who_delegates() -> TestResult
+{
     let mut world = World::new()?;
     let (dana, tom, tom_agent, dana_agent) = (
         IdentityId::Person(world.dana),

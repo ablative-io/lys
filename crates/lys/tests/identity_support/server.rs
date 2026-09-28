@@ -20,6 +20,41 @@ pub fn request(
     headers: &[(&str, &str)],
     body: Option<&str>,
 ) -> TestResult<(u16, String)> {
+    let (head, rest) = exchange(address, method, path, headers, body)?;
+    let status = head.split(' ').nth(1).ok_or("no status")?.parse::<u16>()?;
+    let body = if head
+        .to_ascii_lowercase()
+        .contains("transfer-encoding: chunked")
+    {
+        dechunk(&rest)?
+    } else {
+        rest
+    };
+    Ok((status, body))
+}
+
+/// Sends one request with no body and returns the status and the value of
+/// every `Set-Cookie` header of the answer, in order.
+pub fn cookies_set(address: &str, method: &str, path: &str) -> TestResult<(u16, Vec<String>)> {
+    let (head, _rest) = exchange(address, method, path, &[], None)?;
+    let status = head.split(' ').nth(1).ok_or("no status")?.parse::<u16>()?;
+    let cookies = head
+        .lines()
+        .filter_map(|line| line.split_once(':'))
+        .filter(|(name, _value)| name.eq_ignore_ascii_case("set-cookie"))
+        .map(|(_name, value)| value.trim().to_string())
+        .collect();
+    Ok((status, cookies))
+}
+
+/// Sends one request and returns the answer's head and what follows it.
+fn exchange(
+    address: &str,
+    method: &str,
+    path: &str,
+    headers: &[(&str, &str)],
+    body: Option<&str>,
+) -> TestResult<(String, String)> {
     let mut stream = TcpStream::connect(address)?;
     stream.set_read_timeout(Some(Duration::from_secs(30)))?;
     let mut head = format!("{method} {path} HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n");
@@ -37,16 +72,7 @@ pub fn request(
     stream.read_to_end(&mut raw)?;
     let text = String::from_utf8_lossy(&raw).into_owned();
     let (head, rest) = text.split_once("\r\n\r\n").ok_or("no header terminator")?;
-    let status = head.split(' ').nth(1).ok_or("no status")?.parse::<u16>()?;
-    let body = if head
-        .to_ascii_lowercase()
-        .contains("transfer-encoding: chunked")
-    {
-        dechunk(rest)?
-    } else {
-        rest.to_string()
-    };
-    Ok((status, body))
+    Ok((head.to_string(), rest.to_string()))
 }
 
 fn dechunk(mut rest: &str) -> TestResult<String> {

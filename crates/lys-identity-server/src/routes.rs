@@ -324,6 +324,7 @@ struct Answer {
 
 async fn callback(
     State(state): State<Shared>,
+    headers: HeaderMap,
     Query(answer): Query<Answer>,
 ) -> Result<Response, ServerError> {
     let actor = state.oidc.finish(answer.code, &answer.state).await?;
@@ -332,7 +333,30 @@ async fn callback(
         "authority": AUTHORITY,
     });
     let cookie = state.sessions.begin(actor)?;
+    if wants_page(&headers) {
+        return Ok((
+            StatusCode::SEE_OTHER,
+            [
+                (header::SET_COOKIE, cookie),
+                (header::LOCATION, "/".to_owned()),
+            ],
+        )
+            .into_response());
+    }
     Ok(([(header::SET_COOKIE, cookie)], Json(body)).into_response())
+}
+
+/// Whether the caller is a browser following the sign-in, which is taken to the
+/// screens, rather than a program, which is answered the signed-in JSON.
+fn wants_page(headers: &HeaderMap) -> bool {
+    headers
+        .get(header::ACCEPT)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|accept| {
+            accept
+                .split(',')
+                .any(|kind| kind.trim().starts_with("text/html"))
+        })
 }
 
 #[derive(Deserialize)]

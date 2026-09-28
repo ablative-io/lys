@@ -1,7 +1,7 @@
 import { useShell } from '../../shell/ShellContext';
 import type { Grant } from '../../generated/grants';
-import { clock } from '../file/time';
-import { grantNo, lastUsedText, lastsText, nameOf, onText, passText, standing } from './model';
+import { clock, day } from '../file/time';
+import { grantNo, lastUsedText, nameOf, onText, passText, voidOf } from './model';
 import type { GrantWorld } from './model';
 import { Revoke } from './Revoke';
 
@@ -12,7 +12,7 @@ export function Chain({ w, chain }: { w: GrantWorld; chain: Grant[] }) {
       {chain.map((c, i) => (
         <span key={c.id} style={{ display: 'contents' }}>
           {i ? <span className="arr">→</span> : null}
-          <span className={`pill ${w.who.get(c.holder)?.kind === 'person' ? 'human' : ''} ${standing(w, c).ok ? '' : 'off'}`}>
+          <span className={`pill ${w.who.get(c.holder)?.kind === 'person' ? 'human' : ''} ${c.standing.stands ? '' : 'off'}`}>
             {nameOf(w, c.holder)} · {c.relation} of {onText(c)}
           </span>
         </span>
@@ -21,20 +21,20 @@ export function Chain({ w, chain }: { w: GrantWorld; chain: Grant[] }) {
   );
 }
 
-/** One grant with its chain, what it lets pass on, how long it lasts, and whether it stands. */
+/** One grant with its chain, what it lets pass on, its window, and whether it stands, as the service answered them. */
 export function GrantCard({ w, g, chain, done }: { w: GrantWorld; g: Grant; chain: Grant[]; done: () => void }) {
   const shell = useShell();
-  const s = standing(w, g);
+  const v = voidOf(w, g);
   return (
-    <div className="card" style={s.ok ? undefined : { opacity: 0.72 }}>
+    <div className="card" style={v === null ? undefined : { opacity: 0.72 }}>
       <div className="row" style={{ padding: 0 }}>
         <span className="mono"><b style={{ color: 'var(--accent)', fontWeight: 500 }}>{g.relation}</b> of {onText(g)}</span>
-        {s.ok ? <span className="dot s-active" title="stands" /> : <span className="verdict-mark no" style={{ fontSize: 9, padding: '1px 6px' }}>void</span>}
+        {v === null ? <span className="dot s-active" title="stands" /> : <span className="verdict-mark no" style={{ fontSize: 9, padding: '1px 6px' }}>void</span>}
       </div>
       <div style={{ marginTop: 8 }}><Chain w={w} chain={chain} /></div>
       <div className="note" style={{ marginTop: 6, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
         <span>Passable: {passText(g.pass_on)}</span>
-        <span>Lasts: {lastsText(g)}</span>
+        <span>Window: {g.effective_ends_at === null ? `from ${day(g.window.starts_at)}, no end` : `${day(g.window.starts_at)} to ${day(g.effective_ends_at)}`}</span>
         <span>Last used: {lastUsedText(g)}</span>
         <span className="mono">{grantNo(g.id)}</span>
         {!g.revoked && w.who.get(g.holder)?.state !== 'retired' ? (
@@ -43,10 +43,10 @@ export function GrantCard({ w, g, chain, done }: { w: GrantWorld; g: Grant; chai
           </a>
         ) : null}
       </div>
-      {s.ok ? null : (
+      {v === null ? null : (
         <div className="note" style={{ color: 'var(--danger)', marginTop: 4 }}>
-          {s.why}
-          {s.open ? <> <span className="open-q">what suspension refuses: open</span></> : null}
+          {v.why}
+          {v.open ? <> <span className="open-q">what suspension refuses: open</span></> : null}
         </div>
       )}
       {g.revoked ? <Revocation g={g} /> : null}

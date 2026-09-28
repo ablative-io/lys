@@ -264,7 +264,8 @@ const LEGS: [&str; 8] = [
 ];
 
 #[test]
-fn grant_durability_every_boundary_answers_replay_or_names_what_is_unresolved() -> TestResult {
+fn row_2_6_grant_durability_every_boundary_answers_replay_or_names_what_is_unresolved() -> TestResult
+{
     let mut exercised = 0;
     for (leg, name) in LEGS.iter().enumerate() {
         let plan = Arc::new(Mutex::new(LogFault::None));

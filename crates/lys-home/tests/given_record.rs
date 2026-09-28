@@ -9,6 +9,7 @@
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -48,6 +49,21 @@ type Fallible<T> = Result<T, Box<dyn std::error::Error>>;
 
 #[path = "given_record/refusals.rs"]
 mod refusals;
+
+/// Held by every test for its whole body. A child spawned by one test thread
+/// inherits every open descriptor of this process between its fork and its
+/// exec, so a session lock another test thread held and just dropped stays
+/// held by that child for the moment, and the next open of the session is
+/// refused as `SessionHeld`. The lock is advisory and per open file, which is
+/// what the record promises; so these tests, which both hold sessions in this
+/// process and spawn the binary, run one at a time.
+static SERIAL: Mutex<()> = Mutex::new(());
+
+/// Take [`SERIAL`]; a test that failed while holding it has already reported
+/// its own failure, so the poison is not a second one.
+fn serially() -> MutexGuard<'static, ()> {
+    SERIAL.lock().unwrap_or_else(PoisonError::into_inner)
+}
 
 fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
@@ -257,6 +273,7 @@ fn rendered(fixture: &mut Fixture) -> Fallible<(PathBuf, Value)> {
 #[test]
 fn the_first_render_records_five_documents_in_the_request_s_order_under_the_render_event() -> Outcome
 {
+    let serial = serially();
     let mut fixture = Fixture::new()?;
     let (out, report) = rendered(&mut fixture)?;
     let records = fixture.records()?;
@@ -318,11 +335,13 @@ fn the_first_render_records_five_documents_in_the_request_s_order_under_the_rend
     );
     assert_eq!(record.harness, "claude-code");
     assert_eq!(record.harness_version, "2.1.283");
+    drop(serial);
     Ok(())
 }
 
 #[test]
 fn two_renders_give_equal_lists_and_one_changed_byte_changes_exactly_one_hash() -> Outcome {
+    let serial = serially();
     let mut fixture = Fixture::new()?;
     rendered(&mut fixture)?;
     rendered(&mut fixture)?;
@@ -413,6 +432,7 @@ fn two_renders_give_equal_lists_and_one_changed_byte_changes_exactly_one_hash() 
             assert!(entry.get(key).is_some(), "{key}");
         }
     }
+    drop(serial);
     Ok(())
 }
 
@@ -488,6 +508,7 @@ fn document(path: &Path, bytes: &[u8]) -> GivenDocument {
 #[cfg(unix)]
 #[test]
 fn three_shapes_of_one_directory_record_and_compare_as_one_path() -> Outcome {
+    let serial = serially();
     let mut fixture = Fixture::under_real()?;
     let (real, link) = fixture.link()?;
     let (w, c) = (text(&fixture.w)?.to_owned(), text(&fixture.c)?.to_owned());
@@ -530,12 +551,14 @@ fn three_shapes_of_one_directory_record_and_compare_as_one_path() -> Outcome {
         checks += 1;
     }
     assert_eq!(checks, 2);
+    drop(serial);
     Ok(())
 }
 
 #[cfg(unix)]
 #[test]
 fn given_check_compares_canonical_paths_and_names_what_is_unresolved() -> Outcome {
+    let serial = serially();
     let mut fixture = Fixture::under_real()?;
     let (real, link) = fixture.link()?;
     let (w, c) = (text(&fixture.w)?.to_owned(), text(&fixture.c)?.to_owned());
@@ -600,12 +623,14 @@ fn given_check_compares_canonical_paths_and_names_what_is_unresolved() -> Outcom
         }
     }
     assert_eq!(keys_checked, 1);
+    drop(serial);
     Ok(())
 }
 
 #[cfg(unix)]
 #[test]
 fn given_names_each_record_s_unresolved_paths_as_recorded() -> Outcome {
+    let serial = serially();
     let mut fixture = Fixture::under_real()?;
     fixture.link()?;
     let (w, c) = (text(&fixture.w)?.to_owned(), text(&fixture.c)?.to_owned());
@@ -628,6 +653,7 @@ fn given_names_each_record_s_unresolved_paths_as_recorded() -> Outcome {
     assert_eq!(listed[0]["unresolved"], json!([gone]));
     assert_eq!(listed[1]["unresolved"], json!([]));
     assert_eq!(listed[2]["unresolved"], json!([text(&absent)?]));
+    drop(serial);
     Ok(())
 }
 
@@ -635,6 +661,8 @@ fn given_names_each_record_s_unresolved_paths_as_recorded() -> Outcome {
 #[test]
 fn a_path_that_cannot_be_searched_is_refused_by_render_launch_and_given_check() -> Outcome {
     use std::os::unix::fs::PermissionsExt;
+
+    let serial = serially();
     let mut fixture = Fixture::under_real()?;
     fixture.link()?;
     let locked = fixture.base.join("locked");
@@ -661,5 +689,6 @@ fn a_path_that_cannot_be_searched_is_refused_by_render_launch_and_given_check() 
     std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755))?;
     let named = ["canonicalising a given path", text(&behind)?];
     refused(&checked?, &named);
+    drop(serial);
     Ok(())
 }

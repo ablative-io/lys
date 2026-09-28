@@ -18,6 +18,8 @@
 
 **S4.** As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove.
 
+**S9.** As a log operator, I want the first proof after a restart to read a few stored hashes and never the whole log, so that restarting the service costs the same however long its history grows.
+
 ## Third-party verifier — Checks a leaf without lys
 
 ## Witness operator — Runs a witness anchor that observes other logs' checkpoints
@@ -39,6 +41,8 @@
 **S5.** As a log inspector, I want a store I open read only to refuse every write, so that reading a store can never change it.
 
 **S6.** As a log inspector, I want a read-only open of a store with an interrupted append to refuse and say that a repair is pending, so that I learn the store is past its pin without my open repairing it.
+
+**S10.** As a log inspector, I want opening a log to cost the same however long it is, and one named command that reads every leaf when I ask for an audit, so that I never pay for a full read I did not ask for.
 
 ## Leaf store maintainer — Reads the file store's contract before relying on it or changing it
 

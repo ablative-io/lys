@@ -38,11 +38,10 @@ use crate::handle::{HandleId, new_operation_id};
 use crate::permission::PermissionCheck;
 use crate::store::{Recipients, Scope};
 
-use super::folded::Handles;
-use super::lineage::chain;
+use super::lineage::{MAX_DEPTH, chain};
 use super::owner::checked;
 use super::scope::with_via;
-use super::{Broker, LeaseView};
+use super::{Broker, Handles, LeaseView, Work};
 
 /// How a revoke's drop line opens.
 const ENDED_BY: &str = "ended by ";
@@ -230,16 +229,16 @@ pub(super) fn fold(handles: &mut Handles, line: &AuditLine) {
     let Some((act, by, root)) = parsed(&line.outcome) else {
         return;
     };
-    if let Some(record) = handles.get_mut(id) {
-        record.dropped = true;
-        record.ended = Some(Ended {
+    handles.end(
+        id,
+        &Ended {
             by,
             operation: operation.clone(),
             root,
             act,
             at_ms: line.at_ms,
-        });
-    }
+        },
+    );
 }
 
 /// Refuses a name an ending's drop line could not be read back with.
@@ -285,7 +284,7 @@ impl<P: PermissionCheck> Broker<P> {
     /// holder of a handle above it acts for.
     fn acted_for_under(&self, identity: &str, id: &str) -> bool {
         self.handles.contains_key(id)
-            && chain(&self.handles, id).iter().any(|at| {
+            && chain(&self.handles, id).into_iter().any(|at| {
                 self.handles
                     .get(at)
                     .is_some_and(|record| self.acts_for(identity, &record.identity))
@@ -536,51 +535,63 @@ impl<P: PermissionCheck> Broker<P> {
             .is_ok()
     }
 
-    /// The handle `person` ended under `operation`, when there is one.
-    fn ended_under(&self, person: &str, operation: &str) -> Option<String> {
-        self.handles.values().find_map(|record| {
-            record
-                .ended
-                .as_ref()
-                .filter(|ended| {
-                    ended.by == person && ended.operation == operation && ended.root == record.id
-                })
-                .map(|ended| ended.root.clone())
-        })
+    /// The handle `person` ended under `operation`, when there is one: the
+    /// first, in order of id, that is its own ending's root. Only that handle
+    /// is visited.
+    pub(super) fn ended_under(&self, person: &str, operation: &str) -> Option<String> {
+        let root = self
+            .handles
+            .roots_ended_by(person, operation)
+            .into_iter()
+            .next()?;
+        Work::count(&self.work.visited, 1);
+        Some(root.to_owned())
     }
 
-    /// Every handle `person` ended under `operation`, `root` first.
-    fn ended_with(&self, person: &str, operation: &str, root: &str) -> Vec<String> {
+    /// Every handle `person` ended under `operation`, `root` first. Only
+    /// those handles are visited.
+    pub(super) fn ended_with(&self, person: &str, operation: &str, root: &str) -> Vec<String> {
         let mut ended: Vec<String> = self
             .handles
-            .values()
-            .filter(|record| {
-                record
-                    .ended
-                    .as_ref()
-                    .is_some_and(|ended| ended.by == person && ended.operation == operation)
-            })
-            .map(|record| record.id.clone())
+            .ended_by(person, operation)
+            .into_iter()
+            .map(str::to_owned)
             .collect();
+        let visited = u64::try_from(ended.len()).unwrap_or(u64::MAX);
+        Work::count(&self.work.visited, visited);
         ended.sort_by_key(|id| id != root);
         ended
     }
 
     /// The line of handles from `root` down to each handle at or below it
     /// that still stands, `root` first and the nearest before the deeper.
-    fn standing_below(&self, root: &str) -> Vec<Vec<String>> {
-        let mut paths: Vec<Vec<String>> = self
-            .handles
-            .keys()
-            .filter(|id| !self.line_dropped(id))
-            .filter_map(|id| {
-                let mut path = chain(&self.handles, id);
-                let at = path.iter().position(|above| above == root)?;
-                path.truncate(at.saturating_add(1));
-                path.reverse();
-                Some(path)
-            })
-            .collect();
+    /// It walks down from `root` through each handle's children, so it
+    /// visits the handles at or below `root` and no other, and no deeper
+    /// than a line of handles is counted.
+    pub(super) fn standing_below(&self, root: &str) -> Vec<Vec<String>> {
+        let mut paths: Vec<Vec<String>> = Vec::new();
+        let mut walk: Vec<Vec<String>> = Vec::new();
+        if self.handles.contains_key(root) {
+            walk.push(vec![root.to_owned()]);
+        }
+        while let Some(path) = walk.pop() {
+            Work::count(&self.work.visited, 1);
+            let Some(at) = path.last() else {
+                continue;
+            };
+            if path.len() < MAX_DEPTH {
+                for child in self.handles.children(at) {
+                    if !path.iter().any(|above| above == child) {
+                        let mut below = path.clone();
+                        below.push(child.to_owned());
+                        walk.push(below);
+                    }
+                }
+            }
+            if !self.line_dropped(at) {
+                paths.push(path);
+            }
+        }
         paths.sort_by(|one, other| one.len().cmp(&other.len()).then_with(|| one.cmp(other)));
         paths
     }

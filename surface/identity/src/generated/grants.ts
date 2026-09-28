@@ -20,11 +20,25 @@ export interface GrantWindow {
   ends_at: number | null;
 }
 
+/** `UnreportedView`: permitted exercises whose use events could not be recorded. */
+export interface Unreported {
+  count: number;
+  at: number;
+  route: RouteWire;
+  reason: string;
+}
+
 /**
  * `LastUseView`: when a grant was last seen exercised at an enforcement point.
  * Not seen says only that no exercise was observed, never that it was never used.
+ * `recorded` counts the use events in the grant log; `source` is `reported` when
+ * every permitted exercise the service has seen since it opened has one, and
+ * `missing` when some have none, so a zero is then not no use.
  */
-export type LastUse = { seen: false } | { seen: true; at: number; route: RouteWire; use_event: number };
+export type LastUse = ({ seen: false } | { seen: true; at: number; route: RouteWire; use_event: number }) & { recorded: number } & (
+  | { source: 'reported' }
+  | { source: 'missing'; unreported: Unreported }
+);
 
 /** `GrantView`. */
 export interface Grant {
@@ -48,6 +62,14 @@ export interface Grant {
   /** The grants' revision once its revocation was committed; null while it stands. */
   revoked_revision: number | null;
   last_use: LastUse;
+  /**
+   * `StandingView`: whether it stands, judged by the service over its whole
+   * chain at its clock. A refusal that names a grant or identity the caller
+   * may not see keeps its name, with a null grant and the withheld reason.
+   */
+  standing: { stands: true } | { stands: false; refusal: string; grant: string | null; reason: string };
+  /** The earliest end on its chain, which admission keeps its own end; null when nothing on it ends. */
+  effective_ends_at: number | null;
 }
 
 /** GET /grants */

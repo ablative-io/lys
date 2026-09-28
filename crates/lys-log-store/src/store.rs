@@ -148,8 +148,11 @@ pub trait LeafStore {
     /// [`StoreError::LeafAlreadyWritten`] if `index < extent()`,
     /// [`StoreError::LeafWouldLeaveGap`] if `index > extent()`, and
     /// [`StoreError::Io`] if the write cannot be made durable.
+    /// [`StoreError::LeafDurabilityUncertain`] if the leaf was stored but its
+    /// durability could not be confirmed.
     ///
     /// [`StoreError::LeafAlreadyWritten`]: crate::StoreError::LeafAlreadyWritten
+    /// [`StoreError::LeafDurabilityUncertain`]: crate::StoreError::LeafDurabilityUncertain
     /// [`StoreError::LeafWouldLeaveGap`]: crate::StoreError::LeafWouldLeaveGap
     /// [`StoreError::Io`]: crate::StoreError::Io
     fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()>;

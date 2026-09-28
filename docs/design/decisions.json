@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-28",
+  "updated": "2026-09-29",
   "decisions": [
     {
       "id": "ADR-001",
@@ -1653,6 +1653,309 @@
         "A schema change that would strand standing grants is refused by name, never applied with a silent revoke.",
         "The MCP server and the HTTP API can never disagree: one route table, one set of handlers, one grant check.",
         "No app outage, slowness or removal changes any Lys answer about another app or about Lys itself."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-117",
+      "title": "Lys runs the agents it starts: its own background terminal, or a runner another tool provides",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-28",
+      "decided_by": "Tom, 28 September 2026 19:48 Melbourne, on Dot; recorded by Waffles with DIRECTORY-050",
+      "context": "Lys renders an agent's start command from its kept profile and records the start (launch_api.rs, start.rs), but never runs it: the command is handed to a person or another tool. Sessions report starting, running and stopped themselves (runtime_api.rs), and an emergency stop asks each session's runtime to end it (stop_api.rs). Running, typing into and reading agent sessions is done outside Lys today by Argus through herdr and, as designed, by Manifold, neither of which Lys can rely on.",
+      "decision": "Lys runs the agents it starts. A runner is the part that holds an agent's terminal: Lys ships one of its own, a background process on each machine that runs each started agent in its own pseudo-terminal, and accepts any other runner that speaks the same small, published runner protocol. Through a runner, Lys starts, types into, presses keys in, reads, waits on, resizes, compacts and stops a session, rotates it across its accounts when it reports a usage limit, and wakes it with a message, each act under the caller's grants and recorded. Lys depends on no particular runner: its own is the default, another is chosen per machine.",
+      "quote": "I've decided that I want this to actually handle the launching of agents, either through a background terminal of its own or plugging into something else. I want it to be able to do all of the things that Argus can do currently through herdr, and what was supposed to be done through manifold.",
+      "consequences": [
+        "An agent can be started, driven and stopped entirely from Lys's screens, API and MCP, with no other tool installed.",
+        "Argus and Manifold may become runners or clients of Lys; neither is required by it.",
+        "Every keystroke or message sent to a session is an act under a grant, with a receipt.",
+        "The earlier rule that Lys gives a start command and never runs the agent is superseded for machines with a runner; a machine with none still gets the command."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-118",
+      "title": "Lys owns running and monitoring its agents and enforcing values; Argus reads data for analytics",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-28",
+      "decided_by": "Tom, 28 September 2026 19:50 to 19:51 Melbourne, on Dot; recorded by Waffles with DIRECTORY-051",
+      "context": "Argus, a separate service, watches agent sessions: context use and budgets, compaction requests, goal reminders and scheduled messages, reaching sessions through herdr. Tom: it keeps crashing and cannot track budgets, token usage, time and goals through Lys. Lys already keeps each session's home and transcript (lys-home) and, with DIRECTORY-050, runs the session. Amended by the later clarification relayed by Waffles from Tom on Dot, 29 September 2026 06:59 to 07:00; the earlier quotation below is retained as history, not the current service boundary. Tom reversed the inbound-feed proposal at 07:02 on Dot, relayed in full by Waffles at 07:03. This final clarification governs: Lys installs the hooks/status line and reads the stream itself. The 06:59 to 07:00 intermediate proposal remains history only. At 07:04 Tom further described Argus as an extension consuming Lys streams and reading permitted Lys variables, otherwise doing its own work. Review on29September07:12 found no pre-existing runner enforcement; 07:18–07:20 ruling puts the narrow peer proof and new policy enforcement into051. Earlier wording about displaying existing sandbox records was rejected.",
+      "decision": "Lys owns everything about running and monitoring an agent it starts: installing its hooks/status line, reading its session stream and recording tokens, context and time. Lys holds budgets, goals, expectations and deliverables and enforces them through its runner with notices, compaction requests or stops as the value says. The context-watch notices previously driven by Argus become Lys-driven acts. Lys exposes the resulting data for Argus, which keeps analytics and visualisation; Lys does not depend on it. Lys screens are plain controls/state plus the authoritative tool-policy and grant refused-acts list on each agent page. Context compaction, goals and reminders are Lys-owned background acts. Argus may read explicitly permitted Lys variables alongside its data stream; no secret or arbitrary environment export follows from this. DIRECTORY-051 creates the missing tool-boundary policy and its browser editor. It does not claim an OS sandbox. The runner proves socket peer identity in peer.rs and makes grantable decisions against the live grant authority, denying uncertainty. Codex pre-tool refusal coverage is explicitly unavailable. OS process containment is the separate card11VnzLRp.",
+      "quote": "Argus is not going to be able to do what we need, to be able to track budgets and token usage, time, goals and everything like that through Lys. We're going to completely rewrite that, in Rust.",
+      "consequences": [
+        "No upstream Argus feed dependency or card remains; Lys owns collection and enforcement.",
+        "Hook/status-line installation and incremental stream tracking must be proved on a real scratch session, without global-config writes or telemetry network waits on the turn path.",
+        "Argus analytics readers cannot block Lys collection, turns or enforcement.",
+        "A hard cap is called enforced only with adequate measurement coverage and actual runner enforcement evidence.",
+        "The original quotation and the 06:59 to 07:00 intermediate reversal are retained as history; the 07:02 clarification governs."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-119",
+      "title": "A team is provisioned in one act: agents with memories, an opening conversation, a budget, goals and deliverables, and a checker",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-28",
+      "decided_by": "Tom, 28 September 2026 19:55 Melbourne, on Dot; recorded by Waffles with DIRECTORY-052",
+      "context": "Lys keeps provisioning profiles, a session's home with memory notes and successor letters, and can author an opening conversation a harness resumes (lys-home fewshot, PROOF-FEWSHOT). DIRECTORY-050 runs agents; DIRECTORY-051 holds budgets, goals, expectations and deliverables. Nothing puts them together: starting a working team takes many hand steps and nothing guarantees the work is checked.",
+      "decision": "A team plan is a record: its purpose, a total budget, its deliverables with the evidence each needs, and its members, each with a profile, the memories it starts with, an opening conversation, its share of the budget, its goals and reminders, and a checker (a named person or agent who must accept each deliverable). Provisioning a plan creates the agents, grants, homes, budgets and goals in one act that is all or nothing, and starts them through the runner. A deliverable is met only when its checker accepts it with the evidence.",
+      "quote": "I want you to be able to provision new agents so we can provision them off with the right memories, with the right few-shot kind of prompting to start it off, and to be able to send them off to do work without having to know that they've got a budget, know that they've got reminders, know that it's actually going to happen, know that things are actually being checked. So I could say, Waffles, we need a team to work on this. And you could provision them, give them a certain budget, and we can start to budget out things properly.",
+      "consequences": [
+        "Tom can ask for a team and see it start with its budget, goals and checker in place.",
+        "No agent in a team runs without a budget or a checker.",
+        "Budgets roll up: a team's spend is the sum of its members', held to the team's total."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-120",
+      "title": "Lys is installed by opening an app: a person downloads Lys, opens it, and finishes in the browser, never in a terminal",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-28",
+      "decided_by": "Tom, 28 September 2026 about 19:10 Melbourne (Lys is the only sign-in, an average person sets it up); recorded by Waffles with DIRECTORY-054",
+      "context": "`lys identity install` does the whole install, but it is a command typed in a terminal, it needs a container engine already running, and nothing packages Lys as a thing a person downloads. DIRECTORY-047 begins after the install, and DIRECTORY-029 gives start commands to paste into a shell. So no path exists by which an ordinary person installs Lys.",
+      "decision": "Lys ships for macOS as a signed, notarised Lys.app in a disk image. Opening it runs the same install service as `lys identity install`, in the process, showing each step on a Lys page in the browser, and hands over to the first-run setup page (DIRECTORY-047). Lys then starts at login, opening the app again opens Lys, a newer app upgrades through DIRECTORY-045 with its way back, and uninstalling is a Lys screen. Nothing on the path asks for a terminal, a file edit, a port or a password file. Whether the container engine is removed (running the issuer, the permission service and the database as native processes shipped in the app) is put to Tom separately; until he decides, a missing or stopped engine is a Lys page that says what to do in plain words and continues by itself when the engine appears.",
+      "quote": "how is an average person supposed to do it?",
+      "consequences": [
+        "An ordinary person installs Lys without a terminal.",
+        "The signing identity for the app is Tom's Apple developer identity, held as a secret by handle; building a release app without it is refused by name. An explicit development build is locally signed and named Lys (development), never the release name; it is not notarised and is not release evidence.",
+        "The container engine is still required until Tom decides otherwise; the app guides the person through it."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-121",
+      "title": "A service's exit lock is opened in the service's own process by a holder command, not in the starter",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-28",
+      "decided_by": "Archie, lead of the Lys identity line, 28 September 2026, after the exit watch race was proved on the landing gate; Waffles asked for the comparison with the spawn's file actions",
+      "context": "The starter opened and took the exit lock and handed it to the service. A process started by another thread of the starter carries a copy of that descriptor until its exec, and the lock stays held in the copy. The watch side was fixed by a shared lock released by name; the start side remained.",
+      "decision": "The service is started through `lys identity hold`, which opens the lock, takes it without waiting, says held on its standard output and execs the service. The starter reads that handshake to its end and only then writes the pid file, which names the service because exec keeps the pid. The holder uses safe standard library calls only and is the same on macOS and Linux. Refused are code run between fork and exec (unsafe, async-signal-safe calls only) and the spawn's file actions with O_EXLOCK (macOS and BSD only, a foreign call in an unsafe block, no equal on Linux).",
+      "quote": "",
+      "consequences": [
+        "The starter never holds the exit lock, so no process it starts can carry a copy.",
+        "Every service start costs one more exec.",
+        "Lys code gains no unsafe block."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-122",
+      "title": "Install provisions the audit agent and separate authenticated transport",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-28",
+      "decided_by": "Waffles, on Tom's authority",
+      "context": "The verified sender has no provisioned identity or TLS configuration; copying credentials manually does not make an installed product.",
+      "decision": "Install provisions private stable sender material and a separate TLS-only authority key. Browser setup, after creating the real administrator, completes sender enrolment and login binding through one recoverable intent. The capability authority and event signer never sign TLS certificates. The Rauthy sender verifies chain, hostname and pinned server key before HTTP. DIRECTORY-045 R5 swaps public trust/configuration/mounts with binaries and preserves private credentials. Cross-repository source builds are ordered; activation requires matched artifacts.",
+      "quote": "Split it in two, one brief per repository.",
+      "consequences": [
+        "Lys provisioning waits for DIRECTORY-045, DIRECTORY-047 and the current installer landing; install-service acceptance does not depend on the launcher.",
+        "The sender identity and seed survive upgrade byte-for-byte.",
+        "Original-login reassignment and signed checkpoints remain separate follow-ups."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-123",
+      "title": "A log's proofs come from C2SP hash tiles stored beside its leaves",
+      "status": "decided",
+      "scope": "lys-log-store",
+      "date": "2026-09-28",
+      "decided_by": "Archie, asked by Waffles to brief it under Tom's replay rule",
+      "context": "The first proof after every start read every leaf to build a whole-log proof tree, and held it in memory. Tom's rule forbids a start or first request reading the whole history.",
+      "decision": "Every append writes its leaf hash, and every tile it completes, into C2SP tlog-tiles beside the leaves before it moves the pin. Proofs read only the tiles that hold their hashes. A log made before tiles is given them once. The tile layout is local state, and it is also the layout a static serving of the log would use.",
+      "quote": "",
+      "consequences": [
+        "The whole-log proof tree and its in-memory hashes are removed.",
+        "A missing or wrong tile is refused by name, never rebuilt quietly.",
+        "Serving the log as static tiles later needs no new storage."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-124",
+      "title": "A signing key is used inside the secrets broker, which signs typed members under a purpose's domain and never gives the key out",
+      "status": "decided",
+      "scope": "secrets",
+      "date": "2026-09-28",
+      "decided_by": "Archie as secrets lead, for the signing need DIRECTORY-049 R7 found",
+      "context": "An agent signs its requests to lys-identity-server with its certificate key. Reading that key out of the broker at each call breaks the broker's rule that a secret's value never leaves it.",
+      "decision": "A secret may be sealed as a signing key with one purpose from a closed list. The broker signs for a live, admitted handle, builds the bytes to sign itself from typed members with the same function the verifier uses, and answers a COSE_Sign1 signature and the public key only.",
+      "quote": "",
+      "consequences": [
+        "A signing key has no value-bearing use, and every value route and command refuses it by name.",
+        "The bytes of an agent request are built by one function in lys-core, shared by the signer and the verifier.",
+        "Every signature is on the broker's audit record as an ordinary use line, with no digest and no key, and counts against its lease after a reopen.",
+        "lys-core's rule that no constructor takes private key material is lifted for Ed25519Identity::from_seed alone, which takes the seed wrapped in Zeroizing."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-125",
+      "title": "An agent session's holder key is held by the runner, and a session proves itself by peer credentials and ancestry",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-28",
+      "decided_by": "Waffles, ruling on docs/design/directory/HOLDER-KEY-OPTIONS.md",
+      "context": "A broker handle is usable only with presentations signed by its holder key, and nothing gives an agent session one, so every handle an agent is launched with is unusable.",
+      "decision": "The runner makes one holder key per session in memory. A start becomes key, then issue, then spawn. The harness and lys mcp ask the runner for single presentations over its socket. The session is proved by peer credentials plus the process ancestry reaching the session's own root pid, checked on every connection, on macOS and Linux both, through a named maintained dependency and with no unsafe in Lys code.",
+      "quote": "Option A. The runner holds one key per session. A named refusal on macOS is out. The inherited descriptor is rejected.",
+      "consequences": [
+        "The broker gains a route that issues a handle bound to a named public key (SECRETS-008).",
+        "The runner gains a per-session key and a presentation act in a brief after DIRECTORY-050.",
+        "DIRECTORY-049 R7 and R8 depend on that brief."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-126",
+      "title": "Applications have connector identities; people register them with explicit permission",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-29",
+      "decided_by": "Tom on Dot, 29 September 2026 06:47, 06:48 and 06:50 Melbourne, relayed by Waffles; recorded by Chippy",
+      "context": "DIRECTORY-048 used service accounts and an independent registrar credential for app registration, while IdentityId and grant holders have only person and agent kinds. Those substitutions do not represent the app as its own authority. The 06:50 ruling clarifies the earlier 06:48 restriction: registration is available to a person given register_app by the super administrator, rather than to that administrator alone.",
+      "decision": "An application connector is its own third identity and grant-holder kind. Apps do not act as agents and do not use service accounts, which are accounts people use to service things. Only a signed-in person with an explicit ordinary register_app grant registers an app. The super administrator may grant that permission to a person; an agent, connector or service account cannot register, even if presented with such a grant. Approval creates a connector identity and binds the app to it. No app authority is implicit in approval, binding or ownership of a kind prefix: every permission is an explicit grant with a chain tracing to the super administrator. Own-kind checks, schema acts, batch and which use that connector identity and the ordinary grant engine. Extend IdentityId, grant admission and the permission-store holder, plus event and snapshot representation with compatibility tests. Preserve historical person/agent bytes and signatures; version a representation when necessary, never rewrite history or coerce identities. This supersedes DIRECTORY-048 wording allowing a service account or connector holding register_app to register, and forbids a separate registrar credential as substitute authority.",
+      "quote": "",
+      "consequences": [
+        "DIRECTORY-048 R1, R2, R3 and R5 use application-connector identity and grants; service accounts retain their separate purpose.",
+        "Approval creates identity and binding but no implicit grants.",
+        "Compatibility tests retain historical fixtures and prove old grants and signatures remain valid."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-127",
+      "title": "A SpiceDB wait ends on its answer, its close or its caller, and grants sections run off the async workers",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-29",
+      "decided_by": "Archie, lead of the Lys identity line, under Tom's rule that nothing waits on a clock",
+      "context": "spicedb_http.rs bounds each SpiceDB connect, write and read by a five-second WAIT. The call is blocking and runs on a tokio worker inside with_grants while the std Mutex over GrantState is held. The RelationshipStore trait in lys-identity, which the SpiceDB store implements, is synchronous, and the grant authority calls it synchronously.",
+      "decision": "Keep RelationshipStore synchronous. Run each grants section under spawn_blocking inside a cancel scope owned by the handler's future. Every SpiceDB exchange uses a non-blocking socket and waits in poll(2) on that socket and the scope's wake pipe, with no timeout, and dropping the handler's future cancels the scope, which wakes the poll so the call returns. A section that gets the grants lock after its request left returns before it opens GrantState or calls SpiceDB. The SpiceDB endpoint must be a socket address, so no name lookup is ever waited on. WAIT and the three socket timeouts go with no clock in their place. Making the SpiceDB store and the grant authority async with a tokio Mutex was weighed and not taken, because it changes the lys-identity core trait and every grant act for the same result.",
+      "quote": "No timeouts, deadlines or watchdogs anywhere",
+      "consequences": [
+        "A connected SpiceDB that never answers holds a grants section only for as long as its request's caller waits.",
+        "A request waiting for the grants lock holds one blocking thread until the lock is free.",
+        "At start there is no request, so SpiceDb::open waits for SpiceDB's answer or close, and the start shows its named step until then.",
+        "A section cancelled part way takes the path it takes today when a SpiceDB call fails.",
+        "A configuration naming SpiceDB by host name, accepted before this decision, is refused at load with its reason. The install writes 127.0.0.1 (crates/lys/src/identity/install/server_config.rs), so a generated install is unaffected."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-128",
+      "title": "The runner applies OS containment from the same Lys policy and reports native denials",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-29",
+      "decided_by": "Tom via Waffles at 07:14, 07:16 and 07:23 Melbourne, following Archie's 07:22 review. Recorded by Chippy.",
+      "context": "DIRECTORY-051 creates Lys-owned hooks and refusal recording at the tool boundary. A shell can execute outside a tool hook. OS confinement and source-backed denial reporting are separate capabilities. Linux Landlock network rules apply to ports, not destination hostnames (https://docs.kernel.org/userspace-api/landlock.html). Native audit availability is an explicit host capability (https://www.kernel.org/doc/html/latest/admin-guide/LSM/landlock.html). Apple describes sandbox denial diagnostics and inherited helper restrictions (https://developer.apple.com/documentation/security/discovering-and-diagnosing-app-sandbox-violations).",
+      "decision": "Compile one Lys policy into Seatbelt on macOS and Landlock with a private network namespace on Linux. A policy-bound egress service enforces hostnames while OS rules prevent direct bypass. A runner applies containment before untrusted exec and records its policy digest and session incarnation. Native kernel events feed the same authenticated refusal stream as051, with distinct provenance from tool and proxy denials. Missing enforcement or required audit support refuses launch. gaps are visible and end affected sessions through the existing ownership mechanism. A writable outside-root fixture that succeeds without confinement is the filesystem control. Never infer sandbox enforcement from a failure to write /etc/x. Both native platforms require real tests and receipts.",
+      "quote": "",
+      "consequences": [
+        "The card is 11VnzLRp and the handwritten implementation brief is DIRECTORY-062, after 051.",
+        "Host preparation is a separate one-time privileged act from the Lys page using native macOS administrator or Linux distribution authorisation. It is outside ordinary install. Missing preparation refuses a contained start by name. No terminal is required.",
+        "Linux requires Landlock ABI 7 audit support, introduced with kernel 6.15, and audit-reader privilege. Ubuntu namespace restrictions remain enabled. A helper-specific profile supplies namespace access. Noninitial-namespace LOG capability is explicitly authorised and checked.",
+        "The Linux namespace uses a named local forwarder and a bound host Unix egress socket. It receives no direct host route. Hostnames remain enforced by the same Lys policy.",
+        "Use sandbox-exec on macOS and a separately executed self-restricting Linux helper. Do not use unsafe Rust or pre_exec callbacks.",
+        "Native coalescing retains the aggregate count and marks per-attempt coverage incomplete. Never invent syscall events.",
+        "051 creates the policy version and its store. 062 adds its digest there. The existing pinned Lys server key signs the launch act containing the plan.",
+        "The Linux venue is 205 and is probed only through the gate workflow. Missing kernel or audit capability requires a separate linked venue-prerequisite card. macOS may pass first but both native legs and the full battery must pass on the integrated head before 062 is complete."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-129",
+      "title": "Paths under /api belong to the API and are refused when unknown, and paths outside it stay the page's",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-29",
+      "decided_by": "Archie, lead of the Lys identity line",
+      "context": "The service serves the screens and the API on one origin. The screens are one page that reads its own route from the address, so the server cannot know which paths outside /api the page shows and answers them all with the page. Until now the API had no fallback of its own, so unknown API paths fell through to the page as well.",
+      "decision": "The API nested under /api has its own fallback answering 404 with a named JSON refusal. Paths outside /api stay the page's, so /health and /healthz at the root keep answering the page, and the page shows what it shows for a route it does not know. The one health answer is GET /api/health, which names the service and its build and asks no other service. Serving 404 for chosen root names was weighed and not taken, because the server would then guess at the page's routes.",
+      "quote": "a health answer or a 404",
+      "consequences": [
+        "A caller of a missing API gets 404 and a named reason.",
+        "A check that asks /health or /healthz at the root still gets the page and must ask /api/health.",
+        "GET /api/health says only that this process is serving, not that its dependencies are ready, which lys identity health reports.",
+        "A probe that asks /health, /healthz or /status at the root gets 200 with the page and never reaches the API, so a status-only monitor would report healthy wrongly. Every probe of this service asks /api/health."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-130",
+      "title": "Managed harness channels carry automatic context and reminder acts",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-29",
+      "decided_by": "Tom, direction relayed by Waffles; transport contract authored by Gypsy for non-writer review",
+      "context": "051 owns the tracking and budget/goal models, but its generic runner delivery does not prove a harness boundary and still discusses typing. Tom requires behind-the-scenes acts, with nothing typed into a terminal.",
+      "decision": "064 adds one runner-owned typed control/event channel per managed Claude or Codex session. It reuses 051 operation and usage owners, serialises all inputs at proved boundaries, requires actual harness evidence and retains uncertain outcomes without automatic resend. Legacy PTY sessions remain manual and cannot claim this capability. 065 extends the same Codex event reader for refusal coverage.",
+      "quote": "nothing is typed into a terminal",
+      "consequences": [
+        "051 stores and Usage page are extended, not duplicated.",
+        "An accepted control request is not a completed compaction.",
+        "No source checkout alone establishes installed-harness capability.",
+        "An uncertain pipe write cannot be made exactly-once by a local operation ID."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-132",
+      "title": "Runner placement and process identity are separate upgrade facts",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-29",
+      "decided_by": "Gypsy, integration owner, with Waffles acceptance contract",
+      "context": "The 050 integration e7ec3905 preserves runner startup, but start_runner executes services::sibling(\"lys\") while 045 places only the broker and service. The runner is therefore missing from the installed build set and cannot be upgraded honestly. Archie identified this at 07:41; Waffles supplied the independent acceptance contract at 07:44 (post b162bb51). Gypsy chooses tracked runner placement with separate live/placed evidence and session-preserving upgrades. Card c8HKiQoa.",
+      "decision": "Place lys as the runner binary without putting the runner in the broker/service restart set. Record the running process build separately from placed bytes. Show pending restart and require explicit session-aware confirmation before ending live sessions. Preserve the runner through ordinary upgrade and rollback.",
+      "quote": "the runner joins 045's placed builds",
+      "consequences": [
+        "An upgrade can correctly leave the old runner running.",
+        "The installed record must name both builds.",
+        "A local status read cannot substitute for an authenticated live runner answer."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-131",
+      "title": "Codex policy comes from Lys and refusal provenance follows the real harness contract",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-29",
+      "decided_by": "Tom via Waffles at07:32 Melbourne. Recorded by Chippy.",
+      "context": "The inspected installed package manifest namesbd3798fa. Its relevant config/hooks/rollout/protocol/tool-event source is unchanged at7cbba483. Legacy notify is only after-turn. Modern PreToolUse exists separately. Declined may mean operational rejection and Failed may contain a sandbox error. These types cannot identify policy cause alone. Source paths and proof are pinned byDIRECTORY-065R1.",
+      "decision": "Render the same Lys policy into isolated native Codex settings. Use064's one transport owner and051's one refusal store. Distinguish Codex-reported rejection, Lys judge denial and062 OS denial. Required unrepresentable policy refuses launch. Coverage is capability-derived, never a blanket claim.",
+      "quote": "Lys renders a Codex agent's config with its own sandbox and approval settings from the same Lys policy, and collects Codex's own denials as refusal records",
+      "consequences": [
+        "No notify event or free-text command failure establishes a refusal.",
+        "Unattended approval never rejects escalation while sandboxing remains enabled.",
+        "051's unconditional Codex unsupported display is superseded only where065 proves the required capability.",
+        "The real installed binary and source contract are recorded independently.",
+        "062 and064 remain the owners of native containment and harness transport."
       ],
       "supersedes": [],
       "superseded_by": ""

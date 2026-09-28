@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-28",
+  "updated": "2026-09-29",
   "items": [
     {
       "id": "RM-001",
@@ -1983,7 +1983,7 @@
       "id": "RM-081",
       "title": "Sign and decompress once: the issuer certificate per authority and one key decompression per verify",
       "status": "briefed",
-      "kind": "efficiency",
+      "kind": "fix",
       "summary": "Every certificate the authority issues rebuilds and self-signs its own issuer certificate (an extra Ed25519 signature and DER encode per issue), and every Ed25519 verification in Lys decompresses the public key twice. Both sit under every certificate and every signature check.",
       "provenance": {
         "requested_by": "tom",
@@ -2008,7 +2008,7 @@
       "id": "RM-082",
       "title": "Identity server reads without repeated work: reviews, requests, issuance key, served screens, record reads and the screens' calls",
       "status": "briefed",
-      "kind": "efficiency",
+      "kind": "fix",
       "summary": "Six per-request paths in the identity server and two in its screens do work that is thrown away or repeated: whole-lineage walks before a cheap filter, linear scans over every request ever asked, a key file re-read per certificate, blocking file reads inside async handlers, a whole-record clone to serialise, and screens making serial or refused calls.",
       "provenance": {
         "requested_by": "tom",
@@ -2033,7 +2033,7 @@
       "id": "RM-083",
       "title": "Memory view reads without deep copies or per-lantern rescans",
       "status": "briefed",
-      "kind": "efficiency",
+      "kind": "fix",
       "summary": "Every memory view request deep-copies stored JSON before decoding it, and rescans every epilogue once per lantern cloning its text.",
       "provenance": {
         "requested_by": "tom",
@@ -2132,6 +2132,538 @@
         "RM-085"
       ],
       "notes": "Written by hand straight to main."
+    },
+    {
+      "id": "RM-087",
+      "title": "Lys runs and drives the agents it starts, through its own background terminal or another runner",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "A runner on each machine holds each started agent's terminal; Lys starts, types into, reads, waits on, compacts, rotates accounts for, wakes and stops sessions through it, under grants; any tool speaking the runner protocol can be the runner.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T19:48:31+10:00",
+        "quote": "I've decided that I want this to actually handle the launching of agents, either through a background terminal of its own or plugging into something else. I want it to be able to do all of the things that Argus can do currently through herdr, and what was supposed to be done through manifold.",
+        "context": "Said with the go for the API, before bed; target is the presentation on 29 September at 13:00."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-117"
+        ],
+        "briefs": [
+          "DIRECTORY-050"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-085"
+      ],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-088",
+      "title": "Lys tracks every agent's tokens, context, time, budgets and goals, and acts on them",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Lys installs session hooks/status line and follows runner-local streams, holds and enforces budgets/goals/reminders, and shows plain controls and authoritative refusals. Argus reads Lys data for analytics and visualisation.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T19:51:07+10:00",
+        "quote": "Argus is not going to be able to do what we need, to be able to track budgets and token usage, time, goals and everything like that through Lys. We're going to completely rewrite that, in Rust.",
+        "context": "Argus keeps crashing; Tom wants it rewritten in Rust inside Lys."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-118"
+        ],
+        "briefs": [
+          "DIRECTORY-051"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-087"
+      ],
+      "notes": "Written by hand. Current scope follows Tom's 29 September 07:02 to 07:04 clarification relayed by Waffles; ADR-118 preserves the earlier directions and reversals."
+    },
+    {
+      "id": "RM-089",
+      "title": "Provision a working team in one act: memories, opening conversation, budget, goals, deliverables and a checker",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "A team plan provisions and starts its agents with everything they need and holds them to a budget; deliverables are met only when a checker accepts the evidence.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T19:55:21+10:00",
+        "quote": "I want you to be able to provision new agents so we can provision them off with the right memories, with the right few-shot kind of prompting to start it off, and to be able to send them off to do work without having to know that they've got a budget, know that they've got reminders, know that it's actually going to happen, know that things are actually being checked. So I could say, Waffles, we need a team to work on this. And you could provision them, give them a certain budget, and we can start to budget out things properly.",
+        "context": "Said before bed; the goal of the Lys agent work."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-119"
+        ],
+        "briefs": [
+          "DIRECTORY-052"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-087",
+        "RM-088"
+      ],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-090",
+      "title": "Go back to the previous build after an upgrade that succeeded, and one build stamp for every binary",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "An install that upgraded and then misbehaves returns to the build it ran before with one command; the four binaries take their build stamp from one shared build script.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-28T20:25:00+10:00",
+        "quote": "You can start on all of that, you can refresh as well.",
+        "context": "Tom asked at 19:47 for his live install to be updated tonight. Waffles' review of DIRECTORY-045's first round (card/DIRECTORY-045 ca11e605) found two gaps: upgrade returns to the previous build only when the upgrade itself fails, and the build stamp is four byte-identical build.rs files held equal by a test."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [],
+        "briefs": [
+          "DIRECTORY-053"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand. Follows DIRECTORY-045."
+    },
+    {
+      "id": "RM-091",
+      "title": "Install Lys by downloading and opening an app, with no terminal",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Lys.app for macOS: open it, watch the install on a Lys page, finish first-run setup, and Lys runs at login; update and uninstall from Lys.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T19:10:00+10:00",
+        "quote": "how is an average person supposed to do it?",
+        "context": "Tom's standing rule of that evening: Lys is the only sign-in for everything and an average person sets it up with no terminal. Found missing by Waffles at 20:22 while reviewing an installer draft."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-120"
+        ],
+        "briefs": [
+          "DIRECTORY-054"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-084"
+      ],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-092",
+      "title": "A service's exit lock is opened only in the service's own process, so no other process ever carries a copy of it",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "A service's exit lock is opened and taken in the service's own process by a holder command, so no process the starter starts can carry a copy of it.",
+      "provenance": {
+        "requested_by": "archie",
+        "date": "2026-09-28T20:40:00+10:00",
+        "quote": "",
+        "context": "Found while landing the combined identity landing: the exit watch race on the landing gate, and the review of the sign-in provider's link-audit sender."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-121"
+        ],
+        "briefs": [
+          "DIRECTORY-057"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-093",
+      "title": "A receipt's checkpoint is signed by the service, so inclusion in it proves the act is in the log",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "The receipts route answers its checkpoint signed by the service key, and one function verifies a receipt answer against a pinned key.",
+      "provenance": {
+        "requested_by": "archie",
+        "date": "2026-09-28T20:40:00+10:00",
+        "quote": "",
+        "context": "Found while landing the combined identity landing: the exit watch race on the landing gate, and the review of the sign-in provider's link-audit sender."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [],
+        "briefs": [
+          "DIRECTORY-058"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-095",
+      "title": "The broker signs with a key it holds and returns the signature only; the key never leaves it",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "A secret can be a signing key with one purpose; the broker builds what it signs from typed members and returns the signature only, under its ordinary admission and audit.",
+      "provenance": {
+        "requested_by": "archie",
+        "date": "2026-09-28T20:55:00+10:00",
+        "quote": "",
+        "context": "Found in the review of DIRECTORY-049: its R7 read an agent's key out of the broker, which the broker forbids. DIRECTORY-049 depends on this card."
+      },
+      "links": {
+        "cluster": "secrets",
+        "decisions": [],
+        "briefs": [
+          "SECRETS-006"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-094",
+      "title": "Provision the audit sender and authenticated receiver transport during install",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Make the identity audit connection an installed part of Lys without manual credential handling. Waffles approved the split and scope on 28 September 2026 at 20:22 Melbourne; this brief owns only the Lys side.",
+      "provenance": {
+        "requested_by": "Waffles on Tom's authority",
+        "date": "2026-09-28",
+        "quote": "Split it in two, one brief per repository.",
+        "context": "Cambium review d3e3146b and id reservation 6f40503f, corrected by f39b5d70."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-122"
+        ],
+        "briefs": [
+          "DIRECTORY-055"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Publish docs only after current landing settles; do not dispatch before named brief dependencies. No implementation completed."
+    },
+    {
+      "id": "RM-096",
+      "title": "A proof reads a few stored hash tiles and never a leaf, from the first request after a start",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Hash tiles beside the leaves, written before the pin; proofs read only the tiles they need; old logs get tiles once; a gate test fails when a start or first proof reads before the tail.",
+      "provenance": {
+        "requested_by": "archie",
+        "date": "2026-09-28T22:10:00+10:00",
+        "quote": "",
+        "context": "Found in the replay sweep Tom asked every lead for on 28 September: the first receipt after each restart read the whole log."
+      },
+      "links": {
+        "cluster": "lys-log-store",
+        "decisions": [
+          "ADR-123"
+        ],
+        "briefs": [
+          "LYSLOGSTORE-006"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-097",
+      "title": "Nothing opens a log by reading every leaf: the anchor and the lys log commands open from the tiles",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "A frontier log opens from its tiles; the anchor, the lys log and ca log commands and the revocation appends move onto it; only a new lys log audit reads every leaf; the whole-tree Log is removed; a gate test fails when an open reads under the pin.",
+      "provenance": {
+        "requested_by": "archie",
+        "date": "2026-09-28T22:15:00+10:00",
+        "quote": "",
+        "context": "Found in the replay sweep Tom asked every lead for on 28 September: the anchor and every lys log command read every leaf on open."
+      },
+      "links": {
+        "cluster": "lys-log-store",
+        "decisions": [
+          "ADR-123"
+        ],
+        "briefs": [
+          "LYSLOGSTORE-007"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-096"
+      ],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-098",
+      "title": "The broker's log command reads a window from the tail, never the whole audit log",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "lys-secrets log reads a window from the tail through AuditLog::window; the whole-log read becomes lys-secrets audit, never on a start.",
+      "provenance": {
+        "requested_by": "archie",
+        "date": "2026-09-28T22:20:00+10:00",
+        "quote": "",
+        "context": "Found in the replay sweep Tom asked every lead for on 28 September."
+      },
+      "links": {
+        "cluster": "secrets",
+        "decisions": [],
+        "briefs": [
+          "SECRETS-007"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-099",
+      "title": "Lys finds its own credentials, says where it is, serves its members to any app and signs out everywhere, needing no app to run",
+      "status": "briefed",
+      "kind": "fix",
+      "summary": "Start credentials come from Lys's own broker, a discovery record, a member feed for any app and back-channel sign-out, with no app needed to run.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-28T22:48:00+10:00",
+        "quote": "",
+        "context": "Tom's 21:34 rule that Lys and every app integrate natively and neither depends on the other."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [],
+        "briefs": [
+          "DIRECTORY-059"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-100",
+      "title": "The broker issues a handle bound to a public key a service names, for a person's agent",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "POST /_lys/handles/issue derives a handle under one the agent holds, for a holder that acts for the person acted for, so an agent session's handles are bound to the runner's per-session key.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-28T23:28:00+10:00",
+        "quote": "a SECRETS card for a broker route that issues a handle to a given public key",
+        "context": "Waffles's ruling on the holder-key options note."
+      },
+      "links": {
+        "cluster": "secrets",
+        "decisions": [
+          "ADR-125"
+        ],
+        "briefs": [
+          "SECRETS-008"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-101",
+      "title": "The runner holds one holder key per agent session and signs its presentations",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Start becomes key, then issue, then spawn, and the runner socket gains a present act proved by peer credentials and ancestry.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-28T23:28:00+10:00",
+        "quote": "a new brief, not an amendment to 050",
+        "context": "Waffles's ruling on the holder-key options note."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-125"
+        ],
+        "briefs": [
+          "DIRECTORY-060"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-100"
+      ],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-102",
+      "title": "A SpiceDB call ends on its answer or when its caller leaves, never on a clock",
+      "status": "briefed",
+      "kind": "fix",
+      "summary": "WAIT and the three socket timeouts leave spicedb_http.rs, and grants sections run off the async workers inside a cancel scope the request owns.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-29T03:01:00+10:00",
+        "quote": "No timeouts, deadlines or watchdogs anywhere",
+        "context": "Archie's clock census of Lys main found spicedb_http.rs WAIT as the only production clock, carded YIaL3p3F."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-127"
+        ],
+        "briefs": [
+          "DIRECTORY-061"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-103",
+      "title": "Every runner-owned agent is contained by the operating system and its denials are visible",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Seatbelt and Landlock/network-namespace containment derived from Lys policy, with native denial provenance and a visible real-browser proof on both platforms.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-29T07:14:00+10:00",
+        "quote": "",
+        "context": "Waffles relayed Tom's visible sandboxing request for Archie's card11VnzLRp. The 07:16 correction requires a writable outside-root control instead of treating /etc/x as proof."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-128"
+        ],
+        "briefs": [
+          "DIRECTORY-062"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-088"
+      ],
+      "notes": "Handwritten on main. Stacks after DIRECTORY-051. Author Chippy; independent reviewer Archie."
+    },
+    {
+      "id": "RM-104",
+      "title": "An unknown API path is refused and the service answers one honest health route",
+      "status": "briefed",
+      "kind": "fix",
+      "summary": "The API under /api gets its own 404 fallback, and GET /api/health names the service and its build.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-29T07:23:00+10:00",
+        "quote": "on the live install, /api/health, /health and /healthz answer 200 with the web page instead of a health answer or a 404",
+        "context": "Waffles's handover to Archie, carded 8YKXu3wv."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-129"
+        ],
+        "briefs": [
+          "DIRECTORY-063"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-105",
+      "title": "Lys controls context and delivers goals through managed harness channels",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Extend 051 with one managed harness control channel, verified turn boundaries, real compaction and reminder admission evidence, no PTY automation, and explicit unknown-outcome reconciliation. Keep tracking and policy in their existing owners. The new Codex event owner is also the integration seam for DIRECTORY-065.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-29T07:32:33+10:00",
+        "quote": "nothing is typed into a terminal",
+        "context": "Tom 07:02 intent relayed in Lys post f4d4e7fa; card k7sAzdWw."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-130"
+        ],
+        "briefs": [
+          "DIRECTORY-064"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-088"
+      ],
+      "notes": "Written by hand. Non-writer Chippy reviews. Builds on DIRECTORY-051; supplies managed Codex reader for065."
+    },
+    {
+      "id": "RM-107",
+      "title": "Place the runner and distinguish its running build from the installed build",
+      "status": "briefed",
+      "kind": "fix",
+      "summary": "Place bin/lys through the existing install/upgrade transaction, keep a live runner running across upgrade, record its actual compiled build separately, and add explicit controlled restart plus plain status. This fixes the merge seam through the full card chain without pretending the on-disk replacement is already executing.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-29T07:44:32+10:00",
+        "quote": "Row 3 must run against a real pty session, not a fake.",
+        "context": "Independent acceptance contract after integration review; card c8HKiQoa."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-132"
+        ],
+        "briefs": [
+          "DIRECTORY-066"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Handwritten follow-up to the 045/050 integration. Distinguishes placing from restarting."
+    },
+    {
+      "id": "RM-106",
+      "title": "Codex uses the Lys policy and shows source-backed refusals",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Extend the signed policy and existing harness owner. Render Codex native config, bind native and Lys refusal evidence, and replace the blanket unsupported display with measured capabilities. Independent implementation branches may build in parallel under Tom's07:32 ruling. Integration must contain the actual051/062/064 seams and pass the fresh full chain before landing.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-29T07:32:00+10:00",
+        "quote": "Lys renders a Codex agent's config with its own sandbox and approval settings from the same Lys policy",
+        "context": "Relayed by Waffles in the Lys room. Card lRpNSAg7."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-131"
+        ],
+        "briefs": [
+          "DIRECTORY-065"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Handwritten.051,062 and064 implementation seams required at integration. Gypsy reviews."
     }
   ]
 }

@@ -8,7 +8,10 @@
 //! description closes, which for the service is its exit. Waiting for the
 //! exit is asking for the same lock and blocking until the kernel grants
 //! it: nothing is asked twice and no clock is read. A lock granted at once
-//! is a service already gone.
+//! is a service already gone. A watch asks for a shared lock, so two watches
+//! never refuse each other, and releases it by name before it answers,
+//! since closing its descriptor would leave the lock held in any copy a
+//! process started meanwhile still carries.
 //!
 //! The platforms' own notifications of another process's exit (`kqueue`'s
 //! `EVFILT_PROC`, a pidfd) are reachable from this workspace only through
@@ -55,7 +58,7 @@ pub fn hold(pid_file: &Path) -> IdentityResult<File> {
         .open(&path)
         .map_err(|error| refuse("take exit lock", error.to_string(), &path))?;
     let watch = ExitWatch { lock: file, path };
-    watch.wait()?;
+    watch.take()?;
     Ok(watch.lock)
 }
 
@@ -89,14 +92,36 @@ impl ExitWatch {
 #[cfg(unix)]
 impl ExitWatch {
     /// Whether the service has exited, answered at once without waiting.
+    /// The watch asks for a shared lock, which the service's exclusive one
+    /// refuses and another watch's does not, and releases it before the
+    /// answer, so it keeps nothing a later start would have to wait for.
     pub fn exited(&self) -> IdentityResult<bool> {
-        self.lock(FlockOperation::NonBlockingLockExclusive)
+        let exited = self.lock(FlockOperation::NonBlockingLockShared)?;
+        if exited {
+            self.release()?;
+        }
+        Ok(exited)
     }
 
     /// Blocks until the service has exited: the kernel grants the lock the
-    /// moment the service's last descriptor of it closes.
+    /// moment the service's last descriptor of it closes. The lock is
+    /// released before this returns.
     pub fn wait(&self) -> IdentityResult<()> {
+        self.lock(FlockOperation::LockShared)?;
+        self.release()
+    }
+
+    /// Takes the lock for a service and keeps it, waiting for any holder to
+    /// let go.
+    fn take(&self) -> IdentityResult<()> {
         self.lock(FlockOperation::LockExclusive).map(drop)
+    }
+
+    /// Lets the lock go by name. Closing the descriptor is not enough: a
+    /// process started meanwhile carries a copy of it until its exec, and
+    /// the lock would stay held in that copy.
+    fn release(&self) -> IdentityResult<()> {
+        self.lock(FlockOperation::Unlock).map(drop)
     }
 
     fn lock(&self, operation: FlockOperation) -> IdentityResult<bool> {
@@ -127,6 +152,11 @@ impl ExitWatch {
 
     /// Blocks until the service has exited; an exit lock needs a Unix host.
     pub fn wait(&self) -> IdentityResult<()> {
+        self.exited().map(drop)
+    }
+
+    /// Takes the lock and keeps it; an exit lock needs a Unix host.
+    fn take(&self) -> IdentityResult<()> {
         self.exited().map(drop)
     }
 }

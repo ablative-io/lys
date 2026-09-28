@@ -12,6 +12,8 @@
 
 **S19.** As the person an agent acts for under a lease, I want to revoke the lease and see issuing stopped at once and the confirmation from the system behind shown pending until it comes, so that I know what has stopped and what is still unconfirmed.
 
+**S167.** As a person starting an agent, I want its session's handles issued to a key only its runner holds, so that the agent can use every handle it is launched with and no key is ever handed to it.
+
 ## AI Agent — Uses a handle for its outbound calls and reads its sealed records
 
 **S4.** As an agent, I want to make my call with my handle and have the proxy swap in the credential, refreshing an expired OAuth token itself, so that I can do my work without ever seeing a credential.
@@ -19,6 +21,8 @@
 **S5.** As an agent, I want to ask for one of my sealed memories by name and get back only the piece I am permitted, so that a secret never sits in plain text in my memory files.
 
 **S20.** As an agent holding a lease, I want to give it back by a relinquish recorded as my own act, so that ending my own access is never recorded as a revoke nobody asked for.
+
+**S165.** As an agent, I want the broker to sign my requests with the key it holds for me, so that I can prove who I am without ever holding the key.
 
 ## Token revolver — The worker that runs Claude sessions and builders and turns to the next account on usage-limit words
 
@@ -33,6 +37,8 @@
 **S8.** As an operator, I want to rest an account by one change in the store, so that no worker gives it another call and no file is copied to any machine.
 
 **S9.** As an operator revoking access, I want each case to say what it reaches: a handle refuses new calls, a call already admitted follows the stated cancellation rule, a login token's seat is ended by its engine, and read knowledge stays read, so that I am never told revocation took back what it cannot.
+
+**S166.** As an operator, I want the broker's log command to show me the latest lines at once however long the log has grown, and a separate command when I want every line checked.
 
 ## Reviewer — Reads the audit of what the broker did
 

@@ -1,14 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { $, $$, choose, click, mount, press, text, unreachable } from './harness';
-import { ADA, DIRECTORY, GRANTS, ROOT_G, SCRIBE, SCRIBE_G, SERVICE, ok, refused } from './fixtures';
-import type { DelegateBody } from '../src/generated/grants';
+import { $, $$, choose, click, mount, press, text, unmountAll, unreachable } from './harness';
+import {
+  ADA, BEA, BEA_DIRECTORY, BEA_GRANTS, BEA_REVIEWER_G, BEA_ROOT_G, BEA_SERVICE, DIRECTORY, GRANTS, LEDGER_G,
+  ROOT_G, SCRIBE, SCRIBE_G, SERVICE, ok, refused,
+} from './fixtures';
+import type { DelegateBody, LastUse } from '../src/generated/grants';
 
 beforeEach(() => sessionStorage.clear());
 
 const holdRows = () => $$('.grid2 > div:first-child table')[0].querySelectorAll('tbody tr');
 
-describe('What you hold (conformance 1.4)', () => {
-  it('shows each grant, its source, and whether it may be passed on', async () => {
+describe('What you hold', () => {
+  it('row_1_4_what_you_hold_shows_each_grant_its_source_and_whether_it_may_be_passed_on', async () => {
     const { requests } = await mount('#/me');
     expect(requests).toContain('/grants');
     const rows = [...holdRows()].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent));
@@ -20,14 +23,14 @@ describe('What you hold (conformance 1.4)', () => {
   });
 });
 
-describe('The delegation form (conformance 2.1 to 2.3)', () => {
+describe('The delegation form', () => {
   const open = async (routes = SERVICE) => {
     const m = await mount('#/me', routes);
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
     return m;
   };
 
-  it('opens in the drawer, focused, and shows the source grant, its actions, may-pass-on and its end', async () => {
+  it('row_2_3_the_form_shows_the_source_grant_its_actions_may_pass_on_and_the_effective_end', async () => {
     await open();
     expect($('#drawer')?.classList.contains('open')).toBe(true);
     expect(document.activeElement?.id).toBe('dTo');
@@ -37,9 +40,19 @@ describe('The delegation form (conformance 2.1 to 2.3)', () => {
     expect(from).toContain('owner of project:identity');
     expect(from).toContain('Actions it allowsedit, grant, view');
     expect(from).toContain('You may pass it onagent');
-    expect(from).toContain('Ends no later than illustrative27 Oct, when yours does');
+    expect(from).toContain('Ends no later than27 Oct');
+    const ends = () => $$('#drawer .card')[0].querySelectorAll('.row')[3];
+    expect(ends().textContent).toBe('Ends no later than27 Oct');
+    expect(ends().querySelector('.open-q')).toBeNull();
+    expect(from).not.toContain('when yours does');
     expect($$('#dLease option').map((o) => o.textContent)).toEqual(['7 days', 'ends with assignment', 'no end']);
     expect(unreachable()).toEqual([]);
+
+    unmountAll();
+    const endless = GRANTS.map((g) => (g.id === ROOT_G ? { ...g, window: { ...g.window, ends_at: null }, effective_ends_at: null } : g));
+    await open({ ...SERVICE, '/grants': ok({ grants: endless, revision: 7 }) });
+    expect($$('#drawer .card')[0].textContent).toContain('Ends no later thanno end');
+    expect(ends().textContent).toBe('Ends no later thanno end');
   });
 
   it('offers only relations within what may be passed on, greying the rest', async () => {
@@ -63,9 +76,18 @@ describe('The delegation form (conformance 2.1 to 2.3)', () => {
     expect(body.pass_on).toEqual({ kind: 'use_only' });
     expect(body.route).toBe('browser');
     expect(body.operation).toMatch(/^op-[0-9a-f]{32}$/);
-    expect(body.window.ends_at).not.toBeNull();
+    const E = GRANTS.find((g) => g.id === ROOT_G)?.effective_ends_at ?? NaN;
+    expect(body.window.ends_at).toBe(Math.min(E, body.window.starts_at + 604800));
     expect($('#drawer')?.classList.contains('open')).toBe(false);
     expect($('#toast')?.textContent).toContain("Given. Scribe can now view project:identity, through you.");
+
+    await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
+    await choose($('#dTo'), SCRIBE);
+    await choose($('#dLease'), 'no end');
+    await click($('[data-act="delegatedo"]'));
+    const given = posted.filter((p) => p.path === '/grants').map((p) => p.body as DelegateBody);
+    expect(given).toHaveLength(2);
+    expect(given[1].window.ends_at).toBe(E);
   });
 
   it('names a recipient who is not active as the service refuses it', async () => {
@@ -262,11 +284,25 @@ describe('Who can reach this? (conformance 8.2)', () => {
 describe('A grant card', () => {
   it('shows a void grant of a suspended holder with the open question, and no Allows line', async () => {
     const suspend = (v: typeof DIRECTORY) => ({ ...v, people: v.people.map((p) => ({ ...p, agents: p.agents.map((a) => (a.id === SCRIBE ? { ...a, state: 'suspended' as const } : a)) })) });
-    await mount(`#/file/${SCRIBE}/access`, { ...SERVICE, '/directory/people': ok(suspend(DIRECTORY)), '/people': ok(suspend({ ...DIRECTORY, scope: 'personal', people: [DIRECTORY.people[0]] })) });
+    const reason = `IdentityNotActive: ${SCRIBE} is suspended, and only an active identity's grants are effective`;
+    const refusedScribe = GRANTS.map((g) => (g.id === SCRIBE_G ? { ...g, standing: { stands: false as const, refusal: 'IdentityNotActive', grant: null, reason } } : g));
+    await mount(`#/file/${SCRIBE}/access`, { ...SERVICE, '/grants': ok({ grants: refusedScribe, revision: 7 }), '/directory/people': ok(suspend(DIRECTORY)), '/people': ok(suspend({ ...DIRECTORY, scope: 'personal', people: [DIRECTORY.people[0]] })) });
     const card = $$('.file .card').find((c) => c.querySelector('.verdict-mark.no'));
-    expect(card?.textContent).toContain('Scribe is suspended what suspension refuses: open');
+    expect(card?.textContent).toContain(`${reason} what suspension refuses: open`);
     expect(text()).not.toContain('Allows:');
     expect(card?.textContent).toContain('Last used: 27 Sep 12:00 · tool');
+  });
+});
+
+describe('A grant card, its use and its window', () => {
+  it('row_8_4_a_grant_card_shows_last_used_its_source_and_window_and_never_never_used', async () => {
+    const unseen = GRANTS.map((g) => (g.id === SCRIBE_G ? { ...g, last_use: { seen: false as const, recorded: 0, source: 'reported' as const } } : g));
+    await mount(`#/file/${SCRIBE}/access`, { ...SERVICE, '/grants': ok({ grants: unseen, revision: 7 }) });
+    const card = $$('.file .card').find((c) => c.querySelector('.chain') && c.textContent?.includes('Last used'));
+    expect(card?.textContent).toContain('Last used: not seen');
+    expect([...(card?.querySelectorAll('.chain .pill') ?? [])].map((p) => p.textContent)).toEqual(['Ada (test person) · owner of project:identity', 'Scribe · viewer of project:identity']);
+    expect(card?.textContent).toContain('Window: 27 Sep to 4 Oct');
+    expect(card?.textContent).not.toContain('never used');
   });
 });
 
@@ -300,5 +336,199 @@ describe('A grant that ends with a role assignment (conformance 4.5)', () => {
     const option = $$('#dLease option')[1];
     expect(option?.hasAttribute('disabled')).toBe(true);
     expect(option?.getAttribute('title')).toBe('the agent holds no role with an end date');
+  });
+});
+
+/** The hold table as text, one array per row. */
+const holdText = () => [...holdRows()].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent));
+
+/** Every grant id the page put in the DOM, from the buttons that carry one. */
+const grantIdsOnScreen = () => $$('[data-g]').map((el) => el.dataset.g);
+
+/** Start the next mount of a test from an empty page, as a new session would. */
+const fresh = () => {
+  unmountAll();
+  document.body.innerHTML = '';
+  sessionStorage.clear();
+};
+
+describe('Two people and their agents (conformance 1.4, 1.5)', () => {
+  it('renders one person from their fixture ids, and only the other after the signed-in person changes', async () => {
+    const ada = await mount('#/me');
+    const meReads = ada.requests.filter((r) => r === '/me').length;
+    expect(meReads).toBeGreaterThan(0);
+    expect($('h1')?.textContent).toBe('Ada (test person)');
+    expect(holdText()).toEqual([
+      ['owner', 'project:identity', 'root', 'yes, to agents', 'Give to an agent…'],
+      ['viewer', 'project:ledger', 'root', 'no', ''],
+    ]);
+    expect(grantIdsOnScreen()).toEqual([ROOT_G]);
+    expect(text()).toContain('Scribe');
+    await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
+    const adaSource = $$('#drawer .card')[0].textContent ?? '';
+    expect(adaSource).toContain('owner of project:identity');
+    expect(adaSource).toContain('Actions it allowsedit, grant, view');
+    expect(adaSource).toContain('You may pass it onagent');
+    expect(adaSource).toContain('Ends no later than27 Oct');
+
+    fresh();
+
+    const bea = await mount('#/me', BEA_SERVICE);
+    // The second session read its own identity for itself; nothing was carried over.
+    expect(bea.requests.filter((r) => r === '/me')).toHaveLength(meReads);
+    expect($('h1')?.textContent).toBe('Bea (test person)');
+    expect(holdText()).toEqual([['editor', 'project:ledger', 'root', 'yes, to agents', 'Give to an agent…']]);
+    expect(grantIdsOnScreen()).toEqual([BEA_ROOT_G]);
+    // Her agent, and what it holds under her root grant, not Ada's.
+    expect(text()).toContain('Reviewer');
+    expect(text()).toContain('viewer of project:ledger');
+    await click($(`[data-act="delegate"][data-g="${BEA_ROOT_G}"]`));
+    const beaSource = $$('#drawer .card')[0].textContent ?? '';
+    expect(beaSource).toContain('editor of project:ledger');
+    expect(beaSource).toContain('Actions it allowsedit, view');
+    expect(beaSource).toContain('You may pass it onagent');
+    expect(beaSource).toContain('Ends no later than15 Nov');
+
+    // Nothing of the first person survived the change of session. Bea's own
+    // directory names Ada, so Ada is offered as a recipient in To and nowhere else.
+    const offered = $$('#dTo option').map((o) => (o as HTMLOptionElement).value);
+    expect(offered).toContain(ADA);
+    const rest = document.body.cloneNode(true) as HTMLElement;
+    rest.querySelector('#dTo')?.remove();
+    for (const id of [ROOT_G, LEDGER_G, SCRIBE_G, ADA, SCRIBE]) expect(rest.innerHTML).not.toContain(id);
+    expect(rest.textContent).not.toContain('Ada (test person)');
+    expect(rest.textContent).not.toContain('Scribe');
+    expect(text()).not.toContain('project:identity');
+  });
+
+  it("shows another person's grants through the administrator's own directory route", async () => {
+    const seen = { ...SERVICE, '/directory/people': ok(BEA_DIRECTORY), '/grants': ok({ grants: [...GRANTS, ...BEA_GRANTS], revision: 7 }) };
+    const { requests } = await mount(`#/file/${BEA}/access`, seen);
+    // The wider route answered, so the personal one was never asked for.
+    expect(requests).toContain('/directory/people');
+    expect(requests).not.toContain('/people');
+    expect($('h1')?.textContent).toBe('Bea (test person)');
+    const cards = $$('.file .card').filter((c) => (c.textContent ?? '').includes('Passable:'));
+    expect(cards).toHaveLength(1);
+    expect(cards[0].textContent).toContain('editor of project:ledger');
+    expect(cards[0].textContent).toContain('Passable: agent');
+    expect(cards[0].textContent).toContain('Window: 27 Sep to 15 Nov');
+    expect(cards[0].textContent).toContain('Last used: not seen');
+    expect(grantIdsOnScreen()).toEqual([BEA_ROOT_G]);
+    // The administrator sees her grants, not her agent's: only what she holds.
+    expect(document.body.innerHTML).not.toContain(BEA_REVIEWER_G);
+  });
+
+  it('refuses that same route by name when the caller is not a directory administrator', async () => {
+    const seen = {
+      ...SERVICE,
+      '/directory/people': refused(403, 'NotAdmitted', 'the wider directory is for its administrators'),
+      '/grants': ok({ grants: [...GRANTS, ...BEA_GRANTS], revision: 7 }),
+    };
+    const { requests, posted } = await mount(`#/file/${BEA}/access`, seen);
+    // The wider route was asked, refused, and the personal scope answered instead.
+    expect(requests.filter((r) => r === '/directory/people').length).toBeGreaterThan(0);
+    expect(requests).toContain('/people');
+    expect($('.why-not b')?.textContent).toBe('PersonNotVisible');
+    expect(text()).toContain('not among the records you may see');
+    expect(document.body.innerHTML).not.toContain(BEA_ROOT_G);
+    expect(grantIdsOnScreen()).toEqual([]);
+    expect($$('[data-act="revoke"]')).toEqual([]);
+    expect(posted).toEqual([]);
+  });
+});
+
+/**
+ * The refusals the service answers a delegation with. The reason is the whole
+ * text `GrantError`'s `Display` writes (crates/lys-identity/src/grants/error.rs);
+ * the refusal name is its first word, which is what `ServerError::name()` sends
+ * (crates/lys-identity-server/src/error_status.rs), and the status is the one
+ * `grant_status` gives that variant.
+ */
+interface RefusalCase {
+  /** What the server refused. */
+  what: string;
+  status: number;
+  /** The server's whole reason text; its first word is the refusal name. */
+  reason: string;
+  /** What the screen puts in bold: the refusal's name, or `pending` when the outcome is unknown. */
+  marker: string;
+  /** Whether the original request stays retained, pending its outcome. */
+  retained: boolean;
+}
+
+/** `ServerError::name()`: the refusal's name is the first word of its message. */
+const refusalName = (reason: string): string => reason.split(':')[0];
+
+const REFUSALS: RefusalCase[] = [
+  { what: 'use-only source', status: 403, marker: 'UseOnly', retained: false,
+    reason: `UseOnly: ${LEDGER_G} may be exercised and not passed on` },
+  { what: 'excessive requested scope', status: 403, marker: 'ActionsOutside', retained: false,
+    reason: 'ActionsOutside: `owner` in model version 3 carries grant, outside the authority held' },
+  { what: 'people-only policy', status: 403, marker: 'RecipientRefused', retained: false,
+    reason: `RecipientRefused: ${ROOT_G} may not be passed on to a agent` },
+  { what: 'expired ancestor', status: 403, marker: 'Expired', retained: false,
+    reason: `Expired: ${ROOT_G} ended at ${String(GRANTS[0].window.ends_at)}` },
+  { what: 'service outage', status: 503, marker: 'pending', retained: true,
+    reason: 'PermissionEngineUnavailable: the permission relationships could not be read' },
+];
+
+describe('Every refusal of a delegation (conformance 2.3, 2.4)', () => {
+  it('names the server refusal, sends exactly one request, and records no grant as given', async () => {
+    let ran = 0;
+    for (const c of REFUSALS) {
+      const name = refusalName(c.reason);
+      const { requests, posted } = await mount('#/me', { ...SERVICE, 'POST /grants': refused(c.status, name, c.reason) });
+      const before = holdText();
+      expect(before).toHaveLength(2);
+      const reads = requests.filter((r) => r === '/grants').length;
+      await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
+      await click($('[data-act="delegatedo"]'));
+
+      // One request, no retry, nothing else posted.
+      expect(posted.filter((p) => p.path === '/grants')).toHaveLength(1);
+      expect(posted).toHaveLength(1);
+      expect(requests.filter((r) => r === 'POST /grants')).toHaveLength(1);
+      // The refusal, exactly as the API answered it.
+      expect($('#dAnswer b')?.textContent).toBe(c.marker);
+      expect($('#dAnswer')?.textContent).toContain(c.reason);
+      expect(text()).toContain(name);
+      // Nothing given: no re-read of the list, no success, the rows as they were.
+      expect(requests.filter((r) => r === '/grants')).toHaveLength(reads);
+      expect($('#toast')?.textContent ?? '').not.toContain('Given');
+      expect($('#drawer')?.classList.contains('open')).toBe(true);
+      expect(holdText()).toEqual(before);
+      expect(sessionStorage.getItem('lys.pending.grant.' + ADA + '.' + ROOT_G) !== null).toBe(c.retained);
+
+      ran += 1;
+      fresh();
+    }
+    expect(ran).toBe(5);
+    expect(REFUSALS).toHaveLength(5);
+    expect(new Set(REFUSALS.map((c) => c.what)).size).toBe(5);
+  });
+});
+
+describe('A grant whose uses were not all recorded (conformance 8.4)', () => {
+  const card = () => $$('.file .card').filter((c) => (c.textContent ?? '').includes('Last used:'));
+  const withLastUse = (last_use: LastUse) => GRANTS.map((g) => (g.id === SCRIBE_G ? { ...g, last_use } : g));
+
+  it('counts the uses it could not record beside "not seen", and a reported zero says only "not seen"', async () => {
+    const unreported = { count: 1, at: GRANTS[2].window.starts_at, route: 'tool' as const, reason: 'the use log was unavailable' };
+    const missing = withLastUse({ seen: false, recorded: 0, source: 'missing', unreported });
+    await mount(`#/file/${SCRIBE}/access`, { ...SERVICE, '/grants': ok({ grants: missing, revision: 7 }) });
+    expect(card()).toHaveLength(1);
+    expect(card()[0].textContent).toContain('Last used: not seen · 1 use not recorded');
+    expect(text()).not.toContain('never used');
+
+    fresh();
+
+    // A reported zero is a zero, and is never told as a missing one.
+    const reported = withLastUse({ seen: false, recorded: 0, source: 'reported' });
+    await mount(`#/file/${SCRIBE}/access`, { ...SERVICE, '/grants': ok({ grants: reported, revision: 7 }) });
+    expect(card()).toHaveLength(1);
+    expect(card()[0].textContent).toContain('Last used: not seen');
+    expect(text()).not.toContain('not recorded');
+    expect(text()).not.toContain('never used');
   });
 });

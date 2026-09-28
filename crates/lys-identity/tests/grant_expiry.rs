@@ -3,15 +3,17 @@
 
 mod support;
 
+use std::collections::HashMap;
 use std::error::Error;
 
-use lys_identity::grants::admission::effective;
+use lys_identity::grants::admission::{effective, judge_delegation};
+use lys_identity::grants::lineage::resolve;
 use lys_identity::grants::{
-    GrantError, GrantId, MemoryRelationships, Model, PassOn, RecipientKind, Relation,
-    RevokeRequest, Route, Window,
+    Grant, GrantError, GrantId, GrantParts, MemoryRelationships, Model, PassOn, RecipientKind,
+    Relation, RevokeRequest, Route, Source, Window,
 };
 use lys_identity::{
-    Actor, AuthMethod, IdentityId, LifecycleState, LoginBinding, OperationId, Provenance,
+    Actor, AuthMethod, IdentityId, LifecycleState, LoginBinding, OperationId, PersonId, Provenance,
     Transition,
 };
 use support::{T0, World, actions, alpha, pass};
@@ -28,7 +30,8 @@ fn expired(grant: GrantId, ended_at: u64) -> GrantError {
 }
 
 #[test]
-fn grant_expiry_every_end_binds_at_its_boundary_and_no_role_change_extends_it() -> TestResult {
+fn row_2_6_grant_expiry_every_end_binds_at_its_boundary_and_no_role_change_extends_it() -> TestResult
+{
     let mut world = World::new()?;
     let (dana, tom, lee, agent) = (
         IdentityId::Person(world.dana),
@@ -133,6 +136,85 @@ fn grant_expiry_every_end_binds_at_its_boundary_and_no_role_change_extends_it() 
         Some(Some(T0 + 500))
     );
     assert_eq!(boundaries.len(), 10);
+    Ok(())
+}
+
+/// Admission's own check: a delegation ending past its source is refused
+/// before anything reaches the book, so the check at commit never sees it.
+#[test]
+fn row_2_6_admission_refuses_a_delegation_ending_past_its_source_before_any_commit() -> TestResult {
+    let mut world = World::new()?;
+    let (dana, tom) = (
+        IdentityId::Person(world.dana),
+        IdentityId::Person(world.tom),
+    );
+    let root = world.root(
+        world.dana,
+        "kite",
+        pass(&["read"], &BOTH)?,
+        Some(T0 + 1_000),
+    )?;
+    let request = world.request(dana, root, tom, "tern", PassOn::UseOnly, Some(T0 + 1_001))?;
+    let before = world.grants.book().clone();
+    let judged = judge_delegation(
+        world.grants.book(),
+        world.directory.projection()?,
+        world.grants.model(),
+        &request,
+        world.now,
+        GrantId::from_bytes([4; 16]),
+    );
+    assert_eq!(
+        judged,
+        Err(GrantError::ExpiryBeyondSource {
+            requested: (T0 + 1_001).to_string(),
+            source_grant: root.to_string(),
+            source_ends: T0 + 1_000,
+        })
+    );
+    assert_eq!(
+        world.grants.book(),
+        &before,
+        "a refused delegation changed the book"
+    );
+    Ok(())
+}
+
+/// The hop check at exercise: a chain written by hand, as neither admission
+/// nor the check at commit would let it be, is refused by the walk every
+/// exercise runs, at the hop whose end runs past its source's.
+#[test]
+fn row_2_6_resolve_refuses_a_derived_grant_ending_past_its_source_at_exercise() -> TestResult {
+    let (root, derived) = (GrantId::from_bytes([1; 16]), GrantId::from_bytes([2; 16]));
+    let person = PersonId::from_bytes([9; 16]);
+    let grant = |id, source, ends| -> Result<Grant, GrantError> {
+        Grant::new(GrantParts {
+            id,
+            issuer: IdentityId::Person(person),
+            holder: IdentityId::Person(person),
+            responsible: person,
+            resource: alpha()?,
+            relation: Relation::new("tern")?,
+            actions: actions(&["read"])?,
+            pass_on: pass(&["read"], &BOTH)?,
+            source,
+            window: Window::new(T0, Some(ends))?,
+            model_version: 1,
+            operation: OperationId::from_bytes([3; 16]),
+        })
+    };
+    let held = HashMap::from([
+        (root, grant(root, Source::Root, T0 + 1_000)?),
+        (derived, grant(derived, Source::Grant(root), T0 + 2_000)?),
+    ]);
+    assert_eq!(
+        resolve(derived, |id| held.get(&id)),
+        Err(GrantError::ExpiryBeyondSource {
+            requested: (T0 + 2_000).to_string(),
+            source_grant: root.to_string(),
+            source_ends: T0 + 1_000,
+        })
+    );
     Ok(())
 }
 

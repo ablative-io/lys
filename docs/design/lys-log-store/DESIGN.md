@@ -129,6 +129,76 @@ The witness keeps its per-origin memory in memory, as ADR-100 records. WitnessPr
 | `docs/design/lys-log-store/briefs/LYSLOGSTORE-004.json` | the read-only open, its two refusals, the repair rule and the file store's module doc |  |
 | `crates/lys-log-store/src/frontier_log.rs` | touched by LYSLOGSTORE-005 R1: A hash-only proof tree built by streaming | LYSLOGSTORE-005 |
 | `crates/lys-core/src/merkle/tree.rs` | touched by LYSLOGSTORE-005 R1: A hash-only proof tree built by streaming | LYSLOGSTORE-005 |
+| `crates/lys-log-store/src/tiles.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-log-store/src/tiles_tests.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-log-store/src/file/tiles.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-identity/tests/grant_faults.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-identity/tests/grant_use_reports.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-identity/tests/restart_snapshots.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-identity/tests/revocation_append.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-log-store/examples/restart_timing.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-log-store/src/proof_tree_tests.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-log-store/src/test_store.rs` | R1: Every append writes its hashes into tiles before the pin | LYSLOGSTORE-006 |
+| `crates/lys-log-store/src/tile_proofs.rs` | R2: Proofs are built from the tiles they need | LYSLOGSTORE-006 |
+| `crates/lys-log-store/src/tile_proofs_tests.rs` | R2: Proofs are built from the tiles they need | LYSLOGSTORE-006 |
+| `crates/lys-identity/src/restart.rs` | R2: Proofs are built from the tiles they need | LYSLOGSTORE-006 |
+| `crates/lys-identity-server/src/certificates_store.rs` | R2: Proofs are built from the tiles they need | LYSLOGSTORE-006 |
+| `crates/lys-log-store/src/tiles_adopt.rs` | R3: A log made before tiles gets them once | LYSLOGSTORE-006 |
+| `crates/lys-log-store/src/start.rs` | R3: A log made before tiles gets them once | LYSLOGSTORE-006 |
+| `crates/lys-log-store/tests/first_proof_reads_the_tail.rs` | R4: A gate test fails when a start or its first proof reads past the tail | LYSLOGSTORE-006 |
+| `crates/lys-identity-server/tests/receipt_after_restart.rs` | R4: A gate test fails when a start or its first proof reads past the tail | LYSLOGSTORE-006 |
+| `crates/lys-log-store/src/tile_open.rs` | R1: A frontier log opens from its tiles | LYSLOGSTORE-007 |
+| `crates/lys-log-store/src/tile_open_tests.rs` | R1: A frontier log opens from its tiles | LYSLOGSTORE-007 |
+| `crates/lys-anchor/src/anchor/open.rs` | R2: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys-anchor/src/anchor/genesis/constructors.rs` | R2: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys-anchor/src/anchor/artifact.rs` | R2: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys-anchor/src/anchor/checkpoint.rs` | R2: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys-anchor/src/anchor/submit.rs` | R2: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys-anchor/src/anchor/append.rs` | R2: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys-anchor/src/witness/fixture.rs` | R2: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys/src/commands/log/status.rs` | R3: The lys log and ca log commands and the revocation appends run on it | LYSLOGSTORE-007 |
+| `crates/lys/src/commands/log/checkpoint.rs` | R3: The lys log and ca log commands and the revocation appends run on it | LYSLOGSTORE-007 |
+| `crates/lys/src/commands/log/append.rs` | R3: The lys log and ca log commands and the revocation appends run on it | LYSLOGSTORE-007 |
+| `crates/lys/src/commands/log/prove.rs` | R3: The lys log and ca log commands and the revocation appends run on it | LYSLOGSTORE-007 |
+| `crates/lys/src/commands/ca_log.rs` | R3: The lys log and ca log commands and the revocation appends run on it | LYSLOGSTORE-007 |
+| `crates/lys-identity/src/revocation/append.rs` | R3: The lys log and ca log commands and the revocation appends run on it | LYSLOGSTORE-007 |
+| `crates/lys-log-store/tests/no_open_reads_every_leaf.rs` | R5: A gate test fails when an open reads a leaf under the pin | LYSLOGSTORE-007 |
+| `crates/lys/src/commands/log/audit.rs` | R4: lys log audit, the one read of every leaf | LYSLOGSTORE-007 |
+| `crates/lys/src/commands/log/audit_tests.rs` | R4: lys log audit, the one read of every leaf | LYSLOGSTORE-007 |
+| `crates/lys/src/commands/log/mod.rs` | R4: lys log audit, the one read of every leaf | LYSLOGSTORE-007 |
+| `crates/lys-log-store/src/origin.rs` | R1: A frontier log opens from its tiles | LYSLOGSTORE-007 |
+| `crates/lys-core/src/tlog/build_from_proof_tests.rs` | R2: Artifacts are built from a tile proof and a root | LYSLOGSTORE-007 |
+| `crates/lys-core/src/tlog/build.rs` | R2: Artifacts are built from a tile proof and a root | LYSLOGSTORE-007 |
+| `crates/lys-core/src/tlog/mod.rs` | R2: Artifacts are built from a tile proof and a root | LYSLOGSTORE-007 |
+| `crates/lys-anchor/src/anchor/append_tests.rs` | R3: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys-anchor/src/anchor/artifact_tests.rs` | R3: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys-anchor/src/anchor/checkpoint_tests.rs` | R3: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys-anchor/src/anchor/genesis.rs` | R3: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys-anchor/src/anchor/open_tests.rs` | R3: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys-anchor/src/anchor/status_tests.rs` | R3: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys-anchor/src/anchor/submit_tests.rs` | R3: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys-anchor/src/lib.rs` | R3: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys-anchor/tests/anchor_receipt_conformance/main.rs` | R3: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys-anchor/tests/checkpoint_note_conformance.rs` | R3: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys-anchor/tests/stranger_verification/main.rs` | R3: The anchor runs on the frontier log | LYSLOGSTORE-007 |
+| `crates/lys-identity/tests/revocation_fold.rs` | R4: The lys log and ca log commands and the revocation appends run on it | LYSLOGSTORE-007 |
+| `crates/lys-identity/tests/revocation_history.rs` | R4: The lys log and ca log commands and the revocation appends run on it | LYSLOGSTORE-007 |
+| `crates/lys-identity/tests/revocation_support/fixtures.rs` | R4: The lys log and ca log commands and the revocation appends run on it | LYSLOGSTORE-007 |
+| `crates/lys-identity/tests/revocation_verify.rs` | R4: The lys log and ca log commands and the revocation appends run on it | LYSLOGSTORE-007 |
+| `crates/lys/src/commands/log/store_tests.rs` | R4: The lys log and ca log commands and the revocation appends run on it | LYSLOGSTORE-007 |
+| `crates/lys/src/commands/log/status_tests.rs` | R4: The lys log and ca log commands and the revocation appends run on it | LYSLOGSTORE-007 |
+| `crates/lys/src/cli/log.rs` | R5: Reading every leaf is the audit, by name, and the whole-tree Log is gone | LYSLOGSTORE-007 |
+| `crates/lys/src/main.rs` | R5: Reading every leaf is the audit, by name, and the whole-tree Log is gone | LYSLOGSTORE-007 |
+| `crates/lys-anchor/tests/open_reads_no_leaf.rs` | R6: A gate test fails when an open reads a leaf under the pin | LYSLOGSTORE-007 |
+| `crates/lys-identity-server/tests/store_open_reads_the_tail.rs` | R6: A gate test fails when an open reads a leaf under the pin | LYSLOGSTORE-007 |
+| `crates/lys-secrets/src/audit.rs` | The broker's audit log, a frontier log that keeps tiles and logs their adoption. | LYSLOGSTORE-006 |
+| `crates/lys-identity/src/lib.rs` | Declares the lys-identity modules, without checkpoints after LYSLOGSTORE-006. | LYSLOGSTORE-006 |
+| `crates/lys-identity/src/grants/recovery.rs` | GrantLedger, whose entries is the audit read of every leaf. | LYSLOGSTORE-006 |
+| `crates/lys-identity/src/grants/authority.rs` | Grants, whose events is the audit read of every leaf. | LYSLOGSTORE-006 |
+| `crates/lys-identity/src/checkpoints.rs` | Removed by LYSLOGSTORE-006, as a receipt coordinate comes from the tiles. | LYSLOGSTORE-006 |
+| `crates/lys-anchor-cli/src/commands/anchor/submit.rs` | Its documentation links to Log name FrontierLog or lys log audit. | LYSLOGSTORE-007 |
+| `crates/lys-anchor/src/upward/fixture.rs` | Its documentation links to Log name FrontierLog or lys log audit. | LYSLOGSTORE-007 |
+| `crates/lys-log-store/src/frontier_log_tests.rs` | Its documentation links to Log name FrontierLog or lys log audit. | LYSLOGSTORE-007 |
 
 ## Inventory
 

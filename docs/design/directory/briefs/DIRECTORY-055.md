@@ -1,0 +1,195 @@
+---
+type: brief
+id: DIRECTORY-055
+cluster: directory
+title: Provision the audit sender and authenticated receiver transport during install
+---
+
+# DIRECTORY-055: Provision the audit sender and authenticated receiver transport during install
+
+> **Cluster:** directory
+> **Depends on:** DIRECTORY-045, DIRECTORY-047
+> **Blocked by:** Archie's current installer/exit-lock landing must be on main; implement against main after that landing and both named brief dependencies., Before the implementing round, prepare its locked dependencies on Dean in the offline worker Cargo home and retain the successful offline metadata receipt; no missing cache dependency may be reported as a passed or measured gate.
+> **Design anchor:**
+> - ADR-122 — Install provisions the audit agent and separate authenticated transport — Install provisions private stable sender material and a separate TLS-only authority key. Browser setup, after creating the real administrator, completes sender enrolment and login binding through one recoverable intent. The capability authority and event signer never sign TLS certificates. The Rauthy sender verifies chain, hostname and pinned server key before HTTP. DIRECTORY-045 R5 swaps public trust/configuration/mounts with binaries and preserves private credentials. Cross-repository source builds are ordered; activation requires matched artifacts.
+> **Checklist:**
+> - C405 — The service completes sender enrolment as part of browser setup after install returns, resumes the original intent after interruption, and never requires another install invocation.
+> - C406 — Sender configuration and seed are private, stable, and mounted read-only without exposing the directory private key.
+> - C407 — A dedicated TLS-only authority key issues the receiver certificate, distinct from capability, event, receiver and sender keys; the receiver listens only on its declared restricted address.
+> - C408 — Generated sender configuration names separate TLS trust and receipt trust and a declared positive response-body bound.
+> - C409 — Scratch installation proves signed observation acceptance and named transport, identity and response refusals.
+> - C410 — DIRECTORY-045 R5 retains sender credentials and swaps/restores sender configuration, trust material and mounts with the chosen binaries.
+> **Stories:**
+> - S163 (Installer and operator, Provision and upgrade the internal audit connection) — As a person installing Lys, I want its internal audit connection provisioned automatically so that I never handle credentials or configure the identity provider.
+> - S164 (Installer and operator, Provision and upgrade the internal audit connection) — As an operator, I want upgrade and interrupted setup to preserve the sender identity so that pending audit work remains verifiable.
+
+## Purpose
+
+Make the identity audit connection an installed part of Lys without manual credential handling. Waffles approved the split and scope on 28 September 2026 at 20:22 Melbourne; this brief owns only the Lys side.
+
+## Task
+
+Provision the dedicated signed sender identity, private files, TLS receiver and explicit configuration consumed by the dependent Rauthy TLS brief. Coordinate with the landed installer, first-run and upgrade work; build from their resulting main. The ordinary installer launcher is outside this brief; acceptance invokes the same install service directly.
+
+## Requirements
+
+### R1: Emit an explicit cross-repository sender configuration contract
+
+The shared typed configuration contract SHALL define versioned sender configuration with service_url (HTTPS only), service_key (public receipt-verification key), source_agent, exact source_issuer and source_subject, signing_key_path, tls_ca_path, tls_server_spki_sha256 and positive response_body_bytes. Paths in the mounted configuration SHALL be container paths. The TLS pin SHALL be SHA-256 over the receiver SubjectPublicKeyInfo DER; it is distinct from the receipt signing key. Derive pins from already-held installation authority/material, never fetched unverified network data. Declare the response-body policy in deployment configuration and generated check output; no use-site fallback. Export a machine-readable schema from the shared typed contract so the Rauthy brief consumes the same members. Changing installed trust or identity outside a supported renewal act SHALL refuse instead of silently replacing it. The install writer in the following requirement consumes this contract; this row tests typed construction, serialization and schema independently of installation.
+
+**Acceptance:**
+- Construct and serialize a typed fixture configuration, validate it against its generated shared schema, and assert the container-visible paths, URI, source login, TLS pin and receipt pin are preserved exactly.
+- A fixture configured with response_body_bytes 4096 emits 4096; zero and missing policy values refuse by field name. No missing field is silently replaced.
+- Generated diagnostics expose public identity/trust and named file locations but never seed bytes or credentials.
+
+**Files:**
+- create: crates/lys-identity/src/link_audit_config.rs
+- create: crates/lys-identity/tests/link_audit_config.rs
+- modify: crates/lys-identity/src/lib.rs
+- modify: crates/lys-identity/Cargo.toml
+- modify: crates/lys/src/identity/config.rs
+- modify: crates/lys/src/identity/config/validate.rs
+- modify: crates/lys/src/identity/install/deployment.template.toml
+
+**Checklist:**
+- C408 — Generated sender configuration names separate TLS trust and receipt trust and a declared positive response-body bound.
+
+**Stories:**
+- S163 (Installer and operator, Provision and upgrade the internal audit connection) — As a person installing Lys, I want its internal audit connection provisioned automatically so that I never handle credentials or configure the identity provider.
+- S164 (Installer and operator, Provision and upgrade the internal audit connection) — As an operator, I want upgrade and interrupted setup to preserve the sender identity so that pending audit work remains verifiable.
+
+### R2: Serve audit traffic with a separate installation TLS authority
+
+The installation SHALL issue a receiver server certificate using a dedicated TLS-only certificate authority generated at install, a distinct persistent receiver TLS key, a declared certificate validity policy, the exact deployed DNS/IP subject alternative names, and serverAuth extended key usage. Add a distinct TlsAuthority type and server-certificate issuance API without changing existing capability certificates or signed historical formats. The identity receiver SHALL use this certificate and key for the declared restricted TLS listener and refuse invalid/missing/mismatched key material by path. Address and trust material SHALL come from generated deployment configuration, never a wildcard listener or runtime-learned pin. Preserve the existing supported local service routes and explicitly coordinate HTTPS/cookie/health configuration with the landed installer; no cleartext alternate route for link-audit requests. TLS is new transport work: persist the dedicated TLS authority key and certificate and the separate receiver key before publishing trust configuration. Declare certificate validity and renewal policy in the deployment configuration, not use-site constants; expired certificates refuse until the supported renewal act succeeds. Test Mac Docker host-alias access to the restricted host listener and Linux Docker host-gateway access to a listener bound to its explicit bridge address. Bind no wildcard address and infer no hostname from the machine. One key, one purpose: the new TLS authority, receiver TLS key and sender agent key SHALL be mutually distinct, and each SHALL differ from the existing capability-authority and directory event/receipt-signing keys; never derive the TLS authority key from or reuse an existing signing key. Keep its key owner-only under the selected installation root; the sender receives only public CA material. Certificate construction uses rcgen, already a lys-core workspace dependency (0.13.2 in the inspected lockfile), through the new TLS-only type, not a second issuance method on the capability authority. Declare direct rustls/tokio-rustls server transport dependencies and resolve them in Cargo.lock. Before dispatching the implementing round, the venue preparation fetches the exact locked crates into the same Cargo home used by its offline worker and proves cargo metadata --locked --offline succeeds for that manifest. Reuse the normal target directory; do not turn off offline measurement or substitute an unpinned revision. The preparation receipt names source commit, lockfile digest, platform and Cargo-home path, never credentials. This brief does not rotate or migrate existing capability/event signing identities; the separation requirement constrains the new TLS and sender keys and does not retrospectively rewrite historical signing arrangements.
+
+**Acceptance:**
+- Verify the certificate using standard TLS verification against the provisioned CA for the exact receiver hostname, and reject wrong hostname and wrong CA. Assert serverAuth, SANs and mutually distinct public keys for the new TLS authority, TLS receiver and sender agent, each different from the held capability-authority and event/receipt-signing keys. Assert the TLS authority key remains private and is absent from sender mounts.
+- Start the real receiver with generated TLS configuration and verify its listening address equals the declared restricted address; missing key and certificate/key mismatch each refuse by name before serving.
+- The receiver refuses cleartext link-audit transport; existing signed source and receipt verification remains enforced over TLS.
+- The certificate builder uses the lockfile-resolved rcgen crate, and a preparation receipt followed by successful cargo metadata --locked --offline names the exact worker manifest and dependency cache. A cold fixture missing its declared crate reports the missing dependency rather than beginning an unmeasured round.
+
+**Files:**
+- create: crates/lys-core/src/ca/tls_authority.rs
+- create: crates/lys-core/src/ca/tls_authority_tests.rs
+- create: crates/lys-identity-server/src/tls.rs
+- create: crates/lys-identity-server/tests/tls.rs
+- modify: crates/lys-core/src/ca/mod.rs
+- modify: crates/lys-identity-server/src/main.rs
+- modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-identity-server/src/config.rs
+- modify: crates/lys-identity-server/src/error.rs
+- modify: crates/lys-identity-server/src/error_status.rs
+- modify: crates/lys-identity-server/Cargo.toml
+- modify: Cargo.toml
+- modify: Cargo.lock
+- modify: crates/lys/src/identity/install/services.rs
+- modify: crates/lys/src/identity/install/server_config.rs
+- modify: crates/lys/src/identity/install/layout.rs
+
+**Checklist:**
+- C407 — A dedicated TLS-only authority key issues the receiver certificate, distinct from capability, event, receiver and sender keys; the receiver listens only on its declared restricted address.
+
+**Stories:**
+- S163 (Installer and operator, Provision and upgrade the internal audit connection) — As a person installing Lys, I want its internal audit connection provisioned automatically so that I never handle credentials or configure the identity provider.
+
+### R3: Publish private provisioning files and read-only mounts
+
+Install SHALL generate a dedicated sender Ed25519 seed, distinct from the directory service key, and retain it under the selected installation root. Seed and configuration SHALL be 0600 with private containing directories. Publication and retry SHALL preserve existing matching bytes and refuse conflicting files by path. Compose SHALL mount only the sender seed, sender configuration and public TLS trust material read-only, and set LYS_LINK_AUDIT_CONFIG to the mounted absolute path. The directory service private key SHALL never be mounted into the sender. No secret or upstream provider name SHALL appear in person-facing setup output. Order key and public receipt-pin creation before compose up. Rerun must never replace a matching file merely because later enrolment was interrupted. Integrate these files with DIRECTORY-045 R5, not a second upgrade path: rendered sender configuration, public trust material, receiver configuration, compose mounts and environment join the same staged swap and config.previous/ read-back/rollback set. Sender seed, TLS authority key and receiver private key are persistent credentials outside replaceable render output; inventory them in the upgrade intent and verify their bytes are retained on success and rollback, never regenerate or rotate them as a render step. If upgrade introduces first-time credential files, record that publication durably before the swap and retain those bytes on rollback for retry; do not overwrite or delete pre-existing credentials. A failed swap restores the previous active public trust/configuration/mounts with its previous binaries. Paths and digests, not private bytes, belong in the intent.
+
+**Acceptance:**
+- Inspect generated compose and permissions: sender files 0600, private directories 0700, mounts read-only and all paths under the selected root. Assert the service private-key path is absent from sender mounts.
+- Run install twice and compare sender identity, seed and configuration bytes; no rotation or duplicate enrolment occurs.
+- Interrupt file publication and rerun; named partial state is reconciled without accepting truncated configuration, replacing a pre-existing seed or printing secret material.
+- Drive DIRECTORY-045 R5 with old and new rendered config/trust/mounts; inject failure after each swap publication boundary. The prior active files and binaries return byte-identical, every existing credential is unchanged, and a subsequent retry reuses newly provisioned credential bytes.
+
+**Files:**
+- create: crates/lys/src/identity/install/link_audit_files.rs
+- create: crates/lys/src/identity/install/link_audit_files_tests.rs
+- modify: deploy/identity/compose.yaml
+- modify: crates/lys/src/identity/install/layout.rs
+- modify: crates/lys/src/identity/prepare.rs
+- modify: crates/lys/src/identity/install.rs
+- modify: crates/lys/src/identity/upgrade/render.rs
+- modify: crates/lys/src/identity/upgrade/intent.rs
+- modify: crates/lys/src/identity/upgrade/swap.rs
+
+**Checklist:**
+- C406 — Sender configuration and seed are private, stable, and mounted read-only without exposing the directory private key.
+
+**Stories:**
+- S163 (Installer and operator, Provision and upgrade the internal audit connection) — As a person installing Lys, I want its internal audit connection provisioned automatically so that I never handle credentials or configure the identity provider.
+- S164 (Installer and operator, Provision and upgrade the internal audit connection) — As an operator, I want upgrade and interrupted setup to preserve the sender identity so that pending audit work remains verifiable.
+
+### R4: Browser setup completes the sender enrolment under the new person
+
+DIRECTORY-047 R1 creates the real administrator in the browser after install has ended. Install SHALL therefore publish the sender public key, configured source login, reserved agent identity and stable enrolment/binding operation ids as a durable provisioning intent before compose starts, without inventing a person or enrolling one. As part of completing the authorized browser setup act, the identity service SHALL enrol that sender under the person just created and bind the existing link_audit_source issuer and subject lys-link-audit using the original intent operation ids and authorized directory operations. The browser success path needs no second install invocation, shell command or credential handling. Only after read-back confirms the recorded person, agent key and login binding may it report sender provisioning complete. A service-account display record is not signed-agent admission. Persist the actual setup person and continuation evidence before advancing so cancellation after any log write resumes the same act. If the administrator exists but enrolment is unfinished, preserve the completed administrator and return a named pending outcome with an ordinary Retry action. The authenticated administrator can resume only this recorded provisioning through POST /setup/link-audit/resume, with no caller-supplied identity or keys; a consumed setup code must not reopen administrator creation. The service also reconciles the same pending intent at startup after the directory is available. This is admission/startup reconciliation, never a timer or background task. Repeated setup delivery, explicit retry, startup, upgrade and a later install all converge on the same intent and original operation ids; none can create a second administrator, sender or login. Conflicting person, public key or recorded id refuses without overwriting. The service needs the public sender key and intent only, never the sender seed. All person/machine names come from deployment choices. During the pre-enrolment gap, the sender stays unauthorized, retains pending observations and acknowledges nothing; delivery after enrolment uses the original operation.
+
+**Acceptance:**
+- A fresh install exits before any person exists. Complete the DIRECTORY-047 browser setup act exactly once, without invoking install again; the new person is signed in and the provisioned sender passes the actual signed-agent link_audit_agent admission. Count one person, one sender and one login binding; a display-only service account does not pass.
+- Inject interruption after each of intent publication, administrator commit, agent enrolment and login binding. Restart the service and resume through the browser. Each case settles the same original operation ids and one identity; assert all four cases execute and install was not invoked again.
+- After administrator commit and a provisioning refusal, the signed-in administrator Retry resumes only the saved intent. Wrong actor, consumed setup-code reuse and caller-supplied person/key are refused; the existing administrator and evidence remain intact. Assert these three refusal cases execute.
+- An install with no administrator records pending setup and enrols nobody; an upgrade or later install may settle an existing administrator intent but is not required by the ordinary first-run path. A conflicting public key refuses by name without replacing credentials.
+
+**Files:**
+- create: crates/lys/src/identity/install/link_audit.rs
+- create: crates/lys/src/identity/install/link_audit_tests.rs
+- create: crates/lys-identity-server/src/link_audit_provisioning.rs
+- create: crates/lys-identity-server/src/link_audit_provisioning_tests.rs
+- create: surface/identity/src/features/setup/SetupAudit.test.tsx
+- modify: crates/lys/src/identity/install.rs
+- modify: crates/lys/src/identity/install/layout.rs
+- modify: crates/lys/src/identity/install/server_config.rs
+- modify: crates/lys-identity-server/src/setup.rs
+- modify: crates/lys-identity-server/src/routes.rs
+- modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-identity-server/src/config.rs
+- modify: crates/lys-identity-server/src/error.rs
+- modify: crates/lys-identity-server/src/error_status.rs
+- modify: crates/lys-identity-server/tests/setup.rs
+- modify: surface/identity/src/features/setup/Setup.tsx
+
+**Checklist:**
+- C405 — The service completes sender enrolment as part of browser setup after install returns, resumes the original intent after interruption, and never requires another install invocation.
+
+**Stories:**
+- S163 (Installer and operator, Provision and upgrade the internal audit connection) — As a person installing Lys, I want its internal audit connection provisioned automatically so that I never handle credentials or configure the identity provider.
+- S164 (Installer and operator, Provision and upgrade the internal audit connection) — As an operator, I want upgrade and interrupted setup to preserve the sender identity so that pending audit work remains verifiable.
+
+### R5: Prove provisioning through a scratch installation and upgrade
+
+Run acceptance through the install service used by the launcher, using only a scratch installation root and isolated test services. Its generated configuration/mounts SHALL drive a protocol-conformant fixture sender from the installation network to the real receiver: signed observation, exact-person lookup, signed receipt and repeated original operation. The test SHALL retain pending work on every refusal and assert all adversarial cases executed. It SHALL NOT require or edit the Rauthy sender implementation that depends on this brief; the Rauthy follow-up owns its final binary proof. Upgrade via DIRECTORY-045 and rerun install SHALL keep agent id and sender seed byte-for-byte. The separate launcher owns no-terminal UI acceptance. This brief exposes no private material or raw issuer names through the install service result. Source landing is not activation: the shared contract and receiver may land before the dependent sender, but production install/upgrade must select compatible pinned sender and receiver artifacts together. Until the matching sender release is available, preserve the existing installed configuration and name the missing compatible artifact; never overwrite a working config with a schema the installed sender cannot read. The fixture-only source gate does not authorize production installation. The subsequent combined release acceptance must exercise the actual sender binary. The upgrade proof specifically invokes DIRECTORY-045 R5: sender configuration, public TLS trust, receiver configuration and compose definitions participate in its config.previous/ swap, and its intent preserves the credential inventory from R3. Do not measure only unchanged seed bytes while leaving active trust or mounts from a different build. The first-run proof drives browser setup after the installer has returned; the service completes enrolment as R4 requires.
+
+**Acceptance:**
+- The scratch installer returns with setup pending; the browser setup act then completes provisioning without running install again. A signed fixture observation verifies its exact receipt; retry produces no duplicate audit leaf.
+- Execute and count wrong CA, wrong hostname, wrong TLS pin, wrong receipt pin, redirect, cleartext URL, missing seed, unauthorized agent and over-limit response cases. Each names its refusal and records no audit acknowledgement.
+- Interrupt each durable provisioning boundary enumerated in R3/R4, reopen and rerun; assert one identity, stable seed, original operation ids and retained pending work.
+- Install and complete browser setup, then upgrade through DIRECTORY-045 R5, including its failed-upgrade rollback. Compare sender and TLS authority/receiver private credentials byte-for-byte; compare the active sender configuration, CA/server certificates, pins and compose mounts against the selected build, and assert rollback restores the previous active set and binaries byte-identically. Verify an original pending operation still succeeds. Explicit --back uses the same snapshot mechanism when DIRECTORY-053 is present; it is not silently treated as part of DIRECTORY-045.
+
+**Files:**
+- create: crates/lys/tests/identity_link_audit_install.rs
+- create: crates/lys/tests/identity_support/link_audit_install.rs
+- modify: crates/lys/src/identity/upgrade_tests.rs
+- modify: crates/lys/tests/identity_support/mod.rs
+- modify: crates/lys/src/identity/upgrade/render_tests.rs
+
+**Checklist:**
+- C409 — Scratch installation proves signed observation acceptance and named transport, identity and response refusals.
+- C410 — DIRECTORY-045 R5 retains sender credentials and swaps/restores sender configuration, trust material and mounts with the chosen binaries.
+
+**Stories:**
+- S163 (Installer and operator, Provision and upgrade the internal audit connection) — As a person installing Lys, I want its internal audit connection provisioned automatically so that I never handle credentials or configure the identity provider.
+- S164 (Installer and operator, Provision and upgrade the internal audit connection) — As an operator, I want upgrade and interrupted setup to preserve the sender identity so that pending audit work remains verifiable.
+
+## Boundaries
+
+- SHALL NOT edit the Rauthy repository or vendor/rauthy; its TLS sender is a dependent brief in that repository.
+- SHALL NOT hand-provision live secrets, restart the live service, weaken signature or TLS verification, or bind every interface for convenience.
+- SHALL NOT implement original-login reassignment or signed checkpoints; both remain separate explicit protocols.
+- SHALL NOT overwrite a pre-existing seed or infer a person from an email address.
+- SHALL NOT activate new sender configuration against an old sender binary; source dependency order does not authorize a mixed-version installation.
+
+## Verification
+
+- Run the repository design gate and full card chain on the exact implementation commit.
+- Run receipt/TLS and provisioning fault tests with explicit case counts and no real service writes.
+- Run scratch-install and upgrade acceptance through the install service, then separately run the dependent Rauthy sender acceptance after that brief lands.

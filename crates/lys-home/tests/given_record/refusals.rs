@@ -6,10 +6,11 @@ use std::process::Command;
 
 use serde_json::{Value, json};
 
-use super::{BIN, Fixture, Outcome, SENTENCE, UUID, put, rendered, stderr, text};
+use super::{BIN, Fixture, Outcome, SENTENCE, UUID, put, rendered, serially, stderr, text};
 
 #[test]
 fn given_check_refuses_with_status_2_naming_the_id_the_path_or_the_file() -> Outcome {
+    let serial = serially();
     let mut fixture = Fixture::new()?;
     rendered(&mut fixture)?;
     let records = fixture.records()?;
@@ -61,12 +62,14 @@ fn given_check_refuses_with_status_2_naming_the_id_the_path_or_the_file() -> Out
         "{}",
         stderr(&not_given)
     );
+    drop(serial);
     Ok(())
 }
 
 #[test]
 fn the_rendering_process_s_config_dir_is_never_read_and_home_dot_claude_is_the_fallback() -> Outcome
 {
+    let serial = serially();
     let mut fixture = Fixture::new()?;
     // A template setting no CLAUDE_CONFIG_DIR, a process CLAUDE_CONFIG_DIR
     // naming a directory with its own memory index and CLAUDE.md, and a
@@ -153,6 +156,7 @@ fn the_rendering_process_s_config_dir_is_never_read_and_home_dot_claude_is_the_f
         data["environment"],
         json!(["LYS_FIXTURE_MODE", "LYS_FIXTURE_TOKEN"])
     );
+    drop(serial);
     Ok(())
 }
 
@@ -160,6 +164,8 @@ fn the_rendering_process_s_config_dir_is_never_read_and_home_dot_claude_is_the_f
 #[test]
 fn an_unreadable_claude_md_fails_the_render_by_path_with_no_given_entry() -> Outcome {
     use std::os::unix::fs::PermissionsExt;
+
+    let serial = serially();
     let mut fixture = Fixture::new()?;
     rendered(&mut fixture)?;
     let claude_md = fixture.claude_md();
@@ -180,5 +186,6 @@ fn an_unreadable_claude_md_fails_the_render_by_path_with_no_given_entry() -> Out
     assert_eq!(session.customs_everywhere("lys.harness_event")?.len(), 1);
     assert_eq!(session.head()?, Some("e4"));
     drop(session);
+    drop(serial);
     Ok(())
 }

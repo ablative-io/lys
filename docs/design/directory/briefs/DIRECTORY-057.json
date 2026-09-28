@@ -1,0 +1,135 @@
+{
+  "id": "DIRECTORY-057",
+  "cluster": "directory",
+  "title": "A service's exit lock is opened only in the service's own process, so no other process ever carries a copy of it",
+  "depends_on": [
+    "DIRECTORY-044",
+    "DIRECTORY-045"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C400",
+    "C401",
+    "C402"
+  ],
+  "stories": [
+    "S161"
+  ],
+  "design_anchor": [
+    "ADR-121"
+  ],
+  "purpose": "A service the install starts holds an exclusive lock on its exit lock, and its exit is seen as the release of that lock. Today the starter opens and takes the lock itself and hands it to the service as its standard input (exit_wait::hold, services::start_detached). While the starter holds that descriptor, a process started by any other thread of the starter carries a copy of it until its exec, and the lock stays held in that copy. After the watch side was fixed (a watch asks for a shared lock and releases it by name), this is what remains. It only delays an exit being seen just after a start, and closing it in the starter needs code run between fork and exec, which is unsafe code. This card closes it without unsafe code, and records why the other ways were refused.",
+  "task": "Start each service through a small holder that is the service's own process. The holder opens the exit lock, takes it, and then becomes the service by exec, keeping its pid. The starter never opens the exit lock. Record the comparison of the three ways in ADR-121.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "The decision is recorded with the three ways compared",
+      "spec": "Structural. ADR-121 records the three ways to keep the lock out of the starter and the reason for the one chosen. (a) Code run between fork and exec in the child (pre_exec) needs an unsafe block in Lys code and may call only async-signal-safe functions, so it is refused. (b) The spawn's own file actions (posix_spawn_file_actions_addopen) with O_EXLOCK open and lock in the child with no code of ours run there. But O_EXLOCK exists on macOS and the BSDs only, the standard library exposes no file actions so it needs a foreign call in an unsafe block, and Linux has no equal, so it is refused. (c) A holder command in the lys binary opens the lock, takes it and execs the service. It uses safe standard library calls only, it is the same on macOS and Linux, and the pid written to the pid file is the service's because exec keeps it, so it is chosen. ADR-121 is in docs/design/decisions.json (line 1734), and its decision text was amended on main with this brief, so the card does not change it. The amended decision says that the holder is the same on macOS and Linux, that exec keeps the pid so the pid file names the service, and that the starter learns the lock is held through the holder's handshake of R2 before it writes the pid file.",
+      "acceptance": [
+        "The card's diff leaves the text of ADR-121 in docs/design/decisions.json unchanged from its base.",
+        "The card's diff adds no line containing the word unsafe to any file under crates/."
+      ],
+      "files": {
+        "create": [],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C400"
+      ],
+      "stories": [
+        "S161"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "The holder opens the lock, takes it and becomes the service",
+      "spec": "Behavioural. `lys identity hold --exit-lock <path> --log <path> -- <program> [args]` is the holder. Its code lives in crates/lys/src/identity/install/held_start.rs, declared in install.rs beside exit_wait (line 24), with its tests declared inside it as #[cfg(test)] #[path = \"held_start_tests.rs\"] mod tests, as install.rs lines 247 to 248 do. It opens the exit lock and takes the exclusive lock without waiting. The exit watch's take (crates/lys/src/identity/install/exit_wait.rs lines 112 to 116) blocks on FlockOperation::LockExclusive today. It is replaced by try_take, which asks FlockOperation::NonBlockingLockExclusive and answers held or already held. The function try_take stays private to exit_wait.rs and is called only by exit_wait::hold (line 49, which calls take at line 59 today). The non-Unix take at line 157 becomes the non-Unix try_take with the same words. The function hold is declared pub(super) in place of pub. Its one definition stays at exit_wait.rs line 49, and among files that are not tests it is called only from held_start.rs, as exit_wait::hold. The tests in exit_wait_tests.rs (lines 103, 125 and 140) keep calling it. A lock already held is refused service_running, naming the lock, and the service already running keeps running. Every handshake message starts with the word lys-hold followed by a space. The starter reads from the first lys-hold in each line to the line's end and skips any line without one, so text that the test harness prints on the same line before it, such as the test's name followed by three dots and no newline, is passed over. The lines are lys-hold held, and lys-hold refused followed by the refusal's kind and words. Before it redirects anything, the holder clones its standard output with std::io::stdout().as_fd().try_clone_to_owned(), which opens the clone close-on-exec, so the service never inherits the write end and the starter's read to the end finishes when the exec succeeds. It then opens the log for appending, writes lys-hold held to that clone, and execs the program with the lock as its standard input and the log as its standard output and error. On success the exec closes the clone, which is the end the starter waits for. If the exec fails, the standard output is already the log, and the lock is the standard input. The holder first releases the lock by name with FlockOperation::Unlock on its standard input and closes it, so the lock is free before any refusal can be read. It then writes lys-hold refused service_not_startable, with the program and the cause, to the clone, and exits with a status other than 0. Any other refusal before the lock is held is written to the clone the same way, and one after the lock is held releases it first in the same way. The holder's own code starts no thread and no other process before the exec. The subcommand is dispatched in crates/lys/src/main.rs beside the other identity commands (lines 46 to 52) and is not listed in the help an ordinary person reads. The error kinds ServiceRunning and ServiceNotStartable join crates/lys/src/identity/error.rs (lines 14 and 61) with their lines in error_tests.rs (lines 19 to 41). The install runs on macOS and Linux, and the holder execs through std::os::unix::process::CommandExt. On any other platform the holder refuses in the words the exit watch already uses there, an exit lock needs a Unix host (exit_wait.rs line 146).",
+      "acceptance": [
+        "A service started through the holder has the pid the starter wrote.",
+        "That service holds the exit lock.",
+        "A watch on that service answers not exited while it lives.",
+        "The same watch answers exited after the service ends.",
+        "A second holder on the same lock, while the first service lives, is refused service_running.",
+        "The second holder's refusal comes back before the first service ends.",
+        "The first service keeps running after that refusal.",
+        "A program that does not exist makes the holder write lys-hold refused service_not_startable naming it to the starter.",
+        "At the moment the starter reads that refusal, a take of the same exit lock without waiting succeeds.",
+        "After that refusal the log holds no handshake line."
+      ],
+      "files": {
+        "create": [
+          "crates/lys/src/identity/install/held_start.rs",
+          "crates/lys/src/identity/install/held_start_tests.rs"
+        ],
+        "modify": [
+          "crates/lys/src/identity/cli.rs",
+          "crates/lys/src/identity/error.rs",
+          "crates/lys/src/identity/error_tests.rs",
+          "crates/lys/src/identity/install.rs",
+          "crates/lys/src/identity/install/exit_wait.rs",
+          "crates/lys/src/main.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C401"
+      ],
+      "stories": [
+        "S161"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "The starter never opens the exit lock",
+      "spec": "Behavioural. The function start_detached (services.rs lines 342 to 377) moves whole into a new crates/lys/src/identity/install/detached.rs, declared in install.rs beside services (line 27), because services.rs holds 488 code lines and DIRECTORY-045 R6 grows it first. Its callers name it as detached::start_detached. It starts the holder in place of the program and no longer calls exit_wait::hold, which is called by held_start.rs only. It takes the holder as a value of a type Holder, declared in held_start.rs. A Holder names a program, the arguments that come before the holder's own, the environment to add, and a mode HoldArgs that says where the holder's own arguments go. HoldArgs::Trailing puts them after the leading arguments. HoldArgs::InEnvironment puts them, as a JSON array, in the environment variable LYS_HOLD_ARGS. Install and DIRECTORY-045's upgrade (crates/lys/src/identity/upgrade.rs, upgrade/adopt.rs and upgrade/swap.rs where it starts a unit, created by 045) are production code. They pass the lys binary that is running them (std::env::current_exe) with the leading arguments identity and hold and the mode HoldArgs::Trailing. Code that starts a unit on behalf of a caller takes its Holder from that caller. Their tests (upgrade_tests.rs and upgrade/adopt_tests.rs) pass the test binary as below. The reader of the handshake lives in held_start.rs, for the same reason. It reads the holder's standard output to its end and keeps, from each line, the text from the first lys-hold followed by a space to the line's end, as R2 says, and skips a line without one. The line held followed by the end means the service runs, and only then does start_detached write the pid file, so no watch ever sees a pid file whose lock is not yet held. The line held followed by a refused line, or a refused line alone, or an end with no line, is returned as that refusal, or as service_not_startable naming the log. It is never Ok. Install and the upgrade treat that refusal as a failed start, as they treat a failed spawn today (services.rs line 368). The unit tests that call start_detached (install_tests.rs lines 194 to 217 and 268, exit_wait_tests.rs line 26) pass their own test binary as the holder. That holder is one invocation, the test binary with the leading arguments --exact identity::install::held_start::tests::held_start_entry --nocapture --quiet --test-threads=1 and the mode HoldArgs::InEnvironment, because the test harness takes no arguments of its own kind. The test held_start_entry returns at once when LYS_HOLD_ARGS is absent, and otherwise runs the holder's code with those arguments. Whatever the harness prints around it is passed over by the reader's lys-hold rule, and the harness's own threads end with the exec. No test changes what it asserts. Every start goes this way, in install, in the upgrade's units and in any later unit. The proof is the one that showed the watch side. A service that ends at once is started 300 times beside eight threads that start /usr/bin/true without pause. Its end is learnt from an event other than the lock. The service opens for writing a fifo whose path is in its own arguments, so the far end closes only when the service ends, and the starter never holds that pipe. A watch opened at that moment answers exited every time. The proof is not in the tree and is written anew in crates/lys/src/identity/install/start_race_tests.rs, declared in install.rs as #[cfg(test)] mod start_race_tests beside the other install modules. The test is seen red against today's start before the change.",
+      "acceptance": [
+        "The proof hides 0 of 300 exits after the change, the count recorded in the card's report.",
+        "The same proof run against the card's base hides more than 0 of 300 exits, the count recorded in the card's report.",
+        "The existing install tests pass with only the holder argument and the path detached::start_detached changed in their calls.",
+        "The existing exit watch tests pass with only the holder argument and the path detached::start_detached changed.",
+        "The upgrade tests of DIRECTORY-045 pass with only the holder argument and the path detached::start_detached changed.",
+        "Outside tests, the text `exit_wait::hold(` appears under crates/lys/src only in held_start.rs.",
+        "The text `fn hold(` appears under crates/lys/src/identity/install only once, at exit_wait.rs line 49.",
+        "A search of crates/lys/src finds try_take called only inside exit_wait.rs.",
+        "A holder started as the test binary under the real harness is read as held, measured by an install test that starts through it the fifo scratch service of install_tests.rs lines 185 to 193."
+      ],
+      "files": {
+        "create": [
+          "crates/lys/src/identity/install/start_race_tests.rs",
+          "crates/lys/src/identity/install/detached.rs"
+        ],
+        "modify": [
+          "crates/lys/src/identity/install.rs",
+          "crates/lys/src/identity/install/exit_wait.rs",
+          "crates/lys/src/identity/install/exit_wait_tests.rs",
+          "crates/lys/src/identity/install/services.rs",
+          "crates/lys/src/identity/install_tests.rs",
+          "crates/lys/src/identity/upgrade.rs",
+          "crates/lys/src/identity/upgrade/adopt.rs",
+          "crates/lys/src/identity/upgrade_tests.rs",
+          "crates/lys/src/identity/upgrade/adopt_tests.rs",
+          "crates/lys/src/identity/upgrade/swap.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C402"
+      ],
+      "stories": [
+        "S161"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT add an unsafe block, a foreign call or a new dependency.",
+    "SHALL NOT change the number of test threads in any gate, or serialise tests, to hide a race.",
+    "SHALL NOT add a timeout, deadline, sleep, poll interval, #[allow], #[ignore] or any bypass. A wait ends on an event.",
+    "SHALL NOT add a silent fallback. Every failure is a named refusal.",
+    "SHALL NOT change what a watch does. It asks for a shared lock and releases it by name."
+  ],
+  "verification": [
+    "The full Lys gate and ast-grep scan exit 0 at the card's head, measured by the card round.",
+    "The 300-start proof's two counts, before and after, are in the card's report."
+  ]
+}

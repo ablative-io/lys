@@ -73,6 +73,12 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - ADR-113 — The identity install and its clients wait on signals, never on a clock — A wait ends on the event it is waiting for or on the failure that makes the event impossible: a service is ready when it says so or when a single connection to it succeeds after a readiness event (its log gaining its listening line, observed through the platform's file-change notification), a stopped process is gone when the platform reports its exit (kqueue EVFILT_PROC on macOS, pidfd on Linux), a peer that refuses or closes is an error at once, and nothing carries a timeout. The screen re-measures on a ResizeObserver or animation-frame signal. Rejected: shorter sleeps, which still wait on a clock; keeping timeouts as a safety net, which the rule forbids and which hides a stuck peer's cause.
 - ADR-114 — An installed identity product names its build and upgrades itself in place, keeping the previous build to return to — Every Lys binary answers --version with the commit and dirty state it was built from, stamped at build time; a build with no commit to read says so in those words, never a made-up value. `lys identity upgrade` takes a folder of newly built binaries (and optionally a screens package), checks each one's --version, stops the service and the broker by their exit events, swaps the binaries by rename keeping the previous set beside them, starts the new ones and waits for them ready; if any new binary fails to start or become ready, it puts the previous set back, starts it, and fails naming what broke. Data, credentials, configuration and the compose services are never touched by an upgrade. Rejected: making install restart what differs, which would mix a first install's promises with an upgrade's risks; asking people to copy binaries by hand.
 - ADR-115 — Lys is the only sign-in a person or a product ever sees; the issuer inside it is never shown — Lys is the single sign-on for every product: every product is a client of Lys at Lys's own origin, and no product configuration names the issuer. A person meets only Lys screens: first-run setup, sign-in, provider setup and their own account are Lys pages, and the issuer's pages, admin site, name and password files are never part of any path a person follows. First run asks the person for the administrator's name, email and password; nothing is filled from the machine.
+- ADR-122 — Install provisions the audit agent and separate authenticated transport — Install provisions private stable sender material and a separate TLS-only authority key. Browser setup, after creating the real administrator, completes sender enrolment and login binding through one recoverable intent. The capability authority and event signer never sign TLS certificates. The Rauthy sender verifies chain, hostname and pinned server key before HTTP. DIRECTORY-045 R5 swaps public trust/configuration/mounts with binaries and preserves private credentials. Cross-repository source builds are ordered; activation requires matched artifacts.
+- ADR-126 — Applications have connector identities; people register them with explicit permission — An application connector is its own third identity and grant-holder kind. Apps do not act as agents and do not use service accounts, which are accounts people use to service things. Only a signed-in person with an explicit ordinary register_app grant registers an app. The super administrator may grant that permission to a person; an agent, connector or service account cannot register, even if presented with such a grant. Approval creates a connector identity and binds the app to it. No app authority is implicit in approval, binding or ownership of a kind prefix: every permission is an explicit grant with a chain tracing to the super administrator. Own-kind checks, schema acts, batch and which use that connector identity and the ordinary grant engine. Extend IdentityId, grant admission and the permission-store holder, plus event and snapshot representation with compatibility tests. Preserve historical person/agent bytes and signatures; version a representation when necessary, never rewrite history or coerce identities. This supersedes DIRECTORY-048 wording allowing a service account or connector holding register_app to register, and forbids a separate registrar credential as substitute authority.
+- ADR-127 — A SpiceDB wait ends on its answer, its close or its caller, and grants sections run off the async workers — Keep RelationshipStore synchronous. Run each grants section under spawn_blocking inside a cancel scope owned by the handler's future. Every SpiceDB exchange uses a non-blocking socket and waits in poll(2) on that socket and the scope's wake pipe, with no timeout, and dropping the handler's future cancels the scope, which wakes the poll so the call returns. A section that gets the grants lock after its request left returns before it opens GrantState or calls SpiceDB. The SpiceDB endpoint must be a socket address, so no name lookup is ever waited on. WAIT and the three socket timeouts go with no clock in their place. Making the SpiceDB store and the grant authority async with a tokio Mutex was weighed and not taken, because it changes the lys-identity core trait and every grant act for the same result.
+- ADR-128 — The runner applies OS containment from the same Lys policy and reports native denials — Compile one Lys policy into Seatbelt on macOS and Landlock with a private network namespace on Linux. A policy-bound egress service enforces hostnames while OS rules prevent direct bypass. A runner applies containment before untrusted exec and records its policy digest and session incarnation. Native kernel events feed the same authenticated refusal stream as051, with distinct provenance from tool and proxy denials. Missing enforcement or required audit support refuses launch. gaps are visible and end affected sessions through the existing ownership mechanism. A writable outside-root fixture that succeeds without confinement is the filesystem control. Never infer sandbox enforcement from a failure to write /etc/x. Both native platforms require real tests and receipts.
+- ADR-129 — Paths under /api belong to the API and are refused when unknown, and paths outside it stay the page's — The API nested under /api has its own fallback answering 404 with a named JSON refusal. Paths outside /api stay the page's, so /health and /healthz at the root keep answering the page, and the page shows what it shows for a route it does not know. The one health answer is GET /api/health, which names the service and its build and asks no other service. Serving 404 for chosen root names was weighed and not taken, because the server would then guess at the page's routes.
+- ADR-131 — Codex policy comes from Lys and refusal provenance follows the real harness contract — Render the same Lys policy into isolated native Codex settings. Use064's one transport owner and051's one refusal store. Distinguish Codex-reported rejection, Lys judge denial and062 OS denial. Required unrepresentable policy refuses launch. Coverage is capability-derived, never a blanket claim.
 
 ## Goals
 
@@ -94,6 +100,8 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - DIRECTORY-034 draws the access graph (conformance 8.3) with grant edges and every reachability from Access's answers, and responsible people and resource parents as recorded, holding no permission rule of its own (ADR-098).
 - DIRECTORY-037 passes conformance rows 9.1 to 9.3: the surface's test command runs in .land/gates.sh and proves the rail, the dock side by all three of its controls, the route table, the palette and go-to keys, the help overlay and a counted Tab walk, and index.v6.html carries the same two fixes as the built shell.
 - DIRECTORY-038 states and tests conformance row 1.2: linking a person's provider account to an agent, and delegating from a sign-in identity, are each refused by name and write nothing; one counted test over the store finds no agent record carrying a sign-in identity; the broker's refusal is recorded as a finding against SECRETS-002, on which row 1.2's full pass waits.
+- DIRECTORY-061 takes the last production clock out of Lys. A SpiceDB call ends on its answer, on SpiceDB closing, or on its request leaving, and a request that leaves lets the grants lock go.
+- DIRECTORY-063 refuses unknown API paths by name and adds GET /api/health, so the live install never answers a missing API with its page.
 
 ## Non-Goals
 
@@ -614,6 +622,56 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/surface.rs` | DIRECTORY-046 R4: Served screens never block an async worker and index.html is read once | DIRECTORY-046 |
 | `surface/identity/src/features/grants/check.ts` | DIRECTORY-046 R6: The grants screens ask for reach in one concurrent batch | DIRECTORY-046 |
 | `surface/identity/src/api.ts` | DIRECTORY-046 R7: The screens choose the right route first and fetch independent reads together | DIRECTORY-046 |
+| `sgconfig.yml` | DIRECTORY-048 R7: the ast-grep configuration; gains the rule that refuses an app named in Lys code | DIRECTORY-048 |
+| `crates/lys/src/cli/mcp.rs` | DIRECTORY-049 R7: the Lys MCP server over standard input and output: three tools that cover the whole published API | DIRECTORY-049 |
+| `crates/lys/tests/mcp_stdio.rs` | DIRECTORY-049 R7: the MCP server driven over standard input and output, where the caller is always an agent, so each tool call carries the agent's signature; a person's token is only for the /mcp route over the network | DIRECTORY-049 |
+| `crates/lys-runner/Cargo.toml` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/src/lib.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/src/pty.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/src/session.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/src/socket.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/tests/runner.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys/src/cli/runner.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/src/protocol.rs` | DIRECTORY-050 R2: A published runner protocol; any tool may be the runner | DIRECTORY-050 |
+| `crates/lys-runner/tests/conformance.rs` | DIRECTORY-050 R2: A published runner protocol; any tool may be the runner | DIRECTORY-050 |
+| `crates/lys-identity-server/src/runner_client.rs` | DIRECTORY-050 R2: A published runner protocol; any tool may be the runner | DIRECTORY-050 |
+| `crates/lys-identity-server/tests/runner_start.rs` | DIRECTORY-050 R3: Start runs the agent | DIRECTORY-050 |
+| `crates/lys-identity-server/src/runner_api.rs` | DIRECTORY-050 R4: Type, keys, read, wait, resize and compact through Lys | DIRECTORY-050 |
+| `crates/lys-identity-server/tests/runner_api.rs` | DIRECTORY-050 R4: Type, keys, read, wait, resize and compact through Lys | DIRECTORY-050 |
+| `crates/lys-runner/src/rotation.rs` | DIRECTORY-050 R5: Account rotation on usage limit | DIRECTORY-050 |
+| `surface/identity/src/features/runtime/Terminal.tsx` | DIRECTORY-050 R7: Sessions screen: see, type to and stop every agent | DIRECTORY-050 |
+| `surface/identity/src/features/runtime/terminal.css` | DIRECTORY-050 R7: Sessions screen: see, type to and stop every agent | DIRECTORY-050 |
+| `crates/lys-identity-server/src/usage_api.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys-identity-server/src/usage_state.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys-identity-server/src/usage_store.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys-identity-server/tests/usage.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys-identity-server/src/budgets_api.rs` | DIRECTORY-051 R2: Budgets on agents, teams and people | DIRECTORY-051 |
+| `crates/lys-identity-server/src/budgets_state.rs` | DIRECTORY-051 R2: Budgets on agents, teams and people | DIRECTORY-051 |
+| `crates/lys-identity-server/tests/budgets.rs` | DIRECTORY-051 R2: Budgets on agents, teams and people | DIRECTORY-051 |
+| `crates/lys-identity-server/src/budgets_act.rs` | DIRECTORY-051 R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-identity-server/src/goals_api.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
+| `crates/lys-identity-server/src/goals_state.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
+| `crates/lys-identity-server/tests/goals.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
+| `surface/identity/src/features/usage/Usage.tsx` | DIRECTORY-051 R5: Usage screen | DIRECTORY-051 |
+| `surface/identity/src/features/usage/usage.css` | DIRECTORY-051 R5: Usage screen | DIRECTORY-051 |
+| `surface/identity/src/features/apps/SchemaBuilder.tsx` | DIRECTORY-048 R8: the permission schema builder | DIRECTORY-048 |
+| `surface/identity/src/features/apps/schema-builder.css` | DIRECTORY-048 R8: the permission schema builder | DIRECTORY-048 |
+| `surface/identity/tests/schema-builder.test.tsx` | DIRECTORY-048 R8: the permission schema builder | DIRECTORY-048 |
+| `crates/lys-identity-server/src/team_plans_api.rs` | R1: A team plan record | DIRECTORY-052 |
+| `crates/lys-identity-server/src/team_plans_state.rs` | R1: A team plan record | DIRECTORY-052 |
+| `crates/lys-identity-server/tests/team_plans.rs` | R1: A team plan record | DIRECTORY-052 |
+| `crates/lys-identity-server/src/team_plans_provision.rs` | R2: Provision in one all-or-nothing act | DIRECTORY-052 |
+| `surface/identity/src/features/team-plans/TeamPlans.tsx` | R5: Teams screen | DIRECTORY-052 |
+| `surface/identity/src/features/team-plans/team-plans.css` | R5: Teams screen | DIRECTORY-052 |
+| `surface/identity/src/features/apps/SchemaBench.tsx` | R8: Build an app's permission template on a Lys screen | DIRECTORY-048 |
+| `crates/lys-home/src/record/given.rs` | DIRECTORY-052 R3: the given record lists a member's starting memories and opening conversation | DIRECTORY-052 |
+| `crates/lys/src/identity/upgrade_back_tests.rs` | R1: `lys identity upgrade --back` | DIRECTORY-053 |
+| `crates/lys-build-stamp/Cargo.toml` | R2: One build stamp | DIRECTORY-053 |
+| `crates/lys-build-stamp/src/lib.rs` | R2: One build stamp | DIRECTORY-053 |
+| `crates/lys-build-stamp/tests/stamp.rs` | R2: One build stamp | DIRECTORY-053 |
+| `crates/lys-secrets/Cargo.toml` | R2: One build stamp | DIRECTORY-053 |
+| `crates/lys-home/Cargo.toml` | R2: One build stamp | DIRECTORY-053 |
+| `crates/lys/tests/version.rs` | R2: One build stamp | DIRECTORY-053 |
 | `crates/lys/src/identity/upgrade/render.rs` | R5: The configuration and compose files move with the binaries | DIRECTORY-045 |
 | `crates/lys/src/identity/upgrade/render_tests.rs` | R5: The configuration and compose files move with the binaries | DIRECTORY-045 |
 | `crates/lys/src/identity/install/server_config.rs` | R5: The configuration and compose files move with the binaries | DIRECTORY-045 |
@@ -622,10 +680,413 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/identity/upgrade/intent.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
 | `crates/lys/src/identity/upgrade/intent_tests.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
 | `crates/lys/src/identity/upgrade/swap.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
-| `rules/no-app-names.yml` | DIRECTORY-048 R7: Lys depends on no app | DIRECTORY-048 |
-| `sgconfig.yml` | DIRECTORY-048 R7: Lys depends on no app | DIRECTORY-048 |
-| `crates/lys/src/cli/mcp.rs` | DIRECTORY-049 R7: Agents reach it with 'lys mcp', signing with their own key | DIRECTORY-049 |
-| `crates/lys/tests/mcp_stdio.rs` | DIRECTORY-049 R7: Agents reach it with 'lys mcp', signing with their own key | DIRECTORY-049 |
+| `crates/lys-identity-server/src/apps_api.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `crates/lys-identity-server/src/apps_state.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `crates/lys-identity-server/src/apps_store.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `crates/lys-identity-server/tests/apps.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `surface/identity/src/features/apps/Apps.tsx` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `surface/identity/src/features/apps/apps.css` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `crates/lys-identity/src/grants/schema.rs` | R2: An app's schema: its own kinds, actions, relations and parents, checked on entry | DIRECTORY-048 |
+| `crates/lys-identity/src/grants/schema_tests.rs` | R2: An app's schema: its own kinds, actions, relations and parents, checked on entry | DIRECTORY-048 |
+| `crates/lys-identity-server/src/apps_binding.rs` | R2: An app's schema: its own kinds, actions, relations and parents, checked on entry | DIRECTORY-048 |
+| `crates/lys-identity/src/grants/model.rs` | R2: An app's schema: its own kinds, actions, relations and parents, checked on entry | DIRECTORY-048 |
+| `crates/lys-identity-server/tests/apps_schema.rs` | R3: Schema changes are versioned, dry-run first, and never strand a grant | DIRECTORY-048 |
+| `crates/lys-identity-server/tests/grants_batch.rs` | R5: Apps check many permissions at once and list what a subject may act on | DIRECTORY-048 |
+| `crates/lys-identity-server/src/openapi.rs` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `crates/lys-identity-server/tests/openapi.rs` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `crates/lys-openapi/Cargo.toml` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `crates/lys-openapi/src/lib.rs` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `crates/lys-identity-server/src/error_status.rs` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `rules/ast-grep/no-app-names.yml` | R7: Lys depends on no app | DIRECTORY-048 |
+| `crates/lys-core/src/attestation/mod.rs` | R7: Lys depends on no app | DIRECTORY-048 |
+| `crates/lys/src/identity/install/deployment.template.toml` | R7: Lys depends on no app | DIRECTORY-048 |
+| `surface/styles/tokens.css` | R7: Lys depends on no app | DIRECTORY-048 |
+| `crates/lys-identity-server/src/receipts_api.rs` | R4: Type, keys, read, wait, resize and compact through Lys | DIRECTORY-050 |
+| `crates/lys-identity/src/provisioning.rs` | R5: Account rotation on usage limit | DIRECTORY-050 |
+| `crates/lys-identity-server/src/stop_api.rs` | R6: Wake with a message; stop through the runner | DIRECTORY-050 |
+| `surface/identity/src/features/runtime/Sessions.tsx` | R7: Sessions screen: see, type to and stop every agent | DIRECTORY-050 |
+| `rules/ast-grep/no-poll.yml` | R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys-identity-server/src/setup.rs` | R1: First run is a Lys setup page that asks for the administrator; install fills nothing from the machine | DIRECTORY-047 |
+| `surface/identity/src/features/setup/Setup.tsx` | R1: First run is a Lys setup page that asks for the administrator; install fills nothing from the machine | DIRECTORY-047 |
+| `crates/lys-identity-server/src/sign_in.rs` | R2: Password sign-in is a Lys page; the browser never reaches the issuer's pages | DIRECTORY-047 |
+| `surface/identity/src/features/sign-in/SignIn.tsx` | R2: Password sign-in is a Lys page; the browser never reaches the issuer's pages | DIRECTORY-047 |
+| `crates/lys-identity-server/src/provider.rs` | R3: Lys is the OpenID provider every product is registered with | DIRECTORY-047 |
+| `crates/lys-identity-server/src/oidc.rs` | R3: Lys is the OpenID provider every product is registered with | DIRECTORY-047 |
+| `crates/lys-identity-server/src/sign_in_providers.rs` | R4: Providers are set up inside Lys with every step shown | DIRECTORY-047 |
+| `surface/identity/src/features/connections/SignInProviders.tsx` | R4: Providers are set up inside Lys with every step shown | DIRECTORY-047 |
+| `surface/identity/src/features/people/Account.tsx` | R5: A person's own account, and administration of accounts, are Lys screens | DIRECTORY-047 |
+| `crates/lys-identity-server/src/accounts.rs` | R5: A person's own account, and administration of accounts, are Lys screens | DIRECTORY-047 |
+| `crates/lys/src/identity/install/prepare.rs` | R5: A person's own account, and administration of accounts, are Lys screens | DIRECTORY-047 |
+| `crates/lys-identity-server/src/error.rs` | R6: Nothing a person reads names the issuer | DIRECTORY-047 |
+| `surface/identity/src` | R6: Nothing a person reads names the issuer | DIRECTORY-047 |
+| `crates/lys/src/identity/install/held_start.rs` | R2: The holder opens the lock, takes it and becomes the service | DIRECTORY-057 |
+| `crates/lys/src/identity/install/held_start_tests.rs` | R2: The holder opens the lock, takes it and becomes the service | DIRECTORY-057 |
+| `crates/lys/src/identity/install/start_race_tests.rs` | R3: The starter never opens the exit lock | DIRECTORY-057 |
+| `crates/lys-identity-server/src/checkpoint_api.rs` | R1: The receipts route answers a signed checkpoint | DIRECTORY-058 |
+| `crates/lys-identity-server/tests/receipts_signed.rs` | R1: The receipts route answers a signed checkpoint | DIRECTORY-058 |
+| `crates/lys-identity/src/receipt_answer.rs` | R2: One function verifies a receipt against a pinned key | DIRECTORY-058 |
+| `crates/lys-identity/src/receipt_answer_tests.rs` | R2: One function verifies a receipt against a pinned key | DIRECTORY-058 |
+| `crates/lys-identity-server/src/secrets_api.rs` | R6: Accounts and secrets stored and reached by handle | DIRECTORY-052 |
+| `crates/lys-identity-server/src/verified_caller.rs` | The one extractor that turns a verified request into the caller every handler takes | DIRECTORY-049 |
+| `crates/lys-identity-server/tests/verified_caller.rs` | Proof that only the edges build a verified caller | DIRECTORY-049 |
+| `rules/ast-grep/no-handler-verification.yml` | Refuses a handler that reads its caller from headers | DIRECTORY-049 |
+| `crates/lys/src/identity/config/validate.rs` | Emit an explicit cross-repository sender configuration contract |  |
+| `crates/lys-core/src/ca/mod.rs` | Export the separate installation TLS authority |  |
+| `crates/lys-identity/src/link_audit_config.rs` | Emit an explicit cross-repository sender configuration contract | DIRECTORY-055 |
+| `crates/lys-identity/tests/link_audit_config.rs` | Emit an explicit cross-repository sender configuration contract | DIRECTORY-055 |
+| `crates/lys-core/src/ca/tls_authority.rs` | Serve audit traffic with a separate installation TLS authority | DIRECTORY-055 |
+| `crates/lys-core/src/ca/tls_authority_tests.rs` | Serve audit traffic with a separate installation TLS authority | DIRECTORY-055 |
+| `crates/lys-identity-server/src/tls.rs` | Serve audit traffic with a separate installation TLS authority | DIRECTORY-055 |
+| `crates/lys-identity-server/tests/tls.rs` | Serve audit traffic with a separate installation TLS authority | DIRECTORY-055 |
+| `crates/lys/src/identity/install/link_audit_files.rs` | Publish private provisioning files and read-only mounts | DIRECTORY-055 |
+| `crates/lys/src/identity/install/link_audit_files_tests.rs` | Publish private provisioning files and read-only mounts | DIRECTORY-055 |
+| `crates/lys/src/identity/install/link_audit.rs` | Browser setup completes the sender enrolment under the new person | DIRECTORY-055 |
+| `crates/lys/src/identity/install/link_audit_tests.rs` | Browser setup completes the sender enrolment under the new person | DIRECTORY-055 |
+| `crates/lys-identity-server/src/link_audit_provisioning.rs` | Browser setup completes the sender enrolment under the new person | DIRECTORY-055 |
+| `crates/lys-identity-server/src/link_audit_provisioning_tests.rs` | Browser setup completes the sender enrolment under the new person | DIRECTORY-055 |
+| `surface/identity/src/features/setup/SetupAudit.test.tsx` | Browser setup completes the sender enrolment under the new person | DIRECTORY-055 |
+| `crates/lys-identity-server/tests/setup.rs` | Browser setup completes the sender enrolment under the new person |  |
+| `crates/lys/tests/identity_link_audit_install.rs` | Prove provisioning through a scratch installation and upgrade | DIRECTORY-055 |
+| `crates/lys/tests/identity_support/link_audit_install.rs` | Prove provisioning through a scratch installation and upgrade | DIRECTORY-055 |
+| `crates/lys/src/identity/upgrade/back.rs` | `lys identity upgrade --back`: the exchange of bin/, configuration, compose and surface with the kept build, atomic where both folders exist, undoing its own finished renames on failure, and finishing an interrupted exchange from the intent record. | DIRECTORY-053 |
+| `crates/lys-secrets/src/audit/codec.rs` | The broker's audit log codec: its kinds are one list the decoder matches, entered in the workspace kinds registry so go-back can compare kind sets. | DIRECTORY-053 |
+| `crates/lys/src/identity/install/exit_wait_tests.rs` | Exit watch tests, calling start_detached with the holder. | DIRECTORY-057 |
+| `crates/lys/src/identity/install_tests.rs` | Install tests, calling start_detached with the holder. | DIRECTORY-057 |
+| `crates/lys-identity-server/src/broker_handles.rs` | R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
+| `crates/lys-identity-server/src/broker_handles_tests.rs` | R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
+| `crates/lys-identity-server/tests/start_with_own_broker.rs` | R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
+| `crates/lys-secrets/src/access.rs` | R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
+| `crates/lys-secrets/src/bin/lys-secrets/callers.rs` | R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
+| `crates/lys/src/identity/install/discovery.rs` | R2: Lys writes a discovery record any app can find | DIRECTORY-059 |
+| `crates/lys/src/identity/install/discovery_tests.rs` | R2: Lys writes a discovery record any app can find | DIRECTORY-059 |
+| `crates/lys-identity-server/src/app_members_api.rs` | R3: Any registered app reads Lys's people, seats and agents | DIRECTORY-059 |
+| `crates/lys-identity-server/tests/app_members.rs` | R3: Any registered app reads Lys's people, seats and agents | DIRECTORY-059 |
+| `crates/lys-identity-server/src/backchannel_logout.rs` | R4: Signing out of Lys signs the person out of every registered app | DIRECTORY-059 |
+| `crates/lys-identity-server/tests/backchannel_logout.rs` | R4: Signing out of Lys signs the person out of every registered app | DIRECTORY-059 |
+| `crates/lys-identity-server/src/sessions_api.rs` | R4: Signing out of Lys signs the person out of every registered app | DIRECTORY-059 |
+| `crates/lys-secrets/tests/held_states.rs` | A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
+| `crates/lys-secrets/src/bin/lys-secrets/serve.rs` | A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
+| `crates/lys-secrets/src/bin/lys-secrets/view.rs` | A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
+| `crates/lys-identity-server/src/issuer_sign_out.rs` | Signing out of Lys ends the person's sessions at the issuer, and the issuer tells every registered app | DIRECTORY-059 |
+| `crates/lys-identity-server/src/apps_connect.rs` | An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code | DIRECTORY-059 |
+| `crates/lys-identity-server/tests/apps_connect.rs` | An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code | DIRECTORY-059 |
+| `surface/identity/src/features/apps/ConnectRequest.tsx` | An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code | DIRECTORY-059 |
+| `crates/lys-identity-server/src/session.rs` | Signing out of Lys signs the person out at the issuer, and the issuer tells every registered app | DIRECTORY-059 |
+| `surface/identity/src/features/sessions/Sessions.tsx` | Signing out of Lys signs the person out at the issuer, and the issuer tells every registered app | DIRECTORY-059 |
+| `crates/lys-identity/src/log.rs` | The receipts route answers a signed checkpoint | DIRECTORY-058 |
+| `crates/lys-identity/src/error.rs` | One function verifies a receipt against a pinned key | DIRECTORY-058 |
+| `crates/lys-identity/src/receipt.rs` | One function verifies a receipt against a pinned key | DIRECTORY-058 |
+| `crates/lys-core/src/checkpoint/note.rs` | One function verifies a receipt against a pinned key | DIRECTORY-058 |
+| `crates/lys-core/src/checkpoint/note_tests.rs` | One function verifies a receipt against a pinned key | DIRECTORY-058 |
+| `crates/lys-secrets/src/service.rs` | A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
+| `crates/lys-identity/tests/uncertain_support/mod.rs` | The receipts route answers a signed checkpoint | DIRECTORY-058 |
+| `crates/lys-identity/tests/signed_head_settle.rs` | The receipts route answers a signed checkpoint | DIRECTORY-058 |
+| `crates/lys-identity/tests/support/mod.rs` | The receipts route answers a signed checkpoint | DIRECTORY-058 |
+| `crates/lys/src/identity/install/detached.rs` | a detached start through the holder | DIRECTORY-057 |
+| `docs/design/directory/HOLDER-KEY-OPTIONS.md` | options for agent session holder keys, for a ruling before DIRECTORY-049 R8 and a DIRECTORY-050 amendment | DIRECTORY-050 |
+| `crates/lys-runner/src/session_key.rs` | the runner's session holder key | DIRECTORY-060 |
+| `crates/lys-runner/tests/session_key.rs` | the runner's session holder key | DIRECTORY-060 |
+| `crates/lys-core/src/keys/identity.rs` | the runner's session holder key | DIRECTORY-060 |
+| `crates/lys-runner/src/peer.rs` | R6: socket peer credentials, ancestry and leader start identity; DIRECTORY-060 reuses this proof | DIRECTORY-051 |
+| `crates/lys-runner/tests/present.rs` | the runner's session holder key | DIRECTORY-060 |
+| `crates/lys-runner/src/present_client.rs` | the runner's session holder key | DIRECTORY-060 |
+| `docs/design/directory/briefs/DIRECTORY-060.json` | the runner's session holder key brief | DIRECTORY-060 |
+| `docs/design/directory/briefs/DIRECTORY-060.md` | the runner's session holder key brief | DIRECTORY-060 |
+| `crates/lys/src/identity/upgrade/exchange.rs` | The exchange of bin/, the configuration and the screens with what is kept, undoing its own renames on a failure. | DIRECTORY-053 |
+| `crates/lys/src/identity/upgrade/exchange_tests.rs` | Tests of the exchange with a rename step that fails on a chosen call. | DIRECTORY-053 |
+| `crates/lys-identity-server/src/kinds.rs` | The registry of every signed log kind lys-identity-server folds. | DIRECTORY-053 |
+| `crates/lys-secrets/src/bin/lys-secrets/kinds.rs` | The registry of every audit log kind lys-secrets folds. | DIRECTORY-053 |
+| `crates/lys-install/Cargo.toml` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/config.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/config/validate.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/config_tests.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/configure.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/configure_tests.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/credentials.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/credentials_tests.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/error.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/error_tests.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/health.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/install.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/install/deployment.template.toml` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/install/detached.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/install/exit_wait.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/install/exit_wait_tests.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/install/held_start.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/install/held_start_tests.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/install/layout.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/install/server_config.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/install/services.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/install/start_race_tests.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/install/surface.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/install_tests.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/lib.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/loopback_http.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/loopback_http_tests.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/output.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/output_tests.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/prepare.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/prepare_tests.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/private_files.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/rauthy.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/themes.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/themes_tests.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/upgrade.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/upgrade/back.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/upgrade/exchange.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/upgrade/exchange_tests.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/upgrade_back_tests.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys-install/src/upgrade_tests.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `Cargo.lock` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `Cargo.toml` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys/Cargo.toml` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys/src/commands/mod.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys/src/identity/install.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys/src/identity/mod.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys/src/main.rs` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `deploy/identity/theme-map.md` | R1: Extract the install library without changing its behaviour | DIRECTORY-054 |
+| `crates/lys/src/commands/output.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/commands/output_tests.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/config.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/config/validate.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/config_tests.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/configure.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/configure_tests.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/credentials.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/credentials_tests.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/error.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/error_tests.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/health.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/install/deployment.template.toml` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/install/detached.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/install/exit_wait.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/install/exit_wait_tests.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/install/held_start.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/install/held_start_tests.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/install/layout.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/install/server_config.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/install/services.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/install/start_race_tests.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/install/surface.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/install_tests.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/loopback_http.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/loopback_http_tests.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/prepare.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/prepare_tests.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/private_files.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/rauthy.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/themes.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/themes_tests.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/upgrade.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/upgrade/back.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/upgrade/exchange.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/upgrade/exchange_tests.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/upgrade_back_tests.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys/src/identity/upgrade_tests.rs` | R1: Extract the install library without changing its behaviour (old path removed after relocation) | DIRECTORY-054 |
+| `crates/lys-app/Cargo.toml` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/build.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/bundle.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/bundle_tests.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/flow.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/flow_tests.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/launcher.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/launcher_tests.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/main.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/main_tests.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/progress.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/progress_tests.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/refusal.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/server.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/server_tests.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-install/src/steps.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-install/src/steps_tests.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `surface/identity/src/features/install/InstallProgress.tsx` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `surface/identity/tests/install-progress.test.tsx` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `surface/identity/src/App.tsx` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/engine.rs` | R3: The container engine, guided in plain words | DIRECTORY-054 |
+| `crates/lys-app/src/engine_tests.rs` | R3: The container engine, guided in plain words | DIRECTORY-054 |
+| `crates/lys-app/src/engine_wait.rs` | R3: The container engine, guided in plain words | DIRECTORY-054 |
+| `crates/lys-app/src/engine_wait_tests.rs` | R3: The container engine, guided in plain words | DIRECTORY-054 |
+| `crates/lys-install/src/install/engine_path.rs` | R3: The container engine, guided in plain words | DIRECTORY-054 |
+| `crates/lys-install/src/install/engine_path_tests.rs` | R3: The container engine, guided in plain words | DIRECTORY-054 |
+| `crates/lys-app/src/login_item.rs` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `crates/lys-app/src/login_item_tests.rs` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `crates/lys-app/src/uninstall.rs` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `crates/lys-app/src/uninstall_tests.rs` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `crates/lys-identity-server/src/uninstall_api.rs` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `crates/lys-identity-server/src/uninstall_api_tests.rs` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `surface/identity/src/features/account/Uninstall.tsx` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `surface/identity/tests/uninstall.test.tsx` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `crates/lys-identity-server/src/error.rs` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `crates/lys-identity-server/src/error_status.rs` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `crates/lys-identity-server/src/lib.rs` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `crates/lys-identity-server/src/routes.rs` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `surface/identity/src/features/me/You.tsx` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `surface/identity/tests/fixtures.ts` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `crates/lys/src/package.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `crates/lys/src/package_tests.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `packaging/macos/Info.plist` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `packaging/macos/Lys.icns` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `crates/lys-home/build.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `crates/lys-home/tests/version.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `crates/lys-identity-server/build.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `crates/lys-identity-server/tests/version.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `crates/lys-secrets/build.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `crates/lys-secrets/tests/version.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `crates/lys/build.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `crates/lys/src/cli.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `crates/lys/src/commands/error.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `crates/lys/src/commands/error_tests.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `crates/lys/tests/version.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `docs/design/directory/reports/DIRECTORY-054-fresh-account.md` | R6: Prepare the fresh-account proof and its evidence record | DIRECTORY-054 |
+| `docs/design/directory/reports/DIRECTORY-054-open-items.md` | R6: Prepare the fresh-account proof and its evidence record | DIRECTORY-054 |
+| `crates/lys-home/src/record/lantern.rs` | DIRECTORY-052 R3: a member's starting memories are written as lantern notes | DIRECTORY-052 |
+| `crates/lys-home/src/cli/fewshot.rs` | DIRECTORY-052 R3: a member's opening conversation is written as fewshot turns | DIRECTORY-052 |
+| `crates/lys-home/tests/fewshot_write.rs` | DIRECTORY-052 R3: fewshot turns written through lys-home's public library function | DIRECTORY-052 |
+| `crates/lys-home/src/lib.rs` | DIRECTORY-052 R3: lys-home's library exposes the fewshot writer | DIRECTORY-052 |
+| `crates/lys-home/src/cli.rs` | DIRECTORY-052 R3: the fewshot command calls the library writer | DIRECTORY-052 |
+| `crates/lys-identity-server/src/grants_connector.rs` | Application-connector holder conversion and authorization helpers, keeping grants.rs within ADR-111. | DIRECTORY-048 |
+| `crates/lys-identity-server/src/provisioning_api.rs` | R1: Authenticated parsed tracking from Argus, durably resumed by cursor | DIRECTORY-051 |
+| `crates/lys-identity-server/src/budgets_store.rs` | R2: Budgets on agents, teams and people | DIRECTORY-051 |
+| `crates/lys-runner/src/operations.rs` | R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-runner/tests/operations.rs` | R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-runner/src/state.rs` | R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-identity-server/src/runner_acts.rs` | R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-identity-server/src/goals_store.rs` | R4: Goals, expectations and deliverables, with deadlines and reminders | DIRECTORY-051 |
+| `surface/identity/tests/usage.test.tsx` | R5: Plain budget and goal controls | DIRECTORY-051 |
+| `surface/identity/src/shell/Shell.tsx` | R5: Plain budget and goal controls | DIRECTORY-051 |
+| `crates/lys-identity-server/src/refusals_api.rs` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-identity-server/src/refusals_store.rs` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-identity-server/tests/refusals.rs` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-runner/src/refusals.rs` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-runner/tests/refusals.rs` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `surface/identity/src/features/file/AgentRefusals.tsx` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `surface/identity/tests/agent-refusals.test.tsx` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `surface/identity/src/features/file/tabs.ts` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-runner/src/tracking.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-runner/src/tracking_store.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-runner/tests/tracking.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/tracking.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/tracking_tests.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-identity-server/src/tracking_export.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-runner/src/session/lifecycle.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/mod.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/mod.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/launch.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/launch_env.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/codex/mod.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `surface/identity/tests/acceptance/refusals.spec.ts` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `surface/identity/vite.config.ts` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-identity-server/src/grants_refusals.rs` | R6: refusal capture without growing grants.rs | DIRECTORY-051 |
+| `crates/lys-identity-server/src/spicedb_cancel.rs` | a SpiceDB wait ends when its request leaves | DIRECTORY-061 |
+| `crates/lys-identity-server/src/spicedb_cancel_tests.rs` | a SpiceDB wait ends when its request leaves | DIRECTORY-061 |
+| `crates/lys-identity-server/tests/spicedb_cancel.rs` | a SpiceDB wait ends when its request leaves | DIRECTORY-061 |
+| `docs/design/directory/briefs/DIRECTORY-061.json` | the SpiceDB cancel brief | DIRECTORY-061 |
+| `docs/design/directory/briefs/DIRECTORY-061.md` | the SpiceDB cancel brief | DIRECTORY-061 |
+| `crates/lys-runner/src/containment_policy.rs` | One Lys policy becomes a bound containment plan; DIRECTORY-062 R1. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment.rs` | One Lys policy becomes a bound containment plan; DIRECTORY-062 R1. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_policy.rs` | One Lys policy becomes a bound containment plan; DIRECTORY-062 R1. | DIRECTORY-062 |
+| `crates/lys-identity-server/src/containment_policy.rs` | One Lys policy becomes a bound containment plan; DIRECTORY-062 R1. | DIRECTORY-062 |
+| `crates/lys-identity-server/tests/containment_policy.rs` | One Lys policy becomes a bound containment plan; DIRECTORY-062 R1. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_macos.rs` | macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_egress.rs` | macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_macos.rs` | macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_egress.rs` | macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_linux.rs` | Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_helper.rs` | Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_linux.rs` | Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys/src/cli/containment.rs` | Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_audit.rs` | Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_audit_macos.rs` | Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_audit_linux.rs` | Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_audit.rs` | Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4. | DIRECTORY-062 |
+| `crates/lys-identity-server/src/containment_api.rs` | The agent page states the sandbox and the evidence; DIRECTORY-062 R5. | DIRECTORY-062 |
+| `crates/lys-identity-server/tests/containment.rs` | The agent page states the sandbox and the evidence; DIRECTORY-062 R5. | DIRECTORY-062 |
+| `surface/identity/src/features/file/AgentContainment.tsx` | The agent page states the sandbox and the evidence; DIRECTORY-062 R5. | DIRECTORY-062 |
+| `surface/identity/tests/agent-containment.test.tsx` | The agent page states the sandbox and the evidence; DIRECTORY-062 R5. | DIRECTORY-062 |
+| `scripts/identity-gates/containment-macos.sh` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
+| `scripts/identity-gates/containment-linux.sh` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_probe.rs` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
+| `surface/identity/tests/acceptance/containment.spec.ts` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
+| `docs/design/directory/PROOF-CONTAINMENT.md` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
+| `crates/lys-home/src/harness/claude_code/settings.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/settings_tests.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/codex/config.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/codex/config_tests.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys/src/commands/runner_hook.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys/src/commands/runner_statusline.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys/src/commands/runner_notify.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/render.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/render_write.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/template.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-identity-server/src/provisioning_store.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-runner/src/judge.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-runner/src/refusal_log.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-runner/tests/judge.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys/src/commands/runner_judge.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-identity-server/src/agent_policy_api.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-identity-server/src/agent_policy_store.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-identity-server/tests/agent_policy.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `surface/identity/src/features/file/AgentPolicy.tsx` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `surface/identity/tests/agent-policy.test.tsx` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-runner/tests/judge_peer.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-identity-server/src/runner_sessions.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-identity-server/src/grant_sight.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-identity-server/src/health_api.rs` | the service's own health answer | DIRECTORY-063 |
+| `crates/lys-identity-server/src/health_api_tests.rs` | the service's own health answer | DIRECTORY-063 |
+| `docs/design/directory/briefs/DIRECTORY-063.json` | the unknown API path and health brief | DIRECTORY-063 |
+| `docs/design/directory/briefs/DIRECTORY-063.md` | the unknown API path and health brief | DIRECTORY-063 |
+| `crates/lys-runner/src/containment_forwarder.rs` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_prepare.rs` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_prepare_macos.rs` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_prepare_linux.rs` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_prepare.rs` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_forwarder.rs` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
+| `docs/CONTAINMENT-PREPARATION.md` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
+| `scripts/identity-gates/containment-capabilities.sh` | A person watches real native denials and an allowed control. DIRECTORY-062 R6. | DIRECTORY-062 |
+| `crates/lys-runner/src/harness_control.rs` | One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/events.rs` | One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/process.rs` | One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1). | DIRECTORY-064 |
+| `crates/lys-runner/tests/harness_control.rs` | One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/claude.rs` | Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/codex.rs` | Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2). | DIRECTORY-064 |
+| `crates/lys-runner/tests/harness_claude.rs` | Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2). | DIRECTORY-064 |
+| `crates/lys-runner/tests/harness_codex.rs` | Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/context.rs` | Enforce context thresholds at the owned boundary (DIRECTORY-064 R3). | DIRECTORY-064 |
+| `crates/lys-runner/tests/context_control.rs` | Enforce context thresholds at the owned boundary (DIRECTORY-064 R3). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/reminders.rs` | Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4). | DIRECTORY-064 |
+| `crates/lys-runner/tests/reminder_delivery.rs` | Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4). | DIRECTORY-064 |
+| `crates/lys-runner/tests/control_recovery.rs` | Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5). | DIRECTORY-064 |
+| `crates/lys-identity-server/tests/control_receipts.rs` | Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5). | DIRECTORY-064 |
+| `surface/identity/tests/acceptance/agent-control.spec.ts` | Plain controls and a real managed-session proof (DIRECTORY-064 R6). | DIRECTORY-064 |
+| `crates/lys/src/identity/upgrade/runner.rs` | Place the runner binary without restarting a live runner | DIRECTORY-066 |
+| `crates/lys/src/identity/upgrade/runner_tests.rs` | Place the runner binary without restarting a live runner | DIRECTORY-066 |
+| `crates/lys/src/identity/upgrade/scratch_tests.rs` | Place the runner binary without restarting a live runner | DIRECTORY-066 |
+| `crates/lys-runner/tests/build_identity.rs` | Record running and placed builds as different facts | DIRECTORY-066 |
+| `crates/lys/src/commands/runner.rs` | Record running and placed builds as different facts | DIRECTORY-066 |
+| `crates/lys/src/identity/runner_restart.rs` | Restart only through an explicit session-aware operation | DIRECTORY-066 |
+| `crates/lys/src/identity/runner_restart_tests.rs` | Restart only through an explicit session-aware operation | DIRECTORY-066 |
+| `crates/lys-runner/tests/restart_fence.rs` | Restart only through an explicit session-aware operation | DIRECTORY-066 |
+| `crates/lys/src/identity/status.rs` | Show the same pending restart on the page and CLI | DIRECTORY-066 |
+| `crates/lys/src/identity/status_tests.rs` | Show the same pending restart on the page and CLI | DIRECTORY-066 |
+| `surface/identity/tests/acceptance/runner-build.spec.ts` | Show the same pending restart on the page and CLI | DIRECTORY-066 |
+| `crates/lys-runner/src/codex_policy_contract.rs` | Pin the actual Codex executable and its supported policy contract. DIRECTORY-065 R1. | DIRECTORY-065 |
+| `crates/lys-runner/tests/codex_policy_contract.rs` | Pin the actual Codex executable and its supported policy contract. DIRECTORY-065 R1. | DIRECTORY-065 |
+| `docs/design/directory/CODEX-POLICY-CONTRACT.md` | Pin the actual Codex executable and its supported policy contract. DIRECTORY-065 R1. | DIRECTORY-065 |
+| `crates/lys-home/src/harness/codex/policy.rs` | Render native Codex permissions from the bound Lys policy. DIRECTORY-065 R2. | DIRECTORY-065 |
+| `crates/lys-home/src/harness/codex/policy_tests.rs` | Render native Codex permissions from the bound Lys policy. DIRECTORY-065 R2. | DIRECTORY-065 |
+| `crates/lys-runner/src/codex_judge.rs` | Bind Codex pre-tool policy checks to the existing Lys judge. DIRECTORY-065 R3. | DIRECTORY-065 |
+| `crates/lys-runner/tests/codex_judge.rs` | Bind Codex pre-tool policy checks to the existing Lys judge. DIRECTORY-065 R3. | DIRECTORY-065 |
+| `crates/lys-home/src/harness/codex/hooks.rs` | Bind Codex pre-tool policy checks to the existing Lys judge. DIRECTORY-065 R3. | DIRECTORY-065 |
+| `crates/lys-home/src/harness/codex/hooks_tests.rs` | Bind Codex pre-tool policy checks to the existing Lys judge. DIRECTORY-065 R3. | DIRECTORY-065 |
+| `crates/lys-runner/src/codex_refusals.rs` | Record native Codex rejections with honest provenance. DIRECTORY-065 R4. | DIRECTORY-065 |
+| `crates/lys-runner/tests/codex_refusals.rs` | Record native Codex rejections with honest provenance. DIRECTORY-065 R4. | DIRECTORY-065 |
+| `surface/identity/tests/codex-policy.test.tsx` | The Codex agent page shows measured policy and refusal coverage. DIRECTORY-065 R5. | DIRECTORY-065 |
+| `scripts/identity-gates/codex-policy.sh` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
+| `crates/lys-runner/tests/codex_policy_native.rs` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
+| `crates/lys-runner/tests/support/codex_policy_fixture.rs` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
+| `surface/identity/tests/acceptance/codex-policy.spec.ts` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
+| `docs/design/directory/PROOF-CODEX-POLICY.md` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
 
 ## Inventory
 
@@ -662,15 +1123,15 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 
 ## Constraints
 
-- **CN1** — Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed.
+- **CN1** — The documents-only boundary applies to the original directory planning task, not to published implementation briefs. A published DIRECTORY implementation brief authorises only its exact requirement file walls, including named source, tests, configuration and documentation files. No implementation author may widen those walls silently. The historical IDENTITY-001 record is not rewritten. Tom’s 29 September 07:51 direction, relayed by Waffles, removes lead brief sign-off as a prerequisite to dispatch; the design gate and automatic card review and full delivery gates remain required.
 - **CN2** — Development isolation: rows 02 to 05 use only disposable test identities and test provider registrations; no production tokens, real business sign-in or live Cambium participant migration.
 - **CN3** — Every path written in a document of this cluster is relative to the repository root, whatever directory a session starts in; a command runs from its own tree and spells its paths from there.
 - **CN4** — No structure row or files entry carries a root token; a file in another repository is named in a requirement's spec with its owner.
 - **CN5** — A live demonstration to Tom is never an acceptance criterion of a loop requirement; it is a verification step a person performs after the row lands.
 - **CN6** — The live demonstrations ID001_LINK_LIVE (after row 03) and ID001_DIRECTORY_LIVE (after row 05) are mandatory operator hold points: the brief that follows each is blocked by it until Tom's demonstration receipt is recorded; a loop completion never stands in for one.
 - **CN7** — Revision 5's ceiling stands: 48 focused implementer hours for IDENTITY-001 (row 01 1.5, closed; 02 8; 04 10; 03 10; 05 6; 06 4; 07 5; total 44.5, contingency 3.5), with IDENTITY-002's 4 hours outside it. An overrun is reported as soon as it is known, and Waffles takes any ceiling change to Tom (docs/design/identity/briefs/IDENTITY-001.json:24).
-- **CN8** — One implementer, one row in implementation and one gate invocation at a time in this lane; release builds, checks and tests run through the gate workflow at the venue, and a development exception never bypasses it (docs/design/identity/briefs/IDENTITY-001.json:25-27, docs/design/identity/briefs/IDENTITY-001.json:135).
-- **CN9** — A row that needs a file outside its wall stops and names it, and the reviewer approves a brief revision before that file is edited; a directory wall for a wholly new module allows only its named responsibility and needs an exact file manifest reviewed before its row starts (docs/design/identity/briefs/IDENTITY-001.json:28).
+- **CN8** — There is no one-build-per-lead rule: Tom withdrew that restriction on 29 September at 07:32, relayed by Waffles. Independent card builds may run concurrently. Heavy builds and full gates run at the declared venue. Concurrent dispatch does not supply missing prerequisite code: dependent changes need the actual prerequisite implementation in the integration tree, and the integrated commit passes the full delivery chain before landing.
+- **CN9** — A row that needs a file outside its wall stops and names it. The lead amends the handwritten brief on main and passes the design gate before that additional file is edited; a new module needs an exact file manifest within its named responsibility. Under Tom’s 29 September 07:51 direction, relayed by Waffles, no separate lead review or sign-off is required before dispatch. Automatic card review and full delivery gates remain required. An active run keeps its captured contract; changed words must be reconciled with its result before publication or landing.
 - **CN10** — Rows 02 to 05 run on Rauthy v0.36.2 under Waffles' ruling of 15:36:25; each development install checks current releases and advisories and records the accepted exception; IDENTITY-001-UPSTREAM-AUTH-STATE binds real sign-in and install, rows 06 and 07 (docs/design/identity/briefs/IDENTITY-001.json:18, docs/design/identity/briefs/IDENTITY-001.json:46).
 - **CN11** — Step 1 is directory records, sign-in and the minimum signed identity audit. SpiceDB is installed and checked in row 02 and enforces nothing in step 1; live capability policy and its enforcement are step 2's, and running SpiceDB is not permission enforcement (docs/design/identity/briefs/IDENTITY-001.json:29-30).
 - **CN12** — DIRECTORY-006 is implementation work after the frozen planning task: its source paths are only executable after the DIRECTORY-002/003 foundations are implemented and their integration manifests are reconciled. R6 also waits for the standalone surface foundation. Do not dispatch from a schema-valid but dependency-blocked brief.

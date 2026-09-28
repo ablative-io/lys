@@ -37,7 +37,8 @@ fn revoke(
 }
 
 #[test]
-fn grant_revoke_withdraws_every_derived_grant_and_leaves_the_independent_one() -> TestResult {
+fn row_2_5_grant_revoke_withdraws_every_derived_grant_and_leaves_the_independent_one() -> TestResult
+{
     let mut world = World::new()?;
     let (dana, tom, tom_agent) = (
         IdentityId::Person(world.dana),

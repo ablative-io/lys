@@ -60,6 +60,8 @@
 
 **S111.** As the operator, I want the exact release installed on a node I name and shown to me as a staging install, so that I can accept the product standalone before anything is cut over.
 
+**S165.** As an operator, I want Lys to start agents with their credentials, tell apps where it is and sign people out of every app, with no app needing to run, so that Lys and each app work on their own and together.
+
 ## Verifier — Checks a recorded identity change without the operator's cooperation
 
 **S7.** As a verifier, I want to check a recorded identity change against a checkpoint and key with standard tooling, so that the directory's history does not rest on the operator's word.
@@ -69,6 +71,8 @@
 **S113.** As a verifier, I want to read from an agent's certificate what it was granted at issuance and have a holder, a grant or an instant outside that refused, so that a signed claim is never taken as checked when nothing checked it.
 
 **S114.** As a stranger verifying lys artifacts, I want the capability claim format specified, attacked and ratified before anything is signed under it, with every shipped format left byte-identical, so that no historical verification breaks.
+
+**S162.** As a reader of a receipt, I want the checkpoint it is proved against to be signed by the service, so that a proof of inclusion tells me the act is in the service's log and not in a tree somebody built around it.
 
 ## Grant holder and reviewer — Exercises or delegates current authority and verifies its exact origin
 
@@ -129,6 +133,8 @@
 ## Started agent — Reports back to the directory and presents its session credential
 
 **S80.** As a started agent, I want to present my session credential to the directory, so that it confirms I am my enduring agent in this session.
+
+**S168.** As an agent started by Lys, I want every handle I am launched with to work, without ever holding the key that presents for it.
 
 ## Stranger — Checks an issued certificate and its log entry offline, holding nothing from lys
 
@@ -216,11 +222,17 @@
 
 **S147.** As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
 
+**S159.** As the person who updated Lys, I want to go back to the build I had before with one command when the new one misbehaves after it started fine, so that a bad update never leaves me stuck.
+
+**S161.** As the person who installed Lys, I want a service that has ended to be seen as ended at once, whatever else Lys was starting at that moment, so that a stop, a restart and an upgrade never wait on or misread a process that is gone.
+
 ## Person setting up Lys for the first time — Installs Lys on their own machine with no terminal knowledge and signs in
 
 **S149.** As an ordinary person setting up Lys, I want one installer, then a Lys page that asks my name, email and password and lets me connect Google, GitHub or Microsoft, so that I am signed in without a terminal, a password file or any page that is not Lys.
 
 **S150.** As someone using any of our products, I want to sign in with Lys everywhere, so that there is one account and one sign-in page, and it is always Lys's.
+
+**S160.** As someone who has never used a terminal, I want to download Lys, open it and be guided in my browser until I am signed in, so that I can set it up for my team myself.
 
 ## Developer of an app that signs in with Lys — Builds a product that uses Lys for sign-in and permissions without Lys knowing about it
 
@@ -231,3 +243,51 @@
 ## Person or agent using Lys through an AI assistant — Reads and changes Lys through an MCP client, with only their own rights
 
 **S153.** As a person or an agent using an AI assistant, I want the assistant to reach Lys with my own identity and nothing more, so that it can never see a secret or do what I could not.
+
+## Person running a team of agents — Starts, watches, talks to and stops agents from Lys
+
+**S154.** As a person running agents, I want to start an agent from Lys and have it running in the background, so that I don't need a terminal or another tool.
+
+**S155.** As a person running agents, I want to see what an agent is doing, type to it, and stop it from one screen, so that every agent is in one place I control.
+
+**S156.** As a person running agents, I want each agent held to a budget for context, tokens and time, compacted or stopped when it reaches it, so that no agent burns what I cannot afford.
+
+**S157.** As a person running agents, I want to give an agent goals with deadlines and have it reminded, so that work is paced and I can see where each goal stands.
+
+**S158.** As a person running agents, I want to ask for a team for a piece of work and have it provisioned with the right memories, opening conversation, budget, goals and checker, so that I can send it off knowing it will be done and checked within what I can afford.
+
+## Installer and operator — Provision and upgrade the internal audit connection
+
+**S163.** As a person installing Lys, I want its internal audit connection provisioned automatically so that I never handle credentials or configure the identity provider.
+
+**S164.** As an operator, I want upgrade and interrupted setup to preserve the sender identity so that pending audit work remains verifiable.
+
+**S172.** As the person running a Lys install, I want a missing API to say it is missing and one route that says the service is serving, so that a web page is never mistaken for an answer.
+
+## Person waiting on a permission check — Uses a Lys screen or route that checks a grant
+
+**S169.** As a person whose request is waiting on the permission service, I want my request to end when I leave it, and nobody else's request held behind mine.
+
+## Person running an agent under a policy — Operates and inspects a runner-owned session
+
+**S170.** As the person responsible for an agent, I want its operating-system sandbox to enforce the same policy as Lys, so a shell or child process cannot bypass my limits.
+
+**S171.** As a person watching an agent, I want to see its actual sandbox and OS-backed refusals, so I can distinguish enforced restrictions from missing coverage.
+
+## Person setting agent context and reminders — Controls agents without a terminal
+
+**S173.** As the person responsible for an agent, I want Lys to compact or stop it at my context limit without terminal typing, so the next turn obeys the limit.
+
+**S174.** As the person setting a goal, I want my saved words delivered at a turn boundary with honest receipts, so a reminder never interrupts a tool or silently arrives twice.
+
+## Person upgrading a live runner — Installs and changes builds while agents work
+
+**S177.** As the person upgrading Lys, I want the runner binary placed and both its installed and running builds stated honestly, without losing live sessions.
+
+**S178.** As the person responsible for live sessions, I want a pending runner restart shown clearly and performed only through my explicit controlled action.
+
+## Person running a Codex agent — Sets policy and inspects its actual enforcement
+
+**S175.** As a person running Codex under Lys, I want its native permissions to reflect my Lys policy without hand-editing settings.
+
+**S176.** As the person responsible for an agent, I want real refusals and missing coverage shown separately, so I can trust what the page tells me.

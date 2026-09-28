@@ -22,6 +22,11 @@
 //! exactly as one that does not exist, and a recipient it may not name exactly
 //! as one that does not exist, so no refusal says whether either exists. It
 //! reads and records nothing.
+//!
+//! Every grant answered carries whether it stands and its effective end,
+//! judged here over its whole chain by the same admission a check runs, so a
+//! screen renders the service's judgement and walks no chain of its own. A
+//! refusal that stops a grant standing is read as the caller may read it.
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
@@ -31,7 +36,10 @@ use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use lys_identity::grants::{ExerciseRequest, GrantError, Grants, MemoryRelationships, Model};
+use lys_identity::grants::admission::effective;
+use lys_identity::grants::{
+    ExerciseRequest, GrantError, GrantRecord, Grants, MemoryRelationships, Model,
+};
 use lys_identity::projection::Projection;
 use lys_identity::signer::load_service_key;
 use lys_identity::{IdentityError, IdentityId, PersonId};
@@ -40,8 +48,8 @@ use lys_log_store::FileLeafStore;
 use crate::error::ServerError;
 use crate::grant_contract::{
     ActionBody, CannotGiveAnswer, CannotGiveBody, DelegateBody, GrantList, GrantView, HolderView,
-    ModelView, PAGE_MAX, PermitView, RecordedView, RevokeBody, RootBody, WhoBody, WhoPage,
-    grant_id,
+    ModelView, PAGE_MAX, PermitView, RecordedView, RefusedView, RevokeBody, RootBody, StandingView,
+    WhoBody, WhoPage, grant_id,
 };
 use crate::grant_sight::{as_seen_by, sees, sees_identity, sees_with, visible_or};
 use crate::routes::{AppState, signed_in, with_directory};
@@ -170,6 +178,63 @@ fn engine_permits(
     })
 }
 
+/// The grant a refusal names on the chain it was judged over, if any.
+fn named_grant(error: &GrantError) -> Option<String> {
+    match error {
+        GrantError::Revoked { grant }
+        | GrantError::Expired { grant, .. }
+        | GrantError::NotStarted { grant, .. }
+        | GrantError::OperationUnresolved { grant, .. } => Some(grant.clone()),
+        _ => None,
+    }
+}
+
+/// `record` as `caller` reads it at `at`: whether it stands, judged by
+/// admission over its whole chain, and the earliest end on that chain.
+pub(crate) fn grant_view(
+    judged: &Judged<'_>,
+    caller: IdentityId,
+    record: &GrantRecord,
+    at: u64,
+) -> GrantView {
+    let id = record.grant().id();
+    let book = judged.grants.book();
+    let effective_ends_at = book
+        .lineage(id)
+        .ok()
+        .and_then(|lineage| lineage.ends)
+        .map(|(ends, _)| ends);
+    let standing = match effective(book, judged.directory, id, at) {
+        Ok(_) => StandingView {
+            stands: true,
+            refused: None,
+        },
+        Err(error) => {
+            let named = named_grant(&error);
+            let seen = as_seen_by(judged, caller, error);
+            let grant = if matches!(seen, ServerError::Withheld { .. }) {
+                None
+            } else {
+                named
+            };
+            StandingView {
+                stands: false,
+                refused: Some(RefusedView {
+                    refusal: seen.name(),
+                    grant,
+                    reason: seen.to_string(),
+                }),
+            }
+        }
+    };
+    GrantView::new(
+        record,
+        judged.grants.unreported(id),
+        standing,
+        effective_ends_at,
+    )
+}
+
 /// The identity the signed-in caller's login is bound to, person or agent.
 pub(crate) fn caller(
     state: &AppState,
@@ -192,13 +257,14 @@ async fn list(
 ) -> Result<Json<GrantList>, ServerError> {
     with_grants(&state, |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
+        let at = now();
         let mut known = HashMap::new();
         let grants = judged
             .grants
             .book()
             .records()
             .filter(|record| sees_with(&judged, caller, record, &mut known))
-            .map(GrantView::from)
+            .map(|record| grant_view(&judged, caller, record, at))
             .collect();
         Ok(Json(GrantList {
             grants,
@@ -230,7 +296,7 @@ async fn read(
             .record(id)
             .filter(|record| sees(&judged, caller, record))
             .ok_or(ServerError::GrantNotVisible)?;
-        Ok(Json(GrantView::from(record)))
+        Ok(Json(grant_view(&judged, caller, record, now())))
     })
 }
 

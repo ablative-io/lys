@@ -9,13 +9,16 @@
 //! and [`Broker::secret_list`] applies one scope of three at the server, or
 //! none, and is refused to an agent.
 
+use std::collections::BTreeMap;
+
 use crate::access::{Asker, AskerKind};
 use crate::error::{ListRefusal, SecretsError};
 use crate::handle::{HandleToken, Presentation};
-use crate::permission::PermissionCheck;
+use crate::permission::{PermissionCheck, Relation};
 use crate::store::{EntryView, Recipients, Scope};
 
 use super::Broker;
+use super::checked::Checked;
 use super::owner::{Admission, Call, OwnerChanged, SCOPE};
 
 /// A secret's owner settings as they stand.
@@ -134,6 +137,17 @@ impl<P: PermissionCheck> Broker<P> {
     /// them). A grant alone, from whoever, never crosses a scope. A secret with no scope set bounds no one here. The
     /// refusal says why.
     pub(super) fn within_scope(&self, identity: &str, secret: &str) -> Result<(), String> {
+        self.within_scope_as(identity, secret, None)
+    }
+
+    /// As [`Broker::within_scope`], taking the permission source's answer
+    /// from `checked` where it holds one.
+    pub(super) fn within_scope_as(
+        &self,
+        identity: &str,
+        secret: &str,
+        checked: Option<&Checked>,
+    ) -> Result<(), String> {
         let Some(entry) = self.store.entry(secret) else {
             return Err("no such secret".to_owned());
         };
@@ -148,8 +162,10 @@ impl<P: PermissionCheck> Broker<P> {
                 return Ok(());
             }
         }
-        self.permissions
-            .member_of(identity, &scope.target())
+        let target = scope.target();
+        checked
+            .and_then(|checked| checked.get(Relation::Member, identity, &target))
+            .unwrap_or_else(|| self.permissions.member_of(identity, &target))
             .map(|_permit| ())
             .map_err(|denied| format!("outside the secret's scope: {}", denied.reason))
     }
@@ -192,6 +208,18 @@ impl<P: PermissionCheck> Broker<P> {
             || self.permissions.may_read(identity, granted_as).is_ok()
             || self.permissions.may_lend(identity, granted_as).is_ok();
         granted && self.within_scope(identity, secret).is_ok()
+    }
+
+    /// Whether `identity` may discover each secret it is asked of, each
+    /// asked of the permission source once however many times it is asked
+    /// here. Made for one request, so a grant removed since is seen by the
+    /// next.
+    pub fn discovery<'b>(&'b self, identity: &'b str) -> Discovery<'b, P> {
+        Discovery {
+            broker: self,
+            identity,
+            known: BTreeMap::new(),
+        }
     }
 
     /// The secrets `identity` may discover, without their values.
@@ -294,6 +322,27 @@ impl<P: PermissionCheck> Broker<P> {
         let outcome = with_via(format!("{SCOPE}{}", scope.target()), via);
         self.store.set_scope(secret, scope)?;
         self.record_owner_change(owner, secret, &outcome, call)
+    }
+}
+
+/// What one identity may discover, each secret asked once (see
+/// [`Broker::discovery`]).
+pub struct Discovery<'b, P: PermissionCheck> {
+    broker: &'b Broker<P>,
+    identity: &'b str,
+    known: BTreeMap<String, bool>,
+}
+
+impl<P: PermissionCheck> Discovery<'_, P> {
+    /// Whether the identity may discover `secret`, as
+    /// [`Broker::discovers`] answers it the first time it is asked.
+    pub fn discovers(&mut self, secret: &str) -> bool {
+        if let Some(known) = self.known.get(secret) {
+            return *known;
+        }
+        let found = self.broker.discovers(self.identity, secret);
+        self.known.insert(secret.to_owned(), found);
+        found
     }
 }
 

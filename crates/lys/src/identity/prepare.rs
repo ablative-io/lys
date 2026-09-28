@@ -171,7 +171,7 @@ pub fn render_env(
         .publish_port
         .map_or(String::new(), |p| p.to_string());
     let profiles = if database.bundled { "bundled-db" } else { "" };
-    let lines: [(&str, String); 19] = [
+    let lines: [(&str, String); 20] = [
         ("COMPOSE_PROJECT_NAME", config.deployment.project.clone()),
         ("COMPOSE_PROFILES", profiles.to_string()),
         ("IDENTITY_NODE", config.deployment.node.clone()),
@@ -192,6 +192,7 @@ pub fn render_env(
                 .to_string(),
         ),
         ("RAUTHY_PROXY_MODE", config.public_tls().to_string()),
+        ("RAUTHY_COOKIE_MODE", config.cookie_mode().to_string()),
         (
             "RAUTHY_TRUSTED_PROXIES",
             format!("\"{}\"", config.issuer.trusted_proxies.join("\\n")),

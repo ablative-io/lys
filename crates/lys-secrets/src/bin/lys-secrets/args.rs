@@ -1,7 +1,10 @@
 //! Arguments several commands share: where permission comes from, which
-//! relation a grant names, and a sealed record's class.
+//! relation a grant names, a sealed record's class, and a page of the audit
+//! log.
 
+use std::num::NonZeroU64;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use lys_secrets::{Relation, SecretsError};
 
@@ -34,12 +37,12 @@ pub struct PermissionSource {
 impl PermissionSource {
     pub fn grants(&self, layout: &Layout) -> Result<Grants, SecretsError> {
         Ok(match &self.directory_config {
-            Some(config) => Grants::Directory(SpiceGrants::from_directory(
+            Some(config) => Grants::Directory(Arc::new(SpiceGrants::from_directory(
                 config,
                 &self.use_action,
                 &self.read_action,
                 [&self.lend_action, &self.member_action],
-            )?),
+            )?)),
             None => Grants::File(FileGrants::new(layout.grants())),
         })
     }
@@ -68,4 +71,18 @@ impl From<RelationArg> for Relation {
 pub enum RecordClass {
     Memory,
     Key,
+}
+
+/// A page of the audit log: the last `--most` lines, ending at the tail or
+/// before `--before`. Only those lines are read.
+#[derive(clap::Args)]
+pub struct Page {
+    /// How many lines to print (required; there is no default). The page
+    /// ends at the log's last line, or before `--before`.
+    #[arg(long)]
+    pub most: NonZeroU64,
+    /// The index to end before, as the previous page printed it; without
+    /// it the page ends at the log's last line.
+    #[arg(long)]
+    pub before: Option<u64>,
 }

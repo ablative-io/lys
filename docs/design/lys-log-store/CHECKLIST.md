@@ -34,3 +34,20 @@
 ## Proofs never hold the whole log
 
 - [ ] **C20** — A hash-only proof tree built by streaming (LYSLOGSTORE-005 R1), proved by a counting test that fails at the base.
+
+## A proof reads tiles, never the whole log (LYSLOGSTORE-006)
+
+- [ ] **C21** — Every append writes its hashes into C2SP tiles before the pin (LYSLOGSTORE-006 R1).
+- [ ] **C22** — Inclusion and consistency proofs read only the tiles they need, and the whole-log proof tree is gone (LYSLOGSTORE-006 R2).
+- [ ] **C23** — A log made before tiles gets them once, and never again (LYSLOGSTORE-006 R3).
+- [ ] **C24** — A gate test fails when a start or its first proof reads a leaf before the tail (LYSLOGSTORE-006 R4).
+- [ ] **C31** — A receipt's coordinate is read from the tiles and the growing checkpoints are removed (LYSLOGSTORE-006 R5).
+
+## No open reads every leaf (LYSLOGSTORE-007)
+
+- [ ] **C25** — A frontier log opens from its tiles and reads no leaf under the pin (LYSLOGSTORE-007 R1).
+- [ ] **C30** — Artifacts are built from a tile proof and a root, byte-for-byte as from a whole tree (LYSLOGSTORE-007 R2).
+- [ ] **C26** — The anchor opens, creates, reads and proves through the frontier log and its tiles (LYSLOGSTORE-007 R3).
+- [ ] **C27** — The lys log and ca log commands and the revocation appends run on the frontier log (LYSLOGSTORE-007 R4).
+- [ ] **C28** — Only lys log audit reads every leaf, and the whole-tree Log is removed (LYSLOGSTORE-007 R5).
+- [ ] **C29** — A gate test fails when any open reads a leaf under the pin (LYSLOGSTORE-007 R6).

@@ -24,9 +24,15 @@ use crate::store::{EntryClass, SecretStore};
 
 mod accounts;
 mod admit;
+mod checked;
+pub use checked::{Ask, Checked};
 mod ending;
 pub use ending::{EndAct, EndWay, Ended, HandleEnded, LeaseEnd, SystemBehind};
 mod folded;
+mod handles;
+#[cfg(test)]
+mod handles_tests;
+use handles::{Handles, Work};
 mod held;
 pub use held::{HeldHandle, LeaseView};
 mod inflight;
@@ -42,11 +48,11 @@ use revocation::Upstream;
 pub use revocation::{RevocationState, UpstreamRevocation};
 mod rotation;
 mod scope;
-pub use scope::{ListScope, SecretSettings};
+pub use scope::{Discovery, ListScope, SecretSettings};
 mod spawn;
 mod using;
 
-pub use using::{Admitted, Ticket};
+pub use using::{Admitted, Settled, Ticket};
 
 const ROTATING: &str = "rotating ";
 const HANDLES: &str = "handles.json";
@@ -150,6 +156,10 @@ pub struct HandleRecord {
     /// Where the provider's part of its revocation stands.
     #[serde(skip)]
     upstream: Upstream,
+    /// The token digest, decoded from `digest` once when the record enters
+    /// the broker's handles.
+    #[serde(skip)]
+    held: Option<[u8; 32]>,
 }
 
 /// The secrets broker.
@@ -158,7 +168,9 @@ pub struct Broker<P: PermissionCheck> {
     store_key: StoreKey,
     audit_key: StoreKey,
     audit: AuditLog,
-    handles: BTreeMap<String, HandleRecord>,
+    handles: Handles,
+    /// The work lookups did, counted.
+    work: Work,
     permissions: P,
     clock: Clock,
     handles_path: PathBuf,
@@ -224,7 +236,8 @@ impl<P: PermissionCheck> Broker<P> {
             store_key,
             audit_key,
             audit,
-            handles: BTreeMap::new(),
+            handles: Handles::default(),
+            work: Work::default(),
             permissions,
             clock,
         };
@@ -355,6 +368,7 @@ impl<P: PermissionCheck> Broker<P> {
             parent: None,
             ended: None,
             upstream: Upstream::default(),
+            held: None,
         };
         self.record(
             AuditKind::Issue,
@@ -363,7 +377,7 @@ impl<P: PermissionCheck> Broker<P> {
             Some(0),
             "issued",
         )?;
-        self.handles.insert(record.id.clone(), record);
+        self.handles.insert(record);
         self.write_handles()?;
         Ok(IssuedHandle { id, token })
     }
@@ -410,6 +424,19 @@ impl<P: PermissionCheck> Broker<P> {
     fn append(&mut self, line: &AuditLine) -> Result<u64, SecretsError> {
         let before = self.audit.len();
         let index = self.audit.append(line, self.audit_key.identity())?;
+        self.snapshot_if_due(before);
+        Ok(index)
+    }
+
+    /// Appends `line` without moving the anchor, for a line a later line of
+    /// the same request follows: the anchor moves once, at that later line.
+    /// The log may run ahead of its anchor, never behind it, so a start
+    /// between the two still verifies.
+    fn append_unanchored(&mut self, line: &AuditLine) -> Result<u64, SecretsError> {
+        let before = self.audit.len();
+        let index = self
+            .audit
+            .append_unanchored(line, self.audit_key.identity())?;
         self.snapshot_if_due(before);
         Ok(index)
     }

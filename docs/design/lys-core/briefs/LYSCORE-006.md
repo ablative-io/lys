@@ -29,7 +29,7 @@ Remove the repeated work named in each requirement, keeping every answer identic
 
 ### R1: The issuer certificate is built once per authority
 
-Behavioural. crates/lys-core/src/ca/authority.rs, issue_certificate (about line 252) calls issuer_certificate, which builds and self-signs the issuer certificate on every issue. Build it when the authority is constructed or first used, hold it on the authority, and hand out the held one. The issued certificates are byte-identical to today's.
+Behavioural. crates/lys-core/src/ca/authority.rs, issue_certificate (line 96 on main b39890eb) calls issuer_certificate, which builds and self-signs the issuer certificate on every issue, and so do issue_certificate_for_request and issuer_certificate_der: the certificate is rebuilt at lines 105, 178 and 225. Build it when the authority is constructed or first used, hold it on the authority, and hand out the held one. The issued certificates are byte-identical to today's.
 
 **Acceptance:**
 - A test issues ten certificates from one authority and counts one issuer signature, not ten; each issued certificate's DER equals the one the current code gives for the same inputs.

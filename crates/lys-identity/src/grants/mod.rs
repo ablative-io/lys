@@ -22,6 +22,7 @@ mod state;
 #[cfg(any(test, feature = "test-support"))]
 pub mod test_support;
 pub mod types;
+pub mod usage;
 
 pub use admission::{DelegateRequest, RootRequest, Route};
 pub use authority::{ExerciseRequest, Grants, Permit, Recorded, RevokeRequest};
@@ -44,3 +45,4 @@ pub use recovery::{GrantLedger, Uncertain};
 pub use types::{
     Action, Grant, GrantId, GrantParts, PassOn, RecipientKind, Relation, Resource, Source, Window,
 };
+pub use usage::{Unreported, Usage};
