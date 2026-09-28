@@ -47,10 +47,18 @@ fn refused(disk: Disk, key: &Ed25519Identity, count: u64) -> SnapshotRefusal {
         "a refused snapshot's state is never used"
     );
     assert_eq!(started.tail.from, 0);
-    assert_eq!(started.log.store().reads(), count, "the whole log was read");
     match started.start {
         Start::Rebuilt { refusal, replayed } => {
             assert_eq!(replayed, count);
+            let checking = match refusal {
+                SnapshotRefusal::WrongRoot { size } => count - size,
+                _ => 0,
+            };
+            assert_eq!(
+                started.log.store().reads(),
+                count + checking,
+                "the tail read to check the snapshot, then the whole log"
+            );
             refusal
         }
         Start::Resumed { .. } => panic!("a bad snapshot was resumed from"),
