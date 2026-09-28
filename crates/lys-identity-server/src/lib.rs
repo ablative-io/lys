@@ -4,6 +4,12 @@
 //! admitted only for the configured administrator, and every other caller is
 //! refused by name (P9). The directory itself is crates/lys-identity: this
 //! crate holds sign-in, sessions, admission and the HTTP routes over it.
+//!
+//! No lock guard is held across an `.await`: a route's locked section runs
+//! to its end before the route awaits anything, and the lint that says so
+//! refuses the crate otherwise.
+
+#![deny(clippy::await_holding_lock)]
 
 pub mod admission;
 mod agent_sight;
@@ -15,6 +21,7 @@ pub mod config;
 pub mod configuration_api;
 pub mod connections_api;
 pub mod dev_seed;
+pub mod directory_cell;
 pub mod error;
 mod error_status;
 pub mod file_stores;

@@ -131,11 +131,21 @@ pub struct Held {
     pub teams: Vec<Team>,
 }
 
-#[derive(Serialize, Deserialize)]
+/// The sealed state as it is read back: owned, since decoding makes it.
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Sealed {
     format: String,
     held: Held,
+}
+
+/// The sealed state as it is written: the format and a borrow of what is
+/// held, so sealing serialises the state where it lies and copies none of it.
+/// Its fields and their order are `Sealed`'s, so the bytes are the same.
+#[derive(Serialize)]
+struct SealedRef<'a> {
+    format: &'a str,
+    held: &'a Held,
 }
 
 /// Why a line cannot be kept on the teams as they stand.
@@ -241,9 +251,9 @@ impl Held {
 
     /// The state a snapshot seals.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
-        serde_json::to_vec(&Sealed {
-            format: FORMAT.to_owned(),
-            held: self.clone(),
+        serde_json::to_vec(&SealedRef {
+            format: FORMAT,
+            held: self,
         })
         .map_err(|error| format!("teams state: {error}"))
     }
@@ -262,3 +272,7 @@ impl Held {
         Ok(sealed.held)
     }
 }
+
+#[cfg(test)]
+#[path = "teams_state_tests.rs"]
+mod tests;

@@ -249,8 +249,8 @@ async fn start_command(
     .map_err(|error| ServerError::LaunchUnrenderable {
         reason: error.to_string(),
     })?;
-    let kept = with_runtime(&state, |store| {
-        store.report(Report {
+    let launched = with_runtime(&state, |store| {
+        let kept = store.report(Report {
             operation: session.clone(),
             session: session.clone(),
             agent: Some(agent.clone()),
@@ -261,12 +261,13 @@ async fn start_command(
             reported_by: admitted_by,
             at: now(),
             launch: Some(view),
-        })
+        })?;
+        Ok(kept.first().and_then(|first| first.launch.clone()))
     })?;
-    kept.first()
-        .and_then(|first| first.launch.clone())
-        .map(Json)
-        .ok_or(ServerError::RuntimeReportReused { operation: session })
+    let Some(launched) = launched else {
+        return Err(ServerError::RuntimeReportReused { operation: session });
+    };
+    Ok(Json(launched))
 }
 
 /// Refuse by name the first host a server of `version` is reached at that

@@ -15,6 +15,7 @@
 //! request is refused `OperationReused`.
 
 use std::num::NonZeroU64;
+use std::path::PathBuf;
 
 use lys_core::Ed25519Identity;
 use lys_log_store::LeafStore;
@@ -59,7 +60,21 @@ impl<S: LeafStore> Directory<S> {
         key: Ed25519Identity,
         every: NonZeroU64,
     ) -> Result<Self, IdentityError> {
-        let (mut log, opening) = EventLog::open(reopen, &key, every)?;
+        Self::open_beside(reopen, key, every, None)
+    }
+
+    /// As [`Directory::open_with`], keeping the root each leaf completed in
+    /// the file `roots` beside the log when one is named, so a receipt, an
+    /// agent's view and a retried operation read one leaf rather than every
+    /// leaf from the nearest checkpoint. The file is rebuilt from the log,
+    /// by name, when it is missing or refused.
+    pub fn open_beside(
+        reopen: Reopen<S>,
+        key: Ed25519Identity,
+        every: NonZeroU64,
+        roots: Option<PathBuf>,
+    ) -> Result<Self, IdentityError> {
+        let (mut log, opening) = EventLog::open_beside(reopen, &key, every, roots)?;
         let read = opening
             .state
             .as_deref()
@@ -93,6 +108,18 @@ impl<S: LeafStore> Directory<S> {
         let (projection, folded) = (&self.projection, self.folded);
         self.log
             .snapshot_if_due(&self.key, || directory_state::encode(projection, folded));
+    }
+
+    /// How many leaves of the log the projection folds.
+    pub fn folded(&self) -> u64 {
+        self.folded
+    }
+
+    /// Whether the projection stands as the fold of every leaf the log is
+    /// known to hold: no append is uncertain and the directory is not broken.
+    /// A projection read while this is false may be behind the log.
+    pub fn is_settled(&self) -> bool {
+        self.broken.is_none() && !self.log.is_uncertain()
     }
 
     /// The service's public key, against which every event and receipt verifies.
@@ -189,17 +216,13 @@ impl<S: LeafStore> Directory<S> {
         identity: Option<IdentityId>,
         change: &Change,
     ) -> Result<Option<(IdentityId, Receipt)>, IdentityError> {
-        let Some((event, receipt)) = self.answered(operation)? else {
-            return Ok(None);
-        };
-        let same_identity = identity.is_none_or(|identity| identity == event.identity());
-        if event.actor() == actor && event.change() == change && same_identity {
-            Ok(Some((event.identity(), receipt)))
-        } else {
-            Err(IdentityError::OperationReused {
-                operation: operation.to_string(),
-            })
-        }
+        same_request(
+            self.answered(operation)?,
+            operation,
+            actor,
+            identity,
+            change,
+        )
     }
 
     /// Judge, sign, append and apply one change.
@@ -238,7 +261,21 @@ impl<S: LeafStore> Directory<S> {
         recorded_at: u64,
     ) -> Result<Receipt, IdentityError> {
         self.settle()?;
-        if let Some((_, receipt)) = self.retry(operation, &actor, Some(identity), &change)? {
+        let answered = self.answered(operation)?;
+        self.change_answered(answered, (actor, operation, identity), change, recorded_at)
+    }
+
+    /// As [`Directory::change`], with the first answer to the operation,
+    /// if any, already read from the log.
+    fn change_answered(
+        &mut self,
+        answered: Option<(IdentityEvent, Receipt)>,
+        (actor, operation, identity): (Actor, OperationId, IdentityId),
+        change: Change,
+        recorded_at: u64,
+    ) -> Result<Receipt, IdentityError> {
+        let same = same_request(answered, operation, &actor, Some(identity), &change)?;
+        if let Some((_, receipt)) = same {
             return Ok(receipt);
         }
         self.commit(IdentityEvent::new(
@@ -392,7 +429,8 @@ impl<S: LeafStore> Directory<S> {
         recorded_at: u64,
     ) -> Result<Receipt, IdentityError> {
         self.settle()?;
-        let from = match self.answered(operation)? {
+        let answered = self.answered(operation)?;
+        let from = match &answered {
             Some((event, _)) => match event.change() {
                 Change::Transition { from, .. } => *from,
                 _ => {
@@ -410,10 +448,9 @@ impl<S: LeafStore> Directory<S> {
                 .state(),
         };
         let to = transition.target(from)?;
-        self.change(
-            actor,
-            operation,
-            identity,
+        self.change_answered(
+            answered,
+            (actor, operation, identity),
             Change::Transition {
                 transition,
                 from,
@@ -447,5 +484,28 @@ impl<S: LeafStore> Directory<S> {
             .log
             .entry(index)?
             .map(|(signed, coordinate)| Receipt::of(&signed, coordinate)))
+    }
+}
+
+/// The first answer to `operation`, `answered`, when it was given to the
+/// same request: the same actor and change, and the same identity when the
+/// caller names one. The same operation id for any other request is refused.
+fn same_request(
+    answered: Option<(IdentityEvent, Receipt)>,
+    operation: OperationId,
+    actor: &Actor,
+    identity: Option<IdentityId>,
+    change: &Change,
+) -> Result<Option<(IdentityId, Receipt)>, IdentityError> {
+    let Some((event, receipt)) = answered else {
+        return Ok(None);
+    };
+    let same_identity = identity.is_none_or(|identity| identity == event.identity());
+    if event.actor() == actor && event.change() == change && same_identity {
+        Ok(Some((event.identity(), receipt)))
+    } else {
+        Err(IdentityError::OperationReused {
+            operation: operation.to_string(),
+        })
     }
 }

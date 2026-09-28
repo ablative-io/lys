@@ -27,6 +27,7 @@ use crate::error::HomeError;
 use crate::record::Home;
 use crate::record::entries::{CUSTOM_LANTERN, CUSTOM_LANTERN_EPILOGUE};
 use crate::record::epilogue::epilogue_of;
+use crate::record::given::{GivenLast, given_of, keep_last};
 use crate::record::lantern::{lantern_of, lit_in_session, require_words, session_file};
 use crate::record::reader::SessionReader;
 
@@ -170,6 +171,61 @@ fn recall_where(
         }
     }
     Ok(RecallReport { lanterns, skipped })
+}
+
+/// Every lantern of the home, as [`recall_all`] lists it, and the given entry
+/// appended last, as [`last_given`](crate::last_given) finds
+/// it, in one pass: each session is opened once and that one reader serves
+/// both. Each reading skips and names a session it cannot read exactly as it
+/// does alone, so the two answers are the two functions' answers.
+pub fn recall_all_and_last_given(home: &Home) -> Result<(RecallReport, GivenLast), HomeError> {
+    recall_and_given_with(home, |session| home.read_session(session))
+}
+
+/// As [`recall_all_and_last_given`], each session opened by `open`.
+pub(crate) fn recall_and_given_with(
+    home: &Home,
+    mut open: impl FnMut(&str) -> Result<SessionReader, HomeError>,
+) -> Result<(RecallReport, GivenLast), HomeError> {
+    let mut lanterns = Vec::new();
+    let mut skipped = Vec::new();
+    let mut last = None;
+    let mut given_skipped = Vec::new();
+    for session in home.session_ids()? {
+        let reader = match open(&session) {
+            Ok(reader) => reader,
+            Err(e) => {
+                let reason = e.to_string();
+                skipped.push(Skipped {
+                    session: session.clone(),
+                    reason: reason.clone(),
+                });
+                given_skipped.push(Skipped { session, reason });
+                continue;
+            }
+        };
+        match rows_of(home, &reader, &session) {
+            Ok(rows) => lanterns.extend(rows),
+            Err(e) => skipped.push(Skipped {
+                session: session.clone(),
+                reason: e.to_string(),
+            }),
+        }
+        match given_of(&reader, &session) {
+            Ok(given) => keep_last(&mut last, given),
+            Err(e) => given_skipped.push(Skipped {
+                session,
+                reason: e.to_string(),
+            }),
+        }
+    }
+    Ok((
+        RecallReport { lanterns, skipped },
+        GivenLast {
+            last,
+            skipped: given_skipped,
+        },
+    ))
 }
 
 /// Every lantern of `session` whose point is `point`. A session with no

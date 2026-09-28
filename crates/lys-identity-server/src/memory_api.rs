@@ -10,7 +10,9 @@
 //!
 //! One home is kept for each agent, in the directory of `homes_dir` named
 //! by the agent's id. The route reads and never writes, so an agent with no
-//! home has none made for it.
+//! home has none made for it. The home is read off the async workers, on a
+//! blocking thread, and each session file is opened once for both the
+//! memories and the context given last.
 
 use std::path::{Path as FilePath, PathBuf};
 use std::sync::Arc;
@@ -19,7 +21,7 @@ use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::routing::get;
 use axum::{Extension, Json, Router};
-use lys_home::{GivenSeen, Home, HomeError, LanternRow, Skipped, last_given, recall_all};
+use lys_home::{GivenSeen, Home, HomeError, LanternRow, Skipped, recall_all_and_last_given};
 use serde::Serialize;
 
 use crate::agent_sight::seen_agent;
@@ -195,13 +197,20 @@ async fn read(
         notes_shown: false,
     };
     let root = dir.join(&agent);
-    let home = match Home::read(&root) {
-        Ok(home) => home,
-        Err(HomeError::NoHome { .. }) => return Ok(Json(view)),
-        Err(error) => return Err(unavailable(&error, &root)),
+    let place = root.clone();
+    let read = tokio::task::spawn_blocking(move || match Home::read(&place) {
+        Ok(home) => recall_all_and_last_given(&home).map(Some),
+        Err(HomeError::NoHome { .. }) => Ok(None),
+        Err(error) => Err(error),
+    })
+    .await
+    .map_err(|error| ServerError::MemoryUnavailable {
+        reason: format!("the home could not be read: {error}"),
+    })?
+    .map_err(|error| unavailable(&error, &root))?;
+    let Some((recalled, last)) = read else {
+        return Ok(Json(view));
     };
-    let recalled = recall_all(&home).map_err(|error| unavailable(&error, &root))?;
-    let last = last_given(&home).map_err(|error| unavailable(&error, &root))?;
     view.home = true;
     view.memories = recalled.lanterns.into_iter().map(line).collect();
     view.skipped = skipped(recalled.skipped, last.skipped, &root);

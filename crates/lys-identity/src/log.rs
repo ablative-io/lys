@@ -12,6 +12,7 @@
 //! could be either.
 
 use std::num::NonZeroU64;
+use std::path::PathBuf;
 
 use lys_core::Ed25519Identity;
 use lys_core::merkle::InclusionProof;
@@ -109,7 +110,20 @@ impl<S: LeafStore> EventLog<S> {
         key: &Ed25519Identity,
         every: NonZeroU64,
     ) -> Result<(Self, Opening<SignedEvent>), IdentityError> {
-        let (ledger, opening) = Ledger::open(&reopen, key, every)?;
+        Self::open_beside(reopen, key, every, None)
+    }
+
+    /// As [`EventLog::open`], keeping the root each leaf completed in the
+    /// file `roots` beside the log when one is named, so the event and
+    /// coordinate of one leaf are read from that leaf alone. The file is
+    /// rebuilt from the log when it is missing or refused.
+    pub fn open_beside(
+        reopen: Reopen<S>,
+        key: &Ed25519Identity,
+        every: NonZeroU64,
+        roots: Option<PathBuf>,
+    ) -> Result<(Self, Opening<SignedEvent>), IdentityError> {
+        let (ledger, opening) = Ledger::open_beside(&reopen, key, every, roots)?;
         Ok((
             Self {
                 ledger,
@@ -190,8 +204,9 @@ impl<S: LeafStore> EventLog<S> {
     }
 
     /// The event at `index` with the coordinate it completed, if the log
-    /// holds one there, read from the store from the nearest checkpoint and
-    /// verified, refused while an append is uncertain.
+    /// holds one there, read from the store and verified: its one leaf when
+    /// its root is kept beside the log, otherwise from the nearest
+    /// checkpoint. Refused while an append is uncertain.
     pub fn entry(&self, index: u64) -> Result<Option<(SignedEvent, Coordinate)>, IdentityError> {
         self.certain()?.entry(index, &self.service_key)
     }

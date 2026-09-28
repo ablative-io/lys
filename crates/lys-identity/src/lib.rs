@@ -25,6 +25,7 @@ pub mod provenance;
 pub mod receipt;
 pub mod restart;
 pub mod revocation;
+mod roots;
 pub mod signer;
 mod state_value;
 

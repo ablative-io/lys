@@ -219,7 +219,9 @@ pub struct GivenLast {
     pub skipped: Vec<Skipped>,
 }
 
-fn given_of(reader: &SessionReader, session: &str) -> Result<Vec<GivenSeen>, HomeError> {
+/// Every `lys.given` entry of one session, read by seeking to the given
+/// rows of `reader` only.
+pub(crate) fn given_of(reader: &SessionReader, session: &str) -> Result<Vec<GivenSeen>, HomeError> {
     reader
         .customs_everywhere(CUSTOM_GIVEN)?
         .iter()
@@ -246,16 +248,7 @@ pub fn last_given(home: &Home) -> Result<GivenLast, HomeError> {
             .read_session(&session)
             .and_then(|reader| given_of(&reader, &session));
         match given {
-            Ok(given) => {
-                for seen in given {
-                    if last
-                        .as_ref()
-                        .is_none_or(|kept| kept.given_at <= seen.given_at)
-                    {
-                        last = Some(seen);
-                    }
-                }
-            }
+            Ok(given) => keep_last(&mut last, given),
             Err(e) => skipped.push(Skipped {
                 session,
                 reason: e.to_string(),
@@ -263,6 +256,19 @@ pub fn last_given(home: &Home) -> Result<GivenLast, HomeError> {
         }
     }
     Ok(GivenLast { last, skipped })
+}
+
+/// Keep in `last` whichever of it and `given` was appended last: the
+/// greatest timestamp as text, a later one read winning a tie.
+pub(crate) fn keep_last(last: &mut Option<GivenSeen>, given: Vec<GivenSeen>) {
+    for seen in given {
+        if last
+            .as_ref()
+            .is_none_or(|kept| kept.given_at <= seen.given_at)
+        {
+            *last = Some(seen);
+        }
+    }
 }
 
 fn not_given(entry: &Entry) -> HomeError {

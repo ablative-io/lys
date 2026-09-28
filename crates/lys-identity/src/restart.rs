@@ -25,16 +25,26 @@
 //! and at once after a rebuild. A snapshot that cannot be written does not
 //! undo the append it follows, which is already durable: the failure is
 //! logged by name and kept until a later snapshot succeeds.
+//!
+//! # Receipts
+//!
+//! An owner that names a file beside the log keeps there the root each leaf
+//! completed, flushed before every snapshot, so a receipt
+//! is rebuilt from its one leaf. Without one, or while the file is set
+//! aside, a receipt reads the leaves from the nearest checkpoint.
 
+use std::io;
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
+use std::path::PathBuf;
 
 use lys_core::Ed25519Identity;
-use lys_core::merkle::InclusionProof;
+use lys_core::merkle::{InclusionProof, raw_leaf_hash};
 use lys_log_store::{Frontier, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreError, unseal};
 
 use crate::checkpoints::{self, Checkpoints};
 use crate::log::{Coordinate, Reopen};
+use crate::roots::Beside;
 
 /// How many entries a log grows by between snapshots, unless its owner is
 /// opened with another count.
@@ -65,6 +75,8 @@ pub struct Opening<E> {
     pub state: Option<Vec<u8>>,
     /// The tree size the state was folded at.
     pub size: u64,
+    /// The root of the tree at that size.
+    pub root: [u8; 32],
     /// The events after the state, in log order, with their coordinates.
     pub events: Vec<(E, Coordinate)>,
 }
@@ -89,6 +101,7 @@ pub(crate) struct Ledger<S: LeafStore, K: Leaves> {
     snapshot_at: u64,
     snapshot_owed: bool,
     snapshot_failure: Option<String>,
+    beside: Beside,
     kind: PhantomData<fn() -> K>,
 }
 
@@ -172,6 +185,34 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         }
     }
 
+    /// As [`Ledger::open`], keeping the root each leaf completed in the file
+    /// `roots` beside the log, so a receipt reads one leaf.
+    pub(crate) fn open_beside(
+        reopen: &Reopen<S>,
+        key: &Ed25519Identity,
+        every: NonZeroU64,
+        roots: Option<PathBuf>,
+    ) -> Result<(Self, Opening<K::Event>), K::Error> {
+        let (mut ledger, opening) = Self::open(reopen, key, every)?;
+        ledger.keep_roots(roots, &opening);
+        Ok((ledger, opening))
+    }
+
+    /// Keep the roots in the file at `path`: those of the leaves `opening`
+    /// hands its owner written from their fold, and those before them read
+    /// from the file, or rebuilt from the log where it does not hold them.
+    fn keep_roots(&mut self, path: Option<PathBuf>, opening: &Opening<K::Event>) {
+        let tail: Vec<[u8; 32]> = opening.events.iter().map(|(_, at)| at.root).collect();
+        let log = &self.log;
+        let leaf = |index| match log.leaf_bytes(index) {
+            Ok(Some(bytes)) => Ok(bytes),
+            Ok(None) => Err(io::Error::other(format!("leaf {index} is missing"))),
+            Err(error) => Err(io::Error::other(error.to_string())),
+        };
+        let snapshot = (opening.size, &opening.root);
+        self.beside = Beside::open(path, snapshot, &tail, &self.checkpoints, leaf);
+    }
+
     fn resume(store: S, key: &[u8; 32], every: NonZeroU64) -> Result<Resumed<S, K>, K::Error> {
         let sealed = match store.snapshot() {
             Ok(Some(sealed)) => sealed,
@@ -207,6 +248,7 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
             Err(error) => return Err(store_down::<K>(&error)),
         };
         let mut frontier = frontier;
+        let root = frontier.root();
         let events = fold::<K>(&mut frontier, &mut checkpoints, &tail.leaves, key)?;
         let replayed = u64::try_from(tail.leaves.len()).unwrap_or(u64::MAX);
         let ledger = Self::new(
@@ -221,6 +263,7 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
             Opening {
                 state: Some(state),
                 size,
+                root,
                 events,
             },
         )))
@@ -243,6 +286,7 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
             snapshot_at,
             snapshot_owed,
             snapshot_failure: None,
+            beside: Beside::default(),
             kind: PhantomData,
         }
     }
@@ -270,6 +314,7 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
             Opening {
                 state: None,
                 size: 0,
+                root: Frontier::new().root(),
                 events,
             },
         ))
@@ -286,7 +331,9 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         let refusal = SnapshotRefusal::StateUnreadable { reason };
         let (ledger, opening) =
             Self::rebuild(reopen, refusal, &key.public_key_bytes(), self.every)?;
+        let roots = self.beside.path();
         *self = ledger;
+        self.keep_roots(roots, &opening);
         Ok(opening.events)
     }
 
@@ -320,11 +367,12 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
             .map_err(|error| store_down::<K>(&error))
     }
 
-    /// The recorded event at `index` with the coordinate it completed: the
-    /// leaves from the checkpoint at or below it up to it are read from the
-    /// store, the root is that checkpoint extended by them, and the event is
-    /// verified. Never more than
-    /// [`CHECKPOINT_EVERY`](crate::checkpoints::CHECKPOINT_EVERY) leaves are read.
+    /// The recorded event at `index` with the coordinate it completed. With
+    /// its root kept beside the log, only its own leaf is read from the
+    /// store, hashed, and its event verified. Otherwise the leaves from the
+    /// checkpoint at or below it up to it are read, the root is that
+    /// checkpoint extended by them, and the event is verified: never more
+    /// than [`CHECKPOINT_EVERY`](crate::checkpoints::CHECKPOINT_EVERY) leaves.
     pub(crate) fn entry(
         &self,
         index: u64,
@@ -332,6 +380,9 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
     ) -> Result<Option<(K::Event, Coordinate)>, K::Error> {
         if index >= self.len() {
             return Ok(None);
+        }
+        if let Some(root) = self.beside.root(index) {
+            return self.entry_at(index, root, key).map(Some);
         }
         let mut frontier =
             self.checkpoints.before(index).cloned().ok_or_else(|| {
@@ -364,6 +415,32 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         )))
     }
 
+    /// The recorded event at `index`, which completed the tree whose root is
+    /// `root`: its one leaf is read from the store, hashed and verified.
+    fn entry_at(
+        &self,
+        index: u64,
+        root: [u8; 32],
+        key: &[u8; 32],
+    ) -> Result<(K::Event, Coordinate), K::Error> {
+        let bytes = self
+            .log
+            .leaf_bytes(index)
+            .map_err(|error| store_down::<K>(&error))?
+            .ok_or_else(|| {
+                K::not_an_event(index, "the leaf is missing inside the log".to_owned())
+            })?;
+        let event =
+            K::verify(&bytes, key).map_err(|error| K::not_an_event(index, error.to_string()))?;
+        let coordinate = Coordinate {
+            index,
+            tree_size: index + 1,
+            root,
+            leaf_hash: raw_leaf_hash(&bytes),
+        };
+        Ok((event, coordinate))
+    }
+
     /// Every recorded event from the start of the log with its coordinate,
     /// read from the store in one pass.
     pub(crate) fn entries(&self, key: &[u8; 32]) -> Result<Events<K::Event>, K::Error> {
@@ -393,10 +470,12 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         let (index, leaf_hash) = self.log.append(bytes)?;
         self.frontier.push_hash(leaf_hash);
         self.checkpoints.record(&self.frontier);
+        let root = self.frontier.root();
+        self.beside.push(index, &root);
         Ok(Coordinate {
             index,
             tree_size: self.frontier.size(),
-            root: self.frontier.root(),
+            root,
             leaf_hash,
         })
     }
@@ -427,6 +506,9 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         self.log = log;
         self.frontier = frontier;
         self.checkpoints = checkpoints;
+        for (_, coordinate) in &events {
+            self.beside.push(coordinate.index, &coordinate.root);
+        }
         Ok(events)
     }
 
@@ -443,6 +525,7 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         if !self.snapshot_owed && self.len() / every <= self.snapshot_at / every {
             return;
         }
+        self.beside.sync();
         let checkpoints = &self.checkpoints;
         let written = encode().and_then(|owner| {
             let state = checkpoints::wrap(checkpoints, &owner)?;
