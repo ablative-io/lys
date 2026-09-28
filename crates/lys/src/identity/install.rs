@@ -21,6 +21,7 @@ use super::rauthy::RauthyApi;
 use super::{configure, prepare, private_files};
 use crate::commands::output::Emitter;
 
+pub mod broker_trust;
 pub mod exit_wait;
 pub mod layout;
 pub mod server_config;
@@ -200,6 +201,8 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     if services::broker_init(&layout)? {
         emitter.note("secrets broker made");
     }
+    broker_trust::trust(&layout, server_config::SERVICE_NAME)?;
+    emitter.note("secrets broker trusts the identity service");
     if let Some(package) = &options.surface {
         let manifest = surface::place(package, &layout.surface_dir())?;
         emitter.note(&format!("screens placed from commit {}", manifest.commit));
