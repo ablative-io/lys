@@ -1,3 +1,7 @@
+import { SecretsPage } from './features/secrets/SecretsPage';
+import { Sessions } from './features/sessions/Sessions';
+import { Reviews } from './features/reviews/Reviews';
+import { Requests } from './features/requests/Requests';
 import { Route, Routes } from 'react-router';
 import { Access } from './features/access/Access';
 import { IdentityFile } from './features/file/IdentityFile';
@@ -20,12 +24,17 @@ export function AppRoutes() {
       <Route path="/model" element={<Model />} />
       <Route path="/graph/:id?" element={<Graph />} />
       <Route path="/resources" element={<Resources />} />
+      <Route path="/secrets/:section?" element={<SecretsPage />} />
+      <Route path="/vault" element={<SecretsPage />} />
+      <Route path="/sessions" element={<Sessions />} />
+      <Route path="/reviews" element={<Reviews />} />
+      <Route path="/requests" element={<Requests />} />
       <Route path="/people" element={<People />} />
       <Route path="/file/:id/:tab?" element={<IdentityFile />} />
       <Route path="/me" element={<You />} />
       <Route path="/settings/:sec?" element={<Settings />} />
       <Route path="/access/:mode?/:arg?" element={<Access />} />
-      {[...Object.keys(SCREENS).filter((view) => view !== 'model' && view !== 'resources' && view !== 'graph'), 'vault'].map((view) => (
+      {[...Object.keys(SCREENS).filter((view) => view !== 'model' && view !== 'resources' && view !== 'graph' && view !== 'sessions' && view !== 'reviews' && view !== 'secrets' && view !== 'requests')].map((view) => (
         <Route key={view} path={`/${view}/*`} element={<NotYet />} />
       ))}
       <Route path="*" element={<People />} />
