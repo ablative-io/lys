@@ -28,7 +28,7 @@ export function Requests() {
         <p>{entry.why}</p><p className="note">Allows {entry.actions.join(', ')}. {entry.ends_at === null ? 'No expiry requested.' : 'Until ' + clock(entry.ends_at) + '.'}</p>
         {entry.decision ? <p>{entry.decision.note}{entry.decision.grant ? <> · <Link to={'/file/' + encodeURIComponent(entry.asked_by) + '/access'}>View granted access</Link></> : null}</p>
           : <p className="note">Can be reviewed by {entry.approvers.map((person) => person.display_name).join(', ') || 'no currently eligible person'}.</p>}
-        {entry.state === 'waiting' && choices.status === 'ok' && entry.approvers.some((person) => person.id === choices.data.person)
+        {entry.state === 'waiting' && choices.status === 'ok' && (entry.can_decide ?? entry.approvers.some((person) => person.id === choices.data.person))
           ? <DecisionForm entry={entry} person={choices.data.person} canIssueRoot={entry.can_issue_root === true} changed={refresh} /> : null}
       </article>)}
     </section>} />

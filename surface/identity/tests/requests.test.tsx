@@ -121,6 +121,17 @@ describe('Requests', () => {
     expect(text()).toContain('Issue directly as root authority');
   });
 
+  it('honours an explicit decision capability without inferring grant authority', async () => {
+    const asked: Ask = { operation: 'op-' + '6'.repeat(32), resource: { kind: 'project', id: 'Lys' }, relation: 'reader', ends_at: null, why: 'Review' };
+    await mount('#/requests', { ...routes, '/requests': ok({ requests: [{ ...kept(asked), approvers: [], can_decide: true, can_issue_root: false }] }) });
+    expect(button('Decline request')).not.toBeNull();
+    expect(button('Approve access')?.hasAttribute('disabled')).toBe(true);
+    unmountAll(); document.body.innerHTML = '';
+    await mount('#/requests', { ...routes, '/requests': ok({ requests: [{ ...kept(asked), can_decide: false }] }) });
+    expect(button('Decline request')).toBeNull();
+    expect(button('Approve access')).toBeNull();
+  });
+
   it('retains the same approval operation across remount and does not permit a conflicting decline', async () => {
     const asked: Ask = { operation: 'op-' + '4'.repeat(32), resource: { kind: 'project', id: 'Lys' }, relation: 'reader', ends_at: null, why: 'Review' };
     const entry = { ...kept(asked), sources: ['grant-source'] };

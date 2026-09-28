@@ -18,6 +18,8 @@ export interface AccessRequest {
   sources: string[];
   /** New server capability; older responses offer no root issuance control. */
   can_issue_root?: boolean;
+  /** The service may admit a root decider even when it cannot lend to an agent. */
+  can_decide?: boolean;
   decision: { by: string; note: string; grant: string | null; decided_at: number } | null;
 }
 

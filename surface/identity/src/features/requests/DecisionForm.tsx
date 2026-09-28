@@ -54,7 +54,7 @@ export function DecisionForm({ entry, person, canIssueRoot, changed }: {
       if (!retry && error instanceof Refused && error.status >= 400 && error.status < 500) {
         sessionStorage.removeItem(key); setPending({ kind: 'empty' });
       }
-      setFailure(error instanceof Error ? error.message : String(error));
+      setFailure(error instanceof Refused ? `${error.refusal.refusal}: ${error.refusal.reason}` : error instanceof Error ? error.message : String(error));
     } finally { working.current = false; setBusy(false); }
   };
   const submit = (event: FormEvent<HTMLFormElement>) => {
