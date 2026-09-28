@@ -20,17 +20,17 @@ title: A service's exit lock is opened only in the service's own process, so no 
 
 ## Purpose
 
-A service the install starts holds an exclusive lock on its exit lock, and its exit is seen as the release of that lock. Today the starter opens and takes the lock itself and hands it to the service as its standard input (exit_wait::hold, services::start_detached). While the starter holds that descriptor, a process started by any other thread of the starter carries a copy of it until its exec, and the lock stays held in that copy. After the watch side was fixed (a watch asks for a shared lock and releases it by name), this is what remains: it only delays an exit being seen just after a start, and closing it in the starter needs code run between fork and exec, which is unsafe code. This card closes it without unsafe code, and records why the other ways were refused.
+A service the install starts holds an exclusive lock on its exit lock, and its exit is seen as the release of that lock. Today the starter opens and takes the lock itself and hands it to the service as its standard input (exit_wait::hold, services::start_detached). While the starter holds that descriptor, a process started by any other thread of the starter carries a copy of it until its exec, and the lock stays held in that copy. After the watch side was fixed (a watch asks for a shared lock and releases it by name), this is what remains. It only delays an exit being seen just after a start, and closing it in the starter needs code run between fork and exec, which is unsafe code. This card closes it without unsafe code, and records why the other ways were refused.
 
 ## Task
 
-Start each service through a small holder that is the service's own process: the holder opens the exit lock, takes it, and then becomes the service by exec, keeping its pid. The starter never opens the exit lock. Record the comparison of the three ways in ADR-121.
+Start each service through a small holder that is the service's own process. The holder opens the exit lock, takes it, and then becomes the service by exec, keeping its pid. The starter never opens the exit lock. Record the comparison of the three ways in ADR-121.
 
 ## Requirements
 
 ### R1: The decision is recorded with the three ways compared
 
-Structural. ADR-121 records the three ways to keep the lock out of the starter and the reason for the one chosen. (a) Code run between fork and exec in the child (pre_exec): needs an unsafe block in Lys code and may call only async-signal-safe functions; refused. (b) The spawn's own file actions (posix_spawn_file_actions_addopen) with O_EXLOCK: opens and locks in the child with no code of ours run there, but O_EXLOCK exists on macOS and the BSDs only, the standard library exposes no file actions so it needs a foreign call in an unsafe block, and Linux has no equal; refused. (c) A holder command in the lys binary that opens the lock, takes it and execs the service: safe standard library calls only, the same on macOS and Linux, and the pid written to the pid file is the service's because exec keeps it; chosen.
+Structural. ADR-121 records the three ways to keep the lock out of the starter and the reason for the one chosen. (a) Code run between fork and exec in the child (pre_exec) needs an unsafe block in Lys code and may call only async-signal-safe functions, so it is refused. (b) The spawn's own file actions (posix_spawn_file_actions_addopen) with O_EXLOCK open and lock in the child with no code of ours run there. But O_EXLOCK exists on macOS and the BSDs only, the standard library exposes no file actions so it needs a foreign call in an unsafe block, and Linux has no equal, so it is refused. (c) A holder command in the lys binary opens the lock, takes it and execs the service. It uses safe standard library calls only, it is the same on macOS and Linux, and the pid written to the pid file is the service's because exec keeps it, so it is chosen.
 
 **Acceptance:**
 - ADR-121 is in decisions.json with the three ways, and the brief cites it.
@@ -51,7 +51,7 @@ Behavioural. `lys identity hold --exit-lock <path> -- <program> [args]` opens th
 
 **Acceptance:**
 - A service started through the holder has the pid the starter wrote, holds the exit lock, and a watch answers not exited while it lives and exited after it ends.
-- A second holder on the same lock waits for the first service's exit and then starts; two never run at once.
+- A second holder on the same lock waits for the first service's exit and then starts, so two never run at once.
 - A program that does not exist is refused service_not_startable naming it, and the exit lock is free afterwards.
 
 **Files:**
@@ -69,7 +69,7 @@ Behavioural. `lys identity hold --exit-lock <path> -- <program> [args]` opens th
 
 ### R3: The starter never opens the exit lock
 
-Behavioural. services::start_detached starts the holder in place of the program and no longer calls exit_wait::hold; exit_wait::hold is called by the holder only. Every start goes this way: install, the upgrade's units and any later unit. The proof is the one that showed the watch side: a service that ends at once is started 300 times beside eight threads that start /usr/bin/true without pause; its end is learnt from an event other than the lock (the far end of a pipe it held closes), and a watch opened at that moment answers exited every time. The test is seen red against today's start before the change.
+Behavioural. The function services::start_detached starts the holder in place of the program and no longer calls exit_wait::hold, which is called by the holder only. Every start goes this way, in install, in the upgrade's units and in any later unit. The proof is the one that showed the watch side. A service that ends at once is started 300 times beside eight threads that start /usr/bin/true without pause. Its end is learnt from an event other than the lock (the far end of a pipe it held closes), and a watch opened at that moment answers exited every time. The test is seen red against today's start before the change.
 
 **Acceptance:**
 - The proof hides 0 of 300 exits after the change and more than 0 before it, both counts recorded in the card's report.
@@ -91,9 +91,9 @@ Behavioural. services::start_detached starts the holder in place of the program 
 
 - SHALL NOT add an unsafe block, a foreign call or a new dependency.
 - SHALL NOT change the number of test threads in any gate, or serialise tests, to hide a race.
-- SHALL NOT add a timeout, deadline, sleep, poll interval, #[allow], #[ignore] or any bypass; a wait ends on an event.
-- SHALL NOT add a silent fallback: every failure is a named refusal.
-- SHALL NOT change what a watch does: it asks for a shared lock and releases it by name.
+- SHALL NOT add a timeout, deadline, sleep, poll interval, #[allow], #[ignore] or any bypass. A wait ends on an event.
+- SHALL NOT add a silent fallback. Every failure is a named refusal.
+- SHALL NOT change what a watch does. It asks for a shared lock and releases it by name.
 
 ## Verification
 

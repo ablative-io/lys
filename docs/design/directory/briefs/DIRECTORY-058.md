@@ -26,11 +26,11 @@ Answer the checkpoint as a signed note under the service key, in the form lys-co
 
 ### R1: The receipts route answers a signed checkpoint
 
-Behavioural. The answer of GET /receipts/{index} gains checkpoint.note: the C2SP signed note of the checkpoint body (origin, tree size, root) signed with the service key by lys_core::checkpoint::sign_note. The origin is the deployment's issuer address, read from the service's configuration, never a default. tree_size and root stay in the answer and equal the note's body. The note is signed when the checkpoint is made, not on each request: the log's head moves only on an append, so one signature serves every read until the next append. GET /checkpoint answers the same signed note alone.
+Behavioural. The answer of GET /receipts/{index} gains checkpoint.note, the C2SP signed note of the checkpoint body (origin, tree size, root) signed with the service key by lys_core::checkpoint::sign_note. The origin is the deployment's issuer address, read from the service's configuration, never a default. The members tree_size and root stay in the answer and equal the note's body. The note is signed when the checkpoint is made, not on each request. The log's head moves only on an append, so one signature serves every read until the next append. GET /checkpoint answers the same signed note alone.
 
 **Acceptance:**
 - The note verifies under the service's public key with lys_core::checkpoint::verify_checkpoint, and its body equals the tree_size and root beside it.
-- Two reads with no append between them answer byte for byte the same note; a read after an append answers a note of the larger tree.
+- Two reads with no append between them answer byte for byte the same note, and a read after an append answers a note of the larger tree.
 - A service whose configuration names no issuer is refused at start by name, not at the first read.
 
 **Files:**
@@ -48,7 +48,7 @@ Behavioural. The answer of GET /receipts/{index} gains checkpoint.note: the C2SP
 
 ### R2: One function verifies a receipt against a pinned key
 
-Behavioural. lys-identity gains verify_receipt_answer(answer, service_key, origin): it verifies the note under the pinned key and origin, the event's signature under the same key, that the receipt's fields equal the signed event's, and the inclusion proof of the event's leaf against the note's root at the note's tree size. Each failure is its own named refusal: checkpoint_unsigned, checkpoint_signature, checkpoint_origin, checkpoint_behind_receipt (the note's tree is smaller than the receipt's index needs), event_signature, receipt_mismatch, inclusion_proof. A forged tree around a genuine event, with a true proof against its own root, is refused checkpoint_unsigned or checkpoint_signature.
+Behavioural. The lys-identity crate gains verify_receipt_answer(answer, service_key, origin). It verifies the note under the pinned key and origin, the event's signature under the same key, that the receipt's fields equal the signed event's, and the inclusion proof of the event's leaf against the note's root at the note's tree size. Each failure is its own named refusal, one of checkpoint_unsigned, checkpoint_signature, checkpoint_origin, checkpoint_behind_receipt (the note's tree is smaller than the receipt's index needs), event_signature, receipt_mismatch, inclusion_proof. A forged tree around a genuine event, with a true proof against its own root, is refused checkpoint_unsigned or checkpoint_signature.
 
 **Acceptance:**
 - One test per named refusal produces it from a well-formed answer changed in that one respect.
@@ -68,14 +68,14 @@ Behavioural. lys-identity gains verify_receipt_answer(answer, service_key, origi
 
 ## Boundaries
 
-- SHALL NOT remove or rename tree_size and root in the answer; readers that use them keep working.
+- SHALL NOT remove or rename tree_size and root in the answer, so readers that use them keep working.
 - SHALL NOT sign on each request or hold the service key anywhere but where it is held today.
 - SHALL NOT take the origin or any other field from a machine default.
 - SHALL NOT print or log a key value on any path.
-- SHALL NOT add a timeout, deadline, sleep, poll interval, #[allow], #[ignore] or any bypass; a wait ends on an event.
-- SHALL NOT add a silent fallback: every failure is a named refusal.
+- SHALL NOT add a timeout, deadline, sleep, poll interval, #[allow], #[ignore] or any bypass. A wait ends on an event.
+- SHALL NOT add a silent fallback. Every failure is a named refusal.
 
 ## Verification
 
 - The full Lys gate and ast-grep scan exit 0 at the card's head, measured by the card round.
-- On a scratch install: read a receipt, verify it with verify_receipt_answer under the key read from /service-key, then present the forged tree and see it refused.
+- On a scratch install, read a receipt, verify it with verify_receipt_answer under the key read from /service-key, then present the forged tree and see it refused.
