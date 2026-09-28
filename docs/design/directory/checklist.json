@@ -1126,7 +1126,7 @@
       "items": [
         {
           "id": "C361",
-          "text": "An app is registered through the API with its id, name, sign-in client and permission schema, and has no effect until an administrator approves it on a Lys screen (DIRECTORY-048 R1).",
+          "text": "Only a person holding an explicit register_app grant registers an app; approval creates its distinct application-connector identity and binding, and every app permission follows an explicit grant chain back to the super administrator (ADR-126, DIRECTORY-048 R1).",
           "done": false
         },
         {
@@ -1151,7 +1151,7 @@
         },
         {
           "id": "C366",
-          "text": "Apps check many permissions in one call and list the resources a subject may act on (DIRECTORY-048 R5).",
+          "text": "Apps check many permissions and list permitted resources as their own application connector, under explicit grants and their own-kind boundary; neither binding nor prefix ownership grants authority (ADR-126, DIRECTORY-048 R5).",
           "done": false
         },
         {

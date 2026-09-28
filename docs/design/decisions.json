@@ -1820,6 +1820,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-126",
+      "title": "Applications have connector identities; people register them with explicit permission",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-29",
+      "decided_by": "Tom on Dot, 29 September 2026 06:47, 06:48 and 06:50 Melbourne, relayed by Waffles; recorded by Chippy",
+      "context": "DIRECTORY-048 used service accounts and an independent registrar credential for app registration, while IdentityId and grant holders have only person and agent kinds. Those substitutions do not represent the app as its own authority. The 06:50 ruling clarifies the earlier 06:48 restriction: registration is available to a person given register_app by the super administrator, rather than to that administrator alone.",
+      "decision": "An application connector is its own third identity and grant-holder kind. Apps do not act as agents and do not use service accounts, which are accounts people use to service things. Only a signed-in person with an explicit ordinary register_app grant registers an app. The super administrator may grant that permission to a person; an agent, connector or service account cannot register, even if presented with such a grant. Approval creates a connector identity and binds the app to it. No app authority is implicit in approval, binding or ownership of a kind prefix: every permission is an explicit grant with a chain tracing to the super administrator. Own-kind checks, schema acts, batch and which use that connector identity and the ordinary grant engine. Extend IdentityId, grant admission and the permission-store holder, plus event and snapshot representation with compatibility tests. Preserve historical person/agent bytes and signatures; version a representation when necessary, never rewrite history or coerce identities. This supersedes DIRECTORY-048 wording allowing a service account or connector holding register_app to register, and forbids a separate registrar credential as substitute authority.",
+      "quote": "",
+      "consequences": [
+        "DIRECTORY-048 R1, R2, R3 and R5 use application-connector identity and grants; service accounts retain their separate purpose.",
+        "Approval creates identity and binding but no implicit grants.",
+        "Compatibility tests retain historical fixtures and prove old grants and signatures remain valid."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

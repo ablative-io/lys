@@ -11,13 +11,14 @@ title: Every app registers its sign-in and permission schema with Lys through on
 > **Depends on:** DIRECTORY-047
 > **Design anchor:**
 > - ADR-116 — Every app registers with Lys through one published API; Lys depends on no app — An app is a record in Lys: an id, a name, its sign-in client, and a permission schema it owns (resource kinds under the app's own prefix, each kind's actions, relations carrying actions, and parent kinds whose relations flow down). An app registers and changes its schema only through the API, is approved by an administrator on a Lys screen before it has any effect, and cannot touch another app's kinds. Lys's own model is the schema of the app 'lys'. The API is described by one OpenAPI document generated from the routes and their types, never written by hand. The MCP server is a face over that same API with three tools, the caller's own identity on every call, and no credential or authority of its own. Lys depends on no app. It holds no app's name, kind, schema or code; it never calls an app, waits on one or reads one's store. Every app depends on Lys through this API alone, and Lys runs the same with no apps registered as with twenty.
+> - ADR-126 — Applications have connector identities; people register them with explicit permission — An application connector is its own third identity and grant-holder kind. Apps do not act as agents and do not use service accounts, which are accounts people use to service things. Only a signed-in person with an explicit ordinary register_app grant registers an app. The super administrator may grant that permission to a person; an agent, connector or service account cannot register, even if presented with such a grant. Approval creates a connector identity and binds the app to it. No app authority is implicit in approval, binding or ownership of a kind prefix: every permission is an explicit grant with a chain tracing to the super administrator. Own-kind checks, schema acts, batch and which use that connector identity and the ordinary grant engine. Extend IdentityId, grant admission and the permission-store holder, plus event and snapshot representation with compatibility tests. Preserve historical person/agent bytes and signatures; version a representation when necessary, never rewrite history or coerce identities. This supersedes DIRECTORY-048 wording allowing a service account or connector holding register_app to register, and forbids a separate registrar credential as substitute authority.
 > **Checklist:**
-> - C361 — An app is registered through the API with its id, name, sign-in client and permission schema, and has no effect until an administrator approves it on a Lys screen (DIRECTORY-048 R1).
+> - C361 — Only a person holding an explicit register_app grant registers an app; approval creates its distinct application-connector identity and binding, and every app permission follows an explicit grant chain back to the super administrator (ADR-126, DIRECTORY-048 R1).
 > - C362 — An app's schema declares kinds under its own prefix, their actions, relations carrying actions and parent kinds; an invalid schema is refused naming the line of the fault (DIRECTORY-048 R2).
 > - C363 — An app cannot define, change or grant on another app's kinds; the refusal names the owning prefix (DIRECTORY-048 R2).
 > - C364 — A schema change that would strand standing grants is refused naming the relation and the count; a dry run answers the same without writing (DIRECTORY-048 R3).
 > - C365 — Lys's own model is the schema of the app 'lys'; existing grants and checks answer the same after the move (DIRECTORY-048 R4).
-> - C366 — Apps check many permissions in one call and list the resources a subject may act on (DIRECTORY-048 R5).
+> - C366 — Apps check many permissions and list permitted resources as their own application connector, under explicit grants and their own-kind boundary; neither binding nor prefix ownership grants authority (ADR-126, DIRECTORY-048 R5).
 > - C367 — One OpenAPI document, generated from the routes and types, describes every route; a route without an entry fails the build (DIRECTORY-048 R6).
 > - C368 — Lys holds no app's name or schema in code or configuration and makes no call to any app (DIRECTORY-048 R7).
 > - C386 — A person builds an app's whole permission template on the Apps screen from templates, tests it on example people and resources against the real check, and saves it; built and uploaded schemas are the same record (DIRECTORY-048 R8).
@@ -37,7 +38,7 @@ Make an app a record in Lys with its sign-in client and a permission schema it o
 
 ### R1: An app is a record, registered through the API and approved on a Lys screen
 
-Behavioural. Add apps as log events and a projection (apps_api.rs, apps_state.rs, apps_store.rs, following the *_api/_state/_store shape of teams and service accounts). POST /apps takes an id (lower-case letters, digits and hyphens, 2 to 32, not 'lys'), a display name, redirect addresses and a permission schema (R2); it is accepted from a signed-in administrator or from a service account holding register_app, and creates the app as pending with its sign-in client prepared but not enabled. An administrator approves or declines it on a new Apps screen (surface/identity/src/features/apps) that shows the name, the redirect addresses and the full schema in words before the button; only on approval is the sign-in client enabled at Lys's provider (DIRECTORY-047 R3) and the schema written to the permission store. GET /apps and GET /apps/{app} answer what the caller may see. Retiring an app disables its client and refuses every check on its kinds by name; its grants stay in the log. An app id is 3 to 40 characters of lowercase letters, digits and underscores, starting with a letter, the same alphabet the permission store's names allow, so the id is the store prefix unchanged; a hyphen or dot is refused app_id_invalid. Registering writes only the pending registration: the sign-in client is created at the provider on approval and never before. On approval the app's client secret is shown once, to the approving administrator, on the approval screen and in the approval's API answer, and is never written to a log, a receipt or a stored record in the clear. Correction ruling, Waffles 29 September 2026 06:43 Melbourne: there is no separate registrar credential. A service account must hold register_app as an ordinary grant, checked by the ordinary permission engine on each registration; ownership of a service-account record or possession of a registrar bearer is not that grant. The app binding record is written on approval. Against the landed DIRECTORY-047 R3 provider, connect the production client lookup to apps_binding::sign_in_client; app bearer access to /apps/me is not proof of app-client sign-in. Keep pending, declined and retired clients unable to complete sign-in. Remove the registrar-credential substitution from the delivered authority path. Preserve the existing grant and identity wire contracts: if ordinary service-account grant authority requires a missing identity-model prerequisite, stop this row naming that prerequisite and its files; do not borrow a person's or agent's identity or invent a second permission system.
+Behavioural. Add apps as log events and a projection (apps_api.rs, apps_state.rs, apps_store.rs, following the *_api/_state/_store shape of teams and service accounts). POST /apps takes an id (3 to 40 lowercase letters, digits and underscores, starting with a letter, not 'lys'), a display name, redirect addresses and a permission schema (R2); it is accepted only from a signed-in person holding an explicit ordinary register_app grant whose authority traces to the super administrator, and creates the app as pending with its sign-in client prepared but not enabled. An administrator approves or declines it on a new Apps screen (surface/identity/src/features/apps) that shows the name, the redirect addresses and the full schema in words before the button; only on approval is the sign-in client enabled at Lys's provider (DIRECTORY-047 R3) and the schema written to the permission store. GET /apps and GET /apps/{app} answer what the caller may see. Retiring an app disables its client and refuses every check on its kinds by name; its grants stay in the log. An app id is 3 to 40 characters of lowercase letters, digits and underscores, starting with a letter, the same alphabet the permission store's names allow, so the id is the store prefix unchanged; a hyphen or dot is refused app_id_invalid. Registering writes only the pending registration: the sign-in client is created at the provider on approval and never before. On approval the app's client secret is shown once, to the approving administrator, on the approval screen and in the approval's API answer, and is never written to a log, a receipt or a stored record in the clear. ADR-126 records Tom's 29 September 2026 06:47, 06:48 and 06:50 Melbourne rulings. An application connector is a distinct third identity/holder kind beside person and agent, never a service account or an agent identity. On approval create that connector identity and bind the app to it; registration, identity creation and prefix ownership confer no implicit permissions. No agent, connector or service account can register an app, even if offered a register_app grant or registrar bearer. Every authority an app exercises is an explicit ordinary grant whose derivation reaches the super administrator; authenticate the connector, then judge its grant on each protected act. Add the connector holder kind to IdentityId, grant types/admission and the permission store, and carry it through events, snapshot encoding/restore and server identity dispatch. Preserve existing person/agent encoded bytes, signatures, IDs and history, introduce a versioned representation wherever adding a member otherwise changes a frozen format, and refuse unsupported formats by name. Do not rewrite historical records or silently map connector identities to people, agents or service accounts. Against DIRECTORY-047 R3's complete green provider tree, wire production client lookup to apps_binding::sign_in_client; an app bearer GET /apps/me does not prove an app-client OIDC sign-in. Remove the registrar-credential substitute.
 
 **Acceptance:**
 - A pending app's client cannot complete a sign-in and checks on its kinds answer app_not_approved.
@@ -47,8 +48,11 @@ Behavioural. Add apps as log events and a projection (apps_api.rs, apps_state.rs
 - An id with a hyphen, a dot or under three characters is refused app_id_invalid.
 - Registering creates nothing at the provider; approving creates the client and shows its secret once to the approver; no log line holds it.
 - The production provider client lookup reaches apps_binding::sign_in_client: a pending app is refused, approval permits an OIDC round trip using that app's own client and registered redirect, and retirement refuses another round trip; GET /apps/me does not satisfy this assertion.
-- A service account with a standing register_app grant can register; the same account without that grant, after its revocation, after its expiry, or after the account is retired is refused by name with no registration event. An administrator can register; a registrar bearer alone grants nothing.
 - Registration writes no app binding; approval records the app binding. The secret is answered only to the approving administrator and no persisted record, receipt, or captured log contains its clear value.
+- A signed-in person with an explicit register_app grant can register an app. A person without that grant, or whose required grant or ancestor was revoked or expired, receives a named refusal and creates no app, provider client or binding. An agent, application connector or service account is refused even if presented with register_app or a registrar bearer. No administrator-role bypass substitutes for the ordinary grant check.
+- Approval records one stable application-connector identity and its app binding, idempotently across retry and reopen; the binding names no person, agent or service-account identity as the app's authority.
+- The newly approved connector has no permissions implicitly, including on its own prefix. An explicit root/derived grant chain from the super administrator permits the requested action; revoking or expiring any required ancestor, or retiring the connector's app, refuses the same action by name.
+- Compatibility fixtures written before the connector kind still decode, verify signatures and replay with the same person/agent identities, grants and outcomes; connector event/snapshot fixtures round-trip and reopen with distinct identity tags, and unknown tags/formats are refused by name. Existing fixture bytes are not regenerated to satisfy this test.
 
 **Files:**
 - create: crates/lys-identity-server/src/apps_api.rs
@@ -61,17 +65,57 @@ Behavioural. Add apps as log events and a projection (apps_api.rs, apps_state.rs
 - create: crates/lys-identity-server/src/apps_views.rs
 - create: crates/lys-identity-server/src/apps_error.rs
 - create: crates/lys-identity-server/src/apps_binding_tests.rs
+- create: crates/lys-identity/tests/connector_compatibility.rs
+- create: crates/lys-identity-server/tests/app_connector_grants.rs
 - modify: crates/lys-identity-server/src/routes.rs
 - modify: crates/lys-identity-server/src/lib.rs
 - modify: crates/lys-identity-server/src/provider.rs
 - modify: crates/lys-identity-server/src/grants.rs
-- modify: crates/lys-identity-server/src/service_accounts_api.rs
-- modify: crates/lys-identity-server/src/service_accounts_store.rs
-- modify: crates/lys-identity-server/src/service_accounts_state.rs
 - modify: tests/identity_contract/src/harness.rs
+- modify: crates/lys-identity-server/src/admission.rs
+- modify: crates/lys-identity-server/src/agent_sight.rs
+- modify: crates/lys-identity-server/src/agent_signature.rs
+- modify: crates/lys-identity-server/src/certificates_issue.rs
+- modify: crates/lys-identity-server/src/dev_seed.rs
+- modify: crates/lys-identity-server/src/grant_sight.rs
+- modify: crates/lys-identity-server/src/launch_api.rs
+- modify: crates/lys-identity-server/src/network_api.rs
+- modify: crates/lys-identity-server/src/provisioning_api.rs
+- modify: crates/lys-identity-server/src/read_api.rs
+- modify: crates/lys-identity-server/src/requests_api.rs
+- modify: crates/lys-identity-server/src/requests_decide.rs
+- modify: crates/lys-identity-server/src/reviews_api.rs
+- modify: crates/lys-identity-server/src/runtime_api.rs
+- modify: crates/lys-identity-server/src/start.rs
+- modify: crates/lys-identity-server/src/stop_api.rs
+- modify: crates/lys-identity-server/src/teams_api.rs
+- modify: crates/lys-identity/src/directory.rs
+- modify: crates/lys-identity/src/encoding.rs
+- modify: crates/lys-identity/src/event.rs
+- modify: crates/lys-identity/src/grants/admission.rs
+- modify: crates/lys-identity/src/grants/authority.rs
+- modify: crates/lys-identity/src/grants/codec.rs
+- modify: crates/lys-identity/src/grants/lineage.rs
+- modify: crates/lys-identity/src/grants/permission.rs
+- modify: crates/lys-identity/src/grants/revocation.rs
+- modify: crates/lys-identity/src/grants/types.rs
+- modify: crates/lys-identity/src/link_audit.rs
+- modify: crates/lys-identity/src/projection.rs
+- modify: crates/lys-identity/src/projection_state.rs
+- modify: crates/lys-identity/src/state_value.rs
+- modify: crates/lys-identity/src/id.rs
+- modify: crates/lys-identity/src/lib.rs
+- modify: crates/lys-identity/src/directory_state.rs
+- modify: crates/lys-identity/src/encoding_tests.rs
+- modify: crates/lys-identity/src/grants/events.rs
+- modify: crates/lys-identity/src/grants/book_state.rs
+- modify: crates/lys-identity/src/grants/state.rs
+- modify: crates/lys-identity/src/grants/projection.rs
+- modify: crates/lys-identity-server/src/grant_contract/requests.rs
+- modify: crates/lys-identity-server/src/grant_contract/views.rs
 
 **Checklist:**
-- C361 — An app is registered through the API with its id, name, sign-in client and permission schema, and has no effect until an administrator approves it on a Lys screen (DIRECTORY-048 R1).
+- C361 — Only a person holding an explicit register_app grant registers an app; approval creates its distinct application-connector identity and binding, and every app permission follows an explicit grant chain back to the super administrator (ADR-126, DIRECTORY-048 R1).
 
 **Stories:**
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
@@ -79,13 +123,14 @@ Behavioural. Add apps as log events and a projection (apps_api.rs, apps_state.rs
 
 ### R2: An app's schema: its own kinds, actions, relations and parents, checked on entry
 
-Behavioural. A schema is JSON: kinds, each with actions, relations (each carrying a set of the kind's actions) and optional parents (a relation on a parent kind flows to the child, as a workspace's member reaches its channels). Every kind is written '{app}.{kind}'; a kind outside the app's prefix, an action not declared on its kind, a relation carrying an unknown action, a parent cycle or a parent in another app is refused schema_invalid naming the JSON pointer of the fault. Grant creation, delegation and every check refuse kind_not_registered for a kind no approved app declares, and not_your_app when a caller acting for one app names another's kind. The schema is translated to the permission store's definitions under the app's prefix only; no write touches another prefix. The app 'lys' is the one exception to the app.kind form: Lys's own kinds keep their present names, and every other app's kinds carry its prefix. A service account is bound to an app by an app binding record (service account id, app id, bound by, when), written on approval of the registration that names it and read by not_your_app.
+Behavioural. A schema is JSON: kinds, each with actions, relations (each carrying a set of the kind's actions) and optional parents (a relation on a parent kind flows to the child, as a workspace's member reaches its channels). Every kind is written '{app}.{kind}'; a kind outside the app's prefix, an action not declared on its kind, a relation carrying an unknown action, a parent cycle or a parent in another app is refused schema_invalid naming the JSON pointer of the fault. Grant creation, delegation and every check refuse kind_not_registered for a kind no approved app declares, and not_your_app when a caller acting for one app names another's kind. The schema is translated to the permission store's definitions under the app's prefix only; no write touches another prefix. The app 'lys' is the one exception to the app.kind form: Lys's own kinds keep their present names, and every other app's kinds carry its prefix. An application connector is bound to its app by an app binding record (connector identity id, app id, bound by, when), written on approval and read by not_your_app. The binding constrains which app the caller represents; it grants no authority. Own-kind access must also pass an explicit ordinary grant check rooted in the super administrator.
 
 **Acceptance:**
 - Each fault above is refused with its pointer, with one test per fault.
 - A grant naming an unregistered kind is refused kind_not_registered.
-- An app's service account naming another app's kind is refused not_your_app.
+- An app's authenticated application connector naming another app's kind is refused not_your_app.
 - A parent relation grants the child: a workspace member may read a channel in it.
+- An authenticated connector with no grant is refused even on its own kinds; an explicit grant with a standing chain to the super administrator permits the act, and revocation refuses it; another app's kinds remain not_your_app regardless of that grant.
 
 **Files:**
 - create: crates/lys-identity/src/grants/schema.rs
@@ -105,7 +150,7 @@ Behavioural. A schema is JSON: kinds, each with actions, relations (each carryin
 
 ### R3: Schema changes are versioned, dry-run first, and never strand a grant
 
-Behavioural. PUT /apps/{app}/schema carries the version it replaces and is refused schema_version_moved when that is not current. POST /apps/{app}/schema/check answers what the change would do without writing: kinds, relations and actions added and removed, and the standing grants each removal would strand. A change that removes a kind or relation with standing grants, or an action a standing grant carries, is refused schema_change_strands_grants naming each relation and its count; it is applied only after those grants are revoked through the ordinary revoke route. A change made by a service account waits for administrator approval on the Apps screen, as registration does. Every version stays readable at GET /apps/{app}/schema?version=N. The apps store is born with its checkpoint beside its log, so a start reads the checkpoint and the tail only, never the whole history.
+Behavioural. PUT /apps/{app}/schema carries the version it replaces and is refused schema_version_moved when that is not current. POST /apps/{app}/schema/check answers what the change would do without writing: kinds, relations and actions added and removed, and the standing grants each removal would strand. A change that removes a kind or relation with standing grants, or an action a standing grant carries, is refused schema_change_strands_grants naming each relation and its count; it is applied only after those grants are revoked through the ordinary revoke route. A change made by the app's application connector waits for administrator approval on the Apps screen, as registration does. Every version stays readable at GET /apps/{app}/schema?version=N. The apps store is born with its checkpoint beside its log, so a start reads the checkpoint and the tail only, never the whole history.
 
 **Acceptance:**
 - A stale version is refused schema_version_moved.
@@ -146,13 +191,14 @@ Behavioural. At start, when no 'lys' app exists in the log, the model in grant_m
 
 ### R5: Apps check many permissions at once and list what a subject may act on
 
-Behavioural. POST /grants/check/batch takes up to 500 checks (subject, kind, id, action) and answers each allowed or refused with its reason, in order, at one permission store revision named in the answer. POST /grants/which takes a subject, a kind and an action and answers the ids that subject may act on, paged by cursor. Both are open to an app's service account for its own kinds only, and to administrators. A caller may pass the revision it last wrote (at_least) to read its own write.
+Behavioural. POST /grants/check/batch takes up to 500 checks (subject, kind, id, action) and answers each allowed or refused with its reason, in order, at one permission store revision named in the answer. POST /grants/which takes a subject, a kind and an action and answers the ids that subject may act on, paged by cursor. Both require a signed-in administrator or the app's authenticated application connector with an explicit ordinary grant for the act, limited to that app's own kinds. The connector identity, never a service-account or agent identity, is the caller judged by the grant engine; owning the prefix confers no permission. A caller may pass the revision it last wrote (at_least) to read its own write.
 
 **Acceptance:**
 - A batch of mixed allowed and refused checks answers each in order at one named revision.
 - 501 checks are refused batch_too_large.
 - which lists exactly the ids the batch would allow, across pages.
 - A check with at_least of a just-made grant sees it.
+- An authenticated connector with no grant is refused even on its own kinds; an explicit grant with a standing chain to the super administrator permits the act, and revocation refuses it; another app's kinds remain not_your_app regardless of that grant.
 
 **Files:**
 - create: crates/lys-identity-server/tests/grants_batch.rs
@@ -160,7 +206,7 @@ Behavioural. POST /grants/check/batch takes up to 500 checks (subject, kind, id,
 - modify: crates/lys-identity-server/src/spicedb.rs
 
 **Checklist:**
-- C366 — Apps check many permissions in one call and list the resources a subject may act on (DIRECTORY-048 R5).
+- C366 — Apps check many permissions and list permitted resources as their own application connector, under explicit grants and their own-kind boundary; neither binding nor prefix ownership grants authority (ADR-126, DIRECTORY-048 R5).
 
 **Stories:**
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
@@ -249,9 +295,10 @@ Behavioural. Building the template is the requirement; a description of it is no
 - SHALL NOT let a registration or schema change take effect before an administrator approves it on a Lys screen.
 - SHALL NOT revoke or rewrite a grant as a side effect of a schema change.
 - SHALL NOT create anything at the provider, or grant anything, before an administrator approves.
-- SHALL NOT start this continuation before DIRECTORY-047 R3's provider has landed and is present in the card's integrated tree.
+- SHALL NOT start this continuation before DIRECTORY-047 R3's provider is complete and green and is present in the card's integrated tree.
 - SHALL NOT replace the main branch's DIRECTORY-049 structure descriptions in design.json with older card wording; preserve main's descriptions and regenerate DESIGN.md during integration.
 - SHALL NOT claim complete or green for this card while any required provider integration, ordinary register_app authority, file-wall correction or measured acceptance remains unresolved.
+- SHALL NOT land without DIRECTORY-045 and DIRECTORY-047 present in dependency order in the integrated tree. Builds may stack on a complete, green prerequisite head. Tom's 29 September 2026 06:53 Melbourne ruling permits one src_land of a fully reviewed green stack or green prefix; that landing integrates current main and gets fresh approval.
 
 ## Verification
 
