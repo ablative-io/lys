@@ -93,7 +93,7 @@ fn authorised(state: &AppState, actor: &Actor, holder: &Holder) -> Result<String
             HolderKind::Agent => AgentId::from_str(&holder.id)
                 .ok()
                 .and_then(|agent| projection.record(IdentityId::Agent(agent)))
-                .and_then(|record| record.responsible())
+                .and_then(lys_identity::projection::Record::responsible)
                 .map(|owner| owner.to_string()),
             HolderKind::Person => Some(holder.id.clone()),
             HolderKind::Team => None,
