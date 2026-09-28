@@ -89,7 +89,7 @@ fn installed_root(dir: &Path) -> TestResult<Layout> {
     std::fs::create_dir_all(&layout.root)?;
     std::fs::write(
         layout.deployment_config(),
-        render_deployment("owner@example.test"),
+        render_deployment(Some("owner@example.test")),
     )?;
     prepare::run(&layout.deployment_config(), true)?;
     let recorded = serde_json::json!({
