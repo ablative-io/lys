@@ -71,7 +71,7 @@ fn grant_last_used_an_exercise_is_recorded_with_its_holder_route_and_time() -> T
             index
         }
     );
-    let (signed, receipt) = &world.grants.events()[usize::try_from(index)?];
+    let (signed, receipt) = &world.grants.events()?[usize::try_from(index)?];
     assert_eq!(signed.event().caller(), tom, "the use names its holder");
     assert_eq!(
         signed.event().change(),

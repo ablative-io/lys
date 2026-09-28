@@ -5,6 +5,7 @@
 pub mod admission;
 pub mod authority;
 pub mod codec;
+mod commit;
 pub mod error;
 pub mod events;
 pub mod expiry;
@@ -14,7 +15,9 @@ pub mod permission;
 pub mod projection;
 pub mod receipt;
 pub mod recovery;
+mod refusal_codec;
 pub mod revocation;
+mod state;
 #[cfg(any(test, feature = "test-support"))]
 pub mod test_support;
 pub mod types;

@@ -88,7 +88,7 @@ fn grant_audit_a_receipt_verifies_and_every_tampering_is_rejected() -> TestResul
     world.delegate(&to_agent)?;
     let key = service_key(&world)?;
     let index = usize::try_from(recorded.index)?;
-    let message = world.grants.events()[index].0.bytes().to_vec();
+    let message = world.grants.events()?[index].0.bytes().to_vec();
     let checkpoint = world.grants.ledger().head()?;
     let proof = world.grants.ledger().inclusion_proof(recorded.index)?;
     verify_grant_receipt(&recorded.receipt, &message, &key, checkpoint, &proof)?;
@@ -197,7 +197,7 @@ fn grant_audit_a_refusal_never_appears_as_a_grant_event() -> TestResult {
     assert_eq!(world.events(), before);
     let named = world
         .grants
-        .events()
+        .events()?
         .iter()
         .filter(|(signed, _)| signed.event().operation() == refused.operation)
         .count();
@@ -215,7 +215,7 @@ fn grant_audit_a_refusal_never_appears_as_a_grant_event() -> TestResult {
 fn grant_wire_boundary_a_signed_grant_names_its_envelope_and_no_other_is_read() -> TestResult {
     let mut world = World::new()?;
     let root = world.root(world.dana, "kite", pass(&["read"], &BOTH)?, None)?;
-    let message = world.grants.events()[0].0.bytes().to_vec();
+    let message = world.grants.events()?[0].0.bytes().to_vec();
     let protected: Value = ciborium::from_reader(bytes_of(&parts(&message)?[0])?.as_slice())?;
     let Value::Map(header) = protected else {
         return Err("the protected header is not a map".into());
@@ -225,12 +225,7 @@ fn grant_wire_boundary_a_signed_grant_names_its_envelope_and_no_other_is_read() 
         Value::Text(GRANT_ENVELOPE.to_owned())
     )));
     let key = service_key(&world)?;
-    let identity_event = world
-        .directory
-        .log()?
-        .leaf(0)?
-        .ok_or("no identity event")?
-        .to_vec();
+    let identity_event = world.directory.log()?.leaf(0)?.ok_or("no identity event")?;
     assert!(
         matches!(
             verify_grant_event(&identity_event, &key),

@@ -28,6 +28,23 @@ Future crates (later phases): `lys-anchor` (transparency-ledger service) and `ly
 
 **This is trust infrastructure. Its entire value is that strangers can verify it.** Every design decision serves verifiability-by-third-parties, not cleverness, not performance for its own sake. When choosing between a "better" primitive and the boring interoperable one, choose boring — the verification world speaks SHA-256, Ed25519, and RFC 6962, and a receipt nobody can verify with standard tooling is worthless. Verification must outlive the vendor.
 
+## A start never replays the whole history
+
+A service that keeps a log opens from a signed snapshot of its folded state,
+bound to the log's root, and reads only the entries after it. Snapshots are
+written by entry count, never on a timer. A snapshot that is missing, fails
+its signature, or names another root or log is refused by name, logged, and
+rebuilt from the whole log; never a silent fallback. Every such service has a
+test that counts the entries a restart reads. Opening a store costs the same
+however long its log is.
+
+## No time limits
+
+No timeout, deadline, watchdog or bound in seconds anywhere: not in code, not
+in a test, not in a workflow step, not in a command. A slow run is a defect to
+find at its cause. Something stuck is found by its signal (no progress, a dead
+process), never by a clock.
+
 ## Coding standards
 
 Non-negotiable, enforced by CI (`clippy --all-targets -- -D warnings`):

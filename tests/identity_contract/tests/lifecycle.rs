@@ -28,7 +28,7 @@ fn register_activate_suspend_reinstate_retire_is_five_signed_events() -> TestRes
     let mut signed_about_agent = 0;
     for index in 0..directory.log()?.len()? {
         let leaf = directory.log()?.leaf(index)?.ok_or("leaf missing")?;
-        let event = verify_event(leaf, &key)?;
+        let event = verify_event(&leaf, &key)?;
         if event.event().identity() == agent {
             assert_eq!(event.event().actor(), &administrator()?);
             if let Change::Transition { from, to, .. } = event.event().change() {

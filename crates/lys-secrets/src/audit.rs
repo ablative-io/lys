@@ -2,15 +2,21 @@
 //! signed by the broker's audit key and appended through lys-log-store. The
 //! log's head is anchored outside the store and log directories, so a log
 //! restored from an older copy is refused at start.
+//!
+//! A start does not read the whole log. The log opens from the signed
+//! snapshot its owner last wrote, and hands the owner that snapshot's state
+//! and only the lines after it, each with its signature checked. A snapshot
+//! that cannot be believed is refused by name in [`AuditLog::start`], and
+//! then every line is read.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use lys_core::Ed25519Identity;
-use lys_log_store::{FileLeafStore, Log};
+use lys_log_store::{FileLeafStore, FrontierLog, SnapshotRefusal, Start, Tail, start};
 use serde::{Deserialize, Serialize};
 
-use crate::encoding::{Canonical, Reader, hex, sha256};
+use crate::encoding::{Canonical, hex, sha256};
 use crate::error::SecretsError;
 use crate::fsutil::{ensure_outside, io, write_atomic};
 use crate::keys::StoreKey;
@@ -18,6 +24,11 @@ use crate::keys::StoreKey;
 const LINE_DOMAIN: &str = "lys-secrets/audit-line/v2";
 const SIGNED_DOMAIN: &str = "lys-secrets/audit-signed/v1";
 const ANCHOR_DOMAIN: &str = "lys-secrets/audit-anchor/v1";
+/// The kind of state the log's snapshot carries.
+pub const STATE_DOMAIN: &str = "lys-secrets/audit-state/v1";
+
+mod codec;
+use codec::{decode_signed, encode_line};
 
 /// What an audit line records.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -123,18 +134,32 @@ struct Anchor {
     signature: String,
 }
 
+/// What a start hands the log's owner to fold.
+#[derive(Debug)]
+pub struct Opened {
+    /// The owner's state from the snapshot. `None` when the snapshot was
+    /// refused, and then `lines` holds every line.
+    pub state: Option<Vec<u8>>,
+    /// The lines after the state, in order, each signature verified.
+    pub lines: Vec<RecordedLine>,
+}
+
 /// The append-only, signed audit log.
 pub struct AuditLog {
-    log: Log<FileLeafStore>,
+    log: FrontierLog<FileLeafStore>,
+    dir: PathBuf,
     anchor: PathBuf,
     verifying_key: [u8; 32],
+    /// The digest of the last line, zero for a log that holds none.
+    head: [u8; 32],
+    start: Start,
 }
 
 impl std::fmt::Debug for AuditLog {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AuditLog")
             .field("origin", &self.log.origin())
-            .field("len", &self.log.tree().len())
+            .field("len", &self.log.len())
             .finish_non_exhaustive()
     }
 }
@@ -155,45 +180,124 @@ impl AuditLog {
     ) -> Result<Self, SecretsError> {
         fs::create_dir_all(dir).map_err(io(format!("creating {}", dir.display())))?;
         ensure_outside(anchor, guarded)?;
-        let log = Log::open(FileLeafStore::create(dir, origin)?)?;
+        let (log, _tail) = FrontierLog::open(FileLeafStore::create(dir, origin)?)?;
         let audit = Self {
             log,
+            dir: dir.to_path_buf(),
             anchor: anchor.to_path_buf(),
             verifying_key: key.verifying_key(),
+            head: [0u8; 32],
+            start: Start::Rebuilt {
+                refusal: SnapshotRefusal::Missing,
+                replayed: 0,
+            },
         };
         audit.write_anchor(key.identity())?;
         Ok(audit)
     }
 
-    /// Opens the log in `dir` and checks it against its anchor and every
-    /// line's signature.
+    /// Opens the log in `dir` from its snapshot and checks it against its
+    /// anchor. Only the lines after the snapshot are read, and each one's
+    /// signature is checked. When the snapshot is refused every line is.
     ///
     /// # Errors
     ///
     /// `LogBehindAnchor`-shaped `AuditLineMissing` when the log is shorter
     /// than its anchor, `AuditSignatureInvalid` when the anchor or a line
-    /// does not verify, and `Log`.
+    /// read does not verify, and `Log`.
     pub fn open(
         dir: &Path,
         anchor: &Path,
         guarded: &[&Path],
         key: &StoreKey,
-    ) -> Result<Self, SecretsError> {
+    ) -> Result<(Self, Opened), SecretsError> {
         ensure_outside(anchor, guarded)?;
-        let log = Log::open(FileLeafStore::open(dir)?)?;
+        let started = start(
+            FileLeafStore::open(dir)?,
+            STATE_DOMAIN,
+            &key.verifying_key(),
+        )?;
         let audit = Self {
-            log,
+            log: started.log,
+            dir: dir.to_path_buf(),
             anchor: anchor.to_path_buf(),
             verifying_key: key.verifying_key(),
+            head: [0u8; 32],
+            start: started.start,
         };
-        audit.check_anchor()?;
-        audit.replay()?;
-        Ok(audit)
+        audit.opened(started.state, &started.tail)
+    }
+
+    /// Opens the log again from its first line, because its owner could not
+    /// read the state the snapshot carries.
+    ///
+    /// # Errors
+    ///
+    /// As [`AuditLog::open`].
+    pub fn rebuild(self, reason: String) -> Result<(Self, Opened), SecretsError> {
+        let Self {
+            log,
+            dir,
+            anchor,
+            verifying_key,
+            ..
+        } = self;
+        drop(log);
+        let (log, tail) = FrontierLog::open(FileLeafStore::open(&dir)?)?;
+        let audit = Self {
+            log,
+            dir,
+            anchor,
+            verifying_key,
+            head: [0u8; 32],
+            start: Start::Rebuilt {
+                refusal: SnapshotRefusal::StateUnreadable { reason },
+                replayed: u64::try_from(tail.leaves.len()).unwrap_or(u64::MAX),
+            },
+        };
+        audit.opened(None, &tail)
+    }
+
+    fn opened(
+        mut self,
+        state: Option<Vec<u8>>,
+        tail: &Tail,
+    ) -> Result<(Self, Opened), SecretsError> {
+        self.head = self.digest_before(self.len())?;
+        self.check_anchor()?;
+        let lines = (tail.from..)
+            .zip(&tail.leaves)
+            .map(|(index, bytes)| {
+                let line = decode_signed(index, bytes, &self.verifying_key)?;
+                Ok(RecordedLine { index, line })
+            })
+            .collect::<Result<_, SecretsError>>()?;
+        Ok((self, Opened { state, lines }))
+    }
+
+    /// How the log was started: from its snapshot, or from every line and
+    /// why.
+    pub fn start(&self) -> &Start {
+        &self.start
+    }
+
+    /// Writes a signed snapshot of `state`, which must be the owner's fold
+    /// of every line the log holds now. Answers the size it is bound to.
+    ///
+    /// # Errors
+    ///
+    /// `Log`.
+    pub fn write_snapshot(
+        &mut self,
+        state: &[u8],
+        key: &Ed25519Identity,
+    ) -> Result<u64, SecretsError> {
+        Ok(self.log.write_snapshot(STATE_DOMAIN, state, key)?)
     }
 
     /// The number of lines.
     pub fn len(&self) -> u64 {
-        self.log.tree().len()
+        self.log.len()
     }
 
     /// Whether the log holds no line.
@@ -216,44 +320,53 @@ impl AuditLog {
         let signature = key.sign(&body);
         let mut signed = Canonical::new(SIGNED_DOMAIN)?;
         signed.field(&body)?.field(&signature)?;
-        let (index, _root) = self.log.append(&signed.into_bytes())?;
+        let bytes = signed.into_bytes();
+        let (index, _leaf_hash) = self.log.append(&bytes)?;
+        self.head = sha256(&bytes);
         self.write_anchor(key)?;
         Ok(index)
     }
 
-    /// Every line, each signature verified against the audit key.
+    /// Every line, each signature verified against the audit key. This reads
+    /// the whole log, and is no part of a start.
     ///
     /// # Errors
     ///
     /// `AuditLineMissing`, `AuditLineUnreadable` and `AuditSignatureInvalid`.
     pub fn replay(&self) -> Result<Vec<RecordedLine>, SecretsError> {
-        (0..self.len())
+        self.lines_from(0)
+    }
+
+    /// Every line from `from` on, each signature verified.
+    ///
+    /// # Errors
+    ///
+    /// As [`AuditLog::replay`].
+    pub fn lines_from(&self, from: u64) -> Result<Vec<RecordedLine>, SecretsError> {
+        (from..self.len())
             .map(|index| {
-                let bytes = self
-                    .log
-                    .leaf_bytes(index)
-                    .ok_or(SecretsError::AuditLineMissing {
-                        index,
-                        len: self.len(),
-                    })?;
-                let line = decode_signed(index, bytes, &self.verifying_key)?;
+                let bytes = self.leaf(index)?;
+                let line = decode_signed(index, &bytes, &self.verifying_key)?;
                 Ok(RecordedLine { index, line })
             })
             .collect()
     }
 
-    fn head_digest(&self) -> Result<[u8; 32], SecretsError> {
-        match self.len().checked_sub(1) {
+    fn leaf(&self, index: u64) -> Result<Vec<u8>, SecretsError> {
+        self.log
+            .leaf_bytes(index)?
+            .ok_or(SecretsError::AuditLineMissing {
+                index,
+                len: self.len(),
+            })
+    }
+
+    /// The digest of the last of the first `len` lines, read from the log,
+    /// zero when there is none.
+    fn digest_before(&self, len: u64) -> Result<[u8; 32], SecretsError> {
+        match len.checked_sub(1) {
             None => Ok([0u8; 32]),
-            Some(last) => {
-                self.log
-                    .leaf_bytes(last)
-                    .map(sha256)
-                    .ok_or(SecretsError::AuditLineMissing {
-                        index: last,
-                        len: self.len(),
-                    })
-            }
+            Some(last) => Ok(sha256(&self.leaf(last)?)),
         }
     }
 
@@ -264,7 +377,7 @@ impl AuditLog {
     }
 
     fn write_anchor(&self, key: &Ed25519Identity) -> Result<(), SecretsError> {
-        let digest = self.head_digest()?;
+        let digest = self.head;
         let body = Self::anchor_body(self.len(), &digest)?;
         let anchor = Anchor {
             len: self.len(),
@@ -300,127 +413,14 @@ impl AuditLog {
                 len: self.len(),
             });
         }
-        let at_anchor = match anchor.len.checked_sub(1) {
-            None => [0u8; 32],
-            Some(last) => {
-                self.log
-                    .leaf_bytes(last)
-                    .map(sha256)
-                    .ok_or(SecretsError::AuditLineMissing {
-                        index: last,
-                        len: self.len(),
-                    })?
-            }
+        let at_anchor = if anchor.len == self.len() {
+            self.head
+        } else {
+            self.digest_before(anchor.len)?
         };
         if at_anchor != digest {
             return Err(SecretsError::AuditSignatureInvalid { index: anchor.len });
         }
         Ok(())
     }
-}
-
-fn optional(encoding: &mut Canonical, value: Option<&str>) -> Result<(), SecretsError> {
-    match value {
-        None => encoding.field(&[0]),
-        Some(text) => {
-            let mut bytes = Vec::with_capacity(text.len() + 1);
-            bytes.push(1);
-            bytes.extend_from_slice(text.as_bytes());
-            encoding.field(&bytes)
-        }
-    }
-    .map(|_encoding| ())
-}
-
-fn read_optional(reader: &mut Reader<'_>) -> Result<Option<String>, SecretsError> {
-    let field = reader.field()?;
-    match field.split_first() {
-        Some((0, [])) => Ok(None),
-        Some((1, text)) => {
-            String::from_utf8(text.to_vec())
-                .map(Some)
-                .map_err(|_utf8| SecretsError::Encoding {
-                    context: "audit line",
-                    reason: "a text field is not UTF-8".to_owned(),
-                })
-        }
-        _ => Err(SecretsError::Encoding {
-            context: "audit line",
-            reason: "an optional field is malformed".to_owned(),
-        }),
-    }
-}
-
-fn encode_line(line: &AuditLine) -> Result<Vec<u8>, SecretsError> {
-    let mut encoding = Canonical::new(LINE_DOMAIN)?;
-    encoding.field(line.kind.label().as_bytes())?;
-    encoding.field(&line.at_ms.to_be_bytes())?;
-    optional(&mut encoding, line.handle.as_deref())?;
-    optional(&mut encoding, line.identity.as_deref())?;
-    optional(&mut encoding, line.secret.as_deref())?;
-    optional(&mut encoding, line.operation.as_deref())?;
-    optional(&mut encoding, line.request.as_deref())?;
-    optional(
-        &mut encoding,
-        line.uses.map(|uses| uses.to_string()).as_deref(),
-    )?;
-    optional(
-        &mut encoding,
-        line.spend.map(|spend| spend.to_string()).as_deref(),
-    )?;
-    encoding.field(line.outcome.as_bytes())?;
-    Ok(encoding.into_bytes())
-}
-
-fn decode_signed(index: u64, bytes: &[u8], key: &[u8; 32]) -> Result<AuditLine, SecretsError> {
-    let unreadable = |reason: String| SecretsError::AuditLineUnreadable { index, reason };
-    let mut signed = Reader::new(bytes, "signed audit line");
-    if signed.field()? != SIGNED_DOMAIN.as_bytes() {
-        return Err(unreadable("not a signed audit line".to_owned()));
-    }
-    let body = signed.field()?;
-    let signature = signed.field()?;
-    Ed25519Identity::verify(key, body, signature)
-        .map_err(|_invalid| SecretsError::AuditSignatureInvalid { index })?;
-    let mut reader = Reader::new(body, "audit line");
-    if reader.field()? != LINE_DOMAIN.as_bytes() {
-        return Err(unreadable("not an audit line".to_owned()));
-    }
-    let kind =
-        AuditKind::parse(reader.field()?).ok_or_else(|| unreadable("unknown kind".to_owned()))?;
-    let at: [u8; 8] = reader
-        .field()?
-        .try_into()
-        .map_err(|_length| unreadable("the time is not 8 bytes".to_owned()))?;
-    let handle = read_optional(&mut reader)?;
-    let identity = read_optional(&mut reader)?;
-    let secret = read_optional(&mut reader)?;
-    let operation = read_optional(&mut reader)?;
-    let request = read_optional(&mut reader)?;
-    let uses = read_optional(&mut reader)?
-        .map(|text| {
-            text.parse::<u64>()
-                .map_err(|_number| unreadable("the use count is not a number".to_owned()))
-        })
-        .transpose()?;
-    let spend = read_optional(&mut reader)?
-        .map(|text| {
-            text.parse::<u64>()
-                .map_err(|_number| unreadable("the spend is not a number".to_owned()))
-        })
-        .transpose()?;
-    let outcome = String::from_utf8(reader.field()?.to_vec())
-        .map_err(|_utf8| unreadable("the outcome is not UTF-8".to_owned()))?;
-    Ok(AuditLine {
-        kind,
-        at_ms: i64::from_be_bytes(at),
-        handle,
-        identity,
-        secret,
-        operation,
-        request,
-        uses,
-        spend,
-        outcome,
-    })
 }

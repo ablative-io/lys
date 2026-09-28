@@ -137,6 +137,11 @@ impl<'a> Reader<'a> {
         Ok(field)
     }
 
+    /// Whether every byte has been read.
+    pub(crate) fn is_done(&self) -> bool {
+        self.rest.is_empty()
+    }
+
     /// The next field, read as a `u64`.
     pub(crate) fn number(&mut self) -> Result<u64, SecretsError> {
         let field = self.field()?;

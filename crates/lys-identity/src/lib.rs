@@ -7,7 +7,9 @@
 //! formats it uses and never changes.
 
 pub mod binding;
+pub mod checkpoints;
 pub mod directory;
+mod directory_state;
 pub mod encoding;
 pub mod error;
 pub mod event;
@@ -21,7 +23,9 @@ pub mod profile;
 pub mod projection;
 pub mod provenance;
 pub mod receipt;
+pub mod restart;
 pub mod signer;
+mod state_value;
 
 pub use binding::LoginBinding;
 pub use directory::Directory;
@@ -32,4 +36,5 @@ pub use lifecycle::{LifecycleState, Transition};
 pub use operation::OperationId;
 pub use profile::Profile;
 pub use provenance::{Actor, AuthMethod, Provenance};
+pub use restart::SNAPSHOT_EVERY;
 pub use signer::{SignedEvent, sign_event, verify_event};

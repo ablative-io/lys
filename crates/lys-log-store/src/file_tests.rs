@@ -65,6 +65,8 @@ const ORIGIN: &str = "example.com/lys/store-test";
 mod after_link;
 #[path = "file_tests/pins.rs"]
 mod pins;
+#[path = "file_tests/probe.rs"]
+mod probe;
 
 fn create(dir: &Path) -> FileLeafStore {
     FileLeafStore::create(dir, ORIGIN).unwrap();
