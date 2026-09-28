@@ -108,7 +108,7 @@ fn person_view(id: PersonId, record: &Record, agents: Vec<AgentSummary>) -> Pers
     }
 }
 
-fn person_record(projection: &Projection, id: PersonId) -> Result<&Record, ServerError> {
+pub(crate) fn person_record(projection: &Projection, id: PersonId) -> Result<&Record, ServerError> {
     projection.record(IdentityId::Person(id)).ok_or_else(|| {
         ServerError::from(lys_identity::IdentityError::IdentityUnknown {
             identity: id.to_string(),

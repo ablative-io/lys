@@ -111,6 +111,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::receipts_api::routes())
         .merge(crate::link_audit_api::routes())
         .merge(crate::secrets_api::routes())
+        .merge(crate::sessions_api::routes())
         .with_state(state)
 }
 
@@ -118,12 +119,16 @@ fn malformed(reason: String) -> ServerError {
     ServerError::RequestMalformed { reason }
 }
 
+/// The request's Cookie header, when it carries one that is text.
+pub(crate) fn cookie_header(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get(header::COOKIE)
+        .and_then(|value| value.to_str().ok())
+}
+
 /// The signed-in actor, or a refusal.
 pub(crate) fn signed_in(state: &AppState, headers: &HeaderMap) -> Result<Actor, ServerError> {
-    let cookie = headers
-        .get(header::COOKIE)
-        .and_then(|value| value.to_str().ok());
-    state.sessions.actor(cookie)
+    state.sessions.actor(cookie_header(headers))
 }
 
 /// Run `act` on the directory, one caller at a time.
