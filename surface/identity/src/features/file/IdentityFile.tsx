@@ -24,7 +24,7 @@ export interface FileData {
   /** The receipt of every event about an agent, oldest first. */
   receipts: ReceiptAnswer[];
   /** The grants the caller can see, and whom they name. */
-  grants: GrantWorld | null;
+  grants: GrantWorld;
 }
 
 async function readAgent(id: string): Promise<FileData> {
@@ -53,7 +53,7 @@ function File({ data, tab, reload }: { data: FileData; tab: string; reload: () =
   const since = agent?.provenance.registration?.actor.authenticated_at;
   const counts: Record<string, number | undefined> = {
     record: agent ? agent.provenance.events.length : undefined,
-    access: data.grants ? data.grants.list.grants.filter((g) => g.holder === x.id).length : undefined,
+    access: data.grants.list.grants.filter((g) => g.holder === x.id).length,
   };
   return (
     <div className="page">
