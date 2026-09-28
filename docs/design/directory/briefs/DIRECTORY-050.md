@@ -198,8 +198,11 @@ Behavioural. The Sessions screen (surface/identity/src/features/runtime) lists e
 - SHALL NOT pass an account, key or token value through a route, a log, a receipt or a command line.
 - SHALL NOT add a timeout, deadline, sleep, poll interval, #[allow], #[ignore] or any bypass; waits end on a signal or when the caller leaves.
 - SHALL NOT add a silent fallback: every failure is a named refusal.
+- SHALL NOT add a code line to crates/lys-identity-server/src/grants.rs, which already holds 498 of the 500 code lines the file-length leg allows (ADR-111). Code this card needs beside the grants goes in a new module, and code may move out of grants.rs.
 
 ## Verification
 
 - The full Lys gate, ast-grep scan and the surface checks exit 0 at the card's head, measured by the card round.
 - On a scratch install: start a shell agent from the screen, type to it, read it, wait on a pattern, stop it.
+- sh scripts/file-length.sh exits 0 at the card's head.
+- check_file_length.py counts no more than 498 code lines in crates/lys-identity-server/src/grants.rs at the card's head.
