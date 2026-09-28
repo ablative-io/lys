@@ -151,5 +151,5 @@ fn relate(
 }
 
 #[cfg(test)]
-#[path = "observe_tests.rs"]
+#[path = "observe_tests/mod.rs"]
 mod tests;

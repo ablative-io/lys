@@ -187,5 +187,5 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
 }
 
 #[cfg(test)]
-#[path = "submit_tests.rs"]
+#[path = "submit_tests/mod.rs"]
 mod tests;
