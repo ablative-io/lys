@@ -3501,6 +3501,11 @@
       "path": "crates/lys-identity/tests/support/mod.rs",
       "note": "The receipts route answers a signed checkpoint",
       "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys/src/identity/install/detached.rs",
+      "note": "a detached start through the holder",
+      "brief": "DIRECTORY-057"
     }
   ],
   "inventory": [
