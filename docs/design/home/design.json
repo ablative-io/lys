@@ -67,7 +67,8 @@
     "ADR-072",
     "ADR-031",
     "ADR-073",
-    "ADR-074"
+    "ADR-074",
+    "ADR-029"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -1482,6 +1483,16 @@
       "path": "docs/design/decisions.json",
       "note": "the decision ledger; HOME-008 moves ADR-016 to decided",
       "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-010.json",
+      "note": "the lit-in brief: LanternData's lit_in, recorded by the light act, reported by recall and read by the fork",
+      "brief": "HOME-010"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-010.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-010"
     }
   ],
   "inventory": [
