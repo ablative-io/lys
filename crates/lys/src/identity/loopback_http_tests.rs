@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::io::{Read, Write};
-use std::net::{Ipv6Addr, SocketAddr, TcpListener};
+use std::net::{Ipv6Addr, SocketAddr, TcpListener, TcpStream};
 
 use super::*;
 
@@ -80,9 +80,21 @@ fn a_missing_port_is_the_scheme_default_never_a_digit_of_the_host() {
     );
 }
 
+/// A loopback port that refuses every connection for as long as what is
+/// returned is kept. The port is the near end of an open connection, so it
+/// is given to nobody else, and nothing listens on it, so the kernel
+/// refuses. A port read from a listener already dropped could be given to
+/// any other socket before the connection is tried.
+fn refusing_port() -> TestResult<((TcpListener, TcpStream), SocketAddr)> {
+    let far = TcpListener::bind("127.0.0.1:0")?;
+    let near = TcpStream::connect(far.local_addr()?)?;
+    let address = near.local_addr()?;
+    Ok(((far, near), address))
+}
+
 #[test]
 fn every_resolved_address_is_tried_until_one_accepts() -> TestResult {
-    let refusing = TcpListener::bind("127.0.0.1:0")?.local_addr()?;
+    let (held, refusing) = refusing_port()?;
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let accepting = listener.local_addr()?;
     let stream = connect_any(&[refusing, accepting])?;
@@ -91,6 +103,7 @@ fn every_resolved_address_is_tried_until_one_accepts() -> TestResult {
         .err()
         .ok_or("a closed port accepted")?;
     assert!(refusal.starts_with(&refusing.to_string()), "{refusal}");
+    drop(held);
     Ok(())
 }
 
@@ -183,7 +196,7 @@ fn health_request() -> Request<'static> {
 
 #[test]
 fn a_refused_port_is_named_at_once_with_its_address_and_cause() -> TestResult {
-    let closed = TcpListener::bind("127.0.0.1:0")?.local_addr()?;
+    let (held, closed) = refusing_port()?;
     let failure = exchange(&authority("127.0.0.1", closed.port()), &health_request())
         .err()
         .ok_or("a closed port answered")?;
@@ -193,6 +206,7 @@ fn a_refused_port_is_named_at_once_with_its_address_and_cause() -> TestResult {
     };
     assert!(detail.starts_with(&closed.to_string()), "{detail}");
     assert!(detail.contains("refused"), "{detail}");
+    drop(held);
     Ok(())
 }
 
