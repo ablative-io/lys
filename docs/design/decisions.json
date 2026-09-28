@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-27",
+  "updated": "2026-09-28",
   "decisions": [
     {
       "id": "ADR-001",
@@ -307,7 +307,7 @@
     {
       "id": "ADR-016",
       "title": "A rendered file's derived uuids are a fixed, versioned contract",
-      "status": "proposed",
+      "status": "decided",
       "scope": "home",
       "date": "2026-09-26",
       "decided_by": "",
