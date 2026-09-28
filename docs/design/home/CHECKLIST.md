@@ -77,11 +77,12 @@
 - [ ] **C43** — lys-home fork --home --lantern [--session] prints one JSON report on success, exits 1 with the refusal on stderr and nothing on stdout, and takes no point or entry id.
 - [ ] **C44** — Rendering a child whose coordinate was carried writes the carried message's text parts as a seed prompt beside the rendered file under an in-band marker line, the render report names it, the template's launch line (printed by render-launch only) passes it as the first prompt and is never run, and PROOF-FORK.md records a fork launched on the installed Claude Code version as hashes, counts, paths, commands, versions and exit codes only.
 
-## The config directory through --settings
+## The record module layout
 
-- [ ] **C83** — PROOF-GIVEN.md records three launches from render-launch's printed line through a template whose env slot alone sets CLAUDE_CONFIG_DIR to a fresh directory, with the measured machine's host and claude --version answer and, for CLAUDE.md and for the memory index, whether each was read from the template's directory or from HOME/.claude, as paths, counts and hashes only.
-- [ ] **C84** — RECORD.md and PROOF-GIVEN.md state the answer with every Claude Code version and host measured or cited, and on a no or split answer name the affected entries as lys.given entries whose config_dir.source is template and whose harness_version is 2.1.283, standing as written. A build machine whose Claude Code version is not 2.1.283 is recorded as a finding naming both versions, and MEASURED_VERSION stays 2.1.283.
-- [ ] **C85** — On a no answer a render resolves the config directory as HOME/.claude with source home and never takes the template's CLAUDE_CONFIG_DIR as the path. A template CLAUDE_CONFIG_DIR that is not absolute is refused by name before any file is written or entry appended. With no HOME the render is refused with HomeError::NoConfigDir, whose text names the no answer and HOME and does not tell the person to set the template's env slot.
-- [ ] **C86** — On a no answer a render appends one lys.given.v2 entry carrying harness_version 2.1.283, whose config_dir is exactly {path, source, given_not_applied} and no lys.given entry, and lys.given's shape and its key-set test are unchanged.
-- [ ] **C87** — On a no answer lys-home given lists lys.given and lys.given.v2 entries together in file order, each marked version 1 or 2, and given-check checks each entry by its own version's shape.
-- [ ] **C88** — On a yes answer nothing under crates/ changes; on a split answer nothing under crates/ changes and RECORD.md and PROOF-GIVEN.md name each document with its directory and the per-document config directories card.
+- [ ] **C45** — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs.
+- [ ] **C46** — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs.
+- [ ] **C47** — Home and its impl are defined in crates/lys-home/src/record/home.rs.
+- [ ] **C48** — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line.
+- [ ] **C49** — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it.
+- [ ] **C50** — Every public path lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolves as before the move, and no crate outside lys-home changes.
+- [ ] **C51** — Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass.

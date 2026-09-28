@@ -342,7 +342,7 @@
     {
       "id": "RM-028",
       "title": "Move the home record's logic out of record/mod.rs into named files",
-      "status": "briefed",
+      "status": "idea",
       "kind": "fix",
       "summary": "crates/lys-home/src/record/mod.rs carries Home, Session, their impls, the shared helpers and two constants, against the repository's rule that a mod.rs holds only pub mod, pub use and module docs. HOME-013 moves Home to record/home.rs, Session with the helpers only it calls to record/session.rs, and the shared helpers and constants to record/helpers.rs, re-exports every public item from mod.rs so no public path moves, and changes no behaviour, no test and no crate outside lys-home.",
       "provenance": {

@@ -1320,6 +1320,44 @@
           "text": "As the reviewer, I want lys-home given to list both versions of the context record in file order, each marked with its version, and given-check to check each by its own shape, so that a session rendered after the change shows its record beside the old ones."
         }
       ]
+    },
+    {
+      "name": "Reviewer",
+      "role": "Checks the proofs before anything relies on them",
+      "stories": [
+        {
+          "id": "S5",
+          "text": "As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught."
+        },
+        {
+          "id": "S11",
+          "text": "As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with."
+        },
+        {
+          "id": "S13",
+          "text": "As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed."
+        },
+        {
+          "id": "S17",
+          "text": "As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes."
+        },
+        {
+          "id": "S18",
+          "text": "As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written."
+        },
+        {
+          "id": "S19",
+          "text": "As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom."
+        },
+        {
+          "id": "S22",
+          "text": "As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone."
+        },
+        {
+          "id": "S24",
+          "text": "As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it."
+        }
+      ]
     }
   ]
 }

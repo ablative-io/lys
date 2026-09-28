@@ -52,8 +52,8 @@
 
 **S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
 
-**S35.** As the reviewer, I want whether a template's CLAUDE_CONFIG_DIR, reaching the session through --settings, moves its config directory measured on a named Claude Code version, so that the context record names the directory the session read from and not the one the template asked for.
+**S24.** As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
 
-**S36.** As the reviewer, I want the entries that name a directory the session did not use listed by type, source and Claude Code version in RECORD.md and PROOF-GIVEN.md, so that a reader of an old session can tell which of its entries to discount without any entry being rewritten.
+## Developer — Works on lys-home's code beside the record module
 
-**S37.** As the reviewer, I want lys-home given to list both versions of the context record in file order, each marked with its version, and given-check to check each by its own shape, so that a session rendered after the change shows its record beside the old ones.
+**S25.** As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved.
