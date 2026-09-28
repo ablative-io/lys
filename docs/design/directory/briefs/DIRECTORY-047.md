@@ -23,7 +23,7 @@ title: Lys is the only sign-in anyone sees: first-run setup, sign-in, providers 
 
 ## Purpose
 
-Tom's word on 28 September 2026: 'Lys is meant to be the sign-in for everything. It's meant to be our only own single sign-on for absolutely everything. Cambium uses Lys, not Rauthy.' and 'How is an average person supposed to do it?' That night the live install showed the issuer's own sign-in page, kept the administrator in the issuer's admin site, took the administrator's email from the machine, and needed a password file read in Terminal. This brief makes Lys the one sign-in a person or product meets, and makes first-run setup something an ordinary person can do.
+Tom's word on 28 September 2026: 'Lys is meant to be the sign-in for everything. It's meant to be our only own single sign-on for absolutely everything. Cambium uses Lys, not Rauthy.' and 'How is an average person supposed to do it?' That night the live install showed the issuer's own sign-in page, kept the administrator in the issuer's admin site, took the administrator's email from the machine, and needed a password file read in Terminal. This brief makes Lys the one sign-in a person or product meets, and makes first-run setup something an ordinary person can do. Tom, 20:00: 'The issuer's styling on the page is all still there. I really want that done properly, to match the rest of Lys's styling; it shouldn't feel out of it at all.'
 
 ## Task
 
@@ -57,12 +57,13 @@ Behavioural. Today first-run setup (crates/lys-identity-server/src/setup.rs, sur
 
 ### R2: Password sign-in is a Lys page; the browser never reaches the issuer's pages
 
-Behavioural. GET /login (crates/lys-identity-server/src/routes.rs:319) today redirects to the issuer's authorize page. It serves Lys's sign-in screen instead: email, password and one button per enabled provider. The password form posts to the service, which runs the issuer's authorization server-side for the lys-platform client (including its proof of work and PKCE), completes the code exchange as /callback does today, and sets the session. A refusal is worded by Lys: wrong email or password is one message that does not say which. Provider buttons start the provider flow through the service and return through /callback; a person passes through the provider's own consent page only.
+Behavioural. GET /login (crates/lys-identity-server/src/routes.rs:319) today redirects to the issuer's authorize page. It serves Lys's sign-in screen instead: email, password and one button per enabled provider. The password form posts to the service, which runs the issuer's authorization server-side for the lys-platform client (including its proof of work and PKCE), completes the code exchange as /callback does today, and sets the session. A refusal is worded by Lys: wrong email or password is one message that does not say which. Provider buttons start the provider flow through the service and return through /callback; a person passes through the provider's own consent page only. The sign-in, first-run setup and account screens are Lys screens in every visible respect: built in surface/identity from the same design tokens, forms.css inputs, selects and buttons, typography, spacing and layout shell as the other screens, with Lys's name and mark; no issuer template, stylesheet, font, colour or default browser control appears on any page a person sees.
 
 **Acceptance:**
 - An end-to-end test signs in with email and password and records every URL the browser is sent to: every one is on Lys's origin.
 - A wrong password and an unknown email give the same Lys refusal, and neither names the issuer.
 - A provider sign-in's recorded URLs are Lys's origin and the provider's, never the issuer's.
+- A surface test renders the sign-in and setup screens and finds only the shared form, button and layout classes and no unstyled default control; an end-to-end check loads the served sign-in page and finds no stylesheet or asset served from the issuer.
 
 **Files:**
 - create: crates/lys-identity-server/src/sign_in.rs
@@ -78,10 +79,10 @@ Behavioural. GET /login (crates/lys-identity-server/src/routes.rs:319) today red
 
 ### R3: Lys is the OpenID provider every product is registered with
 
-Behavioural. Today crates/lys-identity-server/src/oidc.rs makes Lys a client of the issuer, and install registers Cambium as the issuer's client. Add the provider side: lys-identity-server serves /.well-known/openid-configuration, authorize, token, userinfo and jwks at its own origin under Lys's issuer URL, completing sign-in through R2's screens and signing ID tokens with a key the install keeps in the state folder. Install registers Cambium (and any later product) as a client of Lys, and the configuration it hands a product names only Lys's address. The issuer's ports are published only on the container network, not on the host.
+Behavioural. Today crates/lys-identity-server/src/oidc.rs makes Lys a client of the issuer, and install registers Cambium as the issuer's client. Add the provider side: lys-identity-server serves /.well-known/openid-configuration, authorize, token, userinfo and jwks at its own origin under Lys's issuer URL, completing sign-in through R2's screens and signing ID tokens with a key the install keeps in the state folder. No product is registered by install and no product is named in Lys: a product registers itself as a client of Lys through the app registration API (DIRECTORY-048), and the configuration a product receives names only Lys's address. Until DIRECTORY-048 lands, acceptance uses a test fixture client. The issuer's ports are published only on the container network, not on the host.
 
 **Acceptance:**
-- Cambium configured from install's output signs in with every URL on Lys's origin or a provider's.
+- a fixture product configured from install's output signs in with every URL on Lys's origin or a provider's.
 - Discovery at Lys's origin answers Lys's issuer, and a token Lys issues verifies against Lys's jwks.
 - No port of the issuer answers from the host after install.
 

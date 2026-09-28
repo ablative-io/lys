@@ -1163,6 +1163,11 @@
           "id": "C368",
           "text": "Lys holds no app's name or schema in code or configuration and makes no call to any app (DIRECTORY-048 R7).",
           "done": false
+        },
+        {
+          "id": "C386",
+          "text": "A person builds an app's whole permission template on the Apps screen from templates, tests it on example people and resources against the real check, and saves it; built and uploaded schemas are the same record (DIRECTORY-048 R8).",
+          "done": false
         }
       ]
     },
@@ -1192,6 +1197,111 @@
         {
           "id": "C373",
           "text": "An agent's launch renders 'lys mcp' into its MCP configuration, signing with its own certificate key held by handle (DIRECTORY-049 R7).",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Lys runs and drives the agents it starts (DIRECTORY-050)",
+      "items": [
+        {
+          "id": "C374",
+          "text": "Lys ships a runner that holds each started agent in its own pseudo-terminal in the background, surviving the screen closing (DIRECTORY-050 R1).",
+          "done": false
+        },
+        {
+          "id": "C375",
+          "text": "A published runner protocol lets another tool be a machine's runner; Lys needs no particular runner (DIRECTORY-050 R2).",
+          "done": false
+        },
+        {
+          "id": "C376",
+          "text": "Starting an agent on a machine with a runner runs it there and reports it running, from the screen, the API and the MCP (DIRECTORY-050 R3).",
+          "done": false
+        },
+        {
+          "id": "C377",
+          "text": "A session can be typed into, sent keys, read, waited on for a pattern, resized and compacted through Lys, each under a grant and with a receipt (DIRECTORY-050 R4).",
+          "done": false
+        },
+        {
+          "id": "C378",
+          "text": "A session that prints its usage-limit words moves to the next account in its list, by handle, never by value (DIRECTORY-050 R5).",
+          "done": false
+        },
+        {
+          "id": "C379",
+          "text": "A message to an agent wakes its session; the emergency stop ends sessions through the runner and reports each confirmed (DIRECTORY-050 R6).",
+          "done": false
+        },
+        {
+          "id": "C380",
+          "text": "A Sessions screen shows every running agent, its terminal read live, with type, keys and stop (DIRECTORY-050 R7).",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Lys tracks tokens, context, time, budgets and goals (DIRECTORY-051)",
+      "items": [
+        {
+          "id": "C381",
+          "text": "Each session's tokens per turn, context in use against its window, time running and paying account are measured from its transcript (DIRECTORY-051 R1).",
+          "done": false
+        },
+        {
+          "id": "C382",
+          "text": "Budgets for context, tokens and time are set on an agent, a team or a person, and inherited downward (DIRECTORY-051 R2).",
+          "done": false
+        },
+        {
+          "id": "C383",
+          "text": "A reached budget compacts, stops or tells, as the budget says, once, with a receipt (DIRECTORY-051 R3).",
+          "done": false
+        },
+        {
+          "id": "C384",
+          "text": "Goals on an agent carry a deadline and reminders delivered into its session (DIRECTORY-051 R4).",
+          "done": false
+        },
+        {
+          "id": "C385",
+          "text": "A Usage screen shows every agent's usage against its budgets, and goals with their state (DIRECTORY-051 R5).",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Provision a working team in one act (DIRECTORY-052)",
+      "items": [
+        {
+          "id": "C387",
+          "text": "A team plan names its purpose, total budget, deliverables with their evidence, and each member's profile, memories, opening conversation, budget share, goals and checker (DIRECTORY-052 R1).",
+          "done": false
+        },
+        {
+          "id": "C388",
+          "text": "Provisioning a plan creates every agent, grant, home, budget and goal in one all-or-nothing act and starts them (DIRECTORY-052 R2).",
+          "done": false
+        },
+        {
+          "id": "C389",
+          "text": "Each member starts with its chosen memories and its opening conversation already in its session (DIRECTORY-052 R3).",
+          "done": false
+        },
+        {
+          "id": "C390",
+          "text": "A deliverable is met only when its checker accepts it with the named evidence; the team's spend is held to its total (DIRECTORY-052 R4).",
+          "done": false
+        },
+        {
+          "id": "C391",
+          "text": "A Teams screen builds a plan from a template, provisions it, and shows each member's state, spend, goals and deliverables (DIRECTORY-052 R5).",
+          "done": false
+        },
+        {
+          "id": "C392",
+          "text": "Accounts and secrets are stored once in the broker and assigned to members by handle; values are never shown again (DIRECTORY-052 R6).",
           "done": false
         }
       ]

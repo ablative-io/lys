@@ -1,0 +1,230 @@
+{
+  "id": "DIRECTORY-050",
+  "cluster": "directory",
+  "title": "Lys runs and drives the agents it starts: its own background terminal, or any runner speaking its protocol",
+  "depends_on": [
+    "DIRECTORY-048"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C374",
+    "C375",
+    "C376",
+    "C377",
+    "C378",
+    "C379",
+    "C380"
+  ],
+  "stories": [
+    "S154",
+    "S155"
+  ],
+  "design_anchor": [
+    "ADR-117"
+  ],
+  "purpose": "Tom, 28 September 2026 19:48, on Dot: 'I've decided that I want this to actually handle the launching of agents, either through a background terminal of its own or plugging into something else. I want it to be able to do all of the things that Argus can do currently through herdr, and what was supposed to be done through manifold.' Today Lys gives a start command and never runs it, so every agent still needs a person at a terminal or another tool that Lys cannot rely on.",
+  "task": "Add a runner: a background process on each machine that holds each started agent's pseudo-terminal, reached by lys-identity-server over a published protocol; make start run the agent through it; expose type, keys, read, wait, resize, compact, account rotation, wake and stop as routes (so the API and MCP carry them) and on a Sessions screen. Lys depends on no other runner.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Lys's own runner: each agent in its own background pseudo-terminal",
+      "spec": "Behavioural. New crate lys-runner and the command 'lys runner' (started by install as a login item beside the server, as the server is). It holds each session in its own pseudo-terminal with a scrollback of a configured size in bytes, keeps running when every screen is closed, and records each session's exit status and instant. Sessions survive a restart of lys-identity-server; a restart of the runner reports every session it held as ended, never as running. It listens only on a Unix socket in the install's run folder at mode 0600, and accepts only the server's signed requests.",
+      "acceptance": [
+        "A started session keeps running after the server restarts, and its output is still readable.",
+        "A runner restart reports its old sessions ended with their instants.",
+        "A request not signed by the server is refused runner_request_unsigned."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-runner/Cargo.toml",
+          "crates/lys-runner/src/lib.rs",
+          "crates/lys-runner/src/pty.rs",
+          "crates/lys-runner/src/session.rs",
+          "crates/lys-runner/src/socket.rs",
+          "crates/lys-runner/tests/runner.rs",
+          "crates/lys/src/cli/runner.rs"
+        ],
+        "modify": [
+          "Cargo.toml",
+          "crates/lys/src/cli.rs",
+          "crates/lys/src/identity/install.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C374"
+      ],
+      "stories": [
+        "S154"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "A published runner protocol; any tool may be the runner",
+      "spec": "Behavioural. The protocol is a short list of acts (start, input, keys, read, wait, resize, end, status) over JSON, described in the OpenAPI document of DIRECTORY-048 R6 as the runner's own section. A machine's record names its runner: Lys's own by default, or another tool's socket or address speaking the protocol. The server holds no code specific to any other tool. A conformance test suite in the crate runs against any runner given its address.",
+      "acceptance": [
+        "The conformance suite passes against Lys's own runner.",
+        "A machine naming a runner that answers a wrong protocol version is refused runner_protocol_mismatch at start, by name.",
+        "ast-grep finds no other tool's name in the server's runner code."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-runner/src/protocol.rs",
+          "crates/lys-runner/tests/conformance.rs",
+          "crates/lys-identity-server/src/runner_client.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/network_store.rs",
+          "crates/lys-identity-server/src/openapi.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C375"
+      ],
+      "stories": [
+        "S154"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Start runs the agent",
+      "spec": "Behavioural. POST /agents/{id}/start on a machine with a runner renders the command as today and has the runner run it, with the working directory, environment and handles the launch record names; the session reports starting, then running when the runner confirms the process is up. A machine without a runner answers the command as today. Every refusal of the existing start is unchanged.",
+      "acceptance": [
+        "Starting an agent on a machine with the runner leaves it running and listed on the Sessions screen.",
+        "A machine without a runner answers the command as before; the existing start tests pass unchanged."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/tests/runner_start.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/start.rs",
+          "crates/lys-identity-server/src/launch_api.rs",
+          "crates/lys-identity-server/src/runtime_api.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C376"
+      ],
+      "stories": [
+        "S154"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Type, keys, read, wait, resize and compact through Lys",
+      "spec": "Behavioural. Routes under /runtime/sessions/{id}: input (text, optionally followed by Enter), keys (named keys), read (the last N lines or bytes, with a cursor to read on from), wait (until a pattern appears in new output, answering when it does, with the matched text; the caller may give up by closing the request, and nothing in Lys ends it on a clock), resize, and compact (sends the harness's compaction command as its profile names it). Each act requires the operate relation on the agent, is refused by name without it, and leaves a receipt naming the caller and the act, never the text typed when the profile marks the session sensitive.",
+      "acceptance": [
+        "Typing a line into a shell session and reading it back shows the line and its output.",
+        "wait answers when the pattern appears, matched text included.",
+        "A caller without operate is refused not_permitted for each act.",
+        "Each act leaves a receipt."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/runner_api.rs",
+          "crates/lys-identity-server/tests/runner_api.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/routes.rs",
+          "crates/lys-identity-server/src/receipts_api.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C377"
+      ],
+      "stories": [
+        "S155"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Account rotation on usage limit",
+      "spec": "Behavioural. An agent's profile may name an ordered list of account handles held by the secrets broker and the words that mean a usage limit. When a session prints them, Lys ends it and starts it again on the next account in the list, resuming its session record, and records the move; at the list's end it stops, reports accounts_exhausted, and does not wrap round. Account values reach only the session's environment through the broker and never a route, a log or a receipt.",
+      "acceptance": [
+        "A session printing the limit words moves to the next account and resumes.",
+        "At the list's end the session is stopped with accounts_exhausted.",
+        "No account value appears in any answer, log line or receipt, checked by a test."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-runner/src/rotation.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/runner_api.rs",
+          "crates/lys-identity/src/provisioning.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C378"
+      ],
+      "stories": [
+        "S154"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Wake with a message; stop through the runner",
+      "spec": "Behavioural. POST /agents/{id}/wake with a message types it into the agent's live session as its profile says a message is delivered, or refuses no_live_session by name. The emergency stop (stop_api.rs) asks the runner to end every session and marks each confirmed only when the runner reports its exit.",
+      "acceptance": [
+        "A wake types the message into the live session.",
+        "A stop ends every session of the agent and each shows confirmed with its exit instant."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/stop_api.rs",
+          "crates/lys-identity-server/src/runner_api.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C379"
+      ],
+      "stories": [
+        "S155"
+      ]
+    },
+    {
+      "id": "R7",
+      "title": "Sessions screen: see, type to and stop every agent",
+      "spec": "Behavioural. The Sessions screen (surface/identity/src/features/runtime) lists every running session the caller may see, and opening one shows its terminal read live through read with a cursor, a line to type into, a row of common keys, and Stop, styled from the design tokens with no default controls.",
+      "acceptance": [
+        "Opening a session shows its live output; typing a line sends it.",
+        "Stop asks to confirm by naming the agent and then ends it.",
+        "Surface tests cover the list, the terminal view and the refusals."
+      ],
+      "files": {
+        "create": [
+          "surface/identity/src/features/runtime/Terminal.tsx",
+          "surface/identity/src/features/runtime/terminal.css"
+        ],
+        "modify": [
+          "surface/identity/src/features/runtime/Sessions.tsx"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C380"
+      ],
+      "stories": [
+        "S155"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT make Lys depend on Argus, herdr, Manifold or any other runner; their names do not appear in Lys code.",
+    "SHALL NOT let the runner listen on any network address; it listens on its Unix socket only.",
+    "SHALL NOT pass an account, key or token value through a route, a log, a receipt or a command line.",
+    "SHALL NOT add a timeout, deadline, sleep, poll interval, #[allow], #[ignore] or any bypass; waits end on a signal or when the caller leaves.",
+    "SHALL NOT add a silent fallback: every failure is a named refusal."
+  ],
+  "verification": [
+    "The full Lys gate, ast-grep scan and the surface checks exit 0 at the card's head, measured by the card round.",
+    "On a scratch install: start a shell agent from the screen, type to it, read it, wait on a pattern, stop it."
+  ]
+}

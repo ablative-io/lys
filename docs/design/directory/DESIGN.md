@@ -618,6 +618,47 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `sgconfig.yml` | DIRECTORY-048 R7: the ast-grep configuration; gains the rule that refuses an app named in Lys code | DIRECTORY-048 |
 | `crates/lys/src/cli/mcp.rs` | DIRECTORY-049 R7: the Lys MCP server over standard input and output: three tools over the published registration API | DIRECTORY-049 |
 | `crates/lys/tests/mcp_stdio.rs` | DIRECTORY-049 R7: the MCP server driven over standard input and output, each tool call carrying the caller's own token or agent signature | DIRECTORY-049 |
+| `crates/lys-runner/Cargo.toml` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/src/lib.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/src/pty.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/src/session.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/src/socket.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/tests/runner.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys/src/cli/runner.rs` | DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal | DIRECTORY-050 |
+| `crates/lys-runner/src/protocol.rs` | DIRECTORY-050 R2: A published runner protocol; any tool may be the runner | DIRECTORY-050 |
+| `crates/lys-runner/tests/conformance.rs` | DIRECTORY-050 R2: A published runner protocol; any tool may be the runner | DIRECTORY-050 |
+| `crates/lys-identity-server/src/runner_client.rs` | DIRECTORY-050 R2: A published runner protocol; any tool may be the runner | DIRECTORY-050 |
+| `crates/lys-identity-server/tests/runner_start.rs` | DIRECTORY-050 R3: Start runs the agent | DIRECTORY-050 |
+| `crates/lys-identity-server/src/runner_api.rs` | DIRECTORY-050 R4: Type, keys, read, wait, resize and compact through Lys | DIRECTORY-050 |
+| `crates/lys-identity-server/tests/runner_api.rs` | DIRECTORY-050 R4: Type, keys, read, wait, resize and compact through Lys | DIRECTORY-050 |
+| `crates/lys-runner/src/rotation.rs` | DIRECTORY-050 R5: Account rotation on usage limit | DIRECTORY-050 |
+| `surface/identity/src/features/runtime/Terminal.tsx` | DIRECTORY-050 R7: Sessions screen: see, type to and stop every agent | DIRECTORY-050 |
+| `surface/identity/src/features/runtime/terminal.css` | DIRECTORY-050 R7: Sessions screen: see, type to and stop every agent | DIRECTORY-050 |
+| `crates/lys-identity-server/src/usage_api.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys-identity-server/src/usage_state.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys-identity-server/src/usage_store.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/usage.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys-identity-server/tests/usage.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys-identity-server/src/budgets_api.rs` | DIRECTORY-051 R2: Budgets on agents, teams and people | DIRECTORY-051 |
+| `crates/lys-identity-server/src/budgets_state.rs` | DIRECTORY-051 R2: Budgets on agents, teams and people | DIRECTORY-051 |
+| `crates/lys-identity-server/tests/budgets.rs` | DIRECTORY-051 R2: Budgets on agents, teams and people | DIRECTORY-051 |
+| `crates/lys-identity-server/src/budgets_act.rs` | DIRECTORY-051 R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-identity-server/src/goals_api.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
+| `crates/lys-identity-server/src/goals_state.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
+| `crates/lys-identity-server/tests/goals.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
+| `surface/identity/src/features/usage/Usage.tsx` | DIRECTORY-051 R5: Usage screen | DIRECTORY-051 |
+| `surface/identity/src/features/usage/usage.css` | DIRECTORY-051 R5: Usage screen | DIRECTORY-051 |
+| `surface/identity/src/features/apps/SchemaBuilder.tsx` | DIRECTORY-048 R8: the permission schema builder | DIRECTORY-048 |
+| `surface/identity/src/features/apps/schema-builder.css` | DIRECTORY-048 R8: the permission schema builder | DIRECTORY-048 |
+| `surface/identity/tests/schema-builder.test.tsx` | DIRECTORY-048 R8: the permission schema builder | DIRECTORY-048 |
+| `crates/lys-identity-server/src/team_plans_api.rs` | R1: A team plan record | DIRECTORY-052 |
+| `crates/lys-identity-server/src/team_plans_state.rs` | R1: A team plan record | DIRECTORY-052 |
+| `crates/lys-identity-server/tests/team_plans.rs` | R1: A team plan record | DIRECTORY-052 |
+| `crates/lys-identity-server/src/team_plans_provision.rs` | R2: Provision in one all-or-nothing act | DIRECTORY-052 |
+| `surface/identity/src/features/team-plans/TeamPlans.tsx` | R5: Teams screen | DIRECTORY-052 |
+| `surface/identity/src/features/team-plans/team-plans.css` | R5: Teams screen | DIRECTORY-052 |
+| `surface/identity/src/features/apps/SchemaBench.tsx` | R8: Build an app's permission template on a Lys screen | DIRECTORY-048 |
+| `crates/lys-home/src/record/given.rs` | DIRECTORY-052 R3: the given record lists a member's starting memories and opening conversation | DIRECTORY-052 |
 
 ## Inventory
 

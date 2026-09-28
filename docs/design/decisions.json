@@ -1656,6 +1656,61 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-117",
+      "title": "Lys runs the agents it starts: its own background terminal, or a runner another tool provides",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-28",
+      "decided_by": "Tom, 28 September 2026 19:48 Melbourne, on Dot; recorded by Waffles with DIRECTORY-050",
+      "context": "Lys renders an agent's start command from its kept profile and records the start (launch_api.rs, start.rs), but never runs it: the command is handed to a person or another tool. Sessions report starting, running and stopped themselves (runtime_api.rs), and an emergency stop asks each session's runtime to end it (stop_api.rs). Running, typing into and reading agent sessions is done outside Lys today by Argus through herdr and, as designed, by Manifold, neither of which Lys can rely on.",
+      "decision": "Lys runs the agents it starts. A runner is the part that holds an agent's terminal: Lys ships one of its own, a background process on each machine that runs each started agent in its own pseudo-terminal, and accepts any other runner that speaks the same small, published runner protocol. Through a runner, Lys starts, types into, presses keys in, reads, waits on, resizes, compacts and stops a session, rotates it across its accounts when it reports a usage limit, and wakes it with a message, each act under the caller's grants and recorded. Lys depends on no particular runner: its own is the default, another is chosen per machine.",
+      "quote": "I've decided that I want this to actually handle the launching of agents, either through a background terminal of its own or plugging into something else. I want it to be able to do all of the things that Argus can do currently through herdr, and what was supposed to be done through manifold.",
+      "consequences": [
+        "An agent can be started, driven and stopped entirely from Lys's screens, API and MCP, with no other tool installed.",
+        "Argus and Manifold may become runners or clients of Lys; neither is required by it.",
+        "Every keystroke or message sent to a session is an act under a grant, with a receipt.",
+        "The earlier rule that Lys gives a start command and never runs the agent is superseded for machines with a runner; a machine with none still gets the command."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-118",
+      "title": "Lys tracks every agent session's tokens, context, time, budgets and goals; Argus's job moves into Lys, in Rust",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-28",
+      "decided_by": "Tom, 28 September 2026 19:50 to 19:51 Melbourne, on Dot; recorded by Waffles with DIRECTORY-051",
+      "context": "Argus, a separate service, watches agent sessions: context use and budgets, compaction requests, goal reminders and scheduled messages, reaching sessions through herdr. Tom: it keeps crashing and cannot track budgets, token usage, time and goals through Lys. Lys already keeps each session's home and transcript (lys-home) and, with DIRECTORY-050, runs the session.",
+      "decision": "Lys measures each session it runs from the harness's own transcript: tokens in and out per turn, context in use against the model's window, time running, and the account each turn was paid from. A budget is set on an agent, a team or a person, for context, tokens and time, and Lys acts when one is reached: compacts at a context threshold, stops at a hard token or time cap, or tells the responsible person. Goals are records on an agent with a deadline and reminders Lys delivers into the session through its runner. Everything is under grants, on screens, in the API and in receipts; nothing depends on Argus.",
+      "quote": "Argus is not going to be able to do what we need, to be able to track budgets and token usage, time, goals and everything like that through Lys. We're going to completely rewrite that, in Rust.",
+      "consequences": [
+        "Argus is retired once Lys does what it does for our sessions; nothing in Lys calls it.",
+        "A budget is only called a hard cap where Lys can stop the session that breaches it.",
+        "Usage is measured from the transcript Lys keeps, never from a session's own claim."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-119",
+      "title": "A team is provisioned in one act: agents with memories, an opening conversation, a budget, goals and deliverables, and a checker",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-28",
+      "decided_by": "Tom, 28 September 2026 19:55 Melbourne, on Dot; recorded by Waffles with DIRECTORY-052",
+      "context": "Lys keeps provisioning profiles, a session's home with memory notes and successor letters, and can author an opening conversation a harness resumes (lys-home fewshot, PROOF-FEWSHOT). DIRECTORY-050 runs agents; DIRECTORY-051 holds budgets, goals, expectations and deliverables. Nothing puts them together: starting a working team takes many hand steps and nothing guarantees the work is checked.",
+      "decision": "A team plan is a record: its purpose, a total budget, its deliverables with the evidence each needs, and its members, each with a profile, the memories it starts with, an opening conversation, its share of the budget, its goals and reminders, and a checker (a named person or agent who must accept each deliverable). Provisioning a plan creates the agents, grants, homes, budgets and goals in one act that is all or nothing, and starts them through the runner. A deliverable is met only when its checker accepts it with the evidence.",
+      "quote": "I want you to be able to provision new agents so we can provision them off with the right memories, with the right few-shot kind of prompting to start it off, and to be able to send them off to do work without having to know that they've got a budget, know that they've got reminders, know that it's actually going to happen, know that things are actually being checked. So I could say, Waffles, we need a team to work on this. And you could provision them, give them a certain budget, and we can start to budget out things properly.",
+      "consequences": [
+        "Tom can ask for a team and see it start with its budget, goals and checker in place.",
+        "No agent in a team runs without a budget or a checker.",
+        "Budgets roll up: a team's spend is the sum of its members', held to the team's total."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

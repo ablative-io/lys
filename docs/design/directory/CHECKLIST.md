@@ -294,6 +294,7 @@
 - [ ] **C366** — Apps check many permissions in one call and list the resources a subject may act on (DIRECTORY-048 R5).
 - [ ] **C367** — One OpenAPI document, generated from the routes and types, describes every route; a route without an entry fails the build (DIRECTORY-048 R6).
 - [ ] **C368** — Lys holds no app's name or schema in code or configuration and makes no call to any app (DIRECTORY-048 R7).
+- [ ] **C386** — A person builds an app's whole permission template on the Apps screen from templates, tests it on example people and resources against the real check, and saves it; built and uploaded schemas are the same record (DIRECTORY-048 R8).
 
 ## Lys MCP server, secure and compact (DIRECTORY-049)
 
@@ -302,3 +303,30 @@
 - [ ] **C371** — Every MCP call runs the same handler and grant check as the HTTP route, as the caller; no MCP answer returns a secret's value (DIRECTORY-049 R3, R4).
 - [ ] **C372** — A destructive write through MCP needs the target's id repeated in confirm; every write leaves a receipt naming the caller and 'mcp' (DIRECTORY-049 R4, R6).
 - [ ] **C373** — An agent's launch renders 'lys mcp' into its MCP configuration, signing with its own certificate key held by handle (DIRECTORY-049 R7).
+
+## Lys runs and drives the agents it starts (DIRECTORY-050)
+
+- [ ] **C374** — Lys ships a runner that holds each started agent in its own pseudo-terminal in the background, surviving the screen closing (DIRECTORY-050 R1).
+- [ ] **C375** — A published runner protocol lets another tool be a machine's runner; Lys needs no particular runner (DIRECTORY-050 R2).
+- [ ] **C376** — Starting an agent on a machine with a runner runs it there and reports it running, from the screen, the API and the MCP (DIRECTORY-050 R3).
+- [ ] **C377** — A session can be typed into, sent keys, read, waited on for a pattern, resized and compacted through Lys, each under a grant and with a receipt (DIRECTORY-050 R4).
+- [ ] **C378** — A session that prints its usage-limit words moves to the next account in its list, by handle, never by value (DIRECTORY-050 R5).
+- [ ] **C379** — A message to an agent wakes its session; the emergency stop ends sessions through the runner and reports each confirmed (DIRECTORY-050 R6).
+- [ ] **C380** — A Sessions screen shows every running agent, its terminal read live, with type, keys and stop (DIRECTORY-050 R7).
+
+## Lys tracks tokens, context, time, budgets and goals (DIRECTORY-051)
+
+- [ ] **C381** — Each session's tokens per turn, context in use against its window, time running and paying account are measured from its transcript (DIRECTORY-051 R1).
+- [ ] **C382** — Budgets for context, tokens and time are set on an agent, a team or a person, and inherited downward (DIRECTORY-051 R2).
+- [ ] **C383** — A reached budget compacts, stops or tells, as the budget says, once, with a receipt (DIRECTORY-051 R3).
+- [ ] **C384** — Goals on an agent carry a deadline and reminders delivered into its session (DIRECTORY-051 R4).
+- [ ] **C385** — A Usage screen shows every agent's usage against its budgets, and goals with their state (DIRECTORY-051 R5).
+
+## Provision a working team in one act (DIRECTORY-052)
+
+- [ ] **C387** — A team plan names its purpose, total budget, deliverables with their evidence, and each member's profile, memories, opening conversation, budget share, goals and checker (DIRECTORY-052 R1).
+- [ ] **C388** — Provisioning a plan creates every agent, grant, home, budget and goal in one all-or-nothing act and starts them (DIRECTORY-052 R2).
+- [ ] **C389** — Each member starts with its chosen memories and its opening conversation already in its session (DIRECTORY-052 R3).
+- [ ] **C390** — A deliverable is met only when its checker accepts it with the named evidence; the team's spend is held to its total (DIRECTORY-052 R4).
+- [ ] **C391** — A Teams screen builds a plan from a template, provisions it, and shows each member's state, spend, goals and deliverables (DIRECTORY-052 R5).
+- [ ] **C392** — Accounts and secrets are stored once in the broker and assigned to members by handle; values are never shown again (DIRECTORY-052 R6).

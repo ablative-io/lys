@@ -2630,6 +2630,211 @@
       "path": "crates/lys/tests/mcp_stdio.rs",
       "note": "DIRECTORY-049 R7: the MCP server driven over standard input and output, each tool call carrying the caller's own token or agent signature",
       "brief": "DIRECTORY-049"
+    },
+    {
+      "path": "crates/lys-runner/Cargo.toml",
+      "note": "DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-runner/src/lib.rs",
+      "note": "DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-runner/src/pty.rs",
+      "note": "DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-runner/src/session.rs",
+      "note": "DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-runner/src/socket.rs",
+      "note": "DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-runner/tests/runner.rs",
+      "note": "DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys/src/cli/runner.rs",
+      "note": "DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-runner/src/protocol.rs",
+      "note": "DIRECTORY-050 R2: A published runner protocol; any tool may be the runner",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-runner/tests/conformance.rs",
+      "note": "DIRECTORY-050 R2: A published runner protocol; any tool may be the runner",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-identity-server/src/runner_client.rs",
+      "note": "DIRECTORY-050 R2: A published runner protocol; any tool may be the runner",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/runner_start.rs",
+      "note": "DIRECTORY-050 R3: Start runs the agent",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-identity-server/src/runner_api.rs",
+      "note": "DIRECTORY-050 R4: Type, keys, read, wait, resize and compact through Lys",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/runner_api.rs",
+      "note": "DIRECTORY-050 R4: Type, keys, read, wait, resize and compact through Lys",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-runner/src/rotation.rs",
+      "note": "DIRECTORY-050 R5: Account rotation on usage limit",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "surface/identity/src/features/runtime/Terminal.tsx",
+      "note": "DIRECTORY-050 R7: Sessions screen: see, type to and stop every agent",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "surface/identity/src/features/runtime/terminal.css",
+      "note": "DIRECTORY-050 R7: Sessions screen: see, type to and stop every agent",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-identity-server/src/usage_api.rs",
+      "note": "DIRECTORY-051 R1: Usage measured from the transcript, per turn",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/usage_state.rs",
+      "note": "DIRECTORY-051 R1: Usage measured from the transcript, per turn",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/usage_store.rs",
+      "note": "DIRECTORY-051 R1: Usage measured from the transcript, per turn",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/usage.rs",
+      "note": "DIRECTORY-051 R1: Usage measured from the transcript, per turn",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/usage.rs",
+      "note": "DIRECTORY-051 R1: Usage measured from the transcript, per turn",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/budgets_api.rs",
+      "note": "DIRECTORY-051 R2: Budgets on agents, teams and people",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/budgets_state.rs",
+      "note": "DIRECTORY-051 R2: Budgets on agents, teams and people",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/budgets.rs",
+      "note": "DIRECTORY-051 R2: Budgets on agents, teams and people",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/budgets_act.rs",
+      "note": "DIRECTORY-051 R3: A reached budget acts once",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/goals_api.rs",
+      "note": "DIRECTORY-051 R4: Goals with deadlines and reminders",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/goals_state.rs",
+      "note": "DIRECTORY-051 R4: Goals with deadlines and reminders",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/goals.rs",
+      "note": "DIRECTORY-051 R4: Goals with deadlines and reminders",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/src/features/usage/Usage.tsx",
+      "note": "DIRECTORY-051 R5: Usage screen",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/src/features/usage/usage.css",
+      "note": "DIRECTORY-051 R5: Usage screen",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/src/features/apps/SchemaBuilder.tsx",
+      "note": "DIRECTORY-048 R8: the permission schema builder",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "surface/identity/src/features/apps/schema-builder.css",
+      "note": "DIRECTORY-048 R8: the permission schema builder",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "surface/identity/tests/schema-builder.test.tsx",
+      "note": "DIRECTORY-048 R8: the permission schema builder",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-identity-server/src/team_plans_api.rs",
+      "note": "R1: A team plan record",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-identity-server/src/team_plans_state.rs",
+      "note": "R1: A team plan record",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/team_plans.rs",
+      "note": "R1: A team plan record",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-identity-server/src/team_plans_provision.rs",
+      "note": "R2: Provision in one all-or-nothing act",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "surface/identity/src/features/team-plans/TeamPlans.tsx",
+      "note": "R5: Teams screen",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "surface/identity/src/features/team-plans/team-plans.css",
+      "note": "R5: Teams screen",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "surface/identity/src/features/apps/SchemaBench.tsx",
+      "note": "R8: Build an app's permission template on a Lys screen",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-home/src/record/given.rs",
+      "note": "DIRECTORY-052 R3: the given record lists a member's starting memories and opening conversation",
+      "brief": "DIRECTORY-052"
     }
   ],
   "inventory": [
