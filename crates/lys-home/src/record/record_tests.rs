@@ -428,8 +428,8 @@ fn a_primary_write_fault_and_a_head_fault_each_leave_the_session_in_step_with_th
 
 #[test]
 fn a_session_counts_the_entries_it_reads_and_the_syncs_its_writes_make() {
-    let (dir, home) = home();
-    let mut s = home.create_session("io", "/w", None).unwrap();
+    let (dir, store) = home();
+    let mut s = store.create_session("io", "/w", None).unwrap();
     let created = IoCounts {
         entries_read: 0,
         syncs: 4,

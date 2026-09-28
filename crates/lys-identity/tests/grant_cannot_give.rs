@@ -181,7 +181,7 @@ fn project(id: &str) -> Result<Resource, Box<dyn Error>> {
 
 /// The grants being written into one book, in the order they are applied.
 struct Book {
-    book: GrantBook,
+    grants: GrantBook,
     model: Model,
     index: u64,
 }
@@ -189,7 +189,7 @@ struct Book {
 impl Book {
     fn new(model: Model) -> Self {
         Self {
-            book: GrantBook::new(),
+            grants: GrantBook::new(),
             model,
             index: 0,
         }
@@ -202,7 +202,7 @@ impl Book {
         operation: OperationId,
     ) -> TestResult {
         let event = GrantEvent::new(operation, IdentityId::Person(issuer), T0, change)?;
-        self.book.apply(&event, self.index)?;
+        self.grants.apply(&event, self.index)?;
         self.index += 1;
         Ok(())
     }
@@ -419,7 +419,7 @@ fn ask(
     };
     let directory = people.projection()?;
     Ok(cannot_give(
-        &book.book,
+        &book.grants,
         directory,
         &book.model,
         &request,
@@ -663,7 +663,7 @@ fn cannot_give_in_force_only() -> TestResult {
         recipient: IdentityId::Agent(people.a1),
     };
     let directory = people.projection()?;
-    let early = cannot_give(&book.book, directory, &book.model, &request, T0 + 1)?;
+    let early = cannot_give(&book.grants, directory, &book.model, &request, T0 + 1)?;
     assert_eq!(seen(&early)?, seen(&list)?);
     Ok(())
 }
@@ -767,7 +767,7 @@ fn cannot_give_admission_agrees() -> TestResult {
             };
             let directory = people.projection()?;
             let admitted =
-                judge_delegation(&book.book, directory, &book.model, &request, AT, g(99)).is_ok();
+                judge_delegation(&book.grants, directory, &book.model, &request, AT, g(99)).is_ok();
             assert_eq!(
                 !names_grant(&list, grant),
                 admitted,
