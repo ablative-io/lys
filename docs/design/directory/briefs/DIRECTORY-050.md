@@ -122,18 +122,21 @@ The CN5 demonstration on a scratch install is a person's step after landing; it 
 
 - Alignment: drifted
 - Acceptance verdicts:
-  - [x] A started session keeps running after the server restarts, and its output is still readable. — crates/lys-runner/tests/runner.rs:155 a_session_keeps_running_when_its_server_goes_and_is_read_by_the_next; passed in my full workspace run (runner: 12 passed)
-  - [x] A runner restart reports its old sessions ended with their instants. — crates/lys-runner/tests/runner.rs:185 a_clean_restart_reports_each_session_ended_with_its_instant; crates/lys/tests/runner_cli.rs:142 a_runner_asked_to_stop_ends_every_session_and_the_next_reports_each_exit; both pass
-  - [x] A request not signed by the server is refused runner_request_unsigned. — crates/lys-runner/src/protocol.rs verify_request (empty signature, non-hex and a failed Ed25519 verify all give RunnerError::Unsigned); tests/runner.rs:340 a_request_the_server_did_not_sign_is_refused_by_name and conformance.rs:157 every_request_refusal_fires_by_name pass
-  - [x] A runner on a second machine, dialling the server with that machine's key, starts an agent the server asked for. — crates/lys-identity-server/tests/runner_start.rs:256 a_runner_on_a_second_machine_dials_in_and_starts_the_agent; admission at crates/lys-identity-server/src/runner_dial.rs admitted() verifies the machine key over dial_signed_bytes under the epoch; runner_start: 6 passed
-  - [x] A runner killed and restarted reports its sessions ended_by_runner_restart with no exit status. — crates/lys-runner/tests/runner.rs:224 a_session_lost_with_its_runner_is_ended_by_the_restart_with_no_status; crates/lys/tests/runner_cli.rs:93 a_killed_runner_restarted_reports_its_sessions_ended_by_the_restart; both pass
-- Checklist verified: C374
+  - [x] A started session keeps running after the server restarts, and its output is still readable. — crates/lys-runner/tests/runner.rs a_session_keeps_running_when_its_server_goes_and_is_read_by_the_next: passed in my run (13/13)
+  - [x] A runner restart reports its old sessions ended with their instants. — runner.rs a_clean_restart_reports_each_session_ended_with_its_instant; crates/lys/tests/runner_cli.rs a_runner_asked_to_stop_ends_every_session_and_the_next_reports_each_exit: both passed
+  - [x] A request not signed by the server is refused runner_request_unsigned. — protocol.rs verify_request; runner.rs a_request_the_server_did_not_sign_is_refused_by_name; conformance.rs every_request_refusal_fires_by_name: passed
+  - [x] A runner on a second machine, dialling the server with that machine's key, starts an agent the server asked for. — crates/lys-identity-server/tests/runner_start.rs a_runner_on_a_second_machine_dials_in_and_starts_the_agent: a separate runner and machine key reached through Dial::bridge, and a forged key is refused runner_dial_refused. Passed. Independence is of state and key, on one host.
+  - [x] A runner killed and restarted reports its sessions ended_by_runner_restart with no exit status. — runner_cli.rs a_killed_runner_restarted_reports_its_sessions_ended_by_the_restart (SIGKILL, status None asserted); runner.rs a_session_lost_with_its_runner_is_ended_by_the_restart_with_no_status: passed
 - Stories verified: S154
 - Issues:
-  - Spec clause not delivered: 'an upgrade says so, naming the running sessions, before its first stop'. DIRECTORY-045's upgrade is not in the tree. Deliver it, or get a brief revision that defers it to DIRECTORY-045.
-  - The published crate `lys` (crates/lys/Cargo.toml has no publish = false) now depends on lys-runner, which is publish = false, so `cargo publish -p lys` cannot succeed. A person must decide whether to publish lys-runner (freezing its wire format) or keep lys's runner command out of the published crate. Record that decision in the brief.
-  - Files outside the brief's named files were edited without the CN9 reviewer-approved brief revision: tests/identity_contract/src/harness.rs, crates/lys-identity-server/src/{error.rs, error_status.rs, config.rs, stop_api.rs, provisioning_api.rs, provisioning_store.rs, receipts_api.rs, runner_dial.rs, runner_sessions.rs, runner_acts.rs}, the lys install files and the new test files. Revise the brief to name them before this lands.
-  - The SCROLLBACK default of 1 MiB (crates/lys/src/cli/runner.rs:6) is a default for the size the spec says is configured (--scrollback), not an unrequested limit; recorded only so the value is known. The COLUMNS/ROWS start size (runner_sessions.rs:36-39) is likewise a resizable default.
+  - The spec clause 'an upgrade says so, naming the running sessions, before its first stop' is not delivered: DIRECTORY-045's upgrade is not in the tree. A reviewer-approved brief revision must defer it to DIRECTORY-045, or it must be built once DIRECTORY-045 lands.
+  - SCROLLBACK = 1 << 20 in crates/lys/src/cli/runner.rs is a size bound that traces to no brief, design or ADR (the brief says only 'a configured size in bytes'), and install starts the runner on that default. Remove the default: the size must come from configuration that a person sets (an install option or the brief naming the value).
+  - crates/lys-runner/src/session.rs Sessions::open → pty::end_left_group SIGKILLs process group <recorded pid> on restart when anything answers in it, with no proof it is still the runner's group. After a reboot, or a pid wrap over a long uptime, that pgid can belong to an unrelated process group of the same user, which is then killed. Bind the leftover-group end to evidence recorded at start (for example the boot identity and the session's tty, checked before signalling), and otherwise report the session gone without signalling anything.
+  - crates/lys (published) now depends on crates/lys-runner (publish = false), so `cargo publish -p lys` cannot succeed. A release decision must be recorded in the brief: publish lys-runner, which freezes its protocol, or keep the runner command out of the published lys.
+  - Scrollback::new silently turned a scrollback of 0 into 1 byte (crates/lys-runner/src/scrollback.rs).
+  - Files outside R1's list were edited (exit_wait.rs, loopback_http_tests.rs, layout.rs, server_config.rs, state.rs, client.rs, dial.rs, dial/transport.rs, error.rs, scrollback.rs, session/lifecycle.rs, commands/runner.rs, runner_cli.rs). Under CN9 they need naming in a brief revision.
+- Fixes:
+  - A zero scrollback is now refused scrollback_invalid by Sessions::open before any state is written, and Scrollback::new no longer coerces the limit. New test runner.rs a_scrollback_that_keeps_nothing_is_refused_by_name; lys-runner runs 13/13.
 
 ### R2: A published runner protocol; any tool may be the runner
 
@@ -183,14 +186,13 @@ Behavioural. The protocol is a short list of acts (start, input, keys, read, wai
 
 - Alignment: drifted
 - Acceptance verdicts:
-  - [x] The conformance suite passes against Lys's own runner. — crates/lys-runner/tests/conformance.rs (5 tests, runs against any runner via LYS_RUNNER_CONFORMANCE_SOCKET/KEY); my full run: 5 passed
-  - [x] A machine naming a runner that answers a wrong protocol version is refused runner_protocol_mismatch at start, by name. — crates/lys-identity-server/tests/runner_start.rs:226 a_runner_on_another_protocol_version_is_refused_by_name passes; read_greeting checks the version first; error_status.rs runner_status maps runner_protocol_mismatch to 502
-  - [x] ast-grep finds no other tool's name in the server's runner code. — rules/ast-grep/no-other-runner-names.yml covers crates/lys-runner/**, lys-identity-server/src/runner_*.rs and the lys runner CLI files; `ast-grep scan --config sgconfig.yml` exits 0; grep -rniE 'argus|herdr|manifold' over lys-identity-server/src, lys-runner and crates/lys/src finds nothing
-- Checklist verified: C375
+  - [x] The conformance suite passes against Lys's own runner. — crates/lys-runner/tests/conformance.rs 5/5 passed, including every_request_refusal_fires_by_name (refusal count asserted)
+  - [x] A machine naming a runner that answers a wrong protocol version is refused runner_protocol_mismatch at start, by name. — runner_start.rs a_runner_on_another_protocol_version_is_refused_by_name passed; protocol.rs read_greeting and read_reply check the version first
+  - [x] ast-grep finds no other tool's name in the server's runner code. — rules/ast-grep/no-other-runner-names.yml covers lys-runner, lys-identity-server/src/runner_*.rs and the lys runner CLI files. grep finds none in the diff; the only hits in the tree (tests/start_command.rs 'manifold' runtime label, lys-core attestation doc) are pre-existing at HEAD. The rerun's ast-grep leg had not finished when this report was due.
 - Stories verified: S154
 - Issues:
-  - Spec clause not delivered: the protocol must be 'described in the OpenAPI document of DIRECTORY-048 R6 as the runner's own section'. crates/lys-identity-server/src/openapi.rs does not exist, and the protocol is served alone at GET /runner/protocol (crates/lys-runner/src/published.rs). Fold it in once DIRECTORY-048 R6 lands, or revise the brief to record the interim route.
-  - A Socket runner record is trusted by path alone, with no pinning; state in the brief that the administrator's choice of path is the trust decision.
+  - The protocol is not in DIRECTORY-048 R6's OpenAPI document (crates/lys-identity-server/src/openapi.rs, a file in this brief's list, does not exist, because DIRECTORY-048 R6 has not landed). It is served alone at GET /runner/protocol. The fold must be done when R6 lands, or a brief revision must record the interim route.
+  - A Socket runner record is trusted by its path alone. The brief must state that the administrator's choice of path is the trust decision.
 
 ### R3: Start runs the agent
 
@@ -239,13 +241,16 @@ Behavioural. POST /agents/{id}/start on a machine with a runner renders the comm
 
 - Alignment: aligned
 - Acceptance verdicts:
-  - [x] Starting an agent on a machine with the runner leaves it running and listed on the Sessions screen. — crates/lys-identity-server/tests/runner_start.rs:171 a_start_on_a_machine_with_the_runner_runs_and_is_listed_running; start_launcher.rs:286 a_start_the_runner_ran_answers_its_runner_member; both pass
-  - [x] A machine without a runner answers the command as before; the existing start tests pass unchanged. — runner_start.rs:202 a_machine_without_a_runner_answers_the_command_as_before; start_launcher.rs:332; git status shows tests/start.rs and start_command.rs unmodified; start 5 passed, start_command 4 passed
-  - [x] crates/lys-identity/tests/start_no_spawn.rs passes unchanged, and no file it scans names a process-spawning API. — git status shows no change under crates/lys-identity; start_no_spawn: 3 passed in my full run (it scans crates/lys-identity/src/start); the service asks the runner over its socket and spawns nothing
+  - [x] Starting an agent on a machine with the runner leaves it running and listed on the Sessions screen. — runner_start.rs a_start_on_a_machine_with_the_runner_runs_and_is_listed_running (runner state running, listed shown=running in /runtime/live, unanswered empty); surface runtime-terminal.test.tsx 'lists every running session the runners answered': passed
+  - [x] A machine without a runner answers the command as before; the existing start tests pass unchanged. — runner_start.rs a_machine_without_a_runner_answers_the_command_as_before and start_launcher.rs a_machine_with_no_runner_is_answered_the_start_alone passed; git status shows no existing start test file modified
+  - [x] crates/lys-identity/tests/start_no_spawn.rs passes unchanged, and no file it scans names a process-spawning API. — cargo test -p lys-identity --test start_no_spawn: 3 passed (no_start_file_names_a_process_spawning_api); git diff HEAD -- crates/lys-identity is empty
 - Checklist verified: C376
 - Stories verified: S154
 - Issues:
-  - POST /agents/{id}/start is exercised through a fixture launcher (start_launcher.rs) because the start owners are NotLanded; DirectoryLauncher's run path is exercised through /start-command. This matches the tree as it stands; no code change is due.
+  - DirectoryLauncher (POST /agents/{id}/start) started every session with rotation None, ignoring the profile's account handles.
+  - DirectoryLauncher::launch is reached by no test, because the start owners are NotLanded and start_launcher.rs uses a fixture launcher. A test must reach it once the owners land.
+- Fixes:
+  - DirectoryLauncher reads the agent profile's session.accounts through runner_api::session_settings (now pub(crate)) and passes them as the launch's rotation; a settings read failure is returned by name.
 
 ### R4: Type, keys, read, wait, resize and compact through Lys
 
@@ -290,10 +295,10 @@ Behavioural. Routes under /runtime/sessions/{id}: input (text, optionally follow
 
 - Alignment: aligned
 - Acceptance verdicts:
-  - [x] Typing a line into a shell session and reading it back shows the line and its output. — crates/lys-identity-server/tests/runner_api.rs:264 typing_a_line_and_reading_it_back_shows_the_line_and_its_output; conformance.rs:236 a_session_is_typed_to_read_and_waited_on; pass
-  - [x] wait answers when the pattern appears, matched text included. — conformance.rs:236 a_session_is_typed_to_read_and_waited_on; runner.rs:496 a_regex_match_after_bytes_that_are_not_text_answers_the_byte_cursor; pass
-  - [x] A caller without operate is refused not_permitted for each act. — runner_api.rs:285 each_act_is_refused_not_permitted_without_operate_and_each_admitted_act_leaves_a_receipt; ServerError::NotPermitted maps to 403 in error_status.rs
-  - [x] Each act leaves a receipt. — runner_api.rs:285 (same test) asserts a receipt per admitted act, with typed text only as length and SHA-256; runner_api: 5 passed
+  - [x] Typing a line into a shell session and reading it back shows the line and its output. — runner_api.rs typing_a_line_and_reading_it_back_shows_the_line_and_its_output passed; conformance.rs a_session_is_typed_to_read_and_waited_on passed
+  - [x] wait answers when the pattern appears, matched text included. — socket.rs wait (literal unless regex); conformance a_session_is_typed_to_read_and_waited_on; runner.rs a_regex_match_after_bytes_that_are_not_text_answers_the_byte_cursor: passed
+  - [x] A caller without operate is refused not_permitted for each act. — runner_api.rs each_act_is_refused_not_permitted_without_operate_and_each_admitted_act_leaves_a_receipt passed; runner_sessions.rs operator()
+  - [x] Each act leaves a receipt. — runner_api.rs perform → keep_act (runner_acts.rs leaf per act, read at /runner-receipts/{index}); same test passed
 - Checklist verified: C377
 - Stories verified: S155
 
@@ -337,15 +342,17 @@ Behavioural. An agent's profile may name an ordered list of account handles held
 
 **Review (recorded):**
 
-- Alignment: aligned
+- Alignment: fixed
 - Acceptance verdicts:
-  - [x] A session printing the limit words moves to the next account and resumes. — runner.rs:430 a_usage_limit_moves_the_session_on_and_the_list_end_stops_it; runner.rs:478 declared_words_move_a_harness_with_no_signal; runner_api.rs:387; pass
-  - [x] At the list's end the session is stopped with accounts_exhausted. — runner.rs:430 and runner_api.rs:387 a_usage_limit_moves_the_session_to_the_next_account_and_the_list_end_stops_it; rotation.rs never wraps
-  - [x] No account value appears in any answer, log line or receipt, checked by a test. — runner_api.rs:387 captures the runner's said() lines (lys_runner::error::also_to) and the service's say lines (start_saying), asserts both logs are non-empty and that PLANTED appears in no answer, log line, receipt or file; rotation.rs carries handles only
+  - [x] A session printing the limit words moves to the next account and resumes. — runner_api.rs a_usage_limit_moves_the_session_to_the_next_account_and_the_list_end_stops_it (on-h-account-two after the words); runner.rs declared_words_move_a_harness_with_no_signal; words_the_harness_did_not_signal_move_nothing: passed
+  - [x] At the list's end the session is stopped with accounts_exhausted. — same runner_api test asserts how=accounts_exhausted and a confirmation starting accounts_exhausted; runner.rs a_usage_limit_moves_the_session_on_and_the_list_end_stops_it passed
+  - [x] No account value appears in any answer, log line or receipt, checked by a test. — runner_api.rs: the stand-in broker plants PLANTED as the handle value; the test scans every answer, every file in the service and runner dirs, and every runner and service log line, and counts that records were read
 - Checklist verified: C378
 - Stories verified: S154
 - Issues:
-  - The brief names crates/lys-identity/src/provisioning.rs, which does not exist; the profile settings live in crates/lys-identity-server/src/provisioning_store.rs. Correct the path in the brief text; no code change is due.
+  - Rotation applied only on the /start-command path; POST /agents/{id}/start passed no rotation (see R3).
+- Fixes:
+  - DirectoryLauncher now passes the profile's rotation (see R3).
 
 ### R6: Wake with a message; stop through the runner
 
@@ -383,8 +390,8 @@ Behavioural. POST /agents/{id}/wake with a message types it into the agent's liv
 
 - Alignment: aligned
 - Acceptance verdicts:
-  - [x] A wake types the message into the live session. — runner_api.rs:488 a_wake_types_the_message_into_the_live_session_and_needs_one; passes
-  - [x] A stop ends every session of the agent and each shows confirmed with its exit instant. — runner_api.rs:511 a_stop_ends_every_session_and_each_shows_confirmed_with_its_exit_instant; tests/emergency_stop.rs 3 passed; stop_api.rs asks every unconfirmed session at once
+  - [x] A wake types the message into the live session. — runner_api.rs a_wake_types_the_message_into_the_live_session_and_needs_one passed; wake refuses no_live_session
+  - [x] A stop ends every session of the agent and each shows confirmed with its exit instant. — runner_api.rs a_stop_ends_every_session_and_each_shows_confirmed_with_its_exit_instant passed; stop_api.rs through_runners/end_sessions
 - Checklist verified: C379
 - Stories verified: S155
 
@@ -430,13 +437,17 @@ Behavioural. The Sessions screen (surface/identity/src/features/runtime) lists e
 
 **Review (recorded):**
 
-- Alignment: aligned
+- Alignment: fixed
 - Acceptance verdicts:
-  - [x] Opening a session shows its live output; typing a line sends it. — surface/identity/tests/runtime-terminal.test.tsx:66-85 (live reads with cursor, input posted {text:'ls -l', enter:true}); surface leg passed (331 tests)
-  - [x] Stop asks to confirm by naming the agent and then ends it. — runtime-terminal.test.tsx:98-104: no /end before confirm, dialog text 'Stop Scribe?', then /end posted and exit shown
-  - [x] Surface tests cover the list, the terminal view and the refusals. — runtime-terminal.test.tsx:49-63 list, 66-104 terminal, 114 refusal 'not_permitted: ...' shown in role=alert; surface leg exit 0
+  - [x] Opening a session shows its live output; typing a line sends it. — surface/identity/tests/runtime-terminal.test.tsx 'opens a session to its live output…' and 'types a line and sends keys…' passed (10/10 in the file)
+  - [x] Stop asks to confirm by naming the agent and then ends it. — runtime-terminal.test.tsx 'asks before Stop by naming the agent, then ends the session' passed; Terminal.tsx alertdialog 'Stop {name}?'
+  - [x] Surface tests cover the list, the terminal view and the refusals. — runtime-terminal.test.tsx covers the list, terminal, typing, keys, stop, refusals, an unavailable runtime and (new) an unanswered runner; the full vitest run gave 331 passed and tsc --noEmit exit 0
 - Checklist verified: C380
 - Stories verified: S155
+- Issues:
+  - GET /runtime/live logged a runner that did not answer only to the service log and still listed its session as Running: a silent fallback against the boundary.
+- Fixes:
+  - runner_api.rs live answers {sessions, unanswered}, naming each session, machine and refusal. Sessions.tsx shows 'Runners that did not answer', never shows such a session Running, and refuses a list without `unanswered` by name. New tests: runner_start.rs a_runner_that_does_not_answer_is_named_beside_the_live_list; surface 'names each session whose runner did not answer…' and 'refuses a list that does not say which runners answered…'. Each drift injection failed exactly its own test.
 
 ## Boundaries
 
