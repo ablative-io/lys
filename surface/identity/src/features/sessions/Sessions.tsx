@@ -33,7 +33,7 @@ export function Sessions() {
   </div>;
 }
 
-function SessionList({ person }: { person: string }) {
+export function SessionList({ person }: { person: string }) {
   const [revision, setRevision] = useState(0);
   const [confirm, setConfirm] = useState<SessionView | null>(null);
   const [busy, setBusy] = useState(false);
