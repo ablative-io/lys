@@ -48,17 +48,10 @@
 - [ ] **C29** — The You and delegation screens show real server authority, separate service accounts from sign-in identities, and preserve personal versus administrator visibility.
 - [ ] **C30** — The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success.
 
-## Certificate revocation folded from the log
+## Audit receipts (DIRECTORY-007)
 
-- [ ] **C65** — docs/design/identity/CERTIFICATE-REVOCATION.md states the certificate-log leaves, the one-claim certificate as the revocable unit, the issuing-authority signer, permanence, revocation_before_issuance, the fold, N and the tolerance, history, the no-log forms and the refusal table.
-- [ ] **C66** — The issuance leaf, the revocation leaf and the attestation entry encode and decode under lys-identity/certificate-log/v1, and a revocation verifies only under the issuing authority's key for the log's origin.
-- [ ] **C67** — The live set is folded from the certificate log with its folded size; revocations not signed by the issuing authority, revocations of a certificate with no earlier issuance and reinstatements are refused by name at their index, and a leaf the fold cannot read blocks every permit.
-- [ ] **C68** — A revocation is one leaf appended at the log's extent through lys-log-store, and the LeafStore trait gains no delete, rewrite, truncate, fork or merge.
-- [ ] **C69** — Revocation-aware verification takes N and a tolerance with no default, carries the folded size in every answer, and refuses a revoked certificate naming its revocation leaf.
-- [ ] **C70** — A revoked certificate's inclusion and consistency proofs and issuance record still verify, an attestation by its key verifies only when its own entry precedes the revocation leaf, and an attestation by a certificate not revoked needs no entry.
-- [ ] **C71** — lys ca verify keeps its meaning and its help says verification without a log does not check revocation, with lys-core unchanged.
-
-## The enduring agent and its session credentials
-
-- [ ] **C49** — docs/design/identity/DIRECTORY-CONTRACT.md states road adjustment 3 as the directory's contract, citing docs/design/identity/STATEMENT-2026-09-22.md:162-167: the agent record holds no session credential, a session is a separate record that points at its agent, starting a session never creates an agent, and a second session of the same agent presents the same enduring identity with a new session credential.
-- [ ] **C50** — An agent registered with no session appears in the directory under its responsible person, and its read carries no session credential.
+- [ ] **C31** — docs/design/identity/AUDIT-RECEIPT.md carries IDENTITY-001's receipt contract word for word with the test tag as its one ruled addition, names exactly one emitter for every operation, states the step-1 sign-in boundary, the changes-only rule and the test-receipt rule, and lists what IDENTITY-EVENTS.md must carry before the code rows start.
+- [ ] **C32** — crates/lys-receipt reads a receipt of the shared shape and verifies it from a LeafStore and a key in the order tag, signature, coordinate, commitment, with every cryptographic or structural failure one refusal class and the test-tag and shape refusals named on their own (rcpt_accept, rcpt_tamper, rcpt_leaf, rcpt_testtag, rcpt_shape, rcpt_redact).
+- [ ] **C33** — lys log verify receipt verifies offline from the receipt, the log directory and the key strings alone, keeps the published CLI's refusal discipline, writes nothing to the log and leaves inclusion and consistency verification unchanged (rcli_accept, rcli_tamper, rcli_precrypto, rcli_test, rcli_readonly).
+- [ ] **C34** — The directory service leaves a sign-in receipt for every sign-in it records and a refusal receipt for the one refusal step 1 makes, registers nobody on a first sign-in, refuses nothing on state, and leaves no receipt for a read or an answered check (signin_ok, signin_refused, signin_first, signin_state).
+- [ ] **C35** — A development install emits test receipts under a test key and a test tag and the whole path is proved end to end: verified with the test key, refused without it by name, refused under another key, with no private key in any document.
