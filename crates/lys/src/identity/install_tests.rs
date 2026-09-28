@@ -214,3 +214,16 @@ fn a_live_process_is_left_alone_unless_its_configuration_changed() -> Result<(),
     assert!(!services::stop(&pid)?);
     Ok(())
 }
+
+#[test]
+fn the_install_names_the_fix_when_docker_is_missing_or_not_running() {
+    let missing = services::require_docker(Path::new("/nonexistent/docker"))
+        .expect_err("a missing program is refused");
+    assert_eq!(missing.kind(), ErrorKind::Unready);
+    assert!(missing.to_string().contains("Docker is not installed"));
+    assert!(missing.to_string().contains("run this install again"));
+    let failing = services::require_docker(Path::new("/usr/bin/false"))
+        .expect_err("a docker without compose is refused");
+    assert!(failing.to_string().contains("without its compose plugin"));
+    assert!(services::require_docker(Path::new("/usr/bin/true")).is_ok());
+}
