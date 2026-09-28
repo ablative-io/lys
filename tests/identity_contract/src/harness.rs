@@ -434,6 +434,24 @@ impl Service {
         answer(request.send().await?).await
     }
 
+    /// GET `path` as a browser following a link does, asking for a page: the
+    /// status, the redirect it names, and whether it set a session cookie.
+    pub async fn get_page(
+        &self,
+        path: &str,
+    ) -> Result<(u16, Option<String>, bool), Box<dyn Error>> {
+        let response = self
+            .client
+            .get(format!("{}{path}", self.base))
+            .header(reqwest::header::ACCEPT, "text/html,application/xhtml+xml")
+            .send()
+            .await?;
+        let status = response.status().as_u16();
+        let to = location(&response).ok();
+        let cookie = response.headers().contains_key(reqwest::header::SET_COOKIE);
+        Ok((status, to, cookie))
+    }
+
     /// POST `body` as JSON to `path`, with the session `cookie` when one is given.
     pub async fn post(
         &self,

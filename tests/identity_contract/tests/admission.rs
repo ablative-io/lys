@@ -82,6 +82,17 @@ async fn a_caller_without_a_session_is_refused_by_name() -> TestResult {
 }
 
 #[tokio::test]
+async fn a_browser_coming_back_from_sign_in_is_taken_to_the_screens_signed_in() -> TestResult {
+    let service = Service::start().await?;
+    let back = service.issuer_answer(login(ADMINISTRATOR)).await?;
+    let (status, to, cookie) = service.get_page(&back).await?;
+    assert_eq!(status, 303, "a browser is sent on, never shown the JSON");
+    assert_eq!(to.as_deref(), Some("/"), "it lands on the screens");
+    assert!(cookie, "and it arrives signed in");
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_first_visit_admits_nobody_and_its_answer_is_used_once() -> TestResult {
     let service = Service::start().await?;
     let back = service.issuer_answer(login(ADMINISTRATOR)).await?;
