@@ -20,14 +20,25 @@
 //! A request is named by the operation id it was asked with, so asking again
 //! with the same operation and the same words answers the request already
 //! kept, and the same operation with other words is refused.
+//!
+//! The leaves are pinned, and what they fold to is sealed in the log's signed
+//! snapshot every [`SNAPSHOT_EVERY`] leaves and at once after a rebuild, so a
+//! start reads the snapshot and only the leaves after it. A snapshot refused,
+//! or a state that does not read back, sends the start to every leaf, by
+//! name, never silently.
 
-use std::collections::BTreeMap;
 use std::path::Path;
+use std::sync::Arc;
 
-use lys_log_store::{FileLeafStore, LeafStore, StoreResult};
+use lys_core::Ed25519Identity;
+use lys_identity::SNAPSHOT_EVERY;
+use lys_log_store::{
+    FileLeafStore, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreResult, start,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
+use crate::requests_state::{DOMAIN, Held, pin_unpinned};
 
 /// A request as it was asked.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -101,7 +112,7 @@ pub struct Withdrawn {
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "line", rename_all = "snake_case")]
-enum Line {
+pub(crate) enum Line {
     Asked(Asked),
     Intended(Intended),
     Withdrawn(Withdrawn),
@@ -120,13 +131,19 @@ pub const ORIGIN: &str = "lys/identity/access-requests";
 /// The requests, read from their leaf store and appended to it.
 pub struct RequestStore<S: LeafStore = FileLeafStore> {
     reopen: Reopen<S>,
-    leaves: S,
-    folded: u64,
+    key: Arc<Ed25519Identity>,
+    log: FrontierLog<S>,
+    held: Held,
+    start: Start,
+    adopted: u64,
+    since_snapshot: u64,
+    snapshot_failure: Option<String>,
     uncertain: bool,
-    asked: Vec<Asked>,
-    intended: BTreeMap<String, Intended>,
-    decided: BTreeMap<String, Decided>,
 }
+
+/// A log opened and folded: the log, what it folds to, how it started, and
+/// how many unpinned leaves it adopted.
+type Opened<S> = (FrontierLog<S>, Held, Start, u64);
 
 fn unavailable(what: impl std::fmt::Display) -> ServerError {
     ServerError::RequestsUnavailable {
@@ -135,51 +152,78 @@ fn unavailable(what: impl std::fmt::Display) -> ServerError {
 }
 
 impl RequestStore<FileLeafStore> {
-    /// The requests kept in the directory `dir`, which is created when it does not exist.
-    pub fn open(dir: &Path) -> Result<Self, ServerError> {
+    /// The requests kept in the directory `dir`, which is created when it
+    /// does not exist, their snapshots signed by `key`.
+    pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
         }
         let dir = dir.to_owned();
-        Self::over(Box::new(move || FileLeafStore::open(&dir)))
+        Self::over(Box::new(move || FileLeafStore::open(&dir)), key)
     }
 }
 
 impl<S: LeafStore> RequestStore<S> {
-    /// The requests kept in the leaf store `reopen` opens.
-    pub fn over(reopen: Reopen<S>) -> Result<Self, ServerError> {
-        let leaves = reopen().map_err(unavailable)?;
+    /// The requests kept in the leaf store `reopen` opens, their snapshots
+    /// signed by `key`.
+    pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
+        let (log, held, start, adopted) = opened(&reopen, &key)?;
         let mut store = Self {
             reopen,
-            leaves,
-            folded: 0,
+            key,
+            log,
+            held,
+            start: start.clone(),
+            adopted,
+            since_snapshot: 0,
+            snapshot_failure: None,
             uncertain: false,
-            asked: Vec::new(),
-            intended: BTreeMap::new(),
-            decided: BTreeMap::new(),
         };
-        store.fold()?;
+        store.after_start(&start);
         Ok(store)
     }
 
-    /// Read every leaf not yet read.
-    fn fold(&mut self) -> Result<(), ServerError> {
-        while self.folded < self.leaves.extent() {
-            let index = self.folded;
-            let bytes = self
-                .leaves
-                .leaf(index)
-                .map_err(unavailable)?
-                .ok_or_else(|| {
-                    unavailable(format!("leaf {index} is within the extent and absent"))
-                })?;
-            let line = serde_json::from_slice(&bytes).map_err(|error| {
-                unavailable(format!("leaf {index} is not a request line: {error}"))
-            })?;
-            self.hold(line);
-            self.folded += 1;
+    /// How the log was started: from its snapshot, or from every leaf and
+    /// the refusal that sent it there.
+    pub fn start(&self) -> &Start {
+        &self.start
+    }
+
+    /// How many leaves written before leaves were pinned were pinned at open.
+    pub fn adopted(&self) -> u64 {
+        self.adopted
+    }
+
+    /// Why the last snapshot could not be written, while no later one was.
+    pub fn snapshot_failure(&self) -> Option<&str> {
+        self.snapshot_failure.as_deref()
+    }
+
+    /// Owe a snapshot for the leaves the start read, and write one at once
+    /// when the start rebuilt.
+    fn after_start(&mut self, start: &Start) {
+        match start {
+            Start::Resumed { replayed, .. } => self.since_snapshot = *replayed,
+            Start::Rebuilt { .. } => self.write_snapshot(),
         }
-        Ok(())
+        if self.since_snapshot >= SNAPSHOT_EVERY.get() {
+            self.write_snapshot();
+        }
+    }
+
+    fn write_snapshot(&mut self) {
+        let written = self.held.encode().and_then(|state| {
+            self.log
+                .write_snapshot(DOMAIN, &state, &self.key)
+                .map_err(|error| error.to_string())
+        });
+        match written {
+            Ok(_) => {
+                self.since_snapshot = 0;
+                self.snapshot_failure = None;
+            }
+            Err(reason) => self.snapshot_failure = Some(reason),
+        }
     }
 
     /// Resolve an append whose outcome is not known, by opening the leaf
@@ -187,33 +231,15 @@ impl<S: LeafStore> RequestStore<S> {
     /// answered from memory and nothing is appended.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
-            self.leaves = (self.reopen)().map_err(unavailable)?;
-            self.fold()?;
+            let (log, held, start, adopted) = opened(&self.reopen, &self.key)?;
+            self.log = log;
+            self.held = held;
+            self.start = start.clone();
+            self.adopted += adopted;
             self.uncertain = false;
+            self.after_start(&start);
         }
         Ok(())
-    }
-
-    fn hold(&mut self, line: Line) {
-        match line {
-            Line::Asked(asked) => self.asked.push(asked),
-            Line::Intended(intended) => {
-                self.intended.insert(intended.id.clone(), intended);
-            }
-            Line::Withdrawn(withdrawn) => {
-                if self
-                    .intended
-                    .get(&withdrawn.id)
-                    .is_some_and(|kept| kept.operation == withdrawn.operation)
-                {
-                    self.intended.remove(&withdrawn.id);
-                }
-            }
-            Line::Decided(decided) => {
-                self.intended.remove(&decided.id);
-                self.decided.insert(decided.id.clone(), decided);
-            }
-        }
     }
 
     /// Append one line as one leaf. A failed append is settled by reading
@@ -221,15 +247,18 @@ impl<S: LeafStore> RequestStore<S> {
     fn append(&mut self, line: Line) -> Result<(), ServerError> {
         self.settle()?;
         let bytes = serde_json::to_vec(&line).map_err(unavailable)?;
-        let index = self.folded;
-        let Err(failure) = self.leaves.put_leaf(index, &bytes) else {
-            self.hold(line);
-            self.folded += 1;
+        let index = self.log.len();
+        let Err(failure) = self.log.append(&bytes) else {
+            self.held.hold(line);
+            self.since_snapshot += 1;
+            if self.since_snapshot >= SNAPSHOT_EVERY.get() {
+                self.write_snapshot();
+            }
             return Ok(());
         };
         self.uncertain = true;
         self.settle()?;
-        match self.leaves.leaf(index).map_err(unavailable)? {
+        match self.log.leaf_bytes(index).map_err(unavailable)? {
             Some(held) if held == bytes => Ok(()),
             Some(_) => Err(unavailable(format!(
                 "leaf {index} was written by another writer: {failure}"
@@ -240,9 +269,10 @@ impl<S: LeafStore> RequestStore<S> {
 
     /// Every request, in the order asked.
     pub fn requests(&self) -> impl Iterator<Item = Kept<'_>> {
-        self.asked
+        self.held
+            .asked
             .iter()
-            .map(|asked| (asked, self.decided.get(&asked.id)))
+            .map(|asked| (asked, self.held.decided.get(&asked.id)))
     }
 
     /// The request named `id`.
@@ -263,7 +293,7 @@ impl<S: LeafStore> RequestStore<S> {
 
     /// The approval of the request `id` being settled, if one is.
     pub fn intent(&self, id: &str) -> Option<&Intended> {
-        self.intended.get(id)
+        self.held.intended.get(id)
     }
 
     /// Keep the intent to approve a request that waits. Intended again in the
@@ -275,7 +305,7 @@ impl<S: LeafStore> RequestStore<S> {
             Some((_, Some(_))) => Err(ServerError::RequestDecided {
                 request: intended.id,
             }),
-            Some((_, None)) => match self.intended.get(&intended.id) {
+            Some((_, None)) => match self.held.intended.get(&intended.id) {
                 None => self.append(Line::Intended(intended)),
                 Some(kept) if same_intent(kept, &intended) => Ok(()),
                 Some(kept) => Err(held(kept)),
@@ -287,7 +317,7 @@ impl<S: LeafStore> RequestStore<S> {
     /// one stands.
     pub fn withdraw(&mut self, id: &str, operation: &str) -> Result<(), ServerError> {
         self.settle()?;
-        match self.intended.get(id) {
+        match self.held.intended.get(id) {
             Some(kept) if kept.operation == operation => self.append(Line::Withdrawn(Withdrawn {
                 id: id.to_owned(),
                 operation: operation.to_owned(),
@@ -301,7 +331,7 @@ impl<S: LeafStore> RequestStore<S> {
     /// any decision but the one an intent that stands was made for.
     pub fn decide(&mut self, decided: Decided) -> Result<(), ServerError> {
         self.settle()?;
-        if let Some(kept) = self.intended.get(&decided.id)
+        if let Some(kept) = self.held.intended.get(&decided.id)
             && !(decided.approved && decided.by == kept.by)
         {
             return Err(held(kept));
@@ -321,6 +351,42 @@ impl<S: LeafStore> RequestStore<S> {
             }),
         }
     }
+}
+
+/// Open the log from its snapshot, or from every leaf when the snapshot or
+/// its state is refused, and fold what the start hands back.
+fn opened<S: LeafStore>(
+    reopen: &Reopen<S>,
+    key: &Ed25519Identity,
+) -> Result<Opened<S>, ServerError> {
+    let mut store = reopen().map_err(unavailable)?;
+    let adopted = pin_unpinned(&mut store).map_err(unavailable)?;
+    let started = start(store, DOMAIN, &key.public_key_bytes()).map_err(unavailable)?;
+    let mut held = match started.state.as_deref().map(Held::decode) {
+        None => Held::default(),
+        Some(Ok(held)) => held,
+        Some(Err(reason)) => return rebuilt(reopen, reason, adopted),
+    };
+    held.fold(&started.tail).map_err(unavailable)?;
+    Ok((started.log, held, started.start, adopted))
+}
+
+/// Open the log from every leaf, because the snapshot's state was refused
+/// for `reason`.
+fn rebuilt<S: LeafStore>(
+    reopen: &Reopen<S>,
+    reason: String,
+    adopted: u64,
+) -> Result<Opened<S>, ServerError> {
+    let (log, tail) = FrontierLog::open(reopen().map_err(unavailable)?).map_err(unavailable)?;
+    let mut held = Held::default();
+    held.fold(&tail).map_err(unavailable)?;
+    let replayed = log.len();
+    let start = Start::Rebuilt {
+        refusal: SnapshotRefusal::StateUnreadable { reason },
+        replayed,
+    };
+    Ok((log, held, start, adopted))
 }
 
 fn held(kept: &Intended) -> ServerError {
