@@ -428,7 +428,7 @@
     {
       "id": "RM-031",
       "title": "LanternData carries lit_in, the light act records it, recall reports it and the fork reads the typed field",
-      "status": "briefed",
+      "status": "idea",
       "kind": "feature",
       "summary": "A lantern records the session it was lit in. LanternData gains an optional lit_in; the light act writes it as the id of the session at whose head it appends the lantern and prints it in its report; recall rows carry it beside point, note and lit_by, null for a lantern lit before it; and HOME-006's fork reads it through a narrower typed view in place of the raw-data stopgap, with L2 in both fork fixtures lit by the light act and only the records the light act cannot produce written by hand. A lantern with no lit_in stays an older record resolved by its holders (ADR-017), and a present lit_in that is not a session id is refused lit_in_not_a_session by the fork and by recall, never read as any session (ADR-046).",
       "provenance": {

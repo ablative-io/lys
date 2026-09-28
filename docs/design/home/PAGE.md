@@ -2,119 +2,151 @@
 
 ## The words, as they were typed
 
-Two tests in crates/lys-home sleep so that a file's modification time can tell a second put that wrote nothing from one that rewrote the same bytes: the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing in src/record/blocks_tests.rs and a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing in src/record/templates_tests.rs, each sleeping 20 milliseconds before the second put. That wait is a clock. On a filesystem with coarse timestamps, or on a loaded host where the second put lands inside the same tick, the 20 milliseconds prove nothing, and the suite pays the wait on every run. Tom's word of 27 September 2026, relayed by Waffles in the pipeline channel: tests must not wait on the clock and must not fail under load; such a wait is a defect, not a flake.
+The lantern's typed data does not carry lit_in and the light act does not record it, so HOME-006's fork reads lit_in from the entry's raw data as a stopgap and the fixtures write L2 by hand. This card makes the typed field the shape. LanternData gains lit_in, the session that held the point when the lantern was lit; the light act records it at the head of the session holding the point; recall reports it beside point, note and lit_by. The fork in HOME-006 reads the typed field and its hand-written fixtures light L2 with the light act instead. A lantern record without lit_in, or with a lit_in that is not a session id, is refused by name as it is today, never read as any session. Ordered after HOME-006 lands. Acceptance: a lantern lit with the light act recalls with lit_in equal to the lighting session; the fork's fixtures contain no hand-written lantern entry; the two lit_in refusals keep their tests; the existing lantern and fork tests keep passing; ADR, checklist and user story rows renumbered past HOME-006's.
 
-The rule to meet: the proof that a second put writes nothing does not depend on elapsed time. Each test, before the second put, sets the stored file's modification time to a fixed instant well in the past with std::fs::File::set_modified, reads it back to confirm the instant took, and after the second put asserts the modification time is still exactly that instant and the directory count is unchanged. No sleep. The stores' write paths are not changed: they already write once by hash, and this card only makes the tests prove it without a clock.
+Rulings of the lead, Archie, given on 27 September 2026 to the run b9d7f174-35fd-4102-be1e-1af9b7a1bc8e in answer to its two rounds. That run wrote its brief as HOME-008, an id another open branch already held, and the renumbering to HOME-010 by hand collided with a third brief, so the build could not find its brief. The brief is written again by the chain with these rulings settled, and the author reopens none of them.
 
-Acceptance: both sleeps are gone; a grep for thread::sleep and tokio::time::sleep across crates/lys-home prints nothing; both tests keep every other assertion they have today; no timeout is raised and no test is split; the change is one commit on the card branch. Keep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh), in the home cluster; the brief id, roadmap row and any decision take the next free id after main's highest and every open brief/* and draft/* branch's, checked with git ls-remote immediately before writing. Not in scope: the block or template store's write path, any other test, or the canon's millis_now, which records a timestamp and waits on nothing. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie on 27 September 2026 on lys main 7b53625.
+Keep the holder rule. The words' 'as it is today' is wrong for a record without lit_in, and the brief corrects that sentence. A lantern with no lit_in key is an older record and resolves by holders as ADR-017 and HOME-006 amendment 3 rule. One holder cuts, and several give lantern_ambiguous. Only a lit_in that is present and not a session id is refused by name. ADR-017 is not retired, and every lantern lit before this card stays forkable.
+
+The lit_in member is optional in LanternData. A lantern lit before this card is read as it is, never as the wrong shape, and recall's row shows lit_in as null for it. The recall by note skips nothing new, and the recall by point refuses nothing new.
+
+The older fixtures are kept. The rule of no hand-written lantern entry applies to every lantern the light act can produce, so the ordinary fork cases are lit with the light act. The older records O2, M2 and N3, the copy N2 and the malformed N1 to N4 stay hand-written, because the light act can no longer write them. Each is named in its test as standing for a record the light act cannot produce, and the brief states this exception.
+
+Both round-trip tests are updated. The test lantern_data_round_trips_with_exactly_its_four_keys becomes five keys with lit_in, and a_row_carries_exactly_its_fields gains lit_in. No other existing lantern or fork test changes.
+
+The Lit report prints lit_in beside id, session, point and lit_at, and the pin at tests/lantern_cli.rs:104 is updated to match.
+
+The refusal is named lit_in_not_a_session, with the fork's four reason texts, for both the skip reason by note and the refusal by point. The name says what is wrong with the lantern, and entry_shape would hide it among every other malformed entry. The lantern is refused and never listed as a row, as R4 says. Recall's other entry_shape cases keep their name.
+
+The brief id, roadmap row, decisions, checklist and story ids each take the next free id past main and every open brief/* and draft/* branch, checked with git ls-remote and a fetch of every head immediately before writing, with the heads read recorded in the dev record. HOME-008 and HOME-010 are both held by other open branches, so neither is used. Answered by Archie, lead for the home line.
 
 ## What the survey found, and its angles
 
-The card asks for two lys-home tests to stop depending on a clock. Each test now sleeps 20 ms so a second put that writes nothing can be told from one that rewrites the same bytes. Instead, each test sets the stored file's modification time to a fixed instant in the past with File::set_modified and reads it back to check it took. After the second put, it asserts that instant is unchanged and that the directory count is the same. No store code changes, and the design record gets a brief, a roadmap row and the ids it needs in the home cluster.
+Make lit_in a real, typed part of a lantern rather than a key the fork reads from raw JSON. LanternData gains an optional lit_in. The light act records the session it lights in. Recall rows and the Lit report print lit_in. The fork reads the typed field, and its fixtures light L2 with the light act instead of writing it by hand. Archie's rulings settle the rest: lanterns without lit_in stay readable and keep the holder rule (lit_in shows as null), only a lit_in that is present and not a session id is refused as lit_in_not_a_session in both the fork and recall, and records the light act cannot produce stay hand-written.
 
 ### What the tree holds
 
-- `crates/lys-home/src/record/blocks_tests.rs:6-37` — the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing sleeps 20 ms at line 22. Its mtime assertion (lines 18-21, 27-33) reads the shard DIRECTORY store.root()/<hh>, not the stored block file. It also asserts files()==count and count==1, !second.new, and second.hash==first.hash
-- `crates/lys-home/src/record/templates_tests.rs:13-46` — a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing sleeps 20 ms at line 31. Its mtime assertion reads the stored template FILE templates/<hh>/<hash> (line 30, 35). It asserts the shard has exactly 1 entry afterwards but takes no count before the second put. It keeps its root-absent, bytes, path_of, contains, get and missing-hash assertions
-- `crates/lys-home/src/record/blocks.rs:88-123` — BlockStore::put returns early with new:false when path.is_file(), before create_dir_all and before any temp file. That is why the second put touches neither the file nor the shard directory. Out of scope to change
-- `crates/lys-home/src/record/templates.rs:40-42` — TemplateStore::put delegates to BlockStore::open(root).put, so both tests exercise the same write path. Out of scope to change
-- `crates/lys-home/src/record/canon.rs:461` — millis_now records a timestamp and waits on nothing. The words exclude it explicitly
-- `docs/design/home/briefs/HOME-001.md:85` — The acceptance the blocks test was written to: 'the second put performs no write (measured by the directory's mtime and file count)'. It names the directory's mtime, not the file's
-- `docs/design/home/CHECKLIST.md:37 (C15)` — The template store keeps each template 'written once and never rewritten'. The template test is that item's gate
-- `crates/lys-home/Cargo.toml` — rust-version 1.89. File::set_modified has been stable since 1.75, so no MSRV change. tempfile is already a dev-dependency and no new crate is needed
-- `docs/design/home/ (DESIGN.md, CHECKLIST.md, briefs/, roadmap.json, decisions.json) and scripts/design/gate.sh` — The brief and roadmap row land in the home cluster and must pass validate.py, check-coverage.py and render-cluster.py through gate.sh
-- `.github/workflows/ci.yml` — Both jobs run on ubuntu-latest, so CI proves the tests on Linux only. This Mac (APFS) and Dean's laptop are the other hosts they run on
+- `crates/lys-home/src/record/entries.rs:41-55` — LanternData has four required fields (point, note, lit_by, lit_at) under #[serde(deny_unknown_fields)]. Today, any lantern carrying lit_in (including the hand-written L2) fails to deserialize. Plain Option<String> would read a present null as absent, which the rulings forbid.
+- `crates/lys-home/src/record/lantern.rs:24-35,95-128` — light() builds LanternData without lit_in. The Lit report carries id, session, point and lit_at. Both gain lit_in, which is the session argument that light opens as owner.
+- `crates/lys-home/src/record/recall.rs:40-57,79-108,124-140,145-162` — LanternRow has no lit_in. rows_of calls lantern_of with only a reader, not the home, so the 'names no session of the home' check needs the home passed in. A bad lantern already makes by-note skip the whole session and by-point return an error; the new refusal must keep those paths and only change the name from entry_shape to lit_in_not_a_session.
+- `crates/lys-home/src/record/fork_cut.rs:100-161` — read_lantern is the stopgap: it reads data.get("point") and data.get("lit_in") from the raw Value and maps null, non-string, unsafe name and missing session to four `what` texts. It needs neither lit_at nor note, so today it forks O2, M2 and N3, which lack lit_at.
+- `crates/lys-home/src/record/fork_cut.rs:1-25` — Module doc describing the raw-data read and the older-record rule. It has to be rewritten for the typed read.
+- `crates/lys-home/src/error.rs:378-388` — HomeError::LitInNotASession { lantern, what } with the prefix lit_in_not_a_session. The rulings reuse it for recall's by-note skip reason and by-point refusal.
+- `crates/lys-home/src/record/fork_cut_tests.rs:1-14,118-135,147-205,279-440,451-535` — The fixture writes L2 by hand with lit_in. The literal "L2" appears in cut-id and refusal assertions. The N2 copy (lit_in "elsewhere") and N1–N4 (null, 5, ../elsewhere, no-such-session) stay hand-written. O2 is written without lit_at.
+- `crates/lys-home/src/record/fork_tests.rs:255-265,325-340` — The older records M2 and N3 are hand-written with no lit_in and no lit_at. They stay, and their tests name them as records the light act cannot produce.
+- `crates/lys-home/tests/fork.rs:1-9,108-122,188-248,452-548` — The binary-level fixture writes L2 (lit_at STAMP) and O2 by hand. The five-forks and five-refusals test relies on L2 resolving by lit_in (lantern_not_lit_here against a child that holds a copy) and on O2 being ambiguous.
+- `crates/lys-home/src/record/lantern_tests.rs:48-63,80-84` — lantern_data_round_trips_with_exactly_its_four_keys becomes five keys. The unknown-field refusal test (an extra 'anchors' key) must keep passing, so deny_unknown_fields stays.
+- `crates/lys-home/src/record/recall_tests.rs:129-157,210-225` — a_row_carries_exactly_its_fields gains lit_in. The existing entry_shape recall case must keep its name.
+- `crates/lys-home/tests/lantern_cli.rs:104` — This line pins the Lit report keys ["id","lit_at","point","session"]. The ruling adds lit_in.
+- `docs/design/home/RECORD.md:133-140,186-196` — The lys.lantern field list says {point, note, lit_by, lit_at}, and the fork section describes lit_in as a data key. Both need lit_in as a typed, optional field.
+- `docs/design/home/PROOF-FORK.md:59-60,314` — It states 'The light act on this tree records no lit_in, so both resolve by the older-record rule'. That is true of the measured run but stale once this card lands.
+- `crates/lys-home/README.md:95` — Describes the fork's lit_in and older-record resolution.
+- `docs/design/home/{design.json,checklist.json,stories.json,briefs/}, docs/design/decisions.json, docs/design/roadmap.json` — Where the brief, its roadmap row, the new ADR, the checklist rows and the stories land. scripts/design/render-cluster.py regenerates the markdown and scripts/design/gate.sh is the design leg.
 
 ### What was already decided
 
-- HOME-001 — Brief acceptance at line 85: putting the same 1 MiB block twice leaves one file, and the second put performs no write, measured by the directory's mtime and file count
-- HOME-002 / C15 — The template store keeps each template under templates/ by SHA-256, written once and never rewritten, with the block store's write discipline
-- ADR-012 — A harness launch template is kept in the home by hash. That is the store whose written-once property the template test proves
-- home CN9 — A render reads no clock and no random source. The same no-clock stance, applied there to production code rather than tests
-- RM-005 — The home row the block store belongs to
-- RM-006 — The launch-template row the template store belongs to
+- ADR-014 — A lantern is a lys.lantern custom entry at its session's head carrying point, note, who lit it and when in custom.data. lit_in is one more key inside custom.data, not a new entry type.
+- ADR-015 — Notes and epilogues are the one text recall prints. Recall rows never carry transcript, so lit_in (a session id) adds no content.
+- ADR-017 — A fork reads lit_in from the lantern data when present, otherwise uses the older-record rule (one holder cuts, several refuse lantern_ambiguous). The rulings keep it unretired.
+- ADR-018 — User-message points are carried as a seed. Untouched, but the L6 fork case must still report coordinate_carried after L2 is relit.
+- HOME-006 amendment 3 (2026-09-26, Waffles) — The fixtures write L2 by hand and the fork reads lit_in from raw data as a stopgap. Absent lit_in follows the holder rule. A present lit_in that is null, not a string, not a safe name or names no session refuses lit_in_not_a_session. Board card 0a59xZFp closes the gap.
+- HOME-006 blocked_by — Anticipated that the lantern card would carry lit_in and that the refresh would renumber past it. It records that LanternData refuses unknown fields, which is why L2 is hand-written.
+- HOME-006 R2 / C38 — lit_in present → cut from that session only, lantern_not_lit_here for another named session. No lit_in → holder rule. A copy of a lantern line in another session is never the lantern when lit_in is recorded.
+- HOME-004 R3/R5 (lantern.rs, recall.rs) — Light appends at the head as sole owner and never prints the note. Recall by note skips an unreadable or misshapen session and names the reason; recall by point refuses by name.
+- RM-008 — The lantern roadmap row, with light, epilogue and recall. This card extends what it delivered.
+- RM-010 — The fork roadmap row, which stands on the lantern card's lys.lantern entry.
+- brief/home/b9d7f174 HOME-010 (superseded run) — Earlier draft with R1–R6: an optional lit_in typed to keep null distinct, the light act records it, the fork reads a typed view that does not require lit_at, recall reports null or refuses lit_in_not_a_session, L2 lit with light, docs. It took C71–C76 and S32–S34.
 
 ### What was measured
 
-- thread::sleep or tokio::time::sleep calls under crates/lys-home: 2 lines (blocks_tests.rs:22, templates_tests.rs:31), each 20 ms
-- other sleeps in the workspace outside lys-home: 1 file (crates/lys-anchor/src/admission/certificate_tests.rs), out of scope
-- set_modified or FileTimes uses in lys-home today: 0
-- size of the block test: 32 lines (6-37) with 7 assertions, including 2 on the shard directory's mtime and count
-- size of the template test: 34 lines (13-46) with 14 assert-type checks
-- blocks_tests.rs / templates_tests.rs file length: 68 / 61 lines
-- blocks.rs / templates.rs length: 263 / 61 lines
-- highest ids on main 7b53625: HOME-007 brief (HOME-005 absent), RM-016 (11 rows), ADR-018 (18 decisions)
-- highest ids seen on the open brief/* and draft/* heads that are present locally: HOME-010 (HOME-008 and HOME-010 briefs exist), RM-018, ADR-029
-- open brief/* and draft/* branches on origin: 67, of which 56 heads are not in the local object store, so their ids could not be read without a fetch
-- CI platforms: ubuntu-latest only (2 jobs)
-- lys-home rust-version against File::set_modified's stable version: 1.89 against 1.75
+- Fields in LanternData today: 4 (point, note, lit_by, lit_at), all required, deny_unknown_fields
+- Occurrences of lit_in in crates/lys-home/src outside tests: fork_cut.rs (raw read, 1 function) and error.rs (2 variants). None in entries.rs, lantern.rs or recall.rs
+- Code lines (non-blank, non-comment) in the files touched: entries.rs 135, lantern.rs 93, recall.rs 106, fork_cut.rs 200, cli_lantern.rs 93. All well under 500
+- #[test] counts in lantern and fork suites: lantern_tests 8, recall_tests 8, epilogue_tests 4, fork_cut_tests 8, fork_tests 12, tests/fork.rs 3, tests/lantern_cli.rs 2, tests/lantern_home.rs 1 (46 total)
+- Literal "L2" occurrences in fork test files that will depend on a generated id once L2 is lit by the light act: 12 (fork_cut_tests.rs, fork_tests.rs, tests/fork.rs)
+- Hand-written lantern records the rulings keep: O2 (in 2 fixtures), M2, N3 (fork_tests), the N2 copy, N1–N4 (fork_cut_tests)
+- Hand-written older records that lack lit_at, a key HOME-004's light act always writes: O2 (both fixtures), M2 and N3: data is exactly {point, note, lit_by}
+- Current lit_in_not_a_session reason texts: 4: 'is null', 'is not a string', 'is not a safe session name', 'names no session of the home'
+- Highest ids on main: Brief HOME-007 (HOME-005 absent on main), ADR-018, RM-016, checklist C44, stories S23
+- Open brief/* and draft/* heads on origin (ls-remote, 2026-09-27): 82 in total, 47 of them home. Only 7 of the 47 home heads are present locally.
+- Ids held on the 7 home heads readable locally: HOME-008, HOME-009, HOME-010, HOME-011. ADRs up to ADR-031. C71–C76 and S32–S34 on b9d7f174. The other 40 heads need a fetch before the next free id is known.
+- main head: 7b536253 (= this tree's HEAD). HOME-006, including amendment 3a (9aefbaf, 1756688), is landed here
 
 ### What it means for the other projects
 
-- aion — The card goes through the aion chain (brief_card, sign-off, card_build_v3, src_pr, src_land). The chain must fetch the open brief/* and draft/* heads to find the next free id. There is no code change in aion.
+- aion — The brief_card chain let a run write HOME-008, an id another open branch held, and a hand renumbering then collided again. This card's id rule (next free id past main and every open brief/* and draft/* head, with the heads recorded) is the chain doing what it should. The collision is a chain defect worth naming so brief_card allocates ids itself.
+- cambium — Lys board card 0a59xZFp ('LanternData carries lit_in and the light act records it') is this card's row. It goes through brief_card → sign-off → card_build_v3 → src_pr → src_land, and the superseded run b9d7f174's brief/draft branches should be closed or marked superseded so they stop holding HOME-010, C71–C76 and S32–S34.
 
 ### The decisions it stands on
 
-- ADR-012 (honour) — The template store stays a by-hash, written-once object store. Only its test changes
--  (new) — A small home rule may be worth recording: no test in lys-home waits on the clock, and 'wrote nothing' is proven by a pinned mtime. The words say 'any decision', so whether this becomes an ADR or only a checklist line is the author's choice
+- ADR-014 (honour) — lit_in is one more key inside the lys.lantern custom entry's data. No new entry type, and nothing is rewritten.
+- ADR-015 (honour) — Recall adds a session id to its rows, not transcript. Notes and epilogues stay the only printed text.
+- ADR-017 (honour) — The rulings keep the holder rule for records without lit_in (one holder cuts, several refuse lantern_ambiguous) and say ADR-017 is not retired. The fork now reads lit_in from the typed field instead of raw data.
+- ADR-018 (honour) — The carried user-message seed is untouched. The L6 fork case must still report coordinate_carried.
+-  (new) — New ADR: lit_in is an optional typed member of LanternData, written by the light act as the session that held the point. A present lit_in that is not a session id is refused as lit_in_not_a_session in both the fork and recall. An absent one is an older record, resolved by holders and shown as null. Its id is the next free past main and every open head.
 
 ### What it requires
 
-- grep -rnE 'thread::sleep|tokio::time::sleep' crates/lys-home prints nothing
-- Before the second put, each of the two tests sets the stored file's mtime (and the directory's, if the lead so rules for blocks) to one fixed past instant with File::set_modified, and asserts that reading it back gives exactly that instant
-- After the second put, each test asserts the mtime is still exactly that instant and the directory count is unchanged
-- Every assertion each test has today is kept: !second.new, hash equality, count==1 / read_dir==1, the bytes, path_of, contains, get and the missing-hash error in the template test
-- No test is split, renamed or ignored, and no timeout is raised
-- One commit on the card branch
-- cargo test -p lys-home passes, and the full leg set (fmt, clippy both shapes, workspace tests --all-features, doc both shapes, design gate) passes on Dean's laptop
-- A brief, a roadmap row and any decision in the home cluster take ids above main's highest and every open brief/* and draft/* head's, checked with git ls-remote at write time, and scripts/design/gate.sh passes
+- LanternData has an optional lit_in. An absent key deserialises as absent. A present null, a non-string, an unsafe name or a name that is no session of the home never deserialises as absent or as any session. deny_unknown_fields stays.
+- lys-home lantern light writes lit_in equal to its --session argument, and a lantern lit that way recalls (by note and by point) with lit_in equal to the lighting session.
+- The Lit report's keys are exactly id, lit_at, lit_in, point and session, and tests/lantern_cli.rs:104 asserts them.
+- Every recall row has a lit_in key, null for a lantern without one. a_row_carries_exactly_its_fields asserts the eight keys, including lit_in.
+- lantern_data_round_trips_with_exactly_its_four_keys asserts five keys, including lit_in.
+- A lantern whose lit_in is present and not a session id makes recall by note skip its session with a reason starting lit_in_not_a_session and the fork's matching text, and makes recall by point return HomeError::LitInNotASession. It is never listed as a row.
+- Recall's other entry_shape cases (e.g. an unknown key such as 'anchors') still refuse as entry_shape.
+- fork_cut.rs no longer looks up lit_in in a raw serde_json::Value. It reads the typed field.
+- A fork of a lantern with no lit_in still resolves by holders: one holder cuts, several refuse lantern_ambiguous, --session picks one.
+- In fork_cut_tests.rs and tests/fork.rs, L2 is lit with the light act, and the only hand-written lanterns are O2, M2, N3, the N2 copy and N1–N4, each marked in its test as a record the light act cannot produce.
+- The two lit_in_not_a_session and lantern_not_lit_here refusal tests pass unchanged in what they assert.
+- Every existing lantern and fork test passes. cargo fmt, both clippy runs, cargo test --workspace --all-features, both cargo doc runs and sh scripts/design/gate.sh are clean on Dean's laptop.
+- RECORD.md lists lit_in in lys.lantern's fields, and the cluster markdown is regenerated with render-cluster.py, not edited by hand.
+- The brief, roadmap row, ADR, checklist and story ids are each the next free past main and every fetched brief/* and draft/* head, and the dev record lists the heads read.
 
 ### What must not change
 
-- BlockStore::put, put_file and TemplateStore::put stay byte-for-byte unchanged
-- canon.rs millis_now is untouched
-- No other test changes, including lys-anchor's certificate_tests.rs
-- No new dependency: std::fs::File::set_modified only
-- No #[allow], #[ignore] or cfg to silence anything
+- ADR-017's holder rule for records without lit_in is not retired or weakened.
+- A lantern without lit_in is never refused or skipped by recall or the fork for lacking lit_in.
+- The names and display prefixes of lit_in_not_a_session, lantern_not_lit_here, lantern_ambiguous and entry_shape do not change, and neither do the four reason texts.
+- The fork's cut, copied line bytes, lys.forked_from and lys.fork data, and report keys do not change.
+- Hand-written refusal and older-record cases (O2, M2, N3, N2 copy, N1–N4) are neither dropped nor weakened.
+- No note, epilogue or transcript content appears in any refusal or report other than recall's rows (ADR-015, P7, CN3).
+- EpilogueData and the epilogue act do not change.
+- HOME-008 and HOME-010 are not used as ids.
+- Rendered markdown is never edited by hand.
 
 ### What we must put in place first
 
-- Fetch or ls-remote and read every open brief/* and draft/* head: 56 of the 67 are not in the local object store, so the next free HOME, RM and ADR ids (at least HOME-011, RM-019 and ADR-030 on what is visible) cannot be fixed yet
-- Get the lead's ruling on whether the block test pins the shard directory's mtime, the file's, or both
+- Fetch every brief/* and draft/* head on origin immediately before writing ids. Only 7 of 47 home heads are local, and the readable ones already hold HOME-008 to HOME-011, up to ADR-031, C76 and S34.
+- Close or mark superseded run b9d7f174's brief/home and draft/home branches, so its HOME-010 and the C71–C76 and S32–S34 rows stop holding ids.
 
 ### The risks
 
-- Moving the block test's mtime check from the shard directory to the file loses the only check that catches a temp file created and then discarded in the shard, weakening HOME-001's gate
-- A sub-second instant can be truncated on coarse-timestamp filesystems so the read-back fails. A whole-second instant avoids that
-- Setting a directory's mtime needs an fd on the directory. That works on Linux and macOS, but it would fail on Windows without backup semantics, if Windows is ever added to CI
-- If the new check pins a path the second put never touches, it proves nothing. The pin must be on the same path(s) the old check read
-- Picking ids from only the locally visible branches could collide with an unseen draft (HOME-010, RM-018 and ADR-029 are already taken on branches)
+- Declaring lit_in as Option<String> with serde default silently reads a present null as absent. That lets a malformed lantern resolve by holders, which the rulings forbid.
+- Switching the fork to full LanternData refuses O2, M2 and N3 (they have no lit_at) as entry_shape and breaks HOME-006's older-record tests.
+- The session-exists check in recall adds one path lookup per lantern with lit_in, and a session deleted after lighting then skips its holders' whole session by note.
+- Recall lists a lantern's copies in fork children with lit_in naming the parent, not the row's session. A person may read that as a second lantern unless RECORD.md says so.
+- Relighting L2 with light changes its id and the timing of lit_at, which may move bytes-read and line-hash expectations in the five-forks test.
+- PROOF-FORK.md's line that the light act records no lit_in becomes stale unless it is annotated.
+- The id rule can race another brief written between the fetch and the push, repeating the HOME-008/HOME-010 collision.
 
 ### Still open
 
-- The block test's mtime check reads the shard directory, as HOME-001's acceptance specifies. Should the new check pin and assert that directory's mtime, the stored block file's mtime, or both? The sentence of the words it stands on: "Each test, before the second put, sets the stored file's modification time to a fixed instant well in the past with std::fs::File::set_modified, reads it back to confirm the instant took, and after the second put asserts the modification time is still exactly that instant and the directory count is unchanged.". Why only the lead can settle it: The two readings of this sentence give different tests. blocks_tests.rs:18-33 asserts the mtime of store.root()/<hh>, a directory, and docs/design/home/briefs/HOME-001.md:85 says 'measured by the directory's mtime and file count'. The directory mtime also catches a temp file created and then deleted, which the file's mtime and the entry count both miss. Moving the check to the file alone would weaken the gate and contradict HOME-001's acceptance and the card's own 'keep every other assertion'.
-
-### The units beyond the first
-
-- Remove the clock wait from lys-anchor's certificate tests — crates/lys-anchor/src/admission/certificate_tests.rs contains a sleep under the same rule, and the card puts any other test out of scope
+- May the tests whose fixture changes replace the literal "L2" with the id the light act returns (12 sites) and update their module docs, given the rule that no other existing lantern or fork test changes? The sentence of the words it stands on: "No other existing lantern or fork test changes.". Why only the lead can settle it: Lighting L2 with the light act gives it a generated id. fork_cut_tests.rs:284-301,333,353,367 and tests/fork.rs assert the literal "L2" in cut ids, bytes-read rows and refusals, and module docs at fork_cut_tests.rs:11-14 and tests/fork.rs:1-9 describe L2 as hand-written. Keeping those tests unchanged would contradict lighting L2 with the light act.
+- Should the fork's typed read accept a lantern with no lit_at (O2, M2 and N3 carry only point, note and lit_by), so they stay forkable, or must every forkable lantern have LanternData's full shape? The sentence of the words it stands on: "The fork in HOME-006 reads the typed field and its hand-written fixtures light L2 with the light act instead.". Why only the lead can settle it: If the fork deserialises into LanternData, which requires lit_at and note, then O2, M2 and N3 are refused as entry_shape and HOME-006's older-record fork cases (O2 named with --session, O2 ambiguous, M2's block counts) fail. The superseded draft solved this with a narrower view that does not require lit_at. Whether a lantern without lit_at is forkable changes what a person sees from lys-home fork.
 
 ### The smallest complete shape
 
-One commit on the card branch. It edits blocks_tests.rs and templates_tests.rs so that each pins the relevant mtime to one fixed whole-second past instant and reads it back. After the second put, each asserts that instant and an unchanged count. Both sleeps are removed and every existing assertion is kept. The commit also carries the home-cluster brief and roadmap row (and a decision only if wanted) under freshly checked next-free ids, with the design gate and the full cargo legs green on Dean's laptop.
+One card on the home line, one PR. It contains: the optional typed lit_in on LanternData (null kept distinct from absent); the light act recording it and the Lit report printing it; recall rows carrying it (null for older records) with lit_in_not_a_session for a bad one; the fork reading the typed field while keeping the holder rule; L2 lit with the light act in both fork fixtures, with the named hand-written exceptions; the two round-trip tests and the CLI pin updated; RECORD.md, the README and a PROOF-FORK note; the new ADR, roadmap row, checklist and stories at the next free ids; and the cluster re-rendered. All gates pass on Dean's laptop.
 
 ## The roadmap row
 
-- **RM-027** — Prove the block and template stores' second put writes nothing without waiting on the clock (fix, idea)
-- Summary: The two lys-home store gates that sleep 20 ms before a second put instead pin the shard directory's and the stored file's modification times to a fixed past instant, read them back, and assert after the second put that both are unchanged and the shard's entry count is the same. No sleep; the store write paths, every other test and canon.rs's millis_now are untouched.
-- Asked by: tom on 2026-09-27T10:23:00+10:00
-- Context: The words' sentence on the stored file's modification time is settled by the lead's answer: both the shard directory's and the stored file's modification times are pinned, read back and asserted unchanged, in the block test and in the template test, because the directory's modification time is what catches a temporary file created and deleted in the shard.
-- Quote: Two tests in crates/lys-home sleep so that a file's modification time can tell a second put that wrote nothing from one that rewrote the same bytes: the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing in src/record/blocks_tests.rs and a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing in src/record/templates_tests.rs, each sleeping 20 milliseconds before the second put. That wait is a clock. On a filesystem with coarse timestamps, or on a loaded host where the second put lands inside the same tick, the 20 milliseconds prove nothing, and the suite pays the wait on every run. Tom's word of 27 September 2026, relayed by Waffles in the pipeline channel: tests must not wait on the clock and must not fail under load; such a wait is a defect, not a flake.
-
-The rule to meet: the proof that a second put writes nothing does not depend on elapsed time. Each test, before the second put, sets the stored file's modification time to a fixed instant well in the past with std::fs::File::set_modified, reads it back to confirm the instant took, and after the second put asserts the modification time is still exactly that instant and the directory count is unchanged. No sleep. The stores' write paths are not changed: they already write once by hash, and this card only makes the tests prove it without a clock.
-
-Acceptance: both sleeps are gone; a grep for thread::sleep and tokio::time::sleep across crates/lys-home prints nothing; both tests keep every other assertion they have today; no timeout is raised and no test is split; the change is one commit on the card branch. Keep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh), in the home cluster; the brief id, roadmap row and any decision take the next free id after main's highest and every open brief/* and draft/* branch's, checked with git ls-remote immediately before writing. Not in scope: the block or template store's write path, any other test, or the canon's millis_now, which records a timestamp and waits on nothing. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie on 27 September 2026 on lys main 7b53625.
-- Cluster: home; briefs: HOME-013
-- Notes: Ids: HOME-013, RM-027, C95, C96 and S40 are the next free after main 7b53625 and every open brief/* and draft/* head on origin, fetched and read immediately before writing (the highest seen: HOME-012 on draft/home/4c46aabc, RM-026 on brief/lys-anchor/6b1c7df6 and draft/home/4c46aabc, ADR-040, C94, S39). No new ADR: the no-clock rule for these gates is carried by C95 and C96. Further unit, not written: Remove the clock wait from lys-anchor's certificate tests.
+- **RM-031** — LanternData carries lit_in, the light act records it, recall reports it and the fork reads the typed field (feature, idea)
+- Summary: A lantern records the session it was lit in. LanternData gains an optional lit_in; the light act writes it as the id of the session at whose head it appends the lantern and prints it in its report; recall rows carry it beside point, note and lit_by, null for a lantern lit before it; and HOME-006's fork reads it through a narrower typed view in place of the raw-data stopgap, with L2 in both fork fixtures lit by the light act and only the records the light act cannot produce written by hand. A lantern with no lit_in stays an older record resolved by its holders (ADR-017), and a present lit_in that is not a session id is refused lit_in_not_a_session by the fork and by recall, never read as any session (ADR-046).
+- Asked by: tom on 2026-09-27T12:35:00+10:00
+- Context: The Lys board card 0a59xZFp that HOME-006's third amendment names as the closer of the lit_in gap, surveyed on lys main 7b536253 with HOME-006 landed. Written again by the brief chain after run b9d7f174 wrote its brief under ids other open branches held. The lead's rulings settled that a lantern with no lit_in keeps the holder rule rather than being refused (correcting the request's 'as it is today'), that lit_in is optional and shows as null in recall for an earlier lantern, that the fork fixtures keep hand-written only the lanterns the light act cannot produce, that the two key-set pins and the light report's pin gain lit_in, that recall refuses a present lit_in that is not a session id as lit_in_not_a_session with the fork's four reason texts, and that every id is the next free past main and every open brief and draft head. The lead's answers to the survey settled that the tests whose fixtures change assert the id the light act returns in place of the literal L2, and that the fork reads a narrower typed view not requiring lit_at or note. HOME-014 carries those answers.
+- Quote: The lantern's typed data does not carry lit_in and the light act does not record it, so HOME-006's fork reads lit_in from the entry's raw data as a stopgap and the fixtures write L2 by hand. This card makes the typed field the shape. LanternData gains lit_in, the session that held the point when the lantern was lit; the light act records it at the head of the session holding the point; recall reports it beside point, note and lit_by. The fork in HOME-006 reads the typed field and its hand-written fixtures light L2 with the light act instead. A lantern record without lit_in, or with a lit_in that is not a session id, is refused by name as it is today, never read as any session. Ordered after HOME-006 lands. Acceptance: a lantern lit with the light act recalls with lit_in equal to the lighting session; the fork's fixtures contain no hand-written lantern entry; the two lit_in refusals keep their tests; the existing lantern and fork tests keep passing; ADR, checklist and user story rows renumbered past HOME-006's.
+- Cluster: home; briefs: HOME-014
+- Notes: Ordered after HOME-006 (RM-010), which is on main at 7b536253, so no roadmap dependency is written and the card starts on the current main. Ids, each the next free past main and every open brief/* and draft/* head, read with git ls-remote and a fetch of every head immediately before writing: HOME-014 (HOME-013 on brief/home/95f9348b and brief/home/a3186728; HOME-008 and HOME-010 are held and not used), RM-031 (RM-030 on draft/directory/d40aa430), ADR-046 (ADR-045 on draft/lys-core/5f185fd4 and draft/lys-core/6747ce61), C100 to C105 and S41 to S43 (C95 to C99 and S40 on brief/home/95f9348b, HOME-013). The superseded run b9d7f174's brief/home and draft/home branches still hold HOME-008, HOME-010, ADR-029, RM-018, C71 to C76 and S32 to S34 and should be closed or marked superseded. Heads read (92): brief/decisions-words/0969edbd, brief/directory/1e30a4cb, brief/directory/28d15c0d, brief/directory/63bd2f2e, brief/directory/67e5c3fc, brief/directory/82882bd5, brief/directory/d70a418b, brief/directory/lifecycl, brief/home/06103633, brief/home/0e229c29, brief/home/31aa723f, brief/home/40b37c5f, brief/home/54e28af6, brief/home/5898fcb0, brief/home/7d3f3efb, brief/home/879bf06e, brief/home/95f9348b, brief/home/99985c4a, brief/home/9e701467, brief/home/a3186728, brief/home/b69a5124, brief/home/b9d7f174, brief/home/c322f3e6, brief/home/d26d0f3b, brief/home/d388a9f7, brief/home/de72f0a4, brief/home/e35a7157, brief/home/ea6ad356, brief/lys-anchor/6b1c7df6, brief/secrets/309540a4, draft/canon-words/e75b3567, draft/decisions-words/0969edbd, draft/directory/073049e0, draft/directory/1e30a4cb, draft/directory/28d15c0d, draft/directory/7e9506d8, draft/directory/82386e20, draft/directory/82882bd5, draft/directory/858c0e71, draft/directory/9bb544d1, draft/directory/b38766d2, draft/directory/c7d95bf6, draft/directory/d40aa430, draft/directory/d5055cc1, draft/directory/dc7fb926, draft/directory/e5171dbd, draft/home/06103633, draft/home/0e229c29, draft/home/0eea471a, draft/home/0efbd7ed, draft/home/128bb392, draft/home/24724e9e, draft/home/2bfc117e, draft/home/31aa723f, draft/home/382db8b8, draft/home/4c46aabc, draft/home/4c5d0ab9, draft/home/533af05d, draft/home/54e28af6, draft/home/5898fcb0, draft/home/65e82438, draft/home/7657952c, draft/home/7d3f3efb, draft/home/9635a408, draft/home/99985c4a, draft/home/a13070d7, draft/home/a62aacfe, draft/home/a6d7b86a, draft/home/b69a5124, draft/home/b9d7f174, draft/home/c322f3e6, draft/home/d26d0f3b, draft/home/d388a9f7, draft/home/d5a29dc7, draft/home/de72f0a4, draft/home/e35a7157, draft/lys-core/04213a71, draft/lys-core/33d9ce6d, draft/lys-core/5f185fd4, draft/lys-core/6747ce61, draft/lys-core/95377829, draft/lys-core/a31929b9, draft/lys-gate/7dc46a76, draft/lys-log-store/a1163a79, draft/lys-log-store/e8440f97, draft/rauthy-rebase/4365d91a, draft/rauthy-rebase/be0c979d, draft/roots/3fa3f51a, draft/secrets/309540a4, draft/secrets/604f95d0, draft/secrets/ad15e87e, main. Further units, not written: Re-measure PROOF-FORK on a real session whose lanterns carry lit_in; Recall tells a lantern lit here from a copy carried in by a fork; Retire the older-record holder rule once no lantern without lit_in remains.
 
 ## The design
 
@@ -166,6 +198,7 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 - ADR-016 — A rendered file's derived uuids are a fixed, versioned contract — Derive every uuid a render needs and the record does not hold as UUIDv5 under the session's namespace and the name `<entry id>#<role>`, with a closed set of roles (`record` first); the session's namespace is UUIDv5 over one fixed lys namespace (32c05904-d1f1-550c-9eee-2f6c8f98b665, itself UUIDv5 of the RFC 9562 URL namespace over `lys/home/claude-code/render-uuid/v1`) and the id of the session being rendered, so the same entry id in two sessions never derives one uuid. Treat the namespace, the session namespace rule, the name form and the roles as frozen: a change is a new version alongside, never a mutation. The fork and launch cards derive by this scheme. Rejected: drawing fresh ids (nondeterministic), keying on a hash of the entry id alone without a namespace, a role and a session (two roles on one entry collide, two sessions with one hand-authored id collide, and it is not reproducible with standard UUID tooling), mixing in the target session id (the record does not hold it), and leaving the scheme mutable until a later card (every recorded hash would move with it).
 - ADR-017 — A fork is a child session cut from the parent's own lines at a lantern's point, with its ancestry on both sides — A fork resolves a lantern to the session it was lit in, read from the lys.lantern data's lit_in when the record carries it and otherwise by the older-record rule (one holder cuts, several refuse lantern_ambiguous until a session is named), and cuts that session's root-to-point chain at the last assistant message at or before the point, through the index. The child is a new session under the parent's cwd whose header's parentSession is the parent file's path relative to the home, holding each cut entry as the parent file's own line bytes, then one lys.forked_from custom entry as its head naming the parent session, the lantern, the point, the cut entry, whether the coordinate was carried and the carried entry; the parent gains one lys.fork custom entry at its head naming the child. Nothing else is copied and no block is written. Rejected: re-serialising the copied entries (the copy would stop hash-matching the parent's lines), a fork store beside the sessions outside Pi's grammar, cutting at a point no lantern names, and a header field beyond Pi's parentSession.
 - ADR-018 — A user-message point is carried as a seed prompt beside the rendered file, never copied into the child — When the point is a user message the cut stops at the assistant message before it and the message is carried, not copied: lys.forked_from records its id with coordinate_carried true and counts, by kind, the parts of it that are not text. The Claude Code render of such a child writes the message's text parts, in order, as a seed prompt beside the rendered file under an in-band marker line naming the parent session, the point and the lantern, and names it in the render report; the template's launch line, printed by render-launch only, passes that file as the resumed session's first prompt. A part that is not text never refuses a fork or a render and never enters the seed. Rejected: copying the user message into the child's chain, refusing a fork for a non-text part, and putting the seed's text in the report or the loss account.
+- ADR-046 — A lantern records the session it was lit in as an optional typed lit_in; a lantern without it is an older record resolved by its holders — LanternData gains an optional lit_in, the id of the session that held the point when the lantern was lit, and keeps refusing unknown keys; a present null and a present non-string value are kept distinct from an absent key. The light act writes it as the id of the session at whose head it appends the lantern and reports it; recall reports it beside point, note and lit_by, as null for a lantern whose data has no lit_in, and gives a lantern whose lit_in is present and not a session id the fork's lit_in_not_a_session refusal with the fork's reason text, skipped by note and refused by point, never a row and never entry_shape. The fork reads lit_in through a narrower typed view carrying point, lit_by and the optional lit_in, which requires neither lit_at nor note: a lantern whose data has no lit_in is an older record and resolves by its holders as ADR-017 rules (one holder cuts, several refuse lantern_ambiguous until a session is named), and a lit_in that is present but is null, not a string, not a safe session name, or names no session of the home is refused lit_in_not_a_session naming which, never read as any session. Rejected: making lit_in required (every lantern lit before it would become the wrong shape, skipped by recall by note and refused by recall by point); refusing a lantern with no lit_in by name (every lantern lit before it would become unforkable, retiring ADR-017's older-record rule); reading a null lit_in as an absent one (a silent fallback to the holder rule); the fork reading the full LanternData (the older records without lit_at would stop being forkable); and rewriting earlier lanterns to carry it (P1).
 
 ## Goals
 
@@ -203,7 +236,6 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `docs/design/home/PROOF-PROXY.md` | the measured subscription login through a pass-through proxy: version, headers that mattered, what failed | HOME-001 |
 | `docs/design/home/LOSS-ACCOUNT.md` | what the Claude Code render preserves, transforms and cannot carry | HOME-001 |
 | `crates/lys-home/src/record/blocks.rs` | content-addressed block store: put by SHA-256, get by hash, never rewritten | HOME-001 |
-| `crates/lys-home/src/record/blocks_tests.rs` | gates on the block store: once by hash, a second put proven write-free by pinned modification times, never rewritten, verifiable | HOME-013 |
 | `crates/lys-home/src/harness/claude_code/import.rs` | Claude Code JSONL into SessionEvents plus blocks | HOME-001 |
 | `crates/lys-home/src/harness/claude_code/render.rs` | SessionEvents into a Claude Code JSONL under a chosen uuid, with the loss account | HOME-001 |
 | `crates/lys-home/src/harness/claude_code/mod.rs` | the Claude Code harness profile: transcript root, cwd slug, version measured | HOME-001 |
@@ -306,8 +338,8 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `crates/lys-home/src/harness/claude_code/seed.rs` | the seed prompt of a carried user message: the marker line, the text parts, the seed argument for the template's launch line | HOME-006 |
 | `crates/lys-home/tests/fork.rs` | the fork run as the binary: five forks and five refusals, blocks unchanged, both ancestry sides | HOME-006 |
 | `docs/design/home/PROOF-FORK.md` | the measured fork: Pi's parentSession read, a real session forked, rendered and launched, as hashes, counts and exit codes | HOME-006 |
-| `docs/design/home/briefs/HOME-013.json` | the clock-free write-once gates: the block and template tests pin modification times instead of sleeping | HOME-013 |
-| `docs/design/home/briefs/HOME-013.md` | its rendered markdown | HOME-013 |
+| `docs/design/home/briefs/HOME-014.json` | the lit-in brief: LanternData's lit_in, recorded by the light act, reported by recall and read by the fork | HOME-014 |
+| `docs/design/home/briefs/HOME-014.md` | its rendered markdown | HOME-014 |
 
 ## Inventory
 
@@ -1950,95 +1982,208 @@ Complete the section of docs/design/home/PROOF-RESUME.md that R3 adds with: the 
 
 ---
 type: brief
-id: HOME-013
+id: HOME-014
 cluster: home
-title: Prove a second put writes nothing by pinned modification times, not by sleeping
+title: LanternData carries lit_in, the light act records it, recall reports it and the fork reads the typed field
 ---
 
-# HOME-013: Prove a second put writes nothing by pinned modification times, not by sleeping
+# HOME-014: LanternData carries lit_in, the light act records it, recall reports it and the fork reads the typed field
 
 > **Cluster:** home
+> **Depends on:** HOME-004, HOME-006
 > **Design anchor:**
-> - ADR-012 — A harness launch template is kept in the home by hash, and each render is recorded on the session beside its context path — A launch template per harness is a JSON object with named slots (transcript, mcp, env, secrets, instructions) plus flags, stored in the home under templates/ by its SHA-256; lys-home renders a template and a session into files and runtime variables with command mappings in text, prints the launch line and never runs it, and records each render as a sixth lys.harness_event kind, template_render, hung as a side leaf beside the context path with the written paths in a manifest block named by hash. Rejected: a transcript converter or adapter protocol per harness, a template kept outside the home (a seat document of another tool), and a render event that advances the head, which would change the session head hash between two renders of the same session.
+> - ADR-014 — A lantern is a custom entry in its session, and its note grows only by epilogue entries — A lantern is a `lys.lantern` custom entry appended at its session's head, carrying in custom.data the entry id of its point (an existing entry of the same session that is not itself a lantern or an epilogue, the head or any entry the head has moved past), the note as written, who lit it and when. Its note grows only by `lys.lantern_epilogue` custom entries naming the lantern's entry id and carrying the further words, who added them and when; a lantern's story is its entry followed by its epilogues in order, and nothing is rewritten. Rejected: Pi's `label` entry on the target (it replaces or clears a label rather than growing one, and carries no author or time), a lantern store beside the session outside Pi's grammar (a lantern would stop travelling with its session), and editing the lantern's note in place (the record is append-only, P1).
+> - ADR-015 — A lantern's note and epilogues are the person's annotations, not transcript — A lantern's note and its epilogues are the person's own annotations, not transcript. Recall prints them by design; they are the one exception to P7 and CN3, and only recall prints them. Transcript lines (message, tool and compaction content) still never appear in output, logs or errors, and a recall row never carries a line of the transcript around its point. Rejected: treating notes as transcript and printing only their hashes, which makes recall useless to the person who wrote them.
+> - ADR-017 — A fork is a child session cut from the parent's own lines at a lantern's point, with its ancestry on both sides — A fork resolves a lantern to the session it was lit in, read from the lys.lantern data's lit_in when the record carries it and otherwise by the older-record rule (one holder cuts, several refuse lantern_ambiguous until a session is named), and cuts that session's root-to-point chain at the last assistant message at or before the point, through the index. The child is a new session under the parent's cwd whose header's parentSession is the parent file's path relative to the home, holding each cut entry as the parent file's own line bytes, then one lys.forked_from custom entry as its head naming the parent session, the lantern, the point, the cut entry, whether the coordinate was carried and the carried entry; the parent gains one lys.fork custom entry at its head naming the child. Nothing else is copied and no block is written. Rejected: re-serialising the copied entries (the copy would stop hash-matching the parent's lines), a fork store beside the sessions outside Pi's grammar, cutting at a point no lantern names, and a header field beyond Pi's parentSession.
+> - ADR-046 — A lantern records the session it was lit in as an optional typed lit_in; a lantern without it is an older record resolved by its holders — LanternData gains an optional lit_in, the id of the session that held the point when the lantern was lit, and keeps refusing unknown keys; a present null and a present non-string value are kept distinct from an absent key. The light act writes it as the id of the session at whose head it appends the lantern and reports it; recall reports it beside point, note and lit_by, as null for a lantern whose data has no lit_in, and gives a lantern whose lit_in is present and not a session id the fork's lit_in_not_a_session refusal with the fork's reason text, skipped by note and refused by point, never a row and never entry_shape. The fork reads lit_in through a narrower typed view carrying point, lit_by and the optional lit_in, which requires neither lit_at nor note: a lantern whose data has no lit_in is an older record and resolves by its holders as ADR-017 rules (one holder cuts, several refuse lantern_ambiguous until a session is named), and a lit_in that is present but is null, not a string, not a safe session name, or names no session of the home is refused lit_in_not_a_session naming which, never read as any session. Rejected: making lit_in required (every lantern lit before it would become the wrong shape, skipped by recall by note and refused by recall by point); refusing a lantern with no lit_in by name (every lantern lit before it would become unforkable, retiring ADR-017's older-record rule); reading a null lit_in as an absent one (a silent fallback to the holder rule); the fork reading the full LanternData (the older records without lit_at would stop being forkable); and rewriting earlier lanterns to carry it (P1).
 > **Checklist:**
-> - C95 — The block store's gate proves a second put of the same bytes writes nothing without elapsed time: before the second put it pins the shard directory's and the block file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock.
-> - C96 — The template store's gate proves a second put of the same template writes nothing without elapsed time: before the second put it pins the template shard directory's and the template file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock.
+> - C100 — LanternData carries an optional lit_in, the session that held the point when the lantern was lit, keeping a present null and a present non-string value distinct from an absent key, and still refuses an unknown key.
+> - C101 — The light act writes lit_in as the id of the session at whose head it appends the lantern, and its report carries lit_in beside id, session, point and lit_at.
+> - C102 — Recall rows carry lit_in beside point, note and lit_by, the lighting session for a lantern the light act lit and null for a lantern whose data has no lit_in, and a lantern whose lit_in is present and not a session id is never listed as a row but skipped by note and refused by point as lit_in_not_a_session with the fork's reason text.
+> - C103 — The fork reads lit_in through a typed view that does not require lit_at or note and never from a raw JSON key: a lantern with no lit_in resolves by its holders, and a present lit_in that is null, not a string, not a safe session name, or names no session of the home refuses lit_in_not_a_session naming which.
+> - C104 — The fork's fixtures light L2 with the light act and write by hand only the lanterns the light act cannot produce (O2, M2, N3, the copy N2 and N1 to N4), each named in its test as standing for such a record.
+> - C105 — RECORD.md and the lys-home README document lit_in, and PROOF-FORK.md keeps its measured older-record sentence with a note that the light act now records lit_in.
 > **Stories:**
-> - S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the proof that a second put writes nothing to hold on a filesystem with coarse timestamps and on a loaded host without the suite waiting on a clock, so that a passing store gate means the store wrote nothing and never that the tick was too coarse to see a write.
+> - S41 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent that lights a lantern, I want it to record the session I lit it in and recall to show that session beside the point and the note, so that I know which session the lantern leads back to.
+> - S42 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a lantern lit before lit_in was recorded to stay readable and forkable by its holders, and a lit_in that is not a session id refused by name, so that no lantern is ever read as a session it does not name.
+> - S43 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the fork's tests to light their lanterns with the light act wherever it can produce them, so that the fork is proved on the record the light act really writes.
 
 ## Purpose
 
-The block store's and the template store's gates tell a second put that wrote nothing from one that rewrote the same bytes by a modification time taken 20 milliseconds apart. That wait is a clock: on a filesystem with coarse timestamps, or on a loaded host where the second put lands inside the same tick, it proves nothing, and the suite pays it on every run. This brief makes both gates prove the write-once property with no elapsed time, by pinning the modification times the second put would change to a fixed instant and asserting they did not move.
+A fork has to know the session a lantern was lit in, because a copied line keeps its id and a fork's child holds a copy of every lantern on the copied chain. HOME-006 reads that session from a `lit_in` key the light act does not write, looked up in the entry's raw data as a stopgap, and its fixtures write the `lit_in` lantern `L2` by hand. This brief makes `lit_in` part of the lantern's typed shape: `LanternData` carries it, the light act records it, the light report and recall report it, and the fork reads the typed field, while every lantern lit before it stays readable and forkable by its holders (ADR-017, ADR-046).
 
 ## Task
 
-Two tests change and nothing else in crates/lys-home: the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing in crates/lys-home/src/record/blocks_tests.rs and a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing in crates/lys-home/src/record/templates_tests.rs. In each, the std::thread::sleep of 20 milliseconds before the second put is removed. In its place, before the second put, the test sets the modification time of both the shard directory and the stored file to the fixed instant std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000) with std::fs::File::set_modified, reads both back and asserts each equals that instant; after the second put it asserts both are still exactly that instant and the shard's entry count equals the count taken before the second put. The shard directory is pinned as well as the file because the directory's modification time is what catches a temporary file created and deleted in the shard, which neither the file's modification time nor the entry count shows; the block test's existing check reads that directory, as HOME-001's acceptance measures it. Every assertion each test makes today is kept. The block and template stores (blocks.rs, templates.rs) already write once by hash and do not change. Out of scope: any store's write path, every other test in the workspace including the sleep in the lys-anchor crate's admission certificate tests, and canon.rs's millis_now, which records a timestamp and waits on nothing.
+Add an optional `lit_in` to `LanternData` in `crates/lys-home/src/record/entries.rs`, typed so that an absent key, a present JSON null and a present non-string value stay three distinct things. `light()` writes `lit_in` as the id of the session at whose head it appends the lantern, and its `Lit` report, printed by `lys-home lantern light`, carries `lit_in` beside `id`, `session`, `point` and `lit_at`. Recall's `LanternRow` carries `lit_in` beside `point`, `note` and `lit_by`, as JSON null for a lantern whose data has no `lit_in`. `fork_cut.rs` reads `point` and `lit_in` through a narrower typed view in place of raw `serde_json::Value` lookups. Both fork fixtures light `L2` with the light act. In scope: `entries.rs`, `lantern.rs`, `recall.rs`, `fork_cut.rs`, their tests, `fork_tests.rs`, `tests/lantern_cli.rs`, `tests/fork.rs`, `docs/design/home/RECORD.md`, the lys-home README, a note in `docs/design/home/PROOF-FORK.md`, and the cluster's rendered markdown.
+
+A correction to the request, as ruled: the request says a lantern record without `lit_in` is refused by name as it is today, and the tree does not refuse it. A lantern whose data has no `lit_in` key is an older record and resolves by its holders as ADR-017 and HOME-006's third amendment rule: one holder cuts, several refuse `lantern_ambiguous` until `--session` names one. Only a `lit_in` that is present and not a session id is refused by name (`lit_in_not_a_session`), never read as any session. ADR-017 is not retired, and every lantern lit before this brief stays forkable. `lit_in` is optional: a lantern lit before this brief is read as it is, never as the wrong shape; recall shows its `lit_in` as null; recall by note skips nothing new and recall by point refuses nothing new for want of `lit_in`.
+
+The fork's typed read, as ruled: the fork reads a lantern through a narrower typed view carrying `point`, `lit_by` and an optional `lit_in`, which does not require `lit_at` or `note`, so the older records `O2`, `M2` and `N3`, whose data is exactly `{point, note, lit_by}`, read as they do today. `LanternData` keeps its full shape for lighting and recall.
+
+The fixtures, as ruled: the rule that the fork's fixtures contain no hand-written lantern entry covers every lantern the light act can produce, so `L2` is lit with the light act in both fork fixtures. The records the light act can no longer write stay hand-written, and this is the rule's one exception: the older records `O2` (in both fixtures), `M2` and `N3` with no `lit_in`, the copy `N2` whose `lit_in` names a session other than the one it stands in, and `N1` to `N4` whose `lit_in` is null, 5, `../elsewhere` and `no-such-session`. Each is named in its test as standing for a record the light act cannot produce.
+
+The tests that change, as ruled: the request's rule that no other existing lantern or fork test changes means that no test changes except those named here and those whose fixtures this brief changes. `lantern_data_round_trips_with_exactly_its_four_keys` becomes a five-key round trip with `lit_in`; `a_row_carries_exactly_its_fields` gains `lit_in`; the light report's key pin in `tests/lantern_cli.rs` gains `lit_in`. A test whose `L2` is now lit by the light act asserts the id the light act returns in place of the literal `"L2"`, at each of the twelve sites in `fork_cut_tests.rs`, `fork_tests.rs` and `tests/fork.rs`, and the module docs of `fork_cut_tests.rs` and `tests/fork.rs` say that `L2` is lit with the light act; what each of those tests asserts is otherwise unchanged. New tests are added for what this brief delivers.
+
+Recall's refusal, as ruled: a lantern whose `lit_in` is present and not a session id is refused in recall as `lit_in_not_a_session`, with the fork's four reason texts, both as the skip reason by note and as the refusal by point, and is never listed as a row. Recall's other `entry_shape` cases keep their name.
+
+Out of scope: re-measuring PROOF-FORK on a real session whose lanterns carry `lit_in`; recall telling a lantern lit in a session from a copy a fork carried in; and retiring the older-record holder rule. The brief is ordered after HOME-006, which is on main, so it starts on the current main.
 
 ## Requirements
 
-### R1: Pin the block shard and block file modification times in the block store's gate instead of sleeping
+### R1: Give LanternData an optional lit_in that keeps null and non-string values distinct from an absent key
 
-WHEN the test the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing has put a 1 MiB block once, THE SYSTEM SHALL, before the second put, set the modification time of the shard directory store.root()/<first two hex digits of the hash> and of the block file store.root()/<hh>/<hash> to the instant std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000) with std::fs::File::set_modified, read each back with std::fs::metadata(..).modified() and assert each equals that instant; WHEN the second put of the same bytes returns, THE SYSTEM SHALL assert the shard directory's and the block file's modification times each still equal that instant and the shard's entry count equals the count taken before the second put. THE SYSTEM SHALL NOT sleep, SHALL NOT read the current time, SHALL NOT drop any assertion the test makes today (first.new, !second.new, second.hash == first.hash, the unchanged count, count == 1), SHALL NOT rename, split, ignore or add a timeout to the test, SHALL NOT change any other test in blocks_tests.rs, and SHALL NOT change crates/lys-home/src/record/blocks.rs.
-
-**Acceptance:**
-- `grep -n 'sleep' crates/lys-home/src/record/blocks_tests.rs` prints nothing.
-- `grep -c 'set_modified' crates/lys-home/src/record/blocks_tests.rs` prints a count of at least 1, and the test pins both the path store.root().join(&first.hash.as_str()[..2]) and the path store.root().join(&first.hash.as_str()[..2]).join(first.hash.as_str()).
-- Before the second put the test asserts `std::fs::metadata(p).unwrap().modified().unwrap() == UNIX_EPOCH + Duration::from_secs(1_000_000_000)` for the shard directory and for the block file.
-- After the second put the test asserts the same equality for the shard directory and for the block file, asserts the shard's read_dir count equals the count taken before the second put, and asserts that count equals 1.
-- The test still asserts `first.new`, `!second.new` and `second.hash == first.hash`.
-- `cargo test -p lys-home the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing` reports `1 passed` and `0 failed`.
-- `git diff --exit-code 7b53625 -- crates/lys-home/src/record/blocks.rs` exits 0.
-
-**Files:**
-- modify: crates/lys-home/src/record/blocks_tests.rs
-
-**Checklist:**
-- C95 — The block store's gate proves a second put of the same bytes writes nothing without elapsed time: before the second put it pins the shard directory's and the block file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock.
-
-**Stories:**
-- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the proof that a second put writes nothing to hold on a filesystem with coarse timestamps and on a loaded host without the suite waiting on a clock, so that a passing store gate means the store wrote nothing and never that the tick was too coarse to see a write.
-
-### R2: Pin the template shard and template file modification times in the template store's gate instead of sleeping
-
-WHEN the test a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing has put the launch template fixture once, THE SYSTEM SHALL, before the second put, take the entry count of the template shard directory <home>/templates/<first two hex digits of the hash>, set the modification time of that shard directory and of the template file <home>/templates/<hh>/<hash> to the instant std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000) with std::fs::File::set_modified, read each back with std::fs::metadata(..).modified() and assert each equals that instant; WHEN the second put of the same bytes returns, THE SYSTEM SHALL assert the shard directory's and the template file's modification times each still equal that instant and the shard's entry count equals the count taken before the second put. THE SYSTEM SHALL NOT sleep, SHALL NOT read the current time, SHALL NOT drop any assertion the test makes today (the root absent before the first put, first.new, first.hash == Hash::of(bytes), the stored bytes, path_of, !second.new, second.hash == first.hash, the shard holding exactly 1 entry, contains, get, and the missing-hash error naming the hash), SHALL NOT rename, split, ignore or add a timeout to the test, SHALL NOT change any other test in templates_tests.rs, and SHALL NOT change crates/lys-home/src/record/templates.rs.
+Structural. `LanternData` in `record/entries.rs` gains a documented fifth field `lit_in: Option<LitIn>`: the session that held the point when the lantern was lit. `LitIn` is a documented public enum declared beside it, `#[serde(untagged)]`, with `LitIn::Session(String)` for a JSON string and `LitIn::Other(serde_json::Value)` for any other JSON value, null included. The field carries `#[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = ...)]` naming a crate function that wraps whatever value is present in `Some`, so an absent key reads as `None` and a present null reads as `Some(LitIn::Other(Value::Null))`. `LanternData` keeps `#[serde(deny_unknown_fields)]`, and `EpilogueData` does not change. THE SYSTEM SHALL NOT read a present null as an absent key, SHALL NOT make `lit_in` required, SHALL NOT refuse a lantern whose data has no `lit_in`, and SHALL NOT rename or retype `point`, `note`, `lit_by` or `lit_at`.
 
 **Acceptance:**
-- `grep -n 'sleep' crates/lys-home/src/record/templates_tests.rs` prints nothing.
-- `grep -c 'set_modified' crates/lys-home/src/record/templates_tests.rs` prints a count of at least 1, and the test pins both path.parent() and path, where path is home.root().join("templates").join(&first.hash.as_str()[..2]).join(first.hash.as_str()).
-- Before the second put the test asserts `std::fs::metadata(p).unwrap().modified().unwrap() == UNIX_EPOCH + Duration::from_secs(1_000_000_000)` for the shard directory and for the template file, and takes the shard's read_dir count.
-- After the second put the test asserts the same equality for the shard directory and for the template file, asserts the shard's read_dir count equals the count taken before the second put, and still asserts that count equals 1.
-- The test still asserts the store root is absent before the first put, `first.new`, `first.hash == Hash::of(&bytes)`, the file's bytes equal the fixture, `store.path_of(&first.hash) == path`, `!second.new`, `second.hash == first.hash`, `store.contains(&first.hash)`, `store.get(&first.hash) == bytes`, and that the error for Hash::of(b"never stored") contains that hash.
-- `cargo test -p lys-home a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing` reports `1 passed` and `0 failed`.
-- `git diff --exit-code 7b53625 -- crates/lys-home/src/record/templates.rs` exits 0.
+- `serde_json::from_value::<LanternData>(json!({"point": "e2", "note": NOTE, "lit_by": LIGHTER, "lit_at": now()}))` is `Ok` with `lit_in == None`.
+- The same object with `"lit_in": null` added is `Ok` with `lit_in == Some(LitIn::Other(Value::Null))`.
+- The same object with `"lit_in": 5` added is `Ok` with `lit_in == Some(LitIn::Other(json!(5)))`.
+- The same object with `"lit_in": "parent"` added is `Ok` with `lit_in == Some(LitIn::Session("parent".to_owned()))`.
+- `lantern_data_round_trips_with_exactly_its_five_keys` builds a `LanternData` with `lit_in: Some(LitIn::Session(FIXTURE.to_owned()))`; its sorted serialised keys equal `["lit_at", "lit_by", "lit_in", "note", "point"]` and it deserialises back equal; no test named `lantern_data_round_trips_with_exactly_its_four_keys` remains.
+- A `LanternData` with `lit_in: None` serialises to exactly the keys `["lit_at", "lit_by", "note", "point"]`.
+- `lantern_data_with_an_extra_key_is_refused` passes unchanged: data carrying `"anchors": []` is `Err`.
+- `git diff` of `record/entries.rs` changes no line of `EpilogueData`.
 
 **Files:**
-- modify: crates/lys-home/src/record/templates_tests.rs
+- modify: crates/lys-home/src/record/entries.rs
+- modify: crates/lys-home/src/record/lantern_tests.rs
 
 **Checklist:**
-- C96 — The template store's gate proves a second put of the same template writes nothing without elapsed time: before the second put it pins the template shard directory's and the template file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock.
+- C100 — LanternData carries an optional lit_in, the session that held the point when the lantern was lit, keeping a present null and a present non-string value distinct from an absent key, and still refuses an unknown key.
 
 **Stories:**
-- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the proof that a second put writes nothing to hold on a filesystem with coarse timestamps and on a loaded host without the suite waiting on a clock, so that a passing store gate means the store wrote nothing and never that the tick was too coarse to see a write.
+- S41 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent that lights a lantern, I want it to record the session I lit it in and recall to show that session beside the point and the note, so that I know which session the lantern leads back to.
+
+### R2: Record lit_in in the light act, print it in the light report, and check a recorded lit_in in one place
+
+WHEN `light(home, session, point, note, by)` appends a lantern, THE SYSTEM SHALL write its data's `lit_in` as `Some(LitIn::Session(session))`, the id of the session at whose head the lantern is appended, and SHALL return a `Lit` report carrying a documented `lit_in: String` field equal to that id beside `id`, `session`, `point` and `lit_at`; `lys-home lantern light` prints that report. `record/lantern.rs` also holds the one `pub(crate)` check of a recorded `lit_in`, taking the home, the lantern id and a `&LitIn` and returning the session id it names. IF the recorded `lit_in` is null, not a string, not a safe session name, or names no session file of the home THEN the check SHALL return `HomeError::LitInNotASession` naming the lantern with `what` equal to `is null`, `is not a string`, `is not a safe session name` and `names no session of the home` respectively. THE SYSTEM SHALL NOT take `lit_in` from an argument other than the session `light` owns, from the point entry, or from any other session, SHALL NOT change the order of `light`'s checks or its refusals, SHALL NOT put the note in the report, and SHALL NOT change a variant, a field or an `#[error]` text in `error.rs`.
+
+**Acceptance:**
+- A new test in `lantern_tests.rs`: `light(&home, FIXTURE, "e2", NOTE, LIGHTER)` returns a `Lit` whose `lit_in == FIXTURE`, and the appended entry's data read as `LanternData` has `lit_in == Some(LitIn::Session(FIXTURE.to_owned()))`.
+- In `tests/lantern_cli.rs`, the light report's sorted keys equal `["id", "lit_at", "lit_in", "point", "session"]` and `report["lit_in"] == FIXTURE`; the test's other assertions are unchanged.
+- `git diff` of `crates/lys-home/src/error.rs` is empty.
+- Every other test in `lantern_tests.rs` and `tests/lantern_cli.rs` passes unchanged.
+
+**Files:**
+- modify: crates/lys-home/src/record/lantern.rs
+- modify: crates/lys-home/src/record/lantern_tests.rs
+- modify: crates/lys-home/tests/lantern_cli.rs
+
+**Checklist:**
+- C101 — The light act writes lit_in as the id of the session at whose head it appends the lantern, and its report carries lit_in beside id, session, point and lit_at.
+
+**Stories:**
+- S41 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent that lights a lantern, I want it to record the session I lit it in and recall to show that session beside the point and the note, so that I know which session the lantern leads back to.
+
+### R3: Report lit_in in recall's rows, null for a lantern without it, and refuse a lit_in that is not a session id by name
+
+`LanternRow` in `record/recall.rs` gains a documented `lit_in: Option<String>`, serialised without `skip_serializing_if`, so every row carries the key beside `point`, `note` and `lit_by`; `rows_of` takes the home so it can run R2's check. WHEN recall by note or by point lists a lantern whose data has no `lit_in`, THE SYSTEM SHALL list it with `lit_in` null. WHEN it lists a lantern whose `lit_in` is present, THE SYSTEM SHALL run R2's check and list the session id it returns. IF that check refuses THEN recall by note SHALL skip the lantern's session and name it in `skipped` with that refusal's display text, and recall by point SHALL return that refusal. THE SYSTEM SHALL NOT give such a lantern `entry_shape`, SHALL NOT change the name of recall's other `entry_shape` refusals, SHALL NOT list a lantern whose `lit_in` is present and not a session id as a row, SHALL NOT skip or refuse a lantern for having no `lit_in`, and SHALL NOT print a line of the transcript (ADR-015).
+
+**Acceptance:**
+- `a_row_carries_exactly_its_fields` asserts row keys `["epilogues", "id", "lit_at", "lit_by", "lit_in", "note", "point", "session"]`, and still counts 2 rows and 2 epilogues.
+- A new test: in `recall_fixture`, `recall_by_point(&home, OTHER, "o1")` lists one row whose `lit_in == Some(OTHER.to_owned())`, and every row `recall_by_note(&home, "fold")` lists has `lit_in == Some(row.session.clone())`.
+- A new test: a lantern appended with `Session::append_entry` whose data is exactly `{point, note, lit_by, lit_at}` recalls by its point as one row with `lit_in == None`, serialised as `"lit_in": null`, and `recall_by_note` on a phrase of its note lists it with `skipped` empty.
+- A new test: four sessions each holding one lantern whose `lit_in` is null, 5, `"../elsewhere"` and `"no-such-session"`; `recall_by_note` on the lanterns' note lists those four sessions in `skipped` and no row from them, each skip's `reason` starting `lit_in_not_a_session` and containing `is null`, `is not a string`, `is not a safe session name` and `names no session of the home` respectively; `recall_by_point` at each lantern's point is `Err(HomeError::LitInNotASession { .. })` with `what` equal to those four texts respectively; the test counts 4 skips and 4 refusals, and no skip reason starts `entry_shape`.
+- `a_lantern_whose_data_is_not_the_shape_is_named_not_dropped` passes unchanged, its refusal still `HomeError::EntryShape`.
+- Every other test in `recall_tests.rs` passes unchanged.
+
+**Files:**
+- modify: crates/lys-home/src/record/recall.rs
+- modify: crates/lys-home/src/record/recall_tests.rs
+
+**Checklist:**
+- C102 — Recall rows carry lit_in beside point, note and lit_by, the lighting session for a lantern the light act lit and null for a lantern whose data has no lit_in, and a lantern whose lit_in is present and not a session id is never listed as a row but skipped by note and refused by point as lit_in_not_a_session with the fork's reason text.
+
+**Stories:**
+- S41 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent that lights a lantern, I want it to record the session I lit it in and recall to show that session beside the point and the note, so that I know which session the lantern leads back to.
+- S42 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a lantern lit before lit_in was recorded to stay readable and forkable by its holders, and a lit_in that is not a session id refused by name, so that no lantern is ever read as a session it does not name.
+
+### R4: Read lit_in in the fork through a narrower typed view, keeping the holder rule and the named refusals
+
+`read_lantern` in `record/fork_cut.rs` deserialises the lantern entry's data into a documented public view declared in `record/entries.rs` beside `LanternData`, carrying `point: String`, `lit_by: String` and a `lit_in` declared with R1's `LitIn` type and R1's deserialiser; the view does not deny unknown keys and does not require `note` or `lit_at`, so the older records whose data is exactly `{point, note, lit_by}` read as they do today. A present `lit_in` is checked with R2's check. IF the data has no `lit_in` THEN THE SYSTEM SHALL resolve by the holders exactly as today: one holder cuts, several refuse `lantern_ambiguous` until a session is named. IF `lit_in` is present and the check refuses THEN THE SYSTEM SHALL return that `lit_in_not_a_session` refusal. IF the data does not deserialise into the view THEN THE SYSTEM SHALL refuse `EntryShape` naming the session, the lantern and `lys.lantern`. The module doc of `fork_cut.rs` describes the typed read. THE SYSTEM SHALL NOT look up a `lit_in` key in a raw `serde_json::Value`, SHALL NOT read a present `lit_in` that is not a session id as any session, SHALL NOT refuse a lantern for having no `lit_in`, and SHALL NOT change the cut, the copied line bytes, the ancestry entries, the fork report, or the names and display prefixes of `lit_in_not_a_session`, `lantern_not_lit_here` and `lantern_ambiguous`.
+
+**Acceptance:**
+- `grep -c '"lit_in"' crates/lys-home/src/record/fork_cut.rs` prints `0`, and `grep -c 'Value::Null' crates/lys-home/src/record/fork_cut.rs` prints `0`.
+- `a_lit_in_that_is_not_a_session_id_is_refused_by_name` passes with the refusals it counts on the base commit: `N1` gives `is null`, `N2` `is not a string`, `N3` `is not a safe session name` and `N4` `names no session of the home`, each display text starting `lit_in_not_a_session`.
+- `a_lit_in_session_that_holds_no_copy_refuses_naming_the_holder_read` passes with the refusals it counts on the base commit, each `LanternNotLitHere` with `lit_in == "elsewhere"`.
+- In `a_lit_in_lantern_cuts_from_its_session_and_an_older_record_needs_one_named`, `O2` with no session named refuses `LanternAmbiguous` with `sessions == ["A", PARENT]`, and with `PARENT` named cuts from `PARENT` with `lit_in == None`.
+- `fork(&home, "M2", None)` still reports `(entries, blocks, unstored) == (2, 1, 2)`, and every test in `fork_tests.rs` that forks `N3` passes, though neither lantern's data carries `lit_at` and neither carries `lit_in`.
+
+**Files:**
+- modify: crates/lys-home/src/record/entries.rs
+- modify: crates/lys-home/src/record/fork_cut.rs
+
+**Checklist:**
+- C103 — The fork reads lit_in through a typed view that does not require lit_at or note and never from a raw JSON key: a lantern with no lit_in resolves by its holders, and a present lit_in that is null, not a string, not a safe session name, or names no session of the home refuses lit_in_not_a_session naming which.
+
+**Stories:**
+- S42 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a lantern lit before lit_in was recorded to stay readable and forkable by its holders, and a lit_in that is not a session id refused by name, so that no lantern is ever read as a session it does not name.
+
+### R5: Light L2 with the light act in both fork fixtures and name every hand-written lantern as a record the light act cannot produce
+
+In `fixture_home` of `record/fork_cut_tests.rs`, `L2` is lit with `light(&home, PARENT, "e2", NOTE, LIGHTER)` while `e2` is the parent's head and no owner holds the session, and in `fixture_home` of `tests/fork.rs` with `lys-home lantern light` at `--session parent --point e2`; `Lanterns.l2` holds the returned id and `O2` is appended as its child. The lanterns the fork fixtures write by hand are exactly those the light act cannot produce: `O2` in both fixtures, `M2` and `N3` in `fork_tests.rs`, `N2` and `N1` to `N4` in `fork_cut_tests.rs`, each call site carrying a comment containing `the light act cannot produce`. Each of the twelve sites that asserted the literal `"L2"` asserts the id the light act returned. The module docs of `fork_cut_tests.rs` and `tests/fork.rs` say that `L2` is lit with the light act. THE SYSTEM SHALL NOT write by hand any lantern the light act can produce, SHALL NOT drop or weaken a hand-written refusal or older-record case, and SHALL NOT change any assertion, count or refusal beyond the literal-id replacement.
+
+**Acceptance:**
+- `grep -c '"L2"'` prints `0` for each of `crates/lys-home/src/record/fork_cut_tests.rs`, `crates/lys-home/src/record/fork_tests.rs` and `crates/lys-home/tests/fork.rs`.
+- `grep -c 'lantern_entry('` prints `4` for `fork_cut_tests.rs` (the helper and the `O2`, `N2` and `N1` to `N4` sites), `2` for `fork_tests.rs` (`M2`, `N3`) and `2` for `tests/fork.rs` (the helper and `O2`).
+- `grep -c 'the light act cannot produce'` prints `3` for `fork_cut_tests.rs`, `2` for `fork_tests.rs` and `1` for `tests/fork.rs`.
+- `five_forks_succeed_and_five_are_refused_with_the_ancestry_on_the_parent` passes with 5 children, 5 refusals and 5 `lys.fork` marks, its `lantern_not_lit_here` refusal naming `lanterns.l2`.
+- The count of `#[test]` functions in `fork_cut_tests.rs`, `fork_tests.rs` and `tests/fork.rs` equals the base commit's: 8, 12 and 3.
+
+**Files:**
+- modify: crates/lys-home/src/record/fork_cut_tests.rs
+- modify: crates/lys-home/src/record/fork_tests.rs
+- modify: crates/lys-home/tests/fork.rs
+
+**Checklist:**
+- C104 — The fork's fixtures light L2 with the light act and write by hand only the lanterns the light act cannot produce (O2, M2, N3, the copy N2 and N1 to N4), each named in its test as standing for such a record.
+
+**Stories:**
+- S43 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the fork's tests to light their lanterns with the light act wherever it can produce them, so that the fork is proved on the record the light act really writes.
+
+### R6: Document lit_in in the record, the README and the fork proof, and render the cluster
+
+Structural. The `lys.lantern` bullet of `docs/design/home/RECORD.md` lists `{point, note, lit_by, lit_at, lit_in}` and states that `lit_in` is the id of the session the light act appended the lantern to, absent from a lantern lit before HOME-014, which recall shows as null; its Forks section states that a lantern with no `lit_in` resolves by its holders, that a present `lit_in` that is not a session id is refused `lit_in_not_a_session` by the fork and by recall, and that a fork's child lists a copy of the lantern whose `lit_in` names the parent. The `lys.lantern` row of the custom-entry table in `crates/lys-home/README.md` lists `lit_in`. `docs/design/home/PROOF-FORK.md` keeps its measured sentence that the light act on the measured tree records no `lit_in` byte for byte, and gains a note directly after it that from HOME-014 the light act records `lit_in`, and that lanterns lit before it, as those measured were, resolve by the older-record rule. `HOME-014.md`, `DESIGN.md`, `CHECKLIST.md` and `USER-STORIES.md` are rendered from their JSON with the repository's `scripts/design/render-cluster.py`. THE SYSTEM SHALL NOT rewrite any measured figure, hash, command or result in PROOF-FORK.md, and SHALL NOT edit any rendered markdown by hand.
+
+**Acceptance:**
+- `grep -c 'point, note, lit_by, lit_at, lit_in' docs/design/home/RECORD.md` prints `1`.
+- `grep -c 'lit_in_not_a_session' docs/design/home/RECORD.md` prints a number greater than `0`.
+- The README line beginning `| \`lys.lantern\`` contains `lit_in`.
+- `git diff` of `docs/design/home/PROOF-FORK.md` deletes no line, and its added lines contain `HOME-014` and `lit_in`.
+- `sh scripts/design/gate.sh` exits 0.
+
+**Files:**
+- create: docs/design/home/briefs/HOME-014.md
+- modify: docs/design/home/RECORD.md
+- modify: crates/lys-home/README.md
+- modify: docs/design/home/PROOF-FORK.md
+- modify: docs/design/home/DESIGN.md
+- modify: docs/design/home/CHECKLIST.md
+- modify: docs/design/home/USER-STORIES.md
+
+**Checklist:**
+- C105 — RECORD.md and the lys-home README document lit_in, and PROOF-FORK.md keeps its measured older-record sentence with a note that the light act now records lit_in.
+
+**Stories:**
+- S42 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a lantern lit before lit_in was recorded to stay readable and forkable by its holders, and a lit_in that is not a session id refused by name, so that no lantern is ever read as a session it does not name.
 
 ## Boundaries
 
-- No change to crates/lys-home/src/record/blocks.rs or crates/lys-home/src/record/templates.rs: BlockStore::put, BlockStore::put_file and TemplateStore::put stay byte-for-byte as they are.
-- No change to any test other than the two this brief names, in lys-home or in any other crate; the sleep in the lys-anchor crate's admission certificate tests stays.
-- No change to crates/lys-home/src/record/canon.rs; millis_now stays.
-- No new dependency: std::fs::File::set_modified only.
-- No test renamed, split, ignored or given a raised timeout, and no #[allow], #[ignore] or cfg added to silence anything.
-- The change is one commit on the card branch.
+- SHALL NOT rewrite, truncate or delete any byte of an existing session line; a lantern lit before this brief stays as it is (P1, ADR-014).
+- SHALL NOT refuse, skip or read as the wrong shape a lantern whose data has no lit_in, and SHALL NOT retire ADR-017's older-record rule.
+- SHALL NOT change the names or display prefixes of lit_in_not_a_session, lantern_not_lit_here, lantern_ambiguous or entry_shape, SHALL NOT change the four lit_in_not_a_session reason texts, and SHALL NOT change error.rs.
+- SHALL NOT change the fork's cut, its copied line bytes, its lys.forked_from and lys.fork data, or its report keys.
+- SHALL NOT change EpilogueData or the epilogue act, and SHALL NOT remove deny_unknown_fields from LanternData.
+- SHALL NOT drop or weaken the hand-written O2, M2, N3, N2 and N1 to N4 cases.
+- SHALL NOT put a note, epilogue words or any transcript content in a refusal, a report other than recall's rows, a log line, a test name or a proof document (ADR-015).
+- SHALL NOT mark or filter in recall a lantern copied into a fork's child, and SHALL NOT re-measure PROOF-FORK on a real session.
+- SHALL NOT edit rendered markdown by hand, and SHALL NOT add a file beyond HOME-014.md.
 
 ## Verification
 
-- From the repository root: `grep -rnE 'thread::sleep|tokio::time::sleep' crates/lys-home` prints nothing.
-- `git diff --name-only 7b53625 -- crates/` prints exactly crates/lys-home/src/record/blocks_tests.rs and crates/lys-home/src/record/templates_tests.rs.
-- `git log --oneline $(git merge-base HEAD origin/main)..HEAD` on the card branch lists exactly one commit; the card branch starts from origin/main, which contains 7b53625.
-- File drift check, run and reverted, never committed: in each test, after the read-back assertions on the pinned instant and before the second put, rewrite the stored file with its own bytes — in the block test `std::fs::write(store.root().join(&first.hash.as_str()[..2]).join(first.hash.as_str()), &block).unwrap();`, in the template test `std::fs::write(&path, &bytes).unwrap();`. Each injection makes exactly that test fail, and the failing assertion is the one after the second put on the stored file's modification time; the shard directory's modification time and the entry count assertions still hold, because rewriting an existing file adds and removes no entry.
-- Directory drift check, run and reverted, never committed: in each test, after the read-back assertions on the pinned instant and before the second put, create a file named drift in the shard directory and remove it — in the block test `let shard = store.root().join(&first.hash.as_str()[..2]); std::fs::write(shard.join("drift"), b"").unwrap(); std::fs::remove_file(shard.join("drift")).unwrap();`, in the template test the same with `path.parent().unwrap()` as the shard. Each injection makes exactly that test fail, and the failing assertion is the one after the second put on the shard directory's modification time; the stored file's modification time and the entry count assertions still hold, because the file is untouched and the created file is gone before the count is taken.
-- cargo fmt --all leaves the tree unchanged.
-- cargo clippy --all-targets --all-features -- -D warnings and cargo clippy --all-targets -- -D warnings exit 0.
-- cargo test --workspace --all-features exits 0 and lists both named tests as passed.
-- cargo doc --no-deps --all-features and cargo doc --no-deps exit 0.
-- sh scripts/design/gate.sh exits 0.
+- From the repository root: `python3 scripts/design/validate.py docs/design/home` and `python3 scripts/design/check-coverage.py docs/design/home` exit 0.
+- From the repository root: `cargo fmt --all`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo clippy --all-targets -- -D warnings`, `cargo test --workspace --all-features`, `cargo doc --no-deps --all-features` and `cargo doc --no-deps` exit 0.
+- From the repository root: `sh scripts/design/gate.sh` exits 0.
+- `crates/lys-home/src/record/entries.rs`, `lantern.rs`, `recall.rs` and `fork_cut.rs` each have at most 500 lines of code, counted without comments and blank lines.
+- `cargo test -p lys-home --all-features --test fork --test lantern_cli` passes, and its output lists the five-forks test and the light report test as passed.
 

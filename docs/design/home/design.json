@@ -71,7 +71,8 @@
     "ADR-029",
     "ADR-030",
     "ADR-019",
-    "ADR-020"
+    "ADR-020",
+    "ADR-046"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
