@@ -153,6 +153,12 @@ pub enum ServerError {
         /// The operation id.
         operation: String,
     },
+    /// The agent's profile holds no version by that number.
+    #[error("ProfileVersionUnknown: the agent's profile holds no version {version}")]
+    ProfileVersionUnknown {
+        /// The version asked for.
+        version: u32,
+    },
     /// The agent's latest profile version is not reviewed, so it is not started.
     #[error(
         "ProfileNotReviewed: version {version} of the agent's profile is not reviewed; review it before the agent is started"
@@ -433,6 +439,7 @@ impl ServerError {
             | Self::RequestUnknown
             | Self::MachineUnknown
             | Self::LaunchRecordMissing
+            | Self::ProfileVersionUnknown { .. }
             | Self::RuntimeSessionUnknown
             | Self::RoleUnknown
             | Self::RoleVersionUnknown
