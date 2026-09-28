@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use sha2::{Digest, Sha256};
 
 use crate::error::HomeError;
+use crate::record::io_counts::SyncCount;
 
 /// A block's SHA-256, as 64 lowercase hex characters.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -59,6 +60,9 @@ pub struct Put {
 #[derive(Clone, Debug)]
 pub struct BlockStore {
     root: PathBuf,
+    /// Every `sync_all` of a block file and every directory sync `put` and
+    /// `put_file` made through this value.
+    syncs: SyncCount,
 }
 
 impl BlockStore {
@@ -67,13 +71,23 @@ impl BlockStore {
         let root = root.into();
         fs::create_dir_all(&root)
             .map_err(|e| HomeError::io("creating the block store", &root, e))?;
-        Ok(Self { root })
+        Ok(Self {
+            root,
+            syncs: SyncCount::default(),
+        })
     }
 
     /// Where the store lives.
     #[must_use]
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// How many syncs this store's puts made: one for each new block's file
+    /// and one for its directory. A put of bytes already held makes none.
+    #[must_use]
+    pub fn syncs(&self) -> u64 {
+        self.syncs.get()
     }
 
     fn path_of(&self, hash: &Hash) -> PathBuf {
@@ -107,6 +121,7 @@ impl BlockStore {
                 .map_err(|e| HomeError::io("writing a block", &tmp, e))?;
             file.sync_all()
                 .map_err(|e| HomeError::io("syncing a block", &tmp, e))?;
+            self.syncs.add();
         }
         match fs::rename(&tmp, &path) {
             Ok(()) => {}
@@ -119,6 +134,7 @@ impl BlockStore {
             Err(e) => return Err(HomeError::io("placing a block", &path, e)),
         }
         sync_dir(&dir)?;
+        self.syncs.add();
         Ok(Put { hash, new: true })
     }
 
@@ -152,6 +168,7 @@ impl BlockStore {
             }
             out.sync_all()
                 .map_err(|e| HomeError::io("syncing a block", &tmp, e))?;
+            self.syncs.add();
         }
         let hash = Hash(hex_of(&hasher.finalize()));
         let path = self.path_of(&hash);
@@ -172,6 +189,7 @@ impl BlockStore {
             Err(e) => return Err(HomeError::io("placing a block", &path, e)),
         }
         sync_dir(&dir)?;
+        self.syncs.add();
         Ok(Put { hash, new: true })
     }
 

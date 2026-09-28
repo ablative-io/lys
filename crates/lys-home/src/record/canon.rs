@@ -25,6 +25,7 @@
 //! running. Curation is a person's act: the tool copies what
 //! it is told to and records who told it.
 
+use std::collections::HashSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -80,6 +81,8 @@ pub struct Canon {
     pub header: SessionHeader,
     /// Every entry, in file order.
     pub entries: Vec<Entry>,
+    /// The id of every entry, as load built it.
+    ids: HashSet<String>,
 }
 
 impl Canon {
@@ -90,6 +93,12 @@ impl Canon {
             .iter()
             .filter(|e| e.is_custom(CUSTOM_INHERITED))
             .collect()
+    }
+
+    /// Whether an entry of this id is in the canon.
+    #[must_use]
+    pub fn contains(&self, id: &str) -> bool {
+        self.ids.contains(id)
     }
 
     /// The id of the last entry, where the next example chains on.
@@ -165,7 +174,7 @@ pub fn load(path: &Path) -> Result<Canon, HomeError> {
         reason: e.to_string(),
     })?;
     let mut entries: Vec<Entry> = Vec::new();
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
     for (n, line) in lines {
         let entry: Entry = serde_json::from_str(line).map_err(|e| HomeError::Malformed {
             path: path.to_path_buf(),
@@ -203,7 +212,11 @@ pub fn load(path: &Path) -> Result<Canon, HomeError> {
         seen.insert(entry.id().to_owned());
         entries.push(entry);
     }
-    Ok(Canon { header, entries })
+    Ok(Canon {
+        header,
+        entries,
+        ids: seen,
+    })
 }
 
 /// Whether a `lys.inherited` entry's data carries a `rule` that is not null.
@@ -232,7 +245,7 @@ pub fn add_from(
             reason: "an example needs at least one entry",
         });
     }
-    let mut asked = std::collections::HashSet::with_capacity(entry_ids.len());
+    let mut asked = HashSet::with_capacity(entry_ids.len());
     for id in entry_ids {
         if !asked.insert(id.as_str()) {
             return Err(HomeError::DuplicateEntry {
@@ -345,9 +358,9 @@ fn append_example(
         .open(canon_path)
         .map_err(|e| HomeError::io("opening the canon", canon_path, e))?;
     let canon = load(canon_path)?;
-    let mut fresh = std::collections::HashSet::with_capacity(entries.len());
+    let mut fresh = HashSet::with_capacity(entries.len());
     for entry in &entries {
-        if canon.entries.iter().any(|e| e.id() == entry.id()) || !fresh.insert(entry.id()) {
+        if canon.contains(entry.id()) || !fresh.insert(entry.id()) {
             return Err(HomeError::DuplicateEntry {
                 session: CANON_ID.to_owned(),
                 id: entry.id().to_owned(),

@@ -8,6 +8,7 @@ use std::path::Path;
 use crate::error::HomeError;
 use crate::record::blocks::sync_dir;
 use crate::record::entries::SessionHeader;
+use crate::record::io_counts::IoCounter;
 
 use super::{Index, parent_dir};
 
@@ -34,6 +35,30 @@ pub fn read_head(session_file: &Path, index: &Index) -> Result<Option<String>, H
 
 /// Persist the head: written whole to a temporary file and renamed into place.
 pub fn write_head(session_file: &Path, head: Option<&str>) -> Result<(), HomeError> {
+    write_head_counted(session_file, head, &IoCounter::default())
+}
+
+/// [`write_head`], counting its two syncs (the head file and its directory)
+/// on the session's counter.
+pub(crate) fn write_head_counted(
+    session_file: &Path,
+    head: Option<&str>,
+    counts: &IoCounter,
+) -> Result<(), HomeError> {
+    place_head(session_file, head, counts)?;
+    sync_dir(parent_dir(session_file))?;
+    counts.synced();
+    Ok(())
+}
+
+/// Write the head whole to a temporary file, sync it and rename it into
+/// place, leaving the directory unsynced: [`write_head_counted`] syncs it
+/// at once, a staged import once for the index and the head together.
+pub(crate) fn place_head(
+    session_file: &Path,
+    head: Option<&str>,
+    counts: &IoCounter,
+) -> Result<(), HomeError> {
     let path = Index::head_path(session_file);
     let tmp = path.with_extension("head.tmp");
     {
@@ -45,9 +70,9 @@ pub fn write_head(session_file: &Path, head: Option<&str>) -> Result<(), HomeErr
             .map_err(|e| HomeError::io("writing the head", &tmp, e))?;
         file.sync_all()
             .map_err(|e| HomeError::io("syncing the head", &tmp, e))?;
+        counts.synced();
     }
-    fs::rename(&tmp, &path).map_err(|e| HomeError::io("placing the head", &path, e))?;
-    sync_dir(parent_dir(&path))
+    fs::rename(&tmp, &path).map_err(|e| HomeError::io("placing the head", &path, e))
 }
 
 /// The header line of a session file and its length in bytes.

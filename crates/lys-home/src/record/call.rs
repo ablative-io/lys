@@ -162,18 +162,12 @@ pub struct OutcomeMeta {
 
 /// The `lys.call` entry anywhere in the session's file that holds this call
 /// id, if any: every durable entry is searched, whatever the head, so a crash
-/// after the append and before the head advanced still finds the call.
+/// after the append and before the head advanced still finds the call. The
+/// first lookup on an open session reads every `lys.call` entry once into a
+/// map from call id to entry id, kept current by every append; later lookups
+/// read nothing.
 pub fn find_call(session: &Session, call_id: &str) -> Result<Option<String>, HomeError> {
-    for entry in session.customs_everywhere(CUSTOM_CALL)? {
-        if let EntryBody::Custom {
-            data: Some(data), ..
-        } = &entry.body
-            && data.get("call_id").and_then(Value::as_str) == Some(call_id)
-        {
-            return Ok(Some(entry.id().to_owned()));
-        }
-    }
-    Ok(None)
+    session.call_entry(call_id)
 }
 
 /// Store a complete call's parts and raw bodies as blocks and append one

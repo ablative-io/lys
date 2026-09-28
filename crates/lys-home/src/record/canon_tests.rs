@@ -355,3 +355,30 @@ fn a_child_holding_a_copied_lock_descriptor_does_not_keep_the_canon_locked()
     assert_eq!(load(&canon)?.examples().len(), 1);
     Ok(())
 }
+
+#[test]
+fn the_canon_keeps_its_ids_and_a_repeated_id_is_refused_by_them_with_no_byte_written() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = Home::open(dir.path().join("home")).unwrap();
+    let canon = dir.path().join("canon").join("canon.jsonl");
+    create(&canon).unwrap();
+    let (session, ids) = thinking_exchange(&home);
+    let s = home.open_session(&session).unwrap();
+    let report = add_from(&canon, &s, &ids, "verify before claiming", "tom").unwrap();
+    let loaded = load(&canon).unwrap();
+    assert_eq!(loaded.entries.len(), 3);
+    for id in [&report.inherited_id, &ids[0], &ids[1]] {
+        assert!(loaded.contains(id), "{id} is in the canon");
+    }
+    assert!(!loaded.contains("absent"));
+    let before = std::fs::read(&canon).unwrap();
+    match add_from(&canon, &s, &ids[..1], "again", "tom") {
+        Err(crate::error::HomeError::DuplicateEntry { session, id }) => {
+            assert_eq!((session.as_str(), id.as_str()), ("canon", ids[0].as_str()));
+        }
+        other => panic!("not a duplicate entry: {other:?}"),
+    }
+    assert_eq!(std::fs::read(&canon).unwrap(), before);
+    drop(s);
+    dir.close().unwrap();
+}
