@@ -577,7 +577,7 @@
     {
       "id": "RM-019",
       "title": "Keep the enduring agent apart from each session's credential",
-      "status": "briefed",
+      "status": "landed",
       "kind": "feature",
       "summary": "Road adjustment 3 (docs/design/identity/STATEMENT-2026-09-22.md:162-167) as a directory contract brief, DIRECTORY-011: the directory contract gains the rules that the agent record holds no session credential, a session is a separate record that points at its agent, starting a session never creates an agent, an agent may be registered before it ever runs, and a second session of the same agent presents the same enduring identity with a new session credential; and one lys-identity test proves an agent registered with no session appears in the directory under its responsible person with no session credential. The brief lands as documents; its build waits on DIRECTORY-003. The second-session proof waits on RM-029; the design's 'Road step 2 onward' non-goal and P6 stand.",
       "provenance": {
@@ -602,7 +602,11 @@
           "HOME-011",
           "DIRECTORY-011"
         ],
-        "commits": []
+        "commits": [
+          "33f34d8967a255004bdd513b5c75637b5d26747f",
+          "605ba3adb5ed80e3f74a062f8fcb43cd307ed34e",
+          "8e5dc427e8a098fef8514442a8ec7046fcd95df8"
+        ]
       },
       "depends_on": [
         "RM-001"
