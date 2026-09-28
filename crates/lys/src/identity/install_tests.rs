@@ -7,6 +7,7 @@ use sha2::{Digest, Sha256};
 
 use super::layout::{self, Layout, SERVICE_PORT, data_root, render_deployment};
 use super::server_config;
+use super::services;
 use super::surface;
 use crate::identity::config::DeploymentConfig;
 use crate::identity::error::ErrorKind;
@@ -173,5 +174,43 @@ fn a_package_without_its_entry_page_is_refused() -> Result<(), Box<dyn Error>> {
         .err()
         .ok_or("a package without index.html was accepted")?;
     assert_eq!(refused.kind(), ErrorKind::ConfigInvalid);
+    Ok(())
+}
+
+#[test]
+fn a_live_process_is_left_alone_unless_its_configuration_changed() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    let pid = dir.path().join("sleep.pid");
+    let log = dir.path().join("sleep.log");
+    let args = ["60".to_string()];
+    assert!(services::start_detached(
+        Path::new("/bin/sleep"),
+        &args,
+        &log,
+        &pid,
+        false
+    )?);
+    let first = std::fs::read_to_string(&pid)?;
+    assert!(services::alive(&pid));
+    assert!(!services::start_detached(
+        Path::new("/bin/sleep"),
+        &args,
+        &log,
+        &pid,
+        false
+    )?);
+    assert_eq!(std::fs::read_to_string(&pid)?, first);
+    assert!(services::start_detached(
+        Path::new("/bin/sleep"),
+        &args,
+        &log,
+        &pid,
+        true
+    )?);
+    assert_ne!(std::fs::read_to_string(&pid)?, first);
+    assert!(services::alive(&pid));
+    assert!(services::stop(&pid)?);
+    assert!(!services::alive(&pid));
+    assert!(!services::stop(&pid)?);
     Ok(())
 }
