@@ -114,18 +114,21 @@ fn a_gap_in_the_stored_indices_is_detected_at_open() {
 }
 
 #[test]
-fn an_unexpected_leaves_entry_is_detected_but_dotfiles_are_ignored() {
+fn an_unexpected_leaves_entry_is_found_by_the_audit_but_dotfiles_are_ignored() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
     let mut store = create(&dir);
     store.put_leaf(0, b"leaf-0").unwrap();
     std::fs::write(dir.join("leaves").join(".DS_Store"), b"junk").unwrap();
     assert!(
-        FileLeafStore::open(&dir).is_ok(),
+        FileLeafStore::open(&dir).unwrap().audit_leaves().is_ok(),
         "dotfiles must be ignored"
     );
     std::fs::write(dir.join("leaves").join("stray.txt"), b"junk").unwrap();
-    let err = FileLeafStore::open(&dir).unwrap_err();
+    let err = FileLeafStore::open(&dir)
+        .unwrap()
+        .audit_leaves()
+        .unwrap_err();
     assert!(err.to_string().contains("unexpected entry"), "{err}");
 }
 

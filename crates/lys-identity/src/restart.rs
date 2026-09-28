@@ -1,42 +1,40 @@
-//! A signed-event log that starts from its signed snapshot and reads only the
-//! leaves after it.
+//! A signed-event log that starts from its owner's signed snapshot and reads
+//! only the leaves after it.
 //!
-//! The directory and the grants each fold one log of signed events. What they
-//! hold of that log is its leaves, in order, each with the coordinate it
-//! completed; their projections are indexes over those events. A snapshot
-//! carries every leaf the log held at one tree size, sealed by the service key
-//! and bound to the tree's root at that size (`lys/log-snapshot/v1`), so a
-//! start reads one snapshot and then only the leaves after it.
+//! The directory and the grants each fold one log of signed events into
+//! state: records, the operations that made them, the refusals kept by name,
+//! and a receipt per event. A snapshot seals that folded state with the tree
+//! size and root it was taken at (`lys/log-snapshot/v1`), so a start reads
+//! one snapshot, then only the leaves after it, and folds only those.
 //!
 //! # What is believed, and when it is refused
 //!
-//! [`lys_log_store::start`] checks the snapshot's signature, kind, origin and
-//! root, and that the log reaches its pinned root from the snapshot's frontier.
-//! This module then requires the snapshot's leaves to fold, through the leaves
-//! after them, to the root the log was opened at, and every one of them to be
-//! an event this service signed. A snapshot failing any check is refused by its
-//! [`SnapshotRefusal`] name, logged, and never used: the state is rebuilt from
-//! every leaf of the log and a new snapshot is written at once.
+//! The snapshot must verify under the service key, name this owner's kind of
+//! state and this log, and its frontier must fold to the root it signs. It
+//! may claim no more leaves than the log has pinned, and the log's leaves
+//! after it must reach the pinned root from its frontier. The owner then
+//! requires the state to read back whole and to hold exactly one receipt per
+//! leaf, the last completing the snapshot's root. A snapshot failing any
+//! check is refused by its [`SnapshotRefusal`] name, logged, and never used:
+//! the state is rebuilt from every leaf and a new snapshot is written.
 //!
 //! # When a snapshot is written
 //!
-//! After every append or adoption that carries the log across a multiple of
-//! the cadence, a count of entries. A snapshot that cannot be written does not
-//! undo the append it follows, which is already durable: the failure is logged
-//! by name and kept on the log until a later snapshot succeeds.
+//! When the owner has folded every leaf the log holds and the log has crossed
+//! a multiple of the cadence, a count of entries, since the last snapshot;
+//! and at once after a rebuild. A snapshot that cannot be written does not
+//! undo the append it follows, which is already durable: the failure is
+//! logged by name and kept until a later snapshot succeeds.
 
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
-use std::sync::OnceLock;
 
 use lys_core::Ed25519Identity;
-use lys_core::merkle::{AppendOnlyTree, InclusionProof, RawLeaf};
-use lys_log_store::{
-    Frontier, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreError, Tail, start,
-};
+use lys_core::merkle::InclusionProof;
+use lys_log_store::{Frontier, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreError, unseal};
 
+use crate::checkpoints::{self, Checkpoints};
 use crate::log::{Coordinate, Reopen};
-use crate::snapshot_state::{decode_leaves, encode_leaves};
 
 /// How many entries a log grows by between snapshots, unless its owner is
 /// opened with another count.
@@ -52,9 +50,6 @@ pub(crate) trait Leaves {
     const DOMAIN: &'static str;
     /// Reads a leaf, checking its signature.
     fn verify(bytes: &[u8], key: &[u8; 32]) -> Result<Self::Event, Self::Error>;
-    /// Reads a leaf a checked snapshot carries, without checking its
-    /// signature again.
-    fn attested(bytes: &[u8], key: &[u8; 32]) -> Result<Self::Event, Self::Error>;
     /// The log could not be read or written.
     fn unavailable(reason: String) -> Self::Error;
     /// The leaf at `index` is not an event this service signed.
@@ -64,25 +59,35 @@ pub(crate) trait Leaves {
 /// Every event of a start or an adoption, in log order, with its coordinate.
 pub(crate) type Events<E> = Vec<(E, Coordinate)>;
 
-/// How a leaf is read into an event.
-type Read<K> = fn(&[u8], &[u8; 32]) -> Result<<K as Leaves>::Event, <K as Leaves>::Error>;
-
-/// A snapshot's leaves with the tail after them, the tree they make, and
-/// their events.
-struct Accepted<E> {
-    leaves: Vec<Vec<u8>>,
-    frontier: Frontier,
-    events: Events<E>,
+/// What a start hands its owner to fold.
+pub struct Opening<E> {
+    /// The owner's state from the snapshot, `None` when the log was rebuilt.
+    pub state: Option<Vec<u8>>,
+    /// The tree size the state was folded at.
+    pub size: u64,
+    /// The events after the state, in log order, with their coordinates.
+    pub events: Vec<(E, Coordinate)>,
 }
 
-/// A signed-event log, its leaves, and the snapshots written of them.
+impl<E> std::fmt::Debug for Opening<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Opening")
+            .field("state", &self.state.as_ref().map(Vec::len))
+            .field("size", &self.size)
+            .field("events", &self.events.len())
+            .finish_non_exhaustive()
+    }
+}
+
+/// A signed-event log and the snapshots written of its owner's state.
 pub(crate) struct Ledger<S: LeafStore, K: Leaves> {
     log: FrontierLog<S>,
-    leaves: Vec<Vec<u8>>,
     frontier: Frontier,
-    proofs: OnceLock<AppendOnlyTree<RawLeaf>>,
+    checkpoints: Checkpoints,
     every: NonZeroU64,
     start: Start,
+    snapshot_at: u64,
+    snapshot_owed: bool,
     snapshot_failure: Option<String>,
     kind: PhantomData<fn() -> K>,
 }
@@ -114,19 +119,22 @@ fn check_past_pin<S: LeafStore, K: Leaves>(store: &S, key: &[u8; 32]) -> Result<
     Ok(())
 }
 
-/// Extends `frontier` by `leaves`, which start at its size, reading each with
-/// `read` and answering each event with the coordinate it completed.
+/// Extends `frontier` by `leaves`, which start at its size, verifying each,
+/// keeping a checkpoint at every multiple, and answering each event with the
+/// coordinate it completed.
 fn fold<K: Leaves>(
     frontier: &mut Frontier,
+    checkpoints: &mut Checkpoints,
     leaves: &[Vec<u8>],
     key: &[u8; 32],
-    read: Read<K>,
 ) -> Result<Events<K::Event>, K::Error> {
     let mut events = Vec::with_capacity(leaves.len());
     for bytes in leaves {
         let index = frontier.size();
         let leaf_hash = frontier.push(bytes);
-        let event = read(bytes, key).map_err(|error| K::not_an_event(index, error.to_string()))?;
+        checkpoints.record(frontier);
+        let event =
+            K::verify(bytes, key).map_err(|error| K::not_an_event(index, error.to_string()))?;
         events.push((
             event,
             Coordinate {
@@ -140,133 +148,146 @@ fn fold<K: Leaves>(
     Ok(events)
 }
 
-/// The snapshot's leaves and the tail folded into events, refused by name
-/// unless they fold to the root the log was opened at.
-fn accept<S: LeafStore, K: Leaves>(
-    state: &[u8],
-    tail: &Tail,
-    log: &FrontierLog<S>,
-    key: &[u8; 32],
-) -> Result<Accepted<K::Event>, SnapshotRefusal> {
-    let size = tail.from;
-    let leaves = decode_leaves(state).map_err(|reason| SnapshotRefusal::StateUnreadable {
-        reason: reason.to_owned(),
-    })?;
-    if u64::try_from(leaves.len()).ok() != Some(size) {
-        return Err(SnapshotRefusal::StateUnreadable {
-            reason: format!(
-                "the snapshot is at tree size {size} and carries {} leaves",
-                leaves.len()
-            ),
-        });
-    }
-    let mut frontier = Frontier::new();
-    let mut events = fold::<K>(&mut frontier, &leaves, key, K::attested).map_err(|error| {
-        SnapshotRefusal::StateUnreadable {
-            reason: error.to_string(),
-        }
-    })?;
-    let tail_events = fold::<K>(&mut frontier, &tail.leaves, key, K::verify).map_err(|error| {
-        SnapshotRefusal::StateUnreadable {
-            reason: error.to_string(),
-        }
-    })?;
-    if frontier.root() != log.frontier().root() || frontier.size() != log.len() {
-        return Err(SnapshotRefusal::WrongRoot { size });
-    }
-    events.extend(tail_events);
-    let mut leaves = leaves;
-    leaves.extend(tail.leaves.iter().cloned());
-    Ok(Accepted {
-        leaves,
-        frontier,
-        events,
-    })
-}
+/// What a start from the snapshot found: the ledger and the opening, or the
+/// refusal that sends the start to the whole log.
+type Resumed<S, K> = Result<(Ledger<S, K>, Opening<<K as Leaves>::Event>), SnapshotRefusal>;
 
 impl<S: LeafStore, K: Leaves> Ledger<S, K> {
-    /// Opens the log `reopen` gives from its snapshot, reading only the leaves
-    /// after it, or from every leaf when the snapshot is refused, and then
-    /// writes a new snapshot. Answers the log and every event it holds.
+    /// Opens the log `reopen` gives from its owner's snapshot, reading only
+    /// the leaves after it, or from every leaf when the snapshot is refused.
     pub(crate) fn open(
         reopen: &Reopen<S>,
         key: &Ed25519Identity,
         every: NonZeroU64,
-    ) -> Result<(Self, Events<K::Event>), K::Error> {
+    ) -> Result<(Self, Opening<K::Event>), K::Error> {
         let public = key.public_key_bytes();
         let store = reopen().map_err(|error| store_down::<K>(&error))?;
         check_past_pin::<S, K>(&store, &public)?;
-        let started = start(store, K::DOMAIN, &public).map_err(|error| store_down::<K>(&error))?;
-        let refusal = match (started.state, started.start) {
-            (Some(state), how) => {
-                match accept::<S, K>(&state, &started.tail, &started.log, &public) {
-                    Ok(Accepted {
-                        leaves,
-                        frontier,
-                        events,
-                    }) => {
-                        let from = started.tail.from;
-                        let mut ledger = Self::new(started.log, leaves, frontier, every, how);
-                        tracing::info!(domain = K::DOMAIN, "{}", ledger.start);
-                        ledger.snapshot_if_due(from, key);
-                        return Ok((ledger, events));
-                    }
-                    Err(refusal) => refusal,
-                }
+        match Self::resume(store, &public, every)? {
+            Ok((ledger, opening)) => {
+                tracing::info!(domain = K::DOMAIN, "{}", ledger.start);
+                Ok((ledger, opening))
             }
-            (None, Start::Rebuilt { refusal, .. }) => {
-                return Self::rebuilt(started.log, &started.tail, refusal, key, every);
-            }
-            (None, Start::Resumed { size, .. }) => SnapshotRefusal::StateUnreadable {
-                reason: format!("the start resumed at tree size {size} without a state"),
-            },
+            Err(refusal) => Self::rebuild(reopen, refusal, &public, every),
+        }
+    }
+
+    fn resume(store: S, key: &[u8; 32], every: NonZeroU64) -> Result<Resumed<S, K>, K::Error> {
+        let sealed = match store.snapshot() {
+            Ok(Some(sealed)) => sealed,
+            Ok(None) => return Ok(Err(SnapshotRefusal::Missing)),
+            Err(error) => return Err(store_down::<K>(&error)),
         };
-        let store = reopen().map_err(|error| store_down::<K>(&error))?;
-        let (log, tail) = FrontierLog::open(store).map_err(|error| store_down::<K>(&error))?;
-        Self::rebuilt(log, &tail, refusal, key, every)
+        let snapshot = match unseal(&sealed, K::DOMAIN, store.origin(), key) {
+            Ok(snapshot) => snapshot,
+            Err(refusal) => return Ok(Err(refusal)),
+        };
+        let (size, pinned) = (snapshot.frontier().size(), store.pinned().tree_size);
+        if size > pinned {
+            return Ok(Err(SnapshotRefusal::BeyondLog { size, pinned }));
+        }
+        let (frontier, state) = snapshot.into_parts();
+        let (mut checkpoints, state) = match checkpoints::unwrap(&state, size) {
+            Ok(unwrapped) => unwrapped,
+            Err(reason) => return Ok(Err(SnapshotRefusal::StateUnreadable { reason })),
+        };
+        if checkpoints
+            .before(size)
+            .is_some_and(|held| held.size() == size && held.root() != frontier.root())
+        {
+            return Ok(Err(SnapshotRefusal::StateUnreadable {
+                reason: format!("the checkpoint at {size} is not the snapshot's tree"),
+            }));
+        }
+        let (log, tail) = match FrontierLog::resume(store, frontier.clone()) {
+            Ok(resumed) => resumed,
+            Err(StoreError::PinMismatch { .. }) => {
+                return Ok(Err(SnapshotRefusal::WrongRoot { size }));
+            }
+            Err(error) => return Err(store_down::<K>(&error)),
+        };
+        let mut frontier = frontier;
+        let events = fold::<K>(&mut frontier, &mut checkpoints, &tail.leaves, key)?;
+        let replayed = u64::try_from(tail.leaves.len()).unwrap_or(u64::MAX);
+        let ledger = Self::new(
+            log,
+            (frontier, checkpoints),
+            every,
+            Start::Resumed { size, replayed },
+            size,
+        );
+        Ok(Ok((
+            ledger,
+            Opening {
+                state: Some(state),
+                size,
+                events,
+            },
+        )))
     }
 
     fn new(
         log: FrontierLog<S>,
-        leaves: Vec<Vec<u8>>,
-        frontier: Frontier,
+        (frontier, checkpoints): (Frontier, Checkpoints),
         every: NonZeroU64,
         start: Start,
+        snapshot_at: u64,
     ) -> Self {
+        let snapshot_owed = matches!(start, Start::Rebuilt { .. });
         Self {
             log,
-            leaves,
             frontier,
-            proofs: OnceLock::new(),
+            checkpoints,
             every,
             start,
+            snapshot_at,
+            snapshot_owed,
             snapshot_failure: None,
             kind: PhantomData,
         }
     }
 
-    /// Folds every leaf of a log opened from nothing because `refusal`
-    /// refused its snapshot, logs the refusal, and writes a new snapshot.
-    fn rebuilt(
-        log: FrontierLog<S>,
-        tail: &Tail,
+    /// Opens the log from every leaf because `refusal` refused its snapshot,
+    /// and logs the refusal. The owner folds every event and a snapshot is
+    /// owed at once.
+    fn rebuild(
+        reopen: &Reopen<S>,
         refusal: SnapshotRefusal,
-        key: &Ed25519Identity,
+        key: &[u8; 32],
         every: NonZeroU64,
-    ) -> Result<(Self, Events<K::Event>), K::Error> {
+    ) -> Result<(Self, Opening<K::Event>), K::Error> {
+        let store = reopen().map_err(|error| store_down::<K>(&error))?;
+        let (log, tail) = FrontierLog::open(store).map_err(|error| store_down::<K>(&error))?;
         let mut frontier = Frontier::new();
-        let events = fold::<K>(
-            &mut frontier,
-            &tail.leaves,
-            &key.public_key_bytes(),
-            K::verify,
-        )?;
+        let mut checkpoints = Checkpoints::default();
+        let events = fold::<K>(&mut frontier, &mut checkpoints, &tail.leaves, key)?;
         let replayed = u64::try_from(tail.leaves.len()).unwrap_or(u64::MAX);
-        let how = Start::Rebuilt { refusal, replayed };
-        tracing::warn!(domain = K::DOMAIN, "{how}");
-        let mut ledger = Self::new(log, tail.leaves.clone(), frontier, every, how);
-        ledger.write_snapshot(key).map_err(K::unavailable)?;
-        Ok((ledger, events))
+        let start = Start::Rebuilt { refusal, replayed };
+        tracing::warn!(domain = K::DOMAIN, "{start}");
+        let ledger = Self::new(log, (frontier, checkpoints), every, start, 0);
+        Ok((
+            ledger,
+            Opening {
+                state: None,
+                size: 0,
+                events,
+            },
+        ))
+    }
+
+    /// Refuses the state the owner could not read from the snapshot, by
+    /// `reason`, and reopens the log from every leaf.
+    pub(crate) fn refuse_state(
+        &mut self,
+        reopen: &Reopen<S>,
+        reason: String,
+        key: &Ed25519Identity,
+    ) -> Result<Events<K::Event>, K::Error> {
+        let refusal = SnapshotRefusal::StateUnreadable { reason };
+        let (ledger, opening) =
+            Self::rebuild(reopen, refusal, &key.public_key_bytes(), self.every)?;
+        *self = ledger;
+        Ok(opening.events)
     }
 
     /// How the log was started, and why, when its snapshot was refused.
@@ -289,57 +310,95 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         (self.frontier.size(), self.frontier.root())
     }
 
-    /// The recorded leaf at `index`.
-    pub(crate) fn leaf(&self, index: u64) -> Option<&[u8]> {
-        usize::try_from(index)
-            .ok()
-            .and_then(|slot| self.leaves.get(slot))
-            .map(Vec::as_slice)
+    /// The recorded leaf at `index`, read from the store.
+    pub(crate) fn leaf(&self, index: u64) -> Result<Option<Vec<u8>>, K::Error> {
+        if index >= self.len() {
+            return Ok(None);
+        }
+        self.log
+            .leaf_bytes(index)
+            .map_err(|error| store_down::<K>(&error))
     }
 
-    /// An inclusion proof of the leaf at `index` in the recorded tree, built
-    /// from the held leaves the first time one is asked for.
+    /// The recorded event at `index` with the coordinate it completed: the
+    /// leaves from the checkpoint at or below it up to it are read from the
+    /// store, the root is that checkpoint extended by them, and the event is
+    /// verified. Never more than
+    /// [`CHECKPOINT_EVERY`](crate::checkpoints::CHECKPOINT_EVERY) leaves are read.
+    pub(crate) fn entry(
+        &self,
+        index: u64,
+        key: &[u8; 32],
+    ) -> Result<Option<(K::Event, Coordinate)>, K::Error> {
+        if index >= self.len() {
+            return Ok(None);
+        }
+        let mut frontier =
+            self.checkpoints.before(index).cloned().ok_or_else(|| {
+                K::unavailable(format!("no checkpoint is held below leaf {index}"))
+            })?;
+        let mut last = None;
+        for at in frontier.size()..=index {
+            let bytes = self
+                .log
+                .leaf_bytes(at)
+                .map_err(|error| store_down::<K>(&error))?
+                .ok_or_else(|| {
+                    K::not_an_event(at, "the leaf is missing inside the log".to_owned())
+                })?;
+            let leaf_hash = frontier.push(&bytes);
+            last = Some((bytes, leaf_hash));
+        }
+        let (bytes, leaf_hash) =
+            last.ok_or_else(|| K::unavailable(format!("no leaf was read up to {index}")))?;
+        let event =
+            K::verify(&bytes, key).map_err(|error| K::not_an_event(index, error.to_string()))?;
+        Ok(Some((
+            event,
+            Coordinate {
+                index,
+                tree_size: frontier.size(),
+                root: frontier.root(),
+                leaf_hash,
+            },
+        )))
+    }
+
+    /// Every recorded event from the start of the log with its coordinate,
+    /// read from the store in one pass.
+    pub(crate) fn entries(&self, key: &[u8; 32]) -> Result<Events<K::Event>, K::Error> {
+        let tail = self
+            .log
+            .leaves_from(0)
+            .map_err(|error| store_down::<K>(&error))?;
+        let mut frontier = Frontier::new();
+        let mut checkpoints = Checkpoints::default();
+        fold::<K>(&mut frontier, &mut checkpoints, &tail.leaves, key)
+    }
+
+    /// An inclusion proof of the leaf at `index` in the recorded tree. The
+    /// proof tree is built from the stored leaves the first time one is asked
+    /// for, never at a start.
     pub(crate) fn inclusion_proof(&self, index: u64) -> Result<InclusionProof, K::Error> {
-        let prove = |tree: &AppendOnlyTree<RawLeaf>| {
-            tree.prove_inclusion(index)
-                .map_err(|error| K::unavailable(error.to_string()))
-        };
-        if let Some(tree) = self.proofs.get() {
-            return prove(tree);
-        }
-        let tree = AppendOnlyTree::<RawLeaf>::reconstruct_from_raw_leaves(&self.leaves);
-        let (root, size) = tree.root().to_parts();
-        if (size, root) != self.head() {
-            return Err(K::unavailable(format!(
-                "the held leaves build a tree of size {size} whose root is not the log's"
-            )));
-        }
-        prove(self.proofs.get_or_init(|| tree))
+        self.log
+            .proof_tree()
+            .map_err(|error| store_down::<K>(&error))?
+            .prove_inclusion(index)
+            .map_err(|error| K::unavailable(error.to_string()))
     }
 
-    /// Appends `bytes` as one leaf and records it, then writes a snapshot if
-    /// the log crossed a multiple of the cadence. A failure may still have
+    /// Appends `bytes` as one leaf and records it. A failure may still have
     /// stored the leaf: nothing is recorded, and [`Ledger::adopt`] resolves it.
-    pub(crate) fn append(
-        &mut self,
-        bytes: &[u8],
-        key: &Ed25519Identity,
-    ) -> Result<Coordinate, StoreError> {
-        let before = self.len();
+    pub(crate) fn append(&mut self, bytes: &[u8]) -> Result<Coordinate, StoreError> {
         let (index, leaf_hash) = self.log.append(bytes)?;
         self.frontier.push_hash(leaf_hash);
-        self.leaves.push(bytes.to_vec());
-        if let Some(tree) = self.proofs.get_mut() {
-            tree.append_raw(bytes);
-        }
-        let coordinate = Coordinate {
+        self.checkpoints.record(&self.frontier);
+        Ok(Coordinate {
             index,
             tree_size: self.frontier.size(),
             root: self.frontier.root(),
             leaf_hash,
-        };
-        self.snapshot_if_due(before, key);
-        Ok(coordinate)
+        })
     }
 
     /// Reopens the store, reads every leaf after the recorded ones, and
@@ -363,39 +422,44 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         let (log, tail) = FrontierLog::resume(store, self.frontier.clone())
             .map_err(|error| store_down::<K>(&error))?;
         let mut frontier = self.frontier.clone();
-        let events = fold::<K>(&mut frontier, &tail.leaves, &public, K::verify)?;
-        if let Some(tree) = self.proofs.get_mut() {
-            for bytes in &tail.leaves {
-                tree.append_raw(bytes);
-            }
-        }
+        let mut checkpoints = self.checkpoints.clone();
+        let events = fold::<K>(&mut frontier, &mut checkpoints, &tail.leaves, &public)?;
         self.log = log;
         self.frontier = frontier;
-        self.leaves.extend(tail.leaves);
-        self.snapshot_if_due(before, key);
+        self.checkpoints = checkpoints;
         Ok(events)
     }
 
-    /// Writes a snapshot when the log has crossed a multiple of the cadence
-    /// since it held `before` leaves. A failure is logged and kept by name.
-    fn snapshot_if_due(&mut self, before: u64, key: &Ed25519Identity) {
+    /// Writes a snapshot of the owner's state when one is owed or the log has
+    /// crossed a multiple of the cadence since the last. The owner calls this
+    /// only when `encode` gives the fold of every leaf the log holds. A
+    /// failure is logged and kept by name.
+    pub(crate) fn snapshot_if_due(
+        &mut self,
+        key: &Ed25519Identity,
+        encode: impl FnOnce() -> Result<Vec<u8>, String>,
+    ) {
         let every = self.every.get();
-        if self.len() / every <= before / every {
+        if !self.snapshot_owed && self.len() / every <= self.snapshot_at / every {
             return;
         }
-        if let Err(reason) = self.write_snapshot(key) {
-            tracing::error!(domain = K::DOMAIN, "SnapshotNotWritten: {reason}");
-            self.snapshot_failure = Some(reason);
+        let checkpoints = &self.checkpoints;
+        let written = encode().and_then(|owner| {
+            let state = checkpoints::wrap(checkpoints, &owner)?;
+            self.log
+                .write_snapshot(K::DOMAIN, &state, key)
+                .map_err(|error| error.to_string())
+        });
+        match written {
+            Ok(size) => {
+                self.snapshot_at = size;
+                self.snapshot_owed = false;
+                self.snapshot_failure = None;
+            }
+            Err(reason) => {
+                tracing::error!(domain = K::DOMAIN, "SnapshotNotWritten: {reason}");
+                self.snapshot_failure = Some(reason);
+            }
         }
-    }
-
-    /// Seals every recorded leaf as the state at the log's size.
-    fn write_snapshot(&mut self, key: &Ed25519Identity) -> Result<(), String> {
-        let state = encode_leaves(&self.leaves);
-        self.log
-            .write_snapshot(K::DOMAIN, &state, key)
-            .map_err(|error| error.to_string())?;
-        self.snapshot_failure = None;
-        Ok(())
     }
 }

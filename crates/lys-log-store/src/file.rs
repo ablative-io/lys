@@ -70,8 +70,8 @@ mod leaves;
 #[cfg(test)]
 use leaves::{LEAF_TEMP_ATTEMPTS, leaf_temp_name};
 use leaves::{
-    contiguous_extent, fsync_dir, link_leaf, next_process_sequence, remove_file, sync_dir,
-    write_leaf_temp,
+    contiguous_extent, fsync_dir, link_leaf, next_process_sequence, probed_extent, remove_file,
+    sync_dir, write_leaf_temp,
 };
 
 mod left_behind;
@@ -195,10 +195,10 @@ impl FileLeafStore {
 
     /// Opens the store at `dir`, establishing contiguity and reading the pin.
     ///
-    /// Leaf *contents* are not read here — that is the caller's business — but
-    /// the index set is enumerated and required to be exactly `0..n`, because
-    /// [`LeafStore::extent`] promises contiguity and a promise checked later is
-    /// not a promise.
+    /// Leaf *contents* are not read here — that is the caller's business. The
+    /// extent is found from the pin forward, so opening costs the same however
+    /// long the log is; [`FileLeafStore::audit_leaves`] enumerates every name
+    /// when a whole-folder check is wanted.
     ///
     /// # Errors
     ///
@@ -234,10 +234,31 @@ impl FileLeafStore {
         Ok(Self {
             dir: dir.to_path_buf(),
             origin: config.origin,
-            extent: contiguous_extent(dir)?,
+            extent: probed_extent(dir, pinned.tree_size)?,
             pinned,
             durability_uncertain: None,
             left_behind: Vec::new(),
+        })
+    }
+
+    /// Reads every name in `leaves/` and checks it is exactly `0..extent`.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::Corrupt`] naming the unexpected entry, the gap, or an
+    /// extent other than the one this handle holds, and [`StoreError::Io`] on
+    /// filesystem failure.
+    pub fn audit_leaves(&self) -> StoreResult<()> {
+        let listed = contiguous_extent(&self.dir)?;
+        if listed == self.extent {
+            return Ok(());
+        }
+        Err(StoreError::Corrupt {
+            path: self.dir.clone(),
+            reason: format!(
+                "the leaves folder holds {listed} leaves but this store's extent is {}",
+                self.extent
+            ),
         })
     }
 

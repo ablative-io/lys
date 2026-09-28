@@ -181,12 +181,54 @@ pub(super) fn remove_file(path: &Path) -> std::io::Result<()> {
     std::fs::remove_file(path)
 }
 
+/// The extent found from the pin forward, touching only the names the pin
+/// does not cover.
+///
+/// The pin is written after the leaves it covers are durable, so the leaf
+/// just below it must be a file, and the extent is the first index at or past
+/// the pin with no file. A name one past that is a gap and is refused. A leaf
+/// removed from below the pin is refused when it is read. Costs one lookup
+/// per unpinned leaf plus two, whatever the log's size.
+pub(super) fn probed_extent(dir: &Path, pinned: u64) -> StoreResult<u64> {
+    let leaves_dir = dir.join("leaves");
+    let named = |index: u64| leaves_dir.join(format!("{index:0LEAF_NAME_WIDTH$}"));
+    if let Some(last_pinned) = pinned.checked_sub(1)
+        && !named(last_pinned).is_file()
+    {
+        return Err(StoreError::Corrupt {
+            path: dir.to_path_buf(),
+            reason: format!(
+                "the pin covers {pinned} leaves but leaf index {last_pinned} is not a file"
+            ),
+        });
+    }
+    let mut extent = pinned;
+    while named(extent).is_file() {
+        extent = extent.checked_add(1).ok_or_else(|| StoreError::Corrupt {
+            path: dir.to_path_buf(),
+            reason: "more leaves than u64 can index".to_string(),
+        })?;
+    }
+    if let Some(beyond) = extent.checked_add(1)
+        && named(beyond).exists()
+    {
+        return Err(StoreError::Corrupt {
+            path: dir.to_path_buf(),
+            reason: format!(
+                "leaves are not contiguous: expected leaf index {extent}, found {beyond}"
+            ),
+        });
+    }
+    Ok(extent)
+}
+
 /// Enumerates `leaves/` and returns the contiguous extent.
 ///
 /// Entries beginning with `.` are ignored — they can never be leaf names,
 /// which are exactly 20 digits, so ignoring them cannot mask a missing or
 /// extra leaf. Any other unexpected entry is corruption. The index set must be
-/// exactly `0..n`.
+/// exactly `0..n`. Its cost grows with the log, so it is the audit, never the
+/// open.
 pub(super) fn contiguous_extent(dir: &Path) -> StoreResult<u64> {
     let leaves_dir = dir.join("leaves");
     let entries = std::fs::read_dir(&leaves_dir).map_err(|source| StoreError::Io {

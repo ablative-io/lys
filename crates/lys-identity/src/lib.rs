@@ -7,7 +7,9 @@
 //! formats it uses and never changes.
 
 pub mod binding;
+pub mod checkpoints;
 pub mod directory;
+mod directory_state;
 pub mod encoding;
 pub mod error;
 pub mod event;
@@ -23,7 +25,7 @@ pub mod provenance;
 pub mod receipt;
 pub mod restart;
 pub mod signer;
-mod snapshot_state;
+mod state_value;
 
 pub use binding::LoginBinding;
 pub use directory::Directory;

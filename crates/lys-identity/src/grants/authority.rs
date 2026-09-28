@@ -27,6 +27,7 @@ use super::projection::GrantBook;
 use super::receipt::GrantReceipt;
 use super::recovery::GrantLedger;
 use super::revocation::judge_revoke;
+use super::state;
 use super::types::{Action, Grant, GrantId, Resource, Source};
 use crate::id::{IdentityId, PersonId};
 use crate::log::Reopen;
@@ -102,7 +103,7 @@ pub struct Grants<S: LeafStore, R: RelationshipStore> {
     pub(super) key: Ed25519Identity,
     pub(super) ledger: GrantLedger<S>,
     pub(super) book: GrantBook,
-    pub(super) events: Vec<(SignedGrantEvent, GrantReceipt)>,
+    pub(super) folded: u64,
     pub(super) relationships: R,
 }
 
@@ -160,19 +161,29 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         root_authority: PersonId,
         every: NonZeroU64,
     ) -> Result<Self, GrantError> {
-        let (ledger, events) = GrantLedger::open(reopen, &key, every)?;
+        let (mut ledger, opening) = GrantLedger::open(reopen, &key, every)?;
+        let read = opening
+            .state
+            .as_deref()
+            .map(|held| state::decode(held, opening.size));
+        let (book, folded, events) = match read {
+            None => (GrantBook::new(), 0, opening.events),
+            Some(Ok(book)) => (book, opening.size, opening.events),
+            Some(Err(reason)) => (GrantBook::new(), 0, ledger.refuse_state(reason, &key)?),
+        };
         let mut grants = Self {
             model,
             root_authority,
             key,
             ledger,
-            book: GrantBook::new(),
-            events: Vec::new(),
+            book,
+            folded,
             relationships,
         };
         for (signed, coordinate) in events {
-            grants.record_committed(signed, coordinate)?;
+            grants.record_committed(&signed, coordinate)?;
         }
+        grants.snapshot();
         grants.project().ok();
         Ok(grants)
     }
@@ -187,14 +198,35 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         &self.book
     }
 
-    /// Every committed grant event with its receipt, in log order.
-    pub fn events(&self) -> &[(SignedGrantEvent, GrantReceipt)] {
-        &self.events
+    /// Every committed grant event with its receipt, in log order, built from
+    /// the log in one pass.
+    pub fn events(&self) -> Result<Vec<(SignedGrantEvent, GrantReceipt)>, GrantError> {
+        Ok(self
+            .ledger
+            .entries()?
+            .into_iter()
+            .map(|(signed, coordinate)| {
+                let receipt = GrantReceipt::of(&signed, coordinate);
+                (signed, receipt)
+            })
+            .collect())
+    }
+
+    /// The receipt of the event at log index `index`, built from the log from
+    /// the nearest checkpoint. `None` past the events folded.
+    pub fn receipt(&self, index: u64) -> Result<Option<GrantReceipt>, GrantError> {
+        if index >= self.folded {
+            return Ok(None);
+        }
+        Ok(self
+            .ledger
+            .entry(index)?
+            .map(|(signed, coordinate)| GrantReceipt::of(&signed, coordinate)))
     }
 
     /// The number of committed grant events: the revision a fully fresh decision stands at.
     pub fn revision(&self) -> u64 {
-        self.events.len() as u64
+        self.folded
     }
 
     /// The grant log, for checkpoints and inclusion proofs.
@@ -221,10 +253,10 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         at: u64,
     ) -> Result<Recorded, GrantError> {
         self.settle_for_change()?;
-        if let Some(event) = self.answered_event(request.operation) {
+        if let Some((event, receipt)) = self.answered(request.operation)? {
             return match event.change() {
                 GrantChange::Issue(grant) if root_matches(request, grant) => {
-                    self.answer(request.operation)
+                    self.answer(event, receipt)
                 }
                 _ => Err(Self::reused(request.operation)),
             };
@@ -252,10 +284,10 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         at: u64,
     ) -> Result<Recorded, GrantError> {
         self.settle_for_change()?;
-        if let Some(event) = self.answered_event(request.operation) {
+        if let Some((event, receipt)) = self.answered(request.operation)? {
             return match event.change() {
                 GrantChange::Issue(grant) if delegation_matches(request, grant) => {
-                    self.answer(request.operation)
+                    self.answer(event, receipt)
                 }
                 _ => Err(Self::reused(request.operation)),
             };
@@ -283,9 +315,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             grant: request.grant,
             reason: request.reason.clone(),
         };
-        if let Some(event) = self.answered_event(request.operation) {
+        if let Some((event, receipt)) = self.answered(request.operation)? {
             return if event.caller() == request.caller && event.change() == &change {
-                self.answer(request.operation)
+                self.answer(event, receipt)
             } else {
                 Err(Self::reused(request.operation))
             };
@@ -310,18 +342,13 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             let Some(record) = self.book.record(*grant) else {
                 continue;
             };
-            let latest = record
-                .revoked()
-                .map_or(record.index(), |revocation| revocation.index);
+            let (latest, operation) = record.revoked().map_or(
+                (record.index(), record.grant().parts().operation),
+                |revocation| (revocation.index, revocation.operation),
+            );
             if latest >= projected {
-                let (signed, _) = usize::try_from(latest)
-                    .ok()
-                    .and_then(|index| self.events.get(index))
-                    .ok_or_else(|| GrantError::GrantUnknown {
-                        grant: grant.to_string(),
-                    })?;
                 return Err(GrantError::ProjectionPending {
-                    operation: signed.event().operation().to_string(),
+                    operation: operation.to_string(),
                     grant: grant.to_string(),
                     index: latest,
                 });

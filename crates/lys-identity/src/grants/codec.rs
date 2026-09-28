@@ -63,7 +63,8 @@ fn write_actions(out: &mut Vec<u8>, actions: &BTreeSet<Action>) {
     }
 }
 
-fn recipient_code(kind: RecipientKind) -> u64 {
+/// A recipient kind's wire code.
+pub(crate) fn recipient_code(kind: RecipientKind) -> u64 {
     match kind {
         RecipientKind::Person => 1,
         RecipientKind::Agent => 2,

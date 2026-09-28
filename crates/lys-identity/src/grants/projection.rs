@@ -17,6 +17,9 @@ use super::types::{Grant, GrantId, Resource, Source};
 use crate::id::IdentityId;
 use crate::operation::OperationId;
 
+/// The rule a use event observed for anyone but the grant's holder breaks.
+pub(crate) const USE_BY_HOLDER: &str = "a use is observed for the grant's own holder";
+
 /// Where and why a grant was revoked.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Revocation {
@@ -77,6 +80,15 @@ impl GrantRecord {
     pub fn revoked(&self) -> Option<&Revocation> {
         self.revoked.as_ref()
     }
+}
+
+/// What the event at one index did to a grant, as the book records it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Changed {
+    /// The grant was issued.
+    Issued(GrantId),
+    /// The grant was revoked.
+    Revoked(GrantId),
 }
 
 /// Every grant, the operations that made them, and the committed events refused.
@@ -205,7 +217,7 @@ impl GrantBook {
                     Ok(())
                 } else {
                     Err(GrantError::EventMismatch {
-                        reason: "a use is observed for the grant's own holder",
+                        reason: USE_BY_HOLDER,
                     })
                 }
             }
@@ -258,9 +270,31 @@ impl GrantBook {
         Ok(())
     }
 
+    /// The changes to relationships the book records at or after `from`: the
+    /// index of each grant's issue and of each revocation, by index. An index
+    /// not named is a use or a refused event, and changes no relationship.
+    pub(crate) fn changes_from(&self, from: u64) -> BTreeMap<u64, Changed> {
+        let mut changes = BTreeMap::new();
+        for record in self.records.values() {
+            let id = record.grant.id();
+            if record.index >= from {
+                changes.insert(record.index, Changed::Issued(id));
+            }
+            if let Some(revocation) = &record.revoked
+                && revocation.index >= from
+            {
+                changes.insert(revocation.index, Changed::Revoked(id));
+            }
+        }
+        changes
+    }
+
     /// Keep a committed event the book refused, by name, granting nothing.
     pub fn refuse(&mut self, event: &GrantEvent, index: u64, refusal: GrantError) {
         self.operations.entry(event.operation()).or_insert(index);
         self.refused.insert(index, (event.operation(), refusal));
     }
 }
+
+#[path = "book_state.rs"]
+pub(crate) mod state;

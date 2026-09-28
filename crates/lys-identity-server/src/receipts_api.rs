@@ -34,18 +34,18 @@ async fn receipt(
 ) -> Result<Json<Value>, ServerError> {
     with_directory(&state, |directory| {
         let log = directory.log()?;
-        let message = log
-            .leaf(index)?
-            .map(hex)
-            .ok_or_else(|| ServerError::RequestMalformed {
-                reason: format!("the log holds no leaf {index}"),
-            })?;
+        let message =
+            log.leaf(index)?
+                .as_deref()
+                .map(hex)
+                .ok_or_else(|| ServerError::RequestMalformed {
+                    reason: format!("the log holds no leaf {index}"),
+                })?;
         let (tree_size, root) = log.head()?;
         let proof = log.inclusion_proof(index)?;
         let receipt =
             directory
-                .receipt_at(index)
-                .cloned()
+                .receipt_at(index)?
                 .ok_or_else(|| ServerError::RequestMalformed {
                     reason: format!("the directory holds no receipt for leaf {index}"),
                 })?;

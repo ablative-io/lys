@@ -33,8 +33,7 @@ impl<S: LeafStore> Directory<S> {
             .link_source(observation.source_operation_id())
         {
             return self
-                .receipt_at(index)
-                .cloned()
+                .receipt_at(index)?
                 .ok_or(IdentityError::ReceiptInvalid {
                     reason: "an accepted source operation has no receipt",
                 });
