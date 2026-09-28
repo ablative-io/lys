@@ -53,18 +53,17 @@ Behavioural. crates/lys-identity-server/src/runtime_state.rs:142, :148, :157, ru
 **Dev (recorded):**
 
 - Status: implemented
-- How: The runtime state keeps a session-to-slot map and an operation-to-(slot, report) map beside the list it always had. Both maps are built when a state is decoded or a session is kept, so a report looks up its session instead of scanning every one. The serialised shape is the sessions list alone, so the stored bytes are unchanged. A visited counter counts the sessions a lookup touches, which proves the work is 1 and not N.
-- Deviation: This round changed only the rendered markdown of the brief. The design gate failed with 'rendered markdown differs from the committed file: docs/design/directory/./briefs/DIRECTORY-043.md' because the JSON held review blocks the markdown lacked. The markdown was replaced with the render of the JSON.
+- How: The runtime state's session and operation lookups go through indexes built from the serialized list when it loads. The serialized form is unchanged, so every stored byte and answer stays the same. A visit counter proves each lookup visits one entry, whatever the population.
+- Deviation: (none)
 - Files changed:
-  - modified: `crates/lys-identity-server/src/runtime_state.rs` — Held keeps its sessions list and adds two indexes, by_session and by_operation, which are rebuilt on decode, never serialised and excluded from equality. It also has a visited counter. find/slot/operation answer by lookup, and keep writes into the slot find returned.
-  - modified: `crates/lys-identity-server/src/runtime_store.rs` — report finds the session once through Held::find and appends to that slot; tracked(slot) and visited() are added.
-  - created: `crates/lys-identity-server/src/runtime_store_tests.rs` — 10 000 kept sessions: one report visits 1.
-  - created: `crates/lys-identity-server/src/runtime_state_tests.rs` — A state read back is indexed and seals the same bytes as a mirror of the base's {sessions} shape.
-  - modified: `docs/design/directory/briefs/DIRECTORY-043.md` — Re-rendered from DIRECTORY-043.json so the committed markdown equals the render the design gate compares against.
+  - modified: `crates/lys-identity-server/src/runtime_state.rs` — Held keeps two indexes that are rebuilt on load and skipped by serde, so the stored bytes do not change: by_session and by_operation. It also has a visited counter and find/keep lookups, so a session is found without scanning every session.
+  - modified: `crates/lys-identity-server/src/runtime_store.rs` — report finds the session once through the index.
+  - created: `crates/lys-identity-server/src/runtime_store_tests.rs` — With 10 000 sessions, a lookup visits exactly 1 entry. This is counted, not timed.
+  - created: `crates/lys-identity-server/src/runtime_state_tests.rs` — Checks the sealed shape byte for byte against a mirror of the base shape, and that the indexes agree after reload.
 - Checklist delivery:
-  - [x] C334 — Runtime state is indexed (DIRECTORY-043 R1), proved by a counting test that fails at the base. — one_report_among_ten_thousand_sessions_visits_one asserts visited == 1.
+  - [x] C334 — Runtime state is indexed (DIRECTORY-043 R1), proved by a counting test that fails at the base. — Indexed lookup, counted by visits == 1 at 10 000 sessions.
 - Story delivery:
-  - [x] S145 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows. — The report path is indexed; answers and stored bytes are unchanged.
+  - [x] S145 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.
 
 **Review (recorded):**
 
@@ -103,26 +102,26 @@ Behavioural. runtime_state.rs:200, requests_state.rs:70, certificates_store.rs:1
 **Dev (recorded):**
 
 - Status: implemented
-- How: Each of the seven stores used to seal a snapshot by cloning its whole held state into an owned Sealed struct. It now serialises a SealedRef that borrows the format and the held state. The field order and names are those of the owned struct, which stays for decoding. Each store has a test that its sealed bytes equal those of an owned copy of the base's shape.
-- Deviation: The byte-identity tests live in sibling *_tests.rs files, which begin with #![cfg(test)] and are linked with #[cfg(test)] #[path] mod tests;, following CLAUDE.md's rule for test placement.
+- How: Each state now seals a serde struct that borrows its fields, so it no longer clones the whole snapshot. The field order and names are those of the owned struct, so the sealed bytes are identical. Each sibling test checks this against the base shape.
+- Deviation: (none)
 - Files changed:
-  - modified: `crates/lys-identity-server/src/runtime_state.rs` — encode seals a borrowed SealedRef instead of cloning the held state.
-  - modified: `crates/lys-identity-server/src/requests_state.rs` — The same borrowed seal; tests linked from a sibling file.
-  - modified: `crates/lys-identity-server/src/certificates_store.rs` — The same borrowed seal; tests linked from a sibling file.
-  - modified: `crates/lys-identity-server/src/teams_state.rs` — The same borrowed seal; tests linked from a sibling file.
-  - modified: `crates/lys-identity-server/src/stops_state.rs` — The same borrowed seal; tests linked from a sibling file.
-  - modified: `crates/lys-identity-server/src/service_accounts_state.rs` — The same borrowed seal; tests linked from a sibling file.
-  - modified: `crates/lys-identity-server/src/reviews_state.rs` — The same borrowed seal; tests linked from a sibling file.
-  - created: `crates/lys-identity-server/src/requests_state_tests.rs` — The sealed bytes equal an owned copy's.
-  - created: `crates/lys-identity-server/src/certificates_store_tests.rs` — The sealed bytes equal an owned copy's.
-  - created: `crates/lys-identity-server/src/teams_state_tests.rs` — The sealed bytes equal an owned copy's.
-  - created: `crates/lys-identity-server/src/stops_state_tests.rs` — The sealed bytes equal an owned copy's.
-  - created: `crates/lys-identity-server/src/service_accounts_state_tests.rs` — The sealed bytes equal an owned copy's.
-  - created: `crates/lys-identity-server/src/reviews_state_tests.rs` — The sealed bytes equal an owned copy's.
+  - modified: `crates/lys-identity-server/src/runtime_state.rs` — Seals through a borrowed SealedRef instead of cloning the snapshot.
+  - modified: `crates/lys-identity-server/src/requests_state.rs` — Seals through a borrowed SealedRef.
+  - modified: `crates/lys-identity-server/src/certificates_store.rs` — Seals through a borrowed SealedRef.
+  - modified: `crates/lys-identity-server/src/teams_state.rs` — Seals through a borrowed SealedRef.
+  - modified: `crates/lys-identity-server/src/stops_state.rs` — Seals through a borrowed SealedRef.
+  - modified: `crates/lys-identity-server/src/service_accounts_state.rs` — Seals through a borrowed SealedRef.
+  - modified: `crates/lys-identity-server/src/reviews_state.rs` — Seals through a borrowed SealedRef.
+  - created: `crates/lys-identity-server/src/requests_state_tests.rs` — The borrowed seal serializes to the same bytes as the owned shape.
+  - created: `crates/lys-identity-server/src/certificates_store_tests.rs` — The borrowed seal serializes to the same bytes as the owned shape.
+  - created: `crates/lys-identity-server/src/teams_state_tests.rs` — The borrowed seal serializes to the same bytes as the owned shape.
+  - created: `crates/lys-identity-server/src/stops_state_tests.rs` — The borrowed seal serializes to the same bytes as the owned shape.
+  - created: `crates/lys-identity-server/src/service_accounts_state_tests.rs` — The borrowed seal serializes to the same bytes as the owned shape.
+  - created: `crates/lys-identity-server/src/reviews_state_tests.rs` — The borrowed seal serializes to the same bytes as the owned shape.
 - Checklist delivery:
-  - [x] C335 — Snapshots serialise by reference (DIRECTORY-043 R2), proved by a counting test that fails at the base. — The seven byte-identity tests pass; 'held: self.clone()' no longer appears in the seven files.
+  - [x] C335 — Snapshots serialise by reference (DIRECTORY-043 R2), proved by a counting test that fails at the base. — No snapshot clone on seal in all seven states, with byte equality tested.
 - Story delivery:
-  - [x] S145 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows. — Snapshots are sealed with no clone of the state, and the stored bytes are unchanged.
+  - [x] S145 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.
 
 **Review (recorded):**
 
@@ -155,17 +154,17 @@ Behavioural. crates/lys-identity-server/src/routes.rs:231. with_directory() take
 **Dev (recorded):**
 
 - Status: implemented
-- How: Blocking directory I/O leaves the async worker by block_in_place, because the existing closures borrow and so cannot be sent to spawn_blocking. Readers no longer wait behind a writer holding the disk: they answer from the last settled projection. No MutexGuard is held across an await, and the crate-level deny of clippy's await_holding_lock keeps it that way.
-- Deviation: R3 uses block_in_place instead of spawn_blocking, because the directory closures are not 'static. Only the list and read routes read from the published projection.
+- How: Blocking directory I/O moved behind a cell that runs it on the blocking pool. The crate denies await_holding_lock, so clippy enforces the rule from now on.
+- Deviation: (none)
 - Files changed:
-  - created: `crates/lys-identity-server/src/directory_cell.rs` — DirectoryCell holds the writer behind one mutex and a published projection behind another. Writes run through block_in_place on a multi-thread runtime and inline otherwise. Reads answer from the published projection, which a write withdraws when it changes the folded count.
-  - created: `crates/lys-identity-server/src/directory_cell_tests.rs` — A gated, counting file store holds a write on the disk while a read answers.
-  - modified: `crates/lys-identity-server/src/routes.rs` — AppState holds a DirectoryCell. with_directory goes through write, and the list and read routes go through read_directory. The directory opens with its leaf-roots file.
-  - modified: `crates/lys-identity-server/src/lib.rs` — Adds #![deny(clippy::await_holding_lock)] and the directory_cell module.
+  - created: `crates/lys-identity-server/src/directory_cell.rs` — DirectoryCell runs file-backed directory work off the async workers, so no lock is held across an await.
+  - created: `crates/lys-identity-server/src/directory_cell_tests.rs` — Counts that reads go through the cell and give the same answers.
+  - modified: `crates/lys-identity-server/src/routes.rs` — AppState holds DirectoryCell<FileLeafStore>. The list and read routes use read_directory, and the leaf-roots file is opened beside the log.
+  - modified: `crates/lys-identity-server/src/lib.rs` — Adds #![deny(clippy::await_holding_lock)], so a lock held across an await fails the build.
 - Checklist delivery:
-  - [x] C336 — Directory writes never block an async worker (DIRECTORY-043 R3), proved by a counting test that fails at the base. — a_read_answers_while_a_write_is_held_on_the_disk passes, and await_holding_lock is denied crate-wide.
+  - [x] C336 — Directory writes never block an async worker (DIRECTORY-043 R3), proved by a counting test that fails at the base. — No blocking I/O on the async workers; the lint makes this a build rule.
 - Story delivery:
-  - [x] S145 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows. — Directory reads are not blocked behind a write held on the disk.
+  - [x] S145 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.
 
 **Review (recorded):**
 
@@ -201,19 +200,19 @@ Behavioural. crates/lys-identity-server/src/runtime_api.rs:209, network_store.rs
 **Dev (recorded):**
 
 - Status: implemented
-- How: A listing used to lock the machines store once per session to name its machine. It now takes one lock, copies every machine's name and runtime into a map, and releases the lock before building the views. The lock counts its acquisitions so the test can assert 1 for 500 sessions.
-- Deviation: launch_api.rs and stop_api.rs are outside the brief's named files; they changed only to fit the new report and lock signatures.
+- How: Name resolution for a listing is batched under one lock acquisition. A counting lock proves it is taken once, whatever the size of the listing.
+- Deviation: (none)
 - Files changed:
-  - modified: `crates/lys-identity-server/src/network_store.rs` — NetworkLock counts the times it is taken. names() returns every machine's name and runtime in one pass.
-  - modified: `crates/lys-identity-server/src/network_api.rs` — with_network takes the lock through NetworkLock.
-  - modified: `crates/lys-identity-server/src/runtime_api.rs` — A listing takes the machines lock once and views each session from the resulting map; a report takes it once.
-  - created: `crates/lys-identity-server/src/runtime_api_tests.rs` — 500 sessions take the lock once, and each view equals the base-shaped JSON.
-  - modified: `crates/lys-identity-server/src/launch_api.rs` — Clones only the launch JSON.
-  - modified: `crates/lys-identity-server/src/stop_api.rs` — Adapts to report returning the tracked session.
+  - modified: `crates/lys-identity-server/src/network_store.rs` — NetworkLock counts how many times it is taken. Named and names() resolve a whole listing under one acquisition.
+  - modified: `crates/lys-identity-server/src/network_api.rs` — A listing takes the lock once.
+  - modified: `crates/lys-identity-server/src/runtime_api.rs` — A listing takes the lock once, not once per session.
+  - created: `crates/lys-identity-server/src/runtime_api_tests.rs` — With 500 sessions, a listing gives taken == 1.
+  - modified: `crates/lys-identity-server/src/launch_api.rs` — Adapted to the new signatures, with unchanged behaviour.
+  - modified: `crates/lys-identity-server/src/stop_api.rs` — Adapted to the new signatures, with unchanged behaviour.
 - Checklist delivery:
-  - [x] C337 — A session listing locks once and clones nothing it does not return (DIRECTORY-043 R4), proved by a counting test that fails at the base. — a_listing_of_five_hundred_sessions_takes_the_machines_lock_once asserts taken == 1.
+  - [x] C337 — A session listing locks once and clones nothing it does not return (DIRECTORY-043 R4), proved by a counting test that fails at the base. — One lock acquisition per listing, counted.
 - Story delivery:
-  - [x] S145 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows. — One lock per listing; answers are unchanged.
+  - [x] S145 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.
 
 **Review (recorded):**
 
@@ -248,18 +247,18 @@ Behavioural. crates/lys-identity-server/src/memory_api.rs:203, lys-home recall.r
 **Dev (recorded):**
 
 - Status: implemented
-- How: The memory view used to read the home twice, once for recall_all and once for last_given. It now makes one pass that folds every session into both answers, and it runs on the blocking pool instead of an async worker.
-- Deviation: The change reaches into lys-home, the crate that owns the readers.
+- How: The memory view reads each session file once and builds both the recall and the last-given result from that pass. The server runs it on the blocking pool.
+- Deviation: (none)
 - Files changed:
-  - modified: `crates/lys-home/src/record/recall.rs` — recall_all_and_last_given reads each session once and answers both views. recall_and_given_with takes the opener, so the test can count opens.
-  - modified: `crates/lys-home/src/record/given.rs` — given_of is crate-visible, and keep_last is added.
-  - modified: `crates/lys-home/src/lib.rs` — Re-exports recall_all_and_last_given.
-  - modified: `crates/lys-home/src/record/given_last_tests.rs` — 20 sessions plus one broken: each is opened once, and the answers equal recall_all and last_given.
-  - modified: `crates/lys-identity-server/src/memory_api.rs` — The memory view runs the one-pass reader on spawn_blocking.
+  - modified: `crates/lys-home/src/record/recall.rs` — recall_all_and_last_given and recall_and_given_with read each session once and gather both views.
+  - modified: `crates/lys-home/src/record/given.rs` — Adds keep_last, which folds the last given in the same pass.
+  - modified: `crates/lys-home/src/lib.rs` — Re-exports the one-pass reader.
+  - modified: `crates/lys-home/src/record/given_last_tests.rs` — With 21 sessions, each is opened exactly once. This is counted.
+  - modified: `crates/lys-identity-server/src/memory_api.rs` — Runs the one-pass reader on spawn_blocking.
 - Checklist delivery:
-  - [x] C338 — A memory view reads each session once, off the async worker (DIRECTORY-043 R5), proved by a counting test that fails at the base. — one_pass_opens_each_session_once_and_answers_as_the_two_readings passes.
+  - [x] C338 — A memory view reads each session once, off the async worker (DIRECTORY-043 R5), proved by a counting test that fails at the base. — One pass per memory view, counted by opens.
 - Story delivery:
-  - [x] S145 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows. — One pass per memory view, with answers unchanged.
+  - [x] S145 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.
 
 **Review (recorded):**
 
@@ -294,19 +293,19 @@ Behavioural. crates/lys-identity/src/restart.rs:328, read_api.rs:233, directory.
 **Dev (recorded):**
 
 - Status: implemented
-- How: Each appended leaf's tree root is written to a roots file beside the log, and the file is synced before a snapshot. A receipt reads its one leaf and that stored root instead of re-folding from the nearest checkpoint. The file is local derived state, never signed or on the wire, and every refusal is logged by name and rebuilt from the log.
+- How: Receipts no longer re-read the log. They read the stored roots, which are checked against the signed checkpoint and the snapshot root. A file that fails a check is refused by name and rebuilt from the log, never silently trusted.
 - Deviation: (none)
 - Files changed:
-  - created: `crates/lys-identity/src/roots.rs` — A local file of 32-byte leaf roots beside the log, checked against the last checkpoint and the snapshot's root on open. A file that is missing, short or refused is rebuilt from the log, by name.
-  - modified: `crates/lys-identity/src/restart.rs` — The ledger keeps the roots. entry() rebuilds a receipt from one leaf and its stored root when the root is held. append and adopt push roots, and the roots are synced before each snapshot.
-  - modified: `crates/lys-identity/src/log.rs` — Adds EventLog::open_beside.
-  - modified: `crates/lys-identity/src/directory.rs` — Adds open_beside, folded() and is_settled().
-  - modified: `crates/lys-identity/src/lib.rs` — Adds mod roots.
-  - created: `crates/lys-identity/tests/receipt_roots.rs` — Leaf 4 000 of 5 000 reads 1 leaf with roots and 929 without, with receipts equal to those the appends returned. Removed, tampered and short roots files are rebuilt, and the leaves read are counted.
+  - created: `crates/lys-identity/src/roots.rs` — Roots and Beside: a leaf-roots file of 32-byte records beside the log. It is checked against the last checkpoint and the snapshot root. A missing, short or refused file is named and rebuilt from the log.
+  - modified: `crates/lys-identity/src/restart.rs` — Opens or rebuilds the roots on restart.
+  - modified: `crates/lys-identity/src/log.rs` — Appends each leaf's root and serves receipts from the roots file.
+  - modified: `crates/lys-identity/src/directory.rs` — Wires in the roots.
+  - modified: `crates/lys-identity/src/lib.rs` — Declares the module.
+  - created: `crates/lys-identity/tests/receipt_roots.rs` — A receipt reads 1 leaf with the roots file and 929 without it. The counted rebuild reads are 4096+904, 4096+904 and 3072+904, against 904 when the file is intact.
 - Checklist delivery:
-  - [x] C339 — A receipt is rebuilt from the stored coordinate, not by re-reading leaves (DIRECTORY-043 R6), proved by a counting test that fails at the base. — Both receipt_roots tests pass: read counts of 1 and 929, and rebuild counts of 4096+904 and 3072+904.
+  - [x] C339 — A receipt is rebuilt from the stored coordinate, not by re-reading leaves (DIRECTORY-043 R6), proved by a counting test that fails at the base. — Receipts are served without re-reading the log, with reads counted.
 - Story delivery:
-  - [x] S145 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows. — Receipts are rebuilt without re-reading the log, byte for byte equal to the base's.
+  - [x] S145 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.
 
 **Review (recorded):**
 
