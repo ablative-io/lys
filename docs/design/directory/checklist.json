@@ -770,6 +770,46 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Row 8.3: the access graph (DIRECTORY-034)",
+      "items": [
+        {
+          "id": "C272",
+          "text": "The graph module under surface/identity/src/features/graph/ imports nothing from the permission engine except the generated Access client (its other imports are only React, the surface's router package, the shell modules the test lists by file name, the surface's stylesheets and its own files, followed transitively, the surface's API client refused by name wherever it is reached), declares none of the mock-up's rule functions and references no mutation, and a test that counts what it checked proves it (conformance 8.3).",
+          "done": false
+        },
+        {
+          "id": "C273",
+          "text": "Every grant edge and every reachability the graph draws equals an Access answer from the real evaluator for the same question, over every identity, resource and declared action of a fixture directory: paths as returned, a no as Access's reason, a does not stand edge only for a grant a forward refusal names, with Access's reason, a grant Access no longer returns gone on the next draw, standing never inferred, and an outage shown as a named refusal.",
+          "done": false
+        },
+        {
+          "id": "C274",
+          "text": "A read-only route in the identity server serves the permission model's resources with their parents, declared actions and model version, recording nothing; a caller sees a resource only where they hold a grant on it or on an ancestor, a directory administrator sees every resource, pass-on authority widens nothing, and a hidden parent is served as withheld without its name.",
+          "done": false
+        },
+        {
+          "id": "C275",
+          "text": "Before any question the graph shows the people, agents and resources the person may see, with containment edges from the served parents, a parent withheld mark where the parent is withheld, answers-to edges from the records and no grant edge, under three toggles: Grants, Containment and Who answers for whom, none of which asks Access again.",
+          "done": false
+        },
+        {
+          "id": "C276",
+          "text": "Choosing a person or agent draws the forward answer for each resource and action its visible grants carry, choosing a resource draws the reverse answer, an administrator holding the reverse question's visibility permission sees the whole directory, a reverse question the person may not ask is refused by name, no hidden grant is drawn or hinted at, and an incomplete reverse answer is marked incomplete.",
+          "done": false
+        },
+        {
+          "id": "C277",
+          "text": "Every grant and does not stand edge shows the model version of the Access answer it came from and every containment edge that of the resource route's answer, a draw of mixed versions names each above the graph, the draw time shows beside the version, and the graph asks Access again only on navigation, reload or its refresh control.",
+          "done": false
+        },
+        {
+          "id": "C278",
+          "text": "The graph is reached by the deep links #/graph and #/graph/<id> and by a Show in graph link on each screen present at build time that shows one identity (the directory's preview drawer, the identity record screen and the You page) and on the grant explanation, whose link opens the graph on the holder's node with that grant's edge selected, none on sign-in or the delegation form, with no rail entry or g h shortcut of its own.",
+          "done": false
+        }
+      ]
     }
   ]
 }

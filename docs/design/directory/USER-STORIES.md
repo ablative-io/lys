@@ -8,10 +8,6 @@
 
 **S5.** As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email.
 
-**S22.** As the responsible person, I want every session my agent runs to present the one enduring agent with a credential of its own, so that starting another session never leaves me a second agent to govern.
-
-**S23.** As the responsible person, I want an agent I registered before it ever ran to show no session credential, so that I can tell an agent that has never run from one that has.
-
 ## Reviewer — Reviews a brief before any of its rows is dispatched
 
 **S2.** As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria.
@@ -21,8 +17,6 @@
 **S3.** As the operator, I want to install the identity product's dependencies on one PostgreSQL database whose host I choose, and restart or restore it without losing anyone, so that the product stands alone without Cambium or Manifold.
 
 **S6.** As the operator, I want the directory's screens to show every refusal, pending audit and outage as it is, so that I never act on a completed state that did not happen.
-
-**S111.** As the operator, I want the exact release installed on a node I name and shown to me as a staging install, so that I can accept the product standalone before anything is cut over.
 
 ## Verifier — Checks a recorded identity change without the operator's cooperation
 
@@ -40,6 +34,10 @@
 
 **S12.** As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
 
-## Release reviewer — Decides from the record whether the release proof is complete
+## Graph viewer — Looks at who can reach what on the access graph
 
-**S110.** As the release reviewer, I want every command, result, ref and hash recorded with every unmet requirement named, so that completion rests on recorded evidence and never on a health check.
+**S121.** As a person signed in to the directory, I want to see what I may see as a graph, with my own reach drawn from Access's answers and the recorded containment and responsible people, so that what the graph shows is what the directory would decide.
+
+**S122.** As a directory administrator holding the visibility permission, I want to ask the graph who can reach a resource and see Access's answer with its model version and the time it was drawn, so that I can review reach without the screen inventing any of it.
+
+**S123.** As a reviewer of conformance row 8.3, I want tests that compare every drawn edge with the real evaluator and prove the graph module holds no rule, so that the graph cannot drift from Access unnoticed.
