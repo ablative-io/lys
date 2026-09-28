@@ -109,6 +109,18 @@
       "by": "Archie",
       "subject": "A repeated source operation id answers only the delivery it was made for",
       "ruling": "Pull request 93 in lys: a source operation id delivered again is answered with its first receipt only when the person and the whole observation (change, issuer, subject, observer, observed_at) equal what was first accepted; otherwise it is refused as LinkSourceSeen and nothing is recorded. The fork's sender still checks identity and change_kind on every acknowledgement."
+    },
+    {
+      "date": "2026-09-28",
+      "by": "Waffles",
+      "subject": "The actor of a signed link-audit delivery is the person responsible for the agent",
+      "ruling": "The actor stays the human responsible for the agent, named by one of that person's bound logins. A new method, agent signature (wire code 2), is added, and the event keeps the agent's id. Old logs keep reading unchanged. Contract line 19 changes in the same pull request as the code. One test decodes an old log, and one shows that a signed delivery with no human signed in is refused unless the agent's responsible person resolves."
+    },
+    {
+      "date": "2026-09-28",
+      "by": "Archie",
+      "subject": "The ruling as built, pull request 96 in lys",
+      "ruling": "The login that names the actor is the configured link-audit source login, which the signing agent's responsible person must hold in the directory's bindings; an agent whose responsible person does not hold it is refused NotAdmitted and nothing is recorded. The agent's id is key 5 of the actor map, 16 bytes, present when the method is 2 and never otherwise, and an OIDC actor encodes byte for byte as before. POST /link-audit and POST /link-audit/person both admit the signature, over the method, the route's path without the product's /api prefix, and the exact bytes of the body. A request carrying both a session and a signature is judged by the signature alone. A malformed body on the two routes is refused 400 RequestMalformed, and the caller is admitted before the body is read. Not built: the responsible person's lifecycle state is not checked on either path, the receipt does not show the method or the agent, and the install does not yet provision the link-audit agent with its person, login and certificate."
     }
   ]
 }
