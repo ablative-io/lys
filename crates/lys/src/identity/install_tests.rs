@@ -1,6 +1,7 @@
 #![cfg(test)]
 
 use std::error::Error;
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
@@ -9,8 +10,10 @@ use super::layout::{self, Layout, SERVICE_PORT, data_root, render_deployment};
 use super::server_config;
 use super::services;
 use super::surface;
+use super::{broker_trust, service_key};
 use crate::identity::config::DeploymentConfig;
 use crate::identity::error::ErrorKind;
+use crate::identity::private_files;
 
 #[test]
 fn the_data_root_follows_the_platform_or_the_named_home() -> Result<(), Box<dyn Error>> {
@@ -353,5 +356,65 @@ fn the_compose_wait_checks_once_per_output_and_names_each_ready() -> Result<(), 
         "{refused}"
     );
     assert_eq!(said.len(), 2, "nothing was said ready that was not");
+    Ok(())
+}
+
+/// Places the workspace's built `program` beside this test binary, where
+/// [`services::sibling`] looks for it as the install does beside `lys`.
+/// Refuses by name when cargo has not built it.
+fn place_beside_test_binary(program: &str) -> Result<(), Box<dyn Error>> {
+    let own = std::env::current_exe()?;
+    let profile = own
+        .parent()
+        .and_then(Path::parent)
+        .ok_or("the test binary has no profile directory above it")?;
+    let built = profile.join(program);
+    if !built.is_file() {
+        return Err(format!(
+            "{} is not built; build it first with `cargo build -p {program}`",
+            built.display()
+        )
+        .into());
+    }
+    std::fs::copy(&built, own.with_file_name(program))?;
+    Ok(())
+}
+
+/// Each screen service the broker's `services.json` names, with the public
+/// key it trusts that service by.
+fn trusted_services(layout: &Layout) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+    let path = layout.broker_root().join("services.json");
+    let held: serde_json::Value = serde_json::from_slice(&std::fs::read(&path)?)?;
+    let mut trusted = Vec::new();
+    for service in held.as_array().ok_or("services.json is not an array")? {
+        let name = service["name"].as_str().ok_or("a service without a name")?;
+        let key = service["public_key"]
+            .as_str()
+            .ok_or("a service without a public key")?;
+        trusted.push((name.to_string(), key.to_string()));
+    }
+    Ok(trusted)
+}
+
+#[test]
+fn the_install_trusts_the_identity_service_by_the_key_it_generated() -> Result<(), Box<dyn Error>> {
+    place_beside_test_binary("lys-secrets")?;
+    let dir = tempfile::TempDir::new()?;
+    let layout = Layout::at(dir.path().join("identity"));
+    private_files::ensure_dir(&layout.root)?;
+    let key = service_key(&layout)?;
+    assert!(services::broker_init(&layout)?, "the broker was not made");
+    broker_trust::trust(&layout, server_config::SERVICE_NAME)?;
+
+    let mut generated = String::new();
+    for byte in key.public_key_bytes() {
+        write!(generated, "{byte:02x}")?;
+    }
+    let expected = [("lys-identity".to_string(), generated)];
+    assert_eq!(trusted_services(&layout)?, expected);
+
+    // An install run again trusts the same key once, not twice.
+    broker_trust::trust(&layout, server_config::SERVICE_NAME)?;
+    assert_eq!(trusted_services(&layout)?, expected);
     Ok(())
 }
