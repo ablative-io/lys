@@ -70,7 +70,70 @@
       ],
       "stories": [
         "S121"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-034.md",
+            "change": "modified",
+            "note": "Re-rendered with scripts/design/render-brief.py from the current DIRECTORY-034.json; sh scripts/design/gate.sh exits 0 on this tree."
+          }
+        ],
+        "how": "Not implemented. GET /grants/resources and GRAPH_RESOURCES consume DIRECTORY-006's grants API, and that has not landed. On origin/main 1841018, crates/lys-identity-server/src/grants.rs and tests/grant_explanations.rs exist, but grep GRANT_EXPLAIN on that test file exits 1, so DIRECTORY-006's landed check exits 1.",
+        "deviation": "This corrects the earlier record: crates/lys-identity-server is present on main; the blocker is the failing landed check, not a missing crate. The design gate went red last round because the workflow wrote new blocks into the JSON after the render. This round's blocks will make the md stale the same way unless it is rendered again after they are recorded.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "crates/lys-identity-server/tests/grant_resources.rs (GRAPH_RESOURCES) states the graph fixture directory of the Task in Rust, seeds it through DIRECTORY-003's and DIRECTORY-006's typed operations before its first request, and writes its label-to-id map to crates/lys-identity-server/tests/grant_resources.ids.json; every id(X) in GRAPH_RESOURCES's lines is read from that file at key X. As person-owner, the answer holds exactly the ids id(resource-org), id(resource-a) and id(resource-b); id(resource-org) has no parent, id(resource-a) and id(resource-b) each have parent id(resource-org), and the actions served equal, as sets, the fixture's literals: id(resource-org) {view, edit, share}, id(resource-a) {view} and id(resource-b) {view, edit}, 6 in all.",
+            "met": false,
+            "evidence": "git diff --stat shows only DIRECTORY-034.json and .md changed. grant_resources.rs does not exist."
+          },
+          {
+            "criterion": "GRAPH_RESOURCES, as person-auditor, who holds no grant: the answer holds exactly id(resource-org), id(resource-a) and id(resource-b), read from crates/lys-identity-server/tests/grant_resources.ids.json at keys resource-org, resource-a and resource-b, with the same parents as person-owner's answer.",
+            "met": false,
+            "evidence": "There is no GRAPH_RESOURCES test and no GET /grants/resources route."
+          },
+          {
+            "criterion": "GRAPH_RESOURCES, as person-plain: the answer holds exactly one resource, id(resource-b), whose parent is {withheld: true}; the serialised response body contains 0 occurrences of id(resource-org) and 0 of id(resource-a), read from crates/lys-identity-server/tests/grant_resources.ids.json at keys resource-org and resource-a, and 0 occurrences of the label texts resource-org and resource-a.",
+            "met": false,
+            "evidence": "There is no route and no test."
+          },
+          {
+            "criterion": "GRAPH_RESOURCES, as person-owner: the answer's model version equals the model version of the POST /grants/why answer for id(agent-owner) on id(resource-a) with the action view, asked in the same test, both ids read from crates/lys-identity-server/tests/grant_resources.ids.json at keys agent-owner and resource-a.",
+            "met": false,
+            "evidence": "There is no route and no test."
+          },
+          {
+            "criterion": "GRAPH_RESOURCES: an unauthenticated request is answered with the named unauthenticated refusal; with the permission engine stopped, a request as person-owner is answered with the named outage refusal and no resource list.",
+            "met": false,
+            "evidence": "There is no route and no test."
+          },
+          {
+            "criterion": "GRAPH_RESOURCES: the authoritative event count and the permission projection revision are equal before and after one request from each of person-owner, person-auditor and person-plain; the test asserts it made 3 such requests.",
+            "met": false,
+            "evidence": "There is no test."
+          },
+          {
+            "criterion": "From the repository root, on a checkout where git status --porcelain prints nothing: after the test run that carries GRAPH_RESOURCES exits, git status --porcelain prints nothing and test -e crates/lys-identity-server/tests/grant_resources.ids.json exits 1; and git check-ignore crates/lys-identity-server/tests/grant_resources.ids.json prints crates/lys-identity-server/tests/grant_resources.ids.json.",
+            "met": false,
+            "evidence": "No test run carries GRAPH_RESOURCES, and .gitignore is not in the diff."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Implement GET /grants/resources and GRAPH_RESOURCES, with the ids.json map and its .gitignore line, once DIRECTORY-006's landed check exits 0 on main. At origin/main c1440e2b it exits 1: grants.rs, grant_explanations.rs and generated/index.ts exist, but grep -c GRANT_EXPLAIN on grant_explanations.rs prints 0 and no file under surface/identity/tests carries GRANT_SCREEN.",
+          "The dev record said 'sh scripts/design/gate.sh exits 0 on this tree', but the workflow's design leg exited 1 because DIRECTORY-034.md differed from its JSON. This is the third round in a row. The chain must render the md after it records the dev and review blocks in the JSON; a render done inside the dev or review session is overwritten."
+        ],
+        "fixes": [
+          "Re-rendered docs/design/directory/briefs/DIRECTORY-034.md with python3 scripts/design/render-cluster.py docs/design/directory. After that, sh scripts/design/gate.sh, validate.py and check-coverage.py each exit 0."
+        ]
+      }
     },
     {
       "id": "R2",
@@ -99,7 +162,56 @@
       "stories": [
         "S121",
         "S123"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not implemented. Re-verified on origin/main 1841018: surface/identity and surface/identity/src/generated/index.ts exist. DIRECTORY-005's landed check exits 1 (no ID001_STANDALONE and no ID001_SCREEN_REFUSAL under surface/identity). DIRECTORY-006's exits 1 (no GRANT_EXPLAIN and no GRANT_SCREEN). graphModel.ts, GraphScreen.tsx and graph.test.tsx wait on both.",
+        "deviation": "This corrects the earlier record: surface/identity is present on main; the blocker is the two failing landed checks.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: given one permitting POST /grants/why answer, of DIRECTORY-006's generated type, whose path has three steps, the model built from it holds exactly three grant edges, and their (from, to, label) triples equal the three steps' in the returned order.",
+            "met": false,
+            "evidence": "The diff is docs only. graph.test.tsx and graphModel.ts do not exist."
+          },
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: given one POST /grants/why refusal that names the grant grant-u1 with reason text R, the model holds exactly 1 does not stand edge, it carries the id grant-u1, its reason text equals R character for character, and the model holds 0 grant edges.",
+            "met": false,
+            "evidence": "Absent."
+          },
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: given one POST /grants/why refusal that names no grant, with reason text R, the model holds 0 grant edges and 0 does not stand edges, and the rendered side panel's text contains R character for character.",
+            "met": false,
+            "evidence": "Absent."
+          },
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: given a grant list returning grant-u1, whose fields carry a revoked state and an end time before the test clock, and a permitting POST /grants/why answer for grant-u1's resource and action, the model holds a grant edge carrying the id grant-u1 and 0 does not stand edges.",
+            "met": false,
+            "evidence": "Absent."
+          },
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: given a first draw from a grant list returning grant-u1 with a permitting answer, and a second draw from a grant list that does not return grant-u1 and answers none of which names grant-u1, the second draw holds 0 edges carrying the id grant-u1.",
+            "met": false,
+            "evidence": "Absent."
+          },
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: when the Access client call rejects with a transport failure, the screen renders the refusal element carrying the name the client reports, and the draw holds 0 grant edges and 0 does not stand edges.",
+            "met": false,
+            "evidence": "Absent."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Build graphModel.ts and GraphScreen.tsx from Access answers only, with graph.test.tsx covering the six rows, once both landed checks exit 0 on main. At origin/main c1440e2b both still exit 1: DIRECTORY-005 lacks ID001_STANDALONE and ID001_SCREEN_REFUSAL, and DIRECTORY-006 lacks GRANT_EXPLAIN and GRANT_SCREEN."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R3",
@@ -130,7 +242,56 @@
       ],
       "stories": [
         "S121"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not implemented. recordEdges.ts, the three toggles, the withheld mark, graph-directory.ts, graph.spec.ts and the .gitignore line depend on DIRECTORY-005 and DIRECTORY-006. Both landed checks exit 1 on origin/main 1841018.",
+        "deviation": "",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "surface/identity/tests/acceptance/graph.spec.ts (GRAPH_VISIBILITY), with the graph fixture directory of surface/identity/tests/fixtures/graph-directory.ts seeded and its label-to-id map written to surface/identity/tests/fixtures/graph-directory.ids.json, every id(X) below read from that file at key X, signed in as person-auditor with no node chosen: the draw's node ids equal, as a set, the 8 ids id(person-owner), id(person-plain), id(person-auditor), id(agent-owner), id(agent-plain), id(resource-org), id(resource-a) and id(resource-b); it holds 2 containment edges (id(resource-a) to id(resource-org), id(resource-b) to id(resource-org)), 2 answers-to edges (id(agent-owner) to id(person-owner), id(agent-plain) to id(person-plain)), 0 grant edges and 0 does not stand edges.",
+            "met": false,
+            "evidence": "graph.spec.ts and graph-directory.ts are absent."
+          },
+          {
+            "criterion": "surface/identity/tests/acceptance/graph.spec.ts (GRAPH_VISIBILITY), signed in as person-plain with no node chosen: the identity node ids drawn equal, as a set, the ids of the identity records the directory lists to person-plain through the generated module; the resource node ids drawn are exactly id(resource-b), read from surface/identity/tests/fixtures/graph-directory.ids.json at key resource-b; that node carries the parent withheld mark; the draw holds 0 containment edges and 0 grant edges; and the serialised rendered document contains 0 occurrences of each of id(resource-org), id(resource-a), id(G1) and id(G3), read from surface/identity/tests/fixtures/graph-directory.ids.json at keys resource-org, resource-a, G1 and G3, and 0 occurrences of each of the label texts resource-org, resource-a, G1 and G3.",
+            "met": false,
+            "evidence": "The spec is absent."
+          },
+          {
+            "criterion": "surface/identity/tests/acceptance/graph.spec.ts, signed in as person-auditor with no node chosen: turning Containment off leaves 0 containment edges and turning it on restores 2; turning Who answers for whom off leaves 0 answers-to edges and turning it on restores 2; the client's request log holds 0 requests issued during the four toggle presses.",
+            "met": false,
+            "evidence": "The spec is absent."
+          },
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: after a draw holding 3 grant edges and 1 does not stand edge, pressing Grants leaves 0 grant and 0 does not stand edges drawn, pressing it again restores 3 and 1, and the client issues 0 requests across both presses; focusing Grants with the Tab key and pressing Enter has the same effect as clicking it.",
+            "met": false,
+            "evidence": "graph.test.tsx is absent."
+          },
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: given R1's answer holding resource-u1 with no parent and resource-u2 with parent {withheld: true}, the draw holds 0 containment edges, resource-u2 carries exactly 1 parent withheld mark, and resource-u1 carries 0 parent withheld marks.",
+            "met": false,
+            "evidence": "graph.test.tsx is absent."
+          },
+          {
+            "criterion": "From the repository root, on a checkout where git status --porcelain prints nothing: after the frontend test command DIRECTORY-005's manifest names has run surface/identity/tests/acceptance/graph.spec.ts and exited, git status --porcelain prints nothing and test -e surface/identity/tests/fixtures/graph-directory.ids.json exits 1; and git check-ignore surface/identity/tests/fixtures/graph-directory.ids.json prints surface/identity/tests/fixtures/graph-directory.ids.json.",
+            "met": false,
+            "evidence": "There is no spec and no .gitignore entry."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Implement recordEdges.ts, the three toggles, the withheld mark, the graph-directory.ts fixture, graph.spec.ts and the .gitignore line for graph-directory.ids.json, once both landed checks exit 0 on main. Both exit 1 at c1440e2b."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R4",
@@ -160,7 +321,61 @@
       "stories": [
         "S121",
         "S122"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not implemented. The chosen-node questions (paged GET /grants, POST /grants/why, POST /grants/who with continuation) go through DIRECTORY-006's generated module. That module's landed check exits 1 on origin/main 1841018.",
+        "deviation": "",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "surface/identity/tests/acceptance/graph.spec.ts, signed in as person-auditor, choosing agent-owner, every id(X) read from surface/identity/tests/fixtures/graph-directory.ids.json at key X: the client issues GET /grants for id(agent-owner), then exactly 2 POST /grants/why, one for (id(resource-a), view) and one for (id(resource-b), edit), the fixture's literals for what G1 and G3 carry, and no other POST /grants/why; and the draw holds an edge carrying id(G1) whose path equals the answer returned for (id(resource-a), view).",
+            "met": false,
+            "evidence": "The spec is absent."
+          },
+          {
+            "criterion": "surface/identity/tests/acceptance/graph.spec.ts (GRAPH_VISIBILITY), signed in as person-auditor, choosing resource-a, every id(X) read from surface/identity/tests/fixtures/graph-directory.ids.json at key X: the client issues exactly 1 POST /grants/who, for id(resource-a) and the action view, the one action the fixture declares for resource-a, and the holders drawn equal, as a set of ids, the holders that answer returns, which includes id(agent-owner).",
+            "met": false,
+            "evidence": "The spec is absent."
+          },
+          {
+            "criterion": "surface/identity/tests/acceptance/graph.spec.ts (GRAPH_VISIBILITY), signed in as person-plain, choosing resource-b: the client issues exactly 2 POST /grants/who requests for id(resource-b), read from surface/identity/tests/fixtures/graph-directory.ids.json at key resource-b, one for view and one for edit, the actions the fixture declares for resource-b; each of those requests is refused; the side panel shows each refusal's name and reason text character for character as returned; the draw holds 0 holder highlights for id(resource-b); and the client's request log holds 0 requests of any kind issued after the last of those POST /grants/who requests.",
+            "met": false,
+            "evidence": "The spec is absent."
+          },
+          {
+            "criterion": "surface/identity/tests/acceptance/graph.spec.ts (GRAPH_VISIBILITY), signed in as person-plain, choosing agent-plain, every id(X) read from surface/identity/tests/fixtures/graph-directory.ids.json at key X: the draw holds an edge carrying id(G2), and the serialised rendered document contains 0 occurrences of each of id(G1), id(G3), id(resource-a) and id(resource-org), and 0 occurrences of each of the label texts G1, G3, resource-a and resource-org.",
+            "met": false,
+            "evidence": "The spec is absent."
+          },
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: given a POST /grants/who answer of two holders that names a continuation, the panel carries the element with data-incomplete=\"true\" and lists exactly 2 holders; given the same answer with no continuation, no element with data-incomplete=\"true\" is rendered.",
+            "met": false,
+            "evidence": "graph.test.tsx is absent."
+          },
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: given a grant list of two pages, the client issues 2 GET /grants requests and the POST /grants/why requests cover the grants of both pages.",
+            "met": false,
+            "evidence": "graph.test.tsx is absent."
+          },
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: moving focus to a resource node with the Tab key and pressing Enter issues the same requests as clicking that node.",
+            "met": false,
+            "evidence": "graph.test.tsx is absent."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Implement the chosen-node questions through the generated module (GET /grants with paging, POST /grants/why, and POST /grants/who with continuation and named refusals), once DIRECTORY-006's landed check exits 0 on main. It exits 1 at c1440e2b."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R5",
@@ -190,7 +405,61 @@
       "stories": [
         "S121",
         "S122"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not implemented. The per-edge model version, the mixed-version line, the draw time, the refresh-only redraw and the deterministic layout are built on R2 to R4, which are blocked.",
+        "deviation": "",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: given a draw built from two answers, one carrying model version v7 and one carrying v8, every edge's shown model version equals the version of the answer it came from, and the line above the graph contains both v7 and v8.",
+            "met": false,
+            "evidence": "graph.test.tsx is absent."
+          },
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: given a draw built only from answers carrying v7, no mixed-version line is rendered and the version shown beside the draw time is v7.",
+            "met": false,
+            "evidence": "Absent."
+          },
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: given R1's answer carrying model version v7 and one POST /grants/why answer carrying v8, each containment edge shows v7, each grant edge shows v8, and the line above the graph contains both v7 and v8.",
+            "met": false,
+            "evidence": "Absent."
+          },
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: with the test clock fixed at a named instant T and the zone UTC, the draw time element's datetime attribute equals T in ISO 8601 form and its text equals T formatted as YYYY-MM-DD HH:MM:SS UTC.",
+            "met": false,
+            "evidence": "Absent."
+          },
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: after a draw that issued N Access requests, the fake timer clock holds 0 pending timeouts and 0 pending intervals, and the graph has opened 0 EventSource and 0 WebSocket connections; pressing the refresh control then issues N requests; focusing the refresh control with the Tab key and pressing Enter issues N more.",
+            "met": false,
+            "evidence": "Absent."
+          },
+          {
+            "criterion": "surface/identity/tests/acceptance/graph.spec.ts, signed in as person-auditor with agent-owner chosen: reloading the page issues the same number of Access requests as the first draw.",
+            "met": false,
+            "evidence": "graph.spec.ts is absent."
+          },
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: laying out the same model twice gives equal x and y coordinates for every node.",
+            "met": false,
+            "evidence": "Absent."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Implement the per-edge model version, the mixed-version line, the draw time, the refresh-only redraw and the deterministic layout, once R2 to R4 are built on landed dependencies."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R6",
@@ -228,7 +497,71 @@
       ],
       "stories": [
         "S121"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not implemented. The #/graph deep links and the Show in graph links change files that DIRECTORY-005 and DIRECTORY-006 own. Under CN9 those edits need reconciling against both landed manifests, and neither landed check exits 0 on origin/main 1841018.",
+        "deviation": "This corrects the earlier record: surface/identity exists on main, so these files will be reconciled against their landed state rather than described as absent.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "surface/identity/tests/acceptance/graph.spec.ts, signed in as person-auditor, opening the location #/graph/ joined to id(agent-owner), read from surface/identity/tests/fixtures/graph-directory.ids.json at key agent-owner: the graph opens with id(agent-owner) chosen and the client issues the GET /grants and POST /grants/why requests R4 names for agent-owner.",
+            "met": false,
+            "evidence": "The diff adds no graph route and no spec."
+          },
+          {
+            "criterion": "surface/identity/tests/acceptance/graph.spec.ts, signed in as person-auditor, opening #/graph: the draw holds 0 grant edges and the client issues 0 POST /grants/why and 0 POST /grants/who requests.",
+            "met": false,
+            "evidence": "The spec is absent."
+          },
+          {
+            "criterion": "Directory preview drawer, surface/identity/tests/acceptance/graph.spec.ts, signed in as person-auditor, every id(X) read from surface/identity/tests/fixtures/graph-directory.ids.json at key X: previewing agent-plain from the directory shows exactly one link whose text is Show in graph, and its href equals #/graph/ joined to id(agent-plain); previewing person-plain shows exactly one such link, whose href equals #/graph/ joined to id(person-plain).",
+            "met": false,
+            "evidence": "No Show in graph link was added."
+          },
+          {
+            "criterion": "Identity record screen, surface/identity/tests/acceptance/graph.spec.ts, signed in as person-auditor, every id(X) read from surface/identity/tests/fixtures/graph-directory.ids.json at key X: the record screen for agent-plain contains exactly one link whose text is Show in graph, and its href equals #/graph/ joined to id(agent-plain); the record screen for person-plain contains exactly one such link, whose href equals #/graph/ joined to id(person-plain).",
+            "met": false,
+            "evidence": "Not added."
+          },
+          {
+            "criterion": "You page, surface/identity/tests/acceptance/graph.spec.ts, signed in as person-plain: the You page contains exactly one link whose text is Show in graph, and its href equals #/graph/ joined to id(person-plain), read from surface/identity/tests/fixtures/graph-directory.ids.json at key person-plain.",
+            "met": false,
+            "evidence": "Not added."
+          },
+          {
+            "criterion": "Grant explanation, surface/identity/tests/acceptance/graph.spec.ts, signed in as person-auditor, every id(X) read from surface/identity/tests/fixtures/graph-directory.ids.json at key X: the grant explanation for G1 contains exactly one link whose text is Show in graph, and its href equals #/graph/ joined to id(agent-owner), then ?grant= joined to id(G1); following it opens the graph with id(agent-owner) chosen, and the draw holds exactly 1 edge with data-selected=\"true\", which carries id(G1).",
+            "met": false,
+            "evidence": "Not added."
+          },
+          {
+            "criterion": "surface/identity/tests/acceptance/graph.spec.ts, signed in as person-plain, opening the location #/graph/ joined to id(agent-plain), then ?grant= joined to id(G1), both read from surface/identity/tests/fixtures/graph-directory.ids.json at keys agent-plain and G1: the draw holds 0 edges with data-selected=\"true\", and the serialised rendered document contains 0 occurrences of id(G1) and 0 occurrences of the label text G1.",
+            "met": false,
+            "evidence": "The spec is absent."
+          },
+          {
+            "criterion": "surface/identity/tests/acceptance/graph.spec.ts: the sign-in screen, before anyone signs in, contains 0 links whose text is Show in graph, and the delegation form, signed in as person-owner, contains 0 links whose text is Show in graph.",
+            "met": false,
+            "evidence": "The spec is absent."
+          },
+          {
+            "criterion": "surface/identity/tests/graph.test.tsx: the entries of the shell's key registry and of its rail list (GO in surface/identity/src/shell/keys.ts and RAIL in surface/identity/src/shell/railItems.ts, as reconciled in blocked_by) are read before the graph screen is mounted and again after it has mounted and drawn; the two readings are equal entry for entry, so the graph module contributes 0 entries to each.",
+            "met": false,
+            "evidence": "graph.test.tsx is absent."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Add the #/graph deep links and the Show in graph links, reconciling each modified file against DIRECTORY-005's and DIRECTORY-006's landed manifests (CN9), once both landed checks exit 0 on main. Both exit 1 at c1440e2b."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R7",
@@ -255,7 +588,61 @@
       ],
       "stories": [
         "S123"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not implemented. GRAPH_BOUNDARY and its five drift injections need the graph module from R2 to R6, which is blocked.",
+        "deviation": "",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "GRAPH_BOUNDARY, on the module as built, passes and reports 0 refused specifiers and more than 0 distinct specifiers; the file paths it reports as checked include all 6 files R2 to R6 create under surface/identity/src/features/graph/, and every other path it reports is surface/identity/src/shell/keyable.ts, surface/identity/src/generated/index.ts or a stylesheet under surface/identity/src/styles/.",
+            "met": false,
+            "evidence": "GRAPH_BOUNDARY and the graph module are absent."
+          },
+          {
+            "criterion": "GRAPH_BOUNDARY, on the module as built: the set of distinct specifiers its walk collected contains no specifier resolving to surface/identity/src/shell/keys.ts and none resolving to surface/identity/src/shell/railItems.ts, asserted by those two file names.",
+            "met": false,
+            "evidence": "Absent."
+          },
+          {
+            "criterion": "Adding the line import { GrantExplanation } from '../grants/GrantExplanation'; to surface/identity/src/features/graph/graphModel.ts makes GRAPH_BOUNDARY fail with exactly 1 refused specifier, '../grants/GrantExplanation', while every test in surface/identity/tests/graph.test.tsx passes.",
+            "met": false,
+            "evidence": "Cannot inject: graphModel.ts does not exist."
+          },
+          {
+            "criterion": "Adding the line import { keyable } from '../../shell/keyable'; to surface/identity/src/features/graph/graphModel.ts and the line import { api } from '../api'; to surface/identity/src/shell/keyable.ts makes GRAPH_BOUNDARY fail with exactly 1 refused specifier, '../api', refused by the name of the surface's API client and reported as reached through surface/identity/src/shell/keyable.ts, while every test in surface/identity/tests/graph.test.tsx passes.",
+            "met": false,
+            "evidence": "Cannot inject."
+          },
+          {
+            "criterion": "Adding the lines import { useParams } from 'react-router'; and import { keyable } from '../../shell/keyable'; to surface/identity/src/features/graph/graphModel.ts leaves GRAPH_BOUNDARY passing with 0 refused specifiers and every test in surface/identity/tests/graph.test.tsx passing; compared with the run on the unmodified module, the set of checked file paths gains exactly the members of {surface/identity/src/shell/keyable.ts} it did not already hold, and the set of distinct allowed specifiers gains exactly the members of {react-router, ../../shell/keyable, react} it did not already hold.",
+            "met": false,
+            "evidence": "Cannot inject."
+          },
+          {
+            "criterion": "Adding the line function standing() { return true; } to surface/identity/src/features/graph/graphModel.ts makes GRAPH_BOUNDARY fail while every test in surface/identity/tests/graph.test.tsx passes.",
+            "met": false,
+            "evidence": "Cannot inject."
+          },
+          {
+            "criterion": "Adding a reference to the generated module's revoke operation to surface/identity/src/features/graph/GraphScreen.tsx makes GRAPH_BOUNDARY fail while every test in surface/identity/tests/graph.test.tsx passes.",
+            "met": false,
+            "evidence": "Cannot inject: GraphScreen.tsx does not exist."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Write GRAPH_BOUNDARY in surface/identity/tests/graph_boundary.test.ts and prove it with the five drift injections, once the graph module exists on landed dependencies."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R8",
@@ -285,7 +672,61 @@
       "stories": [
         "S122",
         "S123"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not implemented. GRAPH_EVERY_PAIR, GRAPH_REVOKED, GRAPH_EXPIRED, GRAPH_VERSION and GRAPH_OUTAGE run against the real DIRECTORY-006 evaluator and the built graph. Both landed checks exit 1 on origin/main 1841018.",
+        "deviation": "",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "GRAPH_EVERY_PAIR: signed in as person-auditor, for every identity (5) on every resource (3) and every action R1's route returns for that resource, the test asks POST /grants/why through the generated module; it asserts that the number of pairs compared equals 30, the fixture's 5 identities times its 6 declared actions, and that at least 1 answer permits and at least 1 refuses. For each identity it draws the graph with that identity chosen and asserts that every grant edge drawn equals, step for step in order, the path of a permitting answer for the same identity, resource and action, and that every does not stand edge drawn carries the id of the grant a refusal for the same identity, resource and action names, with that refusal's reason text character for character; it asserts the number of drawn edges compared is greater than 0.",
+            "met": false,
+            "evidence": "GRAPH_EVERY_PAIR is absent."
+          },
+          {
+            "criterion": "GRAPH_EVERY_PAIR: for each of the 3 resources and each action R1's route returns for it, the holders the graph draws for that resource equal, as a set of ids, the holders the POST /grants/who answer returns; the test asserts the number of reverse questions compared equals 6, the fixture's declared actions.",
+            "met": false,
+            "evidence": "Absent."
+          },
+          {
+            "criterion": "GRAPH_REVOKED: every id(X) read from surface/identity/tests/fixtures/graph-directory.ids.json at key X; signed in as person-auditor with agent-owner chosen, the draw holds a grant edge carrying id(G1); after G1 is revoked through DIRECTORY-006's revoke operation and the refresh control is pressed, the draw holds 0 grant edges carrying id(G1), and the number of does not stand edges carrying id(G1) equals the number of that draw's POST /grants/why refusals naming G1, which the test asserts is greater than 0, each edge carrying its refusal's reason text character for character.",
+            "met": false,
+            "evidence": "Absent."
+          },
+          {
+            "criterion": "GRAPH_EXPIRED: every id(X) read from surface/identity/tests/fixtures/graph-directory.ids.json at key X; signed in as person-auditor with agent-owner chosen, the draw holds a grant edge carrying id(G3); after the server's named clock is advanced past E and the refresh control is pressed, the draw holds 0 grant edges carrying id(G3), and the number of does not stand edges carrying id(G3) equals the number of that draw's POST /grants/why refusals naming G3, which the test asserts is greater than 0, each edge carrying its refusal's reason text character for character.",
+            "met": false,
+            "evidence": "Absent."
+          },
+          {
+            "criterion": "GRAPH_VERSION: for every edge drawn in GRAPH_EVERY_PAIR, the model version shown on it equals the model version of the server's answer it came from; the test asserts the number of edges checked is greater than 0.",
+            "met": false,
+            "evidence": "Absent."
+          },
+          {
+            "criterion": "GRAPH_OUTAGE: with the permission engine stopped, signed in as person-auditor, choosing agent-owner shows the refusal element carrying the outage refusal's name as the server returns it, and the draw holds 0 grant edges.",
+            "met": false,
+            "evidence": "Absent."
+          },
+          {
+            "criterion": "From the repository root: grep -c 'e67622e19f450e2335029f293f18b4757801f3245758a8b667521afa120ab91f' surface/identity/tests/acceptance/graph.spec.ts prints 1, and grep -c 'conformance 8.3' surface/identity/tests/acceptance/graph.spec.ts prints a number greater than 0.",
+            "met": false,
+            "evidence": "graph.spec.ts does not exist in the working tree."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Write GRAPH_EVERY_PAIR, GRAPH_REVOKED, GRAPH_EXPIRED, GRAPH_VERSION and GRAPH_OUTAGE against the real DIRECTORY-006 evaluator, with the conformance hash and the 'conformance 8.3' marker, once both landed checks exit 0 on main."
+        ],
+        "fixes": []
+      }
     }
   ],
   "boundaries": [
