@@ -8,7 +8,7 @@ title: Lys MCP server, secure and compact: three tools over the published API, t
 # DIRECTORY-049: Lys MCP server, secure and compact: three tools over the published API, the caller's own identity on every call
 
 > **Cluster:** directory
-> **Depends on:** DIRECTORY-047, DIRECTORY-048, DIRECTORY-050, SECRETS-006
+> **Depends on:** DIRECTORY-047, DIRECTORY-048, DIRECTORY-050, DIRECTORY-060, SECRETS-006, SECRETS-008
 > **Design anchor:**
 > - ADR-116 — Every app registers with Lys through one published API; Lys depends on no app — An app is a record in Lys: an id, a name, its sign-in client, and a permission schema it owns (resource kinds under the app's own prefix, each kind's actions, relations carrying actions, and parent kinds whose relations flow down). An app registers and changes its schema only through the API, is approved by an administrator on a Lys screen before it has any effect, and cannot touch another app's kinds. Lys's own model is the schema of the app 'lys'. The API is described by one OpenAPI document generated from the routes and their types, never written by hand. The MCP server is a face over that same API with three tools, the caller's own identity on every call, and no credential or authority of its own. Lys depends on no app. It holds no app's name, kind, schema or code; it never calls an app, waits on one or reads one's store. Every app depends on Lys through this API alone, and Lys runs the same with no apps registered as with twenty.
 > **Checklist:**
@@ -186,11 +186,15 @@ Behavioural. Every lys_write that applies leaves a receipt (receipts_api.rs) nam
 
 ### R7: Agents reach it with 'lys mcp', signing with their own key
 
-Behavioural. 'lys mcp --agent ID' serves MCP over stdio and forwards each call to the server as a request signed for the agent. It never holds the agent's private key: it sends the agent's key handle and the request's typed members (method, path, the body's digest, the signing instant and the nonce) to lys-secrets under the agent_request purpose; the broker builds the bytes to sign itself, signs under its ordinary admission (SECRETS-006) and returns the signature only. No digest or bytes composed by 'lys mcp' are ever signed. Nothing is written to a file, an argument or the environment. The launch template (launch_template.rs) renders it into an agent's MCP configuration as 'identity (this service)' when its profile asks for it.
+Behavioural. 'lys mcp --agent ID' serves MCP over stdio and forwards each call to the server as a request signed for the agent. It never holds the agent's certificate key. For each call it sends POST /_lys/signature to lys-secrets (SECRETS-006 R2, SECRETS-006.md line 73) with the agent's key handle (R8), the purpose agent_request and the request's members as SECRETS-006 spells them. The members are method, path, body_digest, signed_at_ms and nonce. The member body_digest is the SHA-256 of the request body as 64 lower-case hex characters. The member nonce is at least 16 bytes as hex. The broker builds the bytes to sign itself with lys_core::agent_request::payload and answers a COSE_Sign1 as hex. 'lys mcp' puts that hex as the fourth word of the lys-agent-signature header, the form agent_signature.rs lines 7 to 8 describe and the server verifies. No digest or bytes composed by 'lys mcp' are ever signed. The signature request is itself a handle route, so 'lys mcp' takes its lys-handle and presentation headers from one answer of the runner's present act through crates/lys-runner/src/present_client.rs (DIRECTORY-060 R3), reached at the socket the environment names as LYS_RUNNER_SOCKET. 'lys mcp' holds no holder key, reads no handle token from the environment, and keeps no token past the one request. Nothing is written to a file, an argument or the environment. The launch template (launch_template.rs) renders it into an agent's MCP configuration as 'identity (this service)' when its profile asks for it.
 
 **Acceptance:**
 - An agent launched from a profile asking for it lists the three tools and reads its own identity.
-- The 'lys mcp' process never receives key material: the broker call answers a signature, and a test on the process's memory-held values and its arguments finds no key.
+- Each call 'lys mcp' forwards carries a lys-agent-signature header whose fourth word is the COSE_Sign1 hex the broker answered, and the server accepts it.
+- Each POST /_lys/signature 'lys mcp' sends carries the lys-handle and presentation headers of one present answer from the runner, and the broker admits it.
+- 'lys mcp' holds no Ed25519Identity and reads no key file and no handle token.
+- The broker's answer to 'lys mcp' holds a signature and a public key and no private key.
+- A test on the 'lys mcp' process's memory-held values and its arguments finds no bytes of the agent's certificate key.
 - The rendered configuration and the process arguments carry no key material, checked by a test.
 - A withdrawn certificate refuses the next call by name.
 
@@ -199,6 +203,26 @@ Behavioural. 'lys mcp --agent ID' serves MCP over stdio and forwards each call t
 - create: crates/lys/tests/mcp_stdio.rs
 - modify: crates/lys/src/cli.rs
 - modify: crates/lys-identity-server/src/launch_template.rs
+
+**Checklist:**
+- C373 — An agent's launch renders 'lys mcp' into its MCP configuration, signing with its own certificate key held by handle (DIRECTORY-049 R7).
+
+**Stories:**
+- S153 (Person or agent using Lys through an AI assistant, Reads and changes Lys through an MCP client, with only their own rights) — As a person or an agent using an AI assistant, I want the assistant to reach Lys with my own identity and nothing more, so that it can never see a secret or do what I could not.
+
+### R8: The agent's key handle is issued to its session's key at start
+
+Behavioural. When a profile asks for 'identity (this service)', the launch record the start renders (launch_template.rs) names the agent's certificate key handle among the handles the session is launched with, as a HandleName with its id, its secret and the variable LYS_AGENT_KEY_HANDLE. So the start of DIRECTORY-060 R1 issues it through POST /_lys/handles/issue (SECRETS-008 R1), bound to the session's holder key, on behalf of the person starting the agent, before anything is spawned. The session's environment carries that handle id and LYS_RUNNER_SOCKET, and no token and no key. 'lys mcp' reads the handle id from LYS_AGENT_KEY_HANDLE and refuses agent_key_handle_missing by name at start when it is absent. A refused issue ends the start by name, as 060 R1 says, and nothing is spawned.
+
+**Acceptance:**
+- A session started from a profile asking for 'identity (this service)' has LYS_AGENT_KEY_HANDLE set to a handle id, and a present for it from inside the session is admitted by the broker.
+- The session's environment holds no handle token and no key bytes, checked by a test.
+- 'lys mcp' started without LYS_AGENT_KEY_HANDLE refuses agent_key_handle_missing.
+- A profile that does not ask for it launches with no agent key handle.
+
+**Files:**
+- modify: crates/lys-identity-server/src/launch_template.rs
+- modify: crates/lys/src/cli/mcp.rs
 
 **Checklist:**
 - C373 — An agent's launch renders 'lys mcp' into its MCP configuration, signing with its own certificate key held by handle (DIRECTORY-049 R7).
