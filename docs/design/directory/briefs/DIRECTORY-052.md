@@ -33,13 +33,16 @@ Add team plans: a record that names a team's purpose, budget, deliverables and m
 
 ### R1: A team plan record
 
-Behavioural. A plan names its purpose, its responsible person, its total budget (tokens and time), its deliverables (each with words, a deadline and the evidence that proves it), and its members; each member names a provisioning profile, the memories it starts with (lantern notes or a predecessor's letter from a named home), an opening conversation (turns authored as lys-home fewshot writes them), its share of the budget, its goals with reminders, and its checker (a person or another member), its place in the team's hierarchy (the member it reports to), the grants it is given (each delegated from the provisioning person's own grants, never beyond them, as the delegation form's cannot-give list says), and the account it runs on (a handle to an account in the secrets broker, or an ordered list of handles for rotation). A plan is refused plan_invalid naming the field when shares exceed the total, a member has no checker, or a deliverable names no evidence. A checker who reports, directly or up the chain, to the member it checks is refused checker_reports_to_member, and two members who check each other are refused checkers_circular: the judged party never holds the pen. A plan's account handle names its kind: a key (a value held by the secrets broker) or a login (a folder of credentials on the runner's machine that never travels and is never copied); rotation over logins is DIRECTORY-050 R5's.
+Behavioural. A plan names its purpose, its responsible person, its total budget (tokens and time), its deliverables (each with words, a deadline and the evidence that proves it), and its members; each member names a provisioning profile, the memories it starts with (lantern notes or a predecessor's letter from a named home), an opening conversation (turns authored as lys-home fewshot writes them), its share of the budget, its goals with reminders, and its checker (a person or another member), its place in the team's hierarchy (the member it reports to), the grants it is given (each delegated from the provisioning person's own grants, never beyond them, as the delegation form's cannot-give list says), and the account it runs on (a handle to an account in the secrets broker, or an ordered list of handles for rotation). A plan is refused plan_invalid naming the field when shares exceed the total, a member has no checker, or a deliverable names no evidence. A checker who reports, directly or up the chain, to the member it checks is refused checker_reports_to_member, and any cycle of checkers, of any length, is refused checkers_circular naming every member in the cycle: the judged party never holds the pen. A plan's account handle names its kind: a key (a value held by the secrets broker) or a login (a folder of credentials on the runner's machine that never travels and is never copied); rotation over logins is DIRECTORY-050 R5's. A plan is stored as log events with a projection (the checkpoint beside the log, so a start reads the checkpoint and the tail only). Creating, changing or provisioning a plan needs a grant of provision_team held by the person acting, who becomes its responsible person; a plan is read only by its responsible person, its members' checkers and administrators, and anyone else is refused not_your_plan.
 
 **Acceptance:**
 - A plan whose member shares exceed its total is refused naming the total.
 - A member with no checker is refused naming the member.
 - A member given a grant the provisioning person does not hold is refused, naming the grant and the reason from cannot-give.
 - A member naming an account handle the broker does not hold is refused account_unknown.
+- Three members who check each other in a ring (A checks B, B checks C, C checks A) are refused checkers_circular naming all three.
+- A person without provision_team who creates a plan is refused, and nothing is written.
+- A plan is read back unchanged after the service restarts, from the checkpoint and the tail.
 
 **Files:**
 - create: crates/lys-identity-server/src/team_plans_api.rs
@@ -55,12 +58,14 @@ Behavioural. A plan names its purpose, its responsible person, its total budget 
 
 ### R2: Provision in one all-or-nothing act
 
-Behavioural. POST /team-plans/{id}/provision creates, under the responsible person's grants: each agent, its grants as the profile names, its home, its budgets (DIRECTORY-051 R2) and goals (R4), then starts each through the runner (DIRECTORY-050 R3). Provisioning runs in three passes: check every member and step, then create every record, then start every agent, so no agent starts until every member exists. If a step is refused after records exist, each created agent is retired and its grants revoked by recorded acts, so nothing of theirs runs or can be used (a log keeps what happened; nothing is unmade), and the refusal names the member and the step; a second provision under the same operation id answers what was done and does nothing twice.
+Behavioural. POST /team-plans/{id}/provision creates, under the responsible person's grants: each agent, its grants as the profile names, its home, its budgets (DIRECTORY-051 R2) and goals (R4), then starts each through the runner (DIRECTORY-050 R3). Provisioning runs in three passes: check every member and step, then create every record, then start every agent, so no agent starts until every member exists. If a step is refused after records exist, or a member fails to start after others have started, every started member is stopped through the runner and its process's end is taken from the runner's own exit record (never assumed from the stop request), then each created agent is retired and its grants revoked by recorded acts, so nothing of theirs runs or can be used (a log keeps what happened; nothing is unmade), and the refusal names the member and the step; a second provision under the same operation id answers what was done and does nothing twice. The operation id and each pass's progress are recorded before the pass acts, so a provision cut off by a restart and sent again with the same id finishes or rolls back from where it stood, and never starts a member twice.
 
 **Acceptance:**
 - Provisioning a three-member plan leaves three running agents with their budgets and goals.
 - A refusal at the third member leaves the first two retired with their grants revoked and never started, naming the member and step.
 - Sending the same operation twice does nothing the second time.
+- A start that fails at the third member, after the first two started, leaves the first two stopped, with the runner's exit record for each process, retired and with grants revoked, naming the member and the step.
+- A provision interrupted by a service restart between the record and start passes, sent again with the same operation id, starts each member exactly once.
 
 **Files:**
 - create: crates/lys-identity-server/src/team_plans_provision.rs
@@ -79,10 +84,13 @@ Behavioural. Each member's home is created with the memories the plan names copi
 **Acceptance:**
 - With a fixture harness, the input given to a member's first turn holds its starting memory text and its opening conversation, and no model is called.
 - The given record names both by digest.
+- The starting memory is written into the member's home as lantern notes, and the opening conversation as fewshot turns, by the same code paths lys-home's own commands use, and the rendered first turn shows both.
 
 **Files:**
 - modify: crates/lys-home/src/record/given.rs
 - modify: crates/lys-identity-server/src/team_plans_provision.rs
+- modify: crates/lys-home/src/record/lantern.rs
+- modify: crates/lys-home/src/cli/fewshot.rs
 
 **Checklist:**
 - C389 — Each member starts with its chosen memories and its opening conversation already in its session (DIRECTORY-052 R3).
@@ -117,10 +125,14 @@ Behavioural. A Teams screen builds a plan from a template (for example: a builde
 - A plan built from a template on the screen provisions and appears with every member running.
 - The screen shows spend, goals and deliverables per member.
 - Surface tests cover building, provisioning and the refusals.
+- The Teams screen is reached from the rail and at its own route, and surface/identity/tests/team-plans.test.tsx covers reaching it, building, provisioning and each refusal.
 
 **Files:**
 - create: surface/identity/src/features/team-plans/TeamPlans.tsx
 - create: surface/identity/src/features/team-plans/team-plans.css
+- create: surface/identity/tests/team-plans.test.tsx
+- modify: surface/identity/src/routes.tsx
+- modify: surface/identity/src/shell/railItems.ts
 
 **Checklist:**
 - C391 — A Teams screen builds a plan from a template, provisions it, and shows each member's state, spend, goals and deliverables (DIRECTORY-052 R5).
@@ -130,11 +142,12 @@ Behavioural. A Teams screen builds a plan from a template (for example: a builde
 
 ### R6: Accounts and secrets stored and reached by handle
 
-Behavioural. The Teams screen and the API let the responsible person store a model account or other secret in the secrets broker (lys-secrets), under a scope, and assign it to members by handle; the secret's value is entered once, never shown again, and reaches only the member's process environment through the broker at start. Listing shows handles, scopes, holders and last use, never values.
+Behavioural. The Teams screen and the API let the responsible person store a model account or other secret in the secrets broker (lys-secrets), under a scope, and assign it to members by handle; the secret's value is entered once, never shown again, and reaches the member only as R4 orders it: through the broker's proxy wherever the harness takes a base address, and in the process environment at start only for a profile that names its harness as unable to take one. Listing shows handles, scopes, holders and last use, never values.
 
 **Acceptance:**
 - An account stored on the screen is assignable to a member and the member runs on it.
 - No answer, screen or log shows the value after it is stored, checked by a test.
+- A member whose harness takes a base address reaches its account through the proxy, and its process environment holds no secret value, checked by a test.
 
 **Files:**
 - modify: surface/identity/src/features/team-plans/TeamPlans.tsx

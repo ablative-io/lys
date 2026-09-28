@@ -935,6 +935,8 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/tests/version.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
 | `docs/design/directory/reports/DIRECTORY-054-fresh-account.md` | R6: Prepare the fresh-account proof and its evidence record | DIRECTORY-054 |
 | `docs/design/directory/reports/DIRECTORY-054-open-items.md` | R6: Prepare the fresh-account proof and its evidence record | DIRECTORY-054 |
+| `crates/lys-home/src/record/lantern.rs` | DIRECTORY-052 R3: a member's starting memories are written as lantern notes | DIRECTORY-052 |
+| `crates/lys-home/src/cli/fewshot.rs` | DIRECTORY-052 R3: a member's opening conversation is written as fewshot turns | DIRECTORY-052 |
 
 ## Inventory
 

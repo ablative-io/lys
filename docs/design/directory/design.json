@@ -4207,6 +4207,16 @@
       "path": "docs/design/directory/reports/DIRECTORY-054-open-items.md",
       "note": "R6: Prepare the fresh-account proof and its evidence record",
       "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-home/src/record/lantern.rs",
+      "note": "DIRECTORY-052 R3: a member's starting memories are written as lantern notes",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-home/src/cli/fewshot.rs",
+      "note": "DIRECTORY-052 R3: a member's opening conversation is written as fewshot turns",
+      "brief": "DIRECTORY-052"
     }
   ],
   "inventory": [
