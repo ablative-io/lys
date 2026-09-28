@@ -74,7 +74,7 @@ fn a_memory_record_is_read_whole_or_in_the_piece_asked_for() -> TestResult {
     assert_eq!(past_the_end.expose(), b"nine");
     let reads = broker
         .audit()
-        .replay()?
+        .audit_every_line()?
         .into_iter()
         .filter(|recorded| recorded.line.kind == AuditKind::SealedRead)
         .count();

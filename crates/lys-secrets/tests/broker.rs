@@ -287,7 +287,7 @@ fn uses_and_drops_survive_a_restart_because_they_are_read_from_the_log() -> Test
         refusal(reopened.use_handle(&dropped.token, &gone, Secret::len)),
         "HandleDropped"
     );
-    assert!(reopened.audit().replay()?.len() >= 6);
+    assert!(reopened.audit().audit_every_line()?.len() >= 6);
     Ok(())
 }
 
@@ -354,7 +354,7 @@ fn rotation_retires_the_old_key_and_every_entry_opens_under_the_new_one() -> Tes
     let change = format!("{old} to {new}");
     let rotations: Vec<String> = broker
         .audit()
-        .replay()?
+        .audit_every_line()?
         .into_iter()
         .filter(|recorded| recorded.line.kind == AuditKind::Rotation)
         .map(|recorded| recorded.line.outcome)

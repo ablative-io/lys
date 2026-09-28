@@ -55,6 +55,6 @@ fn a_window_holds_the_last_lines_before_an_index_and_no_other() -> TestResult {
         "an index past the end reads the last of the log"
     );
     assert_eq!(indexes(&audit.window(None, 0)?), [0u64; 0]);
-    assert_eq!(audit.window(None, size + 9)?, audit.replay()?);
+    assert_eq!(audit.window(None, size + 9)?, audit.audit_every_line()?);
     Ok(())
 }

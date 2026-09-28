@@ -8,9 +8,17 @@
 //! and only the lines after it, each with its signature checked. A snapshot
 //! that cannot be believed is refused by name in [`AuditLog::start`], and
 //! then every line is read.
+//!
+//! After a start a line is read only by asking for it: a window from the
+//! tail ([`AuditLog::window`]), the lines after an index, or the whole log
+//! by name ([`AuditLog::audit_every_line`]), which is an audit and no part of
+//! a start or a page. The log counts the lines it reads and the whole-log
+//! audits it makes, so a test can say what a command read rather than infer
+//! it.
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use lys_core::Ed25519Identity;
 use lys_log_store::{FileLeafStore, FrontierLog, SnapshotRefusal, Start, Tail, start};
@@ -155,6 +163,11 @@ pub struct AuditLog {
     start: Start,
     /// How many times the anchor was written by this log.
     anchor_writes: u64,
+    /// How many lines this log has read from its store, the start's tail
+    /// apart.
+    lines_read: AtomicU64,
+    /// How many times this log has read every line.
+    every_line_audits: AtomicU64,
 }
 
 impl std::fmt::Debug for AuditLog {
@@ -194,6 +207,8 @@ impl AuditLog {
                 replayed: 0,
             },
             anchor_writes: 0,
+            lines_read: AtomicU64::new(0),
+            every_line_audits: AtomicU64::new(0),
         };
         audit.write_anchor(key.identity())?;
         Ok(audit)
@@ -228,6 +243,8 @@ impl AuditLog {
             head: [0u8; 32],
             start: started.start,
             anchor_writes: 0,
+            lines_read: AtomicU64::new(0),
+            every_line_audits: AtomicU64::new(0),
         };
         audit.opened(started.state, &started.tail)
     }
@@ -244,6 +261,8 @@ impl AuditLog {
             dir,
             anchor,
             verifying_key,
+            lines_read,
+            every_line_audits,
             ..
         } = self;
         drop(log);
@@ -259,6 +278,8 @@ impl AuditLog {
                 replayed: u64::try_from(tail.leaves.len()).unwrap_or(u64::MAX),
             },
             anchor_writes: 0,
+            lines_read,
+            every_line_audits,
         };
         audit.opened(None, &tail)
     }
@@ -355,21 +376,40 @@ impl AuditLog {
         self.anchor_writes
     }
 
-    /// Every line, each signature verified against the audit key. This reads
-    /// the whole log, and is no part of a start.
+    /// How many lines this log has read from its store since it was made or
+    /// opened, apart from the tail a start hands its owner. The anchor check
+    /// of a start reads the last line and counts it. Every later read of a
+    /// line is counted, so a window of `n` lines adds `n`.
+    pub fn lines_read(&self) -> u64 {
+        self.lines_read.load(Ordering::Relaxed)
+    }
+
+    /// How many times [`AuditLog::audit_every_line`] has been called on this
+    /// log since it was made or opened. A start calls it never.
+    pub fn every_line_audits(&self) -> u64 {
+        self.every_line_audits.load(Ordering::Relaxed)
+    }
+
+    /// Every line, each signature verified against the audit key, stopping
+    /// at the first that fails and naming it. This reads the whole log,
+    /// however long it has grown: it is the audit of the log, called by
+    /// name, and no part of a start, a page or a view, which read a window
+    /// ([`AuditLog::window`]) instead.
     ///
     /// # Errors
     ///
-    /// `AuditLineMissing`, `AuditLineUnreadable` and `AuditSignatureInvalid`.
-    pub fn replay(&self) -> Result<Vec<RecordedLine>, SecretsError> {
-        self.lines_from(0)
+    /// `AuditLineMissing`, `AuditLineUnreadable` and `AuditSignatureInvalid`,
+    /// each naming the first line that fails.
+    pub fn audit_every_line(&self) -> Result<Vec<RecordedLine>, SecretsError> {
+        self.every_line_audits.fetch_add(1, Ordering::Relaxed);
+        self.lines_between(0, self.len())
     }
 
     /// Every line from `from` on, each signature verified.
     ///
     /// # Errors
     ///
-    /// As [`AuditLog::replay`].
+    /// As [`AuditLog::audit_every_line`].
     pub fn lines_from(&self, from: u64) -> Result<Vec<RecordedLine>, SecretsError> {
         self.lines_between(from, self.len())
     }
@@ -380,7 +420,7 @@ impl AuditLog {
     ///
     /// # Errors
     ///
-    /// As [`AuditLog::replay`].
+    /// As [`AuditLog::audit_every_line`].
     pub fn window(
         &self,
         before: Option<u64>,
@@ -401,6 +441,7 @@ impl AuditLog {
     }
 
     fn leaf(&self, index: u64) -> Result<Vec<u8>, SecretsError> {
+        self.lines_read.fetch_add(1, Ordering::Relaxed);
         self.log
             .leaf_bytes(index)?
             .ok_or(SecretsError::AuditLineMissing {

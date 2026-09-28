@@ -105,7 +105,7 @@ fn a_capped_lease_reserves_before_work_and_refuses_past_its_cap() -> TestResult 
     );
     let settled: Vec<(String, Option<u64>)> = broker
         .audit()
-        .replay()?
+        .audit_every_line()?
         .into_iter()
         .filter(|recorded| recorded.line.kind == AuditKind::Settlement)
         .map(|recorded| (recorded.line.outcome, recorded.line.spend))
@@ -141,7 +141,7 @@ fn an_unsettled_call_counts_in_full_after_a_restart_and_is_never_forwarded_again
     );
     let last = reopened
         .audit()
-        .replay()?
+        .audit_every_line()?
         .into_iter()
         .rfind(|recorded| recorded.line.kind == AuditKind::Settlement)
         .map(|recorded| (recorded.line.outcome, recorded.line.spend));
@@ -160,7 +160,7 @@ fn an_uncapped_lease_needs_no_reservation_and_records_no_spend() -> TestResult {
     broker.settle(ticket, 5)?;
     let spends: Vec<Option<u64>> = broker
         .audit()
-        .replay()?
+        .audit_every_line()?
         .into_iter()
         .map(|recorded| recorded.line.spend)
         .collect();
@@ -201,7 +201,7 @@ fn a_call_forwarded_before_a_revocation_finishes_as_completed_after_drop() -> Te
     broker.settle(forwarded, 25)?;
     let last = broker
         .audit()
-        .replay()?
+        .audit_every_line()?
         .into_iter()
         .rfind(|recorded| recorded.line.kind == AuditKind::Settlement)
         .map(|recorded| (recorded.line.outcome, recorded.line.spend));
