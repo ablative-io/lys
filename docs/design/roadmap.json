@@ -2483,6 +2483,33 @@
       },
       "depends_on": [],
       "notes": "Written by hand."
+    },
+    {
+      "id": "RM-101",
+      "title": "The runner holds one holder key per agent session and signs its presentations",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Start becomes key, then issue, then spawn, and the runner socket gains a present act proved by peer credentials and ancestry.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-28T23:28:00+10:00",
+        "quote": "a new brief, not an amendment to 050",
+        "context": "Waffles's ruling on the holder-key options note."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-125"
+        ],
+        "briefs": [
+          "DIRECTORY-060"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-100"
+      ],
+      "notes": "Written by hand."
     }
   ]
 }

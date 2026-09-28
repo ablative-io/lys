@@ -795,6 +795,14 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity/tests/support/mod.rs` | The receipts route answers a signed checkpoint | DIRECTORY-058 |
 | `crates/lys/src/identity/install/detached.rs` | a detached start through the holder | DIRECTORY-057 |
 | `docs/design/directory/HOLDER-KEY-OPTIONS.md` | options for agent session holder keys, for a ruling before DIRECTORY-049 R8 and a DIRECTORY-050 amendment | DIRECTORY-050 |
+| `crates/lys-runner/src/session_key.rs` | the runner's session holder key | DIRECTORY-060 |
+| `crates/lys-runner/tests/session_key.rs` | the runner's session holder key | DIRECTORY-060 |
+| `crates/lys-core/src/keys/identity.rs` | the runner's session holder key | DIRECTORY-060 |
+| `crates/lys-runner/src/peer.rs` | the runner's session holder key | DIRECTORY-060 |
+| `crates/lys-runner/tests/present.rs` | the runner's session holder key | DIRECTORY-060 |
+| `crates/lys-runner/src/present_client.rs` | the runner's session holder key | DIRECTORY-060 |
+| `docs/design/directory/briefs/DIRECTORY-060.json` | the runner's session holder key brief | DIRECTORY-060 |
+| `docs/design/directory/briefs/DIRECTORY-060.md` | the runner's session holder key brief | DIRECTORY-060 |
 
 ## Inventory
 

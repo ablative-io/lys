@@ -1450,6 +1450,26 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The runner holds each session's holder key (DIRECTORY-060)",
+      "items": [
+        {
+          "id": "C418",
+          "text": "A runner session's handles are issued to a key the runner made for it in memory, before anything is spawned (DIRECTORY-060 R1).",
+          "done": false
+        },
+        {
+          "id": "C419",
+          "text": "The runner signs a presentation only for a peer proved by credentials and ancestry to be the session the handle was issued to, on macOS and Linux (DIRECTORY-060 R2).",
+          "done": false
+        },
+        {
+          "id": "C420",
+          "text": "The harness and lys mcp get every presentation from the runner and hold no key (DIRECTORY-060 R3).",
+          "done": false
+        }
+      ]
     }
   ]
 }

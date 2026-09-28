@@ -134,6 +134,8 @@
 
 **S80.** As a started agent, I want to present my session credential to the directory, so that it confirms I am my enduring agent in this session.
 
+**S168.** As an agent started by Lys, I want every handle I am launched with to work, without ever holding the key that presents for it.
+
 ## Stranger — Checks an issued certificate and its log entry offline, holding nothing from lys
 
 **S84.** As a stranger holding the issuer's certificate, an issued certificate, its leaf and its inclusion artifact, I want to check the certificate and its entry in the log offline with openssl and a standard-library script, so that I rely on nothing from lys and on no one's word that the certificate was logged.

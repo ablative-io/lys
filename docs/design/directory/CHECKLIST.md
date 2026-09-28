@@ -371,3 +371,9 @@
 - [ ] **C413** — Any registered app reads Lys's people, seats and agents (DIRECTORY-059 R3).
 - [ ] **C414** — Signing out of Lys signs the person out at the issuer, and the issuer tells every registered app (DIRECTORY-059 R4).
 - [ ] **C415** — An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code (DIRECTORY-059 R5).
+
+## The runner holds each session's holder key (DIRECTORY-060)
+
+- [ ] **C418** — A runner session's handles are issued to a key the runner made for it in memory, before anything is spawned (DIRECTORY-060 R1).
+- [ ] **C419** — The runner signs a presentation only for a peer proved by credentials and ancestry to be the session the handle was issued to, on macOS and Linux (DIRECTORY-060 R2).
+- [ ] **C420** — The harness and lys mcp get every presentation from the runner and hold no key (DIRECTORY-060 R3).

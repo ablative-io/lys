@@ -288,6 +288,10 @@
         {
           "id": "S80",
           "text": "As a started agent, I want to present my session credential to the directory, so that it confirms I am my enduring agent in this session."
+        },
+        {
+          "id": "S168",
+          "text": "As an agent started by Lys, I want every handle I am launched with to work, without ever holding the key that presents for it."
         }
       ]
     },

@@ -3511,6 +3511,46 @@
       "path": "docs/design/directory/HOLDER-KEY-OPTIONS.md",
       "note": "options for agent session holder keys, for a ruling before DIRECTORY-049 R8 and a DIRECTORY-050 amendment",
       "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-runner/src/session_key.rs",
+      "note": "the runner's session holder key",
+      "brief": "DIRECTORY-060"
+    },
+    {
+      "path": "crates/lys-runner/tests/session_key.rs",
+      "note": "the runner's session holder key",
+      "brief": "DIRECTORY-060"
+    },
+    {
+      "path": "crates/lys-core/src/keys/identity.rs",
+      "note": "the runner's session holder key",
+      "brief": "DIRECTORY-060"
+    },
+    {
+      "path": "crates/lys-runner/src/peer.rs",
+      "note": "the runner's session holder key",
+      "brief": "DIRECTORY-060"
+    },
+    {
+      "path": "crates/lys-runner/tests/present.rs",
+      "note": "the runner's session holder key",
+      "brief": "DIRECTORY-060"
+    },
+    {
+      "path": "crates/lys-runner/src/present_client.rs",
+      "note": "the runner's session holder key",
+      "brief": "DIRECTORY-060"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-060.json",
+      "note": "the runner's session holder key brief",
+      "brief": "DIRECTORY-060"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-060.md",
+      "note": "the runner's session holder key brief",
+      "brief": "DIRECTORY-060"
     }
   ],
   "inventory": [
