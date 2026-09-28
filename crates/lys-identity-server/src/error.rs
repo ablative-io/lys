@@ -115,6 +115,21 @@ pub enum ServerError {
         /// The operation id.
         request: String,
     },
+    /// The machines cannot be read or written.
+    #[error("NetworkUnavailable: {reason}")]
+    NetworkUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// No machine is kept by that id.
+    #[error("MachineUnknown: no machine is kept by that id")]
+    MachineUnknown,
+    /// The operation id already names a machine named in other words.
+    #[error("MachineReused: operation `{machine}` already names a machine named in other words")]
+    MachineReused {
+        /// The operation id.
+        machine: String,
+    },
     /// The directory's worker could not be reached.
     #[error("DirectoryUnavailable: {reason}")]
     DirectoryUnavailable {
@@ -140,15 +155,18 @@ impl ServerError {
             Self::AgentNotVisible
             | Self::GrantNotVisible
             | Self::SessionUnknown
-            | Self::RequestUnknown => StatusCode::NOT_FOUND,
-            Self::RequestDecided { .. } | Self::RequestHeld { .. } | Self::RequestReused { .. } => {
-                StatusCode::CONFLICT
-            }
+            | Self::RequestUnknown
+            | Self::MachineUnknown => StatusCode::NOT_FOUND,
+            Self::RequestDecided { .. }
+            | Self::RequestHeld { .. }
+            | Self::RequestReused { .. }
+            | Self::MachineReused { .. } => StatusCode::CONFLICT,
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. } | Self::SecretsUnavailable { .. } => StatusCode::BAD_GATEWAY,
             Self::ConfigInvalid { .. }
             | Self::DirectoryUnavailable { .. }
-            | Self::RequestsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
+            | Self::RequestsUnavailable { .. }
+            | Self::NetworkUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),

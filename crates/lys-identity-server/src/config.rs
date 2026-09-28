@@ -72,6 +72,10 @@ pub struct Config {
     /// not exist. Without it the request routes answer `RequestsUnavailable`.
     #[serde(default)]
     pub requests_dir: Option<PathBuf>,
+    /// The file the machines are kept in, created at the first machine
+    /// named. Without it the network routes answer `NetworkUnavailable`.
+    #[serde(default)]
+    pub network_file: Option<PathBuf>,
 }
 
 /// The permission model as its file writes it: a version, and each relation

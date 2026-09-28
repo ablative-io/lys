@@ -45,6 +45,8 @@ pub struct AppState {
     pub secrets: Option<crate::secrets_api::SecretsBroker>,
     /// The access requests, when the configuration names their file.
     pub requests: Option<Mutex<crate::requests_store::RequestStore>>,
+    /// The machines, when the configuration names their file.
+    pub network: Option<Mutex<crate::network_store::NetworkStore>>,
 }
 
 type Shared = Arc<AppState>;
@@ -78,6 +80,12 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
             .requests_dir
             .as_deref()
             .map(crate::requests_store::RequestStore::open)
+            .transpose()?
+            .map(Mutex::new),
+        network: config
+            .network_file
+            .as_deref()
+            .map(crate::network_store::NetworkStore::open)
             .transpose()?
             .map(Mutex::new),
     })))
@@ -121,6 +129,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::reviews_api::routes())
         .merge(crate::requests_api::routes())
         .merge(crate::link_audit_api::routes())
+        .merge(crate::network_api::routes())
         .merge(crate::resources_api::routes())
         .merge(crate::secrets_api::routes())
         .merge(crate::sessions_api::routes())

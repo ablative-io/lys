@@ -13,6 +13,8 @@ pub mod grant_contract;
 mod grant_sight;
 pub mod grants;
 pub mod link_audit_api;
+pub mod network_api;
+pub mod network_store;
 pub mod oidc;
 pub mod read_api;
 pub mod read_views;

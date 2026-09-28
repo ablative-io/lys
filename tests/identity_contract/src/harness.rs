@@ -281,6 +281,7 @@ impl Service {
             spicedb,
             secrets,
             requests_dir: Some(dir.path().join("requests")),
+            network_file: Some(dir.path().join("network.json")),
         };
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;
