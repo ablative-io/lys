@@ -236,7 +236,11 @@ fn answer_one(
         flag.store(true, Ordering::SeqCst);
         woken.wake();
     });
-    let answer = dispatch(sessions, server, &greeting, &line, &left);
+    let answer = if crate::peer::is_peer(&line) {
+        crate::peer::answer(sessions, stream, line.trim_end(), &left)
+    } else {
+        dispatch(sessions, server, &greeting, &line, &left)
+    };
     writer.write_all(reply_line(answer).as_bytes())?;
     writer.write_all(b"\n")?;
     writer.flush()?;
