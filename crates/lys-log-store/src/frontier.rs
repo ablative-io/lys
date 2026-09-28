@@ -110,7 +110,7 @@ impl Frontier {
 
     /// Appends raw leaf bytes, returning their RFC 6962 leaf hash.
     pub fn push(&mut self, leaf_bytes: &[u8]) -> [u8; 32] {
-        let leaf_hash = raw_leaf_hash(leaf_bytes);
+        let leaf_hash = hash_leaf(leaf_bytes);
         self.push_hash(leaf_hash);
         leaf_hash
     }
@@ -147,6 +147,14 @@ impl Frontier {
     pub fn root_hash(&self) -> RootHash {
         RootHash::from_parts(self.root(), self.size)
     }
+}
+
+/// `SHA-256(0x00 ‖ leaf-bytes)`, the RFC 6962 leaf hash: the one place this
+/// crate hashes a leaf, so a test can count how often a leaf is hashed.
+pub(crate) fn hash_leaf(leaf_bytes: &[u8]) -> [u8; 32] {
+    #[cfg(test)]
+    crate::leaf_count::count_leaf_hash();
+    raw_leaf_hash(leaf_bytes)
 }
 
 /// `SHA-256(0x01 ‖ left ‖ right)`, the RFC 6962 interior node.

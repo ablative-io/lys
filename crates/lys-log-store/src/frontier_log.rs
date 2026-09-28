@@ -10,8 +10,17 @@
 //! opened either from nothing, reading every leaf once, or from a frontier the
 //! caller already trusts (a checked [`Snapshot`](crate::Snapshot)), reading only
 //! the leaves after it. Leaves are read from the store when they are asked for,
-//! and the full tree an inclusion proof needs is built on the first proof and
-//! kept, never at open.
+//! and the tree an inclusion proof needs is built on the first proof and kept,
+//! never at open.
+//!
+//! # The proof tree holds hashes, not leaves
+//!
+//! The proof tree is a [`HashTree`]: the leaf and interior hashes and nothing
+//! else, at most two 32-byte hashes per leaf. It is built by streaming the
+//! stored leaves through one at a time, each read, hashed and dropped before
+//! the next is read, so building it never holds more than one leaf. An append
+//! hands it the leaf hash the frontier already computed, so a leaf is hashed
+//! once however many trees it extends.
 //!
 //! # The same integrity routine as `Log`
 //!
@@ -35,10 +44,10 @@ use std::sync::OnceLock;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use lys_core::Ed25519Identity;
-use lys_core::merkle::{AppendOnlyTree, RawLeaf, RootHash};
+use lys_core::merkle::{HashTree, RootHash};
 
 use crate::error::{StoreError, StoreResult};
-use crate::frontier::Frontier;
+use crate::frontier::{Frontier, hash_leaf};
 use crate::snapshot::seal;
 use crate::store::{LeafStore, PinnedRoot};
 
@@ -130,7 +139,7 @@ impl Reading {
 pub struct FrontierLog<S: LeafStore> {
     store: S,
     frontier: Frontier,
-    proofs: OnceLock<AppendOnlyTree<RawLeaf>>,
+    proofs: OnceLock<HashTree>,
     recovered_to: Option<u64>,
     poisoned: bool,
 }
@@ -248,7 +257,7 @@ impl<S: LeafStore> FrontierLog<S> {
         self.poisoned = true;
         let leaf_hash = self.frontier.push(leaf_bytes);
         if let Some(tree) = self.proofs.get_mut() {
-            tree.append_raw(leaf_bytes);
+            tree.push_leaf_hash(leaf_hash);
         }
         self.store.pin(PinnedRoot {
             tree_size: self.frontier.size(),
@@ -297,22 +306,36 @@ impl<S: LeafStore> FrontierLog<S> {
         Ok(Tail { from, leaves })
     }
 
-    /// The whole tree, for inclusion and consistency proofs.
+    /// The whole tree's hashes, for inclusion and consistency proofs.
     ///
-    /// Built from every stored leaf the first time it is asked for, then kept
-    /// and extended by each append. The rebuilt root must be the frontier's.
+    /// Built the first time it is asked for by streaming every stored leaf
+    /// through once, one leaf held at a time, then kept and extended by each
+    /// append with the leaf hash the append already computed. It holds no
+    /// leaf bytes. The rebuilt root must be the frontier's.
     ///
     /// # Errors
     ///
     /// [`StoreError::PinMismatch`] if the stored leaves rebuild to another
-    /// root than the log holds, and whatever the store returns while reading.
-    pub fn proof_tree(&self) -> StoreResult<&AppendOnlyTree<RawLeaf>> {
+    /// root than the log holds, [`StoreError::LeafMissingWithinExtent`] if
+    /// the store has no leaf inside the log, [`StoreError::Trust`] if the
+    /// tree cannot answer its root, and whatever the store returns while
+    /// reading.
+    pub fn proof_tree(&self) -> StoreResult<&HashTree> {
         if let Some(tree) = self.proofs.get() {
             return Ok(tree);
         }
-        let tail = self.leaves_from(0)?;
-        let tree = AppendOnlyTree::<RawLeaf>::reconstruct_from_raw_leaves(&tail.leaves);
-        let (rebuilt_root, rebuilt_size) = tree.root().to_parts();
+        let size = self.len();
+        let mut tree = HashTree::with_capacity(size);
+        for index in 0..size {
+            let leaf = self
+                .leaf_bytes(index)?
+                .ok_or(StoreError::LeafMissingWithinExtent {
+                    index,
+                    extent: size,
+                })?;
+            tree.push_leaf_hash(hash_leaf(&leaf));
+        }
+        let (rebuilt_root, rebuilt_size) = tree.root()?.to_parts();
         if rebuilt_root != self.frontier.root() || rebuilt_size != self.frontier.size() {
             return Err(StoreError::PinMismatch {
                 pinned_size: self.frontier.size(),
@@ -353,3 +376,7 @@ impl<S: LeafStore> FrontierLog<S> {
 #[cfg(test)]
 #[path = "frontier_log_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "proof_tree_tests.rs"]
+mod proof_tree_tests;
