@@ -2945,6 +2945,16 @@
             "place:here"
           ],
           "cadence": "round"
+        },
+        {
+          "name": "rauthy-ready",
+          "command": "python3 scripts/identity-gates/rauthy_ready.py",
+          "requires": [
+            "tool:python3",
+            "tool:docker",
+            "tool:git"
+          ],
+          "cadence": "demand"
         }
       ]
     },

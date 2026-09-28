@@ -62,7 +62,48 @@
       "stories": [
         "S13",
         "S14"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "scripts/identity-gates/rauthy_ready.py",
+            "change": "created",
+            "note": "The rauthy-ready leg. It reads the pin and the versions file (checks 1 and 2), checks the runtime (3), both images (4) and the Rauthy revision label (5) before creating anything. It then creates a network and the PostgreSQL and Rauthy containers under lys-rauthy-ready-<run>-<role> with the io.lys.gate.rauthy-ready=<run> label and --pull never, waits for pg_isready and polls /auth/v1/health on the port docker port reports on 127.0.0.1. It prints 'ready:' only on 200 with both flags true and removes everything it made on every exit path."
+          }
+        ],
+        "how": "Row 1 (passes at the venue with exactly one 'ready:' line): main() at scripts/identity-gates/rauthy_ready.py:465 prints one 'ready:' line at :502, only when start_and_probe (:418) returned from wait_for_rauthy (:400). answered_ready (:384) requires HTTP 200 and a JSON body with db_healthy and cache_healthy both true. The line is printed after cleanup succeeds. Met in code; it can only be measured at the venue, which I did not do. Row 2 (0 labelled containers and networks afterwards): Run.cleanup (:294) runs in main's finally. It stops each container, runs rm --volumes on it, then network rm, then rmtree on the temp directory, all by the exact names recorded in Run.containers and Run.network. Run.start (:279) records a name before its docker run, so a container a failed run left behind is still found by name (container inspect) and removed. Row 3 (volume count unchanged): containers are removed with rm --volumes (:323) and the script creates no named volume. Row 4 (containers without the label unchanged): nothing is stopped or removed except names this run created (:310-325). Row 5 (no docker on PATH): check_runtime (:183) uses shutil.which('docker') and refuses 'container_runtime_missing'. A non-zero docker version gives the same refusal. Row 6 (label absent): check_images (:195) reads the labels as '{{json .Config.Labels}}' from the image, never a container, and never prints them. A missing or empty label gives 'refused: rauthy_revision_mismatch' containing 'absent', the pin and `docker buildx build --label org.opencontainers.image.revision=<pin> --load .` (:227-234). This runs before anything is created. Row 7 (Rauthy image missing): the image_missing refusal (:199-208) names rauthy, the image ID, the pin, the build command ending ' --load .' and `docker image inspect --format '{{.Id}}' <id>`. It contains no 'pull'. Row 8 (image list unchanged): the script never pulls, builds, tags or relabels, and every run carries --pull never (:282). Row 9 (rauthy_image_id missing): read_versions (:131) names the path and each bad member only. With only rauthy_image_id bad, 'postgres_image' does not appear. It runs before check_runtime, so it needs no docker. Row 10 (versions path does not exist): OSError gives 'refused: versions_unreadable' with the path. There is no fallback to the default file. Row 11 (image ID of 64 zeros): the ID comes only from the --versions-file path parse_arguments (:91) returns. The image_missing line contains that ID. Other points: the five secrets are drawn in draw_secrets (:339) and written only to 0600 O_EXCL env files (:244). Runtime stdout is captured and never printed, and stderr goes to DEVNULL (:157). The probe uses ProxyHandler({}) so it reaches only 127.0.0.1 (:403). The 60-second bounds are at :56, :352 and :400. SIGINT and SIGTERM raise Interrupted so cleanup runs (:461, :493). Nothing is written outside mkdtemp, and deploy/identity is only read. The venue rows (1 to 4, 6, 7, 8 and 11) need a docker venue and are not measured here.",
+        "deviation": "Four deviations from the brief. (a) Order: step (6) lists creating the network, PostgreSQL and Rauthy containers before step (7), the pg_isready wait. The script starts Rauthy only after pg_isready succeeds (start_and_probe, :418), because a Rauthy that starts before its database accepts TCP connections may exit and turn a healthy install into a readiness_timeout. The Rauthy 60-second bound starts from its own start. (b) Two refusal names the brief does not list: 'arguments_invalid' for any argument other than one --versions-file <path>, and 'interrupted' for SIGINT or SIGTERM. Both print one 'refused:' line and exit 1 after cleanup. (c) The brief's 60-second readiness bounds, and a per-request urllib timeout capped at the remaining bound, conflict with CLAUDE.md's 'No time limits' rule. I followed the brief because its refusal rows and the never-ready test depend on the bound; the conflict needs a ruling. (d) The postgres image_missing refusal says 'pull it before running: docker pull <ref>'. The brief requires telling the operator to pull; the leg itself never pulls.",
+        "checklist": [
+          {
+            "id": "C33",
+            "done": false,
+            "note": "C33 is about render-brief.py's bare-id list rule, which no acceptance row of this requirement covers and this brief's files do not touch. Nothing was done for it here."
+          },
+          {
+            "id": "C34",
+            "done": false,
+            "note": "This brief re-renders no brief markdown; the renderer work is another card's. Re-rendering the directory cluster changed no committed markdown."
+          },
+          {
+            "id": "C35",
+            "done": false,
+            "note": "scripts/design/tests/test_render_brief.py is outside this brief's files and was not touched."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S13",
+            "satisfied": false,
+            "note": "This story is about rendering prose list entries; this requirement delivers the rauthy-ready script, not a renderer change."
+          },
+          {
+            "id": "S14",
+            "satisfied": false,
+            "note": "This requirement changes no renderer and no rendered brief; the directory cluster's rendered markdown is unchanged."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -96,7 +137,43 @@
       ],
       "stories": [
         "S14"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys/tests/rauthy_ready_leg.rs",
+            "change": "created",
+            "note": "An integration test (#![cfg(test)]) with 10 #[test] functions. Each runs `python3 scripts/identity-gates/rauthy_ready.py --versions-file <its own file>` from the repository root. PATH starts with a stub docker that records every argv and every --env-file's contents, and a loopback TcpListener the test owns answers /auth/v1/health and counts requests. It adds no dependency (serde_json is already a normal dependency and tempfile a dev-dependency)."
+          }
+        ],
+        "how": "Setup: Case::new (crates/lys/tests/rauthy_ready_leg.rs:240) reads the pin with git rev-parse HEAD:vendor/rauthy and generates its own image ID and digest reference (made_hex64, :173). It writes its own versions file and the stub's stub.json in a tempdir, and starts the listener (serve_health, :185). find_on_path (:151) panics naming python3 or git when either is absent; there is no skip. Case.run (:330) captures `git status --porcelain -- deploy/identity` before and after every run and asserts they are equal. Case ready: ready() at :476 asserts exit 0, exactly one 'ready:' line, and listener requests >= 1. Case ready, secrets: ready_secrets() at :483 takes the values from the stub record (Run::secrets, :399) under the six keys and asserts exactly 5 distinct. The search control runs the same occurrences() (:424) over the record's env-file text and requires at least 1 hit per value. assert_leaks_none (:413) then requires 0 hits in stdout plus stderr, searching each value as written and as lowercase hexadecimal. Case ready, cleanup: ready_cleanup() at :497 calls assert_every_creation_removed (:454). It requires 3 names created, each removed at a later record index, equal created and removed counts, and every removed name beginning lys-rauthy-ready-. Case ready, no pull: ready_no_pull() at :503 asserts 0 argv starting with 'pull', and exactly 2 run argv, each carrying '--pull never'. Case no runtime: no_runtime() at :516 uses a PATH of python3 and git symlinks only (bare_path, :316) and asserts exit 1, the container_runtime_missing line and no 'ready:'. Case no Rauthy image: no_rauthy_image() at :525 asserts image_missing, 'rauthy', the image ID, the build command with the pin followed by ' --load .', 0 'pull', and 0 run argv (refused_early, :406). Case no PostgreSQL image: :539 asserts 'postgres', the reference and 'pull', with 0 run argv. Case revision differs: :551 uses a label of forty zeros and asserts rauthy_revision_mismatch with 0 run argv. Case revision absent: :562 asserts 'absent', the pin and the build-command prefix, with 0 run argv. Case never ready: :574 has the listener answer 500 and asserts exit 1, readiness_timeout containing 'rauthy', every created name removed, and 5 secrets with 0 leaks. There are exactly 10 #[test] functions, none #[ignore]d, and no fixed credential in the source. I have not run the test, so the 'reported as passed' row is not measured. The never-ready case waits out the script's 60-second bound.",
+        "deviation": "I did not run cargo test, clippy or rustfmt: the brief forbids running any check, so the file is hand-formatted to rustfmt's 2024 defaults. Two additions beyond the rows: the revision-differs case also asserts the refusal names the label value and the pin, and never-ready also asserts the listener counted at least one request. The test depends on std::os::unix, like the repository's other process tests.",
+        "checklist": [
+          {
+            "id": "C34",
+            "done": false,
+            "note": "C34 is about brief markdown re-rendering, which is outside this brief's files; nothing was done for it here."
+          },
+          {
+            "id": "C35",
+            "done": false,
+            "note": "scripts/design/tests/test_render_brief.py is not in this brief's scope and was not touched."
+          },
+          {
+            "id": "C36",
+            "done": true,
+            "note": "ready_secrets and never_ready take the runtime's secret values from the stub record and assert the count is 5. The search control proves the search fires. Both assert 0 occurrences, as written or in hex, in the leg's complete stdout and stderr."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S14",
+            "satisfied": false,
+            "note": "This story is about the renderer and rendered briefs, which this requirement does not touch."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -121,7 +198,38 @@
       ],
       "stories": [
         "S13"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/project.json",
+            "change": "modified",
+            "note": "trees[0].legs gains an 8th entry, {name rauthy-ready, command python3 scripts/identity-gates/rauthy_ready.py, requires tool:python3, tool:docker, tool:git, cadence demand}, appended after the design leg. Nothing else changes."
+          }
+        ],
+        "how": "docs/design/project.json:70-79 (the 'rauthy-ready' name is at :71) holds the appended leg. trees[0].legs now has 8 entries: 7 round legs that are byte-identical to before (the diff shows only the insertion), plus the demand leg. The shorthand map, the roots map and the other trees are untouched. .land/gates.sh, scripts/design/gate.sh and scripts/design/schemas/project.schema.json are not modified, so the git diff row against 7b53625 holds for this change. validate.py and gate.sh were not run by me, as the brief requires; the leg uses the same member shape and tool:<name> spelling as the existing identity-release demand leg in trees[3], which validates on main.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C31",
+            "done": false,
+            "note": "C31 is about render-brief.py and scripts/design/SOURCE.md, which are outside this brief's files; nothing was done for it here."
+          },
+          {
+            "id": "C37",
+            "done": true,
+            "note": ".land/gates.sh is unchanged. The only leg added has cadence demand; the round-leg count in trees[0] stays 7."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S13",
+            "satisfied": false,
+            "note": "This story is about rendering prose lists, which this requirement does not touch."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -146,7 +254,38 @@
       ],
       "stories": [
         "S13"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/directory/design.json",
+            "change": "modified",
+            "note": "The gate entry whose tree is \".\" (the first one, gate[0]) gains the same rauthy-ready demand leg as its last leg. No other field changes."
+          }
+        ],
+        "how": "docs/design/directory/design.json:2949-2958 (the 'rauthy-ready' name is at :2950) appends the leg to gate[0]'s legs. A JSON comparison confirmed that removing that one leg gives back the original document exactly, and that the leg equals project.json's trees[0] leg in name, command, requires and cadence. Among all gate entries, only gate[0] carries a leg named rauthy-ready. I rendered the cluster with scripts/design/render-cluster.py into a temporary copy, as gate.sh does, and every rendered .md was byte-identical to the committed files: render-cluster.py does not render the gate. So docs/design/directory/DESIGN.md needs no change and has none, and gate.sh will report no rendered-markdown difference for this cluster. I did not run validate.py or check-coverage.py.",
+        "deviation": "Two deviations. (1) The brief lists docs/design/directory/DESIGN.md as modified, but re-rendering from the amended design.json produces identical bytes, so no rendered file changes and DESIGN.md is not in the diff. (2) The gate now holds five entries with tree \".\" (it had one at 7b53625, when the brief was written). The brief names 'the gate entry whose tree is \".\"', so I appended to the first, gate[0], the entry that existed at 7b53625; the other four \".\" entries do not carry the leg. A reviewer should confirm that reading.",
+        "checklist": [
+          {
+            "id": "C32",
+            "done": false,
+            "note": "C32 is about how render-brief.py renders blocked_by lists, which is outside this brief's files; nothing was done for it here."
+          },
+          {
+            "id": "C37",
+            "done": true,
+            "note": "The leg added to the directory gate has cadence demand; .land/gates.sh is unchanged."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S13",
+            "satisfied": false,
+            "note": "This story is about rendering prose lists, which this requirement does not touch."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
