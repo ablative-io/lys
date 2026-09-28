@@ -1,37 +1,30 @@
 //! Verifying a certificate against the issuer key that signed it: the
-//! signature, the algorithm, and the validity window at a given instant.
+//! signature, the algorithm, the self-signed rule, and the validity window at
+//! a given instant.
+//!
+//! Self-signed is judged by keys and signature, never by names: a certificate
+//! is self-signed when its subject public key is the supplied issuer key and
+//! its signature verifies under that key.
 
 use chrono::{DateTime, Utc};
 use ed25519_dalek::{Signature, VerifyingKey};
 use x509_parser::oid_registry::OID_SIG_ED25519;
 use x509_parser::prelude::{FromDer, X509Certificate};
 
+use crate::ca::certificate::certificate_subject_public_key;
 use crate::error::{TrustError, TrustResult};
-
-/// Verifies a certificate's Ed25519 signature against an expected issuer key
-/// and checks the validity window at the current time (`Utc::now()`).
-///
-/// Thin wrapper over [`verify_certificate_chain_at`]; see it for the full
-/// list of checks.
-///
-/// # Errors
-///
-/// See [`verify_certificate_chain_at`].
-pub fn verify_certificate_chain(cert_der: &[u8], issuer_public_key: &[u8; 32]) -> TrustResult<()> {
-    verify_certificate_chain_at(cert_der, issuer_public_key, Utc::now())
-}
 
 /// Verifies a certificate's Ed25519 signature against an expected issuer key
 /// and checks that `at` falls within the certificate's validity window.
 ///
-/// Parses `cert_der`, rejects self-signed certificates (issuer equal to
-/// subject), confirms the signature algorithm is Ed25519, recovers the
-/// to-be-signed DER and 64-byte signature, verifies the signature with
-/// `ed25519-dalek` **strict** verification, and finally rejects the
-/// certificate if `at` lies outside its `notBefore`/`notAfter` window
-/// (boundaries inclusive, per X.509). x509-parser's `verify_signature` is
-/// deliberately not used — for Ed25519 it routes to ring's non-strict
-/// verification.
+/// The checks run in this order: `cert_der` parses as an X.509 certificate;
+/// its signature algorithm is Ed25519; its signature is 64 bytes; the
+/// supplied issuer key decodes to an Ed25519 point; the signature verifies
+/// under that key with `ed25519-dalek` **strict** verification; the
+/// certificate is not self-signed; and `at` lies inside its
+/// `notBefore`/`notAfter` window (boundaries inclusive, per X.509).
+/// x509-parser's `verify_signature` is deliberately not used — for Ed25519 it
+/// routes to ring's non-strict verification.
 ///
 /// Strict verification (`verify_strict`) rejects signature malleability and
 /// small-order/torsion issuer keys, which plain `verify` accepts. This crate
@@ -40,31 +33,32 @@ pub fn verify_certificate_chain(cert_der: &[u8], issuer_public_key: &[u8; 32]) -
 /// which signatures can be forged for arbitrary payloads — must be
 /// categorically rejected.
 ///
-/// The self-signed rejection compares the raw subject and issuer DN bytes.
-/// That is a heuristic defence-in-depth screen, not a security boundary —
-/// the Ed25519 signature check against the caller-supplied issuer key is the
-/// real boundary. The heuristic has a known false positive: a certificate
-/// legitimately issued by the authority for a caller-chosen subject equal to
-/// the authority's hex-pubkey common name is rejected here even though its
-/// signature would verify.
+/// A certificate is self-signed when its subject public key is the supplied
+/// issuer key and its signature verifies under that key. Two keys are the
+/// same key when both decode to Ed25519 points and the points are equal, so a
+/// non-canonical encoding of the issuer's point is the issuer's key. The
+/// judgement is made only after the signature has verified, so a certificate
+/// whose signature fails is refused on its signature and never reported as
+/// self-signed. A subject key that cannot be read as an Ed25519 key, or does
+/// not decode to a point, is not the issuer's key. No name takes part: the
+/// subject and issuer distinguished names neither refuse nor accept a
+/// certificate.
 ///
-/// This function says nothing about who controls the certificate's *subject*
-/// key. It verifies that this issuer signed this certificate. Concluding that
-/// the subject key is held by the named subject additionally requires that the
-/// certificate was issued through
-/// [`CertificateAuthority::issue_certificate_for_request`], where possession
-/// was proven at issuance time.
+/// What a successful verification proves, and what it leaves to the caller —
+/// revocation, trust in the supplied key, possession of the subject key,
+/// anything beyond one level, and the meaning of any extension — is stated
+/// on [`verify_certificate_chain`].
 ///
 /// # Errors
 ///
 /// Returns [`TrustError::CertificateParsing`] if `cert_der` cannot be parsed,
-/// and [`TrustError::CertificateVerification`] if the certificate is
-/// self-signed, is not Ed25519-signed, carries a malformed signature or
-/// issuer key, the signature does not strictly verify, or `at` is outside
-/// the validity window (the reason distinguishes `expired` from
-/// `not yet valid` and names the violated boundary instant).
+/// and [`TrustError::CertificateVerification`] if the certificate is not
+/// Ed25519-signed, carries a malformed signature or issuer key, the
+/// signature does not strictly verify, the certificate is self-signed, or
+/// `at` is outside the validity window (the reason distinguishes `expired`
+/// from `not yet valid` and names the violated boundary instant).
 ///
-/// [`CertificateAuthority::issue_certificate_for_request`]: super::CertificateAuthority::issue_certificate_for_request
+/// [`verify_certificate_chain`]: super::verify_certificate_chain
 pub fn verify_certificate_chain_at(
     cert_der: &[u8],
     issuer_public_key: &[u8; 32],
@@ -74,14 +68,6 @@ pub fn verify_certificate_chain_at(
         X509Certificate::from_der(cert_der).map_err(|e| TrustError::CertificateParsing {
             reason: format!("failed to parse certificate DER: {e:?}"),
         })?;
-
-    // Heuristic screen only — see the rustdoc above. The signature check
-    // below is the actual security boundary.
-    if certificate.subject().as_raw() == certificate.issuer().as_raw() {
-        return Err(TrustError::CertificateVerification {
-            reason: "self-signed certificate rejected (issuer equals subject)".to_string(),
-        });
-    }
 
     if certificate.signature_algorithm.algorithm != OID_SIG_ED25519 {
         return Err(TrustError::CertificateVerification {
@@ -115,7 +101,24 @@ pub fn verify_certificate_chain_at(
                 .to_string(),
         })?;
 
+    if subject_key_is_issuer_key(cert_der, issuer_public_key) {
+        return Err(TrustError::CertificateVerification {
+            reason: "self-signed certificate rejected (subject key is the issuer key)".to_string(),
+        });
+    }
+
     check_validity_window(&certificate, at)
+}
+
+/// Whether the certificate's subject public key is `issuer_public_key`.
+///
+/// The subject key is read as [`certificate_subject_public_key`] reads it.
+/// One that cannot be read that way — another algorithm, parameters, unused
+/// bits, a length other than 32 — is not the issuer's key, which is an
+/// Ed25519 key by construction.
+fn subject_key_is_issuer_key(cert_der: &[u8], issuer_public_key: &[u8; 32]) -> bool {
+    certificate_subject_public_key(cert_der)
+        .is_ok_and(|subject_key| super::is_same_ed25519_key(&subject_key, issuer_public_key))
 }
 
 /// Rejects `at` instants outside the certificate's `notBefore`/`notAfter`

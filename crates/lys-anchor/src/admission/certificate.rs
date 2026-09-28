@@ -53,7 +53,7 @@
 //! 1. Was it signed by the authority whose public key this policy was
 //!    constructed with, and is it inside its validity window right now?
 //!    (`verify_certificate_chain`, which uses strict Ed25519 verification and
-//!    rejects self-signed certificates.)
+//!    rejects a certificate whose subject key is the issuer key.)
 //! 2. Optionally: is its subject key one of a set this policy was constructed
 //!    with? (`certificate_subject_public_key`, read **after** the chain
 //!    verified — a key recovered from an unverified certificate is an

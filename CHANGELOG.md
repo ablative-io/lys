@@ -104,6 +104,23 @@ unreleased things cannot be used to tell what a published version contains.
   library now *returns* the fact and the CLI prints it, instead of the library
   writing to stderr on its caller's behalf.
 
+### Changed — `lys-core` certificate verification
+
+- A certificate issued to the subject named by the issuer's lowercase-hex
+  public key now verifies, where it was refused: `verify_certificate_chain` no
+  longer compares the subject and issuer names, which such a certificate shares
+  with its issuer while carrying a subject key of its own.
+- A certificate whose subject key is the issuer key and whose signature
+  verifies under it is now refused as self-signed, whatever its names, where it
+  verified when its names differed — for example one issued by
+  `issue_certificate_for_request` over a request made with the authority's own
+  key. Self-signed is judged by keys and signature, after strict signature
+  verification, and two keys are the same when their decoded points are equal.
+- The rustdoc of `verify_certificate_chain` now states what it checks and what
+  it leaves to the caller: revocation, trust in the supplied issuer key,
+  possession of the subject key, anything beyond one level, and the meaning of
+  any extension or capability claim.
+
 ## [0.2.0] — 2026-07-30
 
 ### Added — `lys-core`

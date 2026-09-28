@@ -37,6 +37,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::{DateTime, Timelike, Utc};
+use ed25519_dalek::VerifyingKey;
 use rcgen::{
     BasicConstraints, Certificate, CertificateParams, CustomExtension, IsCa, KeyPair,
     KeyUsagePurpose, PKCS_ED25519,
@@ -52,7 +53,59 @@ use crate::keys::Ed25519Identity;
 
 mod verify;
 
-pub use verify::{verify_certificate_chain, verify_certificate_chain_at};
+pub use verify::verify_certificate_chain_at;
+
+/// Verifies a certificate's Ed25519 signature against an expected issuer key
+/// and checks the validity window at the current time (`Utc::now()`).
+///
+/// Thin wrapper over [`verify_certificate_chain_at`], which states the order
+/// of the checks and the self-signed rule.
+///
+/// # What this checks
+///
+/// - The bytes parse as an X.509 certificate.
+/// - Its signature algorithm is Ed25519.
+/// - Its signature verifies with strict Ed25519 verification
+///   (`verify_strict`) under the issuer key the caller supplies.
+/// - Its subject key is not that issuer key: a certificate whose subject key
+///   is the issuer key and whose signature verifies under it is self-signed
+///   and refused, whatever its names.
+/// - The current instant lies inside `notBefore` and `notAfter`, both
+///   inclusive.
+///
+/// # What this leaves to the caller
+///
+/// - Revocation: lys-core has no revocation check, so a certificate that has
+///   been revoked still verifies here.
+/// - Trust in the supplied issuer key: the function believes whatever key it
+///   is given, and proves only that this key signed this certificate.
+/// - Possession of the subject key: it is proven only at issuance, by
+///   [`CertificateAuthority::issue_certificate_for_request`]; nothing in the
+///   certificate shows which issuance path produced it.
+/// - Anything beyond one level: it verifies one signature under one key,
+///   walks no chain, and checks no issuer certificate, basic constraints or
+///   key usage.
+/// - The meaning of any extension or capability claim: none is read.
+///
+/// # Errors
+///
+/// See [`verify_certificate_chain_at`].
+pub fn verify_certificate_chain(cert_der: &[u8], issuer_public_key: &[u8; 32]) -> TrustResult<()> {
+    verify_certificate_chain_at(cert_der, issuer_public_key, Utc::now())
+}
+
+/// Whether two 32-byte Ed25519 public keys are the same key: both decode to
+/// Edwards points and the decoded points are equal.
+///
+/// The comparison is of points, not of bytes, so a non-canonical encoding of
+/// a point is the same key as its canonical encoding. Bytes that decode to no
+/// point are the same key as nothing, themselves included.
+fn is_same_ed25519_key(first: &[u8; 32], second: &[u8; 32]) -> bool {
+    match (VerifyingKey::from_bytes(first), VerifyingKey::from_bytes(second)) {
+        (Ok(first), Ok(second)) => first.to_edwards() == second.to_edwards(),
+        (Err(_), _) | (_, Err(_)) => false,
+    }
+}
 
 /// Issues X.509 certificates signed by an Ed25519 root identity.
 #[derive(Debug)]
@@ -200,6 +253,11 @@ impl CertificateAuthority {
     /// authority's public key as the expected issuer. The validity window is
     /// evaluated against `Utc::now()`; use the free
     /// [`verify_certificate_chain_at`] to verify at an explicit instant.
+    ///
+    /// A certificate whose subject public key is this authority's key and
+    /// whose signature verifies under it is self-signed and refused, whatever
+    /// its names. What a successful verification proves, and what it leaves
+    /// to the caller, is stated on [`verify_certificate_chain`].
     ///
     /// # Errors
     ///

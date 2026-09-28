@@ -348,3 +348,56 @@ fn d013_r3_ac8_a_subject_equal_to_the_issuers_hex_key_is_chain_invalid() -> Test
     );
     Ok(())
 }
+
+/// LYSCORE-005 R6: the fold judges self-signed by keys, never by names. A
+/// certificate the issuing authority issued to the subject named by its own
+/// lowercase-hex key is counted issued and can be revoked; one issued over a
+/// request made with the authority's own key has the issuer key as its subject
+/// key and is refused as chain-invalid.
+#[test]
+fn lyscore001_fold_judges_self_signed_by_keys() -> TestResult {
+    let dir = TempDir::new()?;
+    let issuer_seed = seed();
+    let issuer = new_issuer(dir.path(), "issuer", issuer_seed)?;
+    let own_identity = std::sync::Arc::new(revocation_support::fixtures::identity(
+        dir.path(),
+        "issuer-own",
+        issuer_seed,
+    )?);
+    assert_eq!(own_identity.public_key_bytes(), issuer.public_key());
+
+    let h_der = issue(&issuer, &hex(&issuer.public_key()), vec![])?.der_bytes;
+    let h = CertificateHash::of_der(&h_der);
+    let request = lys_core::ca::create_certificate_request(&own_identity, "agent-self")?;
+    let k_der = issuer
+        .authority
+        .issue_certificate_for_request(
+            &request,
+            "agent-self",
+            std::time::Duration::from_secs(3600),
+            vec![],
+        )?
+        .der_bytes;
+    let k = CertificateHash::of_der(&k_der);
+
+    let mut log = open_log(&dir.path().join("self-signed-by-keys"))?;
+    let origin = log.origin().to_owned();
+    for leaf in [
+        issuance(&h_der),
+        issuance(&k_der),
+        revocation(&origin, h, &issuer),
+    ] {
+        log.append(&leaf)?;
+    }
+
+    let set = fold(log.store(), &issuer.public_key())?;
+    assert_eq!(set.folded_size, 3);
+    assert_eq!(set.issued, BTreeMap::from([(h, 0)]));
+    assert!(!set.issued.contains_key(&k));
+    assert_eq!(set.revoked, BTreeMap::from([(h, 2)]));
+    assert_eq!(
+        set.refused,
+        vec![refused(1, LeafRefusal::CertificateChainInvalid)]
+    );
+    Ok(())
+}

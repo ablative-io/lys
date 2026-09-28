@@ -377,3 +377,81 @@ fn the_certificate_flags_cannot_be_supplied_alone() {
         "--issuer-public-key without --cert must be refused, not silently ignored"
     );
 }
+
+/// Self-signed is judged by keys, never by names. A certificate the CA issues
+/// over a holder's key to the subject named by the CA's own lowercase-hex key
+/// carries equal subject and issuer names, and is not self-signed: both
+/// commands accept it.
+#[test]
+fn hex_common_name_certificate_verifies_through_both_commands() {
+    let tmp = tempfile::tempdir().unwrap();
+    let fixture = Fixture::new(tmp.path());
+    assert_eq!(fixture.ca_public_key.len(), 64);
+    assert!(
+        fixture
+            .ca_public_key
+            .chars()
+            .all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c)),
+        "the CA public key must be lowercase hex, got {}",
+        fixture.ca_public_key
+    );
+    fixture.holder("holder.key");
+    fixture.certify_presented("holder.key", &fixture.ca_public_key, "hexcn.pem");
+
+    json_ok(&[
+        "--json",
+        "ca",
+        "verify",
+        "--cert",
+        &fixture.path("hexcn.pem"),
+        "--issuer-public-key",
+        &fixture.ca_public_key,
+    ]);
+
+    fixture.attest("holder.key", "hexcn.cose");
+    let output = fixture.verify_certified("hexcn.cose", "hexcn.pem");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let value: Value = serde_json::from_str(String::from_utf8(output.stdout).unwrap().trim())
+        .expect("stdout was not JSON");
+    assert_eq!(value["verified"], Value::Bool(true));
+}
+
+/// A certificate the CA issues over a request made with its own key has a
+/// subject key that is the issuer key: self-signed by keys whatever its names.
+/// Both commands refuse it with the existing single refusal message, which
+/// names no self-signed check.
+#[test]
+fn authority_own_key_certificate_is_refused_by_both_commands() {
+    let tmp = tempfile::tempdir().unwrap();
+    let fixture = Fixture::new(tmp.path());
+    fixture.certify_presented("ca.key", "agent-self", "self.pem");
+
+    let output = run_lys(&[
+        "ca",
+        "verify",
+        "--cert",
+        &fixture.path("self.pem"),
+        "--issuer-public-key",
+        &fixture.ca_public_key,
+    ]);
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("certificate verification failed"),
+        "got: {stderr}"
+    );
+    assert!(!stderr.contains("self-signed"), "got: {stderr}");
+
+    fixture.attest("ca.key", "self.cose");
+    let output = fixture.verify_certified("self.cose", "self.pem");
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}

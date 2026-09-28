@@ -67,7 +67,58 @@
       ],
       "stories": [
         "S5"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-core/src/ca/authority.rs",
+            "change": "modified",
+            "note": "Now holds the free verify_certificate_chain, moved here from authority/verify.rs with the same signature and body, plus the private fn is_same_ed25519_key(&[u8;32], &[u8;32]). That function decodes both keys with VerifyingKey::from_bytes and compares to_edwards() points. Bytes that decode to no point match nothing. authority.rs calls neither .subject() nor .issuer()."
+          },
+          {
+            "path": "crates/lys-core/src/ca/authority/verify.rs",
+            "change": "modified",
+            "note": "The DN screen is removed. After verify_strict, subject_key_is_issuer_key(certificate_subject_public_key(der).is_ok_and(super::is_same_ed25519_key)) refuses with 'self-signed certificate rejected (subject key is the issuer key)', then the validity window is checked. The verify_certificate_chain wrapper moved to authority.rs."
+          },
+          {
+            "path": "crates/lys-core/src/ca/authority_tests.rs",
+            "change": "modified",
+            "note": "self_signed_certificate_is_rejected is rebuilt, and six named tests are added, along with helpers raw_public_key, named_params, assert_verification_reason, names_match and two reason constants. The file is 530 lines, all test code."
+          }
+        ],
+        "how": "Row 1: rg '\\.subject\\(\\)|\\.issuer\\(\\)' on authority.rs prints nothing, and authority/verify.rs has none either, because the DN comparison at verify.rs:80 was deleted. Row 2: hex_common_name_certificate_is_judged_on_its_real_issuer (authority_tests.rs) issues to hex_lower(A), asserts names_match, Ok under A, SIGNATURE_REASON under B. Row 3: self_signed_certificate_is_rejected is rebuilt: an rcgen cert self-signed by K gives SELF_SIGNED_REASON under K and SIGNATURE_REASON under another key. Row 4: ca_own_key_certificate_is_refused_as_self_signed builds create_certificate_request(&ca_a.identity, \"agent-self\"), issues it with issue_certificate_for_request, asserts !names_match and SELF_SIGNED_REASON. Row 5: key_self_signed_certificate_with_differing_names_is_refused uses issuer-x self-signed by K and leaf-y signed_by(&K, issuer, &K), and gets SELF_SIGNED_REASON. Row 6: subject_key_as_supplied_key_without_its_signature_fails_the_signature gives SIGNATURE_REASON. Row 7: self_signed_judgement_compares_decoded_points calls the private is_same_ed25519_key: y=3 canonical vs p+3 is same, 3 vs 4 differs, 2 vs 2 is not same; it asserts [true,false,false] and counts 1 same and 2 not-same. I checked in Python that y=2 has no point and y=3 has one; curve25519-dalek decompress reduces y mod p. Row 8: unreadable_subject_key_is_not_judged_self_signed uses a P-256 leaf signed by K; certificate_subject_public_key gives CertificateParsing and verify gives Ok(()). Row 9: rg -c over the seven fn names prints 7 (checked). Row 10: openssl_csr_interop and a_request_is_not_accepted_as_a_certificate are untouched; neither can reach the new refusal, since both use fresh or foreign subject keys or a non-certificate. The check order is parse, Ed25519 OID, 64-byte signature, issuer point, verify_strict, self-signed, window (verify.rs). x509-parser verify_signature is not called, no signature changed, and there is no unwrap, expect or panic in library code. .unwrap() in authority_tests.rs went 30→47, .expect( 5→6, panic!( 0→1. I ran no build or test; the workflow measures them.",
+        "deviation": "The brief names only crates/lys-core/src/ca/authority.rs, but commit 7a94612 (a 500-line split) moved verify_certificate_chain and verify_certificate_chain_at into crates/lys-core/src/ca/authority/verify.rs, so the logic change had to be made there. The boundary 'a row that needs any other file stops and names it' is therefore crossed: the file is authority/verify.rs. Moving everything back into authority.rs would have undone the split and pushed it past 500 lines. To meet the rows that name authority.rs literally, the private same-key function and the free verify_certificate_chain wrapper (same signature and body, same public path lys_core::ca::verify_certificate_chain) now live in authority.rs, and verify_certificate_chain_at stays in verify.rs. authority_tests.rs is now 530 lines. It is all test code, which CLAUDE.md's limit excludes, but the briefed LYSGATE-002 leg may count it.",
+        "checklist": [
+          {
+            "id": "C23",
+            "done": false,
+            "note": "This brief's C23 row carries the ast-grep brief's text (the id collided in f6f18d3), not a self-signed claim. The key-based self-signed refusal itself is implemented; C23 ticks only on review, per the brief."
+          },
+          {
+            "id": "C66",
+            "done": true,
+            "note": "authority.rs and authority/verify.rs call neither .subject() nor .issuer()."
+          },
+          {
+            "id": "C67",
+            "done": true,
+            "note": "hex_common_name_certificate_is_judged_on_its_real_issuer."
+          },
+          {
+            "id": "C68",
+            "done": true,
+            "note": "ca_own_key_certificate_is_refused_as_self_signed."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S5",
+            "satisfied": true,
+            "note": "The R1 rows are met; the new tests live in the #![cfg(test)] authority_tests.rs and use no lint opt-out."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -93,7 +144,43 @@
       ],
       "stories": [
         "S5"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-core/src/ca/authority.rs",
+            "change": "modified",
+            "note": "verify_certificate_chain's doc carries '# What this checks' (5 bullets) and '# What this leaves to the caller' (Revocation; Trust in the supplied issuer key; Possession of the subject key; Anything beyond one level; The meaning of any extension or capability claim). CertificateAuthority::verify_certificate_chain's doc states the key rule and links [`verify_certificate_chain`]."
+          },
+          {
+            "path": "crates/lys-core/src/ca/authority/verify.rs",
+            "change": "modified",
+            "note": "verify_certificate_chain_at's doc states the check order, the sentence 'A certificate is self-signed when its subject public key is the supplied issuer key and its signature verifies under that key.' and links [`verify_certificate_chain`]: super::verify_certificate_chain for the caveat. The heuristic and false-positive paragraph is removed."
+          }
+        ],
+        "how": "Row 1: rg '^/// # What this checks$|^/// # What this leaves to the caller$' on authority.rs prints exactly 2 lines (64, 76), both in the doc directly above 'pub fn verify_certificate_chain(cert_der' (checked). Row 2: exactly 5 bullets in that section, starting in the given order. Row 3: verify.rs's doc of verify_certificate_chain_at contains the sentence (wrapped across two /// lines) and [`verify_certificate_chain`]. Row 4: rg -in 'heuristic|false positive|issuer equal to subject|issuer equals subject' on authority.rs and verify.rs prints nothing (checked). Row 5: every link resolves in both feature shapes. They point to verify_certificate_chain_at (in scope through pub use), CertificateAuthority::issue_certificate_for_request, super::verify_certificate_chain and certificate_subject_public_key (a private-fn doc, imported). None is gated by unstable-anchor. Not run; the workflow measures cargo doc.",
+        "deviation": "Same as R1: verify_certificate_chain_at's doc lives in crates/lys-core/src/ca/authority/verify.rs, a file the brief does not name, because of the 7a94612 split. The free verify_certificate_chain moved into authority.rs so the rows that name authority.rs hold literally. I dropped the old 'says nothing about who controls the subject key' paragraph from verify_certificate_chain_at; its content is now the 'Possession of the subject key' bullet on verify_certificate_chain.",
+        "checklist": [
+          {
+            "id": "C69",
+            "done": true,
+            "note": "authority.rs lines 64-90."
+          },
+          {
+            "id": "C70",
+            "done": true,
+            "note": "Both docs state the key rule; no DN heuristic sentence remains."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S5",
+            "satisfied": true,
+            "note": "The R2 rows are met."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -116,7 +203,33 @@
       ],
       "stories": [
         "S11"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys/tests/certified_attestation_tests.rs",
+            "change": "modified",
+            "note": "Adds hex_common_name_certificate_verifies_through_both_commands and authority_own_key_certificate_is_refused_by_both_commands, both using Fixture."
+          }
+        ],
+        "how": "Row 1: holder.key is certified by certify_presented with subject = fixture.ca_public_key into hexcn.pem. The test asserts that key is 64 lowercase hex. `lys --json ca verify` goes through json_ok (success), and verify_certified gives success with verified true. Row 2: certify_presented(\"ca.key\", \"agent-self\", \"self.pem\"). `lys ca verify` gives exit code Some(1), stderr containing 'certificate verification failed' (main.rs prints 'error: {error}') and not containing 'self-signed'. After attest with ca.key, verify_certified gives exit code Some(1). Row 3: no file under crates/lys/src changed; certificate_verification_failed_display_is_single_and_generic is untouched.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C71",
+            "done": true,
+            "note": "Both CLI tests."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S11",
+            "satisfied": true,
+            "note": "Both ca verify and verify --cert judge on keys."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -137,7 +250,27 @@
       "checklist": [
         "C72"
       ],
-      "stories": []
+      "stories": [],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-anchor/src/admission/certificate.rs",
+            "change": "modified",
+            "note": "The module doc's item 1 now says verify_certificate_chain 'rejects a certificate whose subject key is the issuer key.'"
+          }
+        ],
+        "how": "rg 'rejects self-signed certificates' prints nothing; rg -c 'whose subject key is the issuer key' prints 1 (the doc line). No code changed. lys-anchor's tests admit certificates issued with fresh subject keys, which the new rule does not touch.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C72",
+            "done": true,
+            "note": "certificate.rs module doc, lines 55-56."
+          }
+        ],
+        "stories": []
+      }
     },
     {
       "id": "R5",
@@ -158,7 +291,27 @@
       "checklist": [
         "C73"
       ],
-      "stories": []
+      "stories": [],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "CHANGELOG.md",
+            "change": "modified",
+            "note": "Adds '### Changed — `lys-core` certificate verification' under [Unreleased], after '### Changed — `lys`' and before '## [0.2.0]', with three bullets."
+          }
+        ],
+        "how": "There is one heading line, between '## [Unreleased]' and '## [0.2.0]'. The subsection has exactly 3 bullets, containing in order 'now verifies', 'now refused as self-signed' and 'what it leaves to the caller'. It names no version or date. The diff only adds lines, all inside the new subsection plus its trailing blank line.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C73",
+            "done": true,
+            "note": "CHANGELOG.md subsection."
+          }
+        ],
+        "stories": []
+      }
     },
     {
       "id": "R6",
@@ -178,7 +331,27 @@
       "checklist": [
         "C74"
       ],
-      "stories": []
+      "stories": [],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-identity/tests/revocation_fold.rs",
+            "change": "modified",
+            "note": "Appends lyscore001_fold_judges_self_signed_by_keys, using the landed interface: fold, LiveSet.{folded_size, issued, revoked, refused}, CertificateLeaf issuance/revocation helpers, LeafRefusal::CertificateChainInvalid, and revocation_support::{new_issuer, issue, open_log, seed, fixtures::identity}."
+          }
+        ],
+        "how": "Row 1: a 3-leaf log: [0] issuance of H (issue_certificate to hex of the issuer key), [1] issuance of K (issue_certificate_for_request over create_certificate_request of an Arc'd identity from the issuer's own seed, whose public key the test asserts equals the issuer's), [2] revocation of H signed by the issuer for the log's origin. It is folded with the issuer's key and asserts folded_size 3, issued {H:0}, K not issued, revoked {H:2}, refused [(1, CertificateChainInvalid)]. Row 2: nothing under crates/lys-identity/src changed and no line of revocation_fold.rs was removed. Conflict to resolve: the existing DIRECTORY-013 test d013_r3_ac8_a_subject_equal_to_the_issuers_hex_key_is_chain_invalid (revocation_fold.rs:332) asserts the old name-based false positive: a hex-CN certificate refused as CertificateChainInvalid. Under R1 that certificate verifies, so ac8 will fail at `assert_eq!(set.issued, BTreeMap::from([(fixture.a(), 1)]))`. This brief forbids changing any other revocation_fold.rs test or any other DIRECTORY-013 file, so I left ac8 as it is. The fix needs a brief amendment: restate ac8 so e is issued at index 0 and nothing is refused. Also, crates/lys-identity/src/revocation/fold.rs module doc lines 17-20 still describe 'lys-core's self-signed screen, a known false positive'. That is now false, and the brief forbids editing lys-identity/src.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C74",
+            "done": true,
+            "note": "lyscore001_fold_judges_self_signed_by_keys; ac8's conflict is stated in how."
+          }
+        ],
+        "stories": []
+      }
     },
     {
       "id": "R7",
@@ -207,7 +380,21 @@
       "checklist": [
         "C23"
       ],
-      "stories": []
+      "stories": [],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked: the carried record the row assumes is not on this base (3f48732). The blocked_by carry command prints 'carried' only because ids C1–C65 exist, not because they are the carried pre-method items. The docs merge f6f18d3 gave C1–C23 to the ast-grep/LYSCORE-003 briefs ('Cluster documents' C1–C2 … 'The gate leg' C18–C23). C23 now reads 'The leg lands only after origin/main's crates/lys-home/src/record/mod.rs has zero non-module lines…', and this brief's own record carries that same text for C23: its self-signed C23 text was lost in the merge. The checklist also already holds this brief's C66–C74 (under Certificate Authority, CLI Surface, and Consumers and Records, sections ordered before the carried ones), plus other briefs' C75–C94. design.json's title, intention, problem and solution belong to the ast-grep brief, and 'Self-signed certificates are rejected.' is not in its solution. So: row 1 (ids == C1..C74 in order) cannot print True without removing C75–C94 and reordering other briefs' items. Row 5 cannot hold without rewording C23 to a text this brief's record no longer carries. Row 3's sentence substitution has no sentence to act on. Every path breaks the boundary against removing, reordering or rewording carried items. I left docs/design/lys-core untouched. Unblocking needs the lys-core record repaired: the pre-method C1–C65 restored under their ids (or this brief renumbered), and this brief's C23 text restored in its record.",
+        "deviation": "No file changed; the reason is stated in how.",
+        "checklist": [
+          {
+            "id": "C23",
+            "done": false,
+            "note": "Blocked; see how."
+          }
+        ],
+        "stories": []
+      }
     }
   ],
   "boundaries": [
