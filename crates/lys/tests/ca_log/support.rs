@@ -1,6 +1,8 @@
 //! The bench every `lys ca issue --log` test stands on, and the stranger's
-//! tools: `openssl`, Python 3 and the committed `scripts/verify_inclusion.py`.
+//! tools: `openssl`, Python 3 and the committed `scripts/verify_inclusion.py`,
+//! run offline under a network-denying wrapper with nothing else on `PATH`.
 
+use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -71,7 +73,7 @@ pub(crate) fn openssl() -> PathBuf {
     )
 }
 
-fn python() -> PathBuf {
+pub(crate) fn python() -> PathBuf {
     find_tool(
         "LYS_PYTHON_BIN",
         &[
@@ -83,6 +85,138 @@ fn python() -> PathBuf {
         &["--version"],
         "Python 3",
     )
+}
+
+/// `tool` as an absolute path: itself when it is one, otherwise the first
+/// entry of this process's `PATH` that holds it.
+fn absolute_tool(tool: &Path) -> PathBuf {
+    if tool.is_absolute() {
+        return tool.to_path_buf();
+    }
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    std::env::split_paths(&path)
+        .map(|dir| dir.join(tool))
+        .find(|candidate| candidate.is_file())
+        .unwrap_or_else(|| panic!("{} is not on PATH", tool.display()))
+}
+
+/// The network-denying wrapper for this platform, as an absolute path and the
+/// arguments that come before the wrapped command. A platform with neither
+/// wrapper fails the test; it is never skipped.
+fn network_denying_wrapper() -> (PathBuf, Vec<&'static str>) {
+    if cfg!(target_os = "macos") {
+        (
+            PathBuf::from("/usr/bin/sandbox-exec"),
+            vec!["-p", "(version 1)(allow default)(deny network*)"],
+        )
+    } else if cfg!(target_os = "linux") {
+        let unshare = ["/usr/bin/unshare", "/bin/unshare"]
+            .iter()
+            .map(PathBuf::from)
+            .find(|candidate| candidate.is_file())
+            .unwrap_or_else(|| panic!("no unshare in /usr/bin or /bin to deny the network"));
+        (unshare, vec!["--net", "--map-root-user"])
+    } else {
+        panic!("no network-denying wrapper on this platform: need sandbox-exec or unshare");
+    }
+}
+
+/// The stranger's machine: a `PATH` of one directory holding only `openssl`
+/// and `python3`, and a cleared environment. Nothing from lys is reachable.
+pub(crate) struct Stranger {
+    bin: tempfile::TempDir,
+}
+
+impl Stranger {
+    pub(crate) fn new() -> Self {
+        let bin = tempfile::tempdir().unwrap();
+        let openssl_path = absolute_tool(&openssl());
+        let python_path = absolute_tool(&python());
+        symlink(openssl_path, bin.path().join("openssl")).unwrap();
+        symlink(python_path, bin.path().join("python3")).unwrap();
+        Self { bin }
+    }
+
+    /// The names the stranger's `PATH` directory holds, sorted.
+    pub(crate) fn tools(&self) -> Vec<String> {
+        let mut names: Vec<String> = std::fs::read_dir(self.bin.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// `tool args` in `dir` under the network-denying wrapper, with a cleared
+    /// environment whose `PATH` is the stranger's one directory.
+    pub(crate) fn offline(&self, dir: &Path, tool: &str, args: &[&str]) -> Output {
+        let (wrapper, before) = network_denying_wrapper();
+        let output = Command::new(&wrapper)
+            .args(before)
+            .arg(tool)
+            .args(args)
+            .env_clear()
+            .env("PATH", self.bin.path())
+            .current_dir(dir)
+            .output()
+            .expect("the network-denying wrapper did not start");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            !stderr.contains("sandbox_apply") && !stderr.contains("unshare failed"),
+            "the wrapper {} failed to start: {stderr}",
+            wrapper.display()
+        );
+        output
+    }
+
+    /// `tool args` in `dir` with the same environment and no wrapper.
+    pub(crate) fn online(&self, dir: &Path, tool: &str, args: &[&str]) -> Output {
+        Command::new(self.bin.path().join(tool))
+            .args(args)
+            .env_clear()
+            .env("PATH", self.bin.path())
+            .current_dir(dir)
+            .output()
+            .unwrap()
+    }
+}
+
+/// A copy of the committed `scripts/verify_inclusion.py` in `dir`.
+pub(crate) fn copy_verify_inclusion(dir: &Path) {
+    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/verify_inclusion.py");
+    std::fs::copy(script, dir.join("verify_inclusion.py")).unwrap();
+}
+
+/// The line after which argument parsing lists the flags a run left out.
+const REQUIRED: &str = "the following required arguments were not provided:";
+
+/// The flags argument parsing lists under [`REQUIRED`], up to the next blank
+/// line.
+pub(crate) fn missing_required(output: &Output) -> Vec<String> {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    stderr
+        .lines()
+        .skip_while(|line| !line.contains(REQUIRED))
+        .skip(1)
+        .take_while(|line| !line.trim().is_empty())
+        .map(|line| line.trim().to_string())
+        .collect()
+}
+
+/// Replaces the pinned root in `log_dir`'s `state.json` with 32 zero bytes,
+/// so the log fails its integrity check when it is opened.
+pub(crate) fn zero_pinned_root(log_dir: &Path) {
+    let state_path = log_dir.join("state.json");
+    let bytes = std::fs::read(&state_path).unwrap();
+    let mut state: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    state["root_hash"] = serde_json::Value::String(STANDARD.encode([0_u8; 32]));
+    let text = serde_json::to_vec(&state).unwrap();
+    std::fs::write(&state_path, text).unwrap();
+}
+
+/// The number of files in `log_dir`'s leaves directory.
+pub(crate) fn leaf_files(log_dir: &Path) -> usize {
+    std::fs::read_dir(log_dir.join("leaves")).unwrap().count()
 }
 
 /// `openssl verify -CAfile <issuer> <cert>`, run where both files are.
@@ -215,6 +349,61 @@ impl Bench {
 
     pub(crate) fn issue_into(&self, log_dir: &Path, subject: &str) -> Output {
         run_lys(&self.issue_args(log_dir, subject))
+    }
+
+    /// The arguments of an issuance with the CA key only: `--log` and
+    /// `--leaf-out`, no log key and no artifact. With `request`, the subject
+    /// key comes from that certificate-signing request.
+    pub(crate) fn issuer_only_args(
+        &self,
+        log_dir: &Path,
+        subject: &str,
+        request: Option<&Path>,
+    ) -> Vec<String> {
+        let at = |name: String| path_str(&self.path(&name)).to_string();
+        let mut args: Vec<String> = [
+            "--json",
+            "ca",
+            "issue",
+            "--key",
+            path_str(&self.issuer_key),
+            "--subject",
+            subject,
+            "--validity",
+            "1h",
+            "--out",
+            at(format!("{subject}.pem")).as_str(),
+            "--log",
+            path_str(log_dir),
+            "--leaf-out",
+            at(format!("{subject}.leaf")).as_str(),
+        ]
+        .iter()
+        .map(ToString::to_string)
+        .collect();
+        if let Some(request) = request {
+            args.push("--request".to_string());
+            args.push(path_str(request).to_string());
+        }
+        args
+    }
+
+    /// The log's operator, holding the log's key, makes the inclusion-proof
+    /// artifact of the leaf at `leaf_index` at `out`.
+    pub(crate) fn prove(&self, leaf_index: u64, out: &Path) -> Output {
+        run_lys(&[
+            "log",
+            "prove",
+            "inclusion",
+            "--dir",
+            path_str(&self.log_dir),
+            "--key",
+            path_str(&self.log_key),
+            "--leaf-index",
+            &leaf_index.to_string(),
+            "--out",
+            path_str(out),
+        ])
     }
 
     /// The log's tree size, as `lys log status` reports it.

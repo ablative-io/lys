@@ -238,6 +238,19 @@ pub enum CaCommand {
     /// byte-for-byte as a non-critical X.509 extension under OID
     /// 1.3.6.1.4.1.66364.1 (the lys arc); claims always come from the
     /// authority, never from the request.
+    ///
+    /// Every certificate is entered in the transparency log at --log before
+    /// it is written, as one leaf whose bytes are the certificate's DER and
+    /// nothing else, and the leaf is written at --leaf-out. Only the CA key is
+    /// needed: the log's operator makes the inclusion-proof artifact with
+    /// `lys log prove inclusion --leaf-index <reported leaf index>`. One
+    /// operator holding both keys may give --log-key and --artifact-out
+    /// together to make it in the same run.
+    ///
+    /// --issuer-out writes the issuer certificate stored beside the key, at
+    /// the key file's path with .issuer.pem appended (for issuer.key,
+    /// issuer.key.issuer.pem), building and storing it the first time it is
+    /// asked for; `lys ca issuer-cert` writes the same bytes.
     #[command(group(
         clap::ArgGroup::new("validity_window")
             .required(true)
@@ -285,31 +298,54 @@ pub enum CaCommand {
 
         /// Path to write the issuer's self-signed PEM certificate to
         /// (optional). With it, `openssl verify -CAfile <this> <cert>` checks
-        /// the issued certificate with nothing from lys.
+        /// the issued certificate with nothing from lys. The bytes are those
+        /// of the issuer certificate stored beside the key, at the key file's
+        /// path with .issuer.pem appended, built and stored the first time.
         #[arg(long)]
         issuer_out: Option<PathBuf>,
 
         /// Transparency log directory to enter the certificate in before it is
-        /// written (optional), as one leaf whose bytes are the certificate's
-        /// DER. If the log cannot take it, no certificate is written.
-        #[arg(long, requires_all = ["log_key", "leaf_out", "artifact_out"])]
-        log: Option<PathBuf>,
-
-        /// The log operator's identity key file, which signs the checkpoint
-        /// in the inclusion proof. Only with --log.
-        #[arg(long, requires = "log")]
-        log_key: Option<PathBuf>,
+        /// written, as one leaf whose bytes are the certificate's DER. If the
+        /// log cannot take it, no certificate is written.
+        #[arg(long)]
+        log: PathBuf,
 
         /// Path to write the leaf to: the certificate's DER bytes exactly.
-        /// Only with --log.
-        #[arg(long, requires = "log")]
-        leaf_out: Option<PathBuf>,
+        #[arg(long)]
+        leaf_out: PathBuf,
+
+        /// The log operator's identity key file, which signs the checkpoint
+        /// in the inclusion proof (optional). Only with --artifact-out, for
+        /// one operator holding both the CA key and the log's key.
+        #[arg(long)]
+        log_key: Option<PathBuf>,
 
         /// Path to write the `lys/log-inclusion-proof/v1` artifact to, which
-        /// `lys log verify inclusion` and `scripts/verify_inclusion.py` check.
-        /// Only with --log.
-        #[arg(long, requires = "log")]
+        /// `lys log verify inclusion` and `scripts/verify_inclusion.py` check
+        /// (optional). Only with --log-key.
+        #[arg(long)]
         artifact_out: Option<PathBuf>,
+    },
+
+    /// Write the issuer's self-signed CA certificate as PEM.
+    ///
+    /// The certificate is the one stored beside the key, at the key file's
+    /// path with .issuer.pem appended (for issuer.key, issuer.key.issuer.pem).
+    /// It is built and stored the first time it is asked for, here or by
+    /// `lys ca issue --issuer-out`, and every later call writes the same
+    /// bytes. It is public: it carries the issuer public key and a signature,
+    /// never private key material. With it, `openssl verify -CAfile <this>
+    /// <cert>` checks a certificate the key issued with nothing from lys.
+    IssuerCert {
+        /// Path to the issuing authority's identity key file (raw 32-byte
+        /// Ed25519 seed). Must already exist — run `lys key generate` first.
+        #[arg(long)]
+        key: PathBuf,
+
+        /// Path to write the PEM-encoded issuer certificate to. Refused if it
+        /// already exists.
+        #[arg(long)]
+        out: PathBuf,
     },
 
     /// Verify a PEM certificate against a trusted issuer public key at a

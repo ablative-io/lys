@@ -7,8 +7,8 @@ use lys_core::ca::{
 };
 
 use super::{
-    CLAIMS_JSON, CLAIMS_OID, ca_issue_fixture, der_from_pem, field, hex_lower, path_str, run_lys,
-    stderr_of, stdout_of,
+    CLAIMS_JSON, CLAIMS_OID, ca_issue_fixture, der_from_pem, field, hex_lower, init_test_log,
+    log_leaf_count, path_str, run_lys, stderr_of, stdout_of,
 };
 
 #[test]
@@ -17,10 +17,12 @@ fn ca_issue_writes_pem_certificate_that_lys_core_verifies() {
     let key_path = dir.path().join("issuer.key");
     let claims_path = dir.path().join("claims.json");
     let cert_path = dir.path().join("subject.pem");
+    let leaf_path = dir.path().join("subject.leaf");
 
     let generate = run_lys(&["key", "generate", "--out", path_str(&key_path)]);
     assert_eq!(generate.status.code(), Some(0), "{}", stderr_of(&generate));
     std::fs::write(&claims_path, CLAIMS_JSON).unwrap();
+    let log_dir = init_test_log(dir.path());
 
     let output = run_lys(&[
         "ca",
@@ -35,6 +37,10 @@ fn ca_issue_writes_pem_certificate_that_lys_core_verifies() {
         "1",
         "--out",
         path_str(&cert_path),
+        "--log",
+        path_str(&log_dir),
+        "--leaf-out",
+        path_str(&leaf_path),
     ]);
     assert_eq!(output.status.code(), Some(0), "{}", stderr_of(&output));
     let stdout = stdout_of(&output);
@@ -62,7 +68,7 @@ fn ca_issue_writes_pem_certificate_that_lys_core_verifies() {
 
     // The issuer seed never leaks, and no subject key file is minted — the
     // only files in the directory are the ones this test created plus the
-    // certificate.
+    // certificate and its leaf, and the log holds that one leaf.
     let seed_hex = hex_lower(&std::fs::read(&key_path).unwrap());
     assert!(
         !stdout.contains(&seed_hex),
@@ -79,9 +85,17 @@ fn ca_issue_writes_pem_certificate_that_lys_core_verifies() {
     entries.sort();
     assert_eq!(
         entries,
-        vec!["claims.json", "issuer.key", "subject.pem"],
-        "ca issue must not create extra files (e.g. a subject key)"
+        vec![
+            "claims.json",
+            "issuer.key",
+            "log",
+            "subject.leaf",
+            "subject.pem",
+        ],
+        "ca issue must create exactly the certificate and the leaf (no subject key)"
     );
+    assert_eq!(std::fs::read(&leaf_path).unwrap(), der);
+    assert_eq!(log_leaf_count(&log_dir), 1);
 }
 
 #[test]
@@ -89,6 +103,8 @@ fn ca_issue_with_missing_key_fails_and_writes_nothing() {
     let dir = tempfile::tempdir().unwrap();
     let key_path = dir.path().join("absent.key");
     let cert_path = dir.path().join("subject.pem");
+    let leaf_path = dir.path().join("subject.leaf");
+    let log_dir = init_test_log(dir.path());
 
     let output = run_lys(&[
         "ca",
@@ -101,6 +117,10 @@ fn ca_issue_with_missing_key_fails_and_writes_nothing() {
         "1",
         "--out",
         path_str(&cert_path),
+        "--log",
+        path_str(&log_dir),
+        "--leaf-out",
+        path_str(&leaf_path),
     ]);
     assert_eq!(output.status.code(), Some(1));
     let stderr = stderr_of(&output);
@@ -116,6 +136,8 @@ fn ca_issue_with_missing_key_fails_and_writes_nothing() {
         !key_path.exists(),
         "ca issue must never create a key file as a side effect"
     );
+    assert!(!leaf_path.exists(), "no leaf may be written on failure");
+    assert_eq!(log_leaf_count(&log_dir), 0);
 }
 
 #[test]
@@ -124,10 +146,12 @@ fn ca_issue_rejects_malformed_claims_json_and_writes_nothing() {
     let key_path = dir.path().join("issuer.key");
     let claims_path = dir.path().join("claims.json");
     let cert_path = dir.path().join("subject.pem");
+    let leaf_path = dir.path().join("subject.leaf");
 
     let generate = run_lys(&["key", "generate", "--out", path_str(&key_path)]);
     assert_eq!(generate.status.code(), Some(0), "{}", stderr_of(&generate));
     std::fs::write(&claims_path, b"{ not json ]").unwrap();
+    let log_dir = init_test_log(dir.path());
 
     let output = run_lys(&[
         "ca",
@@ -142,6 +166,10 @@ fn ca_issue_rejects_malformed_claims_json_and_writes_nothing() {
         "1",
         "--out",
         path_str(&cert_path),
+        "--log",
+        path_str(&log_dir),
+        "--leaf-out",
+        path_str(&leaf_path),
     ]);
     assert_eq!(output.status.code(), Some(1));
     let stderr = stderr_of(&output);
@@ -153,6 +181,8 @@ fn ca_issue_rejects_malformed_claims_json_and_writes_nothing() {
         !cert_path.exists(),
         "no certificate may be written on failure"
     );
+    assert!(!leaf_path.exists(), "no leaf may be written on failure");
+    assert_eq!(log_leaf_count(&log_dir), 0);
 }
 
 // ------------------------------------------------------------------ ca verify

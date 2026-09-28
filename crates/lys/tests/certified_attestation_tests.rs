@@ -60,6 +60,17 @@ impl Fixture {
             b"{\"capabilities\":[\"release:publish\"]}",
         )
         .unwrap();
+        // Every issuance is entered in a log: a test log, in this test's own
+        // temporary directory.
+        json_ok(&[
+            "--json",
+            "log",
+            "init",
+            "--dir",
+            &path("log"),
+            "--origin",
+            "example.com/lys/issuance",
+        ]);
         Self {
             dir: dir.to_path_buf(),
             ca_public_key,
@@ -109,6 +120,10 @@ impl Fixture {
             "1",
             "--out",
             &self.path(cert),
+            "--log",
+            &self.path("log"),
+            "--leaf-out",
+            &self.path(&format!("{cert}.leaf")),
         ]);
     }
 
@@ -194,6 +209,10 @@ fn a_generated_key_certificate_can_never_satisfy_the_join() {
         "1",
         "--out",
         &fixture.path("generated.pem"),
+        "--log",
+        &fixture.path("log"),
+        "--leaf-out",
+        &fixture.path("generated.pem.leaf"),
     ]);
 
     // Each half is individually valid — prove that, so the failure below is

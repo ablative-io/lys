@@ -1,6 +1,6 @@
 //! `lys ca issue --log`: every certificate is entered in a transparency log
-//! before it is written, and a stranger checks both the certificate and its
-//! entry with standard tools and nothing from lys.
+//! before it is written, holding only the CA key, and a stranger checks both
+//! the certificate and its entry with standard tools and nothing from lys.
 //!
 //! The stranger's tools are `openssl verify` for the certificate and the
 //! committed `scripts/verify_inclusion.py`, which walks RFC 6962 by itself,
@@ -9,6 +9,10 @@
 
 #![cfg(test)]
 
+#[path = "ca_log/issuer_cert.rs"]
+mod issuer_cert;
+#[path = "ca_log/issuer_only.rs"]
+mod issuer_only;
 #[path = "ca_log/outputs.rs"]
 mod outputs;
 #[path = "ca_log/support.rs"]
@@ -17,7 +21,8 @@ mod support;
 mod tamper;
 
 use support::{
-    Bench, assert_success, openssl_verify, path_str, pem_to_der, report, run_lys, verify_inclusion,
+    Bench, assert_success, missing_required, openssl_verify, path_str, pem_to_der, report, run_lys,
+    said, verify_inclusion,
 };
 
 #[test]
@@ -200,21 +205,50 @@ fn a_log_that_cannot_take_the_entry_stops_the_issuance_and_writes_no_certificate
 #[test]
 fn the_log_flags_come_together_or_not_at_all() {
     let bench = Bench::new();
-    let partial = run_lys(&[
-        "ca",
-        "issue",
-        "--key",
-        path_str(&bench.issuer_key),
-        "--subject",
-        "agent-partial",
-        "--validity",
-        "1h",
-        "--out",
-        path_str(&bench.path("agent-partial.pem")),
-        "--log",
-        path_str(&bench.log_dir),
+    let certificate = bench.path("agent-partial.pem");
+    let partial = |extra: &[&str]| {
+        let mut args = vec![
+            "ca",
+            "issue",
+            "--key",
+            path_str(&bench.issuer_key),
+            "--subject",
+            "agent-partial",
+            "--validity",
+            "1h",
+            "--out",
+            path_str(&certificate),
+            "--log",
+            path_str(&bench.log_dir),
+        ];
+        args.extend_from_slice(extra);
+        run_lys(&args)
+    };
+
+    // --log alone: argument parsing refuses the missing --leaf-out.
+    let no_leaf = partial(&[]);
+    assert_eq!(no_leaf.status.code(), Some(2), "{}", said(&no_leaf));
+    let missing = missing_required(&no_leaf);
+    let named = |flag: &str| missing.iter().any(|line| line.starts_with(flag));
+    assert!(named("--leaf-out"), "{missing:?}");
+    assert!(!named("--log "), "{missing:?}");
+    assert!(!certificate.exists());
+    assert_eq!(bench.log_size(), 0);
+
+    // --log-key without --artifact-out: refused by name, nothing appended.
+    let leaf = bench.path("agent-partial.leaf");
+    let half = partial(&[
+        "--leaf-out",
+        path_str(&leaf),
+        "--log-key",
+        path_str(&bench.log_key),
     ]);
-    assert_ne!(partial.status.code(), Some(0));
-    assert!(!bench.path("agent-partial.pem").exists());
+    assert_eq!(half.status.code(), Some(1), "{}", said(&half));
+    let expected = "--log-key and --artifact-out come together or not at all: \
+                    missing --artifact-out";
+    let stderr = String::from_utf8_lossy(&half.stderr);
+    assert!(stderr.contains(expected), "{stderr}");
+    assert!(!certificate.exists());
+    assert!(!leaf.exists());
     assert_eq!(bench.log_size(), 0);
 }
