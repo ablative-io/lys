@@ -212,8 +212,17 @@ export function scopeWords(scope: string): string {
   return scope;
 }
 
-const scopeKindOf = (value: string): ScopeKind => (value === 'team' || value === 'organisation' ? value : 'personal');
-const recipientsOf = (value: string): Recipients => (value === 'anyone' ? 'anyone' : 'people_only');
+const SCOPE_KINDS: readonly ScopeKind[] = ['personal', 'team', 'organisation'];
+const RECIPIENTS: readonly Recipients[] = ['anyone', 'people_only'];
+
+/** The option the select offered; a value it never offered is a defect, never a default. */
+function offered<T extends string>(options: readonly T[], value: string): T {
+  const found = options.find((option) => option === value);
+  if (found === undefined) throw new Error(`the form offered no option ${JSON.stringify(value)}`);
+  return found;
+}
+const scopeKindOf = (value: string): ScopeKind => offered(SCOPE_KINDS, value);
+const recipientsOf = (value: string): Recipients => offered(RECIPIENTS, value);
 
 const OWNER_NOTE = 'Only the secret\'s owner can change this. Anyone else is refused.';
 
