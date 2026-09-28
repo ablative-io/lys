@@ -33,7 +33,7 @@ pub const DOMAIN: &str = "lys/identity/runner-acts-state/v1";
 const FORMAT: &str = "lys-runner-acts-state/v1";
 
 /// Text an act carried, as it is kept: its length and digest, never itself.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Digested {
     /// Its length in bytes.
@@ -53,7 +53,7 @@ impl Digested {
 }
 
 /// One act, as it is kept.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RunnerAct {
     /// The act: `start`, `input`, `keys`, `read`, `wait`, `resize`,
@@ -80,7 +80,7 @@ pub struct RunnerAct {
 }
 
 /// A kept act and where the log holds it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
 pub struct ActReceipt {
     /// The leaf's index in the acts' log.
     pub index: u64,

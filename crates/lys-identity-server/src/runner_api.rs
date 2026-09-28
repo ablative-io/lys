@@ -44,23 +44,24 @@ use crate::runner_sessions::{Driven, driven, ended_in, keep_act, kind, operator,
 use crate::runtime_api::with_runtime;
 use crate::session::now;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct InputBody {
+pub(crate) struct InputBody {
     text: String,
     #[serde(default)]
     enter: bool,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct KeysBody {
+pub(crate) struct KeysBody {
+    #[schema(value_type = Vec<String>)]
     keys: Vec<Key>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct ReadBody {
+pub(crate) struct ReadBody {
     #[serde(default)]
     cursor: Option<u64>,
     #[serde(default)]
@@ -71,9 +72,9 @@ struct ReadBody {
     follow: bool,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct WaitBody {
+pub(crate) struct WaitBody {
     pattern: String,
     #[serde(default)]
     regex: bool,
@@ -81,26 +82,26 @@ struct WaitBody {
     cursor: Option<u64>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct ResizeBody {
+pub(crate) struct ResizeBody {
     columns: u16,
     rows: u16,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct Empty {}
+pub(crate) struct Empty {}
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct WakeBody {
+pub(crate) struct WakeBody {
     message: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct RunnerBody {
+pub(crate) struct RunnerBody {
     runner: Option<RunnerRecord>,
 }
 
