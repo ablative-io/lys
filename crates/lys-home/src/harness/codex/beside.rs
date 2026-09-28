@@ -16,12 +16,11 @@
 //! unlabelled branch, listed and never carried.
 //!
 //! A child forked at a user message ends with the carried message's text,
-//! read through `carried_by`, the reading the Claude Code render's `seed_of`
-//! uses, as one user
-//! message after the whole walked history. The carried entry that seed is
-//! read from also lists each part of the carried message that is not text,
-//! so the parent session's file, the one file read beyond the session's, is
-//! opened once.
+//! read through the same `seed_of` the Claude Code render uses, as one user
+//! message after the whole walked history. `seed_of` keeps only the text
+//! parts, so the parent session's file, the one file read beyond the
+//! session's, is opened once more through its reader to list each part of
+//! the carried message that is not text.
 
 use std::borrow::Cow;
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -29,15 +28,18 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use serde_json::Value;
 
 use crate::error::HomeError;
-use crate::harness::claude_code::seed::carried_by;
+use crate::harness::claude_code::seed::{seed_of, sessions_dir_of};
 use crate::harness::codex::account::{Rows, part_hash};
 use crate::harness::codex::parts::{
     EMPTY_THINKING, NO_ARGUMENTS, NO_RESULT_ID, NO_ROLE_ITEM, NO_TEXT, REDACTED, Thinking, call_of,
     kind_of, named, not_carried, role_of, thinking_of,
 };
 use crate::harness::codex::rollout::{Lines, NOT_CONVERSATION, entry_kind, text_only};
-use crate::record::Session;
 use crate::record::entries::{CUSTOM_FORKED_FROM, Entry, EntryBody};
+use crate::record::fork::ForkedFrom;
+use crate::record::lantern::data_of;
+use crate::record::reader::SessionReader;
+use crate::record::{Session, safe_component};
 
 /// Why an off-path compaction, branch summary or custom message is lost.
 pub const OFF_PATH: &str = "off the context path: not carried";
@@ -230,7 +232,8 @@ impl Beside {
 
     /// A forked child's carried message as the thread's last user prompt,
     /// with its changed row and a lost row for each part of it that is not
-    /// text. The parent session's file is opened once, by [`carried_by`].
+    /// text. The text is read through [`seed_of`]; the parent session's file
+    /// is then opened once more for the carried entry's other parts.
     pub(crate) fn carried_prompt(
         &self,
         session: &Session,
@@ -244,9 +247,10 @@ impl Beside {
         else {
             return Ok(());
         };
-        let Some((seed, carried)) = carried_by(session, forked)? else {
+        let Some(seed) = seed_of(session, std::slice::from_ref(forked))? else {
             return Ok(());
         };
+        let carried = carried_entry(session, forked)?;
         lines.message(&forked.base.timestamp, "user", &seed.text)?;
         let EntryBody::Message { message } = &carried.body else {
             return Ok(());
@@ -270,6 +274,27 @@ impl Beside {
         }
         Ok(())
     }
+}
+
+/// The carried entry a `lys.forked_from` entry names, as the parent session's
+/// file holds it, read once more through the parent's reader after
+/// [`seed_of`] has read its text; `seed_of` has already refused a record
+/// whose `coordinate_carried` and `carried` disagree, so a missing `carried`
+/// here is refused by the same name.
+fn carried_entry(session: &Session, forked: &Entry) -> Result<Entry, HomeError> {
+    let data: ForkedFrom = data_of(&session.header().id, forked, CUSTOM_FORKED_FROM)?;
+    let Some(carried) = data.carried else {
+        return Err(HomeError::EntryShape {
+            session: session.header().id.clone(),
+            id: forked.id().to_owned(),
+            custom_type: CUSTOM_FORKED_FROM.to_owned(),
+            source: None,
+        });
+    };
+    safe_component("session id", &data.parent_session)?;
+    let sessions = sessions_dir_of(session.file())?;
+    SessionReader::open(sessions.join(format!("{}.jsonl", data.parent_session)))?
+        .entry(&carried)
 }
 
 /// The positions from the head back to the root, root first, as the index's

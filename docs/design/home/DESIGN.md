@@ -326,22 +326,22 @@ The given statement (HOME-018, ADR-072). CONFORMANCE row 6.5 asks for three sign
 | `crates/lys-home/tests/fork.rs` | the fork run as the binary: five forks and five refusals, blocks unchanged, both ancestry sides | HOME-006 |
 | `docs/design/home/PROOF-FORK.md` | the measured fork: Pi's parentSession read, a real session forked, rendered and launched, as hashes, counts and exit codes | HOME-006 |
 | `crates/lys-home/Cargo.toml` | the crate manifest; gains the passthrough example, and jiff for the Codex rollout path's local time | HOME-001 |
-| `docs/design/home/briefs/HOME-004.json` | the fourth brief: the first translation, Claude Code to Codex 0.156.0, with its loss account | HOME-004 |
-| `docs/design/home/PROOF-TRANSLATE.md` | the measured resume of a translated rollout by Codex 0.156.0 in an isolated Codex home: version, hashes, counts and paths only | HOME-004 |
-| `crates/lys-home/src/harness/codex/mod.rs` | the Codex profile: the measured 0.156.0 rollout shape and its constants (version, model provider, originator, source, history mode, id prefixes, image detail, content item kinds); declarations only | HOME-004 |
-| `crates/lys-home/src/harness/codex/rollout.rs` | the context path mapped to Codex 0.156.0 lines: session_meta, then text, function call and output whole, readable thinking as text, a compaction as a marked user message, the marker last | HOME-004 |
-| `crates/lys-home/src/harness/codex/rollout_tests.rs` | gates on the item mapping: whole, ordered, deterministic, opaque dropped, base64 images carried and other images lost | HOME-004 |
-| `crates/lys-home/src/harness/codex/loss.rs` | the loss account: kept, changed and lost by entry id, part index and the importer's block hash, and every entry off the context path | HOME-004 |
-| `crates/lys-home/src/harness/codex/loss_tests.rs` | gates on the account: every hash found in the block store, every entry and part once | HOME-004 |
-| `crates/lys-home/src/harness/codex/translate.rs` | render-codex's work: version check, existing path refused, both files written, the codex_translation side leaf | HOME-004 |
-| `crates/lys-home/src/harness/codex/translate_tests.rs` | gates on the refusals writing nothing, and the side leaf leaving the head | HOME-004 |
-| `crates/lys-home/src/cli/codex.rs` | the render-codex subcommand, split out of cli.rs | HOME-004 |
-| `Cargo.toml` | the workspace manifest; gains jiff, the pure-Rust time-zone database the Codex rollout path is dated with | HOME-004 |
-| `Cargo.lock` | the workspace lockfile; gains jiff | HOME-004 |
-| `crates/lys-home/tests/codex_translation.rs` | end to end: fixture Claude Code file imported and translated, matched to the recorded rollout, the account, the Claude Code render unchanged | HOME-004 |
-| `crates/lys-home/tests/fixtures/codex/claude-code.jsonl` | the fixture Claude Code file, synthetic, in the measured part shapes, carrying the recorded rollout's conversation | HOME-004 |
-| `crates/lys-home/tests/fixtures/codex/claude-code-losses.jsonl` | the second fixture Claude Code file, synthetic: thinking, redacted thinking, long tool input and result, images, a sidechain, harness events, meta and authored records | HOME-004 |
-| `crates/lys-home/tests/fixtures/codex/rollout-0.156.0.jsonl` | the fixture rollout recorded from Codex 0.156.0 itself, synthetic | HOME-004 |
+| `docs/design/home/briefs/HOME-033.json` | the first draft of the Codex translation brief, written as HOME-004 and renumbered; HOME-009 is the translation that landed | HOME-033 |
+| `docs/design/home/PROOF-TRANSLATE.md` | the measured resume of a translated rollout by Codex 0.156.0 in an isolated Codex home: version, hashes, counts and paths only | HOME-033 |
+| `crates/lys-home/src/harness/codex/mod.rs` | the Codex profile: the measured 0.156.0 rollout shape and its constants (version, model provider, originator, source, history mode, id prefixes, image detail, content item kinds); declarations only | HOME-033 |
+| `crates/lys-home/src/harness/codex/rollout.rs` | the context path mapped to Codex 0.156.0 lines: session_meta, then text, function call and output whole, readable thinking as text, a compaction as a marked user message, the marker last | HOME-033 |
+| `crates/lys-home/src/harness/codex/rollout_tests.rs` | gates on the item mapping: whole, ordered, deterministic, opaque dropped, base64 images carried and other images lost | HOME-033 |
+| `crates/lys-home/src/harness/codex/loss.rs` | the loss account: kept, changed and lost by entry id, part index and the importer's block hash, and every entry off the context path | HOME-033 |
+| `crates/lys-home/src/harness/codex/loss_tests.rs` | gates on the account: every hash found in the block store, every entry and part once | HOME-033 |
+| `crates/lys-home/src/harness/codex/translate.rs` | render-codex's work: version check, existing path refused, both files written, the codex_translation side leaf | HOME-033 |
+| `crates/lys-home/src/harness/codex/translate_tests.rs` | gates on the refusals writing nothing, and the side leaf leaving the head | HOME-033 |
+| `crates/lys-home/src/cli/codex.rs` | the render-codex subcommand, split out of cli.rs | HOME-033 |
+| `Cargo.toml` | the workspace manifest; gains jiff, the pure-Rust time-zone database the Codex rollout path is dated with | HOME-033 |
+| `Cargo.lock` | the workspace lockfile; gains jiff | HOME-033 |
+| `crates/lys-home/tests/codex_translation.rs` | end to end: fixture Claude Code file imported and translated, matched to the recorded rollout, the account, the Claude Code render unchanged | HOME-033 |
+| `crates/lys-home/tests/fixtures/codex/claude-code.jsonl` | the fixture Claude Code file, synthetic, in the measured part shapes, carrying the recorded rollout's conversation | HOME-033 |
+| `crates/lys-home/tests/fixtures/codex/claude-code-losses.jsonl` | the second fixture Claude Code file, synthetic: thinking, redacted thinking, long tool input and result, images, a sidechain, harness events, meta and authored records | HOME-033 |
+| `crates/lys-home/tests/fixtures/codex/rollout-0.156.0.jsonl` | the fixture rollout recorded from Codex 0.156.0 itself, synthetic | HOME-033 |
 | `docs/design/home/design.json` | the cluster design, rendered to DESIGN.md, CHECKLIST.md and USER-STORIES.md by the design gate |  |
 | `docs/design/home/briefs/HOME-008.json` | the rendered-uuid contract: the rule and its vector in RECORD.md pinned by a test, the launch card amended, ADR-016 decided | HOME-008 |
 | `docs/design/home/briefs/HOME-008.md` | its rendered markdown | HOME-008 |
