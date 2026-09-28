@@ -1,10 +1,14 @@
 #![cfg(test)]
 
 //! An upgrade on a scratch root: build A installed and running as two stub
-//! binaries, upgraded to build B (see the scratch fixture).
+//! binaries, upgraded to build B (see the scratch fixture). The first two
+//! tests are the round's proof (R4): each holds every check its rows name,
+//! runs with no container runtime, no listener on the live port and no live
+//! state directory, and removes its temporary install when it ends.
 
 use super::scratch::{
-    A, B, Behaviour, Fixed, Recorder, Scratch, TestResult, build, package, ready_lines, stub,
+    A, B, Behaviour, Fixed, NEW_KEY, NEW_VALUE, Recorder, Scratch, TestResult, build, package,
+    ready_lines, recorded_as, state, stub,
 };
 use super::{Parts, upgrade, version};
 use crate::identity::error::ErrorKind;
@@ -14,23 +18,66 @@ use crate::identity::install::layout::{BINARIES, Layout};
 fn an_upgrade_runs_the_new_build_and_keeps_the_previous() -> TestResult {
     let scratch = Scratch::new()?;
     assert_eq!(scratch.running()?, ready_lines(A));
+    assert_eq!(scratch.recorded()?, recorded_as(A));
+    let a_files = scratch.configuration()?;
+    assert_eq!(
+        a_files.len(),
+        3,
+        "compose.yaml, compose.env and identity.json"
+    );
     let new = scratch.work().join("b");
     build(&new, B, Behaviour::Serves)?;
     let screens = scratch.work().join("screens-b");
     package(&screens, B)?;
     let mut said = Vec::new();
-    let record = scratch.upgrade(&new, Some(&screens), &mut Recorder::default(), &mut said)?;
+    let mut engine = Recorder::default();
+    let record = scratch.upgrade(&new, Some(&screens), &mut engine, &mut said)?;
     assert_eq!(scratch.running()?, ready_lines(B));
+
+    assert_eq!(
+        scratch.recorded()?,
+        recorded_as(B),
+        "the recorded build names B for every binary"
+    );
+    assert_eq!(record.binaries, recorded_as(B));
+
     for name in BINARIES {
-        assert_eq!(version(&scratch.layout.binary(name), name)?, B);
+        assert_eq!(
+            version(&scratch.layout.binary(name), name)?,
+            B,
+            "{name} --version names B"
+        );
         let kept = scratch.layout.bin_previous_dir().join(name);
         assert_eq!(version(&kept, name)?, A);
         assert!(
             said.contains(&format!("{name}: installed {A}, new {B}")),
             "{said:?}"
         );
-        assert_eq!(record.binaries.get(name).map(String::as_str), Some(B));
     }
+
+    let service_log = std::fs::read_to_string(&scratch.units[1].log)?;
+    let started_with = service_log
+        .lines()
+        .rev()
+        .find_map(|line| line.strip_prefix("configured: "))
+        .filter(|configured| configured.contains(B))
+        .ok_or("B's service never said the configuration it started with")?;
+    assert!(
+        started_with.contains(NEW_KEY),
+        "the service started with B's new key: {started_with}"
+    );
+
+    let environment = std::fs::read_to_string(state(&scratch.layout).join("compose.env"))?;
+    assert!(environment.contains(NEW_VALUE), "{environment}");
+    assert_eq!(engine.applied.len(), 1, "compose applied once, with B's");
+    assert!(engine.applied[0].contains(NEW_VALUE));
+
+    assert_eq!(
+        scratch.kept_configuration()?,
+        a_files,
+        "config.previous/ holds each of A's files, byte for byte"
+    );
+
     assert_eq!(
         record.surface.map(|screens| screens.commit).as_deref(),
         Some(B)
@@ -40,27 +87,33 @@ fn an_upgrade_runs_the_new_build_and_keeps_the_previous() -> TestResult {
         std::fs::read_to_string(previous)?,
         format!("<html>{A}</html>")
     );
-    let written: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(scratch.layout.build_record())?)?;
-    assert_eq!(written["binaries"]["lys-identity-server"], B);
-    assert_eq!(written["surface"]["commit"], B);
     assert!(
         !scratch.layout.upgrade_intent().exists(),
         "a finished upgrade leaves no intent record"
     );
+    let temporary = scratch.dir.path().to_path_buf();
+    drop(scratch);
+    assert!(!temporary.exists(), "the scratch install is removed");
     Ok(())
 }
 
 #[test]
 fn a_service_that_exits_before_ready_puts_the_previous_build_back() -> TestResult {
     let scratch = Scratch::new()?;
+    let a_files = scratch.configuration()?;
+    assert_eq!(
+        a_files.len(),
+        3,
+        "compose.yaml, compose.env and identity.json"
+    );
     let new = scratch.work().join("b");
     build(&new, B, Behaviour::ExitsEarly)?;
     let screens = scratch.work().join("screens-b");
     package(&screens, B)?;
     let mut said = Vec::new();
+    let mut engine = Recorder::default();
     let refused = scratch
-        .upgrade(&new, Some(&screens), &mut Recorder::default(), &mut said)
+        .upgrade(&new, Some(&screens), &mut engine, &mut said)
         .err()
         .ok_or("a service that exited was taken as ready")?;
     assert_eq!(refused.kind(), ErrorKind::UpgradeFailed);
@@ -77,18 +130,40 @@ fn a_service_that_exits_before_ready_puts_the_previous_build_back() -> TestResul
         message.contains("the previous build is back and running"),
         "{message}"
     );
-    assert_eq!(scratch.running()?, ready_lines(A));
     let service_log = std::fs::read_to_string(&scratch.units[1].log)?;
-    assert!(service_log.contains(&format!("lys-identity-server {B} failing")));
+    assert!(
+        service_log.contains(&format!("lys-identity-server {B} failing")),
+        "B was started and failed"
+    );
+    assert_eq!(
+        engine.applied.len(),
+        2,
+        "B's compose applied, then A's again"
+    );
+
+    assert_eq!(scratch.running()?, ready_lines(A), "A is running again");
     for name in BINARIES {
         assert_eq!(version(&scratch.layout.binary(name), name)?, A);
     }
+
+    assert_eq!(
+        scratch.recorded()?,
+        recorded_as(A),
+        "the recorded build names A for every binary"
+    );
+
+    assert_eq!(
+        scratch.configuration()?,
+        a_files,
+        "A's configuration and compose files are back, byte for byte"
+    );
+
     let index = scratch.layout.surface_dir().join("index.html");
     assert_eq!(std::fs::read_to_string(index)?, format!("<html>{A}</html>"));
-    let written: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(scratch.layout.build_record())?)?;
-    assert_eq!(written["binaries"]["lys-identity-server"], A);
     assert!(!scratch.layout.upgrade_intent().exists());
+    let temporary = scratch.dir.path().to_path_buf();
+    drop(scratch);
+    assert!(!temporary.exists(), "the scratch install is removed");
     Ok(())
 }
 

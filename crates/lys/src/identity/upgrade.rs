@@ -6,25 +6,29 @@
 //! An upgrade first ends any upgrade stopped part-way ([`swap::recover`]).
 //! It then reads every binary's `--version`, the new and the installed (an
 //! install made before builds were named is adopted, [`adopt`]), and renders
-//! the new build's configuration and compose files ([`render`]), before it
-//! stops anything; it refuses by name when the root holds no install, when
-//! the folder lacks a binary, or when a new binary's version cannot be read.
-//! It writes its intent record ([`intent`]) and swaps the build in, each
-//! step recorded as it completes ([`swap`]): the service and the broker
-//! stopped, each waited on for its exit; `bin/` kept in `bin.previous/` and
-//! the new binaries placed; the files kept in `config.previous/` and the
-//! new ones placed; the screens kept in `surface.previous/` and the new ones
-//! placed; the compose services brought to a changed definition; and the
-//! broker and then the service started, each waited on for ready.
+//! the new build's four configuration and compose files ([`render`]):
+//! `deploy/compose.yaml`, `deploy/postgres-init.sql`, `compose.env` in the
+//! state directory and the directory service's `identity.json`. It does so
+//! before it stops anything; it refuses by name when the root holds no
+//! install, when the folder lacks a binary, or when a new binary's version
+//! cannot be read. It writes its intent record ([`intent`]) and swaps the
+//! build in, each step recorded as it completes ([`swap`]): the service and
+//! the broker stopped, each waited on for its exit; `bin/` kept in
+//! `bin.previous/` and the new binaries placed; those four files kept in
+//! `config.previous/` and the new ones placed; the screens kept in
+//! `surface.previous/` and the new ones placed; the compose services
+//! brought to a changed definition; and the broker and then the service
+//! started, each waited on for ready.
 //!
 //! Invariants: nothing is stopped until every input has been read, checked
 //! and rendered. When a step, a start or a readiness fails, what was started
 //! is stopped, the previous binaries, files and screens are put back and
 //! started and waited on for ready, and the upgrade fails naming the binary
-//! and its log. An upgrade writes only `bin/`, `bin.previous/`, the
-//! configuration and compose files, `config.previous/`, the screens, the
-//! logs, the process files and `install/`: never `data/`, a credential or
-//! `deployment.toml`.
+//! and its log. An upgrade writes only `bin/`, `bin.previous/`, those four
+//! rendered files, `config.previous/`, the screens, the logs, the process
+//! files and `install/`: never `data/`, a credential file or
+//! `deployment.toml`. `compose.env` carries the credentials as they are
+//! stored; it is rendered from them and is not itself a credential file.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

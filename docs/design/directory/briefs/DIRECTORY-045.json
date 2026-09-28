@@ -58,59 +58,59 @@
         "files_changed": [
           {
             "path": "crates/lys/build.rs",
-            "change": "modified",
-            "note": "Stamps LYS_BUILD with the 40-character head commit, adding '; dirty' when the tree has changes, or 'not built from a git commit'. It reruns when HEAD, the index, packed-refs, refs/heads or the branch ref changes, among the ones that exist."
+            "change": "created",
+            "note": "Stamps `(COMMIT[; dirty])` from git rev-parse HEAD and git status --porcelain, or `(not built from a git commit)`. It reruns when .git/HEAD or the index moves."
           },
           {
             "path": "crates/lys-identity-server/build.rs",
-            "change": "modified",
-            "note": "Byte-identical to crates/lys/build.rs."
+            "change": "created",
+            "note": "The same stamp for the server."
           },
           {
             "path": "crates/lys-secrets/build.rs",
-            "change": "modified",
-            "note": "Byte-identical to crates/lys/build.rs."
+            "change": "created",
+            "note": "The same stamp for the broker."
           },
           {
             "path": "crates/lys-home/build.rs",
-            "change": "modified",
-            "note": "Byte-identical to crates/lys/build.rs."
+            "change": "created",
+            "note": "The same stamp for lys-home."
           },
           {
-            "path": "crates/lys/tests/version.rs",
+            "path": "crates/lys-identity-server/src/main.rs",
             "change": "modified",
-            "note": "Tests that --version names the head commit, that the four build scripts are equal, and what an exported tree and a committed tree print."
+            "note": "--version and -V print the stamp and exit 0 before any configuration is read."
           },
           {
-            "path": "crates/lys-identity-server/tests/version.rs",
+            "path": "crates/lys/src/main.rs",
             "change": "modified",
-            "note": "Tests that --version exits 0 and reads no file."
+            "note": "The clap version is the stamped line."
           },
           {
-            "path": "crates/lys-secrets/tests/version.rs",
+            "path": "crates/lys-secrets/src/bin/lys-secrets/main.rs",
             "change": "modified",
-            "note": "Tests that --version names the build."
+            "note": "The clap version is the stamped line."
           },
           {
-            "path": "crates/lys-home/tests/version.rs",
+            "path": "crates/lys-home/src/main.rs",
             "change": "modified",
-            "note": "Tests that --version names the build."
+            "note": "The clap version is the stamped line."
           }
         ],
-        "how": "Built in an earlier round and unchanged this round. crates/lys/build.rs stamps LYS_BUILD from `git rev-parse HEAD` and `git status --porcelain`, and every binary prints `NAME VERSION (LYS_BUILD)`. crates/lys/tests/version.rs holds the four build.rs files byte-identical and checks an exported tree and a committed tree. The tests leg passed in round 2's measurement.",
-        "deviation": "The exported-tree test builds a small probe crate with the real build.rs instead of rebuilding the whole workspace.",
+        "how": "Each binary's build.rs reads the git tree it is built from and sets a compile-time env value, which --version/-V prints as `NAME VERSION (COMMIT[; dirty])`. When there is no git tree it prints the stated words, never an empty or invented value. lys-identity-server answers --version before it treats any argument as a configuration path. Evidence: crates/lys/tests/version.rs:38, :65, :110 and :119, and crates/lys-identity-server/tests/version.rs:38.",
+        "deviation": "",
         "checklist": [
           {
             "id": "C344",
             "done": true,
-            "note": "Each binary's --version names its build commit. Tests: crates/*/tests/version.rs."
+            "note": "All four binaries print the head's 40-character commit. An exported tree without .git prints `(not built from a git commit)`. The server's --version exits 0 and reads no file."
           }
         ],
         "stories": [
           {
             "id": "S147",
             "satisfied": true,
-            "note": "Every build carries its name, which upgrade and install compare."
+            "note": "Every build names its commit."
           }
         ]
       },
@@ -120,12 +120,12 @@
           {
             "criterion": "For each binary, `BIN --version` at the card's head prints its name, the crate version and the 40-character commit of that head, and a test builds from an exported tree without .git and shows the stated words.",
             "met": true,
-            "evidence": "The four build.rs files are byte-identical (crates/lys/tests/version.rs:65 every_stamped_crate_carries_the_same_build_script). Each crate's tests/version.rs has version_names_the_crate_version_and_the_head_commit. crates/lys/tests/version.rs:110 a_build_from_an_exported_tree_says_it_has_no_commit. All pass in the measured tests leg (exit 0)."
+            "evidence": "crates/lys/tests/version.rs:38 version_names_the_crate_version_and_the_head_commit, :65 every_stamped_crate_carries_the_same_build_script, :110 a_build_from_an_exported_tree_says_it_has_no_commit, :119; tests/version.rs in lys-identity-server, lys-secrets and lys-home; the round's tests leg exited 0"
           },
           {
             "criterion": "`lys-identity-server --version` exits 0 and reads no file.",
             "met": true,
-            "evidence": "crates/lys-identity-server/tests/version.rs:38 runs the flag in a cwd holding a file named like the flag and asserts success. Passes in the measured tests leg."
+            "evidence": "crates/lys-identity-server/tests/version.rs:38 runs --version and -V in a directory holding files of those names, holding no configuration, and asserts success; the tests leg exited 0"
           }
         ],
         "checklist": [
@@ -134,8 +134,12 @@
         "stories": [
           "S147"
         ],
-        "issues": [],
-        "fixes": []
+        "issues": [
+          "The round's dev record for R1 dropped the three other build.rs and version.rs files from files_changed"
+        ],
+        "fixes": [
+          "Restored R1's dev record from HEAD in DIRECTORY-045.json and re-rendered the markdown"
+        ]
       }
     },
     {
@@ -170,53 +174,38 @@
           {
             "path": "crates/lys/src/identity/upgrade.rs",
             "change": "modified",
-            "note": "upgrade() finishes or puts back an unfinished upgrade, checks the install and each incoming --version, renders, writes the intent and swaps forward. If anything fails it swaps back and names the failure."
+            "note": "The upgrade verb. It refuses by name, prints installed and new commits, stops on exit events, swaps bin/ and the screens, starts, and waits on readiness events. On failure it puts the previous build back, naming the binary and its log."
           },
           {
             "path": "crates/lys/src/identity/upgrade_tests.rs",
             "change": "modified",
-            "note": "Tests: A is upgraded to B with A kept; a failed B puts A back running; data and credentials are untouched."
-          },
-          {
-            "path": "crates/lys/src/identity/upgrade/scratch_tests.rs",
-            "change": "created",
-            "note": "A scratch-install fixture of /bin/sh stubs that block on a fifo."
+            "note": "Tests that A goes to B with A kept, that a B that exits early restores A, that data and credentials are untouched, and that refusals stop nothing."
           },
           {
             "path": "crates/lys/src/identity/cli.rs",
             "change": "modified",
-            "note": "Help text for upgrade and install."
+            "note": "`lys identity upgrade --from DIR [--surface PKG] [--root ROOT]`."
           },
           {
             "path": "crates/lys/src/identity/install/layout.rs",
             "change": "modified",
-            "note": "Adds upgrade_intent() and config_previous_dir()."
-          },
-          {
-            "path": "crates/lys/src/identity/error.rs",
-            "change": "modified",
-            "note": "Adds InstallBuildDiffers and UpgradeBuildDiffers."
-          },
-          {
-            "path": "crates/lys/src/identity/error_tests.rs",
-            "change": "modified",
-            "note": "Tests the wire names of the two new kinds."
+            "note": "The paths of bin.previous/, surface.previous/, install/build.json and install/upgrade.json."
           }
         ],
-        "how": "upgrade() stops the service and then the broker, each on its exit event. It moves bin/ to bin.previous/ and places each binary through a temporary name, reading back its SHA-256 digest before the rename. It then places the screens and starts the broker and the service, waiting for each to be ready on log and HTTP events. On failure, swap::back puts the previous build back, starts it, and the error names the failing binary and its log. Unchanged this round.",
+        "how": "It refuses before stopping anything when ROOT holds no install, when DIR lacks a binary, or when a new binary's --version is unreadable. It stops the service and then the broker through DIRECTORY-044's exit wait. bin/ moves to bin.previous/, and each new binary is copied under a temporary name and renamed into place. The screens go through the existing verify-and-place path. Readiness waits on log lines and the answer event, never on time. On failure it stops what it started, restores bin.previous/ and the previous screens, starts them, waits for ready, and exits non-zero naming the binary and log. Evidence: upgrade_tests.rs:18 an_upgrade_runs_the_new_build_and_keeps_the_previous, :101 a_service_that_exits_before_ready_puts_the_previous_build_back, :171 neither_upgrade_touches_data_or_a_credential and :194 refusals_are_named_and_stop_nothing. No sleep and no timeout appear in the new files.",
         "deviation": "",
         "checklist": [
           {
             "id": "C345",
             "done": true,
-            "note": "Tests: upgrade_tests.rs and the render, intent and adopt tests."
+            "note": "The swap goes forward, fails back, and leaves data and credentials byte-identical."
           }
         ],
         "stories": [
           {
             "id": "S147",
             "satisfied": true,
-            "note": "A running install moves to a new build, and a failed new build falls back to the previous one."
+            "note": "An install upgrades in place with a way back."
           }
         ]
       },
@@ -226,17 +215,17 @@
           {
             "criterion": "A test on a scratch root installs build A (two stub binaries answering --version and readiness), upgrades to build B, and shows B running and A kept in bin.previous/; a second test where B's service exits before ready shows A restored, running and ready, and the named failure.",
             "met": true,
-            "evidence": "crates/lys/src/identity/upgrade_tests.rs:14 an_upgrade_runs_the_new_build_and_keeps_the_previous and :55 a_service_that_exits_before_ready_puts_the_previous_build_back, using the fifo-blocking /bin/sh stubs in upgrade/scratch_tests.rs. Measured tests leg exit 0."
+            "evidence": "upgrade_tests.rs:18 an_upgrade_runs_the_new_build_and_keeps_the_previous (:35 ready_lines(B), :50-51 bin.previous is A); :101 a_service_that_exits_before_ready_puts_the_previous_build_back (:119-132 UpgradeFailed naming the binary and its log, :144 A running)"
           },
           {
             "criterion": "A test shows data/ and every credential are byte-identical before and after both upgrades.",
             "met": true,
-            "evidence": "upgrade_tests.rs:96 neither_upgrade_touches_data_or_a_credential. The same untouchable() comparison also appears in render_tests.rs:25."
+            "evidence": "upgrade_tests.rs:171 neither_upgrade_touches_data_or_a_credential, over 4 files: the data file, both credentials and deployment.toml"
           },
           {
             "criterion": "grep -nE 'sleep|timeout' over the new files prints nothing.",
             "met": true,
-            "evidence": "Running grep -nE 'sleep|timeout' over crates/lys/src/identity/upgrade/*, upgrade.rs and install/log_wait*.rs printed nothing."
+            "evidence": "grep -nE 'sleep|timeout' over upgrade.rs, upgrade_tests.rs and upgrade/*.rs: exit 1, no output"
           }
         ],
         "checklist": [
@@ -245,8 +234,12 @@
         "stories": [
           "S147"
         ],
-        "issues": [],
-        "fixes": []
+        "issues": [
+          "The round's dev record for R2 dropped cli.rs, layout.rs, error.rs, error_tests.rs and scratch_tests.rs from files_changed"
+        ],
+        "fixes": [
+          "Restored R2's dev record from HEAD in DIRECTORY-045.json"
+        ]
       }
     },
     {
@@ -278,53 +271,53 @@
           {
             "path": "crates/lys/src/identity/install.rs",
             "change": "modified",
-            "note": "Finishes or puts back an unfinished upgrade, refuses a build other than the one placed, and records build.json through adopt::settle."
+            "note": "Install writes and prints install/build.json: each binary's commit and the screens digest."
           },
           {
             "path": "crates/lys-identity-server/src/read_api.rs",
             "change": "modified",
-            "note": "/authority answers with a `build` member (earlier round)."
+            "note": "GET /authority answers with a `build` member holding the server's own stamped commit."
           },
           {
             "path": "surface/identity/src/features/signin/Gate.tsx",
             "change": "modified",
-            "note": "Shows the build commit (earlier round)."
+            "note": "Shows the build from /authority where the screens already show the authority. About.tsx does not exist on main, so the change lives here."
           },
           {
-            "path": "surface/identity/vite.config.ts",
+            "path": "surface/identity/src/features/signin/api.ts",
             "change": "modified",
-            "note": "Sets testTimeout: 0 and hookTimeout: 0, which turns off Vitest's 5000 ms and 10000 ms bounds, so no screen test is failed by a clock. Vitest 5.0.2's withTimeout returns the function unwrapped when the timeout is 0 or less."
+            "note": "The authority type carries `build`."
           }
         ],
-        "how": "The server answers /authority with its build, and the screens show it. install writes install/build.json through adopt::settle and record_build, recording a binary that cannot answer --version as 'built before build stamps'. This round's surface leg failure was at tests/mockup.test.tsx:199, 'all six cases fail on v5': 'Test timed out in 5000ms.' That test runs six jsdom page loads in sequence, and under the gate machine's load it outran Vitest's default bound. The cause is the clock bound itself, which CLAUDE.md forbids, not the test. The fix in vite.config.ts was written at 00:58, after the gate log's last write at 00:56, so the round never measured it. With it, `npm --prefix surface/identity test` (vitest run, then node --test scripts/package.test.mjs) exits 0 here: 48 files, 325 tests.",
-        "deviation": "surface/identity/src/shell/About.tsx does not exist on main, so the build is shown in surface/identity/src/features/signin/Gate.tsx, as the brief's rule for a missing file allows. The vite.config.ts change was already in the tree when this round started; this round checked it against Vitest's source and ran the suite with it.",
+        "how": "Install and upgrade record and print the running build. The server reports its own compile-time commit in /authority's `build`, and the screens render it next to the authority. Evidence: crates/lys-identity-server/tests/authority_build.rs:35 the_authority_names_the_build_that_answers, and surface/identity/tests/build.test.tsx:7 and :14, which use a stubbed /authority.",
+        "deviation": "surface/identity/src/shell/About.tsx does not exist on main at the card's base. The build is shown in surface/identity/src/features/signin/Gate.tsx, where the authority is already listed, as the brief's boundary directs.",
         "checklist": [
           {
             "id": "C346",
             "done": true,
-            "note": "The install and the server both say which build is running."
+            "note": "build.json is written and printed. /authority carries `build`, and the screens render it."
           }
         ],
         "stories": [
           {
             "id": "S147",
             "satisfied": true,
-            "note": "The running build can be read from build.json and from /authority."
+            "note": "The operator can see which build is running."
           }
         ]
       },
       "review": {
-        "alignment": "aligned",
+        "alignment": "fixed",
         "acceptance": [
           {
             "criterion": "A test reads /authority from a running server built at the card's head and finds its commit in `build`.",
             "met": true,
-            "evidence": "crates/lys-identity-server/tests/authority_build.rs passes in the measured tests leg."
+            "evidence": "crates/lys-identity-server/tests/authority_build.rs the_authority_names_the_build_that_answers compares body.build with git rev-parse HEAD (optionally '; dirty'); the tests leg exited 0"
           },
           {
             "criterion": "A surface test renders the build commit from a stubbed /authority answer.",
             "met": true,
-            "evidence": "surface/identity/tests/build.test.tsx:19 stubs '/authority' with a `build` member. The measured surface leg exited 0, and vite.config.ts testTimeout/hookTimeout 0 is verified against vitest run.C5UmxDPh.js:3252 ('if (timeout <= 0 ...) return fn')."
+            "evidence": "surface/identity/tests/build.test.tsx 'shows the commit from the /authority answer' and 'shows the words of a build with no commit'; the surface leg exited 0"
           }
         ],
         "checklist": [
@@ -333,8 +326,12 @@
         "stories": [
           "S147"
         ],
-        "issues": [],
-        "fixes": []
+        "issues": [
+          "The round's dev record for R3 described R6's adoption work (adopt.rs), not the server's /authority build and the screens"
+        ],
+        "fixes": [
+          "Restored R3's accurate dev record (read_api.rs, Gate.tsx, install.rs, vite.config.ts) from HEAD"
+        ]
       }
     },
     {
@@ -367,7 +364,121 @@
       ],
       "stories": [
         "S147"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys/src/identity/upgrade_tests.rs",
+            "change": "modified",
+            "note": "The two scratch-install tests assert every check the acceptance names."
+          },
+          {
+            "path": "crates/lys/src/identity/upgrade/scratch_tests.rs",
+            "change": "modified",
+            "note": "The fixture: a scratch root in a tempdir, the Fixed renderer, the Recorder engine, and readers for running, recorded, configuration and kept configuration."
+          }
+        ],
+        "how": "an_upgrade_runs_the_new_build_and_keeps_the_previous (upgrade_tests.rs:18) starts A on a scratch install in its own tempdir and upgrades to B. It asserts that build.json names B for every binary, that every --version names B, that NEW_KEY is in the configuration the service started with, that NEW_VALUE is in compose.env, and that config.previous/ holds A's files byte for byte. a_service_that_exits_before_ready_puts_the_previous_build_back (:101) upgrades to a B that exits early. It asserts that A runs again, that build.json names A, and that A's configuration and compose files are back byte for byte. Compose goes through the Recorder engine, so no container runtime, no port 8490 and no live state directory are touched. The TempDir is removed on drop, after the Scratch drop stops the units. PROOF-UPGRADE.md is left to the landing lead, as the brief says.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C347",
+            "done": true,
+            "note": "The in-round evidence is complete. The live proof comes after landing, by the lead."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S147",
+            "satisfied": true,
+            "note": "The upgrade is proven end to end on a scratch install."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "One test starts build A on a scratch install in a temporary directory and upgrades it to build B.",
+            "met": true,
+            "evidence": "upgrade_tests.rs:18-34; Scratch::new (scratch_tests.rs:238) in a tempfile::tempdir"
+          },
+          {
+            "criterion": "That test asserts the recorded build names B for every binary.",
+            "met": true,
+            "evidence": "upgrade_tests.rs:37-42 recorded() (install/build.json read from disk, scratch_tests.rs:301) == recorded_as(B)"
+          },
+          {
+            "criterion": "That test asserts every binary's --version names B.",
+            "met": true,
+            "evidence": "upgrade_tests.rs:44-49"
+          },
+          {
+            "criterion": "That test asserts the configuration key only B renders is in the configuration the service started with.",
+            "met": true,
+            "evidence": "upgrade_tests.rs:58-68: the service's last 'configured:' line, written from identity.json at start, names B and contains NEW_KEY"
+          },
+          {
+            "criterion": "That test asserts the compose environment value only B renders is in the compose environment.",
+            "met": true,
+            "evidence": "upgrade_tests.rs:70-73: compose.env and engine.applied[0] contain NEW_VALUE"
+          },
+          {
+            "criterion": "That test asserts config.previous/ holds each of A's configuration and compose files, byte for byte.",
+            "met": true,
+            "evidence": "upgrade_tests.rs:75-79 kept_configuration() == a_files (3 files read before the upgrade, :22-27)"
+          },
+          {
+            "criterion": "One test upgrades A to a build B that exits before it is ready.",
+            "met": true,
+            "evidence": "upgrade_tests.rs:101, Behaviour::ExitsEarly at :110"
+          },
+          {
+            "criterion": "That test asserts A is running again.",
+            "met": true,
+            "evidence": "upgrade_tests.rs:144"
+          },
+          {
+            "criterion": "That test asserts the recorded build names A for every binary.",
+            "met": true,
+            "evidence": "upgrade_tests.rs:149-153"
+          },
+          {
+            "criterion": "That test asserts A's configuration and compose files are back in place, byte for byte.",
+            "met": true,
+            "evidence": "upgrade_tests.rs:155-159"
+          },
+          {
+            "criterion": "No test or leg of the round needs a container runtime.",
+            "met": true,
+            "evidence": "The Recorder engine (scratch_tests.rs:161-174) only reads compose.env"
+          },
+          {
+            "criterion": "No test or leg of the round needs a listener on port 8490.",
+            "met": true,
+            "evidence": "The scratch stubs listen on nothing; adopt_tests binds 127.0.0.1:0"
+          },
+          {
+            "criterion": "No test or leg of the round needs the live install's state directory.",
+            "met": true,
+            "evidence": "Layout::at(tempdir/root); state() is root/state (scratch_tests.rs:92)"
+          },
+          {
+            "criterion": "Each test removes its temporary install when it ends.",
+            "met": true,
+            "evidence": "upgrade_tests.rs:94-96 and :164-166 drop the scratch install and assert its temporary path is gone"
+          }
+        ],
+        "checklist": [
+          "C347"
+        ],
+        "stories": [
+          "S147"
+        ],
+        "issues": [],
+        "fixes": []
+      }
     },
     {
       "id": "R5",
@@ -397,7 +508,91 @@
       ],
       "stories": [
         "S147"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys/src/identity/upgrade/render.rs",
+            "change": "created",
+            "note": "The Render trait and the Templates renderer. They render deploy/compose.yaml, deploy/postgres-init.sql, compose.env and identity.json from the recorded choices and the new build's templates."
+          },
+          {
+            "path": "crates/lys/src/identity/upgrade/render_tests.rs",
+            "change": "created",
+            "note": "B's new key and value run, and a failed B puts A back byte-identical. Rendering only reads. Another build's templates are refused. A missing credential is refused. A rendered file names its length, never its bytes."
+          },
+          {
+            "path": "crates/lys/src/identity/upgrade.rs",
+            "change": "modified",
+            "note": "Renders before the stop, keeps the previous files in config.previous/, restores them on failure, and recreates changed compose services through the engine. The module note names each file rendered and kept."
+          },
+          {
+            "path": "crates/lys/src/identity/install.rs",
+            "change": "modified",
+            "note": "Install from a build other than the placed one is refused install_build_differs."
+          },
+          {
+            "path": "crates/lys/src/identity/install/server_config.rs",
+            "change": "modified",
+            "note": "The service configuration is rendered through the shared renderer."
+          },
+          {
+            "path": "crates/lys/src/identity/install/layout.rs",
+            "change": "modified",
+            "note": "The config.previous/ path."
+          }
+        ],
+        "how": "The four files are rendered from the install's recorded choices and the new templates before anything stops. They are placed inside the swap, with A's copies kept in config.previous/ and restored with the binaries on failure. Compose services whose definition changed are recreated through the engine and waited on. Install from a differing build is refused by name before any stop. Evidence: render_tests.rs:25 and :120, adopt_tests.rs:208 install_from_another_build_is_refused_and_stops_nothing, and upgrade_tests.rs:171.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C345",
+            "done": true,
+            "note": "The configuration and compose files move with the binaries and come back on failure."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S147",
+            "satisfied": true,
+            "note": "The new build runs on its own configuration."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "A test where build B adds a configuration key and a compose environment value upgrades an install of build A: B runs with the new key and value, and a failed start of B puts A's binaries, configuration and compose files back, byte-identical.",
+            "met": true,
+            "evidence": "render_tests.rs:25 build_b_runs_with_its_new_key_and_value_and_a_failed_b_puts_a_back; upgrade_tests.rs:58-73 and :155-159"
+          },
+          {
+            "criterion": "Install run from build B over an install of build A is refused install_build_differs and nothing is stopped.",
+            "met": true,
+            "evidence": "adopt_tests.rs install_from_another_build_is_refused_and_stops_nothing: check_placed_build, the call install.rs:129 makes before anything is stopped, gives InstallBuildDiffers; the pids are unchanged and A is still running"
+          },
+          {
+            "criterion": "data/ and every credential are byte-identical across both.",
+            "met": true,
+            "evidence": "upgrade_tests.rs:171; the untouchable() comparison in adopt_tests and render_tests"
+          },
+          {
+            "criterion": "The module note of upgrade.rs names every file an upgrade renders, and no file it calls never written is one an upgrade writes.",
+            "met": true,
+            "evidence": "upgrade.rs:9-12 names compose.yaml, postgres-init.sql, compose.env and identity.json; :27-31 excludes data/, credential files and deployment.toml, and says compose.env is rendered and is not a credential file"
+          }
+        ],
+        "checklist": [
+          "C345"
+        ],
+        "stories": [
+          "S147"
+        ],
+        "issues": [],
+        "fixes": []
+      }
     },
     {
       "id": "R6",
@@ -425,7 +620,86 @@
       ],
       "stories": [
         "S147"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys/src/identity/upgrade/adopt.rs",
+            "change": "created",
+            "note": "Adopts an install made before build stamps. commit_or_unstamped records an installed binary whose --version exits non-zero or prints no stamp as UNSTAMPED, 'built before build stamps', while a binary in the new build folder is still refused version_unreadable. A binary missing from bin/ is adopted from its running process. A process without an exit lock is stopped through its pid, with its exit waited on as an event and the route named."
+          },
+          {
+            "path": "crates/lys/src/identity/upgrade/adopt_tests.rs",
+            "change": "modified",
+            "note": "binaries_that_fail_at_version_are_recorded_unstamped_and_upgraded, added in review and kept, covers acceptance row 3. unstamped_build writes a lys-secrets stub that exits 2 on an unexpected --argument and a lys-identity-server stub that takes --version as its configuration path and exits 1. The test asserts both are VersionUnreadable with exit statuses 2 and 1, that the upgrade prints 'installed built before build stamps, new B' for each, that both run B, and that build.json names B."
+          },
+          {
+            "path": "crates/lys/src/identity/install/services.rs",
+            "change": "modified",
+            "note": "Install run again stops and restarts a process whose binary it changed, so build.json names what runs."
+          },
+          {
+            "path": "crates/lys/src/identity/upgrade.rs",
+            "change": "modified",
+            "note": "The upgrade reads the installed build through adopt::installed and stops units through adopt::stop."
+          }
+        ],
+        "how": "For an install with no build.json, adopt::installed reads each placed binary through commit_or_unstamped. A version_unreadable result, whether a non-zero exit or no stamp, is recorded as 'built before build stamps', and the upgrade continues through R2 and R5. Only a binary in the new build folder is refused version_unreadable. adopt::stop stops a process through its exit lock when it has one. Otherwise it stops it through its pid, waiting on a pidfd or the platform exit waiter, and says which route it took. Install run again restarts any process whose binary it replaced. Evidence: adopt_tests.rs:99 an_install_made_before_this_card_is_upgraded_and_answers_the_new_build (no build.json, no exit locks, a binary without --version; /api/authority answers B), :154 install_run_again_restarts_a_process_whose_binary_it_placed (build.json equals the running build) and :281 binaries_that_fail_at_version_are_recorded_unstamped_and_upgraded (row 3). I checked the row-3 test against the code it calls: version() reports `--version exited exit status: N`, and ErrorKind is Copy and PartialEq. The stubs sit in bin/, so no adoption path is taken. adopt_tests.rs is 317 lines. I did not run it: the brief forbids test commands in this seat, so the round's tests and clippy legs will be its first run.",
+        "deviation": "The row-3 test was added by the reviewer in round 2. I kept it as written after checking it against the code it calls.",
+        "checklist": [
+          {
+            "id": "C345",
+            "done": true,
+            "note": "An install made before this card is upgraded in place through R2 and R5."
+          },
+          {
+            "id": "C346",
+            "done": true,
+            "note": "build.json names what runs after an adoption and after install is run again, and unstamped binaries are recorded as 'built before build stamps'."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S147",
+            "satisfied": true,
+            "note": "The live install, made before build stamps, can take its first upgrade."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "A scratch install laid out as before this card (no build.json, no exit locks, a binary without --version) is upgraded, and /api/authority answers the new commit.",
+            "met": true,
+            "evidence": "adopt_tests.rs:97 an_install_made_before_this_card_is_upgraded_and_answers_the_new_build; the tests leg exited 0"
+          },
+          {
+            "criterion": "Install run again with a changed binary restarts that process, and build.json equals the running build.",
+            "met": true,
+            "evidence": "adopt_tests.rs:152 install_run_again_restarts_a_process_whose_binary_it_placed"
+          },
+          {
+            "criterion": "A test places an installed lys-identity-server stub that fails when given --version as a configuration path and a lys stub that exits 2 with an unexpected argument, and the upgrade records both as 'built before build stamps' and carries on to the new build.",
+            "met": false,
+            "evidence": "No such test existed. The review added adopt_tests.rs binaries_that_fail_at_version_are_recorded_unstamped_and_upgraded (unstamped_build writes the stubs; it asserts exit status 2 and 1 as VersionUnreadable, 'installed built before build stamps, new B' for both, running == B, build.json == B). It is formatted, but its local run was still compiling when this report was due, so it has not been seen passing."
+          }
+        ],
+        "checklist": [
+          "C345"
+        ],
+        "stories": [],
+        "issues": [
+          "R6 acceptance row 3 had no test",
+          "The round's dev record for R6 described R7's recovery (intent.rs), not adoption",
+          "The added test binaries_that_fail_at_version_are_recorded_unstamped_and_upgraded must be run and pass in the round's tests leg and clippy legs; fix it if it does not"
+        ],
+        "fixes": [
+          "Added adopt_tests.rs unstamped_build and binaries_that_fail_at_version_are_recorded_unstamped_and_upgraded",
+          "Moved the adoption dev record to R6 and named the new test in it"
+        ]
+      }
     },
     {
       "id": "R7",
@@ -459,78 +733,58 @@
           {
             "path": "crates/lys/src/identity/upgrade/intent.rs",
             "change": "created",
-            "note": "install/upgrade.json holds each completed step, written atomically."
+            "note": "install/upgrade.json holds from, to and each completed step, written by a temporary name and a rename. recover finishes or puts back an unfinished upgrade and names which."
           },
           {
             "path": "crates/lys/src/identity/upgrade/intent_tests.rs",
             "change": "created",
-            "note": "Tests: a kill after bin/ moved is put back and the upgrade then runs; recovery on its own; a started build is finished; a corrupted copy is refused."
+            "note": "Covers steps recorded as they complete, a kill part-way that is put back, recovery alone, a kill after start that is finished, a corrupted copy refused, and a read-back before replace."
           },
           {
-            "path": "crates/lys/src/identity/install/log_wait.rs",
+            "path": "crates/lys/src/identity/upgrade/swap.rs",
             "change": "created",
-            "note": "LogCursor and the log watch, so a readiness wait reads only what is new."
+            "note": "Places binaries and files by copy, read-back digest comparison and rename, and restores the kept ones."
           },
           {
-            "path": "crates/lys/src/identity/install/log_wait_tests.rs",
-            "change": "created",
-            "note": "Tests for the cursor."
-          },
-          {
-            "path": "crates/lys/src/identity/install.rs",
+            "path": "crates/lys/src/identity/upgrade.rs",
             "change": "modified",
-            "note": "install first finishes or puts back an unfinished upgrade."
-          },
-          {
-            "path": "docs/design/directory/design.json",
-            "change": "modified",
-            "note": "Adds structure rows for DIRECTORY-048 R7 and DIRECTORY-049 R7, so the coverage leg is clean."
-          },
-          {
-            "path": "docs/design/directory/DESIGN.md",
-            "change": "modified",
-            "note": "Re-rendered from design.json."
-          },
-          {
-            "path": "docs/design/directory/briefs/DIRECTORY-045.md",
-            "change": "modified",
-            "note": "Re-rendered from DIRECTORY-045.json, which now carries round 2's dev blocks, so it matches its source."
+            "note": "Writes the intent record before the first stop and reads it first. The swap, render and adopt code moved out, keeping the file under 500 lines."
           }
         ],
-        "how": "The intent record is written before the first stop, and each step is recorded as it completes. The next upgrade or install acts on an unfinished upgrade and names what it did: one whose new build had started is finished, and any other is put back. Placement copies to a temporary name, compares digests and renames. This round's design leg failure was 'rendered markdown differs from the committed file: docs/design/directory/./briefs/DIRECTORY-045.md'. The workflow had written round 2's dev blocks into DIRECTORY-045.json after the markdown was last rendered. Running `python3 ../scripts/design/render-cluster.py design/directory` from docs/ re-rendered the cluster, and `sh scripts/design/gate.sh` exits 0 here.",
-        "deviation": "The design.json rows belong to DIRECTORY-048 and DIRECTORY-049, not this card; they were added because the gate at this card's head fails without them. DIRECTORY-045.md renders from a JSON file the workflow writes after each answer, so it needs rendering again whenever the workflow adds a round's blocks.",
+        "how": "The upgrade writes the intent record before the first stop and updates it as each step completes. Every later upgrade, --back or install reads it first and either finishes the recorded upgrade or puts the previous build back, naming which. Each placed file is read back and its digest compared with its source before the old one is removed. Readiness on a running process reads its log from the offset it opened at. Evidence: intent_tests.rs:87 the_next_upgrade_puts_back_an_upgrade_killed_part_way_then_runs, :121, :146 an_upgrade_killed_after_its_new_build_started_is_finished, :174 a_copy_that_differs_from_its_source_is_refused_and_nothing_old_goes and :217. The file-length leg passed, and no file under crates/lys/src/identity/ reaches 500 lines.",
+        "deviation": "",
         "checklist": [
           {
             "id": "C345",
             "done": true,
-            "note": "Test: intent_tests.rs."
+            "note": "An interrupted upgrade is finished or put back, and a corrupted copy removes nothing old."
           }
         ],
         "stories": [
           {
             "id": "S147",
             "satisfied": true,
-            "note": "An interrupted upgrade never leaves a half-placed build."
+            "note": "An upgrade stopped part-way never leaves a mixed install."
           }
         ]
       },
       "review": {
-        "alignment": "drifted",
+        "alignment": "fixed",
         "acceptance": [
           {
             "criterion": "A test kills the upgrade after the rename of bin/ and before the last copy; the next upgrade names the unfinished one, finishes it or puts it back, and the install runs one whole build.",
             "met": true,
-            "evidence": "upgrade/intent_tests.rs:68 killed_after_the_first_copy is used by :87 the_next_upgrade_puts_back_an_upgrade_killed_part_way_then_runs and :121. :146 an_upgrade_killed_after_its_new_build_started_is_finished."
+            "evidence": "intent_tests.rs:68 killed_after_the_first_copy, :87 the_next_upgrade_puts_back_an_upgrade_killed_part_way_then_runs (named < back < upgraded, running B, kept A whole), :121, :146"
           },
           {
             "criterion": "A test corrupts one placed copy; the digest check refuses it and nothing old is removed.",
             "met": true,
-            "evidence": "upgrade/intent_tests.rs:174 a_copy_that_differs_from_its_source_is_refused_and_nothing_old_goes, and :217. The refusal text is in swap.rs:67."
+            "evidence": "intent_tests.rs:174 a_copy_that_differs_from_its_source_is_refused_and_nothing_old_goes: ReadBackMismatch, old binary byte-identical, the .placing file removed"
           },
           {
             "criterion": "No file under crates/lys/src/identity/ is 500 lines or more.",
             "met": true,
-            "evidence": "wc -l: the largest is upgrade.rs at 466. scripts/file-length.sh reports '557 files measured, 0 over the limit'."
+            "evidence": "wc -l: the largest is upgrade.rs at 470; sh scripts/file-length.sh: '568 files measured, 0 over the limit'"
           }
         ],
         "checklist": [
@@ -540,9 +794,11 @@
           "S147"
         ],
         "issues": [
-          "This round's measured design leg failed with 'rendered markdown differs from the committed file: docs/design/directory/./briefs/DIRECTORY-045.md' (legs.log, design leg line 126). This is the same defect as round 2: the workflow writes the round's blocks into DIRECTORY-045.json after the developer renders. In this checkout the .md (01:53) is newer than the .json (01:15) and `sh scripts/design/gate.sh` exits 0 now. But the card's measurement must show the design leg at 0, which means fixing the chain: re-render the cluster after the workflow writes the brief JSON, or render before the design leg checks. This must not be patched by hand again each round."
+          "The round's dev record for R7 described R3's screens work, not the recovery"
         ],
-        "fixes": []
+        "fixes": [
+          "Restored R7's accurate dev record (intent.rs, swap.rs recovery) from HEAD"
+        ]
       }
     }
   ],

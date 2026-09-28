@@ -284,6 +284,33 @@ impl Scratch {
         Ok(files)
     }
 
+    /// A's configuration and compose files as `config.previous/` holds
+    /// them, by the path each was placed at.
+    pub fn kept_configuration(&self) -> TestResult<BTreeMap<PathBuf, Vec<u8>>> {
+        let kept = self.layout.config_previous_dir();
+        let mut files = BTreeMap::new();
+        for rendered in files_for(&self.layout, A, true) {
+            let bytes = std::fs::read(kept.join(rendered.name))?;
+            files.insert(rendered.target, bytes);
+        }
+        Ok(files)
+    }
+
+    /// The commit `install/build.json` records for each binary, read from
+    /// the file on disk.
+    pub fn recorded(&self) -> TestResult<BTreeMap<String, String>> {
+        let written: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(self.layout.build_record())?)?;
+        let mut binaries = BTreeMap::new();
+        for name in BINARIES {
+            let commit = written["binaries"][name]
+                .as_str()
+                .ok_or(format!("build.json records no commit for {name}"))?;
+            binaries.insert(name.to_string(), commit.to_string());
+        }
+        Ok(binaries)
+    }
+
     /// Each unit's last `NAME COMMIT ready` line, each unit running.
     pub fn running(&self) -> TestResult<Vec<String>> {
         let mut said = Vec::new();
@@ -335,5 +362,13 @@ pub fn ready_lines(commit: &str) -> Vec<String> {
     BINARIES
         .iter()
         .map(|name| format!("{name} {commit} ready"))
+        .collect()
+}
+
+/// Every binary named with `commit`, as `install/build.json` records it.
+pub fn recorded_as(commit: &str) -> BTreeMap<String, String> {
+    BINARIES
+        .iter()
+        .map(|name| ((*name).to_string(), commit.to_string()))
         .collect()
 }
