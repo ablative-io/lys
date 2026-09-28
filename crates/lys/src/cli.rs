@@ -13,8 +13,10 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 mod log;
+mod runner;
 
 pub use log::{LogCommand, LogProveCommand, LogVerifyCommand};
+pub use runner::RunnerCommand;
 
 /// Cryptographic trust infrastructure for AI agents — identity, attestation,
 /// and verification.
@@ -64,6 +66,12 @@ pub enum Command {
     /// standard tooling: (printf '\x00'; cat leaf-file) | shasum -a 256.
     #[command(subcommand)]
     Log(LogCommand),
+
+    /// Lys's own runner: holds each agent the server starts in its own
+    /// background pseudo-terminal, reached on a Unix socket only, and the
+    /// bridge a runner on another machine dials the server through.
+    #[command(subcommand)]
+    Runner(RunnerCommand),
 
     /// Sign an attestation over a payload file and write the `COSE_Sign1`
     /// artifact.

@@ -92,6 +92,7 @@ impl ServerError {
             | Self::SignInRefused
             | Self::SetupCodeRefused
             | Self::ClientUnknown
+            | Self::DialRefused { .. }
             | Self::TokenUnknown => StatusCode::UNAUTHORIZED,
             Self::SignInThrottled => StatusCode::TOO_MANY_REQUESTS,
             Self::NotAdmitted { .. }
@@ -100,6 +101,7 @@ impl ServerError {
             | Self::Withheld { .. }
             | Self::MachineNotForAgent
             | Self::SecondFactorUnsupported
+            | Self::NotPermitted { .. }
             | Self::ReviewerOnly => StatusCode::FORBIDDEN,
             Self::AgentNotVisible
             | Self::GrantNotVisible
@@ -147,6 +149,9 @@ impl ServerError {
             | Self::TeamMemberHeld
             | Self::TeamMemberAbsent
             | Self::GrantNotDue { .. }
+            | Self::NoLiveSession { .. }
+            | Self::RunnerAbsent { .. }
+            | Self::DialStale { .. }
             | Self::SetupClosed
             | Self::ReviewReused { .. } => StatusCode::CONFLICT,
             Self::SignInStateUnknown
@@ -178,9 +183,29 @@ impl ServerError {
             | Self::ProviderUnavailable { .. }
             | Self::ReviewsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
+            Self::Runner { refusal, .. } => runner_status(refusal),
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),
             Self::App(error) => error.status(),
         }
+    }
+}
+
+/// How a runner's refusal is answered: one the runner never gave, because
+/// it could not be reached or spoke another protocol, is the gateway's; a
+/// session it does not hold is not found; the rest conflict with the
+/// session's state.
+fn runner_status(refusal: &str) -> StatusCode {
+    match refusal {
+        "runner_unreachable"
+        | "runner_reply_malformed"
+        | "runner_protocol_mismatch"
+        | "runner_request_unsigned"
+        | "runner_request_replayed" => StatusCode::BAD_GATEWAY,
+        "session_unknown" => StatusCode::NOT_FOUND,
+        "pattern_invalid" | "size_invalid" | "cursor_ahead" | "session_invalid" => {
+            StatusCode::BAD_REQUEST
+        }
+        _ => StatusCode::CONFLICT,
     }
 }

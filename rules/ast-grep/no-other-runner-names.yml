@@ -1,0 +1,21 @@
+id: no-other-runner-names
+language: rust
+severity: error
+message: "The runner code names another runner. Lys depends on no other runner: any tool is a machine's runner only by speaking the published runner protocol (DIRECTORY-050 R2)."
+ignores:
+  - "vendor/**"
+files:
+  - "crates/lys-runner/**/*.rs"
+  - "crates/lys-identity-server/src/runner_*.rs"
+  - "crates/lys/src/cli/runner.rs"
+  - "crates/lys/src/commands/runner.rs"
+rule:
+  any:
+    - kind: identifier
+      regex: "(?i)argus|herdr|manifold"
+    - kind: string_literal
+      regex: "(?i)argus|herdr|manifold"
+    - kind: line_comment
+      regex: "(?i)argus|herdr|manifold"
+    - kind: block_comment
+      regex: "(?i)argus|herdr|manifold"

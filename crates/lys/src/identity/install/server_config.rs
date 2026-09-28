@@ -126,6 +126,7 @@ pub fn render(
         "teams_dir": dir("teams"),
         "stops_dir": dir("stops"),
         "reviews_dir": dir("reviews"),
+        "runner_socket": layout.runner_socket().display().to_string(),
     });
     if let Some(administrator) = &carried.administrator {
         rendered["administrator"] = administrator.clone();

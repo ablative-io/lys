@@ -9,6 +9,7 @@ members = [
     "crates/lys-identity-server",
     "crates/lys-log-store",
     "crates/lys-openapi",
+    "crates/lys-runner",
     "crates/lys-secrets",
     "tests/identity_contract",
 ]
@@ -30,6 +31,7 @@ lys-identity = { version = "0.2.0", path = "crates/lys-identity" }
 lys-identity-server = { version = "0.2.0", path = "crates/lys-identity-server" }
 lys-log-store = { version = "0.2.0", path = "crates/lys-log-store" }
 lys-openapi = { version = "0.2.0", path = "crates/lys-openapi" }
+lys-runner = { version = "0.2.0", path = "crates/lys-runner" }
 
 # Cryptographic primitives — pinned at the versions hardened in meridian-trust.
 # This lineup is deliberate and boring: the trust layer speaks the verification
@@ -46,8 +48,13 @@ hkdf = "0.12"
 # zone name gives the same offsets on every machine.
 jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
 postcard = { version = "1", features = ["alloc"] }
+# The runner's pseudo-terminals: open one, make it the child's controlling
+# terminal, resize it; the unsafe calls stay inside the dependency.
+portable-pty = "=0.9.0"
 rand = "0.9"
 rcgen = "0.13"
+# The runner's `wait` on a regular expression, asked for by name.
+regex-lite = "0.1"
 # Readiness events through a safe interface: kqueue on macOS and the BSDs,
 # epoll on Linux, so a wait is on the kernel's notice and never a clock.
 mio = { version = "1", default-features = false, features = ["os-ext"] }
