@@ -20,6 +20,8 @@ import type {
   SecretAuditLog,
   SecretGrantListing,
 } from './secretsApi';
+import { definitelyRefused, pendingAt, pendingKey, recordPending, unconfirmed } from './pendingChange';
+import type { PendingStore } from './pendingChange';
 
 const refusedOf = (error: unknown): Refused =>
   error instanceof Refused ? error : new Refused(0, { refusal: 'Unanswered', reason: String(error) });
@@ -167,27 +169,59 @@ export type ChangeOutcome<T> =
   | { at: 'sending' }
   | { at: 'done'; answer: T }
   | { at: 'refused'; refused: Refused }
-  | { at: 'unknown'; refused: Refused };
+  | { at: 'unknown'; refused: Refused }
+  | { at: 'held'; asked: string };
 
-/** Run one change, once. A change whose outcome is unknown is never repeated by itself. */
-function useChange<T>() {
+/** Whether a form in this outcome may send. Only an idle form or a definite refusal may. */
+export const maySend = (outcome: ChangeOutcome<unknown>): boolean => outcome.at === 'editing' || outcome.at === 'refused';
+
+/**
+ * Run one change, once. The change is recorded in the tab before it is sent;
+ * while its outcome is unknown the form is held, across leaving the screen and
+ * reloading, and nothing sends it again. A confirmed change also holds the form
+ * until a field is edited, which is a new change.
+ */
+function useChange<T>(key: string, store: PendingStore) {
   const [outcome, setOutcome] = useState<ChangeOutcome<T>>({ at: 'editing' });
   const sending = useRef(false);
-  const run = async (send: () => Promise<T>) => {
-    if (sending.current) return;
+  const pending = pendingAt(store, key);
+  const shown: ChangeOutcome<T> = pending !== null && (outcome.at === 'editing' || outcome.at === 'refused' || outcome.at === 'done')
+    ? { at: 'held', asked: pending }
+    : outcome;
+  const run = async (asked: string, send: () => Promise<T>) => {
+    if (sending.current || !maySend(shown)) return;
     sending.current = true;
+    try {
+      recordPending(store, key, asked);
+    } catch (error) {
+      sending.current = false;
+      setOutcome({ at: 'refused', refused: new Refused(0, { refusal: 'PendingNotRecorded', reason: `the change was not sent: ${String(error)}` }) });
+      return;
+    }
     setOutcome({ at: 'sending' });
     try {
-      setOutcome({ at: 'done', answer: await send() });
+      const answer = await send();
+      store.removeItem(key);
+      setOutcome({ at: 'done', answer });
     } catch (error) {
       const refused = refusedOf(error);
-      setOutcome(refused.status === 0 || refused.status >= 500 ? { at: 'unknown', refused } : { at: 'refused', refused });
+      if (definitelyRefused(refused)) {
+        store.removeItem(key);
+        setOutcome({ at: 'refused', refused });
+      } else {
+        setOutcome({ at: 'unknown', refused });
+      }
     } finally {
       sending.current = false;
     }
   };
-  return { outcome, run };
+  const edited = () => {
+    if (outcome.at === 'done' || outcome.at === 'refused' || outcome.at === 'unknown') setOutcome({ at: 'editing' });
+  };
+  return { outcome: shown, run, edited };
 }
+
+const UNKNOWN_NOTE = 'It is not known whether this change was made. It is held here and will not be sent again from this browser.';
 
 export function ChangeView<T>({ outcome, done }: { outcome: ChangeOutcome<T>; done: (answer: T) => string }) {
   switch (outcome.at) {
@@ -197,9 +231,35 @@ export function ChangeView<T>({ outcome, done }: { outcome: ChangeOutcome<T>; do
     case 'refused': return <RefusalLine refused={outcome.refused} />;
     case 'unknown': return <>
       <RefusalLine refused={outcome.refused} />
-      <p className="note">It is not known whether this change was made. Check the secret before asking again.</p>
+      <p className="note">{UNKNOWN_NOTE}</p>
     </>;
+    case 'held': return <p className="note" role="status">A change asked earlier ({outcome.asked}) has no confirmed answer. {UNKNOWN_NOTE}</p>;
   }
+}
+
+/** The broker's name for a scope asked as a kind and a name. */
+export function scopeAsked(kind: ScopeKind, name: string): string {
+  return (kind === 'personal' ? 'person' : kind) + '/' + name;
+}
+
+/** A scope answer that says exactly what was asked, or an unconfirmed outcome. */
+export function confirmScope(answer: unknown, secret: string, scope: string): ScopeChanged {
+  if (answer && typeof answer === 'object' && 'secret' in answer && 'scope' in answer
+    && answer.secret === secret && answer.scope === scope) return { secret, scope };
+  throw unconfirmed(`the service answered, but not with ${secret} kept for ${scope}`);
+}
+
+/** A recipients answer that says exactly what was asked, or an unconfirmed outcome. */
+export function confirmRecipients(answer: unknown, secret: string, recipients: Recipients): RecipientsChanged {
+  if (answer && typeof answer === 'object' && 'secret' in answer && 'recipients' in answer
+    && answer.secret === secret && answer.recipients === recipients) return { secret, recipients };
+  throw unconfirmed(`the service answered, but not with ${secret} handed to ${recipients}`);
+}
+
+/** The tab's session storage; a page without one cannot record a change, so it cannot send one. */
+function tabStore(): PendingStore {
+  if (typeof sessionStorage === 'undefined') throw new Error('this page has no session storage to hold a pending change');
+  return sessionStorage;
 }
 
 /** A scope as the broker names it (`team/<name>`), in plain words. */
@@ -226,25 +286,28 @@ const recipientsOf = (value: string): Recipients => offered(RECIPIENTS, value);
 
 const OWNER_NOTE = 'Only the secret\'s owner can change this. Anyone else is refused.';
 
-export function ScopeChange({ change, secret: initial = '' }: { change: (secret: string, kind: ScopeKind, name: string) => Promise<ScopeChanged>; secret?: string }) {
+export function ScopeChange({ change, secret: initial = '', store = tabStore() }: { change: (secret: string, kind: ScopeKind, name: string) => Promise<unknown>; secret?: string; store?: PendingStore }) {
   const [secret, setSecret] = useState(initial);
   const [kind, setKind] = useState<ScopeKind>('personal');
   const [name, setName] = useState('');
-  const { outcome, run } = useChange<ScopeChanged>();
+  const { outcome, run, edited } = useChange<ScopeChanged>(pendingKey('scope', secret.trim()), store);
   const ready = secret.trim() !== '' && name.trim() !== '';
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (ready) void run(() => change(secret.trim(), kind, name.trim()));
+    if (!ready) return;
+    const asked = { secret: secret.trim(), kind, name: name.trim() };
+    const scope = scopeAsked(asked.kind, asked.name);
+    void run(`${asked.secret} kept for ${scope}`, async () => confirmScope(await change(asked.secret, asked.kind, asked.name), asked.secret, scope));
   };
   return <form onSubmit={submit}>
     <h2>Who can see this secret</h2>
     <p className="note">{OWNER_NOTE}</p>
-    <label className="field">Secret<input value={secret} onChange={(event) => setSecret(event.target.value)} /></label>
-    <label className="field">Kept for<select value={kind} onChange={(event) => setKind(scopeKindOf(event.target.value))}>
+    <label className="field">Secret<input value={secret} onChange={(event) => { edited(); setSecret(event.target.value); }} /></label>
+    <label className="field">Kept for<select value={kind} onChange={(event) => { edited(); setKind(scopeKindOf(event.target.value)); }}>
       <option value="personal">One person</option><option value="team">A team</option><option value="organisation">An organisation</option>
     </select></label>
-    <label className="field">Name<input value={name} onChange={(event) => setName(event.target.value)} placeholder={kind === 'personal' ? 'The person\'s id' : 'Its name'} /></label>
-    <button className="btn primary" type="submit" disabled={outcome.at === 'sending' || !ready}>Save</button>
+    <label className="field">Name<input value={name} onChange={(event) => { edited(); setName(event.target.value); }} placeholder={kind === 'personal' ? 'The person\'s id' : 'Its name'} /></label>
+    <button className="btn primary" type="submit" disabled={!maySend(outcome) || !ready}>Save</button>
     <ChangeView outcome={outcome} done={(answer) => `${answer.secret} is now kept for ${scopeWords(answer.scope)}.`} />
   </form>;
 }
@@ -254,23 +317,25 @@ const RECIPIENT_WORDS: Record<Recipients, string> = {
   people_only: 'people only, never agents',
 };
 
-export function RecipientsChange({ change, secret: initial = '' }: { change: (secret: string, recipients: Recipients) => Promise<RecipientsChanged>; secret?: string }) {
+export function RecipientsChange({ change, secret: initial = '', store = tabStore() }: { change: (secret: string, recipients: Recipients) => Promise<unknown>; secret?: string; store?: PendingStore }) {
   const [secret, setSecret] = useState(initial);
   const [recipients, setRecipients] = useState<Recipients>('people_only');
-  const { outcome, run } = useChange<RecipientsChanged>();
+  const { outcome, run, edited } = useChange<RecipientsChanged>(pendingKey('recipients', secret.trim()), store);
   const ready = secret.trim() !== '';
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (ready) void run(() => change(secret.trim(), recipients));
+    if (!ready) return;
+    const asked = { secret: secret.trim(), recipients };
+    void run(`${asked.secret} handed to ${RECIPIENT_WORDS[asked.recipients]}`, async () => confirmRecipients(await change(asked.secret, asked.recipients), asked.secret, asked.recipients));
   };
   return <form onSubmit={submit}>
     <h2>Who it can be handed to</h2>
     <p className="note">{OWNER_NOTE}</p>
-    <label className="field">Secret<input value={secret} onChange={(event) => setSecret(event.target.value)} /></label>
-    <label className="field">Can be handed to<select value={recipients} onChange={(event) => setRecipients(recipientsOf(event.target.value))}>
+    <label className="field">Secret<input value={secret} onChange={(event) => { edited(); setSecret(event.target.value); }} /></label>
+    <label className="field">Can be handed to<select value={recipients} onChange={(event) => { edited(); setRecipients(recipientsOf(event.target.value)); }}>
       <option value="anyone">Anyone who is permitted</option><option value="people_only">People only</option>
     </select></label>
-    <button className="btn primary" type="submit" disabled={outcome.at === 'sending' || !ready}>Save</button>
+    <button className="btn primary" type="submit" disabled={!maySend(outcome) || !ready}>Save</button>
     <ChangeView outcome={outcome} done={(answer) => `${answer.secret} can now be handed to ${RECIPIENT_WORDS[answer.recipients]}.`} />
   </form>;
 }
