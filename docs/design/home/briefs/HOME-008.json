@@ -1,261 +1,223 @@
 {
   "id": "HOME-008",
   "cluster": "home",
-  "title": "Judge the hand-built HOME-001 code in crates/lys-home at 0073b966 through the chain's whole judgement and record each check's outcome in a proof, without changing the crate",
-  "depends_on": [],
-  "blocked_by": [
-    "A worktree of lys at 0073b966 on the build host with toolchain 1.97.1 installed",
-    "A working jev_ask.awl route (Jev key and ledger) able to judge a file against the empty tree",
-    "Read access to the step 5 board for the map of its seven cards to HOME-001 rows"
+  "title": "Sign what a session was given: a lys/attestation/v2 given statement at render, checked offline with lys verify",
+  "depends_on": [
+    "HOME-003"
   ],
+  "blocked_by": [],
   "checklist": [
-    "C83",
-    "C84",
-    "C85",
-    "C86",
-    "C87",
-    "C88",
-    "C89",
-    "C90"
+    "C45",
+    "C46",
+    "C47",
+    "C48",
+    "C49",
+    "C50",
+    "C51"
   ],
   "stories": [
-    "S35",
-    "S36",
-    "S37"
+    "S24",
+    "S25",
+    "S26"
   ],
   "design_anchor": [
-    "ADR-031",
+    "ADR-003",
+    "ADR-007",
     "ADR-012",
-    "ADR-016"
+    "ADR-013",
+    "ADR-047"
   ],
-  "purpose": "HOME-001's built rows reached main by hand before every carded row had to go through its board's chain, so nothing on main says the chain has judged that code and the cards carrying those rows cannot honestly be done. This brief runs the chain's whole judgement over crates/lys-home as it stands at 0073b966 (Jev per file, fmt, clippy pedantic, tests, the gate's other legs, and ast-grep recorded as not measured), records every outcome and every finding in one proof document against that commit and toolchain, and lands it without changing a byte of the crate, so a card is done only when the chain has judged its row's files and no open finding touches them (ADR-031).",
-  "task": "Measure, do not change. Every compile, test battery and gate of this card runs on Dean's laptop, never on the Mac the card is written on; the words' sentence about the one-build queue on this Mac is dropped. Make a worktree of lys at 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff there with toolchain 1.97.1 (rust-toolchain.toml at that commit) and run the seven commands .land/gates.sh runs at that commit, verbatim, workspace-wide as the gate runs them; fmt is measured by `cargo fmt --check`, the gate's own form, never the rewriting `cargo fmt --all`. Clippy pedantic is the workspace lint table's `pedantic = warn` under `-D warnings`, measured through the two clippy legs. Ask Jev about each of the crate's 25 files at that commit through jev_ask.awl, against the empty tree, cut per part as the chain cuts a new file, with no new src_land mode; Jev's lines are evidence (model, run id, verdict), not a rerunnable command, so the rerun promise of the acceptance covers the seven deterministic legs at the named commit and toolchain only. ast-grep is recorded as not measured, naming card ngzIkkpd, which writes lys's first rule set; no borrowed rule set is run. Only rows whose files are on main at 0073b966 are judged: R7, R10 and R12 are unbuilt and named so, and their cards (0BgjD59r for R7, qY9mBz-y for R10) are never set done here. Each finding is its own line, checked against the current main head: a finding answered there names its fixing commit and gets no card; one still true in crates/lys-home or docs/design/home becomes one card on the step 5 board; one outside them is shown whole and named for its own board. Three findings stand on the repository's rules whatever Jev says: the missing docs/design/home/LOSS-ACCOUNT.md (R4), record/mod.rs carrying functions (R1, R2), and claude_code/mod.rs carrying consts and a fn (R3, R4). A card is done only if no finding still true touches its rows' files; green means the landing passed src_pr and src_land, never that the crate is clean. The measurement at 0073b966 and src_land's gate on the landing head are recorded apart, each with its sha. Out of scope: any new capability in lys-home, any change to a HOME-001 row, writing LOSS-ACCOUNT.md, moving any function, and any card other than the seven. Every requirement writes into the one proof document, so the primary-file rule is met by the proof's sections rather than by separate files.",
+  "purpose": "Row 6.5 of the identity conformance table (docs/design/identity/CONFORMANCE.md) asks that three things be signed statements checked with `lys verify --attestation`: the start of an agent, what the agent was given, and a move of its role. HOME-003 records what a session was given as a lys.given entry at render, unsigned, and lys-core already signs and verifies `lys/attestation/v2` attestations. This brief lands the first of the three, the given statement: at render, `lys-home render-launch` computes the SHA-256 of the lys.given entry's canonical custom.data, reports it beside the template, session head and manifest hashes, and, when it is given a signing key, signs over it in lys-core's existing format and keeps the statement beside the given entry and as two files `lys verify` reads offline. Row 6.5 is partial when this brief lands: the start statement and the role-move statement are further units, each written when the record it signs over lands (ADR-047).",
+  "task": "The card's sentence 'signed at render over the hash it already records' is wrong about the tree: the lys.given entry records the hashes of the documents a session was given and no hash of itself. This brief corrects it: the signed hash is the SHA-256 of the lys.given entry's canonical custom.data, which render_launch computes at render and records in its report as given_sha256, beside the template, session_head and manifest hashes the report already carries. The report is the render record the hash is recorded in. The kept template_render event is not altered and does not gain the hash, so HOME-003's boundary that the render event is not altered holds; a later reader recomputes the given hash from the lys.given entry and compares it with the signed statement, and R6 does exactly that.\n\nThe canonical custom.data is RFC 8785 (JSON Canonicalization Scheme) applied to the lys.given entry's data value (ADR-047). It is frozen from the first signature, since a signature over it is a wire contract; R1 pins it with a literal vector. The attestation's claim is SHA-256 of the payload, so the payload `lys verify` reads is the canonical bytes themselves, never the hex hash, and the signed hash then equals given_sha256 by construction.\n\nA render with no key is unchanged: the lys.given entry is recorded as HOME-003 records it, no statement is written, and the report says unsigned. With a key, the render also signs: one `lys/attestation/v2` COSE_Sign1 over the canonical bytes, stored in the home's block store and named by one lys.given_statement custom entry hung under the lys.given entry, off the context path as that entry is (ADR-012), plus given-statement.cose and given-data.json under --out for `lys verify --attestation given-statement.cose --payload given-data.json`. The report says signed. The key is `--key <path>`, a raw 32-byte Ed25519 seed file, the format `lys attest --key` and `lys key generate` use; in tests and in the proof it is a test key generated at the time, and no seed is committed. No production key is created, used or stored: production keys are the owner's acts (CONFORMANCE row 6.6). The attestation carries its signing time, as the existing format does, so a keyed render reads the clock once, to sign; the files the render writes are unchanged and CN9 is unaffected.\n\n`lys verify` is not changed. Without --cert it proves only that some key signed, so the acceptance also checks the signer: after `lys verify` accepts the statement, a stated command compares the attestation's signer public key with the fixture's test public key and fails on a difference, and a statement signed by a second test key fails that line. Checking the signer against a trusted certificate comes with row 6.1's `--cert`, not here. The refusal of an altered statement is by name in this sense: the stated command names the statement file it was checking and `lys verify` exits non-zero with its one message, never which field or byte was altered; the published `lys` message is unchanged for everyone.\n\nOut of scope, as further units not written here: the start statement, signed when a launch is recorded over the launch id, the agent's directory id and the given hash, attached to the START card 98qkhhCb and written when its launch record lands; the role-move statement, signed when a role move is recorded over the agent, the role, the version moved from and the version moved to, attached to the ROLES card Ink1H1Os and written when its version record lands (ADR-006); and the trusted-certificate check of row 6.1. No signer is built over fields no brief names yet. Row 6.5 is passed partially by this brief and stays partial until those two units land.\n\nThe home design's non-goal on signing is lifted for the given statement only, and anchoring and receipts into a lys log stay non-goals. The reason is that CONFORMANCE row 6.5, marked test, is part of the conformance test the platform's owner set as the definition of done, and the owner asked for all of it to be done; the design's non_goals entry is amended to say so with this brief. HOME-003's boundary against signing the given record is historical and stays as written, and HOME-003 is not edited.\n\nlys-home takes lys-core as a dependency first (R2), for Ed25519Identity and sign_attestation, with default features. launch.rs has 190 code lines, so the signing and the entry live in a new record/given_statement.rs and launch.rs keeps only the argument, the ordering and the report.",
   "requirements": [
     {
       "id": "R1",
-      "title": "Frame the proof: the measured commit, the toolchain, the row map and the card map",
-      "spec": "THE SYSTEM SHALL create docs/design/home/PROOF-CHAIN.md whose first section names the commit every leg of this judgement was measured on as 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff, the toolchain as the channel 1.97.1 that rust-toolchain.toml pins at that commit together with the `rustc --version` and `cargo --version` lines printed where the legs ran, and states that the legs ran from the root of a worktree checked out at that commit on the build host that runs every compile, test battery and gate. It SHALL hold one table row per HOME-001 requirement, R1 to R12, listing every path of that row's files.create and files.modify with `present` or `absent` as `git cat-file -e 0073b966:<path>` reports it, and SHALL name R7, R10 and R12 as unbuilt rows that are not judged and need their own words and briefs. It SHALL hold the map of the seven step 5 cards that carry R1 to R11 to the HOME-001 rows each carries, by card id, as the step 5 board holds it, with 0BgjD59r carrying R7 and qY9mBz-y carrying R10. THE SYSTEM SHALL NOT judge a row any of whose code files is absent at that commit, SHALL NOT edit, reword or renumber any HOME-001 row, and SHALL NOT record as this judgement anything measured on a checkout of another commit.",
+      "title": "Give a lys.given record its canonical bytes and its given hash",
+      "spec": "Add to GivenRecord its canonical bytes and its given hash. WHEN the canonical bytes of a given record are asked for, THE SYSTEM SHALL return the RFC 8785 serialisation of the record's custom.data value: object members ordered by key, no whitespace between tokens, integers in decimal with no sign, fraction or exponent, strings escaping only the quotation mark, the reverse solidus and U+0000 to U+001F (\\b, \\t, \\n, \\f and \\r in their two-character forms, every other control character as \\u00 and two lowercase hex digits), and every other character as its UTF-8 bytes. The given hash SHALL be the lowercase hex SHA-256 of exactly those bytes. THE SYSTEM SHALL NOT hash the entry's line, id, parentId or timestamp, SHALL NOT serialise in struct field order, SHALL NOT append a newline to the canonical bytes, and SHALL NOT change the bytes a lys.given entry is written with.",
       "acceptance": [
-        "`grep -c 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff docs/design/home/PROOF-CHAIN.md` prints a number of 1 or more, and the frame section names the toolchain channel `1.97.1`.",
-        "The row table holds exactly 12 rows, R1 to R12, and its present and absent marks equal what `git cat-file -e 0073b966:<path>` reports for each listed path.",
-        "The row table marks docs/design/home/LOSS-ACCOUNT.md absent in R4's row; crates/lys-home/examples/passthrough.rs and docs/design/home/PROOF-PROXY.md absent in R7's row; 17 paths absent in R10's row; crates/lys-home/src/record/handover.rs and docs/design/home/PROOF-HANDOVER.md absent in R12's row; and every listed path of R1, R2, R3, R5, R6, R8, R9 and R11 present.",
-        "R7, R10 and R12 are each named as unbuilt, needing their own words and brief, and no Jev line, leg outcome or card verdict of this proof is attributed to them as judged.",
-        "The card map lists exactly seven card ids, every row R1 to R11 appears under a card, 0BgjD59r lists R7 and qY9mBz-y lists R10."
+        "The record with config_dir {path \"/c\", source template}, one document {kind claude_md_chain, path \"/w/é<TAB>x.md\" where <TAB> is U+0009, length 3, sha256 of 64 '0' characters}, environment [\"A\"], harness \"claude-code\", harness_version \"2.1.283\" and the measured kinds gives canonical bytes equal, byte for byte, to this 447-byte literal written out in the test: {\"config_dir\":{\"path\":\"/c\",\"source\":\"template\"},\"documents\":[{\"kind\":\"claude_md_chain\",\"length\":3,\"path\":\"/w/é\\tx.md\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\"}],\"environment\":[\"A\"],\"harness\":\"claude-code\",\"harness_version\":\"2.1.283\",\"kinds\":{\"resolved\":[\"claude_md_chain\",\"user_claude_md\",\"memory_index\",\"appended_instructions\",\"mcp_config\",\"environment_names\"],\"unlisted\":[\"claude_md_imports\",\"claude_rules\"]}}",
+        "The given hash of that record is 052eda2d4a3284437ed550cc26e30d4faa5332f9d9444210d3c5b08e12bcc1c8.",
+        "A record appended as a lys.given entry and read back with from_entry gives canonical bytes equal to the appended record's canonical bytes.",
+        "The tests in record/given_tests.rs and tests/given_record.rs that passed before the change pass unchanged."
       ],
       "files": {
-        "create": [
-          "docs/design/home/PROOF-CHAIN.md"
+        "create": [],
+        "modify": [
+          "crates/lys-home/src/record/given.rs",
+          "crates/lys-home/src/record/given_tests.rs"
         ],
-        "modify": [],
         "delete": []
       },
       "checklist": [
-        "C83"
+        "C46"
       ],
       "stories": [
-        "S35"
+        "S24"
       ]
     },
     {
       "id": "R2",
-      "title": "Record Jev's verdict on each file of the crate at the measured commit",
-      "spec": "WHEN the build judges crates/lys-home at 0073b966, THE SYSTEM SHALL ask Jev through jev_ask.awl about each of the 25 paths `git ls-tree -r --name-only 0073b966 crates/lys-home` prints, the change being that file added against the empty tree and cut per part as the chain cuts a new file, and SHALL record in docs/design/home/PROOF-CHAIN.md one line per path with the parts asked, the model, the run id, the verdict (`patched`, `solved`, `unsure` or `not_asked`), the patched value when Jev gives one, held, and Jev's reason. IF a file's verdict is `unsure`, THEN THE SYSTEM SHALL ask once more with the whole file as one part and record both asks, and the line SHALL read `unsure` when the second ask is also unsure. IF the verdict is `not_asked`, THEN the line SHALL record the file as not measured with Jev's reason, and IF that reason is that the chain skipped a file it should have read, THEN THE SYSTEM SHALL record a finding against the chain, for the chain's board. THE SYSTEM SHALL record the Jev lines as evidence, SHALL NOT present them as a command a reader can rerun, SHALL NOT ask Jev about any path outside crates/lys-home, SHALL NOT add a src_land mode, and SHALL NOT let a `solved` verdict close a finding another leg holds.",
+      "title": "Sign a given record and keep the statement beside the lys.given entry",
+      "spec": "Add lys-core to lys-home's dependencies by workspace path with its default features. Add the custom type constant lys.given_statement beside the other lys custom types, and the module record/given_statement.rs declared from record/mod.rs. WHEN a given record appended as a lys.given entry is signed with an Ed25519Identity, THE SYSTEM SHALL call lys-core's sign_attestation over the record's canonical bytes (R1), store the attestation's COSE_Sign1 bytes in the home's block store, and append one custom entry of type lys.given_statement as the child of that lys.given entry, whose data is exactly {given: the lys.given entry's id, statement: the block hash of the COSE bytes}. It SHALL read lys.given_statement entries back with customs_everywhere in file order. THE SYSTEM SHALL NOT change lys-core's attestation format or API, SHALL NOT sign any bytes other than the canonical bytes, SHALL NOT sign the render event or any other entry, SHALL NOT put the canonical bytes, any byte of the key or any document content in the entry, and SHALL NOT move the session head.",
       "acceptance": [
-        "The Jev section holds exactly 25 file lines, and their paths equal, as a set, the 25 lines `git ls-tree -r --name-only 0073b966 crates/lys-home` prints.",
-        "Every Jev line carries a non-empty model, a non-empty run id, and a verdict that is exactly one of `patched`, `solved`, `unsure` and `not_asked`.",
-        "Every Jev line whose first ask was `unsure` carries a second ask whose part is the whole file.",
-        "Every Jev line reading `not_asked` reads not measured and carries Jev's reason.",
-        "No Jev line names a path outside crates/lys-home: docs/design/home/RECORD.md, PROOF-RESUME.md, PROOF-FEWSHOT.md, PROOF-CANON.md and canon/canon.jsonl have no Jev line.",
-        "The Jev section states that its lines are evidence and not a rerunnable command."
+        "crates/lys-home/Cargo.toml's [dependencies] has the line `lys-core.workspace = true` and names no lys-core feature.",
+        "Signing a record appended to a session, with a key generated in a temporary directory by Ed25519Identity::load_or_generate, appends one lys.given_statement entry whose parentId equals the lys.given entry's id and whose data has exactly the keys given and statement, with given equal to that id.",
+        "The block named by statement parses with Attestation::from_cose_bytes, its payload_hash in lowercase hex equals the record's given hash, and verify_attestation_bytes(block bytes, canonical bytes) returns Ok.",
+        "The session's head and head hash are equal before and after the statement is appended, and the lys.given entry's line in the session file is byte-identical before and after.",
+        "Reading back a session holding two signed records gives two lys.given_statement entries in file order, each naming its own lys.given entry."
       ],
       "files": {
-        "create": [],
+        "create": [
+          "crates/lys-home/src/record/given_statement.rs",
+          "crates/lys-home/src/record/given_statement_tests.rs"
+        ],
         "modify": [
-          "docs/design/home/PROOF-CHAIN.md"
+          "Cargo.lock",
+          "crates/lys-home/Cargo.toml",
+          "crates/lys-home/src/record/entries.rs",
+          "crates/lys-home/src/record/mod.rs"
         ],
         "delete": []
       },
       "checklist": [
-        "C84"
+        "C47"
       ],
       "stories": [
-        "S35"
+        "S24"
       ]
     },
     {
       "id": "R3",
-      "title": "Run the gate's seven deterministic legs at the measured commit and record the ast-grep leg as not measured",
-      "spec": "THE SYSTEM SHALL run, from the root of the worktree at 0073b966 with toolchain 1.97.1, each of the seven commands .land/gates.sh runs at that commit, verbatim, workspace-wide and in its order: `sh scripts/design/gate.sh`, `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo clippy --all-targets -- -D warnings`, `cargo test --workspace --all-features`, `cargo doc --no-deps --all-features`, `cargo doc --no-deps`; and SHALL record in docs/design/home/PROOF-CHAIN.md for each leg the exact command, the commit, its exit status and its outcome, `pass` for exit status 0 and `fail` for any other, and for a failing leg the failing crate or design cluster, the command and the first error it printed. Clippy pedantic SHALL be measured by the two clippy legs through the workspace lint table's `pedantic` at `warn` under `-D warnings`, with no flag added. THE SYSTEM SHALL record the ast-grep leg as not measured, naming card ngzIkkpd as the reason: lys has no ast-grep rule set until that card lands. THE SYSTEM SHALL state that the rerun promise covers these seven deterministic legs at that commit and toolchain only, and not Jev. THE SYSTEM SHALL NOT run fmt in its rewriting form, SHALL NOT borrow an ast-grep rule set, SHALL NOT change a byte of the worktree before a leg runs, and SHALL NOT record the landing head's gate as this measurement, nor this measurement as the landing's gate.",
+      "title": "Take an optional signing key in render-launch, report the given hash and say signed or unsigned",
+      "spec": "Add an optional --key <path> to render-launch's arguments, naming a raw 32-byte Ed25519 seed file. WHEN render-launch appends its lys.given entry, THE SYSTEM SHALL put the record's given hash (R1) in the report as given_sha256, and the report's signing member SHALL be the word signed when a key was given and the statement written, and the word unsigned otherwise. WHEN a key is given, THE SYSTEM SHALL load it with Ed25519Identity::load before any file is written; SHALL refuse by path, before any file is written, when given-statement.cose or given-data.json already exists under --out; and after the lys.given entry is appended SHALL sign it (R2), write the canonical bytes to <out>/given-data.json and the statement's COSE bytes to <out>/given-statement.cose, and report statement (the lys.given_statement entry id), statement_file and payload_file, the two files' absolute paths. WHEN no key is given, THE SYSTEM SHALL write no statement block, no lys.given_statement entry, no given-statement.cose and no given-data.json, and the report SHALL carry no statement, statement_file or payload_file member. IF the key file cannot be loaded, THEN THE SYSTEM SHALL fail with an error naming the key file's path, write no file under --out and append no entry. THE SYSTEM SHALL NOT alter the template_render event or add the given hash to it, SHALL NOT change the lys.given entry's data, SHALL NOT put any byte of the seed in a report, an error, a log line or a Debug form, SHALL NOT generate a key, SHALL NOT read a key from the environment, and SHALL NOT run the launch line.",
       "acceptance": [
-        "The legs section holds exactly seven leg lines, whose commands are, verbatim and in order: `sh scripts/design/gate.sh`, `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo clippy --all-targets -- -D warnings`, `cargo test --workspace --all-features`, `cargo doc --no-deps --all-features`, `cargo doc --no-deps`.",
-        "Every leg line names 0073b966, an integer exit status, and `pass` when the exit status is 0 and `fail` when it is not.",
-        "Every leg line reading `fail` names the failing crate or design cluster, the command and the first error line.",
-        "The proof holds an ast-grep line that reads not measured and names ngzIkkpd.",
-        "The rerun statement names the seven commands, 0073b966 and toolchain 1.97.1, and says that Jev's lines are not covered by it.",
-        "Running each recorded command from the root of a worktree made by `git worktree add <dir> 0073b966`, with toolchain 1.97.1, gives the exit status the proof records for it."
+        "A render of the fixture template with no --key exits 0; its report's signing is \"unsigned\", its given_sha256 is 64 lowercase hex characters, and it has no statement, statement_file or payload_file member; --out holds exactly the five launch files; the session holds no lys.given_statement entry.",
+        "A render of the same fixture with --key naming a test key exits 0; its report's signing is \"signed\"; --out holds the five launch files plus given-statement.cose and given-data.json; the session holds exactly one lys.given_statement entry, whose id equals the report's statement.",
+        "In the keyed render, the SHA-256 of given-data.json equals the report's given_sha256, and statement_file and payload_file are absolute paths ending in given-statement.cose and given-data.json.",
+        "The lys.given entries' data values of a keyed and an unkeyed render of the same fixture are equal, and their template_render events' data have the same keys, neither holding the given_sha256 value.",
+        "A keyed render's session head hash equals the session head hash taken before it.",
+        "--key naming a 31-byte file exits non-zero with an error naming that file's path; --out holds no file afterwards and the session file is byte-identical to before.",
+        "--key with <out>/given-statement.cose already present exits non-zero with an error naming that path, writes no other file under --out and appends no entry.",
+        "A keyed render with a key file whose 32 bytes are 0x00 to 0x1F in order has a report and a stderr that contain neither the seed's 64-character lowercase hex form nor its standard base64 form, and the Debug form of the error from the 31-byte case contains neither the hex nor the base64 form of that file's bytes."
       ],
       "files": {
         "create": [],
         "modify": [
-          "docs/design/home/PROOF-CHAIN.md"
+          "crates/lys-home/src/harness/claude_code/launch.rs",
+          "crates/lys-home/src/error.rs"
         ],
         "delete": []
       },
       "checklist": [
-        "C85"
+        "C45",
+        "C46",
+        "C47"
       ],
       "stories": [
-        "S35"
+        "S25"
       ]
     },
     {
       "id": "R4",
-      "title": "Record each finding as its own line, checked against the current main head",
-      "spec": "THE SYSTEM SHALL record in docs/design/home/PROOF-CHAIN.md every finding of every leg as its own line: each `patched` and each `unsure` Jev line, each diagnostic of a failing deterministic leg, each finding against the chain, and each repository-rule finding of R5. Each line SHALL carry a finding id, the leg, the path and line it concerns, what was found (for a `patched` line, what Jev found), the HOME-001 rows whose files include that path, and exactly one status against the main head the proof names by full sha: `still true at <sha>`, or `answered by <sha>` naming the commit that fixed it. WHEN a finding still true lies in crates/lys-home or docs/design/home, THE SYSTEM SHALL list it under findings for the step 5 board, one card each, worded from its line, with the act that answers it; for an `unsure` line that act is a person's read of that file, recorded as a card. WHEN a finding lies outside crates/lys-home and docs/design/home, THE SYSTEM SHALL list it under findings outside this card's scope with the board it belongs to, a lys-core finding on the Lys root board and a design cluster's finding on that cluster's board, and it SHALL hold no HOME-001 row. WHEN a finding is against the chain, THE SYSTEM SHALL list it for the chain's board, holding no row. THE SYSTEM SHALL NOT give an answered finding a card, SHALL NOT put two findings on one line, and SHALL NOT put a finding outside crates/lys-home and docs/design/home on the step 5 board.",
+      "title": "Prove the given statement end to end with two test keys",
+      "spec": "Add an integration test that renders the fixture template with two keys generated at test time in temporary directories by Ed25519Identity::load_or_generate (key A and key B), with the template's environment holding a fixture secret value and the fixture session holding a fixture user message. THE SYSTEM SHALL NOT commit a seed file, SHALL NOT use a fixture secret or message as, or inside, a test name, and every loop over offsets or files SHALL assert how many cases it ran.",
       "acceptance": [
-        "Every finding line carries exactly one of `still true at <sha>` and `answered by <sha>`, and `git cat-file -t <sha>` prints `commit` for every sha named.",
-        "Every Jev line reading `patched` or `unsure` is cited by exactly one finding line, and every failing leg line is cited by one finding line or more.",
-        "Every finding line under findings for the step 5 board reads still true and names a path under crates/lys-home or docs/design/home.",
-        "Every finding line under findings outside this card's scope names its board and holds no HOME-001 row.",
-        "No finding line reading answered appears under findings for the step 5 board."
-      ],
-      "files": {
-        "create": [],
-        "modify": [
-          "docs/design/home/PROOF-CHAIN.md"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C86"
-      ],
-      "stories": [
-        "S36"
-      ]
-    },
-    {
-      "id": "R5",
-      "title": "Record the three findings against the repository's own rules",
-      "spec": "THE SYSTEM SHALL record in docs/design/home/PROOF-CHAIN.md, whether or not Jev or a leg raises them, three findings against the repository's own rules, each as its own line under R4's form. (a) docs/design/home/LOSS-ACCOUNT.md, which HOME-001 R4 lists in files.create, does not exist at 0073b966 nor at the main head the proof names by `git cat-file -e`; the line cites docs/design/home/briefs/HOME-001.json line 148, docs/design/home/briefs/HOME-001.md line 137, docs/design/home/DESIGN.md line 84 and docs/design/home/design.json line 135 as they stand at 7b53625, holds R4, and names as the act that answers it a card that writes LOSS-ACCOUNT.md from render.rs as it stands on main. (b) crates/lys-home/src/record/mod.rs carries functions against the rule that a mod.rs carries only pub mod, pub use and module docs; the line records its line count and fn count at 0073b966 and at the main head, holds every row whose files include that path (R1 and R2), and names as the answering act a card that moves those functions into named modules under record/ so mod.rs carries only pub mod, pub use and docs. (c) crates/lys-home/src/harness/claude_code/mod.rs carries pub consts and a fn beside its pub mods under the same rule; the line records what the file carries at 0073b966 and at the main head, records the fn projects_slug as answered by ca7b462 where the head carries it as `pub use paths::projects_slug`, holds R3 and R4 while any pub const or fn remains in the file at the head, and names as the answering act a card that moves what remains into a named module. THE SYSTEM SHALL NOT write LOSS-ACCOUNT.md, SHALL NOT move any function or const, and SHALL NOT give R4 the verdict done on the strength of render.rs.",
-      "acceptance": [
-        "The LOSS-ACCOUNT finding names docs/design/home/LOSS-ACCOUNT.md and the four citations HOME-001.json:148, HOME-001.md:137, DESIGN.md:84 and design.json:135, and holds R4.",
-        "The record/mod.rs finding records 552 lines and 36 fn items at 0073b966, the values `git show 0073b966:crates/lys-home/src/record/mod.rs | wc -l` and `git show 0073b966:crates/lys-home/src/record/mod.rs | grep -cE '\\bfn [a-z_0-9]+'` print, records the values the same two commands print at the main head it names, and holds R1 and R2.",
-        "The claude_code/mod.rs finding records the four pub consts HARNESS, PROVIDER, API and AUTHORED and the fn projects_slug at 0073b966, and records projects_slug as answered by ca7b462.",
-        "Read at head 7b53625, crates/lys-home/src/harness/claude_code/mod.rs carries the four pub consts and `pub use paths::projects_slug`, so the claude_code/mod.rs finding measured against that head reads still true for the consts and holds R3 and R4.",
-        "`git diff --stat <landing base>..<landing head> -- docs/design/home/LOSS-ACCOUNT.md crates/lys-home` prints nothing."
-      ],
-      "files": {
-        "create": [],
-        "modify": [
-          "docs/design/home/PROOF-CHAIN.md"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C87"
-      ],
-      "stories": [
-        "S36"
-      ]
-    },
-    {
-      "id": "R6",
-      "title": "Give each of the seven cards its verdict by row",
-      "spec": "THE SYSTEM SHALL record in docs/design/home/PROOF-CHAIN.md one verdict for each of the seven step 5 cards of R1's map: `done` when every row the card carries is built and no finding still true at the main head touches any file of those rows, and `in review` otherwise, naming each finding id that holds it. WHILE the finding line citing a `patched` or `unsure` Jev line on a row's file reads `still true at <sha>`, that sha being the main head the proof names, THE SYSTEM SHALL hold the row on it. THE SYSTEM SHALL NOT hold a row on a `patched` or `unsure` Jev line whose finding line reads `answered by <sha>`, nor on a `solved` or `not_asked` line. Cards 0BgjD59r and qY9mBz-y SHALL be recorded as not set done by this card, their rows unbuilt. THE SYSTEM SHALL state that green means the landing passed src_pr and src_land and never that the crate is clean. THE SYSTEM SHALL NOT give `done` to a card any of whose rows is held or unbuilt, and SHALL NOT give a verdict to any card other than the seven.",
-      "acceptance": [
-        "The verdict table holds exactly seven lines, one per card id of R1's card map.",
-        "Each card carrying a row whose files include a path named by an R5 finding line recorded as `still true at <sha>`, that sha being the main head the proof names, reads `in review` and names that finding id.",
-        "0BgjD59r and qY9mBz-y read not set done.",
-        "A card whose only `patched` or `unsure` Jev line is cited by a finding line reading `answered by <sha>` reads `done`, provided every row it carries is built and no finding line reading `still true at <sha>` at the main head the proof names touches a file of those rows.",
-        "No card reading `done` carries a row whose files include a path named by a finding line reading still true.",
-        "The proof holds the statement that green means the landing passed src_pr and src_land and does not mean the crate is clean."
-      ],
-      "files": {
-        "create": [],
-        "modify": [
-          "docs/design/home/PROOF-CHAIN.md"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C88"
-      ],
-      "stories": [
-        "S37"
-      ]
-    },
-    {
-      "id": "R7",
-      "title": "Land the proof through src_pr and src_land without changing the crate",
-      "spec": "WHEN the build lands, THE SYSTEM SHALL land through src_pr and src_land, with src_land's Jev reading the landing diff and src_land's gate running on the landing head, and that gate's outcome SHALL be recorded as the landing's own gate with the landing head's sha, apart from the 0073b966 measurement. The landing diff SHALL hold docs/design/home/PROOF-CHAIN.md, this card's brief and design rows in docs/design/home and the markdown rendered from them, and the roadmap and decision rows written with this brief. THE SYSTEM SHALL NOT change any path under crates/lys-home, SHALL NOT change any HOME-001 row, and SHALL NOT land any other file.",
-      "acceptance": [
-        "`git diff --stat <landing base>..<landing head> -- crates/lys-home` prints nothing.",
-        "`git diff --name-only <landing base>..<landing head>` lists only paths under docs/design.",
-        "`git diff <landing base>..<landing head> -- docs/design/home/briefs/HOME-001.json` prints nothing.",
-        "`sh scripts/design/gate.sh` exits 0 at the landing head.",
-        "src_pr and src_land each record a pass for this card, and src_land's record names the landing head's sha and its gate outcome."
+        "verify_attestation_bytes(given-statement.cose bytes, given-data.json bytes) returns Ok for the render signed with key A.",
+        "For each byte offset of given-statement.cose, flipping the lowest bit of that one byte makes verify_attestation_bytes return Err(TrustError::InvalidSignature); the number of offsets tried equals the file's length, and that length is at least 191 and at most 199.",
+        "verify_attestation_bytes_by_signer with key A's public key returns Ok for the statement signed with key A and Err for the statement signed with key B, and with key B's public key returns Err for the statement signed with key A.",
+        "For one keyed render, the attestation's payload_hash in lowercase hex equals the report's given_sha256, and both equal the SHA-256 of serde_json::to_vec of the data value parsed by the test from the lys.given entry's line in the session file.",
+        "A byte search of given-statement.cose, given-data.json, the statement block's bytes read from the home's block store, and the lys.given_statement entry's line, for the fixture secret value and for the fixture user message's text, searches 4 byte strings and finds 0 matches."
       ],
       "files": {
         "create": [
-          "docs/design/home/briefs/HOME-008.md"
+          "crates/lys-home/tests/given_statement.rs"
         ],
-        "modify": [
-          "docs/design/home/DESIGN.md",
-          "docs/design/home/CHECKLIST.md",
-          "docs/design/home/USER-STORIES.md"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C89"
-      ],
-      "stories": [
-        "S37"
-      ]
-    },
-    {
-      "id": "R8",
-      "title": "After a green landing, set the board from the proof",
-      "spec": "WHEN the landing is green through src_pr and src_land, THE SYSTEM SHALL file one card on the step 5 board for each finding the proof lists under findings for the step 5 board, worded from its proof line; SHALL set each of the seven cards whose verdict reads `done` to done with a pointer to the landing commit; and SHALL keep each card whose verdict reads `in review` in review with a pointer to each finding card that holds it. THE SYSTEM SHALL NOT set 0BgjD59r or qY9mBz-y done, SHALL NOT file a finding outside crates/lys-home and docs/design/home on the step 5 board, and SHALL NOT change any card other than the seven beyond filing finding cards.",
-      "acceptance": [
-        "Every card whose verdict in the proof reads `done` reads done on the step 5 board and names the landing commit's sha.",
-        "Every card whose verdict reads `in review` reads in review on the step 5 board and names one finding card for each finding id the proof lists against it.",
-        "The step 5 board gains exactly one new card per finding line under findings for the step 5 board, and each new card names its finding id.",
-        "0BgjD59r and qY9mBz-y hold the same state after the board acts as before them."
-      ],
-      "files": {
-        "create": [],
         "modify": [],
         "delete": []
       },
       "checklist": [
-        "C90"
+        "C48",
+        "C49",
+        "C50",
+        "C51"
       ],
       "stories": [
-        "S37"
+        "S24",
+        "S26"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Write lys.given_statement into RECORD.md and the crate README",
+      "spec": "Add lys.given_statement to RECORD.md's lys custom entries: its data keys, that it hangs under the lys.given entry it signs, that the statement is a lys/attestation/v2 COSE_Sign1 kept as a block, that its payload is the RFC 8785 bytes of the lys.given entry's data, the two files under --out, and that a render with no key writes none of it. Add the row to the crate README's custom-type table and add --key to its render-launch description. Neither document SHALL carry a key's bytes, a secret value or any document content.",
+      "acceptance": [
+        "RECORD.md's 'The lys custom entries' section has a lys.given_statement item naming the keys given and statement, lys/attestation/v2, RFC 8785, given-statement.cose and given-data.json.",
+        "The README's custom-type table has a lys.given_statement row, and the README names render-launch's --key argument."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/home/RECORD.md",
+          "crates/lys-home/README.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C47"
+      ],
+      "stories": [
+        "S24"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Record a stranger's check of the given statement in PROOF-GIVEN.md",
+      "spec": "Add a section to PROOF-GIVEN.md that renders the fixture with two test keys generated by `lys key generate` in a scratch directory, and records each command a stranger runs with the lys and lys-home binaries built from the tree, with its exit status and output: `lys verify` on the statement; the named refusal of a copy with one byte altered; the signer comparison for both keys; and the given hash recomputed from the session file with python3. The section SHALL name CONFORMANCE row 6.5 as passed partially, the START card 98qkhhCb and the ROLES card Ink1H1Os as carrying the other two statements, and row 6.1's --cert as the trusted-certificate check to come. THE SYSTEM SHALL NOT put a seed, a secret value or any document content in the proof, and SHALL NOT use a production key.",
+      "acceptance": [
+        "The proof records `lys verify --attestation <out>/given-statement.cose --payload <out>/given-data.json` exiting 0.",
+        "The proof records `if lys verify --attestation <copy> --payload <out>/given-data.json; then echo \"accepted: <copy>\"; else echo \"refused: <copy>\"; fi`, run on a copy of given-statement.cose with the byte at offset 100 altered, printing \"refused: <copy>\" on stdout, with lys verify exiting 1 and its stderr exactly \"error: attestation verification failed: malformed or non-canonical artifact, payload mismatch, or invalid signature\".",
+        "The proof records `test \"$(lys --json verify --attestation <statement> --payload <payload> | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"signer_public_key\"])')\" = \"$(lys --json key inspect --key <key A> | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"public_key_ed25519\"])')\"` exiting 0 for the statement signed with key A and exiting 1 for the statement signed with key B.",
+        "The proof records a python3 command that reads the lys.given entry's data from the session file, serialises it with json.dumps(data, sort_keys=True, separators=(',', ':'), ensure_ascii=False), encodes it as UTF-8 and prints its SHA-256, and that value equals the render report's given_sha256 and the payload_hash `lys --json verify` prints for the statement.",
+        "The proof names row 6.5 as partial, names 98qkhhCb and Ink1H1Os, and names row 6.1's --cert.",
+        "A search of PROOF-GIVEN.md for the fixture secret value, for key A's seed in lowercase hex and for key B's seed in lowercase hex finds 0 occurrences of each."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/home/PROOF-GIVEN.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C48",
+        "C49",
+        "C51"
+      ],
+      "stories": [
+        "S24",
+        "S26"
       ]
     }
   ],
   "boundaries": [
-    "No byte under crates/lys-home changes: the landing diff under that path is empty.",
-    "No HOME-001 row (R1 to R12) is edited, reworded or renumbered.",
-    "docs/design/home/LOSS-ACCOUNT.md is not written by this card, and no function or const is moved out of record/mod.rs or claude_code/mod.rs.",
-    "No compile, test battery or gate of this card runs anywhere but the build host that runs every compile; the measurement is taken on a worktree at 0073b966, never on the landing head.",
-    "fmt is measured only in its check form; the rewriting form is never run on the worktree.",
-    "No ast-grep rule set is borrowed, and no src_land mode is added.",
-    "Jev reads only the 25 files of crates/lys-home at 0073b966; the rows' documents are not asked.",
-    "No card other than the seven step 5 cards is set done or changed, beyond filing the finding cards the proof lists; 0BgjD59r and qY9mBz-y are never set done.",
-    "A finding outside crates/lys-home and docs/design/home is recorded in the proof and never filed on the step 5 board.",
+    "No start statement and no role-move statement: no signer is built over a launch record or a role version record; those are the further units on the START card 98qkhhCb and the ROLES card Ink1H1Os.",
+    "`lys verify`, its one failure message and every other part of the lys crate are not changed; lys-core's attestation format and API are used as they are.",
+    "The template_render event is not altered and does not gain the given hash.",
+    "The lys.given entry's data is the same for every render, keyed or not.",
+    "No production key is created, used or stored; no seed file is committed; test keys are generated when a test or the proof runs.",
+    "No anchoring, no receipt and nothing appended to a lys log.",
+    "No check of the signer against a certificate; row 6.1's --cert does that later.",
+    "HOME-003's brief files and CONFORMANCE.md are not edited.",
+    "No transcript content, document content, secret value, credential or key byte in a statement, a payload file, an entry, a report, a log line, an error or a proof.",
     "The design's structure array is the whole file list; a path outside it is not created."
   ],
   "verification": [
-    "`git diff --stat <landing base>..<landing head> -- crates/lys-home` prints nothing.",
-    "`grep -c 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff docs/design/home/PROOF-CHAIN.md` prints 1 or more.",
-    "The proof's Jev section has 25 lines whose paths equal the output of `git ls-tree -r --name-only 0073b966 crates/lys-home`.",
-    "The proof's legs section has seven lines naming the seven commands .land/gates.sh runs at 0073b966, and one ast-grep line naming ngzIkkpd.",
-    "Rerun `sh .land/gates.sh` from the root of `git worktree add <dir> 0073b966` with toolchain 1.97.1: each leg's exit status equals the one the proof records.",
-    "The proof holds the three repository-rule findings, and the verdict table gives `in review`, naming the finding id, to each card carrying a row whose files include a path named by a finding recorded as still true at the main head the proof names.",
-    "`sh scripts/design/gate.sh` exits 0 at the landing head.",
-    "The step 5 board, read after the board acts, matches the proof's verdict table card for card."
+    "python3 scripts/design/validate.py docs/design/home exits 0.",
+    "python3 scripts/design/check-coverage.py docs/design/home exits 0.",
+    "cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, cargo clippy --all-targets -- -D warnings, cargo test --workspace --all-features, cargo doc --no-deps --all-features and cargo doc --no-deps exit 0.",
+    "sh scripts/design/gate.sh exits 0.",
+    "git diff --stat 7b536253 -- crates/lys crates/lys-core docs/design/home/briefs/HOME-003.json docs/design/home/briefs/HOME-003.md docs/design/identity/CONFORMANCE.md prints nothing.",
+    "git ls-files crates/lys-home | grep -E '\\.(key|seed)$' prints nothing.",
+    "The commands the R6 section of PROOF-GIVEN.md records, run again from a fresh clone at the landed commit with newly generated test keys, give the same exit statuses it records."
   ]
 }
