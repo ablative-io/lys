@@ -41,3 +41,11 @@
 - [ ] **C22** — Inclusion and consistency proofs read only the tiles they need, and the whole-log proof tree is gone (LYSLOGSTORE-006 R2).
 - [ ] **C23** — A log made before tiles gets them once, and never again (LYSLOGSTORE-006 R3).
 - [ ] **C24** — A gate test fails when a start or its first proof reads a leaf before the tail (LYSLOGSTORE-006 R4).
+
+## No open reads every leaf (LYSLOGSTORE-007)
+
+- [ ] **C25** — A frontier log opens from its tiles and reads no leaf under the pin (LYSLOGSTORE-007 R1).
+- [ ] **C26** — The anchor opens, creates, reads and proves through the frontier log and its tiles (LYSLOGSTORE-007 R2).
+- [ ] **C27** — The lys log and ca log commands and the revocation appends run on the frontier log (LYSLOGSTORE-007 R3).
+- [ ] **C28** — Only lys log audit reads every leaf, and the whole-tree Log is removed (LYSLOGSTORE-007 R4).
+- [ ] **C29** — A gate test fails when any open reads a leaf under the pin (LYSLOGSTORE-007 R5).

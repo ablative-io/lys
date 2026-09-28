@@ -150,6 +150,36 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "No open reads every leaf (LYSLOGSTORE-007)",
+      "items": [
+        {
+          "id": "C25",
+          "text": "A frontier log opens from its tiles and reads no leaf under the pin (LYSLOGSTORE-007 R1).",
+          "done": false
+        },
+        {
+          "id": "C26",
+          "text": "The anchor opens, creates, reads and proves through the frontier log and its tiles (LYSLOGSTORE-007 R2).",
+          "done": false
+        },
+        {
+          "id": "C27",
+          "text": "The lys log and ca log commands and the revocation appends run on the frontier log (LYSLOGSTORE-007 R3).",
+          "done": false
+        },
+        {
+          "id": "C28",
+          "text": "Only lys log audit reads every leaf, and the whole-tree Log is removed (LYSLOGSTORE-007 R4).",
+          "done": false
+        },
+        {
+          "id": "C29",
+          "text": "A gate test fails when any open reads a leaf under the pin (LYSLOGSTORE-007 R5).",
+          "done": false
+        }
+      ]
     }
   ]
 }

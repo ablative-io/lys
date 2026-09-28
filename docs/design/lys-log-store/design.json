@@ -399,6 +399,101 @@
       "path": "crates/lys-identity-server/tests/receipt_after_restart.rs",
       "note": "R4: A gate test fails when a start or its first proof reads past the tail",
       "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-log-store/src/tile_open.rs",
+      "note": "R1: A frontier log opens from its tiles",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-log-store/src/tile_open_tests.rs",
+      "note": "R1: A frontier log opens from its tiles",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/open.rs",
+      "note": "R2: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/genesis/constructors.rs",
+      "note": "R2: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/artifact.rs",
+      "note": "R2: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/checkpoint.rs",
+      "note": "R2: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/submit.rs",
+      "note": "R2: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/append.rs",
+      "note": "R2: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/witness/fixture.rs",
+      "note": "R2: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/status.rs",
+      "note": "R3: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/checkpoint.rs",
+      "note": "R3: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/append.rs",
+      "note": "R3: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/prove.rs",
+      "note": "R3: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/ca_log.rs",
+      "note": "R3: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-identity/src/revocation/append.rs",
+      "note": "R3: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-log-store/tests/no_open_reads_every_leaf.rs",
+      "note": "R5: A gate test fails when an open reads a leaf under the pin",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/audit.rs",
+      "note": "R4: lys log audit, the one read of every leaf",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/audit_tests.rs",
+      "note": "R4: lys log audit, the one read of every leaf",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/mod.rs",
+      "note": "R4: lys log audit, the one read of every leaf",
+      "brief": "LYSLOGSTORE-007"
     }
   ],
   "inventory": [

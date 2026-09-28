@@ -100,6 +100,10 @@
         {
           "id": "S6",
           "text": "As a log inspector, I want a read-only open of a store with an interrupted append to refuse and say that a repair is pending, so that I learn the store is past its pin without my open repairing it."
+        },
+        {
+          "id": "S10",
+          "text": "As a log inspector, I want opening a log to cost the same however long it is, and one named command that reads every leaf when I ask for an audit, so that I never pay for a full read I did not ask for."
         }
       ]
     },

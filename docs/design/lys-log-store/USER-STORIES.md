@@ -42,6 +42,8 @@
 
 **S6.** As a log inspector, I want a read-only open of a store with an interrupted append to refuse and say that a repair is pending, so that I learn the store is past its pin without my open repairing it.
 
+**S10.** As a log inspector, I want opening a log to cost the same however long it is, and one named command that reads every leaf when I ask for an audit, so that I never pay for a full read I did not ask for.
+
 ## Leaf store maintainer — Reads the file store's contract before relying on it or changing it
 
 **S7.** As a leaf store maintainer, I want the file store's module doc to say what opening a store does and never does, so that I can rely on open never deleting a leftover temporary file.

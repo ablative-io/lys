@@ -2385,6 +2385,33 @@
       },
       "depends_on": [],
       "notes": "Written by hand."
+    },
+    {
+      "id": "RM-097",
+      "title": "Nothing opens a log by reading every leaf: the anchor and the lys log commands open from the tiles",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "A frontier log opens from its tiles; the anchor, the lys log and ca log commands and the revocation appends move onto it; only a new lys log audit reads every leaf; the whole-tree Log is removed; a gate test fails when an open reads under the pin.",
+      "provenance": {
+        "requested_by": "archie",
+        "date": "2026-09-28T22:15:00+10:00",
+        "quote": "",
+        "context": "Found in the replay sweep Tom asked every lead for on 28 September: the anchor and every lys log command read every leaf on open."
+      },
+      "links": {
+        "cluster": "lys-log-store",
+        "decisions": [
+          "ADR-123"
+        ],
+        "briefs": [
+          "LYSLOGSTORE-007"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-096"
+      ],
+      "notes": "Written by hand."
     }
   ]
 }
