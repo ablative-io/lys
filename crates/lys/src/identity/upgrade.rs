@@ -2,24 +2,29 @@
 //! the previous build kept to return to.
 //!
 //! The install runs the secrets broker and the directory service from its
-//! own `bin/`. An upgrade reads every binary's `--version`, the installed
-//! and the new, before it stops anything, and refuses by name when the root
-//! holds no install, when the folder lacks a binary, or when a version
-//! cannot be read. It then stops the service and the broker, each waited on
-//! through its exit lock ([`super::install::exit_wait`]); moves `bin/` to
-//! `bin.previous/`, replacing an older one; places each new binary by a
-//! copy to a temporary name and a rename; places a screens package through
-//! the install's own verify-and-place path, keeping the previous screens in
-//! `surface.previous/`; and starts the broker and the service, each waited
-//! on for ready on its readiness event.
+//! own `bin/`, with the configuration and compose files its build renders.
+//! An upgrade first ends any upgrade stopped part-way ([`swap::recover`]).
+//! It then reads every binary's `--version`, the new and the installed (an
+//! install made before builds were named is adopted, [`adopt`]), and renders
+//! the new build's configuration and compose files ([`render`]), before it
+//! stops anything; it refuses by name when the root holds no install, when
+//! the folder lacks a binary, or when a new binary's version cannot be read.
+//! It writes its intent record ([`intent`]) and swaps the build in, each
+//! step recorded as it completes ([`swap`]): the service and the broker
+//! stopped, each waited on for its exit; `bin/` kept in `bin.previous/` and
+//! the new binaries placed; the files kept in `config.previous/` and the
+//! new ones placed; the screens kept in `surface.previous/` and the new ones
+//! placed; the compose services brought to a changed definition; and the
+//! broker and then the service started, each waited on for ready.
 //!
-//! Invariants: nothing is stopped until every input has been read and
-//! checked. When a start or a readiness fails, what was started is stopped,
-//! the previous binaries (and screens) are put back, started and waited on
-//! for ready, and the upgrade fails naming the binary and its log. An
-//! upgrade writes only `bin/`, `bin.previous/`, the screens, the logs, the
-//! process files and `install/build.json`: never `data/`, a credential,
-//! `deployment.toml`, `identity.json` or the compose services.
+//! Invariants: nothing is stopped until every input has been read, checked
+//! and rendered. When a step, a start or a readiness fails, what was started
+//! is stopped, the previous binaries, files and screens are put back and
+//! started and waited on for ready, and the upgrade fails naming the binary
+//! and its log. An upgrade writes only `bin/`, `bin.previous/`, the
+//! configuration and compose files, `config.previous/`, the screens, the
+//! logs, the process files and `install/`: never `data/`, a credential or
+//! `deployment.toml`.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -28,11 +33,21 @@ use std::process::{Command, Stdio};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
+use super::config::DeploymentConfig;
 use super::error::{ErrorKind, IdentityError, IdentityResult};
 use super::install::layout::{BINARIES, BROKER_PORT, Layout, SERVICE_PORT};
+use super::install::log_wait::{self, LogCursor};
 use super::install::{services, surface};
 use super::private_files;
 use crate::commands::output::Emitter;
+
+pub mod adopt;
+pub mod intent;
+pub mod render;
+pub mod swap;
+
+use intent::Intent;
+use render::Render;
 
 /// What the operator chose.
 #[derive(Debug)]
@@ -65,7 +80,7 @@ pub struct Unit {
     pub args: Vec<String>,
     /// Where its output is appended.
     pub log: PathBuf,
-    /// Where its pid is kept, its exit lock beside it.
+    /// Where its pid is kept, its exit lock and its log offset beside it.
     pub pid: PathBuf,
     /// How it is known to be ready.
     pub ready: Ready,
@@ -109,6 +124,38 @@ pub fn units(layout: &Layout) -> Vec<Unit> {
     ]
 }
 
+/// What an upgrade asks of the engine that runs the compose services.
+pub trait Engine {
+    /// Brings the compose services to the definition now in place,
+    /// recreating those whose definition changed, and waits for them ready.
+    fn apply(&mut self, layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<()>;
+}
+
+/// The compose services through `docker compose`, which recreates exactly
+/// the services whose rendered definition changed.
+#[derive(Debug)]
+pub struct Compose;
+
+impl Engine for Compose {
+    fn apply(&mut self, layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<()> {
+        let config = DeploymentConfig::load(&layout.deployment_config())?;
+        services::compose_up(layout, &config)?;
+        services::wait_ready(layout, &config, say)?;
+        say("compose services on their rendered definition and ready");
+        Ok(())
+    }
+}
+
+/// What an upgrade works with besides its inputs.
+pub struct Parts<'a> {
+    /// The broker and the service, in start order.
+    pub units: &'a [Unit],
+    /// The engine that runs the compose services.
+    pub engine: &'a mut dyn Engine,
+    /// The new build's templates.
+    pub render: &'a dyn Render,
+}
+
 fn refuse(
     kind: ErrorKind,
     action: &'static str,
@@ -119,42 +166,43 @@ fn refuse(
 }
 
 fn io(action: &'static str, path: &Path, error: &std::io::Error) -> IdentityError {
-    refuse(ErrorKind::PrivateFileIo, action, "binaries", error.to_string()).at(path)
-}
-
-/// Whether what `log` holds from byte `from` on contains `line`.
-fn log_says(log: &Path, from: u64, line: &str) -> bool {
-    std::fs::read(log).is_ok_and(|bytes| {
-        let start = usize::try_from(from).unwrap_or(usize::MAX).min(bytes.len());
-        String::from_utf8_lossy(&bytes[start..]).contains(line)
-    })
+    refuse(
+        ErrorKind::PrivateFileIo,
+        action,
+        "binaries",
+        error.to_string(),
+    )
+    .at(path)
 }
 
 /// Starts `unit` from `bin/` and waits for it ready. A process already
-/// running is left alone unless `replace` asks for it to be started afresh,
-/// and its whole log is read for its word. `true` when it was started.
+/// running is left alone unless `replace` asks for it to be started afresh.
+/// Its log is read forward from the offset it opened at, kept beside its
+/// pid file; one started before offsets were kept is read from the start,
+/// once. `true` when it was started.
 pub fn launch(layout: &Layout, unit: &Unit, replace: bool) -> IdentityResult<bool> {
     let before = std::fs::metadata(&unit.log).map_or(0, |meta| meta.len());
     let program = layout.binary(unit.binary);
     let started = services::start_detached(&program, &unit.args, &unit.log, &unit.pid, replace)?;
-    let from = if started { before } else { 0 };
+    let offset_file = unit.pid.with_extension("offset");
+    let from = if started {
+        private_files::write(&offset_file, before.to_string().as_bytes())?;
+        before
+    } else {
+        std::fs::read_to_string(&offset_file)
+            .ok()
+            .and_then(|text| text.trim().parse().ok())
+            .unwrap_or(0)
+    };
+    let mut cursor = LogCursor::at(&unit.log, from);
     let ready = &unit.ready;
-    services::wait_until(unit.binary, &unit.log, &unit.pid, &mut || {
-        log_says(&unit.log, from, &ready.says)
+    log_wait::wait_until(unit.binary, &unit.log, &unit.pid, &mut || {
+        cursor.says(&ready.says)
             && ready
                 .answers
                 .is_none_or(|(port, path)| services::answers(port, path))
     })?;
     Ok(started)
-}
-
-/// Copies `source` into `dir` as `name`: to a temporary name first, then
-/// renamed, so `dir/name` is never a half-written binary.
-pub fn place_binary(source: &Path, dir: &Path, name: &str) -> IdentityResult<()> {
-    let target = dir.join(name);
-    let placing = dir.join(format!(".{name}.placing"));
-    std::fs::copy(source, &placing).map_err(|error| io("place binary", &placing, &error))?;
-    std::fs::rename(&placing, &target).map_err(|error| io("place binary", &target, &error))
 }
 
 /// Runs `program --version`, reads `name VERSION (COMMIT)` and answers what
@@ -185,7 +233,8 @@ pub fn version(program: &Path, name: &str) -> IdentityResult<String> {
 /// The build an install is running, as `install/build.json` records it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct BuildRecord {
-    /// Each binary in `bin/` by name, with the commit its `--version` names.
+    /// Each binary in `bin/` by name, with the commit its `--version` names
+    /// or [`adopt::UNSTAMPED`].
     pub binaries: BTreeMap<String, String>,
     /// The placed screens, when there are any.
     pub surface: Option<SurfaceBuild>,
@@ -209,7 +258,7 @@ pub fn record_build(
 ) -> IdentityResult<BuildRecord> {
     let mut binaries = BTreeMap::new();
     for name in names {
-        let commit = version(&layout.binary(name), name)?;
+        let commit = adopt::commit_or_unstamped(&layout.binary(name), name)?;
         say(&format!("build {name} {commit}"));
         binaries.insert((*name).to_string(), commit);
     }
@@ -253,10 +302,9 @@ pub fn record_build(
     Ok(record)
 }
 
-/// Refuses by name unless `layout` holds an install with its binaries.
-fn require_install(layout: &Layout, names: &[&str]) -> IdentityResult<()> {
-    let mut needed = vec![layout.deployment_config(), layout.service_config()];
-    needed.extend(names.iter().map(|name| layout.binary(name)));
+/// Refuses by name unless `layout` holds an install.
+fn require_install(layout: &Layout) -> IdentityResult<()> {
+    let needed = [layout.deployment_config(), layout.service_config()];
     match needed.into_iter().find(|path| !path.is_file()) {
         None => Ok(()),
         Some(missing) => Err(refuse(
@@ -269,100 +317,11 @@ fn require_install(layout: &Layout, names: &[&str]) -> IdentityResult<()> {
     }
 }
 
-/// What has been changed, so a failure puts back exactly that.
-#[derive(Default)]
-struct Moved {
-    bin: bool,
-    surface: bool,
-}
-
-fn remove_dir(path: &Path) -> IdentityResult<()> {
-    if path.exists() {
-        std::fs::remove_dir_all(path).map_err(|error| io("remove", path, &error))?;
-    }
-    Ok(())
-}
-
-fn swap_in(
-    layout: &Layout,
-    from: &Path,
-    names: &[&str],
-    package: Option<&Path>,
-    moved: &mut Moved,
-) -> IdentityResult<()> {
-    remove_dir(&layout.bin_previous_dir())?;
-    std::fs::rename(layout.bin_dir(), layout.bin_previous_dir())
-        .map_err(|error| io("keep previous binaries", &layout.bin_dir(), &error))?;
-    moved.bin = true;
-    private_files::ensure_dir(&layout.bin_dir())?;
-    for name in names {
-        place_binary(&from.join(name), &layout.bin_dir(), name)?;
-    }
-    if let Some(package) = package {
-        remove_dir(&layout.surface_previous_dir())?;
-        if layout.surface_dir().exists() {
-            std::fs::rename(layout.surface_dir(), layout.surface_previous_dir())
-                .map_err(|error| io("keep previous screens", &layout.surface_dir(), &error))?;
-        }
-        moved.surface = true;
-        surface::place(package, &layout.surface_dir())?;
-    }
-    Ok(())
-}
-
-/// Puts back what `moved` names.
-fn put_back(layout: &Layout, moved: &Moved) -> IdentityResult<()> {
-    if moved.bin {
-        remove_dir(&layout.bin_dir())?;
-        std::fs::rename(layout.bin_previous_dir(), layout.bin_dir())
-            .map_err(|error| io("restore previous binaries", &layout.bin_dir(), &error))?;
-    }
-    if moved.surface {
-        remove_dir(&layout.surface_dir())?;
-        if layout.surface_previous_dir().exists() {
-            std::fs::rename(layout.surface_previous_dir(), layout.surface_dir())
-                .map_err(|error| io("restore previous screens", &layout.surface_dir(), &error))?;
-        }
-    }
-    Ok(())
-}
-
-fn stop_all(units: &[Unit], say: &mut dyn FnMut(&str)) -> IdentityResult<()> {
-    for unit in units.iter().rev() {
-        if services::stop(&unit.pid)? {
-            say(&format!("{} stopped", unit.binary));
-        }
-    }
-    Ok(())
-}
-
-fn start_all(layout: &Layout, units: &[Unit], say: &mut dyn FnMut(&str)) -> Result<(), String> {
-    for unit in units {
-        launch(layout, unit, true).map_err(|error| {
-            format!(
-                "{} did not start ready: {error}; its output is in {}",
-                unit.binary,
-                unit.log.display()
-            )
-        })?;
-        say(&format!("{} started and ready", unit.binary));
-    }
-    Ok(())
-}
-
-/// Upgrades the install under `layout` to the binaries in `from` (and the
-/// screens in `package`), running `units` in their order, and returns the
-/// build now running. `say` hears every line the upgrade prints.
-pub fn upgrade(
-    layout: &Layout,
-    from: &Path,
-    package: Option<&Path>,
-    units: &[Unit],
-    say: &mut dyn FnMut(&str),
-) -> IdentityResult<BuildRecord> {
-    let names: Vec<&str> = units.iter().map(|unit| unit.binary).collect();
-    require_install(layout, &names)?;
-    for name in &names {
+/// Each new binary's commit, refusing a missing binary or an unreadable
+/// version by name.
+fn incoming(from: &Path, names: &[&'static str]) -> IdentityResult<BTreeMap<String, String>> {
+    let mut build = BTreeMap::new();
+    for &name in names {
         let new = from.join(name);
         if !new.is_file() {
             return Err(refuse(
@@ -373,37 +332,83 @@ pub fn upgrade(
             )
             .at(&new));
         }
-        let installed = version(&layout.binary(name), name)?;
-        let incoming = version(&new, name)?;
-        say(&format!("{name}: installed {installed}, new {incoming}"));
+        build.insert(name.to_string(), version(&new, name)?);
     }
+    Ok(build)
+}
+
+/// Upgrades the install under `layout` to the binaries in `from` (and the
+/// screens in `package`), and returns the build now running. `say` hears
+/// every line the upgrade prints.
+pub fn upgrade(
+    layout: &Layout,
+    from: &Path,
+    package: Option<&Path>,
+    parts: &mut Parts<'_>,
+    say: &mut dyn FnMut(&str),
+) -> IdentityResult<BuildRecord> {
+    swap::recover(layout, parts.units, parts.engine, say)?;
+    let names: Vec<&'static str> = parts.units.iter().map(|unit| unit.binary).collect();
+    require_install(layout)?;
+    let to = incoming(from, &names)?;
     if let Some(package) = package {
         let (manifest, _) = surface::verify(package)?;
         say(&format!("screens: new {}", manifest.commit));
     }
-    let mut moved = Moved::default();
-    let outcome = stop_all(units, say)
-        .and_then(|()| swap_in(layout, from, &names, package, &mut moved))
-        .map_err(|error| error.to_string())
-        .and_then(|()| start_all(layout, units, say));
-    let Err(failure) = outcome else {
-        return record_build(layout, &names, say);
+    let installed = adopt::installed(layout, parts.units, say)?;
+    for (name, new) in &to {
+        let old = installed.get(name).map_or(adopt::UNSTAMPED, String::as_str);
+        say(&format!("{name}: installed {old}, new {new}"));
+    }
+    let screens_existed = layout.surface_dir().join("index.html").is_file();
+    let files = parts
+        .render
+        .render(layout, &to, screens_existed || package.is_some())?;
+    let mut intent = Intent {
+        from: installed,
+        to,
+        screens: package.is_some(),
+        screens_existed,
+        files: files
+            .iter()
+            .map(|file| intent::Kept {
+                name: file.name.to_string(),
+                target: file.target.clone(),
+                existed: file.target.is_file(),
+                private: file.private,
+            })
+            .collect(),
+        compose_changed: files.iter().any(|file| file.compose && !file.in_place()),
+        steps: Vec::new(),
+    };
+    intent.write(layout)?;
+    let plan = swap::Plan {
+        from,
+        names: &names,
+        package,
+        files: &files,
+    };
+    let Err(failure) = swap::forward(layout, &plan, &mut intent, parts.units, parts.engine, say)
+    else {
+        let record = record_build(layout, &names, say)?;
+        Intent::clear(layout)?;
+        return Ok(record);
     };
     say(&format!("upgrade failed: {failure}"));
     say("putting the previous build back");
-    let restored = stop_all(units, say)
-        .and_then(|()| put_back(layout, &moved))
-        .map_err(|error| error.to_string())
-        .and_then(|()| start_all(layout, units, say));
-    if let Err(again) = restored {
+    if let Err(again) = swap::back(layout, &intent, parts.units, parts.engine, say) {
         return Err(refuse(
             ErrorKind::UpgradeFailed,
             "upgrade",
             "install",
-            format!("{failure}; the previous build did not come back either: {again}"),
+            format!(
+                "{failure}; the previous build did not come back either: {again}; \
+                 install/upgrade.json keeps the unfinished upgrade for the next run"
+            ),
         ));
     }
     record_build(layout, &names, say)?;
+    Intent::clear(layout)?;
     Err(refuse(
         ErrorKind::UpgradeFailed,
         "upgrade",
@@ -420,11 +425,17 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     };
     let mut emitter = Emitter::new(json);
     emitter.field("root", "root", layout.root.display().to_string());
+    let units = units(&layout);
+    let mut parts = Parts {
+        units: &units,
+        engine: &mut Compose,
+        render: &render::Templates,
+    };
     let record = upgrade(
         &layout,
         &options.from,
         options.surface.as_deref(),
-        &units(&layout),
+        &mut parts,
         &mut |line| {
             if !json {
                 println!("{line}");
@@ -445,6 +456,10 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     emitter.finish();
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "upgrade/scratch_tests.rs"]
+mod scratch;
 
 #[cfg(test)]
 #[path = "upgrade_tests.rs"]

@@ -43,7 +43,11 @@ fn version_names_the_crate_version_and_the_head_commit() -> TestResult {
             .arg(flag)
             .current_dir(cwd.path())
             .output()?;
-        assert!(output.status.success(), "lys-home {flag} exited {}", output.status);
+        assert!(
+            output.status.success(),
+            "lys-home {flag} exited {}",
+            output.status
+        );
         let line = String::from_utf8(output.stdout)?;
         let line = line.trim_end();
         assert!(

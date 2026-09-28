@@ -19,8 +19,10 @@
 //! Invariants: a service never closes its standard input while it runs (one
 //! that did would read as exited), and a process that inherits that input
 //! keeps the lock held until it too has exited. A pid file with no exit lock
-//! beside it names a process this watch cannot see; that is refused by name
-//! with its pid, never waited on some other way.
+//! beside it names a process this watch cannot see; the watch refuses it by
+//! name with its pid. Only an upgrade adopting an install made before exit
+//! locks stops such a process another way, through its pid, and says so
+//! (`upgrade::adopt`).
 
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};

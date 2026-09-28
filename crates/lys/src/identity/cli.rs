@@ -31,7 +31,8 @@ pub enum IdentityCommand {
     /// the application data path, generated keys and configuration, the
     /// compose services, both clients, the secrets broker and the directory
     /// service with its screens. Running it again changes only what is
-    /// missing; nothing is rotated or restarted.
+    /// missing and restarts only what it changed; nothing is rotated, and a
+    /// build other than the one placed is refused: that is an upgrade.
     Install {
         /// The data root; the platform's application data path when absent.
         #[arg(long)]
@@ -45,15 +46,19 @@ pub enum IdentityCommand {
         surface: Option<PathBuf>,
     },
 
-    /// Upgrade a running install to the binaries in a folder: check each
-    /// one's --version, stop the service and the broker, keep the running
-    /// binaries in bin.previous/, place the new ones and start them. When a
-    /// new one does not start or become ready, the previous build is put
-    /// back and started, and the failure is named. Data, credentials,
-    /// configuration and the compose services are never touched.
+    /// Upgrade a running install to the binaries in a folder, run with the
+    /// lys built beside them: finish or put back an upgrade stopped
+    /// part-way, check each binary's --version, render the new build's
+    /// configuration and compose files, stop the service and the broker,
+    /// keep the running binaries in bin.previous/ and the files in
+    /// config.previous/, place the new ones, bring changed compose services
+    /// to their new definition and start the new build. When anything does
+    /// not start or become ready, the previous build is put back and
+    /// started, and the failure is named. Data and credentials are never
+    /// touched. An install made before builds were named is adopted.
     Upgrade {
         /// The folder holding the newly built lys-secrets and
-        /// lys-identity-server.
+        /// lys-identity-server, built with the lys that runs the upgrade.
         #[arg(long)]
         from: PathBuf,
         /// A compiled screens package to verify and place, keeping the

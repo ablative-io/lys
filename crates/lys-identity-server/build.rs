@@ -37,30 +37,46 @@ fn git(dir: &Path, args: &[&str]) -> Option<String> {
         .map(|text| text.trim().to_string())
 }
 
-/// The stamp for a crate whose manifest is in `dir`, with the files whose
-/// change should take it again.
-fn stamp(dir: &Path) -> (String, Vec<String>) {
-    let tracked = git(dir, &["ls-files", "--error-unmatch", "Cargo.toml"]).is_some();
-    let commit = git(dir, &["rev-parse", "HEAD"])
-        .filter(|commit| commit.len() == 40 && commit.bytes().all(|b| b.is_ascii_hexdigit()));
-    let Some(commit) = commit.filter(|_| tracked) else {
-        return (NO_COMMIT.to_string(), Vec::new());
-    };
-    let mut watched = Vec::new();
+/// The files in the git tree `dir` is in whose change should take the stamp
+/// again: HEAD, the index, the packed refs, the branch HEAD names and the
+/// directory of branches, where a first commit makes the branch appear.
+/// Empty when there is no git tree.
+fn watched(dir: &Path) -> Vec<String> {
     let mut paths = vec![
         "HEAD".to_string(),
         "index".to_string(),
         "packed-refs".to_string(),
+        "refs/heads".to_string(),
     ];
     if let Some(branch) = git(dir, &["symbolic-ref", "-q", "HEAD"]) {
         paths.push(branch);
     }
+    let mut watched = Vec::new();
     for path in paths {
-        let args = ["rev-parse", "--path-format=absolute", "--git-path", path.as_str()];
+        let args = [
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            path.as_str(),
+        ];
         if let Some(found) = git(dir, &args) {
             watched.push(found);
         }
     }
+    watched
+}
+
+/// The stamp for a crate whose manifest is in `dir`, with the files whose
+/// change should take it again. A tree with no commit yet is watched too,
+/// so its first commit takes the stamp again.
+fn stamp(dir: &Path) -> (String, Vec<String>) {
+    let watched = watched(dir);
+    let tracked = git(dir, &["ls-files", "--error-unmatch", "Cargo.toml"]).is_some();
+    let commit = git(dir, &["rev-parse", "HEAD"])
+        .filter(|commit| commit.len() == 40 && commit.bytes().all(|b| b.is_ascii_hexdigit()));
+    let Some(commit) = commit.filter(|_| tracked) else {
+        return (NO_COMMIT.to_string(), watched);
+    };
     let dirty = git(dir, &["status", "--porcelain"]).is_some_and(|changes| !changes.is_empty());
     let value = if dirty {
         format!("{commit}; dirty")

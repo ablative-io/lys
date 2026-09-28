@@ -622,6 +622,10 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/identity/upgrade/intent.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
 | `crates/lys/src/identity/upgrade/intent_tests.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
 | `crates/lys/src/identity/upgrade/swap.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
+| `rules/no-app-names.yml` | DIRECTORY-048 R7: Lys depends on no app | DIRECTORY-048 |
+| `sgconfig.yml` | DIRECTORY-048 R7: Lys depends on no app | DIRECTORY-048 |
+| `crates/lys/src/cli/mcp.rs` | DIRECTORY-049 R7: Agents reach it with 'lys mcp', signing with their own key | DIRECTORY-049 |
+| `crates/lys/tests/mcp_stdio.rs` | DIRECTORY-049 R7: Agents reach it with 'lys mcp', signing with their own key | DIRECTORY-049 |
 
 ## Inventory
 
