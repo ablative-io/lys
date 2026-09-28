@@ -43,7 +43,11 @@ fn version_names_the_crate_version_and_the_head_commit() -> TestResult {
             .arg(flag)
             .current_dir(cwd.path())
             .output()?;
-        assert!(output.status.success(), "lys {flag} exited {}", output.status);
+        assert!(
+            output.status.success(),
+            "lys {flag} exited {}",
+            output.status
+        );
         let line = String::from_utf8(output.stdout)?;
         let line = line.trim_end();
         assert!(
@@ -54,8 +58,15 @@ fn version_names_the_crate_version_and_the_head_commit() -> TestResult {
     Ok(())
 }
 
-/// The four crates whose binaries carry the stamp.
-const STAMPED: [&str; 4] = ["lys", "lys-identity-server", "lys-secrets", "lys-home"];
+/// The five crates whose binaries carry the stamp: every binary Lys.app
+/// holds.
+const STAMPED: [&str; 5] = [
+    "lys",
+    "lys-identity-server",
+    "lys-secrets",
+    "lys-home",
+    "lys-app",
+];
 
 #[test]
 fn every_stamped_crate_carries_the_same_build_script() -> TestResult {

@@ -1,0 +1,35 @@
+[package]
+name = "lys-app"
+description = "Lys.app's executable: installs, starts, upgrades and uninstalls Lys with its progress on a Lys page, with no terminal."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "lys-app"
+path = "src/main.rs"
+
+[dependencies]
+lys-install.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+# The one-instance lock and the log the app's own output is moved to, each
+# through a safe interface.
+[target.'cfg(unix)'.dependencies]
+rustix = { workspace = true, features = ["stdio"] }
+
+# The container engine's socket folders watched through kqueue's vnode
+# notice, so the wait for the engine is on the kernel's event, never a clock.
+[target.'cfg(target_os = "macos")'.dependencies]
+kqueue.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

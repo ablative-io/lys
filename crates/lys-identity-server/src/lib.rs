@@ -68,6 +68,7 @@ pub mod surface;
 pub mod teams_api;
 pub mod teams_state;
 pub mod teams_store;
+pub mod uninstall_api;
 
 pub use config::Config;
 pub use error::ServerError;

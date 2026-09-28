@@ -38,6 +38,10 @@ pub enum CliError {
     #[error(transparent)]
     Identity(#[from] crate::identity::IdentityError),
 
+    /// `lys package` refused, naming what it refused.
+    #[error(transparent)]
+    Package(#[from] crate::package::PackageError),
+
     /// A `lys-core` trust operation failed.
     #[error(transparent)]
     Trust(#[from] lys_core::TrustError),

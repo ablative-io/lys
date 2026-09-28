@@ -12,6 +12,7 @@
 mod cli;
 mod commands;
 mod identity;
+mod package;
 
 use std::process::ExitCode;
 
@@ -84,6 +85,30 @@ fn main() -> ExitCode {
                 json,
             ),
         }
+        .map_err(commands::error::CliError::from),
+        Command::Package(package::PackageCommand::App {
+            out,
+            arm64,
+            x86_64,
+            surface,
+            developer_id,
+            notary_profile,
+            development,
+        }) => package::Signing::from_flags(
+            developer_id.as_deref(),
+            notary_profile.as_deref(),
+            development,
+        )
+        .and_then(|signing| {
+            let options = package::Options {
+                out: &out,
+                arm64: &arm64,
+                x86_64: &x86_64,
+                surface: &surface,
+                signing,
+            };
+            package::run(&options, json)
+        })
         .map_err(commands::error::CliError::from),
         Command::Log(log_command) => match log_command {
             LogCommand::Init { dir, origin } => commands::log::init::run(&dir, &origin, json),

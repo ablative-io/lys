@@ -1,0 +1,34 @@
+[package]
+name = "lys-install"
+description = "The identity product's install, upgrade and checks as a library: the one code `lys identity install` and Lys.app both run."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+lys-core.workspace = true
+base64.workspace = true
+rand.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+# Typed deployment configuration, read from TOML.
+toml.workspace = true
+# Generated deployment credentials are wiped from memory when dropped.
+zeroize.workspace = true
+
+# The install waits on events: a service's log through kqueue or inotify,
+# and its exit through the release of the lock it holds.
+[target.'cfg(unix)'.dependencies]
+mio.workspace = true
+rustix.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

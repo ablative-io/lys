@@ -1365,6 +1365,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "kqueue"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d763e5b24120b4ddf50de6c92308156765aabfbbccebf401da7cff2d70a41ea"
+dependencies = [
+ "kqueue-sys",
+ "libc",
+]
+
+[[package]]
+name = "kqueue-sys"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07293a4e297ac234359b510362495713f75ea345d5307140414f20c69ffeb087"
+dependencies = [
+ "bitflags 2.13.1",
+ "libc",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1426,18 +1446,14 @@ dependencies = [
  "chrono",
  "clap",
  "lys-core",
+ "lys-install",
  "lys-log-store",
- "mio",
- "rand 0.9.5",
- "rustix",
  "serde",
  "serde_json",
- "sha2",
  "tempfile",
  "thiserror 2.0.19",
  "toml",
  "x509-parser",
- "zeroize",
 ]
 
 [[package]]
@@ -1466,6 +1482,18 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.19",
+]
+
+[[package]]
+name = "lys-app"
+version = "0.2.0"
+dependencies = [
+ "kqueue",
+ "lys-install",
+ "rustix",
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -1558,6 +1586,23 @@ dependencies = [
  "thiserror 2.0.19",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "lys-install"
+version = "0.2.0"
+dependencies = [
+ "base64 0.22.1",
+ "lys-core",
+ "mio",
+ "rand 0.9.5",
+ "rustix",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "toml",
+ "zeroize",
 ]
 
 [[package]]

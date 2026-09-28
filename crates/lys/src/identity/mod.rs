@@ -1,20 +1,9 @@
-//! `lys identity`: prepare, configure and check the standalone identity
-//! product's dependencies — the maintained Rauthy, `SpiceDB` and one
-//! `PostgreSQL` database. Declarations and re-exports only.
+//! `lys identity`: prepare, configure, install, upgrade and check the
+//! standalone identity product. The work is `lys-install`'s, the one install
+//! Lys.app runs too; this module declares the arguments and re-exports.
 
 pub mod cli;
-pub mod config;
-pub mod configure;
-pub mod credentials;
-pub mod error;
-pub mod health;
 pub mod install;
-pub mod loopback_http;
-pub mod prepare;
-pub mod private_files;
-pub mod rauthy;
-pub mod themes;
-pub mod upgrade;
 
 pub use cli::IdentityCommand;
-pub use error::IdentityError;
+pub use lys_install::{IdentityError, configure, health, prepare, upgrade};

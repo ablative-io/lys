@@ -56,6 +56,10 @@ pub enum Command {
     #[command(subcommand)]
     Identity(crate::identity::IdentityCommand),
 
+    /// Package Lys for a person to download: Lys.app and its disk image.
+    #[command(subcommand)]
+    Package(crate::package::PackageCommand),
+
     /// Transparency-log operations: append-only logs with C2SP signed-note
     /// checkpoints and self-contained RFC 6962 proof artifacts.
     ///

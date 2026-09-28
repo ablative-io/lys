@@ -50,7 +50,96 @@
       ],
       "stories": [
         "S160"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys/src/package.rs",
+            "change": "modified",
+            "note": "lys package app. Makes the binaries universal with lipo and refuses universal_incomplete unless both architectures are held. Codesigns with the hardened runtime and verifies --deep --strict. A release is notarised and stapled, and assessed with spctl, first the app and then the codesigned disk image. The image is placed only after the app. A release without its identity or notary profile is refused by name."
+          },
+          {
+            "path": "crates/lys/src/package_tests.rs",
+            "change": "modified",
+            "note": "8 tests, including a_release_without_its_signing_identity_writes_no_disk_image: run() with a release Signing is refused signing_identity_missing, and no Lys.dmg or output folder is written"
+          },
+          {
+            "path": "crates/lys/src/cli.rs",
+            "change": "modified",
+            "note": "the package app subcommand (outside the manifest; a CN9 revision is asked for in the open-items report)"
+          },
+          {
+            "path": "crates/lys/src/commands/error.rs",
+            "change": "modified",
+            "note": "the package refusals (outside the manifest; CN9)"
+          },
+          {
+            "path": "packaging/macos/Info.plist",
+            "change": "created",
+            "note": "the bundle property list, with the build stamp"
+          },
+          {
+            "path": "packaging/macos/Lys.icns",
+            "change": "created",
+            "note": "the app icon"
+          },
+          {
+            "path": "docs/design/directory/reports/DIRECTORY-054-open-items.md",
+            "change": "created",
+            "note": "records the development and release package runs still owed and the CN9 files"
+          }
+        ],
+        "how": "lys package app puts together Lys.app from arm64 and x86_64 builds of one commit, refusing binaries from two commits by name. It lipo-merges each binary and checks lipo -archs, then signs with the hardened runtime and runs codesign --verify --deep --strict. A release also goes through notarytool --wait and stapler, then spctl --assess on the app and on the dmg. Staging is used throughout, and nothing is placed until every step has passed. A --development build never carries the release name.",
+        "deviation": "cli.rs and commands/error.rs lie outside the manifest, and so does the shared build.rs restamp. The open-items report asks for a CN9 revision naming each of them. CN1 ('documents only') contradicts the requirement's code files; the build followed the requirement, and a revision is asked for.",
+        "checklist": [
+          {
+            "id": "C395",
+            "done": false,
+            "note": "The code, and its tests (8/8), are in place. Not yet recorded: lipo -archs and codesign --verify on a real --development package. That run needs rustup target add x86_64-apple-darwin and a heavy two-architecture build, which goes to Dean's laptop under rule 3. A release build needs Tom's Developer ID and a notary profile; this Mac's security find-identity reports 0 valid identities."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S160",
+            "satisfied": false,
+            "note": "Not satisfied until a signed, notarised Lys.dmg exists"
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "The built app passes codesign --verify --deep --strict and spctl --assess.",
+            "met": false,
+            "evidence": "crates/lys/src/package.rs runs codesign --verify --deep --strict, and spctl --assess for a release, but no package has been built. This Mac holds 0 codesigning identities, and there is no recorded run in docs/design/directory/reports/."
+          },
+          {
+            "criterion": "Binaries built from two commits are refused naming the binary.",
+            "met": true,
+            "evidence": "cargo test -p lys --bin lys package: binaries_from_two_commits_are_refused_naming_the_binary ok; packaging_binaries_from_two_commits_writes_nothing ok."
+          },
+          {
+            "criterion": "With no signing identity it is refused signing_identity_missing and no Lys.dmg is written.",
+            "met": true,
+            "evidence": "package::tests::with_no_signing_identity_a_release_is_refused_by_name ok; a_release_without_its_signing_identity_writes_no_disk_image ok (run() is refused and no Lys.dmg or output folder is written)."
+          },
+          {
+            "criterion": "lipo -archs on each bundled binary names arm64 and x86_64.",
+            "met": false,
+            "evidence": "package.rs checks lipo -archs (universal_incomplete), but no universal package has been built: x86_64-apple-darwin is not installed here, and the run belongs on Dean's laptop under rule 3."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Build a --development package on Dean's laptop and record lipo -archs for each bundled binary and codesign --verify --deep --strict on Lys.app.",
+          "Build a release with Tom's Developer ID and notary profile and record codesign and spctl --assess for Lys.app and Lys.dmg.",
+          "Get the brief revised: CN1 (documents only) contradicts R1's code, and cli.rs, commands/error.rs, main.rs, Cargo.toml and the shared build.rs restamp lie outside the manifest. A reviewer has to approve the revision under CN9 before these edits stand."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R2",
@@ -84,7 +173,94 @@
       ],
       "stories": [
         "S160"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys-install/src/lib.rs",
+            "change": "created",
+            "note": "the install moved into a library that lys and lys-app share"
+          },
+          {
+            "path": "crates/lys-install/src/steps.rs",
+            "change": "created",
+            "note": "the install's steps in plain words, for the progress page"
+          },
+          {
+            "path": "crates/lys-install/src/install/engine_path.rs",
+            "change": "created",
+            "note": "finds the container engine without a shell"
+          },
+          {
+            "path": "crates/lys-app/src/flow.rs",
+            "change": "created",
+            "note": "the app's first-open flow: install or upgrade, then hand the browser to /setup"
+          },
+          {
+            "path": "crates/lys-app/src/engine_wait.rs",
+            "change": "created",
+            "note": "waits for the engine only on kqueue notices and the engine's own /_ping answer, never a clock"
+          },
+          {
+            "path": "crates/lys-app/src/launcher.rs",
+            "change": "created",
+            "note": "opens the browser, starting no shell or terminal"
+          },
+          {
+            "path": "docs/design/directory/reports/DIRECTORY-054-open-items.md",
+            "change": "created",
+            "note": "records that lys-install is published beside lys by a release card, and the CN1/CN9 revisions this row asks for"
+          }
+        ],
+        "how": "Opening Lys.app runs lys-app. It installs through the lys-install library with no shell: it waits for the container engine on kernel notices, shows progress in plain words, and hands the browser to /setup. The test no_shell_or_terminal_is_ever_started checks this, and a grep of the non-test sources finds no Terminal, osascript or sh.",
+        "deviation": "The files outside the manifest are named in the open-items report for a CN9 revision: identity/*, commands/output.rs and mod.rs, steps.rs and engine_path.rs, and lys-app's launcher, flow, server, bundle, refusal, uninstall, engine and engine_wait. Publishing decision, recorded there: lys-install stays publish = false until a release card moves its embedded deploy/identity files inside the crate and publishes it beside lys; no lys release is cut before then.",
+        "checklist": [
+          {
+            "id": "C396",
+            "done": false,
+            "note": "The code and its tests pass. The live run that reaches DIRECTORY-047's /setup page waits on DIRECTORY-047 landing in this tree."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S160",
+            "satisfied": false,
+            "note": "Waits on the live run"
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "Opening the app on a machine without an install reaches the first-run setup page with no terminal started.",
+            "met": false,
+            "evidence": "flow_tests::the_browser_is_handed_to_first_run_setup_on_lys and no_shell_or_terminal_is_ever_started pass, but the app has not been opened live, and DIRECTORY-047's /setup is not in this tree."
+          },
+          {
+            "criterion": "A failure at any step shows its words and next action on the page and leaves the install resumable.",
+            "met": true,
+            "evidence": "flow_tests::a_failure_is_shown_at_its_step_with_the_next_thing_to_do ok. lys-install install.rs run() reports each Step before that step's work, and makes only what is missing, so a rerun resumes. server.rs now names an unreadable file instead of hiding it (the fix below)."
+          },
+          {
+            "criterion": "Opening the app twice during an install shows one install.",
+            "met": false,
+            "evidence": "launcher.rs claim() uses a flock one-instance lock (Claim::Theirs reads the port of the instance already running). No test or live run opens the app twice during an install."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "lys-app server.rs file() answered 404 not_found when a screens file existed but could not be read, which hid the failure.",
+          "Record a live first open of a development build that reaches /setup; this waits on DIRECTORY-047 landing.",
+          "Add a test or a recorded run where a second open during an install joins the first install rather than starting another.",
+          "Get the CN9 revision approved for identity/*, commands/mod.rs, output.rs, steps.rs, engine_path.rs and the lys-app modules outside the manifest."
+        ],
+        "fixes": [
+          "crates/lys-app/src/server.rs file(): a read error other than NotFound now answers 500 screen_unreadable, naming the path and the error; a missing file still answers 404. lys-app fmt and clippy -D warnings are clean, and tests are 59/59."
+        ]
+      }
     },
     {
       "id": "R3",
@@ -107,7 +283,69 @@
       ],
       "stories": [
         "S160"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-app/src/progress.rs",
+            "change": "created",
+            "note": "sends each step in plain words only"
+          },
+          {
+            "path": "crates/lys-app/src/refusal.rs",
+            "change": "created",
+            "note": "every failure is a named refusal, in plain words"
+          },
+          {
+            "path": "surface/identity/src/features/install/InstallProgress.tsx",
+            "change": "created",
+            "note": "the progress page; it never names the issuer"
+          },
+          {
+            "path": "surface/identity/tests/install-progress.test.tsx",
+            "change": "created",
+            "note": "asserts the plain words, and that the issuer is never named"
+          }
+        ],
+        "how": "Each install step and each refusal reaches the person as plain words on a Lys page. No port, password file or command is ever shown, and the issuer is never named.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C397",
+            "done": true,
+            "note": "progress_tests and install-progress.test.tsx pass"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S160",
+            "satisfied": true,
+            "note": "The progress and refusals are shown in plain words"
+          }
+        ]
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "With the engine stopped, the page shows the guidance, and starting the engine continues the install with no action in Lys.",
+            "met": true,
+            "evidence": "engine_wait_tests: the_wait_ends_on_the_folder_notice_when_the_engine_starts, a_socket_made_before_its_engine_answers_ends_the_wait_when_it_answers and an_engine_that_says_not_yet_is_asked_again_when_its_state_folder_changes pass. progress_tests and surface/identity/tests/install-progress.test.tsx show the guidance. These tests use a stand-in engine socket; Docker Desktop itself was not run."
+          },
+          {
+            "criterion": "No wait in lys-app reads a clock or loops on a sleep.",
+            "met": true,
+            "evidence": "A grep of crates/lys-app/src (not the tests) finds no Instant, SystemTime, Duration, sleep or timeout. engine_wait.rs waits only in kqueue poll_forever(None), and progress.rs waits on a Condvar."
+          }
+        ],
+        "checklist": [
+          "C397"
+        ],
+        "stories": [],
+        "issues": [],
+        "fixes": []
+      }
     },
     {
       "id": "R4",
@@ -134,7 +372,81 @@
       ],
       "stories": [
         "S160"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys-app/src/login_item.rs",
+            "change": "created",
+            "note": "writes the LaunchAgent au.com.ablative.lys, which runs bin/lys-app --at-login"
+          },
+          {
+            "path": "crates/lys-app/src/uninstall.rs",
+            "change": "created",
+            "note": "removes bin/; runs compose down --volumes only when the box is ticked"
+          },
+          {
+            "path": "crates/lys-identity-server/src/uninstall_api.rs",
+            "change": "created",
+            "note": "the uninstall request from the account page (outside the manifest; CN9)"
+          },
+          {
+            "path": "surface/identity/src/features/account/Uninstall.tsx",
+            "change": "created",
+            "note": "the uninstall page, with the tick box for the data folder"
+          },
+          {
+            "path": "docs/design/directory/reports/DIRECTORY-054-open-items.md",
+            "change": "created",
+            "note": "records the SMAppService ruling asked of Tom and the live runs still owed"
+          }
+        ],
+        "how": "Start at login is a LaunchAgent. Opening a newer app compares the bundle's build with build.json and upgrades. Uninstall keeps the data folder unless the box is ticked. The restamp build.rs is byte-identical across the crates, and the version tests check it.",
+        "deviation": "Start at login is a LaunchAgent, not SMAppService, which needs the Developer ID. Tom's ruling is asked for in the open-items report. uninstall_api, ServerError::UninstallUnavailable, error_status, routes, lib and the surface fixture are named there for a CN9 revision.",
+        "checklist": [
+          {
+            "id": "C398",
+            "done": false,
+            "note": "The unit tests and the surface tests pass. Still owed: live runs of a restart, an upgrade (with the Build line showing the new commit) and an uninstall without the tick followed by a reinstall. Also Tom's SMAppService ruling."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S160",
+            "satisfied": false,
+            "note": "Waits on the live runs"
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "After a restart of the Mac, Lys is answering without the person doing anything.",
+            "met": false,
+            "evidence": "login_item.rs writes the LaunchAgent au.com.ablative.lys, and login_item_tests pass, but no restart has been run."
+          },
+          {
+            "criterion": "Opening a newer app upgrades the install and the Build line shows the new commit.",
+            "met": false,
+            "evidence": "flow_tests::an_upgrade_says_its_lines ok, but no live upgrade has been run."
+          },
+          {
+            "criterion": "Uninstall without the tick leaves the data folder, and a reinstall signs the same people in.",
+            "met": false,
+            "evidence": "uninstall_tests and surface/identity/tests/uninstall.test.tsx pass, but no reinstall with sign-in has been run."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Start at login is a LaunchAgent, not the SMAppService the spec names. Tom's ruling has to be recorded in a brief revision.",
+          "Record the live runs: a restart, an upgrade with the new commit on the Build line, and an uninstall without the tick followed by a reinstall that signs the same people in.",
+          "Get the CN9 revision approved for uninstall_api.rs, ServerError::UninstallUnavailable, error_status.rs, routes.rs, lib.rs and surface/identity/tests/fixtures.ts."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R5",
@@ -156,7 +468,54 @@
       ],
       "stories": [
         "S160"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "docs/design/directory/reports/DIRECTORY-054-fresh-account.md",
+            "change": "created",
+            "note": "the fresh-account procedure; Status: not run"
+          }
+        ],
+        "how": "The procedure is written: the process record and a scan of every page's text for the issuer, from a signed, notarised Lys.dmg on a fresh macOS VM.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C399",
+            "done": false,
+            "note": "Not run. It needs R1's release image, signed with Tom's Developer ID, and the macOS VM on Tom's Mac."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S160",
+            "satisfied": false,
+            "note": "Not run"
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "The recorded run reaches signed in from the disk image.",
+            "met": false,
+            "evidence": "docs/design/directory/reports/DIRECTORY-054-fresh-account.md says Status: not run."
+          },
+          {
+            "criterion": "The process record holds no terminal started for the person, and a text scan of every page shown finds no issuer name.",
+            "met": false,
+            "evidence": "There is no run, so there is no process record or page scan."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Run the fresh-account procedure on the macOS VM from a signed, notarised Lys.dmg, and record the process record and the page-text scan. This needs R1's release image first."
+        ],
+        "fixes": []
+      }
     }
   ],
   "boundaries": [

@@ -135,3 +135,37 @@ fn pem_parse_display_names_path_and_reason() {
     assert!(display.contains("/certs/agent.pem"), "got: {display}");
     assert!(display.contains("BEGIN boundary"), "got: {display}");
 }
+
+/// An identity failure carried into the CLI's error, formatted with Debug
+/// and Display, shows none of a generated secret's bytes: the check that
+/// stood in the identity module's own tests before the install moved into
+/// `lys-install`, kept here where `CliError` is.
+#[test]
+fn an_identity_error_in_the_cli_formats_no_generated_secret() {
+    use lys_install::credentials::{Credential, Shape};
+    use lys_install::error::{ErrorKind, IdentityError};
+
+    let generated = Credential::generate("rauthy-bootstrap-api-secret", Shape::Alphanumeric(64));
+    let secret = generated.expose().to_string();
+    let wrong_length = format!("{secret}x");
+    let malformed =
+        Credential::from_stored("key", wrong_length.as_bytes(), Shape::Alphanumeric(64));
+    let mut errors: Vec<IdentityError> = malformed.err().into_iter().collect();
+    errors.push(IdentityError::new(
+        ErrorKind::RauthyUnauthorized,
+        "call Rauthy",
+        "clients",
+        "status 401",
+    ));
+    assert_eq!(errors.len(), 2);
+    let window = &secret[..8];
+    let mut checked = 0;
+    for error in errors {
+        let cli_error = CliError::from(error);
+        for text in [format!("{cli_error:?}"), format!("{cli_error}")] {
+            assert!(!text.contains(window), "{text}");
+            checked += 1;
+        }
+    }
+    assert_eq!(checked, 4);
+}
