@@ -36,6 +36,11 @@
 //! matching verification helper. The [`RawLeaf`] marker is uninhabited and
 //! non-`Serialize`, so the two leaf encodings cannot be mixed in one tree.
 //!
+//! **Hash-only trees:** [`HashTree`] is the raw-leaf tree for a log whose
+//! leaves live in storage. It holds only leaf and interior hashes (at most two
+//! per leaf), is fed each leaf's hash rather than its bytes, and proves
+//! inclusion and consistency byte-identically to `AppendOnlyTree<RawLeaf>`.
+//!
 //! [`TrustError::MerkleTree`]: crate::error::TrustError::MerkleTree
 
 pub mod consistency;
@@ -51,4 +56,4 @@ pub use proof::{
     verify_inclusion_raw,
 };
 pub use reconstruct::root_from_inclusion_path;
-pub use tree::{AppendOnlyTree, RawLeaf};
+pub use tree::{AppendOnlyTree, HashTree, RawLeaf};

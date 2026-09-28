@@ -74,4 +74,6 @@ pub use start::{Start, Started, start};
 pub use store::{LeafStore, PinnedRoot};
 
 #[cfg(test)]
+mod leaf_count;
+#[cfg(test)]
 mod test_store;
