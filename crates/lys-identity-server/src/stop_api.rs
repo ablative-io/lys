@@ -97,7 +97,7 @@ pub struct StopView {
 }
 
 /// An asked session whose end its runtime confirmed, never inferred.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ConfirmedEnd {
     /// The session.
     pub session: String,
