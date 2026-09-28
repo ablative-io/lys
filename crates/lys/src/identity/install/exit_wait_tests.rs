@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use super::super::services;
-use super::{ExitWatch, lock_path};
+use super::{ExitWatch, hold, lock_path};
 use crate::identity::error::ErrorKind;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -90,5 +90,61 @@ fn a_live_process_without_an_exit_lock_is_refused_naming_its_pid() -> TestResult
     assert_eq!(refused.kind(), ErrorKind::Unready);
     let named = format!("process {} has no exit lock", held.id());
     assert!(refused.to_string().contains(&named), "{refused}");
+    Ok(())
+}
+
+/// A process started elsewhere carries a copy of every open descriptor until
+/// its exec closes them, and the copy shares the lock. A watch that let go
+/// only by closing its own descriptor would leave the lock held in the copy.
+#[test]
+fn a_watch_that_saw_the_exit_leaves_no_lock_in_a_copy_of_its_descriptor() -> TestResult {
+    let dir = tempfile::TempDir::new()?;
+    let pid = dir.path().join("gone.pid");
+    drop(hold(&pid)?);
+    let waited = ExitWatch::open(&pid)?;
+    waited.wait()?;
+    let copy_of_waited = waited.lock.try_clone()?;
+    drop(waited);
+    let asked = ExitWatch::open(&pid)?;
+    assert!(asked.exited()?, "the wait left its lock in the copy");
+    let copy_of_asked = asked.lock.try_clone()?;
+    drop(asked);
+    assert!(
+        ExitWatch::open(&pid)?.exited()?,
+        "the question left its lock in the copy"
+    );
+    drop(copy_of_asked);
+    drop(copy_of_waited);
+    Ok(())
+}
+
+#[test]
+fn a_held_exit_lock_stays_held_until_its_holder_lets_go() -> TestResult {
+    let dir = tempfile::TempDir::new()?;
+    let pid = dir.path().join("held.pid");
+    let held = hold(&pid)?;
+    assert!(
+        !ExitWatch::open(&pid)?.exited()?,
+        "the holder is still there"
+    );
+    drop(held);
+    ExitWatch::open(&pid)?.wait()?;
+    assert!(ExitWatch::open(&pid)?.exited()?, "the holder let go");
+    Ok(())
+}
+
+#[test]
+fn a_watch_answering_at_the_same_moment_does_not_hide_the_exit() -> TestResult {
+    let dir = tempfile::TempDir::new()?;
+    let pid = dir.path().join("gone.pid");
+    drop(hold(&pid)?);
+    let answering = std::fs::File::open(lock_path(&pid))?;
+    rustix::fs::flock(&answering, rustix::fs::FlockOperation::LockShared)?;
+    assert!(
+        ExitWatch::open(&pid)?.exited()?,
+        "another watch was mid-answer"
+    );
+    ExitWatch::open(&pid)?.wait()?;
+    drop(answering);
     Ok(())
 }
