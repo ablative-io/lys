@@ -1,23 +1,20 @@
 # Lys-Core — Checklist
 
-## Pre-method documents
+## The underscore-binding rule
 
-- [ ] **C85** — docs/design/lys-core/DESIGN.md, CHECKLIST.md and USER-STORIES.md are renamed to DESIGN-PRE-METHOD.md, CHECKLIST-PRE-METHOD.md and USER-STORIES-PRE-METHOD.md with their bytes unchanged, and the two live citations name the new paths.
-- [ ] **C86** — The lys-core cluster's DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSCORE-003.md are rendered from its JSON, and sh scripts/design/gate.sh exits 0.
+- [ ] **C75** — rules/ast-grep/no-underscore-binding.yml holds one rule, id no-underscore-binding, at severity error with vendor/** ignored, whose message and note say it refuses because a leading underscore silences the unused warning instead of fixing its cause.
+- [ ] **C76** — On an uncommitted scratch file with one underscore-prefixed binding in each of the 19 binding positions, the scan reports exactly 19 no-underscore-binding hits, and none on a bare `_`, a struct field declaration, a field initialiser or a field access.
+- [ ] **C77** — `ast-grep scan --config sgconfig.yml` reports zero hits at the repository root of the landed tree.
 
-## Test code recognition
+## Bindings cleared by what they do
 
-- [ ] **C87** — clippy.toml sets allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests to true, and CLAUDE.md and Cargo.toml name it in place of the per-module #![allow].
-- [ ] **C88** — Every *_tests.rs file, both fixture.rs files, every integration test root and the two tests/harness/mod.rs files begin with #![cfg(test)], and no #![allow] line remains in any of them.
-- [ ] **C89** — crates/lys-core/src/keys/identity_tests.rs holds no #[allow(unsafe_code)] and no unsafe block, and the comment above lib.rs's unsafe_code attribute says what is true after that.
+- [ ] **C78** — Every guard whose directory or state the test still uses after the binding (a TempDir holder or an EnvCleanup guard) has a name without a leading underscore and is ended by drop(name) after its last use, with a tail result bound, the guard dropped and the binding returned.
+- [ ] **C84** — Each of the eight test fixture structs that holds a TempDir guard names the field temp_dir and has a close method returning TempDir::close's error, and every test that builds one calls its close after the value's last use.
+- [ ] **C79** — Every discarded error in a closure or match arm is left unbound, map_err is rewritten as .ok().ok_or(…) when the error is already built and .ok().ok_or_else(…) when building it calls a function or a macro, and each site returns the same error as before.
+- [ ] **C80** — Every value with no use is not bound: a bare `_` inside its pattern, including a TempDir a fixture returns beside a value it has already loaded into memory, an expression statement for a whole let, and no `let _ =` statement introduced.
+- [ ] **C81** — Every trait implementation that ignores a parameter takes it as a bare `_`, and no trait declaration changes.
+- [ ] **C82** — The two cfg(not(unix)) stubs, fsync_dir and warn_if_loose_permissions, take their parameter as a bare `_`.
 
-## Existing hits cleared
+## Behaviour held
 
-- [ ] **C90** — No `let _ =` statement remains under crates/.
-- [ ] **C91** — crates/lys-core/tests/harness/mod.rs, crates/lys-anchor/tests/harness/mod.rs and crates/lys-home/src/harness/claude_code/mod.rs hold no fn, struct, enum, trait, impl, const or static item.
-
-## Rules and leg
-
-- [ ] **C92** — sgconfig.yml names rules/ast-grep, which holds mod-rs-declarations-only, no-let-underscore-on-results, no-lint-bypass-attributes and no-unwrap-expect-panic-outside-tests, each at severity error.
-- [ ] **C93** — The leg `ast-grep scan --config sgconfig.yml` is in docs/design/project.json requiring tool:ast-grep, in .land/gates.sh and in CI.
-- [ ] **C94** — The scan reports zero hits over the landed tree, and exactly one hit on an uncommitted scratch file holding an unwrap outside test code.
+- [ ] **C83** — cargo test --workspace --all-features exits 0 at the commit the build starts from and at its final commit, with the same number of tests passed at both.

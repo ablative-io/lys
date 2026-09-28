@@ -1,9 +1,9 @@
 {
   "cluster": "lys-core",
-  "title": "Lys Core — a certificate is self-signed by its keys, and the chain verifier says what it leaves to the caller",
-  "intention": "A stranger holding a lys certificate and an authority's public key should get the same answer from lys-core as from reading the certificate by hand: who really signed it, and whether it is one the authority issued. Whether a certificate is self-signed is a fact about keys and a signature, never about a name, so a subject that happens to carry the authority's hex-key common name is judged on the key that really signed it.\n\nThe verifier should also say plainly what it proves and what it does not. A caller reading the documentation of verify_certificate_chain should learn, without reading the code, which checks ran and which questions (revocation, trust in the issuer key, possession of the subject key, anything above one level, what extensions mean) are still theirs to answer.",
-  "problem": "verify_certificate_chain_at (crates/lys-core/src/ca/authority.rs) decides \"self-signed\" by comparing the raw subject and issuer distinguished-name bytes, before the algorithm and signature checks. The authority writes its issuer name as the lowercase hex of its public key, so a certificate the authority legitimately issues to a subject named with that same hex string has byte-identical names and is refused, even though its signature verifies under the authority's key. The rustdoc already records this as a known false positive of a heuristic. In the other direction, a certificate whose subject key is the issuer's own key and whose signature verifies under it (for example one issued by issue_certificate_for_request over a request made with the authority's own key) carries different names and verifies today, although it is self-signed by keys. The published lys CLI (lys ca verify, lys verify --cert), lys-anchor admission and the Norn runtime's MCP boundary all inherit both errors.\n\nSeparately, verify_certificate_chain's rustdoc is two lines that defer to the _at form and never says what is left to the caller. The revocation brief (DIRECTORY-013) records that gap as owned by its own card, and its fold calls verify_certificate_chain_at, so the order of the two cards matters.",
-  "solution": "One change in lys-core's ca/authority.rs, landed whole through the chain after DIRECTORY-013 has landed (ADR-045).\n\nThe distinguished-name comparison is removed. After the signature has verified strictly under the supplied issuer key, the verifier reads the certificate's subject public key and compares it with the supplied issuer key as decoded Ed25519 curve points; when they are the same point the certificate is self-signed and is refused with a CertificateVerification reason that says so (ADR-044). Placing the judgement after verify_strict makes it exactly the words' definition (same key and the signature verifies under that key), and comparing decoded points rather than raw bytes means a non-canonical encoding of the issuer's point is still the issuer's key. A subject key that is not a readable 32-byte Ed25519 key, or does not decode to a point, is not the issuer's key. The check order is otherwise unchanged: parse, Ed25519 algorithm, signature length, issuer-key decoding, strict signature, self-signed, validity window.\n\nThe rustdoc of the free verify_certificate_chain carries the caveat in full: what it checks, and what it leaves to the caller. verify_certificate_chain_at and CertificateAuthority::verify_certificate_chain describe the key-based rule, drop every mention of the name heuristic, and point to that caveat. The doc links only to items present in both feature shapes.\n\nConsumers see the change directly. lys ca verify and lys verify --cert exit 0 for the hex-common-name certificate and exit 1 for a certificate self-signed by keys; their failure message stays the one non-oracle line. lys-anchor's admission module doc keeps saying it rejects self-signed certificates, now defined by keys. DIRECTORY-013's fold issues a legitimately issued hex-common-name leaf and still records certificate_chain_invalid for a leaf self-signed by keys. CHANGELOG's Unreleased section records both changes. No crates.io release is cut (ADR-045). No wire format, domain tag or issuance field changes (CN1, CN4).\n\nThe record follows the older design rather than replacing it. The hand-written DESIGN.md, CHECKLIST.md and USER-STORIES.md (C1 to C65, S1 to S23) are first carried into design.json, checklist.json and stories.json by their own card, and this brief's build waits for it. The brief then restates C23 in the carried checklist, adds C66 to C74 after C65, finds S5 and S11 already carried, and restates the carried design's self-signed sentence with the key-based definition. The carried title, intention, problem and solution stay the cluster's; this record's own stay here and in the brief. This record's principles, constraints, goals, non-goals and inventory rows are appended after the carried ones, each principle and constraint renumbered to the next free P and CN number after the carried design's highest, so P1 to P4 and CN1 to CN8 here are this record's numbers and not the cluster's. The render it commits keeps every other carried item as it was.",
+  "title": "Lys Core — no underscore-prefixed bindings",
+  "intention": "No name in lys starts with an underscore to quiet the compiler. Where a binding would go unused, the code says what the value is for. A guard that has to live is named and dropped by name where its life ends, and a test fixture that holds a temporary directory names that field and closes it where the test ends, so the directory's removal is checked. A value with no use is not bound at all. A trait parameter one implementation has no use for is written as a bare `_`, and only where another implementation needs it or the trait is published. The gate refuses a new underscore-prefixed binding, and the rule's message says why, so nobody has to remember it.\n\nNothing a caller, a verifier or a test sees changes. Every rewritten site returns the same value and the same error as before, every verification failure still collapses to the one error it collapses to today, and the full suite runs the same tests before and after.",
+  "problem": "CLAUDE.md calls a _-prefixed unused variable a bypass, not a fix, but nothing enforces that. clippy's used_underscore_binding catches only uses of an underscored binding, never the declaration. Measured with this card's rule at 7b53625, the tree holds 303 underscore-prefixed bindings in 70 files. The words count 272; the rule counts 303, and the rule's count is the one this card clears. Of the 303, 59 are guards whose directory or state the test still uses (TempDir holders and four EnvCleanup guards), whose names hide the fact that they exist to hold a lifetime. 68 are discarded errors: 64 map_err closures written |_err|, |_refusal| or |_source| because the workspace's clippy::map_err_ignore refuses map_err(|_| …), plus one or_else closure and three match arms. 164 are values nobody reads, 105 of them TempDirs a fixture returns beside an identity or authority it has already loaded into memory, so the directory keeps nothing alive. 10 are trait parameters an implementation ignores, and 2 are parameters of cfg(not(unix)) stubs. Eight test fixture structs also hold a TempDir in an underscore-prefixed field only to keep its directory alive, where the underscore silences a dead_code warning; a struct field is not a binding, so the rule does not report them, and the words' guard sentence covers them. The ast-grep rule set that LYSCORE-001 (brief 6747ce61) brings to lys left this rule out for a card of its own.",
+  "solution": "One rule file joins the rule directory LYSCORE-001 lands. rules/ast-grep/no-underscore-binding.yml runs at severity error with vendor/** ignored. The existing leg `ast-grep scan --config sgconfig.yml` picks it up through sgconfig.yml's ruleDirs, so docs/design/project.json, .land/gates.sh and CI run it with the other ast-grep rules and none of the three changes (CN16). The rule reports an identifier that starts with an underscore and has at least one more character, wherever it binds: a let pattern, a function or closure parameter, a match arm, a for pattern, an if-let or while-let pattern, and the tuple, tuple-struct, struct (field and shorthand), slice, or, ref, mut, reference and @ patterns inside them. It never reports a bare `_`, which binds nothing (ADR-048), a struct field declaration, a field initialiser or a field access. Its message and note say why it refuses (ADR-047).\n\nEach binding is cleared by what it does. A holder is classified by what happens after the binding, not by its name. A guard whose directory or state the test still uses is renamed without the underscore and ended with drop(name) after its last use; where a function's tail expression is its result, the result is bound, the guard dropped, and the binding returned. It is never made a bare `_`, which would drop it at the end of its statement and delete the directory under the test. Each of the eight fixture structs that holds a TempDir in an underscore-prefixed field names the field temp_dir and gains a close method returning TempDir::close's error, and every test closes each fixture value it builds after the value's last use, so the directory's removal is checked rather than silent. PhantomData's `_marker` in merkle/tree.rs is a type marker, not a held value, and stays. A discarded error is left unbound. A map_err becomes .ok().ok_or(E) when E is already built, and .ok().ok_or_else(…) when building E calls a function or a macro. No enabled clippy lint checks that split, so the brief measures it with an inline ast-grep rule. An or_else closure or a match arm writes the bare `_`. clippy::map_err_ignore stays (CN14). On the verification paths the single error is the design: a verifier must not say which check failed (P7). A value with no use becomes a bare `_` inside its pattern, including a TempDir a fixture returns beside a value it has already loaded into memory. A whole `let _x = expr;` becomes the expression statement `expr;`, never `let _ = expr;` (CN13). A trait parameter an implementation ignores becomes a bare `_` when another implementation of the same trait needs it or the trait is published, and no trait declaration changes (ADR-048, CN11). The two non-unix stubs take a bare `_`.\n\nThe card lands after LYSCORE-001 (brief 6747ce61), which lands sgconfig.yml, rules/ast-grep and the leg. It carries no second copy of any of them. The rule is shown to fire on a scratch file, with one hit for each binding position and none for the non-binding forms, before its zero hits on the tree are trusted (P9).",
   "principles": [
     {
       "id": "P10",
@@ -36,6 +36,26 @@
     {
       "id": "P4",
       "text": "The CLI's refusal stays non-oracle: one message for every failed check, the self-signed refusal included."
+    },
+    {
+      "id": "P5",
+      "text": "Clear a binding by what it does: a guard is named and dropped by name, a value with no use is not bound at all, and an ignored trait parameter is a bare `_` only where the trait cannot drop it."
+    },
+    {
+      "id": "P6",
+      "text": "Behaviour is held: each rewritten site returns the same value and the same error as before, and the suite runs the same tests before and after."
+    },
+    {
+      "id": "P7",
+      "text": "A verifier never says which check failed. The one uniform error on a verification path is the design, so its discarded errors are not carried."
+    },
+    {
+      "id": "P8",
+      "text": "A bare `_` binds nothing and is admitted; an underscore-prefixed name is a binding and is refused."
+    },
+    {
+      "id": "P9",
+      "text": "Count what fired: the rule is shown to fire once for each binding position before zero hits on the tree is trusted."
     }
   ],
   "decisions": [
@@ -45,7 +65,9 @@
     "ADR-003",
     "ADR-008",
     "ADR-044",
-    "ADR-045"
+    "ADR-045",
+    "ADR-047",
+    "ADR-048"
   ],
   "goals": [
     "`ast-grep scan --config sgconfig.yml` exits 0 at the repository root of the landed tree and reports 0 hits.",
@@ -64,7 +86,13 @@
     "A certificate whose subject key is the supplied issuer key and whose signature verifies under it is refused with the reason 'self-signed certificate rejected (subject key is the issuer key)'.",
     "The rustdoc of verify_certificate_chain names every check it makes and every question it leaves to the caller, and both cargo doc shapes build with no warning.",
     "DIRECTORY-013's fold issues a legitimately issued hex-common-name leaf and records certificate_chain_invalid for a leaf self-signed by keys.",
-    "docs/design/lys-core/checklist.json holds C1 to C74 in order, the carried C1 to C65 unchanged but for C23, and sh scripts/design/gate.sh exits 0."
+    "docs/design/lys-core/checklist.json holds C1 to C74 in order, the carried C1 to C65 unchanged but for C23, and sh scripts/design/gate.sh exits 0.",
+    "`ast-grep scan --config sgconfig.yml` reports 0 no-underscore-binding hits at the repository root of the landed tree.",
+    "An uncommitted scratch file holding one underscore-prefixed binding in each of the 19 binding positions gets exactly 19 no-underscore-binding hits. An uncommitted file holding `fn scratch(_: u8, _unused: u8) {}` gets exactly one hit, at `_unused`.",
+    "In each of the eight fixture files, the TempDir field reads `temp_dir`, and every test that builds one of those fixtures calls its close method.",
+    "`cargo test --workspace --all-features` exits 0 at the commit the build starts from and at its final commit, and reports the same number of tests passed at both.",
+    "The trait declarations of AdmissionPolicy, LeafStore, Signer and AnchorTask are byte-identical before and after the card.",
+    "Both clippy legs pass with -D warnings while Cargo.toml still sets map_err_ignore = \"warn\"."
   ],
   "non_goals": [
     {
@@ -138,6 +166,30 @@
     {
       "text": "A distinct CLI message for the self-signed refusal",
       "reason": "The CLI refusal is deliberately non-oracle (P4)."
+    },
+    {
+      "text": "Offering the no-underscore-binding rule to Cambium's rule set",
+      "reason": "Cambium's tree is read only to this card; adopting the rule there is Cambium's own gated change."
+    },
+    {
+      "text": "Retiring or relaxing clippy::map_err_ignore",
+      "reason": "The lint stays; a discarded error is left unbound by .ok().ok_or(…) and .ok().ok_or_else(…) instead."
+    },
+    {
+      "text": "Renaming PhantomData's `_marker` field in merkle/tree.rs",
+      "reason": "It is a type marker, not a held value, and a struct field declaration is not a binding the rule refuses. The marker field is kept as it is; nothing else in tree.rs is promised unchanged, and its two map_err closures are rewritten with the other discarded errors."
+    },
+    {
+      "text": "Changing the AdmissionPolicy, LeafStore, Signer or AnchorTask trait",
+      "reason": "Each parameter is needed by some implementation, and LeafStore is in the published lys-log-store 0.2.0 (ADR-048)."
+    },
+    {
+      "text": "Carrying sgconfig.yml, the rule directory or the ast-grep leg",
+      "reason": "LYSCORE-001 (brief 6747ce61) lands them; this card adds one rule to them."
+    },
+    {
+      "text": "Changing how a verification path collapses its failures",
+      "reason": "The single error is the design (P7); this card keeps it exactly."
     }
   ],
   "structure": [
@@ -865,6 +917,131 @@
       "path": "crates/lys-identity/tests/revocation_fold.rs",
       "note": "the fold's tests, created by DIRECTORY-013 in the directory cluster",
       "brief": "DIRECTORY-013"
+    },
+    {
+      "path": "rules/ast-grep/no-underscore-binding.yml",
+      "note": "lys's rule refusing an underscore-prefixed binding, severity error, vendor/** ignored",
+      "brief": "LYSCORE-002"
+    },
+    {
+      "path": "sgconfig.yml",
+      "note": "ast-grep root config naming rules/ast-grep; landed by LYSCORE-001 (brief 6747ce61), unchanged here",
+      "brief": ""
+    },
+    {
+      "path": "rules/ast-grep",
+      "note": "lys's ast-grep rule directory; landed by LYSCORE-001 (brief 6747ce61)",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/lys-core/design.json",
+      "note": "this design",
+      "brief": "LYSCORE-002"
+    },
+    {
+      "path": "docs/design/lys-core/checklist.json",
+      "note": "the rows LYSCORE-002 delivers",
+      "brief": "LYSCORE-002"
+    },
+    {
+      "path": "docs/design/lys-core/stories.json",
+      "note": "the stories LYSCORE-002 serves",
+      "brief": "LYSCORE-002"
+    },
+    {
+      "path": "docs/design/lys-core/briefs/LYSCORE-002.json",
+      "note": "the brief",
+      "brief": "LYSCORE-002"
+    },
+    {
+      "path": "docs/design/lys-core/DESIGN.md",
+      "note": "rendered from design.json",
+      "brief": "LYSCORE-002"
+    },
+    {
+      "path": "docs/design/lys-core/CHECKLIST.md",
+      "note": "rendered from checklist.json",
+      "brief": "LYSCORE-002"
+    },
+    {
+      "path": "docs/design/lys-core/USER-STORIES.md",
+      "note": "rendered from stories.json",
+      "brief": "LYSCORE-002"
+    },
+    {
+      "path": "docs/design/lys-core/briefs/LYSCORE-002.md",
+      "note": "rendered from the brief",
+      "brief": "LYSCORE-002"
+    },
+    {
+      "path": "docs/design/lys-core/DESIGN-PRE-METHOD.md",
+      "note": "the hand-written pre-method design, renamed by LYSCORE-001 (brief 6747ce61, ADR-045), content unchanged",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/lys-core/CHECKLIST-PRE-METHOD.md",
+      "note": "the hand-written pre-method checklist, renamed by LYSCORE-001 (brief 6747ce61, ADR-045), content unchanged",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/lys-core/USER-STORIES-PRE-METHOD.md",
+      "note": "the hand-written pre-method stories, renamed by LYSCORE-001 (brief 6747ce61, ADR-045), content unchanged",
+      "brief": ""
+    },
+    {
+      "path": "Cargo.toml",
+      "note": "workspace lint table; map_err_ignore and used_underscore_binding at warn, unchanged",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src",
+      "note": "lys-core library and sibling *_tests.rs files",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/tests",
+      "note": "lys-core integration and conformance tests",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-anchor/src",
+      "note": "lys-anchor library and sibling *_tests.rs files",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-anchor/tests",
+      "note": "lys-anchor integration and conformance tests",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-anchor-cli/src",
+      "note": "the anchor CLI and its sibling *_tests.rs files",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-home/src",
+      "note": "lys-home library and sibling *_tests.rs files",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-home/tests",
+      "note": "lys-home integration tests",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-log-store/src",
+      "note": "lys-log-store library, its published LeafStore trait and sibling *_tests.rs files",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src",
+      "note": "the lys CLI",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/tests",
+      "note": "the lys CLI's integration tests",
+      "brief": ""
     }
   ],
   "inventory": [
@@ -1015,6 +1192,90 @@
     {
       "path": "docs/design/lys-core/USER-STORIES.md",
       "note": "the earlier markdown stories, S1 to S23; S5 and S11 are the consumers of chain verification this change reaches."
+    },
+    {
+      "path": "crates",
+      "note": "At 7b53625 this card's rule reports 303 underscore-prefixed bindings in 70 files: 59 guards whose directory or state is still used, in 11 files (55 TempDir holders and four EnvCleanup guards in lys-core keys/identity_tests.rs), 68 discarded errors in 28 files (64 map_err closures, one or_else closure, three match arms), 164 unused values in 34 files (105 of them TempDirs returned beside an identity or authority already loaded into memory, 57 from golden_identity), 10 ignored trait parameters in 5 files and 2 cfg(not(unix)) stub parameters. Every underscore-prefixed identifier in the tree that is not a struct field is one of the 303; nine underscore-prefixed struct fields are not, the eight fixture TempDir fields and PhantomData's _marker."
+    },
+    {
+      "path": "Cargo.toml",
+      "note": "[workspace.lints.clippy]: pedantic at warn, map_err_ignore = \"warn\" (line 87), used_underscore_binding = \"warn\" (line 108), all failing under -D warnings."
+    },
+    {
+      "path": "crates/lys-core/src/tlog/verify.rs",
+      "note": "Eight map_err(|_err| TrustError::LogArtifactVerification) closures; every failure is that one error."
+    },
+    {
+      "path": "crates/lys-core/src/bundle/verify.rs",
+      "note": "Six map_err(|_err| reject()) closures; reject() builds the file's one error."
+    },
+    {
+      "path": "crates/lys-core/src/checkpoint/note.rs",
+      "note": "Three map_err(|_err| TrustError::NoteVerification) closures; every structural failure is that one error."
+    },
+    {
+      "path": "crates/lys-core/src/seal/sealed_envelope.rs",
+      "note": "Line 235 binds (key_bytes, _derived_nonce) from derive_key_and_nonce; the comment after it says why the derived nonce is not compared. A cryptographic file."
+    },
+    {
+      "path": "crates/lys-anchor/src/admission/policy.rs",
+      "note": "AdmissionPolicy::admit(&self, submission, context); AcceptAll ignores both parameters, MaxSize ignores context, the certificate policy ignores submission."
+    },
+    {
+      "path": "crates/lys-log-store/src/store.rs",
+      "note": "LeafStore, public in the published lys-log-store 0.2.0; the LyingStore fake in log_tests.rs ignores index, bytes and pin."
+    },
+    {
+      "path": "crates/lys-anchor/src/keys/signer.rs",
+      "note": "Signer::sign(&self, message); DecliningSigner in anchor/genesis_tests.rs ignores message."
+    },
+    {
+      "path": "crates/lys-anchor-cli/src/commands/anchor/policy.rs",
+      "note": "AnchorTask::run(self, policy); RecordPolicy in policy_tests.rs ignores policy."
+    },
+    {
+      "path": "crates/lys-log-store/src/file.rs",
+      "note": "Line 392: #[cfg(not(unix))] fn fsync_dir(_dir: &Path); no gate host compiles it."
+    },
+    {
+      "path": "crates/lys-core/src/keys/identity.rs",
+      "note": "Line 431: #[cfg(not(unix))] fn warn_if_loose_permissions(_path: &Path) {}; no gate host compiles it. Also seven discarded-error sites."
+    },
+    {
+      "path": "crates/lys-core/src/keys/identity_tests.rs",
+      "note": "Four `let _guard = EnvCleanup;` guards over the from_env tests; LYSCORE-001 plans to remove the environment mutation they guard."
+    },
+    {
+      "path": "crates (test fixture structs)",
+      "note": "Eight test fixture structs hold a TempDir in an underscore-prefixed field only to keep the directory alive: OpensslRequest (lys-core tests/openssl_csr_interop.rs:166), Party (lys-core tests/bundle_conformance.rs:107), Party (lys-core src/bundle/verify_tests.rs:27), ProvenLog (lys tests/log_tests.rs:96), Party (lys-anchor tests/cascade.rs:100), Fixture (lys-anchor-cli tests/anchor_cli.rs:35), Case (lys-anchor tests/stranger_verification.rs:228) and Node (lys-anchor src/upward/fixture.rs:48, used by upward/pin_tests.rs and upward/bundle_tests.rs). None has a close method."
+    },
+    {
+      "path": "crates/lys-core/src/merkle/tree.rs",
+      "note": "Line 68: the struct field _marker: PhantomData, not a binding."
+    },
+    {
+      "path": "sgconfig.yml",
+      "note": "Absent at 7b53625; LYSCORE-001 (brief 6747ce61) creates it."
+    },
+    {
+      "path": "rules",
+      "note": "Absent at 7b53625; LYSCORE-001 (brief 6747ce61) creates rules/ast-grep."
+    },
+    {
+      "path": "docs/design/project.json",
+      "note": "Seven legs; no ast-grep leg at 7b53625. LYSCORE-001 adds `ast-grep scan --config sgconfig.yml` here, in .land/gates.sh and in CI."
+    },
+    {
+      "path": "CLAUDE.md",
+      "note": "Coding standards: silencing a lint with #[allow], an #[ignore]d test, a _-prefixed unused variable or #[cfg(any())] is a bypass, not a fix."
+    },
+    {
+      "path": "docs/design/lys-core",
+      "note": "Hand-written pre-method DESIGN.md, CHECKLIST.md (C1 to C65) and USER-STORIES.md (S1 to S23), renamed *-PRE-METHOD.md with their content unchanged as LYSCORE-001 (ADR-045) does, so this cluster's rendered DESIGN.md, CHECKLIST.md and USER-STORIES.md take the plain names."
+    },
+    {
+      "path": "$cambium/rules/ast-grep",
+      "note": "Six rules, none refusing underscore-prefixed bindings. Read only."
     }
   ],
   "constraints": [
@@ -1088,7 +1349,43 @@
     },
     {
       "id": "CN9",
-      "text": "**Cryptographic changes require an adversarial review before landing.** This cluster ports hardened behaviour unchanged; any deviation beyond the four deliberate breaks (tag renames, legacy strip, env var, OID constant) is out of bounds."
+      "text": "Every rewritten site returns the same value and the same error (variant, fields and message) as before; every failure in tlog/verify.rs, bundle/verify.rs and checkpoint/note.rs still returns the one error it returns today."
+    },
+    {
+      "id": "CN10",
+      "text": "No wire format, domain-separation tag, test vector or signed fixture changes."
+    },
+    {
+      "id": "CN11",
+      "text": "The public API of lys-core, lys and lys-log-store does not change, and the AdmissionPolicy, LeafStore, Signer and AnchorTask declarations are byte-identical."
+    },
+    {
+      "id": "CN12",
+      "text": "No hit is cleared by #[allow], #[expect], #[ignore], #[cfg(any())], a rename to another underscore-prefixed name, or an ignores or files entry beyond vendor/**."
+    },
+    {
+      "id": "CN13",
+      "text": "No `let _ =` statement is introduced under crates/."
+    },
+    {
+      "id": "CN14",
+      "text": "Cargo.toml keeps map_err_ignore = \"warn\" and used_underscore_binding = \"warn\"."
+    },
+    {
+      "id": "CN15",
+      "text": "Cambium's tree is not changed."
+    },
+    {
+      "id": "CN16",
+      "text": "docs/design/project.json, .land/gates.sh, .github/workflows/ci.yml and sgconfig.yml are not changed."
+    },
+    {
+      "id": "CN17",
+      "text": "The hand-written pre-method lys-core documents are not edited."
+    },
+    {
+      "id": "CN18",
+      "text": "The rule is at severity error."
     }
   ],
   "gate": [

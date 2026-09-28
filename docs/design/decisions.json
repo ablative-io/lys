@@ -969,6 +969,42 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-047",
+      "title": "lys refuses an underscore-prefixed binding with an ast-grep rule at severity error",
+      "status": "decided",
+      "scope": "lys-core",
+      "date": "2026-09-27",
+      "decided_by": "The words of the lys underscore-binding card; recorded with LYSCORE-002",
+      "context": "CLAUDE.md calls a _-prefixed unused variable a bypass, not a fix, but nothing enforced it: clippy's used_underscore_binding sees only uses of such a binding, never the declaration, and Cambium's rule set, which lys copies, carries no such rule. The tree held 303 such bindings at 7b53625.",
+      "decision": "lys carries its own ast-grep rule, no-underscore-binding, at severity error beside the rule set LYSCORE-001 lands. It refuses an underscore-prefixed identifier in every binding position, admits the bare `_`, and its message says why it refuses. Each existing binding is cleared by what it does rather than renamed. Rejected: relying on used_underscore_binding and review, which never see the declaration, and clearing hits by renaming, #[allow] or an ignores entry.",
+      "quote": "",
+      "consequences": [
+        "A new underscore-prefixed binding under crates/ fails the ast-grep leg with the rule's reason.",
+        "A guard is named and dropped by name; a value with no use is not bound; the bare `_` stays available.",
+        "The rule is a candidate for Cambium to adopt in its own gated change."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-048",
+      "title": "A trait parameter one implementation ignores is a bare `_` where the trait cannot drop it",
+      "status": "decided",
+      "scope": "lys-core",
+      "date": "2026-09-27",
+      "decided_by": "The lead for the identity line, answering this card's survey; recorded with LYSCORE-002",
+      "context": "The words give an unused trait parameter two ways out: use it, or change the trait so it is not asked for. AdmissionPolicy::admit needs both of its parameters across its implementations, and LeafStore is in the published lys-log-store 0.2.0, where changing it breaks consumers. Neither way out is open without changing behaviour or API.",
+      "decision": "An implementation that has no use for a parameter which another implementation of the same trait needs, or which a published trait asks for, writes the bare `_` pattern. The bare `_` binds nothing, so it is the words' 'not bound at all', and it is not the underscore-prefixed name the rule refuses. The trait is not changed. Rejected: changing AdmissionPolicy or LeafStore, adding a use to a parameter the implementation does not need, and keeping an underscore-prefixed name.",
+      "quote": "",
+      "consequences": [
+        "AcceptAll, MaxSize and the certificate policy under AdmissionPolicy, and the LyingStore, DecliningSigner and RecordPolicy test fakes, write their ignored parameters as a bare `_`.",
+        "The AdmissionPolicy, LeafStore, Signer and AnchorTask declarations do not change.",
+        "The rule admits a bare `_` and refuses an underscore-prefixed name, and one acceptance line shows both."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

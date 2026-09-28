@@ -176,6 +176,60 @@
           "text": "As an auditor, I want `lys ca verify` with an explicit instant so that I can check whether a certificate was valid at the time a disputed action occurred, not just at the time of my audit."
         }
       ]
+    },
+    {
+      "name": "Card author",
+      "role": "Landing work in lys",
+      "stories": [
+        {
+          "id": "S24",
+          "text": "As a card author landing work in lys, I want the gate to refuse an underscore-prefixed binding with a message saying why so that an unused warning is fixed at its cause rather than silenced."
+        }
+      ]
+    },
+    {
+      "name": "Test writer",
+      "role": "Reading a test's fixtures",
+      "stories": [
+        {
+          "id": "S25",
+          "text": "As a test writer, I want a temporary directory's guard named and dropped by name so that I can see where the directory's life ends."
+        }
+      ]
+    },
+    {
+      "name": "Third-party verifier",
+      "role": "Verifying lys artifacts",
+      "stories": [
+        {
+          "id": "S26",
+          "text": "As a third party verifying a lys artifact, I want every verification failure to keep returning the one uniform error so that the cleanup reveals nothing about which check failed."
+        }
+      ]
+    },
+    {
+      "name": "Consumer of lys-log-store",
+      "role": "Implementing LeafStore",
+      "stories": [
+        {
+          "id": "S27",
+          "text": "As a consumer implementing lys-log-store's LeafStore, I want the trait left unchanged so that my implementation still compiles against the next release."
+        }
+      ]
+    },
+    {
+      "name": "Lead",
+      "role": "Trusting the gate",
+      "stories": [
+        {
+          "id": "S28",
+          "text": "As the lead for lys, I want the rule shown to fire once for each binding position so that zero hits on the tree means the rule held and not that nothing was measured."
+        },
+        {
+          "id": "S29",
+          "text": "As the lead for lys, I want the full suite to run the same tests before and after the card so that I know the cleanup changed no behaviour."
+        }
+      ]
     }
   ]
 }
