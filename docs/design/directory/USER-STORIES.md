@@ -262,6 +262,8 @@
 
 **S164.** As an operator, I want upgrade and interrupted setup to preserve the sender identity so that pending audit work remains verifiable.
 
+**S172.** As the person running a Lys install, I want a missing API to say it is missing and one route that says the service is serving, so that a web page is never mistaken for an answer.
+
 ## Person waiting on a permission check — Uses a Lys screen or route that checks a grant
 
 **S169.** As a person whose request is waiting on the permission service, I want my request to end when I leave it, and nobody else's request held behind mine.

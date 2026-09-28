@@ -393,3 +393,8 @@
 - [ ] **C428** — Kernel evidence feeds the existing refusal stream (DIRECTORY-062 R4).
 - [ ] **C429** — The agent page states the sandbox and the evidence (DIRECTORY-062 R5).
 - [ ] **C430** — A person watches real native denials and an allowed control (DIRECTORY-062 R6).
+
+## Unknown API paths and the health route (DIRECTORY-063)
+
+- [ ] **C431** — Every unknown path under /api answers 404 with a named JSON refusal, never the page (DIRECTORY-063 R1).
+- [ ] **C432** — GET /api/health answers that the service is serving, with its name and build, asking no other service (DIRECTORY-063 R2).

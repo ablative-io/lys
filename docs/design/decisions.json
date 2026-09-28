@@ -1879,6 +1879,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-129",
+      "title": "Paths under /api belong to the API and are refused when unknown, and paths outside it stay the page's",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-29",
+      "decided_by": "Archie, lead of the Lys identity line",
+      "context": "The service serves the screens and the API on one origin. The screens are one page that reads its own route from the address, so the server cannot know which paths outside /api the page shows and answers them all with the page. Until now the API had no fallback of its own, so unknown API paths fell through to the page as well.",
+      "decision": "The API nested under /api has its own fallback answering 404 with a named JSON refusal. Paths outside /api stay the page's, so /health and /healthz at the root keep answering the page, and the page shows what it shows for a route it does not know. The one health answer is GET /api/health, which names the service and its build and asks no other service. Serving 404 for chosen root names was weighed and not taken, because the server would then guess at the page's routes.",
+      "quote": "a health answer or a 404",
+      "consequences": [
+        "A caller of a missing API gets 404 and a named reason.",
+        "A check that asks /health or /healthz at the root still gets the page and must ask /api/health.",
+        "GET /api/health says only that this process is serving, not that its dependencies are ready, which lys identity health reports."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

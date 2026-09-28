@@ -1530,6 +1530,21 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Unknown API paths and the health route (DIRECTORY-063)",
+      "items": [
+        {
+          "id": "C431",
+          "text": "Every unknown path under /api answers 404 with a named JSON refusal, never the page (DIRECTORY-063 R1).",
+          "done": false
+        },
+        {
+          "id": "C432",
+          "text": "GET /api/health answers that the service is serving, with its name and build, asking no other service (DIRECTORY-063 R2).",
+          "done": false
+        }
+      ]
     }
   ]
 }

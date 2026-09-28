@@ -590,6 +590,10 @@
         {
           "id": "S164",
           "text": "As an operator, I want upgrade and interrupted setup to preserve the sender identity so that pending audit work remains verifiable."
+        },
+        {
+          "id": "S172",
+          "text": "As the person running a Lys install, I want a missing API to say it is missing and one route that says the service is serving, so that a web page is never mistaken for an answer."
         }
       ]
     },

@@ -85,7 +85,8 @@
     "ADR-122",
     "ADR-126",
     "ADR-127",
-    "ADR-128"
+    "ADR-128",
+    "ADR-129"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -106,7 +107,8 @@
     "DIRECTORY-034 draws the access graph (conformance 8.3) with grant edges and every reachability from Access's answers, and responsible people and resource parents as recorded, holding no permission rule of its own (ADR-098).",
     "DIRECTORY-037 passes conformance rows 9.1 to 9.3: the surface's test command runs in .land/gates.sh and proves the rail, the dock side by all three of its controls, the route table, the palette and go-to keys, the help overlay and a counted Tab walk, and index.v6.html carries the same two fixes as the built shell.",
     "DIRECTORY-038 states and tests conformance row 1.2: linking a person's provider account to an agent, and delegating from a sign-in identity, are each refused by name and write nothing; one counted test over the store finds no agent record carrying a sign-in identity; the broker's refusal is recorded as a finding against SECRETS-002, on which row 1.2's full pass waits.",
-    "DIRECTORY-061 takes the last production clock out of Lys. A SpiceDB call ends on its answer, on SpiceDB closing, or on its request leaving, and a request that leaves lets the grants lock go."
+    "DIRECTORY-061 takes the last production clock out of Lys. A SpiceDB call ends on its answer, on SpiceDB closing, or on its request leaving, and a request that leaves lets the grants lock go.",
+    "DIRECTORY-063 refuses unknown API paths by name and adds GET /api/health, so the live install never answers a missing API with its page."
   ],
   "non_goals": [
     {
@@ -4665,6 +4667,26 @@
       "path": "crates/lys-identity-server/src/grant_sight.rs",
       "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
       "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/health_api.rs",
+      "note": "the service's own health answer",
+      "brief": "DIRECTORY-063"
+    },
+    {
+      "path": "crates/lys-identity-server/src/health_api_tests.rs",
+      "note": "the service's own health answer",
+      "brief": "DIRECTORY-063"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-063.json",
+      "note": "the unknown API path and health brief",
+      "brief": "DIRECTORY-063"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-063.md",
+      "note": "the unknown API path and health brief",
+      "brief": "DIRECTORY-063"
     }
   ],
   "inventory": [
