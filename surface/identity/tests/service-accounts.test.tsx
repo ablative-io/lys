@@ -1,7 +1,7 @@
 /** Account registry acts retain operation ids and distinguish record retirement from provider access. */
 import { act } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { $, click, mount, settle, text, unmountAll } from './harness';
+import { $, click, choose, mount, settle, text, unmountAll } from './harness';
 import { ADA, ME, SERVICE, ok, refused } from './fixtures';
 const account = { id: 'op-' + 'a'.repeat(32), owner: ADA, name: 'Calendar account', description: 'Appointments', state: 'active', created_by: ME.signed_in, created_at: 1790000000, retired_by: null, retired_at: null };
 const routes = { ...SERVICE, '/service-accounts': ok({ scope: 'personal', service_accounts: [account] }) };
@@ -34,4 +34,13 @@ describe('Service-account management', () => {
     await mount('#/service-accounts', { ...routes, '/service-accounts': refused(503, 'ServiceAccountsUnavailable', 'No registry configured') });
     expect(text()).toContain('ServiceAccountsUnavailable'); expect(text()).not.toContain('No service-account records were returned');
   });
+  it('lets an administrator explicitly name a different owner and checks that owner in the receipt', async () => {
+    const other = 'person-' + 'b'.repeat(32);
+    const { posted } = await mount('#/service-accounts', { ...routes, '/service-accounts': ok({ scope: 'directory', service_accounts: [] }), '/directory/people': ok({ scope: 'directory', people: [{ ...ME.person, agents: [] }, { ...ME.person, id: other, display_name: 'Other owner', agents: [] }] }), 'POST /service-accounts': (body) => { const asked = body as Record<string, unknown>; return ok({ ...account, id: asked.operation, owner: asked.owner, name: asked.name, description: asked.description }); } });
+    await choose($('select'), other); await fillName(); await click(button('Register account')); expect(posted[0].body).toMatchObject({ owner: other, name: 'Invoice account' }); expect(sessionStorage.length).toBe(0);
+  });
+  it('does not offer another-owner selection in a personal registry', async () => {
+    await mount('#/service-accounts', routes); expect(text()).not.toContain('Choose a different owner');
+  });
+
 });
