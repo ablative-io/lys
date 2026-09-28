@@ -132,3 +132,49 @@ fn the_bootstrap_api_key_grants_clients_providers_and_reads_of_secrets_and_users
     );
     Ok(())
 }
+
+fn rendered_for(text: &str) -> Result<String, Box<dyn Error>> {
+    let config = DeploymentConfig::parse(text, std::path::PathBuf::from("/deployments/dev"))?;
+    let credentials: Vec<(SecretSpec, Credential)> = SECRETS
+        .iter()
+        .map(|spec| (*spec, Credential::generate(spec.file, spec.shape)))
+        .collect();
+    Ok(render_env(&config, &credentials)?.to_string())
+}
+
+#[test]
+fn a_plain_http_origin_asks_for_a_session_cookie_a_browser_keeps_over_http()
+-> Result<(), Box<dyn Error>> {
+    let env = rendered_for(EXAMPLE)?;
+    assert!(
+        env.lines()
+            .any(|line| line == "RAUTHY_PUB_URL=localhost:8480"),
+        "the example is served over plain http on loopback"
+    );
+    assert!(
+        env.lines()
+            .any(|line| line == "RAUTHY_COOKIE_MODE=danger-insecure"),
+        "a Secure cookie is dropped by a browser over http, so no session survives the sign-in"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_https_origin_keeps_the_host_bound_secure_session_cookie() -> Result<(), Box<dyn Error>> {
+    let text = EXAMPLE
+        .replace(
+            "public_origin = \"http://localhost:8480\"",
+            "public_origin = \"https://identity.example.test\"",
+        )
+        .replace(
+            "trusted_proxies = []",
+            "trusted_proxies = [\"192.0.2.1/32\"]",
+        );
+    let env = rendered_for(&text)?;
+    assert!(
+        env.lines()
+            .any(|line| line == "RAUTHY_PUB_URL=identity.example.test")
+    );
+    assert!(env.lines().any(|line| line == "RAUTHY_COOKIE_MODE=host"));
+    Ok(())
+}

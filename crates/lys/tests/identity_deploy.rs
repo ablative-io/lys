@@ -16,7 +16,7 @@ use identity_support::compose::{self, require_runtime};
 use identity_support::fixtures::{
     Deployment, TestResult, leaks, output_text, repository_root, succeeded,
 };
-use identity_support::server::{LossyProxy, rauthy_json};
+use identity_support::server::{LossyProxy, cookies_set, rauthy_json};
 
 /// The services compose.yaml declares; no other Ablative service is among them.
 const DECLARED: [&str; 4] = ["postgres", "rauthy", "spicedb", "spicedb-migrate"];
@@ -42,6 +42,38 @@ fn operation_lines(text: &str) -> Vec<(String, String)> {
             ))
         })
         .collect()
+}
+
+/// The session cookie Rauthy sets on an install served over plain http on
+/// loopback carries no `Secure` flag and no `__Host-` name. A browser drops
+/// either over http, and the sign-in that follows then finds no session.
+fn session_cookie_is_kept_over_plain_http(deployment: &Deployment) -> TestResult {
+    let (status, cookies) = cookies_set(
+        &deployment.rauthy_address(),
+        "POST",
+        "/auth/v1/oidc/session",
+    )?;
+    assert!((200..300).contains(&status), "a session answered {status}");
+    let session: Vec<&String> = cookies
+        .iter()
+        .filter(|cookie| cookie.contains("RauthySession"))
+        .collect();
+    assert!(!session.is_empty(), "no session cookie in {cookies:?}");
+    for cookie in session {
+        let flags: Vec<String> = cookie
+            .split(';')
+            .map(|part| part.trim().to_ascii_lowercase())
+            .collect();
+        assert!(
+            !flags.iter().any(|flag| flag == "secure"),
+            "a Secure cookie over plain http: {cookie}"
+        );
+        assert!(
+            cookie.starts_with("RauthySession="),
+            "a prefixed cookie name over plain http: {cookie}"
+        );
+    }
+    Ok(())
 }
 
 #[test]
@@ -73,6 +105,7 @@ fn id001_deploy_fresh_install_is_ready_and_configure_is_idempotent() -> TestResu
             "health output holds a secret"
         );
     }
+    session_cookie_is_kept_over_plain_http(&deployment)?;
 
     let builtin_before = rauthy_json(&deployment, "GET", "/auth/v1/clients/rauthy")?;
     assert_eq!(

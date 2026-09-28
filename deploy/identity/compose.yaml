@@ -103,6 +103,9 @@ services:
       RP_ID: ${RAUTHY_RP_ID:?issuer_invalid RAUTHY_RP_ID}
       RP_ORIGIN: ${RAUTHY_RP_ORIGIN:?issuer_invalid RAUTHY_RP_ORIGIN}
       PROXY_MODE: ${RAUTHY_PROXY_MODE:?config_invalid RAUTHY_PROXY_MODE}
+      # A browser drops a Secure cookie over plain http, so a loopback http
+      # origin asks for the session cookie without that flag.
+      COOKIE_MODE: ${RAUTHY_COOKIE_MODE:?config_invalid RAUTHY_COOKIE_MODE}
       TRUSTED_PROXIES: ${RAUTHY_TRUSTED_PROXIES-}
       BOOTSTRAP_ADMIN_EMAIL: ${RAUTHY_BOOTSTRAP_ADMIN_EMAIL:?config_invalid RAUTHY_BOOTSTRAP_ADMIN_EMAIL}
       BOOTSTRAP_ADMIN_PASSWORD_PLAIN: ${RAUTHY_BOOTSTRAP_ADMIN_PASSWORD:?secret_missing RAUTHY_BOOTSTRAP_ADMIN_PASSWORD}
