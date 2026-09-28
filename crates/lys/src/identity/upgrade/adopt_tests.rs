@@ -149,6 +149,50 @@ fn an_install_made_before_this_card_is_upgraded_and_answers_the_new_build() -> T
 }
 
 #[test]
+fn an_install_whose_record_names_an_unstamped_binary_is_upgraded() -> TestResult {
+    let mut scratch = Scratch::laid_out()?;
+    let port = std::net::TcpListener::bind("127.0.0.1:0")?
+        .local_addr()?
+        .port();
+    scratch.units[1].ready.answers = Some((port, "/api/authority"));
+    let server = scratch.work().join("server.py");
+    std::fs::write(&server, SERVER)?;
+    std::fs::create_dir_all(scratch.layout.bin_dir())?;
+    stand_in_for_an_unstamped_binary(&scratch.layout.binary(BINARIES[0]))?;
+    http_service(&scratch.layout.bin_dir(), A, &server, port)?;
+    private_files::ensure_dir(&scratch.layout.install_dir())?;
+    let record = format!(
+        "{{\"binaries\": {{\"{}\": \"{UNSTAMPED}\", \"{}\": \"{UNSTAMPED}\"}}, \"surface\": null}}",
+        BINARIES[0], BINARIES[1]
+    );
+    std::fs::write(scratch.layout.build_record(), record)?;
+    let mut before = vec![
+        start_unlocked(&scratch.layout.binary(BINARIES[0]), &scratch.units[0])?,
+        start_unlocked(&scratch.layout.binary(BINARIES[1]), &scratch.units[1])?,
+    ];
+    let new = scratch.work().join("b");
+    build(&new, B, Behaviour::Serves)?;
+    http_service(&new, B, &server, port)?;
+    let mut said = Vec::new();
+    let upgraded = scratch.upgrade(&new, None, &mut Recorder::default(), &mut said)?;
+    for child in &mut before {
+        child.wait()?;
+    }
+    let unstamped = format!("{}: installed {UNSTAMPED}, new {B}", BINARIES[0]);
+    assert!(said.contains(&unstamped), "{said:?}");
+    assert!(
+        authority(port)?.contains(B),
+        "/api/authority names the new build"
+    );
+    assert_eq!(scratch.running()?, ready_lines(B));
+    assert_eq!(
+        upgraded.binaries.get(BINARIES[0]).map(String::as_str),
+        Some(B)
+    );
+    Ok(())
+}
+
+#[test]
 fn install_run_again_restarts_a_process_whose_binary_it_placed() -> TestResult {
     let scratch = Scratch::new()?;
     let pid = |unit: &Unit| std::fs::read_to_string(&unit.pid);

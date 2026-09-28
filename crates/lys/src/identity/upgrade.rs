@@ -37,7 +37,7 @@ use super::config::DeploymentConfig;
 use super::error::{ErrorKind, IdentityError, IdentityResult};
 use super::install::layout::{BINARIES, BROKER_PORT, Layout, SERVICE_PORT};
 use super::install::log_wait::{self, LogCursor};
-use super::install::{services, surface};
+use super::install::{self, services, surface};
 use super::private_files;
 use crate::commands::output::Emitter;
 
@@ -127,19 +127,19 @@ pub fn units(layout: &Layout) -> Vec<Unit> {
 /// What an upgrade asks of the engine that runs the compose services.
 pub trait Engine {
     /// Brings the compose services to the definition now in place,
-    /// recreating those whose definition changed, and waits for them ready.
+    /// making every service again from it, and waits for them ready.
     fn apply(&mut self, layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<()>;
 }
 
-/// The compose services through `docker compose`, which recreates exactly
-/// the services whose rendered definition changed.
+/// The compose services through `docker compose`, every one made again from
+/// its rendered definition, so a changed network reaches each of them.
 #[derive(Debug)]
 pub struct Compose;
 
 impl Engine for Compose {
     fn apply(&mut self, layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<()> {
         let config = DeploymentConfig::load(&layout.deployment_config())?;
-        services::compose_up(layout, &config)?;
+        services::compose_recreate(layout, &config)?;
         services::wait_ready(layout, &config, say)?;
         say("compose services on their rendered definition and ready");
         Ok(())
@@ -426,6 +426,9 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     let mut emitter = Emitter::new(json);
     emitter.field("root", "root", layout.root.display().to_string());
     let units = units(&layout);
+    require_install(&layout)?;
+    let config = DeploymentConfig::load(&layout.deployment_config())?;
+    install::server_state(&layout, &config)?;
     let mut parts = Parts {
         units: &units,
         engine: &mut Compose,
