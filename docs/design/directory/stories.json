@@ -124,6 +124,10 @@
         {
           "id": "S111",
           "text": "As the operator, I want the exact release installed on a node I name and shown to me as a staging install, so that I can accept the product standalone before anything is cut over."
+        },
+        {
+          "id": "S165",
+          "text": "As an operator, I want Lys to start agents with their credentials, tell apps where it is and sign people out of every app, with no app needing to run, so that Lys and each app work on their own and together."
         }
       ]
     },

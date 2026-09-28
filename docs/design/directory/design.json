@@ -3351,6 +3351,66 @@
       "path": "crates/lys/src/identity/install_tests.rs",
       "note": "Install tests, calling start_detached with the holder.",
       "brief": "DIRECTORY-057"
+    },
+    {
+      "path": "crates/lys-identity-server/src/broker_handles.rs",
+      "note": "R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/src/broker_handles_tests.rs",
+      "note": "R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/start_with_own_broker.rs",
+      "note": "R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-secrets/src/access.rs",
+      "note": "R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-secrets/src/bin/lys-secrets/callers.rs",
+      "note": "R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys/src/identity/install/discovery.rs",
+      "note": "R2: Lys writes a discovery record any app can find",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys/src/identity/install/discovery_tests.rs",
+      "note": "R2: Lys writes a discovery record any app can find",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/src/app_members_api.rs",
+      "note": "R3: Any registered app reads Lys's people, seats and agents",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/app_members.rs",
+      "note": "R3: Any registered app reads Lys's people, seats and agents",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/src/backchannel_logout.rs",
+      "note": "R4: Signing out of Lys signs the person out of every registered app",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/backchannel_logout.rs",
+      "note": "R4: Signing out of Lys signs the person out of every registered app",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/src/sessions_api.rs",
+      "note": "R4: Signing out of Lys signs the person out of every registered app",
+      "brief": "DIRECTORY-059"
     }
   ],
   "inventory": [

@@ -763,6 +763,18 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-secrets/src/audit/codec.rs` | The broker's audit log codec: its kinds are one list the decoder matches, entered in the workspace kinds registry so go-back can compare kind sets. | DIRECTORY-053 |
 | `crates/lys/src/identity/install/exit_wait_tests.rs` | Exit watch tests, calling start_detached with the holder. | DIRECTORY-057 |
 | `crates/lys/src/identity/install_tests.rs` | Install tests, calling start_detached with the holder. | DIRECTORY-057 |
+| `crates/lys-identity-server/src/broker_handles.rs` | R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
+| `crates/lys-identity-server/src/broker_handles_tests.rs` | R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
+| `crates/lys-identity-server/tests/start_with_own_broker.rs` | R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
+| `crates/lys-secrets/src/access.rs` | R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
+| `crates/lys-secrets/src/bin/lys-secrets/callers.rs` | R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
+| `crates/lys/src/identity/install/discovery.rs` | R2: Lys writes a discovery record any app can find | DIRECTORY-059 |
+| `crates/lys/src/identity/install/discovery_tests.rs` | R2: Lys writes a discovery record any app can find | DIRECTORY-059 |
+| `crates/lys-identity-server/src/app_members_api.rs` | R3: Any registered app reads Lys's people, seats and agents | DIRECTORY-059 |
+| `crates/lys-identity-server/tests/app_members.rs` | R3: Any registered app reads Lys's people, seats and agents | DIRECTORY-059 |
+| `crates/lys-identity-server/src/backchannel_logout.rs` | R4: Signing out of Lys signs the person out of every registered app | DIRECTORY-059 |
+| `crates/lys-identity-server/tests/backchannel_logout.rs` | R4: Signing out of Lys signs the person out of every registered app | DIRECTORY-059 |
+| `crates/lys-identity-server/src/sessions_api.rs` | R4: Signing out of Lys signs the person out of every registered app | DIRECTORY-059 |
 
 ## Inventory
 

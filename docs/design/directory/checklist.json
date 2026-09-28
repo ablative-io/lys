@@ -1420,6 +1420,31 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Lys needs no app and every app can find it (DIRECTORY-059)",
+      "items": [
+        {
+          "id": "C411",
+          "text": "A start reads its credentials from Lys's own broker, and no route reaches an app for them (DIRECTORY-059 R1).",
+          "done": false
+        },
+        {
+          "id": "C412",
+          "text": "Lys writes a discovery record any app can find (DIRECTORY-059 R2).",
+          "done": false
+        },
+        {
+          "id": "C413",
+          "text": "Any registered app reads Lys's people, seats and agents (DIRECTORY-059 R3).",
+          "done": false
+        },
+        {
+          "id": "C414",
+          "text": "Signing out of Lys signs the person out of every registered app (DIRECTORY-059 R4).",
+          "done": false
+        }
+      ]
     }
   ]
 }

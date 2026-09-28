@@ -363,3 +363,10 @@
 - [ ] **C408** — Generated sender configuration names separate TLS trust and receipt trust and a declared positive response-body bound.
 - [ ] **C409** — Scratch installation proves signed observation acceptance and named transport, identity and response refusals.
 - [ ] **C410** — DIRECTORY-045 R5 retains sender credentials and swaps/restores sender configuration, trust material and mounts with the chosen binaries.
+
+## Lys needs no app and every app can find it (DIRECTORY-059)
+
+- [ ] **C411** — A start reads its credentials from Lys's own broker, and no route reaches an app for them (DIRECTORY-059 R1).
+- [ ] **C412** — Lys writes a discovery record any app can find (DIRECTORY-059 R2).
+- [ ] **C413** — Any registered app reads Lys's people, seats and agents (DIRECTORY-059 R3).
+- [ ] **C414** — Signing out of Lys signs the person out of every registered app (DIRECTORY-059 R4).

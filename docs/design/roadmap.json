@@ -2435,6 +2435,29 @@
       },
       "depends_on": [],
       "notes": "Written by hand."
+    },
+    {
+      "id": "RM-099",
+      "title": "Lys finds its own credentials, says where it is, serves its members to any app and signs out everywhere, needing no app to run",
+      "status": "briefed",
+      "kind": "fix",
+      "summary": "Start credentials come from Lys's own broker, a discovery record, a member feed for any app and back-channel sign-out, with no app needed to run.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-28T22:48:00+10:00",
+        "quote": "",
+        "context": "Tom's 21:34 rule that Lys and every app integrate natively and neither depends on the other."
+      },
+      "links": {
+        "cluster": "secrets",
+        "decisions": [],
+        "briefs": [
+          "SECRETS-007"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
     }
   ]
 }
