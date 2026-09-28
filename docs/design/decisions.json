@@ -1724,7 +1724,7 @@
       "quote": "how is an average person supposed to do it?",
       "consequences": [
         "An ordinary person installs Lys without a terminal.",
-        "The signing identity for the app is Tom's Apple developer identity, held as a secret by handle; building the app without it is refused by name.",
+        "The signing identity for the app is Tom's Apple developer identity, held as a secret by handle; building a release app without it is refused by name. An explicit development build is locally signed and named Lys (development), never the release name; it is not notarised and is not release evidence.",
         "The container engine is still required until Tom decides otherwise; the app guides the person through it."
       ],
       "supersedes": [],
