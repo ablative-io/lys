@@ -1,0 +1,101 @@
+{
+  "id": "DIRECTORY-061",
+  "cluster": "directory",
+  "title": "A SpiceDB call ends on its answer or when its caller leaves, never on a clock",
+  "depends_on": [
+    "DIRECTORY-050"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C422",
+    "C423",
+    "C424"
+  ],
+  "stories": [
+    "S169"
+  ],
+  "design_anchor": [
+    "ADR-127"
+  ],
+  "purpose": "The one production clock left in the Lys crates is WAIT in crates/lys-identity-server/src/spicedb_http.rs (line 9), a five-second bound on each SpiceDB connect, write and read (lines 29 to 31). Tom's rule is that no wait in Lys ends on a clock. Taking WAIT away alone would be worse than keeping it, because post_json is a blocking std TcpStream call made by SpiceDb::call (crates/lys-identity-server/src/spicedb.rs line 185) inside with_grants (crates/lys-identity-server/src/grants.rs lines 130 to 154), which holds the std Mutex over GrantState (routes.rs, AppState.grants, locked at grants.rs line 141) on a tokio worker. A connected SpiceDB that never answers would then hold that lock and that worker for as long as the process lives. ADR-127 rules how the wait ends instead. It ends on SpiceDB's answer, on SpiceDB closing the connection, or on the request that asked for it going away.",
+  "task": "Take WAIT and the three timeouts out of post_json. Run every grants critical section off the async workers inside a cancel scope that the handler's future owns. Make post_json register its live stream with the scope, so the scope's cancel shuts that stream down and the blocking read returns. Make a section that gets the lock after its request has gone return before it calls SpiceDB.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "post_json waits on SpiceDB or on its cancel scope, never on a clock",
+      "spec": "Behavioural. A new module crates/lys-identity-server/src/spicedb_cancel.rs holds Cancel, a shared flag with the one live SpiceDB stream of a request, and a scope that sets the current thread's Cancel for the length of a closure. post_json in spicedb_http.rs connects with TcpStream::connect and sets no read, write or connect timeout. When the current thread has a scope, post_json registers a clone of its stream with that scope's Cancel and then reads the flag, so a cancel that lands before the registration is never lost. Cancel::cancel sets the flag and calls shutdown(Both) on the registered stream, so a blocked write or read returns at once. A call made after its scope is cancelled returns without connecting. A cancelled call returns the error text 'the request that asked left before SpiceDB answered', which SpiceDb::call maps to the same GrantError it maps an unreachable SpiceDB to today, so every section takes the path it takes today when the wait fails. With no scope on the thread, as at start (SpiceDb::open, spicedb.rs line 137), post_json waits for the answer or for SpiceDB to close, and a SpiceDB that does neither shows as the start still at its named step.",
+      "acceptance": [
+        "A test holds a listener that accepts and never answers, calls post_json to it inside a scope, and cancels the scope from another thread, and post_json returns the error naming that the request left.",
+        "In that test the listener's accepted socket reads end of file after the cancel.",
+        "A test that cancels the scope before calling post_json sees it return that error, and the listener has accepted no connection.",
+        "A test calls post_json with no scope to a listener that answers 200 with a JSON body, and gets that status and body.",
+        "A post_json to a loopback port that refuses returns an error that names the authority.",
+        "grep -nE 'Duration|timeout' crates/lys-identity-server/src/spicedb_http.rs prints nothing."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/spicedb_cancel.rs",
+          "crates/lys-identity-server/src/spicedb_cancel_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/spicedb_http.rs",
+          "crates/lys-identity-server/src/lib.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C422"
+      ],
+      "stories": [
+        "S169"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Every grants section runs off the async workers and ends when its request leaves",
+      "spec": "Behavioural. A new async function judged in spicedb_cancel.rs takes the Arc of AppState and a Send closure over Judged, makes a Cancel, and runs with_grants inside that Cancel's scope under tokio::task::spawn_blocking. It holds a guard in its own future whose drop calls Cancel::cancel, so when the HTTP caller goes away and the handler's future is dropped, a SpiceDB wait in that section ends. with_grants reads the flag after it takes the lock and before it calls act, and returns at once when it is set. Every async handler in crates/lys-identity-server/src that calls with_grants calls judged instead, capturing owned values rather than borrowed ones. A request waiting on the lock holds a blocking thread until the lock is free and then returns at once if its request has left. The order of each section's own acts is unchanged.",
+      "acceptance": [
+        "git grep -n 'with_grants(' crates/lys-identity-server/src prints only its definition in grants.rs and its one call in spicedb_cancel.rs.",
+        "A test starts the service with its SpiceDB endpoint at a listener that accepts and never answers, sends a request to a route that checks a grant, and drops the client connection, and the listener's accepted socket reads end of file.",
+        "In that test a second request to the same route afterwards reaches the listener as a new connection, which shows the grants lock was let go.",
+        "A test sends a request whose section finds its flag set after it takes the lock, and the listener accepts no connection for it.",
+        "grep -rnE 'Duration::|_timeout|timeout\\(' crates/lys-identity-server/src/spicedb_cancel.rs prints nothing."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/tests/spicedb_cancel.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/spicedb_cancel.rs",
+          "crates/lys-identity-server/src/grants.rs",
+          "crates/lys-identity-server/src/certificates_issue.rs",
+          "crates/lys-identity-server/src/requests_api.rs",
+          "crates/lys-identity-server/src/requests_decide.rs",
+          "crates/lys-identity-server/src/resources_api.rs",
+          "crates/lys-identity-server/src/reviews_api.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C423",
+        "C424"
+      ],
+      "stories": [
+        "S169"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT add a timeout, deadline, sleep, poll interval or watchdog anywhere. Every wait ends on an answer, a close or its caller leaving.",
+    "SHALL NOT change the RelationshipStore trait in crates/lys-identity or make it async.",
+    "SHALL NOT add a code line to crates/lys-identity-server/src/grants.rs beyond the flag read in with_grants. Anything more goes in spicedb_cancel.rs.",
+    "SHALL NOT add unsafe, #[allow], #[ignore], let _ = or a renamed _name binding.",
+    "SHALL NOT change the order of the acts inside any grants section."
+  ],
+  "verification": [
+    "The full Lys gate and ast-grep scan exit 0 at the card's head, measured by the card round.",
+    "sh scripts/file-length.sh exits 0 at the card's head.",
+    "`cargo test -p lys-identity-server --test spicedb_cancel` exits 0 on Dean's laptop at the card's head.",
+    "`cargo test -p lys-identity-server --lib spicedb_cancel` exits 0 on Dean's laptop at the card's head."
+  ]
+}

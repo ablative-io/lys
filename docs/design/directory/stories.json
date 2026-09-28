@@ -592,6 +592,16 @@
           "text": "As an operator, I want upgrade and interrupted setup to preserve the sender identity so that pending audit work remains verifiable."
         }
       ]
+    },
+    {
+      "name": "Person waiting on a permission check",
+      "role": "Uses a Lys screen or route that checks a grant",
+      "stories": [
+        {
+          "id": "S169",
+          "text": "As a person whose request is waiting on the permission service, I want my request to end when I leave it, and nobody else's request held behind mine."
+        }
+      ]
     }
   ]
 }

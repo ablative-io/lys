@@ -83,7 +83,8 @@
     "ADR-114",
     "ADR-115",
     "ADR-122",
-    "ADR-126"
+    "ADR-126",
+    "ADR-127"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -103,7 +104,8 @@
     "Road step 2's certificate half (defined in docs/design/identity/STATEMENT-2026-09-22.md, The road; brought into this cluster by ADR-093): an enduring agent's certificate states what it was granted at issuance in a typed, versioned claim, lys/agent-capability/v1, a new format under its own proposed OID 1.3.6.1.4.1.66364.2.1 alongside the unchanged shipped .1 extension transport, and a named verifier, verify_agent_capability, checks the chain against a set of trusted issuer keys, reads the claim and refuses what it does not cover (DIRECTORY-031).",
     "DIRECTORY-034 draws the access graph (conformance 8.3) with grant edges and every reachability from Access's answers, and responsible people and resource parents as recorded, holding no permission rule of its own (ADR-098).",
     "DIRECTORY-037 passes conformance rows 9.1 to 9.3: the surface's test command runs in .land/gates.sh and proves the rail, the dock side by all three of its controls, the route table, the palette and go-to keys, the help overlay and a counted Tab walk, and index.v6.html carries the same two fixes as the built shell.",
-    "DIRECTORY-038 states and tests conformance row 1.2: linking a person's provider account to an agent, and delegating from a sign-in identity, are each refused by name and write nothing; one counted test over the store finds no agent record carrying a sign-in identity; the broker's refusal is recorded as a finding against SECRETS-002, on which row 1.2's full pass waits."
+    "DIRECTORY-038 states and tests conformance row 1.2: linking a person's provider account to an agent, and delegating from a sign-in identity, are each refused by name and write nothing; one counted test over the store finds no agent record carrying a sign-in identity; the broker's refusal is recorded as a finding against SECRETS-002, on which row 1.2's full pass waits.",
+    "DIRECTORY-061 takes the last production clock out of Lys. A SpiceDB call ends on its answer, on SpiceDB closing, or on its request leaving, and a request that leaves lets the grants lock go."
   ],
   "non_goals": [
     {
@@ -4392,6 +4394,31 @@
       "path": "crates/lys-identity-server/src/grants_refusals.rs",
       "note": "R6: refusal capture without growing grants.rs",
       "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/spicedb_cancel.rs",
+      "note": "a SpiceDB wait ends when its request leaves",
+      "brief": "DIRECTORY-061"
+    },
+    {
+      "path": "crates/lys-identity-server/src/spicedb_cancel_tests.rs",
+      "note": "a SpiceDB wait ends when its request leaves",
+      "brief": "DIRECTORY-061"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/spicedb_cancel.rs",
+      "note": "a SpiceDB wait ends when its request leaves",
+      "brief": "DIRECTORY-061"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-061.json",
+      "note": "the SpiceDB cancel brief",
+      "brief": "DIRECTORY-061"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-061.md",
+      "note": "the SpiceDB cancel brief",
+      "brief": "DIRECTORY-061"
     }
   ],
   "inventory": [

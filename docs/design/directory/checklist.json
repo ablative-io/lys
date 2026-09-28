@@ -1475,6 +1475,26 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "A SpiceDB call ends on its answer or its caller (DIRECTORY-061)",
+      "items": [
+        {
+          "id": "C422",
+          "text": "No SpiceDB connect, write or read in Lys waits on a clock, and a cancelled call returns at once (DIRECTORY-061 R1).",
+          "done": false
+        },
+        {
+          "id": "C423",
+          "text": "Every grants section runs off the async workers, and a request that leaves ends its SpiceDB wait and lets the grants lock go (DIRECTORY-061 R2).",
+          "done": false
+        },
+        {
+          "id": "C424",
+          "text": "A section that takes the grants lock after its request left calls no SpiceDB (DIRECTORY-061 R2).",
+          "done": false
+        }
+      ]
     }
   ]
 }

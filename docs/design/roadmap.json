@@ -2510,6 +2510,31 @@
         "RM-100"
       ],
       "notes": "Written by hand."
+    },
+    {
+      "id": "RM-102",
+      "title": "A SpiceDB call ends on its answer or when its caller leaves, never on a clock",
+      "status": "briefed",
+      "kind": "fix",
+      "summary": "WAIT and the three socket timeouts leave spicedb_http.rs, and grants sections run off the async workers inside a cancel scope the request owns.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-29T03:01:00+10:00",
+        "quote": "No timeouts, deadlines or watchdogs anywhere",
+        "context": "Archie's clock census of Lys main found spicedb_http.rs WAIT as the only production clock, carded YIaL3p3F."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-127"
+        ],
+        "briefs": [
+          "DIRECTORY-061"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
     }
   ]
 }

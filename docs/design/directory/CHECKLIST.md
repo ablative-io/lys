@@ -378,3 +378,9 @@
 - [ ] **C418** — A runner session's handles are issued to a key the runner made for it in memory, before anything is spawned (DIRECTORY-060 R1).
 - [ ] **C419** — The runner signs a presentation only for a peer proved by credentials and ancestry to be the session the handle was issued to, on macOS and Linux (DIRECTORY-060 R2).
 - [ ] **C420** — The harness and lys mcp get every presentation from the runner and hold no key (DIRECTORY-060 R3).
+
+## A SpiceDB call ends on its answer or its caller (DIRECTORY-061)
+
+- [ ] **C422** — No SpiceDB connect, write or read in Lys waits on a clock, and a cancelled call returns at once (DIRECTORY-061 R1).
+- [ ] **C423** — Every grants section runs off the async workers, and a request that leaves ends its SpiceDB wait and lets the grants lock go (DIRECTORY-061 R2).
+- [ ] **C424** — A section that takes the grants lock after its request left calls no SpiceDB (DIRECTORY-061 R2).

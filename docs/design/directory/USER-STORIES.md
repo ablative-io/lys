@@ -261,3 +261,7 @@
 **S163.** As a person installing Lys, I want its internal audit connection provisioned automatically so that I never handle credentials or configure the identity provider.
 
 **S164.** As an operator, I want upgrade and interrupted setup to preserve the sender identity so that pending audit work remains verifiable.
+
+## Person waiting on a permission check — Uses a Lys screen or route that checks a grant
+
+**S169.** As a person whose request is waiting on the permission service, I want my request to end when I leave it, and nobody else's request held behind mine.
