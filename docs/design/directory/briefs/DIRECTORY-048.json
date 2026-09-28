@@ -120,7 +120,32 @@
       "stories": [
         "S151",
         "S152"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. None of R1's acceptance rows is met by this round. The boundary 'SHALL NOT start this continuation before DIRECTORY-047 R3's provider is complete and green and is present in the card's integrated tree' is not satisfied. crates/lys-identity-server/src/provider.rs is absent at HEAD e495f38. It exists on origin/card/DIRECTORY-047b (f4904598) and origin/card/DIRECTORY-047b-onmain (fac16efd), but neither is an ancestor of HEAD, checked with git merge-base --is-ancestor. The row 'production provider client lookup reaches apps_binding::sign_in_client ... OIDC round trip' depends on that provider directly, and the wall lists provider.rs as 'modify', which cannot be done while the file does not exist. State of the tree: the registrar substitute is still present (apps_api.rs:88 route /apps/registrars, apps_api.rs:509 fn registrar, apps_state.rs:355 registrars). No connector holder kind exists in crates/lys-identity/src (grep for Connector finds nothing). grants_connector.rs does not exist. The rows on register_app authority, the connector identity, compatibility fixtures and the secret shown once on approval via the provider are therefore unmet.",
+        "deviation": "I implemented nothing, because the brief's own start boundary is not met. To unblock: integrate DIRECTORY-045 and then DIRECTORY-047 (with R3 green) into card/DIRECTORY-048-onmain in dependency order, then resume this session.",
+        "checklist": [
+          {
+            "id": "C361",
+            "done": false,
+            "note": "Blocked on DIRECTORY-047 R3 provider being absent from the integrated tree; no connector kind or register_app grant path yet."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S151",
+            "satisfied": false,
+            "note": "Blocked on DIRECTORY-047 R3."
+          },
+          {
+            "id": "S152",
+            "satisfied": false,
+            "note": "Blocked on DIRECTORY-047 R3."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -153,7 +178,32 @@
       ],
       "stories": [
         "S151"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked by the same start boundary; nothing was changed. The rows on connectors (not_your_app for an authenticated application connector, and the connector-with-no-grant row) need the connector holder kind from R1, which does not exist in the tree. Schema validation from an earlier round is present (crates/lys-identity/src/grants/schema.rs), but this round verified no row of it.",
+        "deviation": "I made no change because the continuation's start boundary is unmet.",
+        "checklist": [
+          {
+            "id": "C362",
+            "done": false,
+            "note": "Not verified this round; continuation blocked."
+          },
+          {
+            "id": "C363",
+            "done": false,
+            "note": "Needs the connector identity from R1; blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S151",
+            "satisfied": false,
+            "note": "Blocked on DIRECTORY-047 R3."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -180,7 +230,27 @@
       ],
       "stories": [
         "S151"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked by the same start boundary; nothing was changed. The row requiring that 'a change made by the app's application connector waits for administrator approval' needs the connector kind from R1.",
+        "deviation": "I made no change because the continuation's start boundary is unmet.",
+        "checklist": [
+          {
+            "id": "C364",
+            "done": false,
+            "note": "Not verified this round; continuation blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S151",
+            "satisfied": false,
+            "note": "Blocked on DIRECTORY-047 R3."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -205,7 +275,27 @@
       ],
       "stories": [
         "S151"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked by the same start boundary; nothing was changed. This round verified no row.",
+        "deviation": "I made no change because the continuation's start boundary is unmet.",
+        "checklist": [
+          {
+            "id": "C365",
+            "done": false,
+            "note": "Not verified this round; continuation blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S151",
+            "satisfied": false,
+            "note": "Blocked on DIRECTORY-047 R3."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -233,7 +323,27 @@
       ],
       "stories": [
         "S151"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked by the same start boundary; nothing was changed. R5 requires the application connector identity, not a service account, to be the caller the grant engine judges, and that kind does not exist until R1 is built.",
+        "deviation": "I made no change because the continuation's start boundary is unmet.",
+        "checklist": [
+          {
+            "id": "C366",
+            "done": false,
+            "note": "Needs the connector identity; blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S151",
+            "satisfied": false,
+            "note": "Blocked on DIRECTORY-047 R3."
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -263,7 +373,27 @@
       ],
       "stories": [
         "S151"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked by the same start boundary; nothing was changed. The OpenAPI document must describe every route, and the route table changes once the provider routes are integrated and the registrar route is removed, so it cannot be completed before then.",
+        "deviation": "I made no change because the continuation's start boundary is unmet.",
+        "checklist": [
+          {
+            "id": "C367",
+            "done": false,
+            "note": "Not verified this round; continuation blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S151",
+            "satisfied": false,
+            "note": "Blocked on DIRECTORY-047 R3."
+          }
+        ]
+      }
     },
     {
       "id": "R7",
@@ -295,7 +425,27 @@
       ],
       "stories": [
         "S151"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked by the same start boundary; nothing was changed. This round verified no row.",
+        "deviation": "I made no change because the continuation's start boundary is unmet.",
+        "checklist": [
+          {
+            "id": "C368",
+            "done": false,
+            "note": "Not verified this round; continuation blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S151",
+            "satisfied": false,
+            "note": "Blocked on DIRECTORY-047 R3."
+          }
+        ]
+      }
     },
     {
       "id": "R8",
@@ -325,7 +475,32 @@
       "stories": [
         "S151",
         "S152"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked by the same start boundary; nothing was changed. This round verified no row.",
+        "deviation": "I made no change because the continuation's start boundary is unmet.",
+        "checklist": [
+          {
+            "id": "C386",
+            "done": false,
+            "note": "Not verified this round; continuation blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S151",
+            "satisfied": false,
+            "note": "Blocked on DIRECTORY-047 R3."
+          },
+          {
+            "id": "S152",
+            "satisfied": false,
+            "note": "Blocked on DIRECTORY-047 R3."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
