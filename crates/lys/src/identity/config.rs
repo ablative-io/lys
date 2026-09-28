@@ -139,7 +139,9 @@ pub struct Clients {
     pub platform: Client,
     /// The one app client installed beside the platform's, themed with the
     /// app accent the theme mapping declares, when a configuration names it.
-    #[serde(default)]
+    /// An install written before the app client had its name keeps it under
+    /// `cambium`, and is read as that same client.
+    #[serde(default, alias = "cambium")]
     pub app: Option<Client>,
 }
 
