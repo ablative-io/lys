@@ -17,6 +17,7 @@ import { IssueRoot } from './features/grants/IssueRoot';
 import { Model } from './features/access/Model';
 import { Graph } from './features/access/Graph';
 import { Resources } from './features/access/Resources';
+import { StartPage } from './features/start/StartDrawer';
 
 /** Every screen and tab has its own address (conformance 9.1). */
 export function AppRoutes() {
@@ -37,6 +38,7 @@ export function AppRoutes() {
       <Route path="/reviews" element={<Reviews />} />
       <Route path="/requests" element={<Requests />} />
       <Route path="/people" element={<People />} />
+      <Route path="/file/:id/start" element={<StartPage />} />
       <Route path="/file/:id/:tab?" element={<IdentityFile />} />
       <Route path="/me" element={<You />} />
       <Route path="/settings/:sec?" element={<Settings />} />

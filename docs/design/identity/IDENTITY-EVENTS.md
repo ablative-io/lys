@@ -74,3 +74,53 @@ Reviewed jointly by Archie and Buckley on DIRECTORY-003 at 6590854, and accepted
 1. lys-identity keeps its own canonical head writer, and lys-core does not change. A test pins the writer to RFC 8949 Appendix A's head vectors at every width boundary (0, 23, 24, 255, 256, 65535, 65536, 4294967295 and 4294967296), so a drift from the shortest form fails on its own line, not only through a round trip that could be wrong both ways.
 2. The actor is the login binding plus its provenance. The step-1 administrator is configured by issuer and subject. A reader resolves a binding to a person through the directory when it reads, never when the event is written.
 3. The link-audit payload is taken from R4 now, and row 01's typed contract must equal it.
+
+## Launch records and withdrawals (DIRECTORY-029)
+
+Two further kinds of signed directory event keep what a start gave and whether its request still stands. They are written by crates/lys-identity/src/start/: launch_record.rs holds both envelopes and the launch record's body, withdrawal.rs the withdrawal's body, and state.rs the log they are kept on.
+
+### Status
+
+Proposed, awaiting the joint review this document records for every kind before its first durable signature. Until the review is recorded here, launch records and withdrawals are signed only inside development isolation and tests. Neither kind changes a byte of `lys/identity-event/v1` or of kinds 1 to 7.
+
+### The envelope
+
+Each is a `COSE_Sign1` message in exactly the envelope above, signed by the directory service's key, with its own content type in the protected header:
+
+| Kind | Content type |
+| --- | --- |
+| launch record | `application/vnd.lys.launch-record.v1+cbor` |
+| withdrawal | `application/vnd.lys.launch-withdrawal.v1+cbor` |
+
+So neither is ever read as the other or as an identity event: a reader takes the content type from the exact protected header it re-derives for the service key, and refuses any other. Each message is one leaf of the launch-record log (origin `lys/identity/launch-records`), kept beside the directory log, whose folded state is sealed in its signed snapshot under `lys/identity/launch-records-state/v1`: every leaf up to the snapshot, as a CBOR array of byte strings, checked at a start to fold to the log's own tree.
+
+### The launch record's body
+
+A canonical CBOR map with keys 1 to 12, every key present:
+
+| Key | Field | Value |
+| --- | --- | --- |
+| 1 | version | `1` |
+| 2 | launch record id | text: `launch-` and 32 lowercase hex digits from the secure random source |
+| 3 | agent | text: the enduring agent id |
+| 4 | machine | text: the machine's identifier |
+| 5 | executable | text: the profile version's recorded executable |
+| 6 | arguments | array of text: its recorded arguments, in order |
+| 7 | working directory | text: its recorded working directory |
+| 8 | profile version | text |
+| 9 | credential ids | array of text: the ids the credentials check handed on, never a value |
+| 10 | given by | text: the person who gave it |
+| 11 | given at | seconds since the Unix epoch |
+| 12 | copied from | text: the launch record it was given again from, or null |
+
+### The withdrawal's body
+
+A canonical CBOR map with keys 1 to 4: `1` version (`1`), `2` the launch record id withdrawn, `3` who withdrew it (text), `4` when (seconds since the Unix epoch). A withdrawal says the request no longer stands. It never says the agent did not start.
+
+### Strict reading
+
+A message is refused unless it is the exact canonical message over its three parts, its protected header is the one for its content type and the service key, its signature verifies, and re-encoding the body it names gives back the very bytes that were read. Every failure is the one refusal, whatever it was. A log is refused whole when it keeps a launch record id twice, or withdraws a record it does not keep or withdraws one twice.
+
+### What reads them
+
+A launch record's state is derived and never kept: running when the sessions record (the sessions brief of run d5055cc1, drafted as DIRECTORY-015) holds a verified `lys/session-start/v1` report, signed with the agent's own key, whose agent id and launch record id equal the record's; unconfirmed while no such report exists and no withdrawal names it; withdrawn when a withdrawal names it and no such report exists. The ruling that report rests on: the sessions brief adds the launch record id to `lys/session-start/v1` before its tag freezes, so its signed message holds five things, the tag, the agent's directory id, the directory's identifier, the launch record id and the directory-issued challenge; this card does not define that message.
