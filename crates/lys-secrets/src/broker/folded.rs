@@ -1,6 +1,7 @@
 //! What the broker folds from its audit log: each lease's use count, drop,
-//! operations and spend, who has read which sealed record, and a rotation
-//! the log shows starting and not finishing.
+//! operations and spend, who has read which sealed record, a rotation the
+//! log shows starting and not finishing, and each secret's owner changes
+//! applied under an operation id.
 //!
 //! One function applies one line, and it is the only way a line reaches the
 //! state, at a start and when a snapshot is written alike. So the state a
@@ -8,8 +9,9 @@
 //! gives, and a start from it ends where a start from the whole log ends.
 //!
 //! The state is the snapshot's payload, in a canonical encoding. It holds
-//! handle ids, identities, record names, operation ids and request marks, as
-//! the audit lines themselves do, and no secret, token, digest or key.
+//! handle ids, identities, record names, operation ids, request marks and
+//! the digests of owner changes, as the audit lines themselves do, and no
+//! secret, token, token digest or key.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -17,9 +19,10 @@ use crate::audit::{AuditKind, AuditLine};
 use crate::encoding::{Canonical, Reader};
 use crate::error::SecretsError;
 
+use super::owner::{self, Operations, Owners};
 use super::{HandleRecord, ROTATING, lineage, records};
 
-const STATE_FORMAT: &str = "lys-secrets/broker-folded/v1";
+const STATE_FORMAT: &str = "lys-secrets/broker-folded/v2";
 const CONTEXT: &str = "broker snapshot state";
 
 /// The handle records with what the log says of each.
@@ -43,6 +46,8 @@ pub(super) struct Folded {
     pub(super) readers: BTreeSet<(String, String)>,
     /// The change of a rotation the log shows starting and not finishing.
     pub(super) rotating: Option<String>,
+    /// Each secret's owner changes applied, by secret name.
+    pub(super) owners: Owners,
 }
 
 fn unreadable(reason: impl Into<String>) -> SecretsError {
@@ -57,12 +62,13 @@ fn text(reader: &mut Reader<'_>) -> Result<String, SecretsError> {
 }
 
 impl Folded {
-    /// The state `handles` hold, with `readers` and `rotating`. A lease the
-    /// log says nothing of is left out.
+    /// The state `handles` hold, with `readers`, `rotating` and `owners`. A
+    /// lease or a secret the log says nothing of is left out.
     pub(super) fn of(
         handles: &Handles,
         readers: &BTreeSet<(String, String)>,
         rotating: Option<&str>,
+        owners: &Owners,
     ) -> Self {
         let leases = handles
             .iter()
@@ -82,6 +88,11 @@ impl Folded {
             leases,
             readers: readers.clone(),
             rotating: rotating.map(str::to_owned),
+            owners: owners
+                .iter()
+                .filter(|(_secret, operations)| **operations != Operations::default())
+                .map(|(secret, operations)| (secret.clone(), operations.clone()))
+                .collect(),
         }
     }
 
@@ -103,8 +114,10 @@ impl Folded {
         handles: &mut Handles,
         readers: &mut BTreeSet<(String, String)>,
         rotating: &mut Option<String>,
+        owners: &mut Owners,
         line: AuditLine,
     ) {
+        owner::fold(owners, &line);
         if line.kind == AuditKind::SealedRead && line.outcome == records::READ {
             if let (Some(identity), Some(record)) = (line.identity, line.secret) {
                 readers.insert((identity, record));
@@ -176,6 +189,20 @@ impl Folded {
             None => state.field(&[0])?,
             Some(change) => state.field(&[1])?.field(change.as_bytes())?,
         };
+        state.number(count(self.owners.len())?)?;
+        for (secret, operations) in &self.owners {
+            state.field(secret.as_bytes())?;
+            match &operations.last {
+                None => state.field(&[0])?,
+                Some(last) => state.field(&[1])?.field(last.as_bytes())?,
+            };
+            state.number(count(operations.applied.len())?)?;
+            for (operation, (digest, outcome)) in &operations.applied {
+                state.field(operation.as_bytes())?;
+                state.field(digest.as_bytes())?;
+                state.field(outcome.as_bytes())?;
+            }
+        }
         Ok(state.into_bytes())
     }
 
@@ -225,6 +252,7 @@ impl Folded {
             [1] => Some(text(&mut reader)?),
             _ => return Err(unreadable("a rotation is neither absent nor present")),
         };
+        let owners = decode_owners(&mut reader)?;
         if !reader.is_done() {
             return Err(unreadable("bytes follow the state"));
         }
@@ -232,6 +260,28 @@ impl Folded {
             leases,
             readers,
             rotating,
+            owners,
         })
     }
+}
+
+/// Each secret's owner changes, as the state encodes them.
+fn decode_owners(reader: &mut Reader<'_>) -> Result<Owners, SecretsError> {
+    let mut owners = Owners::new();
+    for _secret in 0..reader.number()? {
+        let secret = text(reader)?;
+        let last = match reader.field()? {
+            [0] => None,
+            [1] => Some(text(reader)?),
+            _ => return Err(unreadable("a last operation is neither absent nor present")),
+        };
+        let mut applied = BTreeMap::new();
+        for _operation in 0..reader.number()? {
+            let operation = text(reader)?;
+            let digest = text(reader)?;
+            applied.insert(operation, (digest, text(reader)?));
+        }
+        owners.insert(secret, Operations { last, applied });
+    }
+    Ok(owners)
 }
