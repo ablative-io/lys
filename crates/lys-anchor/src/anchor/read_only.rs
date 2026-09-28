@@ -46,13 +46,26 @@
 //! # A read-only anchor is still an anchor, and still refuses a log without
 //! genesis
 //!
-//! `open_read_only` performs exactly the checks [`Anchor::open`] performs: the
-//! tree is rebuilt from stored leaves and reconciled with the pin, an
-//! interrupted append is repaired and reported through
-//! [`recovered_to`](Anchor::recovered_to), and a log with no leaves is refused.
-//! Dropping the genesis check for a reader would make the read path accept logs
-//! the write path rejects, so a `status` command would report happily on a log
-//! that could never issue a receipt.
+//! `open_read_only` performs the checks [`Anchor::open`] performs: the tree is
+//! rebuilt from stored leaves and compared with the pin, and a log with no
+//! leaves is refused. Dropping the genesis check for a reader would make the
+//! read path accept logs the write path rejects, so a `status` command would
+//! report happily on a log that could never issue a receipt.
+//!
+//! # A reader never repairs
+//!
+//! A pin is a write, and reading a log must never change it. So a read-only
+//! open **never repairs** a store found one leaf ahead of its pin, the state
+//! an append interrupted between storing its leaf and advancing the pin
+//! leaves behind. Its store comes from the file store's own read-only open,
+//! which refuses that store with
+//! [`StoreError::RepairPending`](lys_log_store::StoreError::RepairPending)
+//! before any leaf is read: a read-only anchor over it is refused, never
+//! opened, and nothing is repaired or pinned through it. Only a writable
+//! open, [`Anchor::open`] or [`Log::open`](lys_log_store::Log::open) over a
+//! store from [`FileLeafStore::open`](lys_log_store::FileLeafStore::open),
+//! repairs it, and reports the repair through
+//! [`recovered_to`](Anchor::recovered_to).
 
 use lys_log_store::{LeafStore, Log};
 
@@ -99,9 +112,13 @@ impl<S: LeafStore> Anchor<S, NoSigner, NoPolicy> {
     /// Opens an anchor over an existing `store` for reading only, with no
     /// signer and no admission policy.
     ///
-    /// Refuses a log with no leaves, repairs and reports an interrupted append,
-    /// and rebuilds the tree from stored leaves — the same checks
-    /// [`Anchor::open`] performs, for the reason in the [module docs](self).
+    /// Refuses a log with no leaves and rebuilds the tree from stored leaves —
+    /// the checks [`Anchor::open`] performs, for the reason in the
+    /// [module docs](self).
+    ///
+    /// It never repairs a store found one leaf ahead of its pin: that store is
+    /// refused by the file store's own read-only open with
+    /// `StoreError::RepairPending`, and only a writable open repairs it.
     ///
     /// # What this value can and cannot do
     ///
@@ -127,8 +144,10 @@ impl<S: LeafStore> Anchor<S, NoSigner, NoPolicy> {
     /// #     AnchorConfig::unconfigured(),
     /// # )?;
     /// # drop(created);
-    /// let reader =
-    ///     Anchor::open_read_only(FileLeafStore::open(&path)?, AnchorConfig::unconfigured())?;
+    /// let reader = Anchor::open_read_only(
+    ///     FileLeafStore::open_read_only(&path)?,
+    ///     AnchorConfig::unconfigured(),
+    /// )?;
     ///
     /// // The reads resolve, and a status cannot be had without its posture.
     /// let status = reader.status();
@@ -153,8 +172,10 @@ impl<S: LeafStore> Anchor<S, NoSigner, NoPolicy> {
     /// #     AnchorConfig::unconfigured(),
     /// # )?;
     /// # drop(created);
-    /// let reader =
-    ///     Anchor::open_read_only(FileLeafStore::open(&path)?, AnchorConfig::unconfigured())?;
+    /// let reader = Anchor::open_read_only(
+    ///     FileLeafStore::open_read_only(&path)?,
+    ///     AnchorConfig::unconfigured(),
+    /// )?;
     ///
     /// // No signer, so there is no `publish_checkpoint` to call.
     /// reader.publish_checkpoint()?;

@@ -246,6 +246,26 @@ pub enum StoreError {
         expected: u32,
     },
 
+    /// An append was refused because the log was opened at its pin with one
+    /// leaf standing ahead of the pin.
+    ///
+    /// The log was opened by [`Log::open_at_pin`](crate::Log::open_at_pin),
+    /// which never pins, so the leaf an interrupted append stored is still
+    /// ahead of the pin. Appending would meet that leaf at the next index, and
+    /// the store never reports its own leaf as another writer's. A writable
+    /// open ([`Log::open`](crate::Log::open) over a handle from
+    /// [`FileLeafStore::open`](crate::FileLeafStore::open)) must repair it
+    /// before any append.
+    #[error(
+        "refusing to append: the log has a pending repair, its store holds {leaves} leaves but its pin is at tree size {pinned_tree_size}; a writable open must repair it before any append"
+    )]
+    AppendAwaitsRepair {
+        /// The pin's tree size the log was opened at.
+        pinned_tree_size: u64,
+        /// The count of leaves the store held.
+        leaves: u64,
+    },
+
     /// The log refused further use because an earlier append failed partway.
     ///
     /// An append writes the leaf durably and *then* advances the pin. If the

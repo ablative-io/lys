@@ -54,6 +54,33 @@
 //! which is a different and weaker axis of independence than the crate's Merkle
 //! cross-checks, where two separately written implementations disagree or agree.
 //!
+//! # A named leaf is whole
+//!
+//! A file under a 20-digit leaf name is always a whole, flushed leaf. Only
+//! files whose names begin with `.` may be partial, and those are never counted
+//! as leaves and never changed by an open.
+//!
+//! - A write that fails before a successful link removes its own temporary
+//!   file, and no other.
+//! - The no-replace link is the **commit point**: once it succeeds the leaf is
+//!   this writer's and the extent advances, whatever happens after it.
+//! - A failure to flush `leaves/` after the link is
+//!   [`StoreError::LeafDurabilityUncertain`], and the handle refuses further
+//!   appends until the store is reopened.
+//! - A writable open ([`FileLeafStore::open`]) flushes `leaves/` before
+//!   counting, so a leaf named at a writable open is durable, and the open
+//!   fails when that flush fails.
+//! - A read-only open ([`FileLeafStore::open_read_only`]) counts the named
+//!   leaves without flushing, and its handle refuses to write a leaf, a pin or
+//!   a snapshot with [`StoreError::ReadOnly`].
+//! - **Open never deletes a leftover temporary file**, and neither open
+//!   deletes, renames, truncates or writes any file in the store's directory.
+//!   Clearing leftover temporary files that a crash stranded is not done here:
+//!   it is a maintenance act of its own.
+//!
+//! The directory flushes above hold on unix targets only; elsewhere the flush
+//! of a directory is a no-op, as the Durability section says.
+//!
 //! # What open does and never does
 //!
 //! [`FileLeafStore::open`] reads `log.json` and `state.json`, flushes
@@ -69,7 +96,7 @@
 //! without the flush, and creates, writes, renames, links and removes nothing.
 //! It refuses a store exactly one leaf past its pin with
 //! [`StoreError::RepairPending`], and otherwise returns a handle whose
-//! `put_leaf` and `pin` refuse with [`StoreError::ReadOnly`].
+//! `put_leaf`, `pin` and `put_snapshot` refuse with [`StoreError::ReadOnly`].
 //!
 //! Neither open reads leaf bytes, repairs a store or advances the pin: the
 //! one-leaf repair of an interrupted append is [`Log::open`]'s, over a writable
@@ -156,7 +183,8 @@ pub struct FileLeafStore {
     /// order it met them.
     left_behind: Vec<LeftBehind>,
     /// Set on a handle from [`FileLeafStore::open_read_only`], whose
-    /// `put_leaf` and `pin` refuse with [`StoreError::ReadOnly`].
+    /// `put_leaf`, `pin` and `put_snapshot` refuse with
+    /// [`StoreError::ReadOnly`].
     read_only: bool,
 }
 
@@ -262,7 +290,7 @@ impl FileLeafStore {
     /// [`FileLeafStore::open`] in the same order, without flushing `leaves/`
     /// and without creating, writing, renaming, linking or removing any file.
     ///
-    /// The handle's `put_leaf` and `pin` refuse with [`StoreError::ReadOnly`].
+    /// The handle's `put_leaf`, `pin` and `put_snapshot` refuse with [`StoreError::ReadOnly`].
     /// A store holding exactly one leaf past its pin is an interrupted append
     /// that only a writable open repairs, so it is refused rather than served
     /// at the pinned head. That is decided from the count and `state.json`
@@ -488,6 +516,7 @@ impl LeafStore for FileLeafStore {
     }
 
     fn put_snapshot(&mut self, bytes: &[u8]) -> StoreResult<()> {
+        self.refuse_if_read_only("write a snapshot")?;
         snapshot_slot::write(&self.dir, bytes)
     }
 }

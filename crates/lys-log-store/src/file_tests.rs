@@ -451,6 +451,21 @@ fn a_read_only_handle_refuses_a_pin_and_changes_no_byte() {
 }
 
 #[test]
+fn a_read_only_handle_refuses_a_snapshot_write_and_changes_no_byte() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    store_pinned_over(&dir, b"leaf-0");
+    let mut store = FileLeafStore::open_read_only(&dir).unwrap();
+    let before = tree_bytes(&dir);
+    let err = store.put_snapshot(b"a snapshot").unwrap_err();
+    assert!(
+        matches!(&err, StoreError::ReadOnly { path, operation: "write a snapshot" } if *path == dir),
+        "{err}"
+    );
+    assert_eq!(tree_bytes(&dir), before, "the refusal changed no file");
+}
+
+#[test]
 fn leftover_temporaries_names_the_stores_own_temporary_files() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
