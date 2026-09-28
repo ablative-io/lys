@@ -3,7 +3,7 @@
   "title": "The standalone identity directory, with every grant rooted in a person",
   "intention": "An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change. Cambium later uses this issuer, keeping its participant ids (row 06); that direction is recorded here while row 06 stays the non-goal recorded below, and this sentence does not promise it.",
   "problem": "IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands. DIRECTORY-002 will install the maintained Rauthy, SpiceDB and one PostgreSQL database, but no gate leg starts the Rauthy container and checks it, and the release row holds that gap as a blocker. A leg declared only in docs/design/project.json would not reach a directory round either, because a round reads this cluster's gate.",
-  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.\n\nThe Rauthy readiness leg (DIRECTORY-009) closes the release row's missing Rauthy check without touching landing. It is one demand-cadence leg, rauthy-ready, declared in docs/design/project.json and in this cluster's gate, and a round never runs it unless asked. Until the method can request a demand leg, a person runs its command at the venue. Its command is one standard-library Python script under scripts/identity-gates/. The script reads the vendor/rauthy pin from git and the two image digests from DIRECTORY-002's deploy/identity/versions.json, so no digest is duplicated. It accepts only a Rauthy image whose OCI revision label equals the pin (ADR-009), set by a build of the pin at the venue. An image with no revision label is refused, and the refusal names the build command that makes one. That makes a pin move refuse until an image of the new pin exists, instead of passing while checking other software. It starts that image against its own scratch PostgreSQL container (ADR-005), so nothing is configured and no other service is needed (ADR-004). Every object carries a per-run name and label, and only that run's objects are removed. Rauthy's port is read from its own container, never assumed. Secrets are generated per run and reach the runtime only through private env files. The leg is a check, not a provisioning engine: it leaves nothing behind. A Rust test run by the tests leg drives the script against a stub runtime, keying its secret search on what the runtime received.",
+  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.\n\nDIRECTORY-038 carries conformance row 1.2: sign-in identities belong to people only (ADR-105). A sign-in identity is a provider account (P1) linked to a person in the directory; the directory classifies every issuer-subject pair from its signed history as a sign-in identity, an agent's own account, unbound, or unreconciled while its link is not yet reconciled (P5). The refusals sit in seams other rows already own: the DIRECTORY-003 R1 binding API, the directory's side of the link path beside the DIRECTORY-003 R4 receiver (an issuer and subject is bound to one holder, whichever came first; a person's refused link is recorded in the history, naming the agent to its responsible person and a directory administrator and never to the person linking), and DIRECTORY-006 admission and explanation. One refusal value carries two views: the identity's owner and a directory administrator see the provider and subject, everyone else only that a sign-in identity is involved. The broker's refusal is a finding against SECRETS-002, and the harness login token (SECRETS-002 R5) is the one named exception, never passing through anything lys issues, links or delegates.",
   "principles": [
     {
       "id": "P1",
@@ -70,7 +70,8 @@
     "ADR-077",
     "ADR-089",
     "ADR-092",
-    "ADR-098"
+    "ADR-098",
+    "ADR-105"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -87,7 +88,8 @@
     "Every grant and permission check the standalone identity server makes is answered by SpiceDB behind DIRECTORY-006's permission decision, the administrator's admission being the one named exception, a call after a committed revoke is never admitted, and the screen answers why an identity can and why it cannot do a thing from the server's answer (DIRECTORY-025, ADR-078).",
     "Road step 2's certificate half (defined in docs/design/identity/STATEMENT-2026-09-22.md, The road; brought into this cluster by ADR-093): an enduring agent's certificate states what it was granted at issuance in a typed, versioned claim, lys/agent-capability/v1, a new format under its own proposed OID 1.3.6.1.4.1.66364.2.1 alongside the unchanged shipped .1 extension transport, and a named verifier, verify_agent_capability, checks the chain against a set of trusted issuer keys, reads the claim and refuses what it does not cover (DIRECTORY-031).",
     "DIRECTORY-034 draws the access graph (conformance 8.3) with grant edges and every reachability from Access's answers, and responsible people and resource parents as recorded, holding no permission rule of its own (ADR-098).",
-    "The rauthy-ready leg is declared with cadence demand in docs/design/project.json and in this cluster's gate, both files validate, and the leg exits 0 at the venue only on Rauthy's ready answer (DIRECTORY-009)."
+    "The rauthy-ready leg is declared with cadence demand in docs/design/project.json and in this cluster's gate, both files validate, and the leg exits 0 at the venue only on Rauthy's ready answer (DIRECTORY-009).",
+    "DIRECTORY-038 states and tests conformance row 1.2: linking a person's provider account to an agent, and delegating from a sign-in identity, are each refused by name and write nothing; one counted test over the store finds no agent record carrying a sign-in identity; the broker's refusal is recorded as a finding against SECRETS-002, on which row 1.2's full pass waits."
   ],
   "non_goals": [
     {
@@ -237,6 +239,14 @@
     {
       "text": "Adding the readiness leg to .land/gates.sh",
       "reason": "The land gate script is not changed; a demand leg never enters landing."
+    },
+    {
+      "text": "The broker's refusal to issue an agent any credential derived from a person's sign-in session",
+      "reason": "Issuance is the broker's (ADR-001); DIRECTORY-038 records it as a finding against SECRETS-002, carried by the broker's card."
+    },
+    {
+      "text": "The cannot-give list on the delegation screen",
+      "reason": "The screen is row 2.4's, carried by Cambium card jAfmblAP; DIRECTORY-038 supplies only the server's reason 'sign-in identity'."
     }
   ],
   "structure": [
@@ -2094,6 +2104,71 @@
       "path": "docs/design/identity/CONFORMANCE.md",
       "note": "the identity conformance table; DIRECTORY-035 amends the Brief cell of rows 1.4, 1.5, 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4",
       "brief": ""
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-038.json",
+      "note": "conformance row 1.2: sign-in identities belong to people only, refused by name at every directory act that would give one to an agent",
+      "brief": "DIRECTORY-038"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-038.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-038"
+    },
+    {
+      "path": "crates/lys-identity/src/sign_in_identity.rs",
+      "note": "classifies an issuer-subject pair as a sign-in identity, an agent's own account, unbound or unreconciled, from the signed history",
+      "brief": "DIRECTORY-038"
+    },
+    {
+      "path": "crates/lys-identity/src/sign_in_refusal.rs",
+      "note": "the sign-in identity refusal and its owner-and-administrator view and its view for anyone else",
+      "brief": "DIRECTORY-038"
+    },
+    {
+      "path": "crates/lys-identity/tests/sign_in_classification.rs",
+      "note": "the four classes of an issuer-subject pair, through reopen",
+      "brief": "DIRECTORY-038"
+    },
+    {
+      "path": "crates/lys-identity/tests/sign_in_refusal_views.rs",
+      "note": "the two views of the refusal, and the absence of provider and subject from the view for anyone else",
+      "brief": "DIRECTORY-038"
+    },
+    {
+      "path": "crates/lys-identity/tests/sign_in_agent_binding.rs",
+      "note": "a person's provider account refused as an agent's binding, an agent's own machine account accepted",
+      "brief": "DIRECTORY-038"
+    },
+    {
+      "path": "crates/lys-identity/src/bindings.rs",
+      "note": "DIRECTORY-003 R1's binding module, reconciled against its reviewed manifest before dispatch: gains the refusal of a person's provider account as an agent's binding",
+      "brief": "DIRECTORY-038"
+    },
+    {
+      "path": "crates/lys-identity-server/src/sign_in_link_check.rs",
+      "note": "the directory's side of the link path: a person's link of an account bound to an agent refused by name and recorded in the history, the agent withheld from the person linking",
+      "brief": "DIRECTORY-038"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/sign_in_link_check.rs",
+      "note": "the reverse-order refusal, its history entry naming the agent to the responsible person and the administrator and never to the person linking, the unbound answer and the two refused callers",
+      "brief": "DIRECTORY-038"
+    },
+    {
+      "path": "crates/lys-identity/tests/grant_sign_in_identity.rs",
+      "note": "delegating from a sign-in identity refused for agent and person recipients; a service-access grant on the same account admitted",
+      "brief": "DIRECTORY-038"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/grant_cannot_give.rs",
+      "note": "the reason 'sign-in identity' on the cannot-give list, and the two views at the grant seam",
+      "brief": "DIRECTORY-038"
+    },
+    {
+      "path": "crates/lys-identity/tests/sign_in_store.rs",
+      "note": "after the two directory refusals, no agent record carries a sign-in identity, counted over the store",
+      "brief": "DIRECTORY-038"
     }
   ],
   "inventory": [
@@ -2208,6 +2283,10 @@
     {
       "path": ".land/gates.sh",
       "note": "the land gate script: the design leg and the six cargo gates; not changed by DIRECTORY-009"
+    },
+    {
+      "path": "docs/design/secrets/briefs/SECRETS-002.json",
+      "note": "the broker brief: R4 keeps a sign-in identity and an OAuth service-access grant as distinct records, R5 puts the seat's login token into its environment at spawn; DIRECTORY-038 records a finding against it and changes nothing in it"
     }
   ],
   "constraints": [
