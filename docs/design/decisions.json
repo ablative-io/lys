@@ -1584,6 +1584,23 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-113",
+      "title": "The identity install and its clients wait on signals, never on a clock",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-28",
+      "decided_by": "Tom's standing rules (CLAUDE.md 'No time limits'; 24 September 2026, waits are on signals, never on a clock); recorded by Waffles with DIRECTORY-044",
+      "context": "On main f003aff the lys identity install polls its services with thread::sleep (install/services.rs:149, :229, :315) and each loopback exchange, the Rauthy client and the health check carry fixed timeouts (loopback_http.rs, rauthy.rs:21, health.rs:23, services.rs:298). The identity shell's Explain view re-measures on a 120 ms timer. Each is a bound in seconds or a wait on a clock.",
+      "decision": "A wait ends on the event it is waiting for or on the failure that makes the event impossible: a service is ready when it says so or when a single connection to it succeeds after a readiness event (its log gaining its listening line, observed through the platform's file-change notification), a stopped process is gone when the platform reports its exit (kqueue EVFILT_PROC on macOS, pidfd on Linux), a peer that refuses or closes is an error at once, and nothing carries a timeout. The screen re-measures on a ResizeObserver or animation-frame signal. Rejected: shorter sleeps, which still wait on a clock; keeping timeouts as a safety net, which the rule forbids and which hides a stuck peer's cause.",
+      "quote": "No timeout, deadline, watchdog or bound in seconds anywhere: not in code, not in a test, not in a workflow step, not in a command. A slow run is a defect to find at its cause. Something stuck is found by its signal (no progress, a dead process), never by a clock.",
+      "consequences": [
+        "A service that never becomes ready and never exits leaves the install waiting and saying what it waits on; its cause is found from its log, never cut off by a clock.",
+        "Interaction timings on the screen that are behaviour, not waits (how long a notice stays shown, the window for a two-key chord), are not time limits and stay."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

@@ -207,3 +207,7 @@
 ## Estate operator — Runs Lys behind every agent and session
 
 **S145.** As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.
+
+## Installer of the identity stack — Runs lys identity install and stop on a machine
+
+**S146.** As the person installing the identity stack, I want the install to go on the moment each service is ready and to name at once the one that died, so that nothing is cut off by a clock and nothing waits longer than the service does.

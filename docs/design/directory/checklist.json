@@ -995,6 +995,31 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Waits on signals, never on a clock",
+      "items": [
+        {
+          "id": "C340",
+          "text": "Waiting for a service to answer waits on its readiness event, not a one-second sleep (DIRECTORY-044 R1).",
+          "done": false
+        },
+        {
+          "id": "C341",
+          "text": "Stopping a service waits on the platform's exit notification (DIRECTORY-044 R2).",
+          "done": false
+        },
+        {
+          "id": "C342",
+          "text": "Loopback, Rauthy and health exchanges carry no timeout (DIRECTORY-044 R3).",
+          "done": false
+        },
+        {
+          "id": "C343",
+          "text": "The Explain view re-measures on a layout signal (DIRECTORY-044 R4).",
+          "done": false
+        }
+      ]
     }
   ]
 }

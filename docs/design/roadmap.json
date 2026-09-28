@@ -1926,6 +1926,31 @@
       },
       "depends_on": [],
       "notes": "Written by hand straight to main; ids the next free on main at writing."
+    },
+    {
+      "id": "RM-079",
+      "title": "The identity install and its clients wait on signals: no sleeps, no poll loops, no timeouts",
+      "status": "briefed",
+      "kind": "fix",
+      "summary": "CLAUDE.md forbids every timeout and every wait on a clock, and the identity install still sleeps between readiness checks, polls a stopped process every 200 ms, and bounds every loopback, Rauthy and health exchange in seconds. A slow or stuck service is then either cut off by a clock or found late, instead of named by its signal.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T17:10:00+10:00",
+        "quote": "No timeout, deadline, watchdog or bound in seconds anywhere: not in code, not in a test, not in a workflow step, not in a command. A slow run is a defect to find at its cause. Something stuck is found by its signal (no progress, a dead process), never by a clock.",
+        "context": "Waffles' grep of main f003aff for timeouts, sleeps and timers outside tests, 28 September 2026, while checking Tom's ask that nothing takes extra time."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-113"
+        ],
+        "briefs": [
+          "DIRECTORY-044"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand straight to main; ids the next free on main f003aff. The SpiceDB client's timeouts are DIRECTORY-042 R8's, after DIRECTORY-025."
     }
   ]
 }

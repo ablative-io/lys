@@ -250,3 +250,10 @@
 - [ ] **C337** — A session listing locks once and clones nothing it does not return (DIRECTORY-043 R4), proved by a counting test that fails at the base.
 - [ ] **C338** — A memory view reads each session once, off the async worker (DIRECTORY-043 R5), proved by a counting test that fails at the base.
 - [ ] **C339** — A receipt is rebuilt from the stored coordinate, not by re-reading leaves (DIRECTORY-043 R6), proved by a counting test that fails at the base.
+
+## Waits on signals, never on a clock
+
+- [ ] **C340** — Waiting for a service to answer waits on its readiness event, not a one-second sleep (DIRECTORY-044 R1).
+- [ ] **C341** — Stopping a service waits on the platform's exit notification (DIRECTORY-044 R2).
+- [ ] **C342** — Loopback, Rauthy and health exchanges carry no timeout (DIRECTORY-044 R3).
+- [ ] **C343** — The Explain view re-measures on a layout signal (DIRECTORY-044 R4).
