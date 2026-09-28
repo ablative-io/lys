@@ -102,7 +102,10 @@ Evidence, in two parts. In the round: the upgrade tests drive `upgrade` end to e
 **Acceptance:**
 - A test starts build A on a scratch install in a temporary directory, upgrades it to build B, and asserts that the recorded build and every binary's --version name B, that the configuration key and compose environment value only B renders are in place, and that config.previous/ holds A's files.
 - A test in which build B exits before it is ready asserts that A is running again, A is the recorded build, and A's configuration and compose files are back in place.
-- No test or leg of the round needs a container runtime, a listener on port 8490 or the live install's state directory, and each test removes its temporary install when it ends.
+- No test or leg of the round needs a container runtime.
+- No test or leg of the round needs a listener on port 8490.
+- No test or leg of the round needs the live install's state directory.
+- Each test removes its temporary install when it ends.
 
 **Checklist:**
 - C347 — Prove the upgrade on a scratch install in the round; the live install is upgraded and recorded after landing (DIRECTORY-045 R4).
