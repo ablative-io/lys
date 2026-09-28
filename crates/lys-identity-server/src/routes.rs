@@ -73,14 +73,23 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
 pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
     let mut directory = open_directory(config)?;
     say(&format!("directory log {}", directory.log()?.start()));
-    let requests = config
-        .requests_dir
-        .as_deref()
-        .map(crate::requests_store::RequestStore::open)
-        .transpose()?;
+    let requests = match config.requests_dir.as_deref() {
+        Some(dir) => Some(crate::requests_store::RequestStore::open(
+            dir,
+            Arc::new(load_service_key(&config.event_key_file)?),
+        )?),
+        None => None,
+    };
     if let Some(store) = &requests {
+        if store.adopted() > 0 {
+            say(&format!(
+                "requests log pinned {} leaves written before leaves were pinned",
+                store.adopted()
+            ));
+        }
         say(&format!(
-            "requests read from the whole log, holding {} requests",
+            "requests log {}, holding {} requests",
+            store.start(),
             store.requests().count()
         ));
     }

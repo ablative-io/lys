@@ -4,10 +4,12 @@
 //! beside a request that waits or is declined.
 
 use std::error::Error;
+use std::sync::Arc;
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
 use lys_identity::OperationId;
+use lys_identity::signer::load_service_key;
 use lys_identity_server::dev_seed::{Seeded, seed_configured};
 use lys_identity_server::requests_store::{Asked, Intended, RequestStore};
 use serde_json::{Value, json};
@@ -69,7 +71,8 @@ async fn interrupted() -> Result<(Table, String, String), Box<dyn Error>> {
         let seeded = seed_configured(config, [ADMINISTRATOR, BEA])?;
         let (ada, bea) = (&seeded.people[0], &seeded.people[1]);
         let dir = config.requests_dir.as_deref().ok_or("no requests_dir")?;
-        let mut store = RequestStore::open(dir)?;
+        let mut store =
+            RequestStore::open(dir, Arc::new(load_service_key(&config.event_key_file)?))?;
         store.ask(Asked {
             id: id.clone(),
             asked_by: bea.id.to_string(),
