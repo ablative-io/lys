@@ -2,198 +2,165 @@
 
 ## The words, as they were typed
 
-The HOME-001 rows R1 to R11 were built by hand on 24 September 2026 and reached lys main through the merge 7b47115, before Tom's rule of 25 September that every carded row goes through its board's chain. The seven cards that carry those rows on the step 5 board sit in review with no chain fields, and nothing on main says the chain has judged that code. This card adds no new code and only proves what is already there. It runs the chain's whole judgement over crates/lys-home as it stands on main at 0073b966: Jev per file, fmt, clippy pedantic, tests, ast-grep and the gate. The brief names each check and the command it runs, and the build's proof document records each check's outcome on the crate as found, with the commit it was measured on. If every check passes the build lands with only the proof document and the design rows this card needs. If Jev or the gate finds something, the build records each finding as its own line in the proof document and lands without changing the crate; each finding then becomes a card of its own on the step 5 board, worded from that line. When this card lands green the seven cards are set to done and each points at this card's landing, so that done means judged by the chain and never just merged before the rule. Acceptance is that the proof document names the commit, every check by name and its outcome, and holds no code changes to crates/lys-home; that a reader can rerun each named command at that commit and see the same outcome; and that the landing is green through src_pr and src_land with Jev and the gate. Not in scope: any new capability in lys-home, any change to the eleven rows, or any card other than the seven named. This card builds behind the six Lys briefs in the one-build queue on this Mac under the load guard. Filed by Archie on Waffles' ruling of 07:08 on 26 September 2026 in the Cambium channel, on Tom's rule of 22:26 on 25 September 2026 that every carded row goes through the chain, and on lys main 0073b966.
+HOME-001 row R4 lists docs/design/home/LOSS-ACCOUNT.md among the files it creates, at HOME-001.json:148 and HOME-001.md:137, and DESIGN.md:84 and design.json:135 name the same path. The document does not exist on lys main at 7b53625, checked with git cat-file. The judged-rows card holds R4's card in review on that finding and names this card as the act that answers it. This card writes the document and changes no code.
 
-Rulings of the lead, Archie, given on 27 September 2026 to the run a6d7b86a-aba7-4110-a5a7-7331405de7d3 in answer to its rounds. That run took every answer and then failed before writing, when the Argus gate refused every tool call of its session. They are settled here, and the author reopens none of them.
+The document is written from crates/lys-home/src/harness/claude_code/render.rs and launch.rs as they stand on main at the brief's commit. It states where the loss account is written, as the file named by the session uuid with .loss.json beside the rendered session, and the shape of one entry as the Loss struct carries it. It states every reason the render writes into it, each quoted exactly as the source writes it, with the source line that writes it. It states when an entry is written, which is when signed thinking is rendered as text for a different provider, api or model, and when redacted or empty thinking is dropped. It states that the account names each dropped block by its hash and never carries the block's content. It states whether a render with nothing dropped still writes the account, as the code shows.
 
-The tree is right and the sentence is too broad. Only rows whose code is on main at 0073b966 are judged, and only their cards can be set done. The brief maps each HOME-001 row to its files on main by git cat-file. R7 (proxy proof), R10 (little proxy) and R12 (handover) are not built: their cards (0BgjD59r R7, qY9mBz-y R10) are never set done by this card. The brief names them as unbuilt rows that need their own words and briefs.
+Acceptance. The file docs/design/home/LOSS-ACCOUNT.md exists on the landing commit. A check that the brief names reads every reason string in render.rs from the source and finds each one quoted in the document, and finds no reason in the document that the source does not write. Every file:line the document cites exists at the commit it names. No file under crates changes. The design gate, sh scripts/design/gate.sh, exits 0.
 
-Through jev_ask.awl per file, against the empty tree, each file cut per part as the chain does for a new file, with no new src_land mode. The proof records each file's Jev verdict with its run id. src_land's own Jev then reads the landing diff (the proof document) as usual.
-
-Record Jev's verdict as evidence: model, run id and outcome for each file. It is not a rerunnable command. The rerun promise covers the deterministic legs only (fmt, clippy pedantic, tests, the gate at the named commit and toolchain), and the brief amends the acceptance line to say exactly that.
-
-Neither borrowed rule set. lys has none yet, and card ngzIkkpd (add an ast-grep leg to the lys gate) is where it gets written. The proof records the ast-grep leg as not measured, naming ngzIkkpd as the reason. The leg is run over the crate when that card lands.
-
-Every finding from any leg becomes its own card: Jev, fmt, clippy, tests, ast-grep once it exists, and the gate.
-
-It is recorded as answered, naming the fixing commit (for example HOME-007 a2d6d2c, HOME-003 ca7b462), and gets no card. Only findings still true on current main become cards.
-
-Per row. A row's card is set done on this landing only if no finding still true on main touches that row's files. A row with open findings stays in review, and its card points at each finding card, until they close. Green means the landing passed src_pr and src_land. It never means the crate is clean.
-
-Dean's laptop. Tom's rule 7 of 27 September supersedes the words: every compile, test battery and gate goes there. The brief says so and drops the one-build-queue sentence.
-
-Both, labelled. The proof's judgement is measured on a checkout of 0073b966 itself, a worktree at that commit on Dean's laptop, and each leg's outcome is recorded against that sha. src_land's gate on the landing head is recorded separately, as the landing's own gate, with its sha. Neither stands in for the other.
-
-The missing document is a finding, and the card carrying R4 is not done. R4's files list create: docs/design/home/LOSS-ACCOUNT.md (HOME-001.json:148, HOME-001.md:137), and DESIGN.md:84 and design.json:135 name the same path. Checked by Archie at 08:23 on 27 September against lys origin/main: git cat-file -e reports the path does not exist. R4's code being on main does not discharge a requirement whose own file list is unmet. Record it as a finding naming the path and the lines that cite it, give that card the verdict in review rather than done, and state the act that answers it: a card that writes LOSS-ACCOUNT.md from render.rs as it stands on main. Do not write the document in this brief, and do not mark R4 done on the strength of render.rs alone. Answered by Archie, lead for the home line.
-
-Further rulings of the lead, Archie, given on 27 September 2026 to the run 0a22ff20-e295-43f6-9ad6-b87296a4b267 in answer to its round 1. That run took both answers and then failed while writing, when its author session's declared resume found no state to continue. They are settled here, and the author reopens none of them.
-
-It is a finding, whether or not Jev raises it. CLAUDE.md's mod.rs rule is the repository's own rule, and the proof judges the crate against the repository's rules the way the chain judges a new file. A lead who can see a rule broken on main does not wait for a model to notice it. The proof records it as its own line naming crates/lys-home/src/record/mod.rs, the line count and the function count at 0073b966 and at the main head the proof reads. R1's card stays in review on it, and so does any other of the seven whose files include that mod.rs. The act that answers it is a card that moves those functions out of mod.rs into named modules under record/, so mod.rs carries only pub mod, pub use and docs. This brief does not move them.
-
-Patched and unsure hold the card in review. Solved and not_asked do not. Patched is a finding by name, and the line records what Jev found. Unsure is a finding of its own kind. The file is asked once more as one whole part, and if Jev is still unsure the line records unsure and the card stays in review, with the act that answers it being a person's read of that file, recorded as a card. Not_asked is recorded as not measured with Jev's reason and holds no row. If the reason is that the chain skipped a file it should have read, that is a finding against the chain, filed on the chain's board, not against the row. Solved is recorded and closes nothing that another leg holds. Answered by Archie, lead for the home line.
+Keep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh). The brief id, roadmap row and any decision take the next free id after main's highest and every open brief/* and draft/* branch's, checked with git ls-remote immediately before writing. If the render card, which changes render.rs refusals, lands before this card is built, the document is written from main as it then stands and names that commit. Not in scope are any change to what the render drops or why, and the loss account of any harness other than Claude Code. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie, lead for the home line, on 27 September 2026 on lys main 7b53625.
 
 ## What the survey found, and its angles
 
-Judge the hand-built HOME-001 code in crates/lys-home after the fact through the chain's whole judgement, measured on a worktree of lys main at 0073b966 on Dean's laptop, without changing a byte of the crate. The work lands one proof document (plus the design rows it needs) recording, against that sha and toolchain, each file's Jev verdict with model and run id, and the outcome of fmt, both clippy shapes (pedantic), tests, docs and the gate, with ast-grep recorded as not measured pending ngzIkkpd. Each finding still true on current main becomes its own card. Of the seven step-5 cards, only those whose row is built and whose files carry no open finding are set done, each pointing at this landing.
+Archie asks for one missing design document, docs/design/home/LOSS-ACCOUNT.md. HOME-001 R4 promised it, and the inventory in DESIGN.md and design.json names it, but it was never written. The document must describe the Claude Code render's loss account exactly as the code on main writes it: where the file goes, the shape of one entry, every reason string quoted with its source line, when an entry is written, that entries carry hashes and never content, and whether an account is written when nothing was lost. Only the document and the method's brief and roadmap records are added. No code changes, the design gate stays green, and a check the brief names proves the document's reasons match the source both ways.
 
 ### What the tree holds
 
-- `crates/lys-home/ (at 0073b966)` — The subject of the judgement: 25 files, 23 of them .rs. It must come out byte-identical. Jev reads each file, cut per part, as a new file against the empty tree.
-- `crates/lys-home/src/record/mod.rs` — At 0073b966 it carries 36 fns plus the Home and Session impls, against CLAUDE.md's rule that mod.rs holds only pub mod, pub use and docs. The lead ruled this a finding: it holds R1, and any other row that lists this file (R2 modifies it), in review.
-- `crates/lys-home/src/harness/claude_code/mod.rs` — At 0073b966 it carries 4 pub consts and the fn projects_slug beside its pub mods. That is the same mod.rs rule broken in a second file, and R3 and R4 list it.
-- `docs/design/home/briefs/HOME-001.json` — The source of the row→file map (requirements[].files). It has 12 rows (R1–R12), not 11. R4 lists LOSS-ACCOUNT.md at line 148.
-- `docs/design/home/briefs/HOME-001.md:137, docs/design/home/DESIGN.md:84, docs/design/home/design.json:135` — These lines cite docs/design/home/LOSS-ACCOUNT.md, which does not exist at 0073b966 or at head. The R4 finding must name them.
-- `docs/design/home/design.json and DESIGN.md` — The proof document and the new brief need structure rows here. The design gate (scripts/design/gate.sh) checks that the rendered markdown matches the JSON and that coverage is clean.
-- `docs/design/home/briefs/ (new HOME-0xx.json/.md)` — The brief this card writes. HOME-001, 002, 003, 004, 006 and 007 are on main. HOME-010 appears in git history. HOME-005, 008 and 009 are not on main.
-- `.land/gates.sh` — The gate as src_land runs it at 0073b966, with 7 legs: the design gate, fmt --check, clippy in both feature shapes, test --all-features, and doc in both shapes. The proof names its commands verbatim.
-- `Cargo.toml [workspace.lints.clippy]` — pedantic = warn under -D warnings. This is how 'clippy pedantic' is measured: through the two clippy legs, with no extra flag.
-- `rust-toolchain.toml` — Pins 1.97.1 with clippy and rustfmt at both 0073b966 and head. The rerun promise names this toolchain.
-- `/Users/tom/.aion/authoring/jev_ask.awl` — The Jev leg per file. It takes the inputs part, cause and change (a diff cut on whole-file boundaries) and returns a verdict, patched, held and reason, which are the fields the proof records per file.
-- `/Users/tom/Developer/ablative/stack/aion (src_land, card_build_v3)` — The chain this card must go through green. src_land's own Jev reads only the landing diff, which is the proof document.
+- `crates/lys-home/src/harness/claude_code/render.rs:48-55` — The Loss struct: one entry is {hash: String, reason: String}. The doc comments say hash is 'The hash of the part as stored' and reason is 'Why, naming no content'. This is the entry shape the document must state.
+- `crates/lys-home/src/harness/claude_code/render.rs:184-203` — The thinking branch, the only place losses are pushed. Kept whole when provider, api and model all match and the block is redacted or signed. Rendered as text when the text is non-empty and the block is not redacted, with a loss entry only if it carried a signature (198). Otherwise dropped, with the redacted or the empty reason (201).
+- `crates/lys-home/src/harness/claude_code/render.rs:198` — Writes the reason "signed thinking rendered as text: different provider, api or model".
+- `crates/lys-home/src/harness/claude_code/render.rs:201` — Writes two reasons on one line: "redacted thinking dropped: different provider, api or model" and "empty thinking dropped". A check that reads reasons line by line must find both.
+- `crates/lys-home/src/harness/claude_code/render.rs:263-269` — The loss path is path.with_extension("loss.json"), i.e. named after the rendered file's stem. The account object is {session_id, model, authored, dropped: [Loss]}. It is written with std::fs::write every time, even when dropped is empty, and nothing refuses an existing loss file.
+- `crates/lys-home/src/harness/claude_code/render.rs:267` — serde_json::to_vec_pretty(&account).unwrap_or_default(): if serialisation fails, an empty loss file is written silently. The document is written 'as the code shows', so this bears on what it can promise.
+- `crates/lys-home/src/harness/claude_code/render.rs:286-292` — loss(): the hash is Hash::of(serde_json::to_vec(part)), the SHA-256 of the part re-serialised (serde_json without preserve_order, so keys are sorted). The entry holds only hash and reason, never the part's text or signature.
+- `crates/lys-home/src/harness/claude_code/import.rs:415-425` — store_part serialises a part with the same serde_json::to_vec before blocks.put. For an imported session this is what makes the loss hash the block's own hash ('as stored'). A hand-authored or canon part may have no block.
+- `crates/lys-home/src/harness/claude_code/launch.rs:78-86` — render-launch fixes the loss account at out/<uuid>.loss.json, beside out/<uuid>.jsonl.
+- `crates/lys-home/src/harness/claude_code/launch.rs:96-101` — render-launch refuses LaunchTargetExists for the loss path. Plain render does not check the loss path.
+- `crates/lys-home/src/harness/claude_code/launch.rs:123-133` — The loss account is the second file in the render manifest and is hashed into the template_render event (ADR-012). Its bytes are recorded.
+- `crates/lys-home/src/cli.rs:88-110` — lys-home render takes an optional --out path. With --out other.jsonl the account is other.loss.json, not <uuid>.loss.json. render_tests.rs:106 renders to other.jsonl.
+- `crates/lys-home/src/harness/claude_code/render_tests.rs:97-129` — The only test of the account's contents: a different model gives (kept 0, as_text 1, dropped 1), one entry, hash length 64, authored false. None of the three reason strings is asserted anywhere.
+- `docs/design/home/briefs/HOME-001.json:148 and HOME-001.md:137` — R4's files.create lists docs/design/home/LOSS-ACCOUNT.md. This is the finding the document answers.
+- `docs/design/home/DESIGN.md:84 and design.json:134-137` — The inventory row for LOSS-ACCOUNT.md has the note 'what the Claude Code render preserves, transforms and cannot carry', attributed to HOME-001. That is broader than the words' list.
+- `docs/design/home/RECORD.md:232-235` — A four-line stub section '## The loss account' ('Written with R4 ... each dropped block named by hash and reason') that the new document would stand beside.
+- `scripts/design/gate.sh` — The design leg. It validates decisions.json, project.json and each cluster, runs check-coverage, and re-renders each cluster to compare the markdown. A hand-written LOSS-ACCOUNT.md is copied into the temp tree and compares equal to itself, as the PROOF-*.md files do. The new brief JSON must validate and its .md must be the rendered one.
+- `docs/design/roadmap.json and docs/design/decisions.json` — Where the new roadmap row goes, and a decision if any. Main's highest ids are RM-016 and ADR-018.
 
 ### What was already decided
 
-- HOME-001 — 12 rows. R7 (proxy proof), R10 (lys-proxy) and R12 (handover) have their files absent from main. R4's file list includes LOSS-ACCOUNT.md, which was never written.
-- home DESIGN.md Structure — Row 84 lists LOSS-ACCOUNT.md as HOME-001's 'what the Claude Code render preserves, transforms and cannot carry'. PROOF-PROXY.md and examples/passthrough.rs are also listed and absent.
-- HOME-007 — Derives a record's uuid as UUIDv5 (a2d6d2c, on main after 0073b966). The lead cites it as an example of a finding already answered by a fixing commit.
-- HOME-003 — ca7b462 moved the project slug into paths.rs. The lead cites it as an answered finding, and it bears on claude_code/mod.rs's projects_slug at 0073b966.
-- CLAUDE.md Coding standards — No file over 500 code lines. mod.rs carries only pub mod, pub use and docs. No lint bypass with #[allow]. Every public item documented.
-- CLAUDE.md Gates before any commit — Both feature shapes for clippy and doc. 81 tests compile out without --all-features.
-- CLAUDE.md How a carded row is built — Rules 1–6: every carded row goes through brief_card → sign-off → card_build_v3 → src_pr → src_land. Heavy builds go to Dean's laptop.
-- ~/.claude/CLAUDE.md rule 7 — Every compile, test battery and gate goes to Dean's laptop. This supersedes the words' one-build-queue-on-this-Mac sentence.
-- RM-005 — The roadmap row that carries the home's steps 4 and 5. It notes that HOME-001 was 'dispatched through the board'. It is the natural row for this card.
+- HOME-001 R4 — The render writes 'a loss account beside the file listing every dropped block by hash and reason'. Its acceptance ties the account's entry count to the signed thinking blocks on the path when rendering for a different model.
+- HOME-001 checklist C4 — Events render to a Claude Code JSONL under a chosen uuid at the harness path, with a loss account beside it.
+- HOME-001 story S4 — As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
+- home P3 — Opaque blocks are rendered whole only when provider, api and model all match. Another model gets readable thinking as text, with opaque blocks dropped and each named by hash in the loss account.
+- home P7 / CN3 — Transcript content never appears in output, logs or errors, only hashes and counts. The document must describe the account without quoting any transcript content.
+- home CN2 — A rendered file never carries another provider's opaque block, and the loss account names each block dropped by hash.
+- ADR-012 — Each render is recorded as a template_render event with the written paths hashed in a manifest. The loss account is one of those files.
+- ADR-016 — Derived uuids are a frozen contract. Not touched here, but it is the precedent for treating a written byte format as frozen.
+- ADR-018 — The seed's text is never put in the report or the loss account. The document can state that the account never carries it.
+- RM-005 / RM-006 — The home and launch-template rows the render and its account belong to.
+- draft/home/9635a408 (HOME-008, 'Refuse by name what the Claude Code render cannot shape') — Open render card. R4 moves assistant shaping, 'the loss reasons and the thinking counts unchanged', out of render.rs into a new render_assistant.rs. R5 makes the loss hash's serialisation return a Result and serialises the account before any write. Its boundary keeps the reasons' text and the account's fields unchanged.
+- draft/home/a6d7b86a (HOME-008, 'Judge the hand-built HOME-001 crate through the chain at 0073b966') — The judged-rows card. It gives each HOME-001 card a verdict from path presence and open findings, and holds R4's card in review because LOSS-ACCOUNT.md is absent.
+- brief/home/54e28af6 (HOME-008, compaction import) — Adds a separate lys.loss custom entry written at import, a different 'loss account', and changes render.rs's compaction output. It states it writes no lys.loss line from the render.
 
 ### What was measured
 
-- Commits from 0073b966 to main head 7b53625: 64
-- Diff of crates/lys-home between 0073b966 and main head: 56 files, +9312 / −83 lines
-- Files in crates/lys-home at 0073b966: 25 (23 .rs, Cargo.toml, README.md)
-- Rows in HOME-001: 12 (R1–R12)
-- HOME-001 rows with every listed file present at 0073b966 (git cat-file -e): 8: R1, R2, R3, R5, R6, R8, R9, R11
-- R4 files missing at 0073b966 and at head: 1: docs/design/home/LOSS-ACCOUNT.md
-- R7 / R10 / R12 files missing at 0073b966: R7 2 of 3, R10 17 of 19, R12 2 of 5
-- record/mod.rs at 0073b966: 552 lines, 417 non-blank non-comment lines, 36 `fn` items
-- record/mod.rs at main head 7b53625: 630 lines, 472 non-blank non-comment lines, 41 `fn` items
-- claude_code/mod.rs logic at 0073b966: 4 pub consts + 1 fn (projects_slug)
-- Largest lys-home file by non-blank non-comment lines at 0073b966: call_tests.rs 519 (a test file); call.rs 460, the largest library file, under 500
-- #[allow] attributes in lys-home at 0073b966, other than the test unwrap/expect/panic opt-out: 0
-- Merge 7b47115 an ancestor of 0073b966: yes
-- Pinned toolchain at 0073b966 and at head: 1.97.1 (clippy, rustfmt)
-- ast-grep rule set in lys (sgconfig.yml / .ast-grep): none
-- Legs in .land/gates.sh: 7
-- Cards named by the words / cards named in the rulings: 7 on the step 5 board; 2 named by id (0BgjD59r R7, qY9mBz-y R10), plus ngzIkkpd for ast-grep
+- main commit the words name: 7b536253165f920cd8bc5f1d1dfdd987339e3e12 (HEAD of this tree, clean)
+- docs/design/home/LOSS-ACCOUNT.md at 7b53625: absent (git cat-file -e exits 128)
+- docs/design/home/PROOF-PROXY.md at 7b53625 (also in HOME-001's inventory, DESIGN.md:83): absent (exit 128). It belongs to HOME-001 R7, not this card.
+- distinct reason strings render.rs writes: 3, on 2 source lines: 198 (1) and 201 (2)
+- places in crates/ that construct a Loss: 1 (render.rs:286-292, called only from 198 and 201)
+- Loss struct fields: 2: hash (String, 64 hex, SHA-256), reason (String)
+- loss account top-level keys: 4: session_id, model, authored, dropped
+- render.rs size: 390 lines
+- launch.rs size: 247 lines
+- tests asserting any reason string's text: 0 (render_tests.rs asserts count and hash length only)
+- measured runs showing an account with nothing dropped: PROOF-RESUME.md:38 and PROOF-LAUNCH.md:28 both show dropped: []
+- hand-written .md documents in docs/design/home: 11 .md at top level (7 PROOF-*, RECORD, DESIGN, CHECKLIST, USER-STORIES)
+- RECORD.md loss-account section: 4 lines (232-235) in a 235-line file
+- open brief/* and draft/* branches on origin: 68 (11 with objects local, 57 read through gh api)
+- highest brief id in the home cluster across main and open branches: HOME-011 (brief/home/06103633); main's highest is HOME-007. Next free: HOME-012
+- highest roadmap id across main and open branches: RM-025 (draft/directory/1e30a4cb); main's highest is RM-016. Next free: RM-026
+- highest decision id across main and open branches: ADR-039 (draft/directory/1e30a4cb); main's highest is ADR-018. Next free: ADR-040
+- open branches using HOME-008 for different cards: at least 13 distinct HOME-008 titles
 
 ### What it means for the other projects
 
-- aion — The chain's own workflows run this card: brief_card, card_build_v3, jev_ask.awl per file, src_pr, src_land. A file the chain skips wrongly (not_asked for that reason) is filed as a finding on the chain's board. No new src_land mode is added.
-- cambium — The step 5 board changes state. Some of the seven cards are set done with a pointer to this landing, others stay in review pointing at finding cards. New finding cards are filed there: LOSS-ACCOUNT, the record/mod.rs split, claude_code/mod.rs if still true, and any Jev or leg findings. 0BgjD59r and qY9mBz-y stay untouched.
-- argus — An earlier run failed when the Argus gate refused every tool call. The build session needs Argus to let its tool calls through, and a queued build may route through Argus's queue.
-- method — The new brief and the design.json structure rows must validate against the method's schemas through scripts/design/validate.py and check-coverage.py.
+- cambium — The judged-rows card holds HOME-001 R4's card in review on the missing file. Once this lands, that card's verdict can move, and the board's R4 card should point at this card's landing.
+- aion — The card runs through the chain (brief_card, sign-off, card_build_v3, src_pr, src_land) with inputs naming the lys repository, the commit, the card and the brief. It is docs-only, so the heavy Rust legs still run on Dean's laptop per the standing rules.
+- method — The scripts are copied from the design-system method at 3c3bac7 (scripts/design/SOURCE.md). The new brief must validate against that copy's brief schema. Nothing changes upstream.
 
 ### The decisions it stands on
 
-- ADR-012 (honour) — The judgement changes no lys-home behaviour. The template render and render-event contract stays as landed.
-- ADR-016 (honour) — The derived-uuid contract (landed after 0073b966 via HOME-007) is not touched. The proof may cite a2d6d2c as answering a finding.
--  (new) — Record the process rule for carded rows built before the chain: a carded row is done only when the chain has judged its code at a named sha and no open finding touches its files. A merge alone never makes it done, and green means passed src_pr and src_land, not clean.
+- ADR-012 (honour) — The loss account is one of the files hashed in the template_render manifest. The document describes it and must not imply its bytes or name change.
+- ADR-018 (honour) — The seed text never enters the loss account. The document can state this and must not contradict it.
+- ADR-016 (honour) — Not touched. The document must not describe render uuids in a way that reads as a change to the frozen scheme.
+-  (new) — No new decision seems needed: the document records existing behaviour. If the lead chooses to widen the document to 'preserves and transforms', or to redefine the file-naming claim, only the design.json inventory note changes. That is a doc edit, not an ADR. Leave ADR-040 unclaimed unless one is actually made.
 
 ### What it requires
 
-- The proof document names 0073b966 and toolchain 1.97.1 as the commit and toolchain the legs were measured on.
-- The proof records a Jev line for each of the 25 files of crates/lys-home at 0073b966, each with model, run id and verdict (solved, patched, unsure or not_asked).
-- The proof records fmt, clippy --all-targets --all-features -D warnings, clippy --all-targets -D warnings, test --workspace --all-features, doc in both shapes, and the design gate, each by exact command with its outcome at 0073b966.
-- ast-grep is recorded as not measured, citing card ngzIkkpd.
-- The proof records findings as separate lines: LOSS-ACCOUNT.md missing (citing HOME-001.json:148, HOME-001.md:137, DESIGN.md:84, design.json:135), and record/mod.rs with line and fn counts at 0073b966 (552/36) and at the main head read.
-- The landing diff contains no change under crates/lys-home (git diff --stat <base>..<landing> -- crates/lys-home is empty).
-- R7, R10 and R12 are named as unbuilt rows needing their own words and briefs, and cards 0BgjD59r and qY9mBz-y are not set done.
-- Each finding is marked still-true or answered-by-<sha> against current main, and only still-true findings get cards.
-- The brief states the rerun promise covers only the deterministic legs and drops the one-build-queue sentence.
-- src_land's gate on the landing head is recorded separately, with its own sha.
-- sh scripts/design/gate.sh passes with the new brief, proof and structure rows.
-- The landing is green through src_pr and src_land, with Jev and the gate.
-- Each card set done points at this landing, and each card kept in review points at its finding cards.
+- docs/design/home/LOSS-ACCOUNT.md exists on the landing commit.
+- The document names the commit it was written from (7b53625, or main's head at build time if the render card landed first).
+- The document states where the account is written, citing render.rs:263 and launch.rs:81 (or their equivalents at the named commit).
+- The document states one entry's shape as the Loss struct's two fields, hash and reason, citing render.rs:50-55.
+- The document quotes, character for character, each reason the source writes (at 7b53625: "signed thinking rendered as text: different provider, api or model", "redacted thinking dropped: different provider, api or model", "empty thinking dropped"), each with its source file:line.
+- The named check extracts every reason string from the source, asserts it found exactly the number present (3 at 7b53625, not zero), finds each quoted in the document, and finds no reason-shaped quote in the document that the source does not write.
+- The document states when an entry is written, as the thinking branch at render.rs:184-203 decides it.
+- The document states that an entry carries a SHA-256 hash and a reason, never the block's text or signature.
+- The document states that the account is written on every render, including with dropped: [].
+- Every file:line the document cites resolves at the commit it names.
+- git diff --stat of the landing shows no path under crates/.
+- sh scripts/design/gate.sh exits 0 on the landing commit.
+- The new brief, roadmap row and any decision use ids checked free against main and every open brief/* and draft/* branch immediately before writing.
 
 ### What must not change
 
-- No byte of crates/lys-home changes.
-- No HOME-001 row (R1–R12) is edited, reworded or renumbered.
-- LOSS-ACCOUNT.md is not written by this card.
-- record/mod.rs and claude_code/mod.rs functions are not moved by this card.
-- No card other than the seven named is set done or changed, beyond filing new finding cards.
-- No new src_land mode, and no borrowed ast-grep rule set.
-- No compile, test or gate runs on Tom's Mac. All go to Dean's laptop.
+- No file under crates/ changes, including render.rs, launch.rs, their tests and the crate README.
+- The reason strings, the Loss struct, the account's keys and its bytes are not changed or proposed changed.
+- No existing brief's rows, acceptance or identifiers are rewritten. HOME-001's R4 files.create entry stays as it is.
+- No other harness's loss account (e.g. the Codex translation card) and not the import-time lys.loss entry of the compaction card.
+- No transcript content appears in the document (P7, CN3). Examples use hashes and counts only.
+- The design scripts copied from the method are not edited.
 
 ### What we must put in place first
 
-- A worktree of lys at 0073b966 on Dean's laptop with toolchain 1.97.1 installed.
-- A working jev_ask.awl route (Jev key and ledger) able to judge a file against the empty tree.
-- The map from the seven step-5 card ids to HOME-001 rows, read from the Cambium board.
+- Immediately before writing, re-read open brief/* and draft/* branches for the highest HOME, RM and ADR ids. Here that meant 57 of the 68 branches through gh api because their objects are not local.
+- Check whether the render card (draft/home/9635a408) has landed on main, and pick the source commit and file(s) accordingly.
 
 ### The risks
 
-- main has moved 64 commits and changed lys-home by 9312 lines since 0073b966, so the 'still true on current main' check per finding is real work, and a finding can shift file or line.
-- Feature unification: a bare workspace test at 0073b966 would hide the 81 gated tests. Both shapes must be run and recorded.
-- Jev nondeterminism: an unsure verdict needs a second whole-file ask, and a reader cannot rerun Jev to reproduce it.
-- Setting cards done is a board mutation outside the git landing. If it is not tied to src_land it can drift from the proof.
-- The gate's design leg at 0073b966 may fail on documents unrelated to lys-home, which raises the scope question above.
-- The earlier runs failed on the Argus gate refusing tool calls and on a lost resume state, and the same failures could recur.
-- Very few of the seven cards may reach done: R1 (record/mod.rs), R2 (modifies record/mod.rs), R3 and R4 (claude_code/mod.rs, LOSS-ACCOUNT) are already likely held in review.
+- If the render card lands mid-build, the reasons move to render_assistant.rs, and a document or check still pinned to render.rs lines cites lines that no longer hold the reasons.
+- A check that greps render.rs line by line can miss the second reason on line 201, or pass vacuously after a move if it does not assert a found count of 3.
+- Stating 'named by the session uuid' as a universal fact would be false for render --out and would mislead a reader looking for the file.
+- Saying the account names only 'dropped' blocks misstates the as-text entries that share the dropped array and the report's dropped count.
+- Repeating the Loss doc comment's 'hash of the part as stored' as universal is only true for imported parts; canon and hand-authored parts may have no stored block with that hash.
+- Id collisions: HOME-008 is already taken by at least 13 different open cards, so ids read even minutes early can be stale.
+- Documenting render.rs:267's silent unwrap_or_default as intended behaviour could entrench a defect the render card is fixing.
 
 ### Still open
 
-- When a leg run over the whole workspace or docs (the gate's design leg, workspace clippy or tests) fails at 0073b966 outside crates/lys-home, does that failure become a card and appear in the proof, or is it out of scope? The sentence of the words it stands on: "Every finding from any leg becomes its own card: Jev, fmt, clippy, tests, ast-grep once it exists, and the gate.". Why only the lead can settle it: .land/gates.sh runs workspace-wide and runs scripts/design/gate.sh over every cluster. A failure in lys-core or docs/design/identity would be a finding of 'the gate' but not of lys-home, and would put cards on the step 5 board for code this card was not asked to judge.
+- The code names the loss file after the rendered file's stem, not the session uuid. Should the document say that, noting the two cases where the stem is the uuid, or describe only those two cases? The sentence of the words it stands on: "It states where the loss account is written, as the file named by the session uuid with .loss.json beside the rendered session, and the shape of one entry as the Loss struct carries it.". Why only the lead can settle it: render.rs:263 uses path.with_extension("loss.json"). With lys-home render --out other.jsonl (cli.rs:106, render_tests.rs:106) the account is other.loss.json. Only the default path (render.rs:85-93) and render-launch (launch.rs:80-81) give <uuid>.loss.json. A reader using --out would look for the wrong file.
+- If the render card lands first and moves the reasons into render_assistant.rs, should the acceptance check read the reasons from whichever file writes them, or from render.rs as the words say? The sentence of the words it stands on: "A check that the brief names reads every reason string in render.rs from the source and finds each one quoted in the document, and finds no reason in the document that the source does not write.". Why only the lead can settle it: The render card on draft/home/9635a408, R4, moves the reasons 'out of render.rs' into render_assistant.rs. After that landing, a check scoped to render.rs finds zero reasons, and the check fails because the document quotes three reasons that render.rs no longer writes. That conflicts with the words' own rule to write from main as it then stands.
+- Does LOSS-ACCOUNT.md cover only the account, or also what the render preserves and transforms beyond it, as the inventory note promises? The sentence of the words it stands on: "HOME-001 row R4 lists docs/design/home/LOSS-ACCOUNT.md among the files it creates, at HOME-001.json:148 and HOME-001.md:137, and DESIGN.md:84 and design.json:135 name the same path.". Why only the lead can settle it: design.json:136 and DESIGN.md:84 describe the file as 'what the Claude Code render preserves, transforms and cannot carry'. The words list only the account's contents. Custom entries and labels are not rendered, compaction becomes a summary record, and gitBranch and usage are fixed values (render.rs:9-10, 148, 226, 234-237), but none of these writes a loss entry. Either the document is narrower than its inventory row or the row's note changes.
 
 ### The units beyond the first
 
-- Write docs/design/home/LOSS-ACCOUNT.md from render.rs as it stands on main — The lead's named act that answers R4's finding. It is a document of its own, outside this card's no-write scope.
-- Move record/mod.rs's functions into named modules under record/ — The act that answers the mod.rs finding for R1 (and R2). It is a code change this card may not make.
-- Move claude_code/mod.rs's consts and projects_slug into a named module, if still true on main — The same mod.rs rule in a second file. It holds R3 and R4 unless ca7b462 already answered it.
-- Add an ast-grep leg to the lys gate (ngzIkkpd), then run it over crates/lys-home — The ast-grep leg is recorded as not measured until that card lands.
-- R7 proxy proof: words and brief — This row is unbuilt, and its card 0BgjD59r stays open.
-- R10 little proxy: words and brief — This row is unbuilt, and its card qY9mBz-y stays open.
-- R12 handover: words and brief — This row is unbuilt, with no files on main.
-- One card per Jev, fmt, clippy, test or gate finding still true on main — The lead ruled that each finding is its own card, worded from its proof line.
+- Pin the three loss reasons' text in render_tests.rs — No test asserts any reason string today (render_tests.rs). This card may not change crates/, so pinning them is code work for a later card, likely the render card's line.
+- Fix the loss account's silent empty write on serialisation failure and its overwrite under plain render — render.rs:267 uses unwrap_or_default, and plain render overwrites an existing loss file. Both are behaviour changes out of scope here. The render card's R5 covers the first.
+- Write PROOF-PROXY.md for HOME-001 R7 — The same inventory lists a second missing file (DESIGN.md:83). It belongs to the R7 proxy-proof card, not to this card.
 
 ### The smallest complete shape
 
-One landing with a new home brief (JSON and rendered MD) plus the design.json and DESIGN.md structure rows and one proof document. The proof holds the per-file Jev verdicts and the deterministic legs measured on a 0073b966 worktree on Dean's laptop, each finding as its own line marked still-true or answered-by-sha, and the per-row verdict for each of the seven cards. The landing leaves crates/lys-home unchanged, goes green through src_pr and src_land, and is followed by the board acts: set done the cards with no open finding, point the others at their finding cards.
+One docs-only landing:
+- docs/design/home/LOSS-ACCOUNT.md, written from render.rs and launch.rs at the named commit, with all six statements the words list, each cited by file:line.
+- The new brief HOME-012 (JSON and its rendered .md) in the home cluster, naming the reason-matching check, which lives outside crates/.
+- Roadmap row RM-026, with no ADR unless one is made.
+- Optionally a one-line pointer from RECORD.md's loss-account section.
+All of it passes sh scripts/design/gate.sh.
 
 ## The roadmap row
 
-- **RM-020** — Judge the hand-built HOME-001 code at 0073b966 through the chain and set its cards by row (design, idea)
-- Summary: The chain's whole judgement over crates/lys-home at 0073b966, recorded in one proof document (docs/design/home/PROOF-CHAIN.md) without changing the crate: Jev per file, the gate's seven deterministic legs, ast-grep recorded as not measured, each finding its own line checked against current main, and each of the seven step 5 cards given done or in review by row, set on the board after a green landing.
-- Asked by: tom on 2026-09-27T11:23:00+10:00
-- Context: The card on the home step 5 board filed on the ruling that every carded row goes through its board's chain, with the lead's rulings to runs a6d7b86a and 0a22ff20 and the lead's answer on findings outside crates/lys-home, written as HOME-008.
-- Quote: The HOME-001 rows R1 to R11 were built by hand on 24 September 2026 and reached lys main through the merge 7b47115, before Tom's rule of 25 September that every carded row goes through its board's chain. The seven cards that carry those rows on the step 5 board sit in review with no chain fields, and nothing on main says the chain has judged that code. This card adds no new code and only proves what is already there. It runs the chain's whole judgement over crates/lys-home as it stands on main at 0073b966: Jev per file, fmt, clippy pedantic, tests, ast-grep and the gate. The brief names each check and the command it runs, and the build's proof document records each check's outcome on the crate as found, with the commit it was measured on. If every check passes the build lands with only the proof document and the design rows this card needs. If Jev or the gate finds something, the build records each finding as its own line in the proof document and lands without changing the crate; each finding then becomes a card of its own on the step 5 board, worded from that line. When this card lands green the seven cards are set to done and each points at this card's landing, so that done means judged by the chain and never just merged before the rule. Acceptance is that the proof document names the commit, every check by name and its outcome, and holds no code changes to crates/lys-home; that a reader can rerun each named command at that commit and see the same outcome; and that the landing is green through src_pr and src_land with Jev and the gate. Not in scope: any new capability in lys-home, any change to the eleven rows, or any card other than the seven named. This card builds behind the six Lys briefs in the one-build queue on this Mac under the load guard. Filed by Archie on Waffles' ruling of 07:08 on 26 September 2026 in the Cambium channel, on Tom's rule of 22:26 on 25 September 2026 that every carded row goes through the chain, and on lys main 0073b966.
+- **RM-027** — Write the loss account of the Claude Code render down as the code writes it (design, idea)
+- Summary: HOME-001 R4 and the home design name docs/design/home/LOSS-ACCOUNT.md, which was never written. One docs-only card writes it from the Claude Code render on main: where the account is written (beside the rendered file under its stem, with the two cases where the stem is the session uuid), the account's keys and one entry's fields, every reason quoted with its source line, when an entry is written, that an entry names a part by hash and never carries its content, that every render writes the account, and what the render changes without an entry. A reason check keyed on the source proves both directions; no file under crates changes.
+- Asked by: tom on 2026-09-27T11:35:00+10:00
+- Context: The words of the card that answers the judged-rows card's finding that HOME-001 R4's LOSS-ACCOUNT.md is absent on main at 7b53625; the survey's three questions were answered by the lead for the home line before this round.
+- Quote: HOME-001 row R4 lists docs/design/home/LOSS-ACCOUNT.md among the files it creates, at HOME-001.json:148 and HOME-001.md:137, and DESIGN.md:84 and design.json:135 name the same path. The document does not exist on lys main at 7b53625, checked with git cat-file. The judged-rows card holds R4's card in review on that finding and names this card as the act that answers it. This card writes the document and changes no code.
 
-Rulings of the lead, Archie, given on 27 September 2026 to the run a6d7b86a-aba7-4110-a5a7-7331405de7d3 in answer to its rounds. That run took every answer and then failed before writing, when the Argus gate refused every tool call of its session. They are settled here, and the author reopens none of them.
+The document is written from crates/lys-home/src/harness/claude_code/render.rs and launch.rs as they stand on main at the brief's commit. It states where the loss account is written, as the file named by the session uuid with .loss.json beside the rendered session, and the shape of one entry as the Loss struct carries it. It states every reason the render writes into it, each quoted exactly as the source writes it, with the source line that writes it. It states when an entry is written, which is when signed thinking is rendered as text for a different provider, api or model, and when redacted or empty thinking is dropped. It states that the account names each dropped block by its hash and never carries the block's content. It states whether a render with nothing dropped still writes the account, as the code shows.
 
-The tree is right and the sentence is too broad. Only rows whose code is on main at 0073b966 are judged, and only their cards can be set done. The brief maps each HOME-001 row to its files on main by git cat-file. R7 (proxy proof), R10 (little proxy) and R12 (handover) are not built: their cards (0BgjD59r R7, qY9mBz-y R10) are never set done by this card. The brief names them as unbuilt rows that need their own words and briefs.
+Acceptance. The file docs/design/home/LOSS-ACCOUNT.md exists on the landing commit. A check that the brief names reads every reason string in render.rs from the source and finds each one quoted in the document, and finds no reason in the document that the source does not write. Every file:line the document cites exists at the commit it names. No file under crates changes. The design gate, sh scripts/design/gate.sh, exits 0.
 
-Through jev_ask.awl per file, against the empty tree, each file cut per part as the chain does for a new file, with no new src_land mode. The proof records each file's Jev verdict with its run id. src_land's own Jev then reads the landing diff (the proof document) as usual.
-
-Record Jev's verdict as evidence: model, run id and outcome for each file. It is not a rerunnable command. The rerun promise covers the deterministic legs only (fmt, clippy pedantic, tests, the gate at the named commit and toolchain), and the brief amends the acceptance line to say exactly that.
-
-Neither borrowed rule set. lys has none yet, and card ngzIkkpd (add an ast-grep leg to the lys gate) is where it gets written. The proof records the ast-grep leg as not measured, naming ngzIkkpd as the reason. The leg is run over the crate when that card lands.
-
-Every finding from any leg becomes its own card: Jev, fmt, clippy, tests, ast-grep once it exists, and the gate.
-
-It is recorded as answered, naming the fixing commit (for example HOME-007 a2d6d2c, HOME-003 ca7b462), and gets no card. Only findings still true on current main become cards.
-
-Per row. A row's card is set done on this landing only if no finding still true on main touches that row's files. A row with open findings stays in review, and its card points at each finding card, until they close. Green means the landing passed src_pr and src_land. It never means the crate is clean.
-
-Dean's laptop. Tom's rule 7 of 27 September supersedes the words: every compile, test battery and gate goes there. The brief says so and drops the one-build-queue sentence.
-
-Both, labelled. The proof's judgement is measured on a checkout of 0073b966 itself, a worktree at that commit on Dean's laptop, and each leg's outcome is recorded against that sha. src_land's gate on the landing head is recorded separately, as the landing's own gate, with its sha. Neither stands in for the other.
-
-The missing document is a finding, and the card carrying R4 is not done. R4's files list create: docs/design/home/LOSS-ACCOUNT.md (HOME-001.json:148, HOME-001.md:137), and DESIGN.md:84 and design.json:135 name the same path. Checked by Archie at 08:23 on 27 September against lys origin/main: git cat-file -e reports the path does not exist. R4's code being on main does not discharge a requirement whose own file list is unmet. Record it as a finding naming the path and the lines that cite it, give that card the verdict in review rather than done, and state the act that answers it: a card that writes LOSS-ACCOUNT.md from render.rs as it stands on main. Do not write the document in this brief, and do not mark R4 done on the strength of render.rs alone. Answered by Archie, lead for the home line.
-
-Further rulings of the lead, Archie, given on 27 September 2026 to the run 0a22ff20-e295-43f6-9ad6-b87296a4b267 in answer to its round 1. That run took both answers and then failed while writing, when its author session's declared resume found no state to continue. They are settled here, and the author reopens none of them.
-
-It is a finding, whether or not Jev raises it. CLAUDE.md's mod.rs rule is the repository's own rule, and the proof judges the crate against the repository's rules the way the chain judges a new file. A lead who can see a rule broken on main does not wait for a model to notice it. The proof records it as its own line naming crates/lys-home/src/record/mod.rs, the line count and the function count at 0073b966 and at the main head the proof reads. R1's card stays in review on it, and so does any other of the seven whose files include that mod.rs. The act that answers it is a card that moves those functions out of mod.rs into named modules under record/, so mod.rs carries only pub mod, pub use and docs. This brief does not move them.
-
-Patched and unsure hold the card in review. Solved and not_asked do not. Patched is a finding by name, and the line records what Jev found. Unsure is a finding of its own kind. The file is asked once more as one whole part, and if Jev is still unsure the line records unsure and the card stays in review, with the act that answers it being a person's read of that file, recorded as a card. Not_asked is recorded as not measured with Jev's reason and holds no row. If the reason is that the chain skipped a file it should have read, that is a finding against the chain, filed on the chain's board, not against the row. Solved is recorded and closes nothing that another leg holds. Answered by Archie, lead for the home line.
-- Cluster: home; briefs: HOME-008
-- Notes: A new row rather than RM-005, which carries HOME-001's building; this row carries its judgement. RM-020 is the next after main's RM-016 and the open brief branches' highest, RM-019; ADR-031, C83 to C90 and S35 to S37 likewise follow the highest on main and the open brief branches. HOME-008 is the brief id this run was given; open brief branches brief/home/54e28af6 and brief/home/5898fcb0 each also hold a HOME-008 of their own, so one of the three renumbers before it lands. Further units, not written: Write docs/design/home/LOSS-ACCOUNT.md from render.rs as it stands on main; Move record/mod.rs's functions into named modules under record/; Move claude_code/mod.rs's consts and projects_slug into a named module, if still true on main; Add an ast-grep leg to the lys gate (ngzIkkpd), then run it over crates/lys-home; R7 proxy proof: words and brief; R10 little proxy: words and brief; R12 handover: words and brief; One card per Jev, fmt, clippy, test or gate finding still true on main.
+Keep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh). The brief id, roadmap row and any decision take the next free id after main's highest and every open brief/* and draft/* branch's, checked with git ls-remote immediately before writing. If the render card, which changes render.rs refusals, lands before this card is built, the document is written from main as it then stands and names that commit. Not in scope are any change to what the render drops or why, and the loss account of any harness other than Claude Code. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie, lead for the home line, on 27 September 2026 on lys main 7b53625.
+- Cluster: home; briefs: HOME-013
+- Notes: Ids checked with git ls-remote and a fetch of all 74 open brief/* and draft/* branches immediately before writing, against main 7b53625: HOME-012 and RM-026 are taken on open branches (draft/home/4c46aabc, brief/lys-anchor/6b1c7df6) and ADR-040 likewise, so this row is RM-027 and its brief HOME-013; checklist C95 to C99 and story S40 follow the highest numbers on those branches (C94, S39). No new decision: the document records existing behaviour. Further units, not written: Pin the three loss reasons' text in render_tests.rs; Fix the loss account's silent empty write on serialisation failure and its overwrite under plain render; Write PROOF-PROXY.md for HOME-001 R7; Decide whether custom entries, labels, compaction, gitBranch or usage should write a loss entry.
 
 ## The design
 
@@ -245,7 +212,6 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 - ADR-016 — A rendered file's derived uuids are a fixed, versioned contract — Derive every uuid a render needs and the record does not hold as UUIDv5 under the session's namespace and the name `<entry id>#<role>`, with a closed set of roles (`record` first); the session's namespace is UUIDv5 over one fixed lys namespace (32c05904-d1f1-550c-9eee-2f6c8f98b665, itself UUIDv5 of the RFC 9562 URL namespace over `lys/home/claude-code/render-uuid/v1`) and the id of the session being rendered, so the same entry id in two sessions never derives one uuid. Treat the namespace, the session namespace rule, the name form and the roles as frozen: a change is a new version alongside, never a mutation. The fork and launch cards derive by this scheme. Rejected: drawing fresh ids (nondeterministic), keying on a hash of the entry id alone without a namespace, a role and a session (two roles on one entry collide, two sessions with one hand-authored id collide, and it is not reproducible with standard UUID tooling), mixing in the target session id (the record does not hold it), and leaving the scheme mutable until a later card (every recorded hash would move with it).
 - ADR-017 — A fork is a child session cut from the parent's own lines at a lantern's point, with its ancestry on both sides — A fork resolves a lantern to the session it was lit in, read from the lys.lantern data's lit_in when the record carries it and otherwise by the older-record rule (one holder cuts, several refuse lantern_ambiguous until a session is named), and cuts that session's root-to-point chain at the last assistant message at or before the point, through the index. The child is a new session under the parent's cwd whose header's parentSession is the parent file's path relative to the home, holding each cut entry as the parent file's own line bytes, then one lys.forked_from custom entry as its head naming the parent session, the lantern, the point, the cut entry, whether the coordinate was carried and the carried entry; the parent gains one lys.fork custom entry at its head naming the child. Nothing else is copied and no block is written. Rejected: re-serialising the copied entries (the copy would stop hash-matching the parent's lines), a fork store beside the sessions outside Pi's grammar, cutting at a point no lantern names, and a header field beyond Pi's parentSession.
 - ADR-018 — A user-message point is carried as a seed prompt beside the rendered file, never copied into the child — When the point is a user message the cut stops at the assistant message before it and the message is carried, not copied: lys.forked_from records its id with coordinate_carried true and counts, by kind, the parts of it that are not text. The Claude Code render of such a child writes the message's text parts, in order, as a seed prompt beside the rendered file under an in-band marker line naming the parent session, the point and the lantern, and names it in the render report; the template's launch line, printed by render-launch only, passes that file as the resumed session's first prompt. A part that is not text never refuses a fork or a render and never enters the seed. Rejected: copying the user message into the child's chain, refusing a fork for a non-text part, and putting the seed's text in the report or the loss account.
-- ADR-031 — A carded row built before the chain is done only when the chain has judged its code at a named commit and no open finding touches its files — A carded row built before the chain is set done only when the chain's whole judgement has been run over its code at a named commit and no finding still true on current main touches that row's files; a row with an open finding stays in review, pointing at each finding card, until they close. Green means the landing passed src_pr and src_land, never that the code is clean. Rejected: setting the cards done on the merge alone, and setting every card done when the proof lands green regardless of its findings.
 
 ## Goals
 
@@ -385,9 +351,6 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `crates/lys-home/src/harness/claude_code/seed.rs` | the seed prompt of a carried user message: the marker line, the text parts, the seed argument for the template's launch line | HOME-006 |
 | `crates/lys-home/tests/fork.rs` | the fork run as the binary: five forks and five refusals, blocks unchanged, both ancestry sides | HOME-006 |
 | `docs/design/home/PROOF-FORK.md` | the measured fork: Pi's parentSession read, a real session forked, rendered and launched, as hashes, counts and exit codes | HOME-006 |
-| `docs/design/home/briefs/HOME-008.json` | the chain's judgement of HOME-001's hand-built code at 0073b966: Jev per file, the gate's legs, findings and card verdicts | HOME-008 |
-| `docs/design/home/briefs/HOME-008.md` | its rendered markdown | HOME-008 |
-| `docs/design/home/PROOF-CHAIN.md` | the measured judgement of crates/lys-home at 0073b966: commit and toolchain, row and card maps, Jev lines, leg outcomes, findings and each card's verdict | HOME-008 |
 
 ## Inventory
 
@@ -2030,226 +1993,149 @@ Complete the section of docs/design/home/PROOF-RESUME.md that R3 adds with: the 
 
 ---
 type: brief
-id: HOME-008
+id: HOME-013
 cluster: home
-title: Judge the hand-built HOME-001 code in crates/lys-home at 0073b966 through the chain's whole judgement and record each check's outcome in a proof, without changing the crate
+title: Write the loss account of the Claude Code render down as the code writes it
 ---
 
-# HOME-008: Judge the hand-built HOME-001 code in crates/lys-home at 0073b966 through the chain's whole judgement and record each check's outcome in a proof, without changing the crate
+# HOME-013: Write the loss account of the Claude Code render down as the code writes it
 
 > **Cluster:** home
-> **Blocked by:** A worktree of lys at 0073b966 on the build host with toolchain 1.97.1 installed, A working jev_ask.awl route (Jev key and ledger) able to judge a file against the empty tree, Read access to the step 5 board for the map of its seven cards to HOME-001 rows
 > **Design anchor:**
-> - ADR-031 — A carded row built before the chain is done only when the chain has judged its code at a named commit and no open finding touches its files — A carded row built before the chain is set done only when the chain's whole judgement has been run over its code at a named commit and no finding still true on current main touches that row's files; a row with an open finding stays in review, pointing at each finding card, until they close. Green means the landing passed src_pr and src_land, never that the code is clean. Rejected: setting the cards done on the merge alone, and setting every card done when the proof lands green regardless of its findings.
 > - ADR-012 — A harness launch template is kept in the home by hash, and each render is recorded on the session beside its context path — A launch template per harness is a JSON object with named slots (transcript, mcp, env, secrets, instructions) plus flags, stored in the home under templates/ by its SHA-256; lys-home renders a template and a session into files and runtime variables with command mappings in text, prints the launch line and never runs it, and records each render as a sixth lys.harness_event kind, template_render, hung as a side leaf beside the context path with the written paths in a manifest block named by hash. Rejected: a transcript converter or adapter protocol per harness, a template kept outside the home (a seat document of another tool), and a render event that advances the head, which would change the session head hash between two renders of the same session.
-> - ADR-016 — A rendered file's derived uuids are a fixed, versioned contract — Derive every uuid a render needs and the record does not hold as UUIDv5 under the session's namespace and the name `<entry id>#<role>`, with a closed set of roles (`record` first); the session's namespace is UUIDv5 over one fixed lys namespace (32c05904-d1f1-550c-9eee-2f6c8f98b665, itself UUIDv5 of the RFC 9562 URL namespace over `lys/home/claude-code/render-uuid/v1`) and the id of the session being rendered, so the same entry id in two sessions never derives one uuid. Treat the namespace, the session namespace rule, the name form and the roles as frozen: a change is a new version alongside, never a mutation. The fork and launch cards derive by this scheme. Rejected: drawing fresh ids (nondeterministic), keying on a hash of the entry id alone without a namespace, a role and a session (two roles on one entry collide, two sessions with one hand-authored id collide, and it is not reproducible with standard UUID tooling), mixing in the target session id (the record does not hold it), and leaving the scheme mutable until a later card (every recorded hash would move with it).
+> - ADR-018 — A user-message point is carried as a seed prompt beside the rendered file, never copied into the child — When the point is a user message the cut stops at the assistant message before it and the message is carried, not copied: lys.forked_from records its id with coordinate_carried true and counts, by kind, the parts of it that are not text. The Claude Code render of such a child writes the message's text parts, in order, as a seed prompt beside the rendered file under an in-band marker line naming the parent session, the point and the lantern, and names it in the render report; the template's launch line, printed by render-launch only, passes that file as the resumed session's first prompt. A part that is not text never refuses a fork or a render and never enters the seed. Rejected: copying the user message into the child's chain, refusing a fork for a non-text part, and putting the seed's text in the report or the loss account.
 > **Checklist:**
-> - C83 — docs/design/home/PROOF-CHAIN.md names commit 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff and toolchain 1.97.1, maps every HOME-001 row to its files present or absent at that commit, names R7, R10 and R12 unbuilt, and maps the seven step 5 cards to their rows.
-> - C84 — The proof holds one Jev line per file of crates/lys-home at 0073b966, 25 in all, each with model, run id and verdict.
-> - C85 — The proof records the seven commands .land/gates.sh runs at 0073b966 with each exit status and outcome, and the ast-grep leg as not measured naming ngzIkkpd.
-> - C86 — Every finding is its own proof line marked still true at a named main head or answered by a named commit, and only still-true findings in crates/lys-home or docs/design/home are listed for the step 5 board.
-> - C87 — The proof records the missing LOSS-ACCOUNT.md, record/mod.rs's functions and claude_code/mod.rs's consts and fn as findings with their citations and counts.
-> - C88 — The proof gives each of the seven step 5 cards the verdict done or in review by row, and never done to 0BgjD59r or qY9mBz-y.
-> - C89 — The landing changes nothing under crates/lys-home and passes src_pr, src_land and sh scripts/design/gate.sh.
-> - C90 — After the green landing the step 5 board matches the proof: done cards point at the landing, in-review cards at their finding cards.
+> - C95 — docs/design/home/LOSS-ACCOUNT.md exists, names on its first line the commit it was read from, and states that the loss account is written beside the rendered file under the rendered file's stem with .loss.json, naming the default render path and render-launch as the two cases where that stem is the session uuid.
+> - C96 — LOSS-ACCOUNT.md states the account's four keys, one entry's two fields hash and reason, and that every render writes the account, with dropped: [] when nothing was dropped.
+> - C97 — LOSS-ACCOUNT.md quotes every reason string the render passes to the loss constructor, with the line that writes it, and the reason check prints 1 3 3 [] at the landing commit.
+> - C98 — LOSS-ACCOUNT.md states that an entry's hash is the SHA-256 of the part as serde_json serialises it and that an entry never carries the part's text, signature or redacted data.
+> - C99 — LOSS-ACCOUNT.md lists the four things the render changes without a loss entry, custom entries and labels, compaction, gitBranch and usage, each with the line that does it.
 > **Stories:**
-> - S35 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want each check of the chain's judgement recorded with the commit and toolchain it was measured on, so that I can rerun the deterministic checks at that commit and see the same outcome.
-> - S36 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want every finding recorded as its own line marked still true or answered by a named commit, so that only what is still wrong on main becomes a card.
-> - S37 (Lead, Owns the cards of a board and sets them done) — As the lead who owns the step 5 board, I want a card set done only when the chain has judged its rows' files and no open finding touches them, so that done means judged by the chain and never just merged.
+> - S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
 
 ## Purpose
 
-HOME-001's built rows reached main by hand before every carded row had to go through its board's chain, so nothing on main says the chain has judged that code and the cards carrying those rows cannot honestly be done. This brief runs the chain's whole judgement over crates/lys-home as it stands at 0073b966 (Jev per file, fmt, clippy pedantic, tests, the gate's other legs, and ast-grep recorded as not measured), records every outcome and every finding in one proof document against that commit and toolchain, and lands it without changing a byte of the crate, so a card is done only when the chain has judged its row's files and no open finding touches them (ADR-031).
+HOME-001 R4 names docs/design/home/LOSS-ACCOUNT.md among the files it creates, and the cluster design's structure names the same path, but the document was never written. This brief writes it from the Claude Code render as it stands on main: where the account is written, the shape of the account and of one entry, every reason the render writes quoted with its source line, when an entry is written, that an entry names a part by hash and never carries its content, that every render writes the account, and what the render changes without writing an entry. A reader can then check a render's account against the source without reading the render, and a reason check keyed on the source proves the document and the source agree in both directions.
 
 ## Task
 
-Measure, do not change. Every compile, test battery and gate of this card runs on Dean's laptop, never on the Mac the card is written on; the words' sentence about the one-build queue on this Mac is dropped. Make a worktree of lys at 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff there with toolchain 1.97.1 (rust-toolchain.toml at that commit) and run the seven commands .land/gates.sh runs at that commit, verbatim, workspace-wide as the gate runs them; fmt is measured by `cargo fmt --check`, the gate's own form, never the rewriting `cargo fmt --all`. Clippy pedantic is the workspace lint table's `pedantic = warn` under `-D warnings`, measured through the two clippy legs. Ask Jev about each of the crate's 25 files at that commit through jev_ask.awl, against the empty tree, cut per part as the chain cuts a new file, with no new src_land mode; Jev's lines are evidence (model, run id, verdict), not a rerunnable command, so the rerun promise of the acceptance covers the seven deterministic legs at the named commit and toolchain only. ast-grep is recorded as not measured, naming card ngzIkkpd, which writes lys's first rule set; no borrowed rule set is run. Only rows whose files are on main at 0073b966 are judged: R7, R10 and R12 are unbuilt and named so, and their cards (0BgjD59r for R7, qY9mBz-y for R10) are never set done here. Each finding is its own line, checked against the current main head: a finding answered there names its fixing commit and gets no card; one still true in crates/lys-home or docs/design/home becomes one card on the step 5 board; one outside them is shown whole and named for its own board. Three findings stand on the repository's rules whatever Jev says: the missing docs/design/home/LOSS-ACCOUNT.md (R4), record/mod.rs carrying functions (R1, R2), and claude_code/mod.rs carrying consts and a fn (R3, R4). A card is done only if no finding still true touches its rows' files; green means the landing passed src_pr and src_land, never that the crate is clean. The measurement at 0073b966 and src_land's gate on the landing head are recorded apart, each with its sha. Out of scope: any new capability in lys-home, any change to a HOME-001 row, writing LOSS-ACCOUNT.md, moving any function, and any card other than the seven. Every requirement writes into the one proof document, so the primary-file rule is met by the proof's sections rather than by separate files.
+Write docs/design/home/LOSS-ACCOUNT.md by hand from render.rs, launch.rs, import.rs, cli.rs, mod.rs and blocks.rs under crates/lys-home/src as they stand on main when the document is written, and name that commit on the document's first line. At the time of this brief main is 7b53625 and every line number below is read there; if the render card that moves the render's refusals and its assistant shaping has landed first, the document is written from main as it then stands, names that commit, and cites the lines that hold the same code there; the reason check reads whichever files call the loss constructor, so it finds the reasons wherever they are written. The document is the one file this brief creates, and all five requirements are sections of it, so R1 to R5 share it as their primary file. The code decides what the document says: the account is named by the rendered file's stem, which is the session uuid only for the default output path and for render-launch; the array named `dropped` also holds signed thinking rendered as text; and the account is written on every render. In scope: the document only. Out of scope: any change to what the render drops or why, any code, the loss account of any harness other than Claude Code, the import-time `lys.loss` entry of the compaction card, pinning the reasons in a test, and changing the silent empty write or plain render's overwrite of an existing account. Transcript content never appears in the document (CN3): it names keys, reasons, line citations and counts.
 
 ## Requirements
 
-### R1: Frame the proof: the measured commit, the toolchain, the row map and the card map
+### R1: Name the commit the document is read from and where the loss account is written
 
-THE SYSTEM SHALL create docs/design/home/PROOF-CHAIN.md whose first section names the commit every leg of this judgement was measured on as 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff, the toolchain as the channel 1.97.1 that rust-toolchain.toml pins at that commit together with the `rustc --version` and `cargo --version` lines printed where the legs ran, and states that the legs ran from the root of a worktree checked out at that commit on the build host that runs every compile, test battery and gate. It SHALL hold one table row per HOME-001 requirement, R1 to R12, listing every path of that row's files.create and files.modify with `present` or `absent` as `git cat-file -e 0073b966:<path>` reports it, and SHALL name R7, R10 and R12 as unbuilt rows that are not judged and need their own words and briefs. It SHALL hold the map of the seven step 5 cards that carry R1 to R11 to the HOME-001 rows each carries, by card id, as the step 5 board holds it, with 0BgjD59r carrying R7 and qY9mBz-y carrying R10. THE SYSTEM SHALL NOT judge a row any of whose code files is absent at that commit, SHALL NOT edit, reword or renumber any HOME-001 row, and SHALL NOT record as this judgement anything measured on a checkout of another commit.
+Structural: `docs/design/home/LOSS-ACCOUNT.md` is created, a hand-written markdown document titled `# The loss account of the Claude Code render`. Its first line after the title is `Written from commit <id>.`, where <id> is the full 40-character id of main's head at the time the document is written: `7b536253165f920cd8bc5f1d1dfdd987339e3e12` while main stands there, and main's head as it then stands if the render card that moves the render's refusals has landed first. Every source line the document cites is written as a repository-relative path, a colon and a line number or a first-last range (`crates/lys-home/src/harness/claude_code/render.rs:263`, `crates/lys-home/src/harness/claude_code/render.rs:85-93`), read at that commit. The document has the section `## The loss account` first and the section `## What the render changes without a loss entry` second. The loss account section states that the account is written beside the rendered file and named by the rendered file's stem with `.loss.json`, because the render computes its path with `path.with_extension("loss.json")`, citing that line of render.rs; that the stem is the session uuid in two cases, the default output path of `lys-home render` (citing render.rs's `default_path`, lines 85-93 at 7b53625) and `render-launch` (citing launch.rs's `{uuid}.jsonl` and `{uuid}.loss.json` lines, 80-81 at 7b53625); and that `lys-home render --out other.jsonl` writes the account as `other.loss.json` (citing the `out` argument in cli.rs, lines 105-107 at 7b53625). It states that plain render writes the account with `std::fs::write`, which replaces a file already at that path (citing render.rs's lines 265-269 at 7b53625), that `render-launch` refuses an existing loss path by name before it writes any file (citing launch.rs's lines 96-101 at 7b53625), and that `render-launch` hashes the account as the second file of its render manifest (citing launch.rs's lines 123-133 at 7b53625). The document SHALL NOT state that the account is named by the session uuid for every render, SHALL NOT propose a change to the account's path or name, and SHALL NOT cite a line at any commit other than the one it names.
 
 **Acceptance:**
-- `grep -c 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff docs/design/home/PROOF-CHAIN.md` prints a number of 1 or more, and the frame section names the toolchain channel `1.97.1`.
-- The row table holds exactly 12 rows, R1 to R12, and its present and absent marks equal what `git cat-file -e 0073b966:<path>` reports for each listed path.
-- The row table marks docs/design/home/LOSS-ACCOUNT.md absent in R4's row; crates/lys-home/examples/passthrough.rs and docs/design/home/PROOF-PROXY.md absent in R7's row; 17 paths absent in R10's row; crates/lys-home/src/record/handover.rs and docs/design/home/PROOF-HANDOVER.md absent in R12's row; and every listed path of R1, R2, R3, R5, R6, R8, R9 and R11 present.
-- R7, R10 and R12 are each named as unbuilt, needing their own words and brief, and no Jev line, leg outcome or card verdict of this proof is attributed to them as judged.
-- The card map lists exactly seven card ids, every row R1 to R11 appears under a card, 0BgjD59r lists R7 and qY9mBz-y lists R10.
+- `git cat-file -e HEAD:docs/design/home/LOSS-ACCOUNT.md` exits 0 on the landing commit.
+- The document holds exactly one line matching `^Written from commit [0-9a-f]{40}\.$`, and the id on it equals the output of `git merge-base origin/main HEAD` on the card's branch (`7b536253165f920cd8bc5f1d1dfdd987339e3e12` while main stands at 7b53625).
+- `python3 -c "import re;ls=[l for l in open('docs/design/home/LOSS-ACCOUNT.md').read().splitlines() if l.strip()];i=ls.index('# The loss account of the Claude Code render');print(bool(re.fullmatch(r'Written from commit [0-9a-f]{40}\.',ls[i+1])))"` run from the repository root prints `True`: the first non-blank line after `# The loss account of the Claude Code render` is the `Written from commit <id>.` line.
+- `python3 -c "import re,subprocess;d=open('docs/design/home/LOSS-ACCOUNT.md').read();c=re.search(r'(?m)^Written from commit ([0-9a-f]{40})\.$',d).group(1);cs=re.findall(r'((?:crates|docs)/[A-Za-z0-9_./-]+\.[a-z]+):([0-9]+)(?:-([0-9]+))?',d);n=lambda p:len(subprocess.run(['git','show',c+':'+p],capture_output=True,text=True,check=True).stdout.splitlines());print(c,sorted({x[0] for x in cs}),[x for x in cs if not 1<=int(x[1])<=int(x[2] or x[1])<=n(x[0])])"` run from the repository root prints the named commit, a sorted list of cited paths that contains each of the three files this requirement cites, `crates/lys-home/src/cli.rs`, `crates/lys-home/src/harness/claude_code/launch.rs` and `crates/lys-home/src/harness/claude_code/render.rs`, and `[]`.
+- At the named commit, the render.rs line the location paragraph cites holds `with_extension("loss.json")` (line 263 at 7b53625), and the launch.rs range it cites holds `{uuid}.loss.json` (range 80-81 at 7b53625).
+- The document contains the string `--out other.jsonl` and the string `other.loss.json`.
+- At the named commit, the launch.rs range the document cites for the refusal holds `LaunchTargetExists` (range 96-101 at 7b53625), and the render.rs range it cites for the plain write holds `std::fs::write(` (range 265-269 at 7b53625).
+- `grep -c '^## ' docs/design/home/LOSS-ACCOUNT.md` prints 2, and the two headings are `## The loss account` then `## What the render changes without a loss entry`.
 
 **Files:**
-- create: docs/design/home/PROOF-CHAIN.md
+- create: docs/design/home/LOSS-ACCOUNT.md
 
 **Checklist:**
-- C83 — docs/design/home/PROOF-CHAIN.md names commit 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff and toolchain 1.97.1, maps every HOME-001 row to its files present or absent at that commit, names R7, R10 and R12 unbuilt, and maps the seven step 5 cards to their rows.
+- C95 — docs/design/home/LOSS-ACCOUNT.md exists, names on its first line the commit it was read from, and states that the loss account is written beside the rendered file under the rendered file's stem with .loss.json, naming the default render path and render-launch as the two cases where that stem is the session uuid.
 
 **Stories:**
-- S35 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want each check of the chain's judgement recorded with the commit and toolchain it was measured on, so that I can rerun the deterministic checks at that commit and see the same outcome.
+- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
 
-### R2: Record Jev's verdict on each file of the crate at the measured commit
+### R2: State the account's shape and that every render writes it
 
-WHEN the build judges crates/lys-home at 0073b966, THE SYSTEM SHALL ask Jev through jev_ask.awl about each of the 25 paths `git ls-tree -r --name-only 0073b966 crates/lys-home` prints, the change being that file added against the empty tree and cut per part as the chain cuts a new file, and SHALL record in docs/design/home/PROOF-CHAIN.md one line per path with the parts asked, the model, the run id, the verdict (`patched`, `solved`, `unsure` or `not_asked`), the patched value when Jev gives one, held, and Jev's reason. IF a file's verdict is `unsure`, THEN THE SYSTEM SHALL ask once more with the whole file as one part and record both asks, and the line SHALL read `unsure` when the second ask is also unsure. IF the verdict is `not_asked`, THEN the line SHALL record the file as not measured with Jev's reason, and IF that reason is that the chain skipped a file it should have read, THEN THE SYSTEM SHALL record a finding against the chain, for the chain's board. THE SYSTEM SHALL record the Jev lines as evidence, SHALL NOT present them as a command a reader can rerun, SHALL NOT ask Jev about any path outside crates/lys-home, SHALL NOT add a src_land mode, and SHALL NOT let a `solved` verdict close a finding another leg holds.
+Structural: the loss account section states that the account is one JSON object with exactly four keys, `session_id` (the session id the rendered file carries), `model` (the model the file is rendered for), `authored` (true when an entry on the rendered path is the `lys.authored` custom entry) and `dropped` (an array of entries), citing the render.rs line that builds the object (264 at 7b53625) and the line that sets `authored` (128 at 7b53625); that one entry is the `Loss` struct's two string fields, `hash` and `reason`, citing render.rs's lines 48-55 at 7b53625; and that the account is written on every render, including a render that drops nothing, whose account carries `dropped: []`, citing the render.rs lines that write it with no condition (263-269 at 7b53625) and the two measured runs that show it, docs/design/home/PROOF-RESUME.md:38 and docs/design/home/PROOF-LAUNCH.md:28. It states, as found at the named commit and not as intended behaviour, that the account is serialised with `unwrap_or_default()`, so a serialisation failure writes an empty file and returns no error, citing that render.rs line (267 at 7b53625). The document SHALL NOT name a key or field the code does not write, SHALL NOT propose a change to the account's keys, fields or bytes, and SHALL NOT present the empty-file behaviour as a guarantee.
 
 **Acceptance:**
-- The Jev section holds exactly 25 file lines, and their paths equal, as a set, the 25 lines `git ls-tree -r --name-only 0073b966 crates/lys-home` prints.
-- Every Jev line carries a non-empty model, a non-empty run id, and a verdict that is exactly one of `patched`, `solved`, `unsure` and `not_asked`.
-- Every Jev line whose first ask was `unsure` carries a second ask whose part is the whole file.
-- Every Jev line reading `not_asked` reads not measured and carries Jev's reason.
-- No Jev line names a path outside crates/lys-home: docs/design/home/RECORD.md, PROOF-RESUME.md, PROOF-FEWSHOT.md, PROOF-CANON.md and canon/canon.jsonl have no Jev line.
-- The Jev section states that its lines are evidence and not a rerunnable command.
+- The loss account section contains each of the strings `session_id`, `model`, `authored`, `dropped`, `hash` and `reason` in backticks.
+- At the named commit, the render.rs line the document cites for the object holds `"dropped": losses` (line 264 at 7b53625), and the range it cites for the entry holds `pub struct Loss` (range 48-55 at 7b53625).
+- The document contains the string `dropped: []` and cites `docs/design/home/PROOF-RESUME.md:38` and `docs/design/home/PROOF-LAUNCH.md:28`, and at 7b53625 each of those lines contains `dropped: []`.
+- At the named commit, the render.rs line the document cites for the empty write holds `to_vec_pretty(&account).unwrap_or_default()` (line 267 at 7b53625).
 
 **Files:**
-- modify: docs/design/home/PROOF-CHAIN.md
+- create: docs/design/home/LOSS-ACCOUNT.md
 
 **Checklist:**
-- C84 — The proof holds one Jev line per file of crates/lys-home at 0073b966, 25 in all, each with model, run id and verdict.
+- C96 — LOSS-ACCOUNT.md states the account's four keys, one entry's two fields hash and reason, and that every render writes the account, with dropped: [] when nothing was dropped.
 
 **Stories:**
-- S35 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want each check of the chain's judgement recorded with the commit and toolchain it was measured on, so that I can rerun the deterministic checks at that commit and see the same outcome.
+- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
 
-### R3: Run the gate's seven deterministic legs at the measured commit and record the ast-grep leg as not measured
+### R3: Quote every reason the render writes, with its line, and state when each is written
 
-THE SYSTEM SHALL run, from the root of the worktree at 0073b966 with toolchain 1.97.1, each of the seven commands .land/gates.sh runs at that commit, verbatim, workspace-wide and in its order: `sh scripts/design/gate.sh`, `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo clippy --all-targets -- -D warnings`, `cargo test --workspace --all-features`, `cargo doc --no-deps --all-features`, `cargo doc --no-deps`; and SHALL record in docs/design/home/PROOF-CHAIN.md for each leg the exact command, the commit, its exit status and its outcome, `pass` for exit status 0 and `fail` for any other, and for a failing leg the failing crate or design cluster, the command and the first error it printed. Clippy pedantic SHALL be measured by the two clippy legs through the workspace lint table's `pedantic` at `warn` under `-D warnings`, with no flag added. THE SYSTEM SHALL record the ast-grep leg as not measured, naming card ngzIkkpd as the reason: lys has no ast-grep rule set until that card lands. THE SYSTEM SHALL state that the rerun promise covers these seven deterministic legs at that commit and toolchain only, and not Jev. THE SYSTEM SHALL NOT run fmt in its rewriting form, SHALL NOT borrow an ast-grep rule set, SHALL NOT change a byte of the worktree before a leg runs, and SHALL NOT record the landing head's gate as this measurement, nor this measurement as the landing's gate.
+WHEN the document states the reasons, THE DOCUMENT SHALL write each reason string the source passes to the loss constructor on its own line of the form `- reason: "<reason>" (<path>:<line>)`, the reason copied character for character, one line per reason, where the source is every file under `crates/lys-home/src` holding a line that calls `loss(&`; at 7b53625 that is render.rs alone, with one reason on line 198 and two on line 201. It SHALL state when an entry is written as the thinking branch decides it at the named commit, citing render.rs's lines 170-174 (the provider, api and model comparison) and 184-202 (the thinking branch) at 7b53625 and mod.rs's `PROVIDER` and `API` lines (52 and 54 at 7b53625): a thinking part is kept whole with no entry when provider, api and model all equal the target's and the part is redacted or carries a signature; otherwise, when its text is not empty after trimming whitespace and it is not redacted, it is rendered as a text part, and an entry with the signed-as-text reason is written only when it carries a signature, so a thinking part with no signature rendered as text writes no entry, for the same model as for another (citing the `if sig.is_some()` line, 197 at 7b53625); otherwise it is dropped with an entry carrying the redacted reason when it is redacted and the empty reason when it is not, so an empty thinking part with no signature is dropped even for the same model, and a signed empty thinking part for another model carries the empty reason. It SHALL state that the array named `dropped` therefore holds entries for signed thinking rendered as text as well as for dropped parts, that the report's `dropped` count is the number of entries in it (citing render.rs line 279 at 7b53625) while `thinking_as_text` counts every thinking part rendered as text (line 196 at 7b53625), and that no part other than thinking writes an entry (citing lines 183 and 204-210 at 7b53625). The document SHALL NOT write on a `- reason:` line any string the source does not pass to the loss constructor, SHALL NOT paraphrase a reason, and SHALL NOT state that every entry names a dropped part.
 
 **Acceptance:**
-- The legs section holds exactly seven leg lines, whose commands are, verbatim and in order: `sh scripts/design/gate.sh`, `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo clippy --all-targets -- -D warnings`, `cargo test --workspace --all-features`, `cargo doc --no-deps --all-features`, `cargo doc --no-deps`.
-- Every leg line names 0073b966, an integer exit status, and `pass` when the exit status is 0 and `fail` when it is not.
-- Every leg line reading `fail` names the failing crate or design cluster, the command and the first error line.
-- The proof holds an ast-grep line that reads not measured and names ngzIkkpd.
-- The rerun statement names the seven commands, 0073b966 and toolchain 1.97.1, and says that Jev's lines are not covered by it.
-- Running each recorded command from the root of a worktree made by `git worktree add <dir> 0073b966`, with toolchain 1.97.1, gives the exit status the proof records for it.
+- `python3 -c "import re,pathlib;fs=[p for p in sorted(pathlib.Path('crates/lys-home/src').rglob('*.rs')) if re.search(r'\bloss\(&',p.read_text())];src={s for p in fs for l in p.read_text().splitlines() if re.search(r'\bloss\(&',l) for s in re.findall(r'\"([^\"]+)\"',l)};doc=re.findall(r'(?m)^- reason: \"([^\"]+)\"',open('docs/design/home/LOSS-ACCOUNT.md').read());print(len(fs),len(src),len(doc),sorted(src^set(doc)))"` run from the repository root at the landing commit prints `1 3 3 []`: one source file found, three reasons in the source, three reason lines in the document, and no reason on one side only.
+- At 7b53625 the document's three reason lines are exactly `- reason: "signed thinking rendered as text: different provider, api or model" (crates/lys-home/src/harness/claude_code/render.rs:198)`, `- reason: "redacted thinking dropped: different provider, api or model" (crates/lys-home/src/harness/claude_code/render.rs:201)` and `- reason: "empty thinking dropped" (crates/lys-home/src/harness/claude_code/render.rs:201)`; at a later named commit, the same three strings with the path and line that write each there.
+- With the line carrying `"empty thinking dropped"` removed from a working copy of the document, the reason check prints `1 3 2 ['empty thinking dropped']`; with a line `- reason: "invented" (crates/lys-home/src/harness/claude_code/render.rs:1)` added instead, it prints `1 3 4 ['invented']`; the document is restored after each.
+- At the named commit, the render.rs range the document cites for the thinking branch holds `Some("thinking") =>` on its first line (range 184-202 at 7b53625), and the line it cites for the signature condition holds `if sig.is_some()` (line 197 at 7b53625).
+- At the named commit, the render.rs line the document cites for the report's count holds `dropped: losses.len()` (line 279 at 7b53625).
 
 **Files:**
-- modify: docs/design/home/PROOF-CHAIN.md
+- create: docs/design/home/LOSS-ACCOUNT.md
 
 **Checklist:**
-- C85 — The proof records the seven commands .land/gates.sh runs at 0073b966 with each exit status and outcome, and the ast-grep leg as not measured naming ngzIkkpd.
+- C97 — LOSS-ACCOUNT.md quotes every reason string the render passes to the loss constructor, with the line that writes it, and the reason check prints 1 3 3 [] at the landing commit.
 
 **Stories:**
-- S35 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want each check of the chain's judgement recorded with the commit and toolchain it was measured on, so that I can rerun the deterministic checks at that commit and see the same outcome.
+- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
 
-### R4: Record each finding as its own line, checked against the current main head
+### R4: State that an entry names its part by hash and never carries the part's content
 
-THE SYSTEM SHALL record in docs/design/home/PROOF-CHAIN.md every finding of every leg as its own line: each `patched` and each `unsure` Jev line, each diagnostic of a failing deterministic leg, each finding against the chain, and each repository-rule finding of R5. Each line SHALL carry a finding id, the leg, the path and line it concerns, what was found (for a `patched` line, what Jev found), the HOME-001 rows whose files include that path, and exactly one status against the main head the proof names by full sha: `still true at <sha>`, or `answered by <sha>` naming the commit that fixed it. WHEN a finding still true lies in crates/lys-home or docs/design/home, THE SYSTEM SHALL list it under findings for the step 5 board, one card each, worded from its line, with the act that answers it; for an `unsure` line that act is a person's read of that file, recorded as a card. WHEN a finding lies outside crates/lys-home and docs/design/home, THE SYSTEM SHALL list it under findings outside this card's scope with the board it belongs to, a lys-core finding on the Lys root board and a design cluster's finding on that cluster's board, and it SHALL hold no HOME-001 row. WHEN a finding is against the chain, THE SYSTEM SHALL list it for the chain's board, holding no row. THE SYSTEM SHALL NOT give an answered finding a card, SHALL NOT put two findings on one line, and SHALL NOT put a finding outside crates/lys-home and docs/design/home on the step 5 board.
+Structural: the loss account section states that an entry's `hash` is the SHA-256 of the part as serialised by `serde_json::to_vec` from the assistant message, written as 64 lowercase hexadecimal characters, with object keys in sorted order because serde_json's `preserve_order` feature is not enabled in the workspace, citing render.rs's `loss` function (lines 286-292 at 7b53625) and blocks.rs's `Hash::of` (lines 19-20 at 7b53625); that for an imported part this equals the hash the importer stored the part's block under, because the importer serialises a part the same way before it stores it, citing import.rs's lines 420-424 at 7b53625; and that a part from a canon or a hand-authored session may name no block in the store. It states that an entry carries only the hash and the reason, never the part's thinking text, signature or redacted data, and, as found at the named commit, that the part's serialisation uses `unwrap_or_default()`, so a serialisation failure hashes zero bytes (citing render.rs line 287 at 7b53625). The document SHALL NOT state that every entry's hash names a stored block, SHALL NOT carry any text, signature or hash taken from a real session, and SHALL NOT propose a change to how the hash is computed.
 
 **Acceptance:**
-- Every finding line carries exactly one of `still true at <sha>` and `answered by <sha>`, and `git cat-file -t <sha>` prints `commit` for every sha named.
-- Every Jev line reading `patched` or `unsure` is cited by exactly one finding line, and every failing leg line is cited by one finding line or more.
-- Every finding line under findings for the step 5 board reads still true and names a path under crates/lys-home or docs/design/home.
-- Every finding line under findings outside this card's scope names its board and holds no HOME-001 row.
-- No finding line reading answered appears under findings for the step 5 board.
+- At the named commit, the render.rs lines the document cites for the hash hold `serde_json::to_vec(part)` and `Hash::of(&bytes)` (lines 287 and 289 at 7b53625), the import.rs range it cites holds `serde_json::to_vec(part)` (range 420-424 at 7b53625), and the blocks.rs range it cites holds `Sha256::digest` (range 19-20 at 7b53625).
+- The document contains the string `preserve_order` and the string `64`.
+- `grep -cE '[0-9a-f]{64}' docs/design/home/LOSS-ACCOUNT.md` prints 0, and `grep -c 'thinkingSignature": *"' docs/design/home/LOSS-ACCOUNT.md` prints 0.
 
 **Files:**
-- modify: docs/design/home/PROOF-CHAIN.md
+- create: docs/design/home/LOSS-ACCOUNT.md
 
 **Checklist:**
-- C86 — Every finding is its own proof line marked still true at a named main head or answered by a named commit, and only still-true findings in crates/lys-home or docs/design/home are listed for the step 5 board.
+- C98 — LOSS-ACCOUNT.md states that an entry's hash is the SHA-256 of the part as serde_json serialises it and that an entry never carries the part's text, signature or redacted data.
 
 **Stories:**
-- S36 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want every finding recorded as its own line marked still true or answered by a named commit, so that only what is still wrong on main becomes a card.
+- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
 
-### R5: Record the three findings against the repository's own rules
+### R5: Record what the render changes without writing a loss entry
 
-THE SYSTEM SHALL record in docs/design/home/PROOF-CHAIN.md, whether or not Jev or a leg raises them, three findings against the repository's own rules, each as its own line under R4's form. (a) docs/design/home/LOSS-ACCOUNT.md, which HOME-001 R4 lists in files.create, does not exist at 0073b966 nor at the main head the proof names by `git cat-file -e`; the line cites docs/design/home/briefs/HOME-001.json line 148, docs/design/home/briefs/HOME-001.md line 137, docs/design/home/DESIGN.md line 84 and docs/design/home/design.json line 135 as they stand at 7b53625, holds R4, and names as the act that answers it a card that writes LOSS-ACCOUNT.md from render.rs as it stands on main. (b) crates/lys-home/src/record/mod.rs carries functions against the rule that a mod.rs carries only pub mod, pub use and module docs; the line records its line count and fn count at 0073b966 and at the main head, holds every row whose files include that path (R1 and R2), and names as the answering act a card that moves those functions into named modules under record/ so mod.rs carries only pub mod, pub use and docs. (c) crates/lys-home/src/harness/claude_code/mod.rs carries pub consts and a fn beside its pub mods under the same rule; the line records what the file carries at 0073b966 and at the main head, records the fn projects_slug as answered by ca7b462 where the head carries it as `pub use paths::projects_slug`, holds R3 and R4 while any pub const or fn remains in the file at the head, and names as the answering act a card that moves what remains into a named module. THE SYSTEM SHALL NOT write LOSS-ACCOUNT.md, SHALL NOT move any function or const, and SHALL NOT give R4 the verdict done on the strength of render.rs.
+Structural: the section `## What the render changes without a loss entry` states, each with the render.rs line that does it at the named commit: custom entries, the lys ones included, and labels are not rendered (lines 9-10 and 237 at 7b53625); a compaction becomes a `summary` record carrying the compaction's summary and the previous record's uuid as `leafUuid` (lines 234-236 at 7b53625); every record's `gitBranch` is written as the empty string (line 148 at 7b53625); and every assistant record's `usage` is written as zero input and zero output tokens (line 226 at 7b53625). It states that none of these writes a loss entry at the named commit, records them as found, and names whether any of them should write a loss entry as a question for its own card, which this document does not answer. The section SHALL NOT list any other change, SHALL NOT propose a change to the render, and SHALL NOT state that any of these is carried by the loss account.
 
 **Acceptance:**
-- The LOSS-ACCOUNT finding names docs/design/home/LOSS-ACCOUNT.md and the four citations HOME-001.json:148, HOME-001.md:137, DESIGN.md:84 and design.json:135, and holds R4.
-- The record/mod.rs finding records 552 lines and 36 fn items at 0073b966, the values `git show 0073b966:crates/lys-home/src/record/mod.rs | wc -l` and `git show 0073b966:crates/lys-home/src/record/mod.rs | grep -cE '\bfn [a-z_0-9]+'` print, records the values the same two commands print at the main head it names, and holds R1 and R2.
-- The claude_code/mod.rs finding records the four pub consts HARNESS, PROVIDER, API and AUTHORED and the fn projects_slug at 0073b966, and records projects_slug as answered by ca7b462.
-- Read at head 7b53625, crates/lys-home/src/harness/claude_code/mod.rs carries the four pub consts and `pub use paths::projects_slug`, so the claude_code/mod.rs finding measured against that head reads still true for the consts and holds R3 and R4.
-- `git diff --stat <landing base>..<landing head> -- docs/design/home/LOSS-ACCOUNT.md crates/lys-home` prints nothing.
+- At the named commit, the render.rs lines this section cites hold, in turn, `Custom entries` (range 9-10 at 7b53625), `_ => {}` (line 237 at 7b53625), `"type": "summary"` (range 234-236 at 7b53625), `"gitBranch": ""` (line 148 at 7b53625) and `"usage": {"input_tokens": 0, "output_tokens": 0}` (line 226 at 7b53625).
+- The section names exactly four items, as four list items: custom entries and labels, compaction, `gitBranch`, `usage`.
+- The section contains the sentence `None of these writes a loss entry.`
 
 **Files:**
-- modify: docs/design/home/PROOF-CHAIN.md
+- create: docs/design/home/LOSS-ACCOUNT.md
 
 **Checklist:**
-- C87 — The proof records the missing LOSS-ACCOUNT.md, record/mod.rs's functions and claude_code/mod.rs's consts and fn as findings with their citations and counts.
+- C99 — LOSS-ACCOUNT.md lists the four things the render changes without a loss entry, custom entries and labels, compaction, gitBranch and usage, each with the line that does it.
 
 **Stories:**
-- S36 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want every finding recorded as its own line marked still true or answered by a named commit, so that only what is still wrong on main becomes a card.
-
-### R6: Give each of the seven cards its verdict by row
-
-THE SYSTEM SHALL record in docs/design/home/PROOF-CHAIN.md one verdict for each of the seven step 5 cards of R1's map: `done` when every row the card carries is built and no finding still true at the main head touches any file of those rows, and `in review` otherwise, naming each finding id that holds it. WHILE the finding line citing a `patched` or `unsure` Jev line on a row's file reads `still true at <sha>`, that sha being the main head the proof names, THE SYSTEM SHALL hold the row on it. THE SYSTEM SHALL NOT hold a row on a `patched` or `unsure` Jev line whose finding line reads `answered by <sha>`, nor on a `solved` or `not_asked` line. Cards 0BgjD59r and qY9mBz-y SHALL be recorded as not set done by this card, their rows unbuilt. THE SYSTEM SHALL state that green means the landing passed src_pr and src_land and never that the crate is clean. THE SYSTEM SHALL NOT give `done` to a card any of whose rows is held or unbuilt, and SHALL NOT give a verdict to any card other than the seven.
-
-**Acceptance:**
-- The verdict table holds exactly seven lines, one per card id of R1's card map.
-- Each card carrying a row whose files include a path named by an R5 finding line recorded as `still true at <sha>`, that sha being the main head the proof names, reads `in review` and names that finding id.
-- 0BgjD59r and qY9mBz-y read not set done.
-- A card whose only `patched` or `unsure` Jev line is cited by a finding line reading `answered by <sha>` reads `done`, provided every row it carries is built and no finding line reading `still true at <sha>` at the main head the proof names touches a file of those rows.
-- No card reading `done` carries a row whose files include a path named by a finding line reading still true.
-- The proof holds the statement that green means the landing passed src_pr and src_land and does not mean the crate is clean.
-
-**Files:**
-- modify: docs/design/home/PROOF-CHAIN.md
-
-**Checklist:**
-- C88 — The proof gives each of the seven step 5 cards the verdict done or in review by row, and never done to 0BgjD59r or qY9mBz-y.
-
-**Stories:**
-- S37 (Lead, Owns the cards of a board and sets them done) — As the lead who owns the step 5 board, I want a card set done only when the chain has judged its rows' files and no open finding touches them, so that done means judged by the chain and never just merged.
-
-### R7: Land the proof through src_pr and src_land without changing the crate
-
-WHEN the build lands, THE SYSTEM SHALL land through src_pr and src_land, with src_land's Jev reading the landing diff and src_land's gate running on the landing head, and that gate's outcome SHALL be recorded as the landing's own gate with the landing head's sha, apart from the 0073b966 measurement. The landing diff SHALL hold docs/design/home/PROOF-CHAIN.md, this card's brief and design rows in docs/design/home and the markdown rendered from them, and the roadmap and decision rows written with this brief. THE SYSTEM SHALL NOT change any path under crates/lys-home, SHALL NOT change any HOME-001 row, and SHALL NOT land any other file.
-
-**Acceptance:**
-- `git diff --stat <landing base>..<landing head> -- crates/lys-home` prints nothing.
-- `git diff --name-only <landing base>..<landing head>` lists only paths under docs/design.
-- `git diff <landing base>..<landing head> -- docs/design/home/briefs/HOME-001.json` prints nothing.
-- `sh scripts/design/gate.sh` exits 0 at the landing head.
-- src_pr and src_land each record a pass for this card, and src_land's record names the landing head's sha and its gate outcome.
-
-**Files:**
-- create: docs/design/home/briefs/HOME-008.md
-- modify: docs/design/home/DESIGN.md
-- modify: docs/design/home/CHECKLIST.md
-- modify: docs/design/home/USER-STORIES.md
-
-**Checklist:**
-- C89 — The landing changes nothing under crates/lys-home and passes src_pr, src_land and sh scripts/design/gate.sh.
-
-**Stories:**
-- S37 (Lead, Owns the cards of a board and sets them done) — As the lead who owns the step 5 board, I want a card set done only when the chain has judged its rows' files and no open finding touches them, so that done means judged by the chain and never just merged.
-
-### R8: After a green landing, set the board from the proof
-
-WHEN the landing is green through src_pr and src_land, THE SYSTEM SHALL file one card on the step 5 board for each finding the proof lists under findings for the step 5 board, worded from its proof line; SHALL set each of the seven cards whose verdict reads `done` to done with a pointer to the landing commit; and SHALL keep each card whose verdict reads `in review` in review with a pointer to each finding card that holds it. THE SYSTEM SHALL NOT set 0BgjD59r or qY9mBz-y done, SHALL NOT file a finding outside crates/lys-home and docs/design/home on the step 5 board, and SHALL NOT change any card other than the seven beyond filing finding cards.
-
-**Acceptance:**
-- Every card whose verdict in the proof reads `done` reads done on the step 5 board and names the landing commit's sha.
-- Every card whose verdict reads `in review` reads in review on the step 5 board and names one finding card for each finding id the proof lists against it.
-- The step 5 board gains exactly one new card per finding line under findings for the step 5 board, and each new card names its finding id.
-- 0BgjD59r and qY9mBz-y hold the same state after the board acts as before them.
-
-**Checklist:**
-- C90 — After the green landing the step 5 board matches the proof: done cards point at the landing, in-review cards at their finding cards.
-
-**Stories:**
-- S37 (Lead, Owns the cards of a board and sets them done) — As the lead who owns the step 5 board, I want a card set done only when the chain has judged its rows' files and no open finding touches them, so that done means judged by the chain and never just merged.
+- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
 
 ## Boundaries
 
-- No byte under crates/lys-home changes: the landing diff under that path is empty.
-- No HOME-001 row (R1 to R12) is edited, reworded or renumbered.
-- docs/design/home/LOSS-ACCOUNT.md is not written by this card, and no function or const is moved out of record/mod.rs or claude_code/mod.rs.
-- No compile, test battery or gate of this card runs anywhere but the build host that runs every compile; the measurement is taken on a worktree at 0073b966, never on the landing head.
-- fmt is measured only in its check form; the rewriting form is never run on the worktree.
-- No ast-grep rule set is borrowed, and no src_land mode is added.
-- Jev reads only the 25 files of crates/lys-home at 0073b966; the rows' documents are not asked.
-- No card other than the seven step 5 cards is set done or changed, beyond filing the finding cards the proof lists; 0BgjD59r and qY9mBz-y are never set done.
-- A finding outside crates/lys-home and docs/design/home is recorded in the proof and never filed on the step 5 board.
-- The design's structure array is the whole file list; a path outside it is not created.
+- No file under crates/ changes: not render.rs, launch.rs, import.rs, cli.rs, their tests or the crate README.
+- No reason string, no field of the Loss struct, no key of the account, no byte of the account and no part of its path is changed or proposed changed.
+- No change to what the render drops or why, and no loss account of any harness other than Claude Code, including the import-time lys.loss entry.
+- The build writes docs/design/home/LOSS-ACCOUNT.md and no other file: no existing brief, no row of HOME-001, no JSON document of the cluster, no rendered markdown, RECORD.md and none of the scripts under scripts/design is edited.
+- No transcript text, signature or hash taken from a real session appears in the document.
+- The document cites no line at a commit other than the one it names.
 
 ## Verification
 
-- `git diff --stat <landing base>..<landing head> -- crates/lys-home` prints nothing.
-- `grep -c 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff docs/design/home/PROOF-CHAIN.md` prints 1 or more.
-- The proof's Jev section has 25 lines whose paths equal the output of `git ls-tree -r --name-only 0073b966 crates/lys-home`.
-- The proof's legs section has seven lines naming the seven commands .land/gates.sh runs at 0073b966, and one ast-grep line naming ngzIkkpd.
-- Rerun `sh .land/gates.sh` from the root of `git worktree add <dir> 0073b966` with toolchain 1.97.1: each leg's exit status equals the one the proof records.
-- The proof holds the three repository-rule findings, and the verdict table gives `in review`, naming the finding id, to each card carrying a row whose files include a path named by a finding recorded as still true at the main head the proof names.
-- `sh scripts/design/gate.sh` exits 0 at the landing head.
-- The step 5 board, read after the board acts, matches the proof's verdict table card for card.
+- `git cat-file -e HEAD:docs/design/home/LOSS-ACCOUNT.md` exits 0 on the landing commit.
+- `git diff --name-only $(git merge-base origin/main HEAD) HEAD -- crates` prints nothing.
+- `python3 -c "import re,pathlib;fs=[p for p in sorted(pathlib.Path('crates/lys-home/src').rglob('*.rs')) if re.search(r'\bloss\(&',p.read_text())];src={s for p in fs for l in p.read_text().splitlines() if re.search(r'\bloss\(&',l) for s in re.findall(r'\"([^\"]+)\"',l)};doc=re.findall(r'(?m)^- reason: \"([^\"]+)\"',open('docs/design/home/LOSS-ACCOUNT.md').read());print(len(fs),len(src),len(doc),sorted(src^set(doc)))"` prints `1 3 3 []`.
+- `python3 -c "import re,subprocess;d=open('docs/design/home/LOSS-ACCOUNT.md').read();c=re.search(r'(?m)^Written from commit ([0-9a-f]{40})\.$',d).group(1);cs=re.findall(r'((?:crates|docs)/[A-Za-z0-9_./-]+\.[a-z]+):([0-9]+)(?:-([0-9]+))?',d);n=lambda p:len(subprocess.run(['git','show',c+':'+p],capture_output=True,text=True,check=True).stdout.splitlines());print(c,sorted({x[0] for x in cs}),[x for x in cs if not 1<=int(x[1])<=int(x[2] or x[1])<=n(x[0])])"` prints the commit on the document's `Written from commit` line, a list of cited paths containing `crates/lys-home/src/cli.rs`, `crates/lys-home/src/harness/claude_code/launch.rs` and `crates/lys-home/src/harness/claude_code/render.rs`, and `[]`.
+- `sh scripts/design/gate.sh` exits 0.
+- cargo fmt --all leaves the tree unchanged; cargo clippy --all-targets --all-features -- -D warnings, cargo clippy --all-targets -- -D warnings, cargo test --workspace --all-features, cargo doc --no-deps --all-features and cargo doc --no-deps each exit 0.
 

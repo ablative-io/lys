@@ -2,171 +2,146 @@
 type: brief
 id: HOME-013
 cluster: home
-title: Move the home record's logic out of record/mod.rs into home.rs, session.rs and helpers.rs
+title: Write the loss account of the Claude Code render down as the code writes it
 ---
 
-# HOME-013: Move the home record's logic out of record/mod.rs into home.rs, session.rs and helpers.rs
+# HOME-013: Write the loss account of the Claude Code render down as the code writes it
 
 > **Cluster:** home
 > **Design anchor:**
 > - ADR-012 — A harness launch template is kept in the home by hash, and each render is recorded on the session beside its context path — A launch template per harness is a JSON object with named slots (transcript, mcp, env, secrets, instructions) plus flags, stored in the home under templates/ by its SHA-256; lys-home renders a template and a session into files and runtime variables with command mappings in text, prints the launch line and never runs it, and records each render as a sixth lys.harness_event kind, template_render, hung as a side leaf beside the context path with the written paths in a manifest block named by hash. Rejected: a transcript converter or adapter protocol per harness, a template kept outside the home (a seat document of another tool), and a render event that advances the head, which would change the session head hash between two renders of the same session.
-> - ADR-014 — A lantern is a custom entry in its session, and its note grows only by epilogue entries — A lantern is a `lys.lantern` custom entry appended at its session's head, carrying in custom.data the entry id of its point (an existing entry of the same session that is not itself a lantern or an epilogue, the head or any entry the head has moved past), the note as written, who lit it and when. Its note grows only by `lys.lantern_epilogue` custom entries naming the lantern's entry id and carrying the further words, who added them and when; a lantern's story is its entry followed by its epilogues in order, and nothing is rewritten. Rejected: Pi's `label` entry on the target (it replaces or clears a label rather than growing one, and carries no author or time), a lantern store beside the session outside Pi's grammar (a lantern would stop travelling with its session), and editing the lantern's note in place (the record is append-only, P1).
-> - ADR-017 — A fork is a child session cut from the parent's own lines at a lantern's point, with its ancestry on both sides — A fork resolves a lantern to the session it was lit in, read from the lys.lantern data's lit_in when the record carries it and otherwise by the older-record rule (one holder cuts, several refuse lantern_ambiguous until a session is named), and cuts that session's root-to-point chain at the last assistant message at or before the point, through the index. The child is a new session under the parent's cwd whose header's parentSession is the parent file's path relative to the home, holding each cut entry as the parent file's own line bytes, then one lys.forked_from custom entry as its head naming the parent session, the lantern, the point, the cut entry, whether the coordinate was carried and the carried entry; the parent gains one lys.fork custom entry at its head naming the child. Nothing else is copied and no block is written. Rejected: re-serialising the copied entries (the copy would stop hash-matching the parent's lines), a fork store beside the sessions outside Pi's grammar, cutting at a point no lantern names, and a header field beyond Pi's parentSession.
 > - ADR-018 — A user-message point is carried as a seed prompt beside the rendered file, never copied into the child — When the point is a user message the cut stops at the assistant message before it and the message is carried, not copied: lys.forked_from records its id with coordinate_carried true and counts, by kind, the parts of it that are not text. The Claude Code render of such a child writes the message's text parts, in order, as a seed prompt beside the rendered file under an in-band marker line naming the parent session, the point and the lantern, and names it in the render report; the template's launch line, printed by render-launch only, passes that file as the resumed session's first prompt. A part that is not text never refuses a fork or a render and never enters the seed. Rejected: copying the user message into the child's chain, refusing a fork for a non-text part, and putting the seed's text in the report or the loss account.
 > **Checklist:**
-> - C45 — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs.
-> - C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs.
-> - C47 — Home and its impl are defined in crates/lys-home/src/record/home.rs.
-> - C48 — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line.
-> - C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it.
-> - C50 — Every public path lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolves as before the move, and no crate outside lys-home changes.
-> - C51 — Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass.
+> - C95 — docs/design/home/LOSS-ACCOUNT.md exists, names on its first line the commit it was read from, and states that the loss account is written beside the rendered file under the rendered file's stem with .loss.json, naming the default render path and render-launch as the two cases where that stem is the session uuid.
+> - C96 — LOSS-ACCOUNT.md states the account's four keys, one entry's two fields hash and reason, and that every render writes the account, with dropped: [] when nothing was dropped.
+> - C97 — LOSS-ACCOUNT.md quotes every reason string the render passes to the loss constructor, with the line that writes it, and the reason check prints 1 3 3 [] at the landing commit.
+> - C98 — LOSS-ACCOUNT.md states that an entry's hash is the SHA-256 of the part as serde_json serialises it and that an entry never carries the part's text, signature or redacted data.
+> - C99 — LOSS-ACCOUNT.md lists the four things the render changes without a loss entry, custom entries and labels, compaction, gitBranch and usage, each with the line that does it.
 > **Stories:**
-> - S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
-> - S25 (Developer, Works on lys-home's code beside the record module) — As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved.
+> - S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
 
 ## Purpose
 
-The repository's structure rule says a mod.rs carries only pub mod, pub use and module docs, with logic in named files and tests in sibling *_tests.rs files. crates/lys-home/src/record/mod.rs carries the record's logic: Home, Session, their impls, the shared helpers and two constants, 630 lines at 7b53625. The judged-rows card of the home line, whose brief is on brief/home/e35a7157-b4f6-447c-9988-4006d58ba102 at 8620ba6, records this as a finding on HOME-001 R1 and names this card as the act that answers it; that finding is not on main. This brief moves the code into named files and changes no behaviour and no public path, so the record module meets the rule and no caller notices.
+HOME-001 R4 names docs/design/home/LOSS-ACCOUNT.md among the files it creates, and the cluster design's structure names the same path, but the document was never written. This brief writes it from the Claude Code render as it stands on main: where the account is written, the shape of the account and of one entry, every reason the render writes quoted with its source line, when an entry is written, that an entry names a part by hash and never carries its content, that every render writes the account, and what the render changes without writing an entry. A reader can then check a render's account against the source without reading the render, and a reason check keyed on the source proves the document and the source agree in both directions.
 
 ## Task
 
-Start from main as it stands when the build runs and move whatever crates/lys-home/src/record/mod.rs then holds; other home cards change files under record, so the item list below is mod.rs at 7b53625 and the build moves any item added since by the same rule. BASE names the main commit the build branch starts from (git merge-base HEAD origin/main). Order: helpers.rs first (R1), then session.rs (R2), which calls the helpers, then home.rs (R3), which calls Session, then fork.rs's import (R4), then mod.rs reduced to docs, mod lines and re-exports (R5), then the proof that nothing else changed (R6). Home goes to home.rs, Session and the helpers only Session calls (take_lock, load_checked, to_line) to session.rs, and the helpers and constants the record's files share (safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable, custom_type_of) to helpers.rs. The three new modules are private and their public items are re-exported from mod.rs, so lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolve as before and no public path is added. Private fields and methods of Session and Home become pub(super), which reaches the record module and its descendants, exactly the reach private had in mod.rs; the impl Session blocks in beside.rs and fork.rs depend on it. Code moves byte for byte: a body's text does not change, and each new file imports what its bodies name. The 500-line measure is the repository's own: lines of code, without blank and comment lines, counted over non-test source; *_tests.rs files and files under crates/lys-home/tests are outside it, so record/call_tests.rs (519 lines of code at 7b53625) is not measured and is not split here. A test file changes only where the move requires a use path, and none is expected to. Out of scope: renaming or removing any public item, changing what any function does, splitting any test file, any other module's mod.rs (harness/claude_code/mod.rs included), and any crate outside lys-home.
+Write docs/design/home/LOSS-ACCOUNT.md by hand from render.rs, launch.rs, import.rs, cli.rs, mod.rs and blocks.rs under crates/lys-home/src as they stand on main when the document is written, and name that commit on the document's first line. At the time of this brief main is 7b53625 and every line number below is read there; if the render card that moves the render's refusals and its assistant shaping has landed first, the document is written from main as it then stands, names that commit, and cites the lines that hold the same code there; the reason check reads whichever files call the loss constructor, so it finds the reasons wherever they are written. The document is the one file this brief creates, and all five requirements are sections of it, so R1 to R5 share it as their primary file. The code decides what the document says: the account is named by the rendered file's stem, which is the session uuid only for the default output path and for render-launch; the array named `dropped` also holds signed thinking rendered as text; and the account is written on every render. In scope: the document only. Out of scope: any change to what the render drops or why, any code, the loss account of any harness other than Claude Code, the import-time `lys.loss` entry of the compaction card, pinning the reasons in a test, and changing the silent empty write or plain render's overwrite of an existing account. Transcript content never appears in the document (CN3): it names keys, reasons, line citations and counts.
 
 ## Requirements
 
-### R1: Move the shared helpers and constants into record/helpers.rs
+### R1: Name the commit the document is read from and where the loss account is written
 
-Create crates/lys-home/src/record/helpers.rs holding, moved from crates/lys-home/src/record/mod.rs as it stands at BASE, the constants MAX_NAME_BYTES and PI_FORMAT_VERSION, and the functions safe_component, now, fresh_id, json_len, write_durable and custom_type_of, each with its doc comment, attributes and body unchanged, and every other free function or constant mod.rs holds at BASE that is not Home's or Session's and is not used only by Session. MAX_NAME_BYTES, PI_FORMAT_VERSION, safe_component, now, fresh_id and json_len stay pub; write_durable and custom_type_of are declared pub(super), so they reach the record module and its descendants and nothing wider. The file opens with a //! module doc naming what it holds and imports what the moved bodies name (fresh_id's blocks::hex_of through a use of the record's blocks module), so no body's text changes. The file SHALL NOT hold Home, Session, take_lock, load_checked or to_line, SHALL NOT declare any item pub(crate) or pub(in ...), SHALL NOT rename any item, and SHALL NOT change what any function returns, writes or refuses.
+Structural: `docs/design/home/LOSS-ACCOUNT.md` is created, a hand-written markdown document titled `# The loss account of the Claude Code render`. Its first line after the title is `Written from commit <id>.`, where <id> is the full 40-character id of main's head at the time the document is written: `7b536253165f920cd8bc5f1d1dfdd987339e3e12` while main stands there, and main's head as it then stands if the render card that moves the render's refusals has landed first. Every source line the document cites is written as a repository-relative path, a colon and a line number or a first-last range (`crates/lys-home/src/harness/claude_code/render.rs:263`, `crates/lys-home/src/harness/claude_code/render.rs:85-93`), read at that commit. The document has the section `## The loss account` first and the section `## What the render changes without a loss entry` second. The loss account section states that the account is written beside the rendered file and named by the rendered file's stem with `.loss.json`, because the render computes its path with `path.with_extension("loss.json")`, citing that line of render.rs; that the stem is the session uuid in two cases, the default output path of `lys-home render` (citing render.rs's `default_path`, lines 85-93 at 7b53625) and `render-launch` (citing launch.rs's `{uuid}.jsonl` and `{uuid}.loss.json` lines, 80-81 at 7b53625); and that `lys-home render --out other.jsonl` writes the account as `other.loss.json` (citing the `out` argument in cli.rs, lines 105-107 at 7b53625). It states that plain render writes the account with `std::fs::write`, which replaces a file already at that path (citing render.rs's lines 265-269 at 7b53625), that `render-launch` refuses an existing loss path by name before it writes any file (citing launch.rs's lines 96-101 at 7b53625), and that `render-launch` hashes the account as the second file of its render manifest (citing launch.rs's lines 123-133 at 7b53625). The document SHALL NOT state that the account is named by the session uuid for every render, SHALL NOT propose a change to the account's path or name, and SHALL NOT cite a line at any commit other than the one it names.
 
 **Acceptance:**
-- `grep -nE '^(pub(\(super\))? )?(const|fn) (MAX_NAME_BYTES|PI_FORMAT_VERSION|safe_component|now|fresh_id|json_len|write_durable|custom_type_of)\b' crates/lys-home/src/record/helpers.rs` prints exactly 8 lines, one per name.
-- `grep -nE '^pub\(super\) fn (write_durable|custom_type_of)\(' crates/lys-home/src/record/helpers.rs` prints exactly 2 lines.
-- `grep -nE 'pub\(crate\)|pub\(in |struct (Home|Session)|fn (take_lock|load_checked|to_line)\b' crates/lys-home/src/record/helpers.rs` prints nothing.
-- The first line of crates/lys-home/src/record/helpers.rs begins with `//!`.
+- `git cat-file -e HEAD:docs/design/home/LOSS-ACCOUNT.md` exits 0 on the landing commit.
+- The document holds exactly one line matching `^Written from commit [0-9a-f]{40}\.$`, and the id on it equals the output of `git merge-base origin/main HEAD` on the card's branch (`7b536253165f920cd8bc5f1d1dfdd987339e3e12` while main stands at 7b53625).
+- `python3 -c "import re;ls=[l for l in open('docs/design/home/LOSS-ACCOUNT.md').read().splitlines() if l.strip()];i=ls.index('# The loss account of the Claude Code render');print(bool(re.fullmatch(r'Written from commit [0-9a-f]{40}\.',ls[i+1])))"` run from the repository root prints `True`: the first non-blank line after `# The loss account of the Claude Code render` is the `Written from commit <id>.` line.
+- `python3 -c "import re,subprocess;d=open('docs/design/home/LOSS-ACCOUNT.md').read();c=re.search(r'(?m)^Written from commit ([0-9a-f]{40})\.$',d).group(1);cs=re.findall(r'((?:crates|docs)/[A-Za-z0-9_./-]+\.[a-z]+):([0-9]+)(?:-([0-9]+))?',d);n=lambda p:len(subprocess.run(['git','show',c+':'+p],capture_output=True,text=True,check=True).stdout.splitlines());print(c,sorted({x[0] for x in cs}),[x for x in cs if not 1<=int(x[1])<=int(x[2] or x[1])<=n(x[0])])"` run from the repository root prints the named commit, a sorted list of cited paths that contains each of the three files this requirement cites, `crates/lys-home/src/cli.rs`, `crates/lys-home/src/harness/claude_code/launch.rs` and `crates/lys-home/src/harness/claude_code/render.rs`, and `[]`.
+- At the named commit, the render.rs line the location paragraph cites holds `with_extension("loss.json")` (line 263 at 7b53625), and the launch.rs range it cites holds `{uuid}.loss.json` (range 80-81 at 7b53625).
+- The document contains the string `--out other.jsonl` and the string `other.loss.json`.
+- At the named commit, the launch.rs range the document cites for the refusal holds `LaunchTargetExists` (range 96-101 at 7b53625), and the render.rs range it cites for the plain write holds `std::fs::write(` (range 265-269 at 7b53625).
+- `grep -c '^## ' docs/design/home/LOSS-ACCOUNT.md` prints 2, and the two headings are `## The loss account` then `## What the render changes without a loss entry`.
 
 **Files:**
-- create: crates/lys-home/src/record/helpers.rs
+- create: docs/design/home/LOSS-ACCOUNT.md
 
 **Checklist:**
-- C45 — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs.
+- C95 — docs/design/home/LOSS-ACCOUNT.md exists, names on its first line the commit it was read from, and states that the loss account is written beside the rendered file under the rendered file's stem with .loss.json, naming the default render path and render-launch as the two cases where that stem is the session uuid.
 
 **Stories:**
-- S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
+- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
 
-### R2: Move Session and its own helpers into record/session.rs
+### R2: State the account's shape and that every render writes it
 
-Create crates/lys-home/src/record/session.rs holding, moved from mod.rs at BASE, the Session struct with its derive and field docs, its impl block whole, and the functions take_lock, load_checked and to_line, which only Session's impl calls; bodies, doc comments and attributes unchanged. Every field and every method of Session that is private at BASE is declared pub(super), so the impl Session blocks in record/beside.rs and record/fork.rs, and every other descendant of the record module, keep exactly the reach they have today; take_lock, load_checked and to_line stay private to the file. The file opens with a //! module doc naming what it holds and imports the helpers it calls from crate::record::helpers. It SHALL NOT make any field or method pub or pub(crate), SHALL NOT add, remove or rename a field or method, SHALL NOT change the lock, the durability order of line, index row and head, the reconcile path or any error variant, and SHALL NOT use an #[allow] to quiet a lint the move raises.
+Structural: the loss account section states that the account is one JSON object with exactly four keys, `session_id` (the session id the rendered file carries), `model` (the model the file is rendered for), `authored` (true when an entry on the rendered path is the `lys.authored` custom entry) and `dropped` (an array of entries), citing the render.rs line that builds the object (264 at 7b53625) and the line that sets `authored` (128 at 7b53625); that one entry is the `Loss` struct's two string fields, `hash` and `reason`, citing render.rs's lines 48-55 at 7b53625; and that the account is written on every render, including a render that drops nothing, whose account carries `dropped: []`, citing the render.rs lines that write it with no condition (263-269 at 7b53625) and the two measured runs that show it, docs/design/home/PROOF-RESUME.md:38 and docs/design/home/PROOF-LAUNCH.md:28. It states, as found at the named commit and not as intended behaviour, that the account is serialised with `unwrap_or_default()`, so a serialisation failure writes an empty file and returns no error, citing that render.rs line (267 at 7b53625). The document SHALL NOT name a key or field the code does not write, SHALL NOT propose a change to the account's keys, fields or bytes, and SHALL NOT present the empty-file behaviour as a guarantee.
 
 **Acceptance:**
-- `grep -nE '^pub struct Session\b|^impl Session\b' crates/lys-home/src/record/session.rs` prints exactly 2 lines.
-- `grep -nE '^fn (take_lock|load_checked|to_line)\b' crates/lys-home/src/record/session.rs` prints exactly 3 lines.
-- `grep -cE '^[[:space:]]+pub\(super\) ' crates/lys-home/src/record/session.rs` prints the number of Session's fields and methods that carry no pub at BASE (11 at 7b53625: the 8 fields file, header, index, head, rebuilt, lock, stale and reconciliations, and the methods reconcile, fresh and append_line).
-- `grep -nE 'pub\(crate\)|pub\(in |#\[allow|#!\[allow' crates/lys-home/src/record/session.rs` prints nothing.
-- `git diff "$BASE" -- crates/lys-home/src/record/beside.rs` prints nothing.
+- The loss account section contains each of the strings `session_id`, `model`, `authored`, `dropped`, `hash` and `reason` in backticks.
+- At the named commit, the render.rs line the document cites for the object holds `"dropped": losses` (line 264 at 7b53625), and the range it cites for the entry holds `pub struct Loss` (range 48-55 at 7b53625).
+- The document contains the string `dropped: []` and cites `docs/design/home/PROOF-RESUME.md:38` and `docs/design/home/PROOF-LAUNCH.md:28`, and at 7b53625 each of those lines contains `dropped: []`.
+- At the named commit, the render.rs line the document cites for the empty write holds `to_vec_pretty(&account).unwrap_or_default()` (line 267 at 7b53625).
 
 **Files:**
-- create: crates/lys-home/src/record/session.rs
+- create: docs/design/home/LOSS-ACCOUNT.md
 
 **Checklist:**
-- C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs.
+- C96 — LOSS-ACCOUNT.md states the account's four keys, one entry's two fields hash and reason, and that every render writes the account, with dropped: [] when nothing was dropped.
 
 **Stories:**
-- S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
+- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
 
-### R3: Move Home into record/home.rs
+### R3: Quote every reason the render writes, with its line, and state when each is written
 
-Create crates/lys-home/src/record/home.rs holding, moved from mod.rs at BASE, the Home struct with its derive and doc and its impl block whole, bodies, doc comments and attributes unchanged. Every field and method of Home that is private at BASE is declared pub(super). The file opens with a //! module doc naming what it holds and imports Session, the helpers and the stores it names. It SHALL NOT hold Session or any helper, SHALL NOT add, remove or rename a field or method, and SHALL NOT change where a session, block or template file is placed or how a session id is checked.
+WHEN the document states the reasons, THE DOCUMENT SHALL write each reason string the source passes to the loss constructor on its own line of the form `- reason: "<reason>" (<path>:<line>)`, the reason copied character for character, one line per reason, where the source is every file under `crates/lys-home/src` holding a line that calls `loss(&`; at 7b53625 that is render.rs alone, with one reason on line 198 and two on line 201. It SHALL state when an entry is written as the thinking branch decides it at the named commit, citing render.rs's lines 170-174 (the provider, api and model comparison) and 184-202 (the thinking branch) at 7b53625 and mod.rs's `PROVIDER` and `API` lines (52 and 54 at 7b53625): a thinking part is kept whole with no entry when provider, api and model all equal the target's and the part is redacted or carries a signature; otherwise, when its text is not empty after trimming whitespace and it is not redacted, it is rendered as a text part, and an entry with the signed-as-text reason is written only when it carries a signature, so a thinking part with no signature rendered as text writes no entry, for the same model as for another (citing the `if sig.is_some()` line, 197 at 7b53625); otherwise it is dropped with an entry carrying the redacted reason when it is redacted and the empty reason when it is not, so an empty thinking part with no signature is dropped even for the same model, and a signed empty thinking part for another model carries the empty reason. It SHALL state that the array named `dropped` therefore holds entries for signed thinking rendered as text as well as for dropped parts, that the report's `dropped` count is the number of entries in it (citing render.rs line 279 at 7b53625) while `thinking_as_text` counts every thinking part rendered as text (line 196 at 7b53625), and that no part other than thinking writes an entry (citing lines 183 and 204-210 at 7b53625). The document SHALL NOT write on a `- reason:` line any string the source does not pass to the loss constructor, SHALL NOT paraphrase a reason, and SHALL NOT state that every entry names a dropped part.
 
 **Acceptance:**
-- `grep -nE '^pub struct Home\b|^impl Home\b' crates/lys-home/src/record/home.rs` prints exactly 2 lines.
-- `grep -nE 'struct Session|impl Session|pub\(crate\)|pub\(in |#\[allow|#!\[allow' crates/lys-home/src/record/home.rs` prints nothing.
+- `python3 -c "import re,pathlib;fs=[p for p in sorted(pathlib.Path('crates/lys-home/src').rglob('*.rs')) if re.search(r'\bloss\(&',p.read_text())];src={s for p in fs for l in p.read_text().splitlines() if re.search(r'\bloss\(&',l) for s in re.findall(r'\"([^\"]+)\"',l)};doc=re.findall(r'(?m)^- reason: \"([^\"]+)\"',open('docs/design/home/LOSS-ACCOUNT.md').read());print(len(fs),len(src),len(doc),sorted(src^set(doc)))"` run from the repository root at the landing commit prints `1 3 3 []`: one source file found, three reasons in the source, three reason lines in the document, and no reason on one side only.
+- At 7b53625 the document's three reason lines are exactly `- reason: "signed thinking rendered as text: different provider, api or model" (crates/lys-home/src/harness/claude_code/render.rs:198)`, `- reason: "redacted thinking dropped: different provider, api or model" (crates/lys-home/src/harness/claude_code/render.rs:201)` and `- reason: "empty thinking dropped" (crates/lys-home/src/harness/claude_code/render.rs:201)`; at a later named commit, the same three strings with the path and line that write each there.
+- With the line carrying `"empty thinking dropped"` removed from a working copy of the document, the reason check prints `1 3 2 ['empty thinking dropped']`; with a line `- reason: "invented" (crates/lys-home/src/harness/claude_code/render.rs:1)` added instead, it prints `1 3 4 ['invented']`; the document is restored after each.
+- At the named commit, the render.rs range the document cites for the thinking branch holds `Some("thinking") =>` on its first line (range 184-202 at 7b53625), and the line it cites for the signature condition holds `if sig.is_some()` (line 197 at 7b53625).
+- At the named commit, the render.rs line the document cites for the report's count holds `dropped: losses.len()` (line 279 at 7b53625).
 
 **Files:**
-- create: crates/lys-home/src/record/home.rs
+- create: docs/design/home/LOSS-ACCOUNT.md
 
 **Checklist:**
-- C47 — Home and its impl are defined in crates/lys-home/src/record/home.rs.
+- C97 — LOSS-ACCOUNT.md quotes every reason string the render passes to the loss constructor, with the line that writes it, and the reason check prints 1 3 3 [] at the landing commit.
 
 **Stories:**
-- S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
+- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
 
-### R4: Point fork.rs's import of the private helpers at record::helpers
+### R4: State that an entry names its part by hash and never carries the part's content
 
-In crates/lys-home/src/record/fork.rs, import write_durable and custom_type_of from crate::record::helpers, and keep Home, Session and fresh_id imported from crate::record. No other line of fork.rs changes, and its impl Session block is unchanged. The change SHALL NOT re-export write_durable or custom_type_of from mod.rs and SHALL NOT widen either beyond pub(super).
+Structural: the loss account section states that an entry's `hash` is the SHA-256 of the part as serialised by `serde_json::to_vec` from the assistant message, written as 64 lowercase hexadecimal characters, with object keys in sorted order because serde_json's `preserve_order` feature is not enabled in the workspace, citing render.rs's `loss` function (lines 286-292 at 7b53625) and blocks.rs's `Hash::of` (lines 19-20 at 7b53625); that for an imported part this equals the hash the importer stored the part's block under, because the importer serialises a part the same way before it stores it, citing import.rs's lines 420-424 at 7b53625; and that a part from a canon or a hand-authored session may name no block in the store. It states that an entry carries only the hash and the reason, never the part's thinking text, signature or redacted data, and, as found at the named commit, that the part's serialisation uses `unwrap_or_default()`, so a serialisation failure hashes zero bytes (citing render.rs line 287 at 7b53625). The document SHALL NOT state that every entry's hash names a stored block, SHALL NOT carry any text, signature or hash taken from a real session, and SHALL NOT propose a change to how the hash is computed.
 
 **Acceptance:**
-- `git diff -U0 "$BASE" -- crates/lys-home/src/record/fork.rs | grep -E '^[+-]' | grep -vE '^(\+\+\+|---) '` prints exactly the three lines `-use crate::record::{Home, Session, custom_type_of, fresh_id, write_durable};`, `+use crate::record::helpers::{custom_type_of, write_durable};` and `+use crate::record::{Home, Session, fresh_id};`, in any order.
+- At the named commit, the render.rs lines the document cites for the hash hold `serde_json::to_vec(part)` and `Hash::of(&bytes)` (lines 287 and 289 at 7b53625), the import.rs range it cites holds `serde_json::to_vec(part)` (range 420-424 at 7b53625), and the blocks.rs range it cites holds `Sha256::digest` (range 19-20 at 7b53625).
+- The document contains the string `preserve_order` and the string `64`.
+- `grep -cE '[0-9a-f]{64}' docs/design/home/LOSS-ACCOUNT.md` prints 0, and `grep -c 'thinkingSignature": *"' docs/design/home/LOSS-ACCOUNT.md` prints 0.
 
 **Files:**
-- modify: crates/lys-home/src/record/fork.rs
+- create: docs/design/home/LOSS-ACCOUNT.md
 
 **Checklist:**
-- C48 — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line.
+- C98 — LOSS-ACCOUNT.md states that an entry's hash is the SHA-256 of the part as serde_json serialises it and that an entry never carries the part's text, signature or redacted data.
 
 **Stories:**
-- S25 (Developer, Works on lys-home's code beside the record module) — As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved.
+- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
 
-### R5: Reduce record/mod.rs to module docs, mod lines and pub use lines
+### R5: Record what the render changes without writing a loss entry
 
-crates/lys-home/src/record/mod.rs keeps its //! module docs, every pub mod and mod line it holds at BASE with its cfg(test) attribute, and declares the three new modules as private `mod helpers;`, `mod home;` and `mod session;`. It re-exports with pub use exactly the public items it defined at BASE: Home from home, Session from session, and MAX_NAME_BYTES, PI_FORMAT_VERSION, safe_component, now, fresh_id and json_len from helpers, plus any other public item it defines at BASE from the file it moved to. Its five private use lines at BASE go, and its module doc's link to HomeError::SessionHeld keeps its text and names its target as crate::error::HomeError::SessionHeld, so it resolves without an import. mod.rs SHALL NOT hold any fn, struct, enum, union, impl, const, static, type or trait item, any private use line or any restricted re-export, SHALL NOT re-export any item that is not public at BASE, and SHALL NOT make helpers, home or session a pub mod, so no new public path is added. crates/lys-home/src/lib.rs does not change.
+Structural: the section `## What the render changes without a loss entry` states, each with the render.rs line that does it at the named commit: custom entries, the lys ones included, and labels are not rendered (lines 9-10 and 237 at 7b53625); a compaction becomes a `summary` record carrying the compaction's summary and the previous record's uuid as `leafUuid` (lines 234-236 at 7b53625); every record's `gitBranch` is written as the empty string (line 148 at 7b53625); and every assistant record's `usage` is written as zero input and zero output tokens (line 226 at 7b53625). It states that none of these writes a loss entry at the named commit, records them as found, and names whether any of them should write a loss entry as a question for its own card, which this document does not answer. The section SHALL NOT list any other change, SHALL NOT propose a change to the render, and SHALL NOT state that any of these is carried by the loss account.
 
 **Acceptance:**
-- `grep -nE '^[[:space:]]*(pub(\([^)]*\))?[[:space:]]+)?((const|async|unsafe|extern)[[:space:]]+)*(fn|struct|enum|union|impl|const|static|type|trait)\b|macro_rules!' crates/lys-home/src/record/mod.rs` prints nothing.
-- `grep -nE '^[[:space:]]*use |pub\((crate|super|in )[^)]*\) use ' crates/lys-home/src/record/mod.rs` prints nothing.
-- `grep -nxE 'mod (helpers|home|session);' crates/lys-home/src/record/mod.rs` prints exactly 3 lines.
-- After `cargo doc --no-deps -p lys-home`, the 8 files target/doc/lys_home/record/struct.Home.html, struct.Session.html, fn.safe_component.html, fn.now.html, fn.fresh_id.html, fn.json_len.html, constant.MAX_NAME_BYTES.html and constant.PI_FORMAT_VERSION.html all exist, and none of the directories target/doc/lys_home/record/helpers, target/doc/lys_home/record/home and target/doc/lys_home/record/session exists.
-- `git diff "$BASE" -- crates/lys-home/src/lib.rs` prints nothing.
-- `cargo doc --no-deps` and `cargo doc --no-deps --all-features` each exit 0 with no warning line naming crates/lys-home/src/record.
+- At the named commit, the render.rs lines this section cites hold, in turn, `Custom entries` (range 9-10 at 7b53625), `_ => {}` (line 237 at 7b53625), `"type": "summary"` (range 234-236 at 7b53625), `"gitBranch": ""` (line 148 at 7b53625) and `"usage": {"input_tokens": 0, "output_tokens": 0}` (line 226 at 7b53625).
+- The section names exactly four items, as four list items: custom entries and labels, compaction, `gitBranch`, `usage`.
+- The section contains the sentence `None of these writes a loss entry.`
 
 **Files:**
-- modify: crates/lys-home/src/record/mod.rs
+- create: docs/design/home/LOSS-ACCOUNT.md
 
 **Checklist:**
-- C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it.
-- C50 — Every public path lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolves as before the move, and no crate outside lys-home changes.
+- C99 — LOSS-ACCOUNT.md lists the four things the render changes without a loss entry, custom entries and labels, compaction, gitBranch and usage, each with the line that does it.
 
 **Stories:**
-- S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
-- S25 (Developer, Works on lys-home's code beside the record module) — As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved.
-
-### R6: Prove the move changed no code, no test and no other crate
-
-WHEN the moved items in helpers.rs, session.rs and home.rs are compared with mod.rs at BASE, ignoring blank lines, //! lines, use lines, mod lines, cfg(test) attributes and the text `pub(super) `, THE SYSTEM SHALL show the same lines. WHEN the workspace's tests run with all features, THE SYSTEM SHALL report the same passed, failed and ignored counts as at BASE, with none failed. THE SYSTEM SHALL NOT change any file outside crates/lys-home except the design documents that carry this brief and its roadmap row, SHALL NOT change any line of a test file other than a use line, SHALL NOT change any other module's mod.rs, and SHALL NOT leave any non-test source file in crates/lys-home over 500 lines of code, counted without blank lines and comment lines, with *_tests.rs files and files under crates/lys-home/tests left out of the count.
-
-**Acceptance:**
-- `bash -c 'strip() { sed -E "/^(pub )?use .*\{$/,/\};$/d" | grep -vE "^[[:space:]]*($|//!|(pub )?use |(pub(\(crate\))? )?mod |#\[cfg\(test\)\])" | sed -E "s/pub\(super\) //" | sort; }; diff <(git show "$BASE":crates/lys-home/src/record/mod.rs | strip) <(cat crates/lys-home/src/record/helpers.rs crates/lys-home/src/record/session.rs crates/lys-home/src/record/home.rs | strip)'` prints nothing.
-- `cargo test --workspace --all-features 2>&1 | grep -E '^test result:' | awk '{p+=$4; f+=$6; i+=$8} END {print p, f, i}'` prints the same three numbers on the branch as on BASE, and the second number is 0.
-- `git diff -U0 "$BASE" -- 'crates/lys-home/*_tests.rs' crates/lys-home/tests | grep -E '^[+-]' | grep -vE '^(\+\+\+|---) ' | grep -vE '^[+-][[:space:]]*(pub )?use '` prints nothing.
-- `git diff --name-only "$BASE" -- . ':!crates/lys-home' ':!docs/design'` prints nothing.
-- `git diff --name-only "$BASE" -- 'crates/lys-home/*mod.rs'` prints exactly crates/lys-home/src/record/mod.rs.
-- `find crates/lys-home -name '*.rs' ! -name '*_tests.rs' ! -path 'crates/lys-home/tests/*' -exec sh -c 'n=$(grep -cvE "^[[:space:]]*(//|$)" "$1"); [ "$n" -gt 500 ] && echo "$1 $n"' _ {} \;` prints nothing.
-
-**Checklist:**
-- C51 — Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass.
-
-**Stories:**
-- S25 (Developer, Works on lys-home's code beside the record module) — As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved.
+- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
 
 ## Boundaries
 
-- SHALL NOT rename, remove or move to a new path any public item of lys-home, and SHALL NOT add a public path.
-- SHALL NOT change the text of any moved function body, and SHALL NOT change any on-disk format, the session lock, the durability order of line, index row and head, or any error variant.
-- SHALL NOT change any file of a crate other than lys-home.
-- SHALL NOT change any test file except a use line the move requires, and SHALL NOT split or add a test file.
-- SHALL NOT change any mod.rs other than crates/lys-home/src/record/mod.rs.
-- SHALL NOT widen any private field, method or helper beyond pub(super).
-- SHALL NOT silence a lint with #[allow], #[ignore], a _-prefixed name or #[cfg(any())].
+- No file under crates/ changes: not render.rs, launch.rs, import.rs, cli.rs, their tests or the crate README.
+- No reason string, no field of the Loss struct, no key of the account, no byte of the account and no part of its path is changed or proposed changed.
+- No change to what the render drops or why, and no loss account of any harness other than Claude Code, including the import-time lys.loss entry.
+- The build writes docs/design/home/LOSS-ACCOUNT.md and no other file: no existing brief, no row of HOME-001, no JSON document of the cluster, no rendered markdown, RECORD.md and none of the scripts under scripts/design is edited.
+- No transcript text, signature or hash taken from a real session appears in the document.
+- The document cites no line at a commit other than the one it names.
 
 ## Verification
 
-- Set and export BASE as the main commit the build branch starts from: `export BASE=$(git merge-base HEAD origin/main)`.
-- Run `grep -nE '^[[:space:]]*(pub(\([^)]*\))?[[:space:]]+)?((const|async|unsafe|extern)[[:space:]]+)*(fn|struct|enum|union|impl|const|static|type|trait)\b|macro_rules!' crates/lys-home/src/record/mod.rs` and confirm it prints nothing.
-- Run `bash -c 'strip() { sed -E "/^(pub )?use .*\{$/,/\};$/d" | grep -vE "^[[:space:]]*($|//!|(pub )?use |(pub(\(crate\))? )?mod |#\[cfg\(test\)\])" | sed -E "s/pub\(super\) //" | sort; }; diff <(git show "$BASE":crates/lys-home/src/record/mod.rs | strip) <(cat crates/lys-home/src/record/helpers.rs crates/lys-home/src/record/session.rs crates/lys-home/src/record/home.rs | strip)'` and confirm it prints nothing.
-- Run `cargo test --workspace --all-features 2>&1 | grep -E '^test result:' | awk '{p+=$4; f+=$6; i+=$8} END {print p, f, i}'` on BASE and on the branch and confirm the two outputs are equal with 0 failed.
-- Run `find crates/lys-home -name '*.rs' ! -name '*_tests.rs' ! -path 'crates/lys-home/tests/*' -exec sh -c 'n=$(grep -cvE "^[[:space:]]*(//|$)" "$1"); [ "$n" -gt 500 ] && echo "$1 $n"' _ {} \;` and confirm it prints nothing.
-- Run `cargo fmt --all` and confirm `git status --porcelain` shows no file it changed.
-- Run `cargo clippy --all-targets --all-features -- -D warnings` and `cargo clippy --all-targets -- -D warnings` and confirm each exits 0.
-- Run `cargo test --workspace --all-features` and confirm it exits 0.
-- Run `cargo doc --no-deps --all-features` and `cargo doc --no-deps` and confirm each exits 0.
-- Run `sh scripts/design/gate.sh` and confirm it exits 0.
+- `git cat-file -e HEAD:docs/design/home/LOSS-ACCOUNT.md` exits 0 on the landing commit.
+- `git diff --name-only $(git merge-base origin/main HEAD) HEAD -- crates` prints nothing.
+- `python3 -c "import re,pathlib;fs=[p for p in sorted(pathlib.Path('crates/lys-home/src').rglob('*.rs')) if re.search(r'\bloss\(&',p.read_text())];src={s for p in fs for l in p.read_text().splitlines() if re.search(r'\bloss\(&',l) for s in re.findall(r'\"([^\"]+)\"',l)};doc=re.findall(r'(?m)^- reason: \"([^\"]+)\"',open('docs/design/home/LOSS-ACCOUNT.md').read());print(len(fs),len(src),len(doc),sorted(src^set(doc)))"` prints `1 3 3 []`.
+- `python3 -c "import re,subprocess;d=open('docs/design/home/LOSS-ACCOUNT.md').read();c=re.search(r'(?m)^Written from commit ([0-9a-f]{40})\.$',d).group(1);cs=re.findall(r'((?:crates|docs)/[A-Za-z0-9_./-]+\.[a-z]+):([0-9]+)(?:-([0-9]+))?',d);n=lambda p:len(subprocess.run(['git','show',c+':'+p],capture_output=True,text=True,check=True).stdout.splitlines());print(c,sorted({x[0] for x in cs}),[x for x in cs if not 1<=int(x[1])<=int(x[2] or x[1])<=n(x[0])])"` prints the commit on the document's `Written from commit` line, a list of cited paths containing `crates/lys-home/src/cli.rs`, `crates/lys-home/src/harness/claude_code/launch.rs` and `crates/lys-home/src/harness/claude_code/render.rs`, and `[]`.
+- `sh scripts/design/gate.sh` exits 0.
+- cargo fmt --all leaves the tree unchanged; cargo clippy --all-targets --all-features -- -D warnings, cargo clippy --all-targets -- -D warnings, cargo test --workspace --all-features, cargo doc --no-deps --all-features and cargo doc --no-deps each exit 0.

@@ -77,12 +77,10 @@
 - [ ] **C43** — lys-home fork --home --lantern [--session] prints one JSON report on success, exits 1 with the refusal on stderr and nothing on stdout, and takes no point or entry id.
 - [ ] **C44** — Rendering a child whose coordinate was carried writes the carried message's text parts as a seed prompt beside the rendered file under an in-band marker line, the render report names it, the template's launch line (printed by render-launch only) passes it as the first prompt and is never run, and PROOF-FORK.md records a fork launched on the installed Claude Code version as hashes, counts, paths, commands, versions and exit codes only.
 
-## The record module layout
+## The loss account document
 
-- [ ] **C45** — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs.
-- [ ] **C46** — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs.
-- [ ] **C47** — Home and its impl are defined in crates/lys-home/src/record/home.rs.
-- [ ] **C48** — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line.
-- [ ] **C49** — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it.
-- [ ] **C50** — Every public path lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolves as before the move, and no crate outside lys-home changes.
-- [ ] **C51** — Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass.
+- [ ] **C95** — docs/design/home/LOSS-ACCOUNT.md exists, names on its first line the commit it was read from, and states that the loss account is written beside the rendered file under the rendered file's stem with .loss.json, naming the default render path and render-launch as the two cases where that stem is the session uuid.
+- [ ] **C96** — LOSS-ACCOUNT.md states the account's four keys, one entry's two fields hash and reason, and that every render writes the account, with dropped: [] when nothing was dropped.
+- [ ] **C97** — LOSS-ACCOUNT.md quotes every reason string the render passes to the loss constructor, with the line that writes it, and the reason check prints 1 3 3 [] at the landing commit.
+- [ ] **C98** — LOSS-ACCOUNT.md states that an entry's hash is the SHA-256 of the part as serde_json serialises it and that an entry never carries the part's text, signature or redacted data.
+- [ ] **C99** — LOSS-ACCOUNT.md lists the four things the render changes without a loss entry, custom entries and labels, compaction, gitBranch and usage, each with the line that does it.
