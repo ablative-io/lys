@@ -3481,6 +3481,11 @@
       "path": "crates/lys-core/src/checkpoint/note_tests.rs",
       "note": "One function verifies a receipt against a pinned key",
       "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys-secrets/src/service.rs",
+      "note": "A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
     }
   ],
   "inventory": [

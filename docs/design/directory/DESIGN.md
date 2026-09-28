@@ -789,6 +789,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity/src/receipt.rs` | One function verifies a receipt against a pinned key | DIRECTORY-058 |
 | `crates/lys-core/src/checkpoint/note.rs` | One function verifies a receipt against a pinned key | DIRECTORY-058 |
 | `crates/lys-core/src/checkpoint/note_tests.rs` | One function verifies a receipt against a pinned key | DIRECTORY-058 |
+| `crates/lys-secrets/src/service.rs` | A start reads its credentials from Lys's own broker, and no route reaches an app for them | DIRECTORY-059 |
 
 ## Inventory
 
