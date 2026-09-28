@@ -197,13 +197,13 @@
     },
     {
       "id": "ADR-012",
-      "title": "Done on a carded row means judged by the chain, never merely merged",
-      "status": "decided",
-      "scope": "project",
-      "date": "2026-09-26",
-      "decided_by": "Waffles, ruling of 07:08 on 26 September 2026 in the Cambium channel; applied to HOME-002 by the lead who owns the card",
-      "context": "HOME-001's rows R1 to R11 were built by hand and reached lys main before the rule that every carded row goes through its board's chain. The seven step 5 cards carrying them sat in review with no chain fields, and two of the rows (R7, R10) have no code on main. Setting those cards done because the code is merged would say the chain judged code it never saw, and in two cases code that does not exist.",
-      "decision": "A carded row built before the chain is brought under it by a proof card that runs the chain's whole judgement over the code as found and changes none of it; its card is set done only on a green landing of that proof with no finding on the rows it carries, and only when its rows have code at the commit measured. Rejected: setting the cards done because their code is on main, and counting a landing that records a finding as green.",
+      "title": "A fork's ancestry is written on both sides as two lys custom entries",
+      "status": "proposed",
+      "scope": "home",
+      "date": "",
+      "decided_by": "",
+      "context": "A fork is a new session cut from a parent at a lantern's point. Pi's header field parentSession names the parent from the child's side only, and it is a file path, so the parent never learns it was forked, and nothing on either side says which lantern and which point the cut was made from. The lifecycle screen will later show a session's forks and ancestry, so both directions must be readable from the record without transcript content. Home P2 allows lys to add entry kinds only as Pi custom entries, never a field.",
+      "decision": "The child carries a lys.forked_from custom entry (parent session id, lantern, point, the entry the cut ended at, whether the point's user message was carried and which entry it was), appended directly after the copied path, and the parent carries a lys.fork custom entry naming the child, appended at its head; both are home-local state in durable session files, not signed wire formats. Rejected: recording the ancestry in the child's header parentSession alone, which is one-sided, names no lantern or point, and would have needed a field outside Pi's grammar to say more; and a sidecar file beside the sessions, which Pi's parser never reads and which could drift from the files it describes.",
       "quote": "",
       "consequences": [
         "RECORD.md's list of lys.harness_event kinds grows to six; the five existing kinds and the 512-byte data cap do not change.",
@@ -217,7 +217,10 @@
         "A check of a file against the record is by hash only, and prints neither file.",
         "HOME-002 lands the proof with findings recorded one per line, each carded, and leaves the seven cards in review while any finding stands on their rows.",
         "A card carrying a row with no code at the commit measured (HOME-001 R7, R10) stays in review marked not built until that row is built through the chain.",
-        "Every other row built before the chain needs its own proof card before its card can be done."
+        "Every other row built before the chain needs its own proof card before its card can be done.",
+        "RECORD.md documents both entries with their data keys; a change to either is a new custom type alongside, never a mutation of the shipped one.",
+        "Appending lys.fork to a parent takes the parent's one-owner lock and rewrites no earlier byte (home P1).",
+        "The render skips both entries, as it skips every custom entry, so neither reaches a Claude Code file."
       ],
       "supersedes": [],
       "superseded_by": ""
