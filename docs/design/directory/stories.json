@@ -212,6 +212,62 @@
           "text": "As the administrator, I want the screen to show an identity's state and the record that put it there, for a retired identity exactly as for a live one, so that I can answer why a check refused from the record and not from memory."
         }
       ]
+    },
+    {
+      "name": "Operator",
+      "role": "Installs and runs the standalone identity product",
+      "stories": [
+        {
+          "id": "S3",
+          "text": "As the operator, I want to install the identity product's dependencies on one PostgreSQL database whose host I choose, and restart or restore it without losing anyone, so that the product stands alone without Cambium or Manifold."
+        },
+        {
+          "id": "S6",
+          "text": "As the operator, I want the directory's screens to show every refusal, pending audit and outage as it is, so that I never act on a completed state that did not happen."
+        }
+      ]
+    },
+    {
+      "name": "Verifier",
+      "role": "Checks a recorded identity change without the operator's cooperation",
+      "stories": [
+        {
+          "id": "S7",
+          "text": "As a verifier, I want to check a recorded identity change against a checkpoint and key with standard tooling, so that the directory's history does not rest on the operator's word."
+        }
+      ]
+    },
+    {
+      "name": "Person who signs in",
+      "role": "Keeps their sign-in identities to themselves",
+      "stories": [
+        {
+          "id": "S13",
+          "text": "As a person who signs in with a provider account, I want the directory to refuse every act that would give that account to an agent, so that no agent can ever hold my sign-in."
+        },
+        {
+          "id": "S14",
+          "text": "As a person delegating to an agent or another person, I want my sign-in identities listed as things I cannot give with the reason 'sign-in identity', so that I know why they are never offered."
+        },
+        {
+          "id": "S15",
+          "text": "As the responsible person, I want my agent's own machine account accepted as its binding, so that the agent can have its own service account without holding anyone's sign-in."
+        },
+        {
+          "id": "S16",
+          "text": "As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request."
+        }
+      ]
+    },
+    {
+      "name": "Directory administrator",
+      "role": "Resolves a refused act",
+      "stories": [
+        {
+          "id": "S17",
+          "text": "As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched."
+        }
+      ]
     }
   ]
 }

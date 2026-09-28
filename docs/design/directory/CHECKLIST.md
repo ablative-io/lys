@@ -48,10 +48,11 @@
 - [ ] **C29** — The You and delegation screens show real server authority, separate service accounts from sign-in identities, and preserve personal versus administrator visibility.
 - [ ] **C30** — The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success.
 
-## Lifecycle conformance rows 3.1 and 3.2 (DIRECTORY-019)
+## Sign-in identities belong to people (conformance row 1.2)
 
-- [ ] **C123** — docs/design/identity/LIFECYCLE-CONTRACT.md maps CONFORMANCE rows 3.1 and 3.2 to named tests and states the needs-a-new-person rule, that ADR-011 is not revised, and that the state is authority only.
-- [ ] **C124** — Registering an agent whose register request names no responsible person is refused lifecycle_agent_without_person and appends nothing.
-- [ ] **C125** — An agent's lifecycle read carries needs_a_new_person, worked out on read, true on every one of a person's agents once that person is retired and false while the person is suspended, with no record appended and each agent's state unchanged.
-- [ ] **C126** — A walk of all 20 origin-by-target changes of state admits exactly the 6 in the table and refuses the other 14 by name with nothing appended.
-- [ ] **C127** — A change of state starts and stops no process, and no key of the typed lifecycle read says anything about running.
+- [ ] **C31** — Binding to an agent a provider account that is, or once was, linked to a person is refused by name and writes nothing, while an agent's own machine account, linked to no person, is accepted as its issuer-subject binding.
+- [ ] **C32** — A person's link of a provider account already bound to an agent as its service account is refused by name at the lys-identity check the link path asks, naming the withdrawal that answers it, naming the agent only to its responsible person and a directory administrator, and no binding is withdrawn.
+- [ ] **C33** — Delegating a sign-in identity is refused by name for an agent recipient and for a person recipient, while a service-access grant consented through the same provider account is admitted by the grant rules alone.
+- [ ] **C34** — The explanation seam lists each of a person's sign-in identities on the cannot-give list with the reason 'sign-in identity', whoever the recipient is.
+- [ ] **C35** — A sign-in identity refusal shows the provider and subject to the identity's owner and a directory administrator only; anyone else sees the act, the recipient and that a sign-in identity is involved.
+- [ ] **C36** — Every sign-in identity refusal leaves the log and projection unchanged, and one counted test over the store finds no agent record carrying a sign-in identity.

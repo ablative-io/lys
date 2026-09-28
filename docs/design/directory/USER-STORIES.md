@@ -18,13 +18,9 @@
 
 **S6.** As the operator, I want the directory's screens to show every refusal, pending audit and outage as it is, so that I never act on a completed state that did not happen.
 
-**S52.** As an operator, I want every agent whose person is retired to show that it needs a new person, so that no agent is left answering to a retired person without anyone seeing it.
-
 ## Verifier — Checks a recorded identity change without the operator's cooperation
 
 **S7.** As a verifier, I want to check a recorded identity change against a checkpoint and key with standard tooling, so that the directory's history does not rest on the operator's word.
-
-**S53.** As a verifier, I want an identity's state to move only along the lifecycle table and to say nothing about running, so that a state is read as authority and never mistaken for whether a process is alive.
 
 ## Grant holder and reviewer — Exercises or delegates current authority and verifies its exact origin
 
@@ -38,14 +34,16 @@
 
 **S12.** As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
 
-## Certificate verifier — Checks an agent's certificate and its record against the certificate log without the issuer's cooperation
+## Person who signs in — Keeps their sign-in identities to themselves
 
-**S31.** As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word.
+**S13.** As a person who signs in with a provider account, I want the directory to refuse every act that would give that account to an agent, so that no agent can ever hold my sign-in.
 
-**S32.** As a certificate verifier, I want a revoked certificate's past record to still verify, so that revoking a certificate does not erase what it legitimately did before its revocation.
+**S14.** As a person delegating to an agent or another person, I want my sign-in identities listed as things I cannot give with the reason 'sign-in identity', so that I know why they are never offered.
 
-**S34.** As a certificate verifier using the command that takes no log, I want its help to say it does not check revocation, so that I never take its pass as proof a certificate is live.
+**S15.** As the responsible person, I want my agent's own machine account accepted as its binding, so that the agent can have its own service account without holding anyone's sign-in.
 
-## Responsible person — Relies on an agent's certificate staying ended once it is revoked
+**S16.** As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request.
 
-**S33.** As a responsible person, I want my agent's certificate revocable only by its issuing authority's key, so that nobody else can end it and nothing can quietly bring it back.
+## Directory administrator — Resolves a refused act
+
+**S17.** As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.

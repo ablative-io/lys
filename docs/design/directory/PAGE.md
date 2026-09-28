@@ -2,159 +2,187 @@
 
 ## The words, as they were typed
 
-An agent whose person is retired shows as needing a new person, and the four identity states are recorded as authority only.
+Conformance row 1.2 says a sign-in identity is never lent to or held by an agent. A sign-in identity is a person's link to a provider, such as a Google or GitHub account, through which that person signs in. IDENTITY-001 was to state this and never did, and no brief tests it. The directory holds sign-in identities beside people (DIRECTORY-004 links two providers to one person) and gives grants to agents (DIRECTORY-006), so the refusal belongs at the point where anything would attach a sign-in identity to an agent.
 
-This card covers the first two rows of section 3 of the identity CONFORMANCE document on lys main 7b536253, Lifecycle, and each row gets at least one acceptance line that tests it on the lifecycle record.
-No brief on main makes either row true, and the lifecycle-hand brief on its own branch cites neither row.
-This brief reads that brief's lifecycle record rather than keeping its own copy.
+The directory refuses, by name, every act that would give an agent a sign-in identity: linking a provider account to an agent, delegating a grant whose source is a sign-in identity, and issuing any credential to an agent that is derived from a person's sign-in session. The refusal names the act, the agent and the sign-in identity, and states that sign-in identities belong to people only. Nothing an agent holds or presents is ever a person's sign-in session or token. The "cannot give" list of row 2.4 shows sign-in identities with the reason "sign-in identity".
 
-The first row is that every agent answers to a person.
-When that person is retired, each of their agents is flagged in its lifecycle record as needing a new person, and a test retires a person and reads the flag on every one of their agents.
-An agent with no person is refused by name when it is recorded, and a test shows that refusal.
+Acceptance is that linking a provider account to an agent is refused by name; that delegating from a sign-in identity to an agent is refused by name; that a credential request for an agent that presents a person's sign-in token is refused by name; that each refusal writes nothing to the directory; and that no agent record in the directory ever carries a sign-in identity, checked by one test over the store after all three refusals. This brief names row 1.2 as the row it passes.
 
-The second row is that the identity states are registered, active, suspended and retired.
-A test walks each allowed change of state in the lifecycle record and shows every other change refused by name.
-The state is authority only.
-A test shows that changing an agent's state starts and stops no process, and that the record says nothing about whether the agent is running.
+It waits for DIRECTORY-004 and DIRECTORY-006 to land, each checked by a command a stranger can run against lys main. Filed by Archie, lead for the identity line, on 27 September 2026, against lys main 7b536253.
 
-Giving an agent a new person is out of scope and is its own card.
+Rulings of the lead, Archie, given on 27 September 2026 to the run ea580795-f9fa-4284-99e5-1f7cce6b37c4 in answer to its rounds. That run took every answer and then failed before writing, when the account pool refused every session. They are settled here, and the author reopens none of them.
+
+The exception stays, because it is Tom's ruling and this brief does not overturn it. The brief states it as the one named exception, citing STATEMENT-2026-09-22.md:43 and :167 and PROVISIONING-2026-09-22.md:18. The harness login token reaches a seat's process under that ruling, and it never passes through anything lys issues, links or delegates. The rule governs everything lys itself gives an agent. The token is not redefined, and the brief does not pretend it is something other than what it is. Answered by Archie, lead for the identity line.
+
+No seam that exists only to refuse. The directory enforces the two acts it owns, linking a provider account to an agent and delegating a grant whose source is a sign-in identity, each refused by name with an acceptance line. Issuing credentials is the broker's, so the third refusal is a rule the broker enforces. This brief states it and names it as a finding against SECRETS-002, with the acceptance line that the broker refuses to issue an agent any credential derived from a person's sign-in session, to be carried by the broker's card. The brief says that row 1.2 is met in full only when that line passes. Answered by Archie.
+
+Only that one exists. A refusal returned to anyone other than the identity's owner or a directory administrator names the act, the agent and the fact that a sign-in identity is involved, and states that sign-in identities belong to people only. It never shows the provider or the subject, as DIRECTORY-006 R5 requires. The owner and administrators see the provider and subject. Acceptance lines cover both views. Answered by Archie.
+
+Only a person's account. A sign-in identity is a provider account linked to a person in the directory, and only that is refused. An agent's own machine account, bound to the agent and to no person, is a service account under row 1.3's separate list, and registering it as the agent's issuer-subject binding under DIRECTORY-003 R1 is allowed. A provider account already linked to a person is refused for an agent by name. Acceptance lines cover an agent's own account accepted and a person's linked account refused. Answered by Archie.
+
+The server's reason is this brief's, and the screen is row 2.4's. Apollo's card jAfmblAP carries the cannot-give list with its four reasons, sign-in identity among them, on the delegation screen. This brief asserts that the server returns the reason 'sign-in identity' for such an entry, and names jAfmblAP as where a person sees it. No screen work is duplicated here. Answered by Archie.
 
 ## What the survey found, and its angles
 
-The words ask for a new directory brief that makes CONFORMANCE rows 3.1 and 3.2 true. Row 3.1: every agent has a responsible person, recording an agent without one is refused by name, and when a person is retired each of their agents is flagged as needing a new person. Row 3.2: an identity has exactly four states, only the allowed transitions are admitted and every other one is refused by name, and the state is authority only, so it neither starts nor stops anything and says nothing about running. The brief must build on the lifecycle record from DIRECTORY-009, which sits unmerged on brief/directory/lifecycle-hand, rather than keep its own copy. Giving an agent a new person is left to another card.
+Archie wants a directory brief that finally states and tests conformance row 1.2: a sign-in identity (a provider account linked to a person) is never lent to or held by an agent. The directory refuses two acts by name: binding a person-linked provider account to an agent, and delegating a sign-in identity to an agent. Each refusal writes nothing, has an owner/administrator view and a redacted view, and is followed by one test over the store showing that no agent record carries a sign-in identity. The third act, issuing an agent a credential derived from a person's sign-in session, is stated as a finding against SECRETS-002 and left for the broker's card to enforce. The harness login token stays as the one named exception, and the "sign-in identity" reason is served to the cannot-give list that Cambium card jAfmblAP displays.
 
 ### What the tree holds
 
-- `docs/design/identity/CONFORMANCE.md:36-37` — Rows 3.1 and 3.2 are the behaviours this card makes true. Both are Kind test, Brief 'LIFECYCLE-STATES (to brief: new)', owner Waffles. Build order step 3 (line 112) groups them with 3.3, 3.4 and 5.1 to 5.6.
-- `origin/brief/directory/lifecycle-hand @ 28e4603: docs/design/directory/briefs/DIRECTORY-009.json` — The lifecycle-hand brief the words say to read and not copy. Its rows are R1 LIFECYCLE-CONTRACT.md, R2 causes.rs, R3 fold.rs/state.rs, R4 gate.rs, R5 the session gate and R6 the typed read. The lifecycle record is the fold of signed transition records (ADR-027). It never cites CONFORMANCE 3.1/3.2, and has zero hits for 'needing', 'new person', 'running' or 'process'.
-- `docs/design/directory/briefs/DIRECTORY-003.json R1 and R5` — R1 records the responsible person in the signed registration event 'for life', says 'No API of this row changes an agent's responsible person', and refuses a registration with no signed-in caller. R5 records the state beside each identity, not enforced, and refuses retired→active, registered→suspended and registered→retired by name. This is where 'an agent with no person is refused when it is recorded' lands. Not landed: execution is null.
-- `docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44,71-95` — The source for the four states and the transition table (retire only from active or suspended) and for the responsible human carried 'for life'. Lines 87-89 say retiring the human makes derived grants refuse. Line 23 ('Running executions stop at their next admission') and line 59 ('Executions as a count of running ones') talk about running beside the state.
-- `docs/design/directory/DESIGN.md (design.json)` — The cluster this card continues. P3 says registration creates no running state. The Structure table gains this brief's paths. The Non-Goals keep suspension semantics and the grant representation open for Tom.
-- `crates/lys-identity/src/lifecycle/ (planned by DIRECTORY-009)` — The code seam for the flag read and the transition-walk tests. It does not exist on main: crates/lys-identity and crates/lys-identity-server are both absent.
-- `docs/design/decisions.json` — Main holds ADR-001 to ADR-018. ADR-027 (fold, never set) and ADR-028 (next-check rule) exist only on the lifecycle-hand branch, so this brief cites decisions that are not yet on main.
-- `docs/design/directory/checklist.json, stories.json, docs/design/roadmap.json` — This brief gains checklist items, stories and a roadmap row. Main has C1-C30 and RM-001 to RM-016. The branches already claim C36-C41, S16-S18 and RM-017 (DIRECTORY-009), and DIRECTORY-007/011/013 sit on other branches, so ids must avoid collisions.
-- `scripts/design/gate.sh, validate.py, check-coverage.py` — The design gate leg this documents-only brief has to pass.
+- `docs/design/identity/CONFORMANCE.md` — Row 1.2 (line 17) reads 'Sign-in identities are never lent to or held by an agent.', with Brief 'IDENTITY-001 (amend: state it)', owner Waffles. Row 1.3 is the separate service-account list. Row 2.4's cannot-give reasons include 'sign-in identity'. This is the row the brief says it passes.
+- `docs/design/identity/briefs/IDENTITY-001.json` — Grep finds no statement of 1.2: no 'lent', 'lend' or 'sign-in identit' in it. CN1 of the directory cluster keeps this file unchanged, so the new brief carries the statement instead of amending it.
+- `docs/design/directory/briefs/DIRECTORY-003.json` — R1 defines the 'external issuer-subject bindings' in crates/lys-identity. Registering an agent there already must not 'manufacture a human login for it'. This binding API is the lys-side seam where linking a provider account to an agent is refused and an agent's own machine account is accepted. R4's link-audit receiver is where a fork link event naming an agent would arrive.
+- `docs/design/directory/briefs/DIRECTORY-004.json` — Provider linking happens inside the Rauthy fork (vendor/rauthy, fork-owned files). It requires an authenticated person and refuses an 'already-owned provider identity' (ID001_LINK_REFUSAL). Its blocked_by says the fork-owned brief 'does not yet exist'. The fork knows only Rauthy users, and DIRECTORY-003 R1 says an agent has none, so the fork alone cannot see an agent-bound subject.
+- `docs/design/directory/briefs/DIRECTORY-006.json` — R1 is the grant contract, still a proposal awaiting review. It gives a grant a 'source grant' but no source kind that is a sign-in identity. R2 is where delegation admission refuses by name with zero mutations. R5 is the explanation seam that must not disclose another identity's protected records, which is what the words cite for the redacted view. R6 renders sign-in identities separately on the You page. The delegation refusal and the 'sign-in identity' reason land here.
+- `docs/design/secrets/briefs/SECRETS-002.json` — R1 is handle issuance, which has to trace to a person. R4 already says 'A provider sign-in identity and an OAuth service-access grant SHALL remain distinct records'. R5 puts the Claude Code login token into the seat's environment at spawn and is the named exception (STATEMENT:43, :167). The finding and its broker acceptance line go against this brief.
+- `docs/design/identity/STATEMENT-2026-09-22.md` — Line 43 is Tom's 13:32 ruling that the seat's own Claude Code login is the one place a credential reaches the process. Line 167 is adjustment 4, which carries the login exception. The rulings require the brief to cite both lines.
+- `docs/design/identity/PROVISIONING-2026-09-22.md` — Line 18 is step 4, the credential handle: 'The login exception stands: the harness login token still reaches its process.' It is the third citation for the exception.
+- `docs/design/directory/design.json / DESIGN.md / checklist.json / stories.json` — This is the cluster the brief continues. Structure rows name every path a row brief touches. The checklist runs to C30 and the stories to S12. C29 already asks that service accounts be kept separate from sign-in identities. The design gate (scripts/design/gate.sh) validates and re-renders every one of these files.
+- `docs/design/roadmap.json` — RM-001 carries the directory briefs. A new brief needs a roadmap row or a link to one. The 26 September 20:31 ruling gives ids from the next number after main's highest and every open brief branch's.
+- `docs/design/identity/mockup/index.v5.html` — Lines 1278 and 1502 are the accepted mock-up's copy: 'Accounts that prove you are you. Never lent to an agent.' and 'They prove who you are. No agent can hold them.'
 
 ### What was already decided
 
-- ADR-011 — Proposed: four states and five transitions, each a signed audit record. An agent's registering person is its responsible person 'for life'. A retired identity is never reactivated.
-- ADR-003 — Everything is pegged to a human authority, and withdrawing the authority stops every grant derived from it.
-- ADR-007 — The product never runs an agent, it only gives its start command. A started agent reports back to the sessions screen, so 'running' belongs there and not in the lifecycle record.
-- ADR-027 (branch lifecycle-hand only) — The state is folded from signed transition records and never set directly. No API, migration or repair writes a state.
-- ADR-028 (branch lifecycle-hand only) — A suspension or retirement takes effect at the next check. Nothing calls Rauthy to revoke a session.
-- DIRECTORY-009 R1 (branch) — 'no policy causes a transition in this contract: the only automatic effect a suspension or retirement has on other identities is the grant-check one DIRECTORY-006 R4 enforces'.
-- DIRECTORY-003 R1 — The responsible person is recorded at registration. A registration without a signed-in caller is refused. No API changes an agent's responsible person. Registering does not pretend the agent is running.
-- DIRECTORY-003 R5 — State is recorded beside each identity and not enforced (CN11). Out-of-table transitions are refused by name and record nothing.
-- directory P3 — Registration creates no running state and issues no login, credential or certificate.
-- directory Non-Goal (suspension semantics) — What else stops with a suspended identity is OPEN for Tom.
-- CONFORMANCE build order step 3 — Lifecycle and the start command (3.1 to 3.4, 5.1 to 5.6) come after directory grants and delegation.
+- directory P1 — Issuer plus subject identifies an external login, and an enduring id is stable through provider additions. Bindings are therefore unique per issuer-subject, which is what makes the order of agent binding and person linking matter.
+- directory P3 — Registration issues no Rauthy login, runtime credential or certificate.
+- directory P9 / DIRECTORY-003 R3 — In step 1 the only caller allowed to change the directory is the configured administrator. That is who the 'directory administrator' view means.
+- directory CN1 — Documents only for DIRECTORY-001's cluster. The IDENTITY-001 files are not changed.
+- directory CN12 — DIRECTORY-006 cannot be dispatched until the DIRECTORY-002/003 foundations are implemented and their manifests reconciled.
+- DIRECTORY-003 R1 — Defines external issuer-subject bindings. Registering an agent never manufactures a human login for it or issues it a credential.
+- DIRECTORY-004 R1 — The linking change lives in the fork. It refuses an already-owned provider identity, and it unlinks only when a usable authentication method remains.
+- DIRECTORY-006 R1/R2/R5/R6 — The grant contract (a proposal), affirmative delegation with zero mutations on refusal, the explanation seam that hides other identities' protected records, and the You page with sign-in identities shown apart.
+- SECRETS-002 R4/R5 — A sign-in identity and an OAuth service grant are distinct records. The seat's Claude Code login reaches its environment at spawn.
+- CONFORMANCE 1.2, 1.3, 2.4 — The rule, the separate service-account list, and the cannot-give reasons.
+- ADR-003 — Everything is pegged to a human authority, and an agent holds an explicit subset.
+- ADR-009 — People sign in through the maintained Rauthy fork, pinned as vendor/rauthy.
+- ADR-011 (proposed) — A signed-in person registers an agent and remains its responsible person for life.
+- ADR-001 — The broker holds credentials behind handles. Issuance is the broker's act.
 
 ### What was measured
 
-- CONFORMANCE.md length and location of the rows: 118 lines; row 3.1 at line 36, row 3.2 at line 37
-- Briefs on main or on any origin brief/directory, conformance branch that cite 3.1/3.2 or 'needing a new person': 0 (checked main plus 8 branches, including lifecycle-hand)
-- DIRECTORY-009 on lifecycle-hand: 6 rows, 34 acceptance lines, 18 estimated hours, 244 JSON lines; branch base 1756688 is 4 commits behind main 7b53625
-- crates/lys-identity and crates/lys-identity-server on main: 0 files (neither directory exists)
-- DIRECTORY-003 execution status on main: null (not landed)
-- Decisions on main: 18 (ADR-001 to ADR-018); ADR-027 and ADR-028 exist only on lifecycle-hand
-- Directory checklist items on main: 30 (C1 to C30); DIRECTORY-009 claims C36 to C41
-- Roadmap rows on main: 11 (last RM-016); lifecycle-hand adds RM-017
-- Allowed transitions in the tree's table: 6 edges: none→registered, registered→active, active→suspended, suspended→active, active→retired, suspended→retired
-- Mentions of 'needing', 'new person', 'running' or 'process' in DIRECTORY-009.json: 0 each
+- Mentions of sign-in identities, lending or lent in IDENTITY-001.json: 0
+- Lys briefs that mention 'sign-in identity' at all: 2: SECRETS-002 R4 (distinct records) and DIRECTORY-006 R6 (shown apart), plus checklist C29
+- Acceptance lines in the tree that test row 1.2: 0
+- Directory briefs on main: 7 (DIRECTORY-001 to 006, and 008)
+- Highest ids on open brief branches this clone could read: DIRECTORY-013, RM-031, SECRETS-003. 18 of 36 brief heads are not in the local object store, so the true highest may be greater.
+- Directory checklist and stories: 30 checklist items (C1 to C30), stories up to S12
+- Conformance rows in CONFORMANCE.md: 52 table rows
+- crates/lys-identity and crates/lys-identity-server: neither exists. Workspace members: 6 (lys, lys-anchor, lys-anchor-cli, lys-core, lys-home, lys-log-store)
+- deploy/identity, surface/identity, tests/identity_contract: none exist
+- vendor/rauthy submodule: not initialised in this clone, pinned at dd61ac3c (v0.36.2). The fork-owned brief DIRECTORY-004 waits on does not exist.
+- DIRECTORY-006 requirements and acceptance lines: 6 requirements, 22 acceptance lines, none about sign-in identities
+- SECRETS-002 requirements: 9 (R1 to R9). R5 is the login-at-spawn exception.
+- Size of the briefs this work cites: DIRECTORY-003.json 16039 B, DIRECTORY-004.json 9588 B, DIRECTORY-006.json 22190 B
+- Matches for jAfmblAP in the lys tree or the cambium checkout: 0 (the card lives on the Cambium board, not in either tree)
 
 ### What it means for the other projects
 
-- aion — The card runs through the chain (brief_card → sign-off → card_build_v3 → src_pr → src_land). Its inputs name the repository, commit 7b53625 and the card, and it depends on DIRECTORY-009 landing through the same chain.
-- cambium — The card lives on Cambium's board. Nothing in Cambium changes: rows 06 and 07 and the participant-id carry-over stay a non-goal.
+- cambium — Card jAfmblAP (Apollo) shows the 'sign-in identity' reason on the delegation screen and must use the server's reason, not compute its own. SECRETS-002's broker and proxy files are door-owned inside the cambium checkout, so the broker line (refuse any agent credential derived from a person's sign-in session) lands on a Cambium-side card.
+- aion — The brief runs through aion's chain (brief_card, sign-off, card_build_v3, src_pr, src_land). The harness login token aion's claude-worker hands a seat is the named exception, and nothing in aion changes.
 
 ### The decisions it stands on
 
-- ADR-011 (honour) — This card uses its four states and its transition table unchanged, and adds no fifth state. Tension: 'responsible person for life' against a flag that points to reassignment. That tension goes to the lead and is not superseded here.
-- ADR-003 (honour) — Every agent is pegged to a person. Refusing an agent with no person enforces the root.
-- ADR-007 (honour) — The product never runs an agent. 'Authority only' is the lifecycle-record side of that rule.
-- ADR-027 (honour) — The flag and the state come from the fold and are never set. It is currently decided only on the lifecycle-hand branch.
-- ADR-028 (honour) — The effect of retiring someone shows at the next check, and nothing is revoked at once.
--  (new) — If the lead chooses a derived flag, a decision should record that 'needs a new person' is a view computed from the agent's registration and its person's retire record, never a stored or appended value. That is the flag's equivalent of 'provisioned is a view'.
+- ADR-003 (honour) — A sign-in identity is a person's link to their human authority. An agent's explicit subset never includes it.
+- ADR-009 (honour) — Provider linking stays in the maintained fork (DIRECTORY-004). This brief refuses on the lys side and moves no pin.
+- ADR-011 (honour) — An agent is registered by a person and never manufactures a human login. That is P3 and DIRECTORY-003 R1, which this brief extends.
+- ADR-001 (honour) — Issuance is the broker's, so the third refusal is carried by the broker's card, not by a directory seam.
+- ADR-004 (honour) — The refusals and the store test run against the standalone directory with no Cambium, Aion or Manifold present.
+-  (new) — 'Sign-in identities belong to people only; the harness login token (STATEMENT:43, :167; PROVISIONING:18) is the one named exception, and it never passes through anything lys issues, links or delegates.' This is stated nowhere in the ledger today.
 
 ### What it requires
 
-- A test registers a person and at least two agents under them, retires the person, and reads the needs-a-new-person flag as true on every one of those agents and false on an agent of another person. The test asserts the count of agents flagged.
-- A test attempts to record an agent with no responsible person and asserts a named refusal with 0 records appended.
-- A test walks all 6 allowed transitions on the lifecycle record and asserts each is admitted, then attempts every other pair among none, registered, active, suspended and retired and asserts each is refused by name with the log size unchanged. The test asserts both counts.
-- A test drives every allowed transition and asserts that no process was started or stopped across them.
-- A test or check shows that the lifecycle record's type carries no running, execution or session field.
-- The brief reads DIRECTORY-009's lifecycle record (fold) and adds no state store or copy of the state.
-- Each of CONFORMANCE rows 3.1 and 3.2 is cited by at least one acceptance line of the brief.
-- The brief passes scripts/design/gate.sh (validate.py and check-coverage.py exit 0).
+- Binding to an agent a provider account that is already linked to a person is refused with a named error that names the act (link), the agent and the sign-in identity, and states that sign-in identities belong to people only.
+- Binding an agent's own machine account, which is linked to no person, as its DIRECTORY-003 R1 issuer-subject binding succeeds, and an acceptance line proves it.
+- Delegating a sign-in identity to an agent is refused by name at DIRECTORY-006 admission, with zero grant events.
+- The explanation seam returns the reason 'sign-in identity' for each of a person's sign-in identities in the cannot-give list.
+- A refusal returned to the identity's owner or a directory administrator shows the provider and subject. A refusal returned to anyone else shows the act, the agent and that a sign-in identity is involved, and never the provider or the subject. There is one acceptance line per view.
+- Each directory refusal leaves the directory's event count and projection unchanged, and the test counts this.
+- One test over the store, after the refusals, finds no agent record carrying a sign-in identity. It counts the agent records it inspected, and that count is non-zero.
+- The brief states the harness login token as the one named exception, citing STATEMENT-2026-09-22.md:43 and :167 and PROVISIONING-2026-09-22.md:18.
+- The brief records a finding against SECRETS-002 with the acceptance line that the broker refuses to issue an agent any credential derived from a person's sign-in session, to be carried by the broker's card.
+- The brief names row 1.2 as the row it passes, says the row is met in full only when the broker line passes, and names jAfmblAP as where a person sees the reason.
+- The brief names DIRECTORY-004 and DIRECTORY-006 as dependencies, each with a command a stranger can run against lys main.
+- sh scripts/design/gate.sh passes with the new brief, its rendered markdown and any design, checklist, stories or roadmap rows.
 
 ### What must not change
 
-- No API, record or row changes an agent's responsible person. Reassignment is a separate card.
-- No fifth state and no new transition. A retired identity is never reactivated.
-- The state is never set directly (ADR-027), and the flag adds no stored copy of lifecycle state.
-- Nothing in lifecycle starts, stops or observes a process or session (ADR-007, P3).
-- No change to LIFECYCLE-STATES-2026-09-22.md, the IDENTITY-001 files, lys-core, lys-log-store or any shipped wire tag.
-- No call to Rauthy. SpiceDB is asked only through the grant leg.
-- No wall clock in new code, and test identities only (CN2).
+- docs/design/identity/briefs/IDENTITY-001.json and .md are not changed (directory CN1).
+- No screen work. The You and delegation screens stay with DIRECTORY-006 R6 and jAfmblAP.
+- No seam that exists only to refuse. Refusals sit in the binding and admission seams that DIRECTORY-003 and 006 already own.
+- SECRETS-002 R5 (the login token at spawn) and the harness login token exception are not changed or redefined.
+- lys-core, its published wire formats and lys/delegation/v1 are not changed (DIRECTORY-006 R1 GRANT_WIRE_BOUNDARY).
+- An agent's own machine-account binding under DIRECTORY-003 R1 stays allowed.
+- The existing briefs' ids, requirements, estimates and dependency order stay unchanged.
+- The rulings of 27 September given to run ea580795 are not reopened.
 
 ### What we must put in place first
 
-- DIRECTORY-009 (brief/directory/lifecycle-hand) signed off and merged to main, rebased past 7b53625, so that its lifecycle record, ADR-027/028 and ids exist on main to cite.
-- DIRECTORY-003 landed, with crates/lys-identity and the transition commit path, before any code row of this brief starts.
-- DIRECTORY-009 R3 (the fold) landed before the flag or transition-walk rows can run.
+- DIRECTORY-002 and DIRECTORY-003 must be implemented. crates/lys-identity and crates/lys-identity-server do not exist on main, so the refusal seams have nowhere to land yet.
+- The fork-owned brief for DIRECTORY-004's linking change must be written and landed on a gated ablative commit. Its absence blocks DIRECTORY-004.
+- DIRECTORY-006 R1's grant contract must be ratified by independent review before a delegation refusal can be keyed on it.
+- A stranger-runnable landing check must exist for DIRECTORY-004 and DIRECTORY-006 on lys main.
 
 ### The risks
 
-- The flag contradicts ADR-011 and DIRECTORY-003 R1 ('for life'). If this is not settled, the brief is refused at sign-off or fixes a flag that can never clear.
-- Appending per-agent flag records would breach DIRECTORY-009 R1's rule of no automatic effect on other identities, and would add audit lines nobody decided to write.
-- Id collisions: parallel branches already claim DIRECTORY-007/009/011/013, C31-C41, S16-S18, RM-017 and ADR-019 to ADR-028.
-- The code rows are blocked behind DIRECTORY-003 (not landed) and DIRECTORY-009 (not on main), so the card may sit signed-off but unbuildable.
-- In step 1 every agent's responsible person is the configured administrator (DIRECTORY-003 R1), so retiring the administrator flags every agent and may remove the only actor who can register or transition.
-- The table has no registered→retired edge, so a flagged agent still in the registered state can never be retired. That may surprise a reader of 'every other change refused'.
-- 'Starts and stops no process' is hard to show by a test alone, and a weak check (no process observed) only agrees with itself unless it is paired with a structural check.
+- The build waits on four unimplemented rows and on a fork brief that does not exist, so the brief can sit dispatch-blocked for a long time.
+- The fork links providers only to Rauthy users. If the lys-side check lives only in the receiver, an agent-bound subject that a person later links may slip through, or be refused without an explanation.
+- The ruling's definition (linked to a person) leaves a link, unlink, bind-to-agent path that moves a person's account onto an agent.
+- 'Source is a sign-in identity' has no field in the proposed grant contract. An author could add a source kind that widens R1's reviewed schema without review.
+- The broker line is enforced on another card, in door-owned files in the cambium checkout. Row 1.2 may be reported as passed while that line is unwritten.
+- The redacted view could leak provider or subject through error Debug output, logs or distinct error codes. Tests have to assert the absence, not just the presence.
+- The store test's loop can pass over zero agents unless it counts what it inspected.
+- The words cite DIRECTORY-006 R5 for hiding provider and subject, but R5 only says 'another identity's protected records'. The brief has to cite what R5 actually says.
+- Id collision with open brief branches, 18 of which are not readable in this clone.
 
 ### Still open
 
-- ADR-011 and DIRECTORY-003 R1 say an agent keeps its responsible person for life and no API changes it. Does flagging an agent as 'needing a new person' mean this card revises that rule, or should the flag stand while 'for life' stays in force until the reassignment card? The sentence of the words it stands on: "Giving an agent a new person is out of scope and is its own card.". Why only the lead can settle it: docs/design/decisions.json ADR-011 ('carries it as its responsible person for life') and docs/design/directory/briefs/DIRECTORY-003.json R1 ('No API of this row changes an agent's responsible person') rule out the reassignment the flag points to. A reader would see a flag that the recorded design says can never be cleared.
-- Should the flag be computed when the lifecycle record is read (from the agent's registration and its person's retire record, with nothing appended), or should retiring a person append a signed record on each of their agents? The sentence of the words it stands on: "When that person is retired, each of their agents is flagged in its lifecycle record as needing a new person, and a test retires a person and reads the flag on every one of their agents.". Why only the lead can settle it: An appended record puts a new line in each agent's audit history, and DIRECTORY-009 R1 (branch) says retiring someone has no automatic effect on other identities except the grant check. A computed flag leaves the history as it is.
-- When an agent is flagged, does its own state stay unchanged (for example still active, with its grants refusing at the check), or does retiring the person also move the agent to another state? The sentence of the words it stands on: "When that person is retired, each of their agents is flagged in its lifecycle record as needing a new person, and a test retires a person and reads the flag on every one of their agents.". Why only the lead can settle it: The words only say the agent is flagged. DIRECTORY-009 R1 forbids automatic transitions, and LIFECYCLE-STATES lines 87-89 say derived grants refuse. Whether the agent shows as active, suspended or retired changes what an operator sees.
-- Is 'shows' met by the flag in the lifecycle record and the typed read (DIRECTORY-009 R6), with the step-7 screen left to a later card, or must a screen show it in this card? The sentence of the words it stands on: "An agent whose person is retired shows as needing a new person, and the four identity states are recorded as authority only.". Why only the lead can settle it: No identity screen exists on main (the surface/ folder is absent) and DIRECTORY-009 R6 builds only the typed read. Whether a person sees the flag on a screen at landing is a scope boundary.
-- Should an agent whose person is suspended (not retired) also be flagged, or only when the person is retired? The sentence of the words it stands on: "When that person is retired, each of their agents is flagged in its lifecycle record as needing a new person, and a test retires a person and reads the flag on every one of their agents.". Why only the lead can settle it: The words name retirement only, and what stops with a suspended identity is OPEN for Tom (DESIGN.md Non-Goals). A suspended person's agents would or would not show the flag.
+- If an agent's own machine account is bound first and a person later tries to link that same provider account as their sign-in, which side wins: is the person's link refused, or is the agent's binding withdrawn? The sentence of the words it stands on: "An agent's own machine account, bound to the agent and to no person, is a service account under row 1.3's separate list, and registering it as the agent's issuer-subject binding under DIRECTORY-003 R1 is allowed.". Why only the lead can settle it: P1 makes an issuer-subject pair unique. The fork's ID001_LINK_REFUSAL (DIRECTORY-004) only knows Rauthy users and cannot see an agent binding held in lys-identity (DIRECTORY-003 R1). If nothing decides, either the person sees an unexplained link refusal or the agent ends up holding a sign-in identity, which breaks row 1.2.
+- Once a person unlinks a provider account from themselves, may it then be bound to an agent (their own or anyone's), or does an account once linked to a person stay refused for agents? The sentence of the words it stands on: "A sign-in identity is a provider account linked to a person in the directory, and only that is refused.". Why only the lead can settle it: DIRECTORY-004 R1 lets a person unlink an account. Read literally, the ruling allows link, unlink, then bind to an agent, which moves a person's own login onto an agent. The person would see the move succeed or be refused.
+- Does 'a grant whose source is a sign-in identity' mean only a delegation that offers the sign-in identity itself, or does it also cover a service-access grant (for example Google Drive OAuth) consented through the same account the person signs in with? The sentence of the words it stands on: "The directory refuses, by name, every act that would give an agent a sign-in identity: linking a provider account to an agent, delegating a grant whose source is a sign-in identity, and issuing any credential to an agent that is derived from a person's sign-in session.". Why only the lead can settle it: DIRECTORY-006 R1's proposed grant contract has only source grants, and no source kind is a sign-in identity. SECRETS-002 R4 keeps sign-in identities and OAuth service grants as distinct records. Which reading applies decides whether a person can delegate Drive access to their agent.
+- When the recipient is a person rather than an agent, does the cannot-give list still show the person's sign-in identities with the reason 'sign-in identity', and is that delegation refused too? The sentence of the words it stands on: "The "cannot give" list of row 2.4 shows sign-in identities with the reason "sign-in identity".". Why only the lead can settle it: DIRECTORY-006 R2 accepts both person and agent recipients, but row 1.2 and the words name agents only. The delegation form shown for a person recipient changes with the answer.
 
 ### The units beyond the first
 
-- Give an agent whose person is retired a new responsible person — Excluded by the words as its own card, and it needs ADR-011 and DIRECTORY-003 R1's 'for life' rule revised.
-- Show the needs-a-new-person flag on the people list and the agent file — The step-7 screen is not built. DIRECTORY-009 R6 only exposes the typed read the screen consumes.
-- CONFORMANCE 3.4: emergency stop revokes tokens and asks sessions to end — The next row of section 3, a separate LIFECYCLE (new) brief, and it touches running sessions, which this card keeps out of the record.
+- SECRETS-002: the broker refuses to issue an agent any credential derived from a person's sign-in session — The lead ruled that issuance is the broker's. The line lands in door-owned files on the broker's card, and row 1.2 is met in full only when it passes.
+- jAfmblAP: the cannot-give list shows 'sign-in identity' from the server's reason — The screen is row 2.4's, and Apollo's Cambium card carries it. This brief supplies only the server reason.
+- The fork-owned brief for DIRECTORY-004's linking change in ablative-io/rauthy — DIRECTORY-004, which this brief waits on, is blocked until that brief exists and lands on a gated commit. It is a separate repository and card.
+- CONFORMANCE.md row 1.2 Brief column repointed from 'IDENTITY-001 (amend: state it)' to this brief — The file lives in docs/design/identity, outside the directory cluster's wall. It is a small document row of its own.
 
 ### The smallest complete shape
 
-One documents brief in docs/design/directory (JSON plus rendered MD, with design.json, DESIGN.md, checklist, stories and one roadmap row), depending on DIRECTORY-003 and DIRECTORY-009. Its rows: (1) state rows 3.1 and 3.2 against DIRECTORY-009's lifecycle contract; (2) refuse by name an agent recorded without a responsible person, with a test; (3) the needs-a-new-person flag read from the lifecycle record when the agent's person is retired, with a test that retires a person and reads it on every one of their agents; (4) a transition walk over all 6 allowed edges with every other change refused by name; (5) a test that a state change starts and stops no process and that the record has no running field. It passes the design gate and goes through sign-off, with its code rows blocked on DIRECTORY-003 and DIRECTORY-009 R3 landing.
+One directory brief in docs/design/directory/briefs (JSON plus rendered markdown), with its design, checklist, stories and roadmap rows, all passing the design gate. Its requirements:
+- R1: the lys-identity issuer-subject binding refuses a person-linked provider account for an agent by name and accepts the agent's own machine account.
+- R2: DIRECTORY-006 admission refuses delegating a sign-in identity to an agent by name, and the explanation seam returns the reason 'sign-in identity' for the cannot-give list.
+- R3: two refusal views, one for the owner and administrator and one redacted for everyone else.
+- R4: every refusal writes nothing, and one counted store test finds no agent record carrying a sign-in identity.
+- A stated rule citing the named login-token exception, the SECRETS-002 finding with the broker's line, jAfmblAP named for the screen, and dependencies on DIRECTORY-004 and DIRECTORY-006, each with a stranger-runnable landing check.
 
 ## The roadmap row
 
-- **RM-032** — Flag an agent whose person is retired as needing a new person, and keep the four identity states authority only (feature, idea)
-- Summary: Makes CONFORMANCE rows 3.1 and 3.2 true on the lifecycle record the lifecycle-hand brief DIRECTORY-009 (RM-017) defines, reading its fold and typed read and keeping no copy: an agent recorded with no person is refused by name; an agent's read carries needs_a_new_person, worked out on read from its registration and its person's retire record, true on every one of a retired person's agents, never for a suspended person, with nothing appended and each agent's own state unchanged; every change of state is walked, six admitted and fourteen refused by name; and a test shows the state starts and stops no process and says nothing about running. One brief, DIRECTORY-019, of five rows.
-- Asked by: tom on 2026-09-27T13:26:00+10:00
-- Context: The lifecycle conformance card on Cambium's board, run through the brief_card chain at lys main 7b53625. The survey's five questions were answered by the lead for the identity line and are written into DIRECTORY-019 as settled: the flag stands and ADR-011's responsible person for life stays in force until the reassignment card revises it; the flag is worked out on read with nothing appended (the new decision ADR-056); a flagged agent's own state is unchanged; the flag shows in the lifecycle read and the typed read, the screen being a later card; and only a retired person's agents are flagged, never a suspended person's.
-- Quote: An agent whose person is retired shows as needing a new person, and the four identity states are recorded as authority only.
+- **RM-032** — Refuse by name every act that would give a sign-in identity to an agent (conformance row 1.2) (feature, idea)
+- Summary: States and tests conformance row 1.2: a sign-in identity, a provider account linked to a person, is never lent to or held by an agent. The directory refuses by name linking such an account to an agent and delegating a sign-in identity, each refusal writing nothing, and one counted test over the store finds no agent record carrying a sign-in identity. The broker's refusal of credentials derived from a person's sign-in session is recorded as a finding against SECRETS-002; row 1.2 is met in full only when it passes.
+- Asked by: tom on 2026-09-27T14:22:00+10:00
+- Context: The identity line's card for conformance row 1.2, filed against lys main 7b536253; the lead's rulings of 27 September to run ea580795-f9fa-4284-99e5-1f7cce6b37c4 and the answers to this run's survey are carried into DIRECTORY-009 as settled.
+- Quote: Conformance row 1.2 says a sign-in identity is never lent to or held by an agent. A sign-in identity is a person's link to a provider, such as a Google or GitHub account, through which that person signs in. IDENTITY-001 was to state this and never did, and no brief tests it. The directory holds sign-in identities beside people (DIRECTORY-004 links two providers to one person) and gives grants to agents (DIRECTORY-006), so the refusal belongs at the point where anything would attach a sign-in identity to an agent.
 
-This card covers the first two rows of section 3 of the identity CONFORMANCE document on lys main 7b536253, Lifecycle, and each row gets at least one acceptance line that tests it on the lifecycle record.
-No brief on main makes either row true, and the lifecycle-hand brief on its own branch cites neither row.
-This brief reads that brief's lifecycle record rather than keeping its own copy.
+The directory refuses, by name, every act that would give an agent a sign-in identity: linking a provider account to an agent, delegating a grant whose source is a sign-in identity, and issuing any credential to an agent that is derived from a person's sign-in session. The refusal names the act, the agent and the sign-in identity, and states that sign-in identities belong to people only. Nothing an agent holds or presents is ever a person's sign-in session or token. The "cannot give" list of row 2.4 shows sign-in identities with the reason "sign-in identity".
 
-The first row is that every agent answers to a person.
-When that person is retired, each of their agents is flagged in its lifecycle record as needing a new person, and a test retires a person and reads the flag on every one of their agents.
-An agent with no person is refused by name when it is recorded, and a test shows that refusal.
+Acceptance is that linking a provider account to an agent is refused by name; that delegating from a sign-in identity to an agent is refused by name; that a credential request for an agent that presents a person's sign-in token is refused by name; that each refusal writes nothing to the directory; and that no agent record in the directory ever carries a sign-in identity, checked by one test over the store after all three refusals. This brief names row 1.2 as the row it passes.
 
-The second row is that the identity states are registered, active, suspended and retired.
-A test walks each allowed change of state in the lifecycle record and shows every other change refused by name.
-The state is authority only.
-A test shows that changing an agent's state starts and stops no process, and that the record says nothing about whether the agent is running.
+It waits for DIRECTORY-004 and DIRECTORY-006 to land, each checked by a command a stranger can run against lys main. Filed by Archie, lead for the identity line, on 27 September 2026, against lys main 7b536253.
 
-Giving an agent a new person is out of scope and is its own card.
-- Cluster: directory; briefs: DIRECTORY-019
-- Notes: Its own row rather than riding RM-001, which carries IDENTITY-001's rows; it depends on RM-001 for DIRECTORY-003. Ids under the ruling that a brief's ids are the next after main's highest and every open branch's: ADR-056, C123 to C127 and S52 to S53 (the open branches reach ADR-055, C122 and S51 in this cluster); RM-032 is kept as the draft's row. The brief id DIRECTORY-019 is the next after main's highest and every open branch's (the open branches reach DIRECTORY-018; the lifecycle-hand brief holds DIRECTORY-009 on brief/directory/lifecycle-hand). DIRECTORY-019 depends on DIRECTORY-009, which creates the lifecycle contract, module and typed read its rows modify; RM-017 is named in its blocked_by rather than in this row's depends_on because RM-017 is not yet on main. The flag stands against ADR-011's responsible person for life and DIRECTORY-003 R1's rule that no request changes it; this card revises neither, and clearing the flag needs the reassignment card, which is the one that revises that rule. Further units, not written: Give an agent whose person is retired a new responsible person; Show the needs-a-new-person flag on the people list and the agent file; CONFORMANCE 3.4: emergency stop revokes tokens and asks sessions to end.
+Rulings of the lead, Archie, given on 27 September 2026 to the run ea580795-f9fa-4284-99e5-1f7cce6b37c4 in answer to its rounds. That run took every answer and then failed before writing, when the account pool refused every session. They are settled here, and the author reopens none of them.
+
+The exception stays, because it is Tom's ruling and this brief does not overturn it. The brief states it as the one named exception, citing STATEMENT-2026-09-22.md:43 and :167 and PROVISIONING-2026-09-22.md:18. The harness login token reaches a seat's process under that ruling, and it never passes through anything lys issues, links or delegates. The rule governs everything lys itself gives an agent. The token is not redefined, and the brief does not pretend it is something other than what it is. Answered by Archie, lead for the identity line.
+
+No seam that exists only to refuse. The directory enforces the two acts it owns, linking a provider account to an agent and delegating a grant whose source is a sign-in identity, each refused by name with an acceptance line. Issuing credentials is the broker's, so the third refusal is a rule the broker enforces. This brief states it and names it as a finding against SECRETS-002, with the acceptance line that the broker refuses to issue an agent any credential derived from a person's sign-in session, to be carried by the broker's card. The brief says that row 1.2 is met in full only when that line passes. Answered by Archie.
+
+Only that one exists. A refusal returned to anyone other than the identity's owner or a directory administrator names the act, the agent and the fact that a sign-in identity is involved, and states that sign-in identities belong to people only. It never shows the provider or the subject, as DIRECTORY-006 R5 requires. The owner and administrators see the provider and subject. Acceptance lines cover both views. Answered by Archie.
+
+Only a person's account. A sign-in identity is a provider account linked to a person in the directory, and only that is refused. An agent's own machine account, bound to the agent and to no person, is a service account under row 1.3's separate list, and registering it as the agent's issuer-subject binding under DIRECTORY-003 R1 is allowed. A provider account already linked to a person is refused for an agent by name. Acceptance lines cover an agent's own account accepted and a person's linked account refused. Answered by Archie.
+
+The server's reason is this brief's, and the screen is row 2.4's. Apollo's card jAfmblAP carries the cannot-give list with its four reasons, sign-in identity among them, on the delegation screen. This brief asserts that the server returns the reason 'sign-in identity' for such an entry, and names jAfmblAP as where a person sees it. No screen work is duplicated here. Answered by Archie.
+- Cluster: directory; briefs: DIRECTORY-009
+- Notes: Ids: the brief is DIRECTORY-009, the id this run was given; this row is RM-032, the next after RM-031, the highest the survey read on open brief branches (18 of 36 brief heads were not readable, so a collision there is possible), and ADR-019 is the next after main's ADR-018. DIRECTORY-006, which DIRECTORY-009 also waits on, has no roadmap row on main. Findings recorded in DIRECTORY-009's task: against SECRETS-002, the broker refuses to issue an agent any credential derived from a person's sign-in session (row 1.2 is met in full only when that line passes); against DIRECTORY-004, its link path asks lys-identity by issuer-subject pair before the fork links. Further units, not written: SECRETS-002: the broker refuses to issue an agent any credential derived from a person's sign-in session; jAfmblAP: the cannot-give list shows 'sign-in identity' from the server's reason; The fork-owned brief for DIRECTORY-004's linking change in ablative-io/rauthy; CONFORMANCE.md row 1.2 Brief column repointed from 'IDENTITY-001 (amend: state it)' to this brief.
 
 ## The design
 
@@ -180,6 +208,8 @@ IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, an
 
 Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.
 
+DIRECTORY-009 carries conformance row 1.2, sign-in identities belong to people only (ADR-019). A sign-in identity is a provider account (P1) linked to a person; the directory classifies every issuer-subject pair from its signed history as a current or former sign-in identity, an agent's service account, or unbound, so an account once linked to a person stays refused for agents after an unlink. The refusals sit in seams other rows already own: the DIRECTORY-003 R1 binding API, a check beside the DIRECTORY-003 R4 receiver that the link path asks by issuer-subject pair before the fork links (DIRECTORY-004), and DIRECTORY-006 admission and explanation. One refusal value carries two views: the identity's owner and a directory administrator see the provider and subject, everyone else only that a sign-in identity is involved. The harness login token (SECRETS-002 R5) is the one named exception and never passes through anything lys issues, links or delegates.
+
 ## Principles
 
 - **P1** — An enduring identity ID is stable through provider additions, key rotation and later sessions; issuer plus subject identifies an external login; email and display name never establish identity equivalence.
@@ -194,6 +224,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 
 ## Decisions
 
+- ADR-001 — Secrets are held behind a handle the door swaps for the credential — A seat holds a short-lived handle bound to its identity. The real credential sits in the door's encrypted store and never leaves the server. The door's proxy checks SpiceDB, swaps the handle for the credential, forwards the call and writes one audit line. Built in Rust inside the door; no OpenBao unless credentials minted on demand are later needed.
 - ADR-003 — Everything is pegged to a human authority — A person signs in first; an agent is provisioned under that person with its own identity; the person's permissions are the ceiling and the agent holds an explicit subset; every grant says who may exercise it and who may pass it on; withdrawing the authority stops every grant derived from it. The exact delegation schema is not settled by this decision.
 - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
 - ADR-005 — The identity database is PostgreSQL, possibly on a network device — PostgreSQL is used for the identity product's database. It may be set up on one of the network devices rather than on Tom's Mac.
@@ -202,7 +233,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
 - ADR-010 — Every product shares one design and keeps its own accent; the identity product's is orange — The identity screens follow Aion's structure, typography, spacing and interaction, and Rauthy's client themes take the same colours, with no build dependency on Cambium or Aion. Each product keeps its own accent within the estate colour family: Cambium green, Aion blue and black, Argus light blue, Haematite mustard. The identity product's accent is orange (accent #D4975A, deep #A86B2E, wash #3D2A17 in the estate colour tokens), set apart from Manifold's copper. No product is silently made Aion-blue, and purple is not used.
 - ADR-011 — An identity is registered, active, suspended or retired — An identity is in one of four states: registered (exists in the directory, no grants, no credential handle, may not act), active (may act within its grants), suspended (kept whole, grants kept but not effective) and retired (permanent, history kept, never reactivated; a new identity is made instead). Register, activate, suspend, reinstate and retire are the only transitions, each one signed audit record naming the authenticated actor and their provenance, the identity, from, to, when and reason. Having a grant or a credential is a fact beside the state, not a state. A person is registered by first sign-in; an agent is registered by a signed-in person, who carries it as its responsible person for life and may cause every transition of their own agents. Source: docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:71-95.
-- ADR-056 — Needs a new person is a view worked out on read from an agent's registration and its person's retire record, never stored or appended — An agent's needs-a-new-person flag is worked out each time its lifecycle record is read, from the responsible person its registration names and that person's retire record: it is true when that person's folded state is retired and false otherwise, a suspended person included. Nothing is appended to any agent's history, no transition is made on the agent, the agent keeps its own state, and no responsible person changes. The flag records a fact, that the agent's person is retired; clearing it needs the reassignment card, which is the one that revises ADR-011's responsible person for life. Rejected: a signed flag record appended on each agent when its person is retired; moving the agent to another state with its person.
+- ADR-019 — Sign-in identities belong to people only; the harness login token is the one named exception — A sign-in identity, a provider account linked to a person, belongs to that person only: lys refuses by name every act of its own that would give one to an agent or to another person, and an account once linked to a person stays refused for agents after it is unlinked. The harness login token recorded at docs/design/identity/STATEMENT-2026-09-22.md:43 and :167 and docs/design/identity/PROVISIONING-2026-09-22.md:18 is the one named exception; it never passes through anything lys issues, links or delegates, and it is not redefined. Rejected: letting a person lend a sign-in identity to their own agent, dropping the refusal once an account is unlinked, and redefining the login token so the rule could be claimed without an exception.
 
 ## Goals
 
@@ -211,7 +242,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - Every decision still open for Tom is recorded as open and decided nowhere in this cluster.
 - The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6).
 - DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record.
-- CONFORMANCE rows 3.1 and 3.2 are true on the lifecycle record, each tested by at least one acceptance line of DIRECTORY-019, reading the lifecycle-hand brief DIRECTORY-009's record and keeping no copy of it.
+- DIRECTORY-009 states and tests conformance row 1.2: linking a provider account linked to a person to an agent, and delegating a sign-in identity, are each refused by name and write nothing; one counted test over the store finds no agent record carrying a sign-in identity; the broker's refusal is recorded as a finding against SECRETS-002, on which row 1.2's full pass waits.
 
 ## Non-Goals
 
@@ -226,8 +257,8 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - The examples in AGENT-PARITY-2026-09-23 (abilities with an assignment or project, seat provisioning within a budget, private and shared notes) — Tom gave them as not yet decided (docs/design/identity/AGENT-PARITY-2026-09-23.md:11-15); they are never turned into requirements.
 - A production Cambium auth cutover, and any upstream Rauthy contribution as a prerequisite — Revision 5 forbids both before scratch acceptance, review and Gypsy's coordinated install (docs/design/identity/briefs/IDENTITY-001.json:31).
 - A shared design-system package extracted for every product — Tom left it as a thing to look at, not a row (ADR-010).
-- Giving an agent a new person — It is its own card, the one that revises ADR-011's responsible person for life and clears the flag; DIRECTORY-019 only flags that an agent's person is retired (ADR-056).
-- A screen that shows the needs-a-new-person flag on the people list and the agent file — It belongs to a later card; DIRECTORY-019 shows the flag in the lifecycle read and the lifecycle-hand brief's typed read (RM-017), which that screen consumes.
+- The broker's refusal to issue an agent any credential derived from a person's sign-in session — Issuance is the broker's (ADR-001); DIRECTORY-009 records it as a finding against SECRETS-002, carried by the broker's card.
+- The cannot-give list on the delegation screen — The screen is row 2.4's, carried by Cambium card jAfmblAP; DIRECTORY-009 supplies only the server's reason 'sign-in identity'.
 
 ## Structure
 
@@ -329,17 +360,18 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `surface/identity/src/generated/index.ts` | Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch | DIRECTORY-006 |
 | `docs/design/directory/briefs/DIRECTORY-008.json` | the grant brief residue after PR 6: DIRECTORY-005's verification line, three inventory rows and the intention sentence, as requirements on the documents | DIRECTORY-008 |
 | `docs/design/directory/briefs/DIRECTORY-008.md` | rendered markdown | DIRECTORY-008 |
-| `docs/design/identity/LIFECYCLE-CONTRACT.md` | the lifecycle contract, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R1 adds its conformance section for rows 3.1 and 3.2 | DIRECTORY-019 |
-| `crates/lys-identity/src/lifecycle/mod.rs` | the lifecycle module list, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds the responsible module | DIRECTORY-019 |
-| `crates/lys-identity/src/lifecycle/error.rs` | the lifecycle refusal names, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds lifecycle_agent_without_person | DIRECTORY-019 |
-| `crates/lys-identity/src/lifecycle/causes.rs` | who may cause each transition, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds one line calling the no-person check | DIRECTORY-019 |
-| `crates/lys-identity/tests/lifecycle_support/mod.rs` | the lifecycle test support, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 adds persons with agents to its fixtures | DIRECTORY-019 |
-| `crates/lys-identity-server/src/lifecycle_read.rs` | the typed lifecycle read, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R3 adds the needs_a_new_person field | DIRECTORY-019 |
-| `crates/lys-identity/src/lifecycle/responsible.rs` | the no-person refusal and the needs-a-new-person flag worked out on read (DIRECTORY-019 R2, R3) | DIRECTORY-019 |
-| `crates/lys-identity/tests/lifecycle_no_person.rs` | CONFORMANCE 3.1: an agent recorded with no person is refused by name (DIRECTORY-019 R2) | DIRECTORY-019 |
-| `crates/lys-identity/tests/lifecycle_needs_new_person.rs` | CONFORMANCE 3.1: retiring a person flags every one of their agents as needing a new person, and suspending one flags none (DIRECTORY-019 R3) | DIRECTORY-019 |
-| `crates/lys-identity/tests/lifecycle_walk.rs` | CONFORMANCE 3.2: the walk of all 20 changes of state (DIRECTORY-019 R4) | DIRECTORY-019 |
-| `crates/lys-identity-server/tests/lifecycle_authority.rs` | CONFORMANCE 3.2: the state is authority only and the read says nothing about running (DIRECTORY-019 R5) | DIRECTORY-019 |
+| `docs/design/directory/briefs/DIRECTORY-009.json` | conformance row 1.2: sign-in identities belong to people only, refused by name at every directory act that would give one to an agent | DIRECTORY-009 |
+| `docs/design/directory/briefs/DIRECTORY-009.md` | rendered markdown | DIRECTORY-009 |
+| `crates/lys-identity/src/sign_in_identity.rs` | classifies an issuer-subject pair as a current or former sign-in identity, an agent's service account, or unbound, from the signed history | DIRECTORY-009 |
+| `crates/lys-identity/src/sign_in_refusal.rs` | the sign-in identity refusal and its owner-and-administrator and redacted views | DIRECTORY-009 |
+| `crates/lys-identity/tests/sign_in_classification.rs` | the four classes of an issuer-subject pair, through unlink and reopen | DIRECTORY-009 |
+| `crates/lys-identity/tests/sign_in_refusal_views.rs` | the two views of the refusal, and the redacted view's absence of provider and subject | DIRECTORY-009 |
+| `crates/lys-identity/tests/sign_in_agent_binding.rs` | a sign-in identity refused as an agent's binding, an agent's own machine account accepted | DIRECTORY-009 |
+| `crates/lys-identity-server/src/sign_in_link_check.rs` | the check the link path asks by issuer-subject pair before a person links a provider account | DIRECTORY-009 |
+| `crates/lys-identity-server/tests/sign_in_link_check.rs` | a person's link of an agent's service account refused by name | DIRECTORY-009 |
+| `crates/lys-identity/tests/grant_sign_in_identity.rs` | delegating a sign-in identity refused for agent and person recipients; a service-access grant on the same account admitted | DIRECTORY-009 |
+| `crates/lys-identity-server/tests/grant_cannot_give.rs` | the reason 'sign-in identity' on the cannot-give list, and the two views at the grant seam | DIRECTORY-009 |
+| `crates/lys-identity-server/tests/sign_in_store.rs` | every refusal writes nothing; no agent record carries a sign-in identity, counted over the store | DIRECTORY-009 |
 
 ## Inventory
 
@@ -354,6 +386,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - `vendor/rauthy` — the maintained Rauthy fork (ADR-009), the git submodule pinned at dd61ac3c84d6b238108dc8438b53043b5177a662, the upstream v0.36.2 commit the ablative branch was created from; DIRECTORY-004 moves the pin (structure row); read here, never changed by a document row
 - `crates/lys` — the lys CLI crate: Cargo.toml, src/main.rs, src/cli.rs and src/commands/ (attest, ca, key, log, inspect, files); DIRECTORY-002 adds src/identity/ and the identity subcommand to it (structure rows)
 - `docs/design/decisions.json` — the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row
+- `docs/design/secrets/briefs/SECRETS-002.json` — the broker brief: R4 keeps a sign-in identity and an OAuth service-access grant as distinct records, R5 puts the seat's login token into its environment at spawn; DIRECTORY-009 records a finding against it and changes nothing in it
 
 ## Constraints
 
@@ -1571,173 +1604,228 @@ THE SYSTEM SHALL append one sentence to the intention of docs/design/directory/d
 
 ---
 type: brief
-id: DIRECTORY-019
+id: DIRECTORY-009
 cluster: directory
-title: Make CONFORMANCE rows 3.1 and 3.2 true on the lifecycle record: every agent answers to a person, an agent whose person is retired is flagged on read as needing a new person, and the four states are authority only
+title: Refuse by name every directory act that would give a sign-in identity to an agent
 ---
 
-# DIRECTORY-019: Make CONFORMANCE rows 3.1 and 3.2 true on the lifecycle record: every agent answers to a person, an agent whose person is retired is flagged on read as needing a new person, and the four states are authority only
+# DIRECTORY-009: Refuse by name every directory act that would give a sign-in identity to an agent
 
 > **Cluster:** directory
-> **Depends on:** DIRECTORY-003, DIRECTORY-009
-> **Blocked by:** The lifecycle-hand brief DIRECTORY-009 (roadmap row RM-017, branch brief/directory/lifecycle-hand) signed off and landed on main with ADR-027 and ADR-028, because this brief reads that brief's lifecycle record, its fold (its R3, crates/lys-identity/src/lifecycle/fold.rs and state.rs), its cause rule (its R2, crates/lys-identity/src/lifecycle/causes.rs), its typed read (its R6, crates/lys-identity-server/src/lifecycle_read.rs) and its contract (its R1, docs/design/identity/LIFECYCLE-CONTRACT.md), and keeps no copy of any of them. Check: git ls-tree -r --name-only origin/main crates/lys-identity/src/lifecycle crates/lys-identity-server/src/lifecycle_read.rs docs/design/identity/LIFECYCLE-CONTRACT.md prints fold.rs, state.rs, causes.rs, error.rs, mod.rs, lifecycle_read.rs and LIFECYCLE-CONTRACT.md. Until then no row starts, R1 included, because R1 adds to that contract., The lead's sign-off of this brief before any row is dispatched (DIRECTORY-001 boundary), which is also the manifest review CN9 asks for of the four files this brief adds under crates/lys-identity/ and crates/lys-identity-server/ and of the added lines it names in the lifecycle-hand brief's files. Check: python3 scripts/design/validate.py docs/design/directory and python3 scripts/design/check-coverage.py docs/design/directory both exit 0, and the card that carries this brief records the sign-off before card_build_v3 runs.
+> **Depends on:** DIRECTORY-004, DIRECTORY-006
+> **Blocked by:** Sign-off of this brief before it is dispatched (DIRECTORY-001 boundary: no row brief is dispatched until it has been reviewed)., DIRECTORY-004 landed on lys main, checked by a command anyone can run: git clone https://github.com/ablative-io/lys.git lys-check && cd lys-check && git ls-tree origin/main vendor/rauthy prints a commit other than dd61ac3c84d6b238108dc8438b53043b5177a662, and git ls-tree -r --name-only origin/main -- docs/design/identity/PROVIDER-LINK-CONTRACT.md docs/design/identity/reports/IDENTITY-001-links.md prints both paths. Until both hold, this brief is not dispatched., DIRECTORY-006 landed on lys main, checked by a command anyone can run: in the same clone, git ls-tree -r --name-only origin/main -- crates/lys-identity/src/grants/admission.rs crates/lys-identity-server/src/grants.rs crates/lys-identity-server/src/routes.rs crates/lys-identity/tests/grant_delegation.rs crates/lys-identity-server/tests/grant_explanations.rs prints all five paths. crates/lys-identity-server/src/routes.rs is created by DIRECTORY-005 R1 and modified by DIRECTORY-006 R5, and R4 below modifies it, so its presence on lys main is checked here. Until it does, this brief is not dispatched., The binding registration path of DIRECTORY-003 R1 and its link-audit receiver (R4) are named by DIRECTORY-003's reviewed file manifest, which does not exist yet; R1, R3 and R4 below reconcile their call sites to that manifest before dispatch, and a missing seam is a named dispatch blocker, never a new seam invented here., Finding against DIRECTORY-004 (recorded in this brief's task): its link path has no call that asks lys-identity by issuer-subject pair before the fork links. That check does not exist yet: R4 creates it on the lys-identity side (crates/lys-identity-server/src/sign_in_link_check.rs), and the fork-side call, which passes the authenticated person on whose behalf it asks, and its acceptance line are carried by DIRECTORY-004 and the fork-owned brief it waits on.
 > **Design anchor:**
+> - ADR-001 — Secrets are held behind a handle the door swaps for the credential — A seat holds a short-lived handle bound to its identity. The real credential sits in the door's encrypted store and never leaves the server. The door's proxy checks SpiceDB, swaps the handle for the credential, forwards the call and writes one audit line. Built in Rust inside the door; no OpenBao unless credentials minted on demand are later needed.
 > - ADR-003 — Everything is pegged to a human authority — A person signs in first; an agent is provisioned under that person with its own identity; the person's permissions are the ceiling and the agent holds an explicit subset; every grant says who may exercise it and who may pass it on; withdrawing the authority stops every grant derived from it. The exact delegation schema is not settled by this decision.
 > - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
-> - ADR-007 — The product starts an agent by giving its start command, never by running it — The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.
+> - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
 > - ADR-011 — An identity is registered, active, suspended or retired — An identity is in one of four states: registered (exists in the directory, no grants, no credential handle, may not act), active (may act within its grants), suspended (kept whole, grants kept but not effective) and retired (permanent, history kept, never reactivated; a new identity is made instead). Register, activate, suspend, reinstate and retire are the only transitions, each one signed audit record naming the authenticated actor and their provenance, the identity, from, to, when and reason. Having a grant or a credential is a fact beside the state, not a state. A person is registered by first sign-in; an agent is registered by a signed-in person, who carries it as its responsible person for life and may cause every transition of their own agents. Source: docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:71-95.
-> - ADR-056 — Needs a new person is a view worked out on read from an agent's registration and its person's retire record, never stored or appended — An agent's needs-a-new-person flag is worked out each time its lifecycle record is read, from the responsible person its registration names and that person's retire record: it is true when that person's folded state is retired and false otherwise, a suspended person included. Nothing is appended to any agent's history, no transition is made on the agent, the agent keeps its own state, and no responsible person changes. The flag records a fact, that the agent's person is retired; clearing it needs the reassignment card, which is the one that revises ADR-011's responsible person for life. Rejected: a signed flag record appended on each agent when its person is retired; moving the agent to another state with its person.
+> - ADR-019 — Sign-in identities belong to people only; the harness login token is the one named exception — A sign-in identity, a provider account linked to a person, belongs to that person only: lys refuses by name every act of its own that would give one to an agent or to another person, and an account once linked to a person stays refused for agents after it is unlinked. The harness login token recorded at docs/design/identity/STATEMENT-2026-09-22.md:43 and :167 and docs/design/identity/PROVISIONING-2026-09-22.md:18 is the one named exception; it never passes through anything lys issues, links or delegates, and it is not redefined. Rejected: letting a person lend a sign-in identity to their own agent, dropping the refusal once an account is unlinked, and redefining the login token so the rule could be claimed without an exception.
 > **Checklist:**
-> - C123 — docs/design/identity/LIFECYCLE-CONTRACT.md maps CONFORMANCE rows 3.1 and 3.2 to named tests and states the needs-a-new-person rule, that ADR-011 is not revised, and that the state is authority only.
-> - C124 — Registering an agent whose register request names no responsible person is refused lifecycle_agent_without_person and appends nothing.
-> - C125 — An agent's lifecycle read carries needs_a_new_person, worked out on read, true on every one of a person's agents once that person is retired and false while the person is suspended, with no record appended and each agent's state unchanged.
-> - C126 — A walk of all 20 origin-by-target changes of state admits exactly the 6 in the table and refuses the other 14 by name with nothing appended.
-> - C127 — A change of state starts and stops no process, and no key of the typed lifecycle read says anything about running.
+> - C31 — Binding to an agent a provider account that is, or once was, linked to a person is refused by name and writes nothing, while an agent's own machine account, linked to no person, is accepted as its issuer-subject binding.
+> - C32 — A person's link of a provider account already bound to an agent as its service account is refused by name at the lys-identity check the link path asks, naming the withdrawal that answers it, naming the agent only to its responsible person and a directory administrator, and no binding is withdrawn.
+> - C33 — Delegating a sign-in identity is refused by name for an agent recipient and for a person recipient, while a service-access grant consented through the same provider account is admitted by the grant rules alone.
+> - C34 — The explanation seam lists each of a person's sign-in identities on the cannot-give list with the reason 'sign-in identity', whoever the recipient is.
+> - C35 — A sign-in identity refusal shows the provider and subject to the identity's owner and a directory administrator only; anyone else sees the act, the recipient and that a sign-in identity is involved.
+> - C36 — Every sign-in identity refusal leaves the log and projection unchanged, and one counted test over the store finds no agent record carrying a sign-in identity.
 > **Stories:**
-> - S52 (Operator, Installs and runs the standalone identity product) — As an operator, I want every agent whose person is retired to show that it needs a new person, so that no agent is left answering to a retired person without anyone seeing it.
-> - S53 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want an identity's state to move only along the lifecycle table and to say nothing about running, so that a state is read as authority and never mistaken for whether a process is alive.
+> - S13 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want the directory to refuse every act that would give that account to an agent, so that no agent can ever hold my sign-in.
+> - S14 (Person who signs in, Keeps their sign-in identities to themselves) — As a person delegating to an agent or another person, I want my sign-in identities listed as things I cannot give with the reason 'sign-in identity', so that I know why they are never offered.
+> - S15 (Person who signs in, Keeps their sign-in identities to themselves) — As the responsible person, I want my agent's own machine account accepted as its binding, so that the agent can have its own service account without holding anyone's sign-in.
+> - S16 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request.
+> - S17 (Directory administrator, Resolves a refused act) — As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.
 
 ## Purpose
 
-CONFORMANCE section 3 (docs/design/identity/CONFORMANCE.md:36-37) holds two lifecycle rows no brief on main makes true. Row 3.1: every agent answers to a person, and an agent whose person is retired is flagged as needing a new one. Row 3.2: the identity states are registered, active, suspended and retired, and the state is authority only and says nothing about running. This brief makes both rows true on the lifecycle record the lifecycle-hand brief DIRECTORY-009 (RM-017) defines, reading its fold and its typed read and keeping no copy of either: an agent recorded with no person is refused by name; an agent's read carries a needs-a-new-person flag worked out each time it is read from its registration and its person's retire record (ADR-056); every change of state is walked, the six in the table admitted and the fourteen others refused by name; and a test shows a change of state starts and stops no process and that the read says nothing about running (ADR-007, ADR-004). Each row maps to at least one acceptance line that tests it on the lifecycle record: row 3.1 to R2 and R3, row 3.2 to R4 and R5.
+State and test conformance row 1.2 of docs/design/identity/CONFORMANCE.md: a sign-in identity is never lent to or held by an agent. A sign-in identity is a provider account (issuer plus subject, P1) linked to a person in the directory, through which that person signs in; sign-in identities belong to people only (ADR-019). IDENTITY-001 was to state this and never did, and no brief tests it; this brief carries the statement and its tests instead of amending IDENTITY-001 (CN1). The directory holds sign-in identities beside people (DIRECTORY-004) and gives grants to agents (DIRECTORY-006), so the refusal sits at the two acts the directory owns: linking a provider account to an agent, and delegating a sign-in identity. Each is refused by name, writes nothing, and one counted test over the store then finds no agent record carrying a sign-in identity. The third act, issuing an agent a credential derived from a person's sign-in session, is the broker's (ADR-001): this brief states it as a finding against SECRETS-002 and does not enforce it. This brief names row 1.2 as the row it passes; row 1.2 is met in full only when the broker's line (task, finding 1) also passes. The one named exception is the harness login token, which reaches a seat's process under the ruling recorded at docs/design/identity/STATEMENT-2026-09-22.md:43 and docs/design/identity/STATEMENT-2026-09-22.md:167 and docs/design/identity/PROVISIONING-2026-09-22.md:18; it never passes through anything lys issues, links or delegates, it is not redefined here, and the rule governs everything lys itself gives an agent.
 
 ## Task
 
-Five rows, in order: R1 the conformance section of the lifecycle contract (1 hour), R2 the named refusal of an agent recorded with no person (2 hours), R3 the needs-a-new-person flag worked out on read (3 hours), R4 the walk of every change of state (2 hours), R5 the authority-only test (2 hours): 10 focused implementer hours. R1 is documents only; R2 to R5 stand on files the lifecycle-hand brief DIRECTORY-009 (RM-017) creates, and every such file is touched only by the added lines a row names (CN9).
+Build R1 to R7 in order, after DIRECTORY-004 and DIRECTORY-006 have landed on lys main (blocked_by gives the command that checks each). R1 classifies an issuer-subject pair from the directory's signed history; R2 is the one refusal value and its two views; R3 refuses a sign-in identity as an agent's binding and accepts an agent's own machine account; R4 is the lys-identity check the link path asks before a person links a provider account; R5 refuses delegating a sign-in identity at DIRECTORY-006 admission; R6 serves the reason 'sign-in identity' on the cannot-give list and the two refusal views at the grant seam; R7 proves every refusal writes nothing and that no agent record carries a sign-in identity. Every path is relative to the repository root (CN3).
 
-The lead's answers are written in as settled. (1) The flag stands, and ADR-011's responsible person for life stays in force: this brief does not revise ADR-011 or DIRECTORY-003 R1. The flag records a fact: the agent's person is retired. Clearing it needs the reassignment card, which is the one that revises that rule. (2) The flag is computed on read, from the agent's registration and its person's retire record, with nothing appended to the agent: each agent's history stays as it is, and the lifecycle-hand brief's rule that retiring someone has no automatic effect on other identities except the grant check holds (ADR-056). (3) The agent's own state is unchanged: it stays in whatever state it was, for example active, and its derived grants refuse at the check, as the lifecycle-states statement's rule that retiring the human makes every derived grant refuse at the next check already says; retiring the person moves no other identity, and this brief neither asserts nor duplicates that grant rule (DIRECTORY-006 R4). (4) Shows is met by the flag in the lifecycle read and in the lifecycle-hand brief's typed read (its R6); the screen that shows it on the people list and the agent file belongs to a later card. (5) Only an agent whose person is retired is flagged. What a suspension stops stays open, so a suspended person's agents are not flagged.
+The rule. Sign-in identities belong to people only. Nothing an agent holds or presents is ever a person's sign-in session or token. A sign-in identity is never a thing anyone can give, to an agent or to another person; row 1.2 is the agent case, and the person-recipient case follows from the same rule. An agent's own machine account, bound to the agent and to no person, is a service account under row 1.3's separate list and stays allowed as its DIRECTORY-003 R1 issuer-subject binding. A provider account once linked to a person stays refused as any agent's binding after it is unlinked, whether the agent is that person's or anyone else's; the directory keeps the unlink on the record, and the refusal names the account as a former sign-in identity. When an agent's own machine account is bound first and a person later tries to link that same provider account, the agent's binding stands and the person's link is refused by name; nothing is ever withdrawn silently to make room. A service-access grant (for example Google Drive consented through the same account the person signs in with) is a separate record under SECRETS-002 R4, delegated under DIRECTORY-006's own rules; delegating it gives the agent that service's access, never the person's sign-in or session, and this brief does not refuse it.
 
-Split notes. DIRECTORY-003 R5 already refuses four named out-of-table transitions; R4's walk is its superset over all twenty origin-by-target pairs and adds no second table check: every refusal it counts is the one DIRECTORY-003 R5's commit path gives, or the lifecycle-hand brief's lifecycle_unknown_identity. DIRECTORY-003 R1 refuses a registration with no signed-in caller at the server; R2's refusal is of the record, an agent registration naming no responsible person whoever the caller is, and the two stay separate names.
+The named exception. The harness login token reaches a seat's process under the ruling recorded at docs/design/identity/STATEMENT-2026-09-22.md:43 and docs/design/identity/STATEMENT-2026-09-22.md:167 and docs/design/identity/PROVISIONING-2026-09-22.md:18 (SECRETS-002 R5). It is the one named exception, it never passes through anything lys issues, links or delegates, and this brief neither overturns nor redefines it.
 
-Out: giving an agent a new person (its own card); the screen that shows the flag on the people list and the agent file (a later card); CONFORMANCE row 3.4.
+Finding 1, against SECRETS-002, carried by the broker's card. Issuing credentials is the broker's (ADR-001), so the third refusal is a rule the broker enforces, not a directory seam. Its acceptance line, for the broker's card to carry: the broker refuses to issue an agent any credential derived from a person's sign-in session; a credential request for an agent that presents a person's sign-in token is refused by name, the refusal names the act, the agent and the sign-in identity, and the request issues nothing. Row 1.2 is met in full only when that line passes.
+
+Finding 2, against DIRECTORY-004, carried by DIRECTORY-004 and the fork-owned brief it waits on. DIRECTORY-004's link path has no call that asks lys-identity by issuer-subject pair before the fork links, and the fork knows only Rauthy users, so it cannot see an agent's binding. Its acceptance line: the fork's call passes the issuer-subject pair and the authenticated person on whose behalf it asks, because R4 chooses the refusal's view by that person; with an agent's own machine account bound to issuer https://github.com and subject gh-7 in lys-identity, a person's attempt to link that account in the fork is refused by name with R4's refusal in the view R4 chooses for that person, and the fork creates no link.
+
+The screen. The cannot-give list is row 2.4's screen, carried by Cambium card jAfmblAP on the delegation screen; this brief supplies only the server's reason (R6) and does no screen work.
+
+In: the classification, the refusal and its views, the two directory refusals, the pre-link check, the cannot-give reason and the store test. Out: the broker's refusal (finding 1), the fork-side call (finding 2), any screen, any change to CONFORMANCE.md or to IDENTITY-001, and any change to lys-core or a published wire format.
 
 ## Requirements
 
-### R1: Add the conformance section to the lifecycle contract: rows 3.1 and 3.2 mapped to their tests, the needs-a-new-person rule, and the state as authority only
+### R1: Classify an issuer-subject pair from the directory's signed history
 
-Documents only. The contract is created by DIRECTORY-009 R1, on which this brief depends. THE SYSTEM SHALL add to docs/design/identity/LIFECYCLE-CONTRACT.md, after its existing sections, one section headed 'Conformance rows 3.1 and 3.2' holding, in this order: (1) a table with one row per conformance row, beginning '| 3.1 |' and '| 3.2 |', each naming the test files and test functions of this brief that test it on the lifecycle record: 3.1 to crates/lys-identity/tests/lifecycle_no_person.rs and crates/lys-identity/tests/lifecycle_needs_new_person.rs, 3.2 to crates/lys-identity/tests/lifecycle_walk.rs and crates/lys-identity-server/tests/lifecycle_authority.rs; (2) the needs-a-new-person rule: an agent's needs_a_new_person flag is worked out on read from the agent's registration and its responsible person's retire record, and never appended; it is true on every one of that person's agents when the person is retired and false otherwise, a suspended person included, because what a suspension stops stays open; the flag is not a state and not a transition, the agent keeps its own state, its derived grants refuse at the check, and no responsible person changes; (3) the statement that the flag records a fact, the agent's person is retired, that this contract does not revise ADR-011's responsible person for life or DIRECTORY-003 R1, and that clearing the flag needs the reassignment card, which is the one that revises that rule; (4) the sentence 'the state is authority only: it starts and stops no process and says nothing about whether an identity is running'. The section SHALL NOT change any existing line of the contract, SHALL NOT edit the lifecycle-states statement or CONFORMANCE.md, and SHALL NOT add a state or a transition. Estimate: 1 hour.
-
-**Acceptance:**
-- grep -c '^| 3.1 |\|^| 3.2 |' docs/design/identity/LIFECYCLE-CONTRACT.md prints 2.
-- Each of grep -c 'needs_a_new_person', grep -c 'worked out on read', grep -c 'a suspended person included', grep -c 'clearing the flag needs the reassignment card' and grep -c 'the state is authority only' over docs/design/identity/LIFECYCLE-CONTRACT.md prints at least 1.
-- git diff --numstat on the R1 commit for docs/design/identity/LIFECYCLE-CONTRACT.md prints a second number of 0, and git diff --stat on the R1 commit for docs/design/identity/CONFORMANCE.md and the lifecycle-states statement under docs/design/identity/ prints nothing.
-- sh scripts/design/gate.sh exits 0 on the R1 commit.
-
-**Files:**
-- modify: docs/design/identity/LIFECYCLE-CONTRACT.md
-
-**Checklist:**
-- C123 — docs/design/identity/LIFECYCLE-CONTRACT.md maps CONFORMANCE rows 3.1 and 3.2 to named tests and states the needs-a-new-person rule, that ADR-011 is not revised, and that the state is authority only.
-
-**Stories:**
-- S52 (Operator, Installs and runs the standalone identity product) — As an operator, I want every agent whose person is retired to show that it needs a new person, so that no agent is left answering to a retired person without anyone seeing it.
-- S53 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want an identity's state to move only along the lifecycle table and to say nothing about running, so that a state is read as authority and never mistaken for whether a process is alive.
-
-### R2: Refuse by name an agent recorded with no responsible person, and append nothing
-
-IF a register transition for an agent names no responsible person, THEN THE SYSTEM SHALL refuse it lifecycle_agent_without_person, whose message names the agent and says that every agent is registered under a responsible person, and SHALL append nothing. The check lives in crates/lys-identity/src/lifecycle/responsible.rs, the refusal name in crates/lys-identity/src/lifecycle/error.rs beside the lifecycle-hand brief's names, and it is called by one added line in crates/lys-identity/src/lifecycle/causes.rs on the register path, before the append. THE SYSTEM SHALL NOT fill an absent responsible person from the caller, the administrator or any other source, SHALL NOT apply the check to the registration of a person, and SHALL NOT change DIRECTORY-003 R1's refusal of a registration with no signed-in caller, which stays a separate refusal at the server. The four modified files are created by DIRECTORY-009 R2, on which this brief depends. No wall clock; every time value the test needs is injected through crates/lys-identity/tests/lifecycle_support/mod.rs. Estimate: 2 hours.
+THE SYSTEM SHALL classify an issuer-subject pair, from the directory's signed events, as exactly one of: a current sign-in identity (linked to a person now, naming that person), a former sign-in identity (linked to a person once and since unlinked, naming that person), an agent's service account (bound to an agent and never to a person, naming that agent), or unbound. A person's registration binding and every provider link the DIRECTORY-003 R4 receiver records count as linked to a person; an unlink the receiver records moves the pair to former and never back to unbound. The classification SHALL be derived from the replayed log, so it is the same after reopen. It SHALL NOT use email, display name or provider-side account labels to decide anything (P1), and SHALL NOT drop a former sign-in identity from the projection on unlink, retirement of the person, or replay.
 
 **Acceptance:**
-- cf3_r2_ac1: the attested administrator registers an agent whose register request names no responsible person: 1 refusal named lifecycle_agent_without_person, its message containing 'responsible person', and the log's leaf count unchanged; the same request naming a registered test person P as responsible person is admitted, the leaf count rises by exactly 1, and the agent's registration record names P; the test asserts 1 refusal and 1 admission; cargo test -p lys-identity --test lifecycle_no_person cf3_r2_ac1 prints 'test result: ok. 1 passed; 0 failed'.
-- cf3_r2_ac2: the attested administrator registers a person with no responsible person named: admitted, the leaf count rises by exactly 1, and no refusal named lifecycle_agent_without_person is returned; cargo test -p lys-identity --test lifecycle_no_person cf3_r2_ac2 prints 'test result: ok. 1 passed; 0 failed'.
-- rg -c 'responsible::' crates/lys-identity/src/lifecycle/causes.rs prints 1, and git diff --numstat on the row's commits for crates/lys-identity/src/lifecycle/causes.rs prints a second number of 0.
-- rg -c 'fn cf3_r2_ac(1|2)' crates/lys-identity/tests/lifecycle_no_person.rs prints 2, and on the row's first commit cargo test -p lys-identity --test lifecycle_no_person fails to compile.
+- With issuer https://accounts.google.com and subject g-100 linked to person P, the classifier returns current sign-in identity naming P.
+- After the receiver records P's unlink of that pair, the classifier returns former sign-in identity naming P; after the store is closed and reopened, it still returns former sign-in identity naming P.
+- With issuer https://accounts.google.com and subject svc-a bound to agent A and to no person, the classifier returns agent's service account naming A.
+- A pair with issuer https://accounts.google.com and subject g-999 that no event names returns unbound, including when P's recorded email is the email of the g-999 account in the fixture.
+- The test counts the four classes it exercised and asserts the count is 4.
 
 **Files:**
-- create: crates/lys-identity/src/lifecycle/responsible.rs
-- create: crates/lys-identity/tests/lifecycle_no_person.rs
-- modify: crates/lys-identity/src/lifecycle/mod.rs
-- modify: crates/lys-identity/src/lifecycle/error.rs
-- modify: crates/lys-identity/src/lifecycle/causes.rs
-- modify: crates/lys-identity/tests/lifecycle_support/mod.rs
+- create: crates/lys-identity/src/sign_in_identity.rs
+- create: crates/lys-identity/tests/sign_in_classification.rs
+- modify: crates/lys-identity/src/lib.rs
 
 **Checklist:**
-- C124 — Registering an agent whose register request names no responsible person is refused lifecycle_agent_without_person and appends nothing.
+- C31 — Binding to an agent a provider account that is, or once was, linked to a person is refused by name and writes nothing, while an agent's own machine account, linked to no person, is accepted as its issuer-subject binding.
 
 **Stories:**
-- S52 (Operator, Installs and runs the standalone identity product) — As an operator, I want every agent whose person is retired to show that it needs a new person, so that no agent is left answering to a retired person without anyone seeing it.
+- S13 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want the directory to refuse every act that would give that account to an agent, so that no agent can ever hold my sign-in.
 
-### R3: Work out each agent's needs-a-new-person flag on read from its registration and its person's retire record, and move nothing
+### R2: Define the sign-in identity refusal and its two views
 
-WHEN an agent's lifecycle record is read, THE SYSTEM SHALL work out its needs_a_new_person flag from the responsible person its registration record names and that person's folded state (the lifecycle-hand brief's fold, in which only the person's retire record makes it retired): true when that person is retired, whatever the agent's own state, and false when that person is registered, active or suspended. The derivation is one function in crates/lys-identity/src/lifecycle/responsible.rs over the lifecycle-hand brief's fold, and the typed read in crates/lys-identity-server/src/lifecycle_read.rs gains one field, needs_a_new_person, filled from that function by added lines and serialised as a JSON boolean. THE SYSTEM SHALL NOT append any record to work out or show the flag, SHALL NOT make a transition on the agent, SHALL NOT change the agent's state, SHALL NOT change the agent's responsible person, SHALL NOT store the flag, SHALL NOT make the flag a state, SHALL NOT flag an agent whose person is suspended, and SHALL NOT read DIRECTORY-006's grant decision to work it out. crates/lys-identity-server/src/lifecycle_read.rs is created by DIRECTORY-009 R6, on which this brief depends. No second store or projection of lifecycle state is added. Estimate: 3 hours.
+THE SYSTEM SHALL define one refusal for acts that would give a sign-in identity away. It names the act (link to an agent, or delegate), the recipient and its kind (agent or person), and the sign-in identity (provider and subject, current or former), and it states the literal sentence 'sign-in identities belong to people only'. WHEN the refusal is returned to the sign-in identity's owner or to a directory administrator (DIRECTORY-003 R3), THE SYSTEM SHALL show the provider and subject. WHEN it is returned to anyone else, THE SYSTEM SHALL show the act, the recipient and its kind, and that a sign-in identity is involved, and SHALL state the literal sentence 'sign-in identities belong to people only'. The view for anyone else SHALL NOT carry the provider or the subject in any form: not in its text, its Display, its Debug, its serialised response or its error code, which SHALL be the same whichever provider and subject are involved. This is what DIRECTORY-006 R5 requires of a why-refused response: it names the blocking condition without disclosing another identity's protected records.
 
 **Acceptance:**
-- cf3_r3_ac1 (row 3.1): person P, active, with agents A1 active, A2 suspended and A3 retired, and person Q, active, with agent B1 active; the attested administrator retires P; the reads answer A1 needs_a_new_person true with state active, A2 true with state suspended, A3 true with state retired, and B1 false with state active; the test asserts a flagged count of 3, equal to the count of P's agents, a flagged count of 0 among Q's agents, each agent's state equal to its state before the retire, each agent's history length equal to its length before the retire, and a log leaf count exactly 1 higher (the retire of P); cargo test -p lys-identity --test lifecycle_needs_new_person cf3_r3_ac1 prints 'test result: ok. 1 passed; 0 failed'.
-- cf3_r3_ac2: person R, active, with agents C1 active and C2 registered: before any change both read needs_a_new_person false; the administrator suspends R and both read false with their states unchanged; the administrator reinstates R and both read false; the administrator retires R and both read true; the test asserts flagged counts 0, 0, 0 and 2 in that order, and each agent's history length unchanged across all three transitions of R; cargo test -p lys-identity --test lifecycle_needs_new_person cf3_r3_ac2 prints 'test result: ok. 1 passed; 0 failed'.
-- cf3_r3_ac3: the test records the log's leaf count, the count of files under the log directory and the SHA-256 of each file, then reads every agent of cf3_r3_ac1 again, and asserts that the leaf count, the file count and each file's SHA-256 equal those recorded before the read; cargo test -p lys-identity --test lifecycle_needs_new_person cf3_r3_ac3 prints 'test result: ok. 1 passed; 0 failed'.
-- rg -n '\.append\(|fn set_state|grants::' crates/lys-identity/src/lifecycle/responsible.rs prints nothing; rg -c 'needs_a_new_person' crates/lys-identity-server/src/lifecycle_read.rs prints at least 1; git diff --numstat on the row's commits for crates/lys-identity-server/src/lifecycle_read.rs prints a second number of 0.
-- rg -c 'fn cf3_r3_ac(1|2|3)' crates/lys-identity/tests/lifecycle_needs_new_person.rs prints 3, and on the row's first commit cargo test -p lys-identity --test lifecycle_needs_new_person fails to compile.
+- For act delegate, recipient agent A, sign-in identity issuer https://accounts.google.com subject g-100 owned by P: the owner view shown to P contains https://accounts.google.com and g-100, and so does the administrator view shown to the configured administrator.
+- The same refusal shown to person Q contains the act delegate, agent A, the kind agent, the words sign-in identity and the literal sentence 'sign-in identities belong to people only', and neither https://accounts.google.com nor g-100 appears in any of its Display, its Debug and its serialised JSON.
+- The redacted views of two refusals that differ only in the sign-in identity (issuer https://accounts.google.com subject g-100, and issuer https://github.com subject gh-200) serialise to byte-identical JSON with the same error code.
+- A refusal for a former sign-in identity shown to its owner names it as a former sign-in identity.
 
 **Files:**
-- create: crates/lys-identity/tests/lifecycle_needs_new_person.rs
-- modify: crates/lys-identity/src/lifecycle/responsible.rs
-- modify: crates/lys-identity-server/src/lifecycle_read.rs
-- modify: crates/lys-identity/tests/lifecycle_support/mod.rs
+- create: crates/lys-identity/src/sign_in_refusal.rs
+- create: crates/lys-identity/tests/sign_in_refusal_views.rs
+- modify: crates/lys-identity/src/lib.rs
 
 **Checklist:**
-- C125 — An agent's lifecycle read carries needs_a_new_person, worked out on read, true on every one of a person's agents once that person is retired and false while the person is suspended, with no record appended and each agent's state unchanged.
+- C35 — A sign-in identity refusal shows the provider and subject to the identity's owner and a directory administrator only; anyone else sees the act, the recipient and that a sign-in identity is involved.
 
 **Stories:**
-- S52 (Operator, Installs and runs the standalone identity product) — As an operator, I want every agent whose person is retired to show that it needs a new person, so that no agent is left answering to a retired person without anyone seeing it.
+- S16 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request.
+- S17 (Directory administrator, Resolves a refused act) — As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.
 
-### R4: Walk every change of state on the lifecycle record: admit the six in the table and refuse the fourteen others by name
+### R3: Refuse a sign-in identity as an agent's binding and accept an agent's own machine account
 
-THE SYSTEM SHALL admit, through the lifecycle-hand brief's transition path over DIRECTORY-003 R5's commit path, exactly the six changes of state in the table: none to registered (register), registered to active (activate), active to suspended (suspend), suspended to active (reinstate), active to retired (retire) and suspended to retired (retire). IF any other change of an origin in none, registered, active, suspended and retired to a target in registered, active, suspended and retired is requested, THEN THE SYSTEM SHALL refuse it by name and append nothing: lifecycle_unknown_identity when the origin is none, and DIRECTORY-003 R5's out-of-table refusal otherwise. This row adds no table check, no refusal name and no source file: the walk is a test, crates/lys-identity/tests/lifecycle_walk.rs, that requests each of the twenty origin-by-target pairs once, self-changes included, as the attested administrator so no refusal is by actor, each pair through the operation the table records for its target (register for registered, activate for active except reinstate from suspended, suspend for suspended, retire for retired). THE SYSTEM SHALL NOT admit a retired identity to any other state, and SHALL NOT add a fifth state. Estimate: 2 hours.
+WHEN a caller asks the DIRECTORY-003 R1 binding API to bind an issuer-subject pair to an agent, and R1 classifies the pair as a current or former sign-in identity, THE SYSTEM SHALL refuse with R2's refusal for the act link to an agent, naming the agent and the sign-in identity, and SHALL write no event. This holds whether the agent's responsible person is the sign-in identity's owner or anyone else. WHEN the pair is unbound, THE SYSTEM SHALL accept it as the agent's own machine account, a service account under row 1.3's separate list, as DIRECTORY-003 R1 does today. THE SYSTEM SHALL NOT withdraw, move or alter any existing binding to make room, and SHALL NOT manufacture a human login for the agent (P3).
 
 **Acceptance:**
-- cf3_r4_ac1 (row 3.2): setup, before the walk and outside it, registers and transitions the identities that give each origin state (a fresh id for none, and one identity each brought to registered, active, suspended and retired for every pair from that origin); the walk then requests the 20 pairs, and the test samples the log's leaf count immediately before each of the 20 requests and immediately after it; the test asserts exactly 20 requests, 6 admissions (the six pairs of the table, each folding to its target) and 14 refusals, a leaf count difference of exactly +1 across each of the 6 admissions and exactly 0 across each of the 14 refusals, and a sum of the 20 differences equal to 6; cargo test -p lys-identity --test lifecycle_walk cf3_r4_ac1 prints 'test result: ok. 1 passed; 0 failed'.
-- cf3_r4_ac2: of the 14 refusals, the 3 whose origin is none are named lifecycle_unknown_identity; each of the other 11 carries a non-empty refusal name that is neither lifecycle_actor_not_permitted nor lifecycle_unknown_identity, and a message containing both its origin state's name and its target state's name; the test asserts the counts 3 and 11; cargo test -p lys-identity --test lifecycle_walk cf3_r4_ac2 prints 'test result: ok. 1 passed; 0 failed'.
-- cf3_r4_ac3: the listing of every value of the lifecycle-hand brief's state type has length 4 and names registered, active, suspended and retired; cargo test -p lys-identity --test lifecycle_walk cf3_r4_ac3 prints 'test result: ok. 1 passed; 0 failed'.
-- rg -c 'fn cf3_r4_ac(1|2|3)' crates/lys-identity/tests/lifecycle_walk.rs prints 3, and the row's commits change no file under crates/lys-identity/src: git diff --stat on them for crates/lys-identity/src prints nothing.
+- Binding issuer https://accounts.google.com subject svc-a, linked to no person, to agent A is accepted: the log gains exactly one event and R1 then returns agent's service account naming A.
+- Binding issuer https://accounts.google.com subject g-100, linked to person P, to agent A whose responsible person is P is refused with the sign-in identity refusal naming act link to an agent, agent A and the sign-in identity, and the log's length is unchanged.
+- The same binding to agent B whose responsible person is Q is refused the same way, and the log's length is unchanged.
+- After P links then unlinks issuer https://github.com subject gh-200, binding that pair to agent A is refused by name as a former sign-in identity, and binding it to agent B is refused the same way; the log's length is unchanged by both.
+- The test counts one accepted case and four refused cases, and asserts both counts.
 
 **Files:**
-- create: crates/lys-identity/tests/lifecycle_walk.rs
+- create: crates/lys-identity/tests/sign_in_agent_binding.rs
+- modify: crates/lys-identity/src/lib.rs
 
 **Checklist:**
-- C126 — A walk of all 20 origin-by-target changes of state admits exactly the 6 in the table and refuses the other 14 by name with nothing appended.
+- C31 — Binding to an agent a provider account that is, or once was, linked to a person is refused by name and writes nothing, while an agent's own machine account, linked to no person, is accepted as its issuer-subject binding.
 
 **Stories:**
-- S53 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want an identity's state to move only along the lifecycle table and to say nothing about running, so that a state is read as authority and never mistaken for whether a process is alive.
+- S13 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want the directory to refuse every act that would give that account to an agent, so that no agent can ever hold my sign-in.
+- S15 (Person who signs in, Keeps their sign-in identities to themselves) — As the responsible person, I want my agent's own machine account accepted as its binding, so that the agent can have its own service account without holding anyone's sign-in.
 
-### R5: Show that a change of state starts and stops no process, and that the lifecycle read says nothing about running
+### R4: Answer the link path's question before a person links a provider account
 
-WHEN an agent's state changes, THE SYSTEM SHALL record the transition and do nothing else: THE SYSTEM SHALL NOT start, stop, signal or ask any engine to start or stop a process, and the lifecycle code SHALL NOT reference a process API. THE SYSTEM SHALL keep the typed lifecycle read free of any field about running: no key of the read, at any depth, names running, an execution, a process, a pid, liveness or a heartbeat. The test counts the child processes of the test process around each transition, and lives in crates/lys-identity-server/tests/lifecycle_authority.rs; it carries a positive control proving its key matcher fires, so the absence it asserts cannot pass vacuously. This row changes no source file. Estimate: 2 hours.
+WHEN the link path asks lys-identity, by issuer-subject pair, whether a person may link that provider account, and R1 classifies the pair as an agent's service account, THE SYSTEM SHALL refuse by name. The refusal SHALL say the provider account is bound to an agent as that agent's service account, and SHALL name the act that answers it: the agent's responsible person or a directory administrator withdraws that binding first, and then the person links. The link path SHALL supply the authenticated person on whose behalf it asks, and the refusal's view SHALL be chosen by that person: WHEN that person is the agent's responsible person or a directory administrator (DIRECTORY-003 R3), the refusal SHALL name which agent holds the binding; WHEN that person is anyone else, the refusal SHALL say only that the provider account is bound to an agent as its service account and SHALL NOT name or identify the agent in its text, its Display, its Debug, its serialised response or its error code, as DIRECTORY-006 R5 keeps a refusal from disclosing another identity's protected records. THE SYSTEM SHALL NOT withdraw the agent's binding, SHALL NOT write any event, and SHALL answer only a caller authenticated as the link-audit source the DIRECTORY-003 R4 receiver already admits. WHEN the pair is bound to no agent, THE SYSTEM SHALL answer that lys-identity holds no agent binding for it, and SHALL NOT decide anything the fork's own refusals decide (DIRECTORY-004 R1). The check is new: it does not exist in DIRECTORY-004, and R4 creates it, served by the standalone identity server beside the receiver; the fork-side call, which supplies the pair and the authenticated person, is finding 2 in the task.
 
 **Acceptance:**
-- cf3_r5_ac1 (row 3.2): the attested administrator registers, activates, suspends, reinstates and retires one agent, and after each of the 5 transitions the typed read of the agent is serialised to JSON; the key matcher, the case-insensitive pattern run|exec|process|pid|alive|heartbeat applied to every key at every depth, finds 0 matches in each of the 5 reads, and the same matcher applied to the fixture object {"running": true, "pid": 1} finds 2; the test asserts 5 reads, 0 matches and the control's 2; cargo test -p lys-identity-server --test lifecycle_authority cf3_r5_ac1 prints 'test result: ok. 1 passed; 0 failed'.
-- cf3_r5_ac2: the same serialised read carries the key needs_a_new_person at its top level after each of the 5 transitions; cargo test -p lys-identity-server --test lifecycle_authority cf3_r5_ac2 prints 'test result: ok. 1 passed; 0 failed'.
-- cf3_r5_ac3 (row 3.2): the attested administrator registers, activates, suspends, reinstates and retires one agent, and the test records the count of child processes of the test process immediately before and immediately after each of the 5 transitions; the test asserts 5 comparisons with 0 differences, each after-count equal to its before-count; cargo test -p lys-identity-server --test lifecycle_authority cf3_r5_ac3 prints 'test result: ok. 1 passed; 0 failed'.
-- rg -n 'std::process|Command::new|tokio::process|process::exit|libc::kill|nix::sys::signal' crates/lys-identity/src/lifecycle crates/lys-identity-server/src/lifecycle_read.rs prints nothing, and the same pattern's positive control, printf 'Command::new\n' | rg -c 'std::process|Command::new|tokio::process|process::exit|libc::kill|nix::sys::signal', prints 1.
-- rg -c 'fn cf3_r5_ac(1|2|3)' crates/lys-identity-server/tests/lifecycle_authority.rs prints 3, and the row's commits change no file under crates/lys-identity/src and no file under crates/lys-identity-server/src: git diff --stat on them for those two directories prints nothing.
+- With issuer https://github.com subject gh-7 bound to agent B, whose responsible person is Q, as B's service account, the check asked on behalf of person P, who is not B's responsible person and not an administrator, returns the refusal: it states the account is bound to an agent as that agent's service account and names the act that answers it: the binding withdrawn first by one of the two who may withdraw it, the agent's responsible person and a directory administrator, and then the person's link; agent B's enduring id and name appear in none of its Display, its Debug and its serialised JSON; the log's length is unchanged and R1 still returns agent's service account naming B.
+- In a second store, created only in this test, the same issuer https://github.com subject gh-7 is bound instead to agent C, whose responsible person is also Q, as C's service account; the check asked on behalf of P in that store and the check asked on behalf of P in the first store, where B holds the binding, return redacted views that serialise to byte-identical JSON with the same error code.
+- The same check asked on behalf of B's responsible person Q, and again on behalf of the configured administrator, returns the refusal naming agent B as the holder of the binding, and the log's length is unchanged.
+- The check for issuer https://github.com subject gh-8, bound to no agent, returns that lys-identity holds no agent binding for it, and the log's length is unchanged.
+- An unauthenticated caller and a caller authenticated as anything other than the link-audit source are each refused by name, and neither receives an answer about gh-7.
+- The test counts the six cases it drove (the three views of the agent-bound refusal, the unbound pair and the two refused callers) and asserts the count is 6.
 
 **Files:**
-- create: crates/lys-identity-server/tests/lifecycle_authority.rs
+- create: crates/lys-identity-server/src/sign_in_link_check.rs
+- create: crates/lys-identity-server/tests/sign_in_link_check.rs
+- modify: crates/lys-identity-server/src/routes.rs
 
 **Checklist:**
-- C127 — A change of state starts and stops no process, and no key of the typed lifecycle read says anything about running.
+- C32 — A person's link of a provider account already bound to an agent as its service account is refused by name at the lys-identity check the link path asks, naming the withdrawal that answers it, naming the agent only to its responsible person and a directory administrator, and no binding is withdrawn.
 
 **Stories:**
-- S53 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want an identity's state to move only along the lifecycle table and to say nothing about running, so that a state is read as authority and never mistaken for whether a process is alive.
+- S15 (Person who signs in, Keeps their sign-in identities to themselves) — As the responsible person, I want my agent's own machine account accepted as its binding, so that the agent can have its own service account without holding anyone's sign-in.
+
+### R5: Refuse delegating a sign-in identity at grant admission, for every recipient
+
+WHEN a delegation request reaches DIRECTORY-006 R2 admission and its offered source resolves in the directory to a person's sign-in identity rather than to a grant, THE SYSTEM SHALL refuse with R2's refusal for the act delegate, naming the recipient, the recipient's kind and the sign-in identity, before any mutation, whether the recipient is an agent or a person. The offered source is the value in the request's source grant member, the DIRECTORY-006 R1 member that names what is passed on; every other member is formed as for any delegation. Admission SHALL resolve that value against the directory before its unknown-parent refusal: a value that names a grant resolves to that grant, and a value that is instead an issuer-subject pair, in the form DIRECTORY-003 R1 uses for an external binding, which R1 of this brief classifies as a current or former sign-in identity resolves to that person's sign-in identity. So the request 'P delegates that sign-in identity to A' is a delegation request whose actor is P, whose recipient is A and whose source grant member holds P's issuer-subject pair. Such a request reaches admission through DIRECTORY-006 R1's contract unchanged: the source grant member R1 proposes is a directory reference, and GRANT_CONTRACT parses it as well-formed lineage whether it names a grant or an issuer-subject pair; GRANT_CONTRACT's malformed-lineage refusal is only for a value that is not a well-formed directory reference. So a request whose source grant member holds a well-formed issuer-subject pair passes the parse and reaches R2 admission, where resolution finds the sign-in identity and this requirement refuses it by name. THE SYSTEM SHALL NOT add a source kind or any member to DIRECTORY-006 R1's grant contract to do this. A service-access grant consented through the same provider account the person signs in with is a separate record (SECRETS-002 R4); THE SYSTEM SHALL admit or refuse it by DIRECTORY-006's own rules only, and SHALL NOT refuse it because it shares an account with a sign-in identity.
+
+**Acceptance:**
+- Person P, who signs in with issuer https://accounts.google.com subject g-100, delegates that sign-in identity to P's agent A, by a delegation request whose source grant member holds issuer https://accounts.google.com subject g-100: refused with the sign-in identity refusal naming act delegate, recipient A and kind agent, and zero grant events are written; the refusal returned is the sign-in identity refusal and not GRANT_CONTRACT's malformed-lineage refusal.
+- P delegates the same sign-in identity to person Q: refused naming act delegate, recipient Q and kind person, and zero grant events are written.
+- P sends a delegation request to agent A whose source grant member holds a value that is not a well-formed directory reference: it is refused at the GRANT_CONTRACT parse with GRANT_CONTRACT's malformed-lineage refusal, not the sign-in identity refusal, and zero grant events are written.
+- P holds a Google Drive service-access grant consented through issuer https://accounts.google.com subject g-100, with pass-on authority for agents; P delegates it to agent A: accepted, exactly one grant event is written, and A's new grant names the Drive grant as its source.
+- The test counts three refusals (two sign-in identity refusals and one malformed-lineage refusal) and one acceptance, and asserts both counts.
+
+**Files:**
+- create: crates/lys-identity/tests/grant_sign_in_identity.rs
+- modify: crates/lys-identity/src/grants/admission.rs
+
+**Checklist:**
+- C33 — Delegating a sign-in identity is refused by name for an agent recipient and for a person recipient, while a service-access grant consented through the same provider account is admitted by the grant rules alone.
+
+**Stories:**
+- S13 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want the directory to refuse every act that would give that account to an agent, so that no agent can ever hold my sign-in.
+- S14 (Person who signs in, Keeps their sign-in identities to themselves) — As a person delegating to an agent or another person, I want my sign-in identities listed as things I cannot give with the reason 'sign-in identity', so that I know why they are never offered.
+
+### R6: Serve the reason 'sign-in identity' on the cannot-give list and the two views at the grant seam
+
+WHEN a person asks DIRECTORY-006 R5's explanation seam what they cannot give to a recipient, THE SYSTEM SHALL list each of that person's current sign-in identities with the reason 'sign-in identity', whoever the recipient is. THE SYSTEM SHALL NOT list another person's sign-in identities to them. WHEN the grant seam returns R5's refusal, THE SYSTEM SHALL choose R2's view by the caller: the owner and a directory administrator see the provider and subject, and anyone else sees the redacted view. The list is shown to a person by Cambium card jAfmblAP on the delegation screen, which uses this reason; THE SYSTEM SHALL NOT add or change any screen file.
+
+**Acceptance:**
+- Person P with sign-in identities issuer https://accounts.google.com subject g-100 and issuer https://github.com subject gh-200 asks what P cannot give to agent A: the response lists exactly those two, each with reason sign-in identity.
+- The same question with recipient person Q lists the same two, each with reason sign-in identity.
+- Q's sign-in identity issuer https://accounts.google.com subject g-300 appears in neither of P's responses.
+- Agent A, holding pass-on authority from P, asks the grant seam to delegate P's sign-in identity g-100 to agent B: A receives the redacted view, whose body contains neither https://accounts.google.com nor g-100; the same refusal read by P and by the configured administrator contains both.
+- No file under surface/ changes in this brief's diff.
+
+**Files:**
+- create: crates/lys-identity-server/tests/grant_cannot_give.rs
+- modify: crates/lys-identity-server/src/grants.rs
+
+**Checklist:**
+- C34 — The explanation seam lists each of a person's sign-in identities on the cannot-give list with the reason 'sign-in identity', whoever the recipient is.
+- C35 — A sign-in identity refusal shows the provider and subject to the identity's owner and a directory administrator only; anyone else sees the act, the recipient and that a sign-in identity is involved.
+
+**Stories:**
+- S14 (Person who signs in, Keeps their sign-in identities to themselves) — As a person delegating to an agent or another person, I want my sign-in identities listed as things I cannot give with the reason 'sign-in identity', so that I know why they are never offered.
+- S16 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request.
+- S17 (Directory administrator, Resolves a refused act) — As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.
+
+### R7: Prove every refusal writes nothing and no agent record carries a sign-in identity
+
+WHEN any refusal of R3, R4 or R5 is returned, THE SYSTEM SHALL leave the directory's log length and its projection unchanged. After those refusals, one test over the store SHALL enumerate every agent record, from the projection and again from a replay of the log after reopen, and SHALL find that no agent's binding is classified by R1 as a current or former sign-in identity and that no grant an agent holds has a sign-in identity as its source. The test lives in the lys-identity-server crate, which depends on lys-identity, so it drives all seven refusals, R4's through the server with R4's gh-7 fixture; lys-identity gains no dependency on the server. The test SHALL NOT pass over zero agents: it counts the agent records it inspected and the refusals it drove, and asserts both.
+
+**Acceptance:**
+- Before and after each refusal case of R3, R4 and R5 the test records the log's length and a digest of the projection; for each of the seven refusal cases (the four of R3, R4's agent-bound refusal asked on behalf of P, and the two of R5) the two values are equal, and the test asserts it counted 7 refusals.
+- After the seven refusals, R3's accepted binding of issuer https://accounts.google.com subject svc-a to agent A (responsible person P) and R4's fixture binding of issuer https://github.com subject gh-7 to agent B (responsible person Q), the store holds agents A and B; the test inspects every agent record, asserts it inspected 2, and finds for each agent zero bindings classified as a current sign-in identity, zero bindings classified as a former sign-in identity and zero held grants whose source is a sign-in identity.
+- After the store is closed and reopened, the same enumeration over the replayed log inspects 2 agent records and finds the same zero counts.
+
+**Files:**
+- create: crates/lys-identity-server/tests/sign_in_store.rs
+
+**Checklist:**
+- C36 — Every sign-in identity refusal leaves the log and projection unchanged, and one counted test over the store finds no agent record carrying a sign-in identity.
+
+**Stories:**
+- S13 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want the directory to refuse every act that would give that account to an agent, so that no agent can ever hold my sign-in.
 
 ## Boundaries
 
-- No way to give an agent a new person, and no change to any agent's responsible person: that is its own card, the one that revises ADR-011's responsible person for life and clears the flag. This brief revises neither ADR-011 nor DIRECTORY-003 R1.
-- No copy of the lifecycle-hand brief's lifecycle record: no second store, projection or fold of lifecycle state. Its files are touched only by the added lines a row names: one line in crates/lys-identity/src/lifecycle/causes.rs (R2), added lines in crates/lys-identity/src/lifecycle/error.rs and mod.rs (R2), crates/lys-identity/tests/lifecycle_support/mod.rs (R2, R3), crates/lys-identity-server/src/lifecycle_read.rs (R3) and one added section of docs/design/identity/LIFECYCLE-CONTRACT.md (R1). A row that needs any other file stops and names it (CN9).
-- No fifth state; the needs-a-new-person flag and provisioned are never states; no transition is added and none is caused by the flag, and retiring a person moves no other identity. Nothing is appended except the transitions a test drives through DIRECTORY-003 R5's commit path.
-- No flag for an agent whose person is suspended: what a suspension stops stays open.
-- No screen: showing the flag on the people list and the agent file is a later card; this brief shows it in the lifecycle read and the typed read.
-- No start, stop or execution control in the identity product, and no call to any engine (ADR-007, ADR-004).
-- DIRECTORY-006 R4's grant rule is neither asserted nor duplicated: the flag reads the person's folded state, never a grant decision.
-- The IDENTITY-001 files, docs/design/identity/LIFECYCLE-STATES-2026-09-22.md, docs/design/identity/CONFORMANCE.md and lys-core's shipped formats are unchanged.
-- No audit record is deleted, hidden or rewritten; the checklist and story ledgers are append-only.
-- No wall clock in new code, no person's name or date in code, no credential, token or key value anywhere, test identities only.
+- SHALL NOT change docs/design/identity/briefs/IDENTITY-001.json, docs/design/identity/briefs/IDENTITY-001.md or docs/design/identity/CONFORMANCE.md (CN1).
+- SHALL NOT change SECRETS-002 R5 or the harness login token exception, and SHALL NOT redefine that token as anything other than what it is.
+- SHALL NOT build the broker's refusal (finding 1) or any credential issuance; issuance is the broker's (ADR-001).
+- SHALL NOT add a seam that exists only to refuse: the refusals sit in the binding seam DIRECTORY-003 owns, the admission seam DIRECTORY-006 owns, and the lys-identity side of the link path's pre-link check, which does not exist yet and which R4 creates as the check the link path asks; the fork side of that check is finding 2.
+- SHALL NOT add or change any screen file; the cannot-give list is shown by Cambium card jAfmblAP.
+- SHALL NOT change lys-core, its published wire formats or lys/delegation/v1, and SHALL NOT add a member or source kind to DIRECTORY-006 R1's grant contract.
+- SHALL NOT refuse an agent's own machine account, linked to no person, as its DIRECTORY-003 R1 binding.
+- SHALL NOT withdraw, move or alter any existing binding or grant to make a refused act succeed.
+- SHALL NOT change any existing brief's id, requirements, estimates or dependency order.
 
 ## Verification
 
-- From the repository root: sh scripts/design/gate.sh exits 0, and python3 scripts/design/validate.py docs/design/decisions.json and python3 scripts/design/validate.py docs/design/roadmap.json each exit 0.
-- From the repository root, after each code row: cargo fmt --all; cargo clippy --all-targets --all-features -- -D warnings; cargo clippy --all-targets -- -D warnings; cargo test --workspace --all-features; cargo doc --no-deps --all-features; cargo doc --no-deps, all clean, with git status showing no change from cargo fmt (heavy runs at the gate venue, CN8).
-- From the repository root: rg -c 'fn cf3_r2_ac(1|2)' crates/lys-identity/tests/lifecycle_no_person.rs prints 2; rg -c 'fn cf3_r3_ac(1|2|3)' crates/lys-identity/tests/lifecycle_needs_new_person.rs prints 3; rg -c 'fn cf3_r4_ac(1|2|3)' crates/lys-identity/tests/lifecycle_walk.rs prints 3; rg -c 'fn cf3_r5_ac(1|2|3)' crates/lys-identity-server/tests/lifecycle_authority.rs prints 3.
-- grep -c '^| 3.1 |\|^| 3.2 |' docs/design/identity/LIFECYCLE-CONTRACT.md prints 2, and every test function that section names exists in the file it names.
-- The row diffs touch no path under vendor/rauthy, docs/design/identity/briefs, docs/design/identity/CONFORMANCE.md or the lifecycle-states statement, and of the lifecycle-hand brief's source files only added lines: git diff --numstat <base> HEAD -- crates/lys-identity/src/lifecycle/causes.rs crates/lys-identity-server/src/lifecycle_read.rs prints lines whose second number is 0.
-- rg -n 'SystemTime::now|Utc::now|Local::now|Instant::now' crates/lys-identity/src/lifecycle/responsible.rs prints nothing.
+- From the repository root: sh scripts/design/gate.sh exits 0.
+- At implementation time, from the exact revision: cargo fmt --check; cargo clippy --all-targets --all-features -- -D warnings; cargo clippy --all-targets -- -D warnings; cargo test --workspace --all-features; cargo doc --no-deps --all-features; cargo doc --no-deps. Report each refusal case and each counted leg the tests exercised.
+- Drift injection, each failing exactly one test file, the one built for the check, and no other. First: make R2's redacted view carry an error code that varies with the sign-in identity's provider and subject without containing either; exactly one test file fails, crates/lys-identity/tests/sign_in_refusal_views.rs (its byte-identical case), because no other test compares redacted views across two sign-in identities, and R6's redacted-view case checks only that the body lacks the provider and subject. Second: make R4's redacted view name agent B, the agent that holds the binding; exactly one test file fails, crates/lys-identity-server/tests/sign_in_link_check.rs (its agent-bound case asked on behalf of P, and its second-store byte-identical case), because crates/lys-identity-server/tests/sign_in_store.rs, which drives R4's refusal with the same gh-7 fixture, records only the log's length and the projection's digest around it, never its content. Revert both.
+- Before reporting row 1.2 passed, confirm the broker's card carries finding 1's acceptance line and that it passes; until then row 1.2 is reported as met by the directory and awaiting the broker.
 
