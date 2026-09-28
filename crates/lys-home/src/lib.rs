@@ -31,6 +31,7 @@ mod cli_translate_tests;
 pub mod error;
 pub mod harness;
 pub mod home_move;
+pub mod proxy;
 pub mod record;
 
 pub use error::HomeError;

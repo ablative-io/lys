@@ -12,15 +12,23 @@ categories = ["database-implementations"]
 
 [dependencies]
 clap.workspace = true
+# The little proxy's transport (HOME-001 R7, R10): HTTP/1 over rustls with
+# ring and the Mozilla roots, each pinned at the version already in the lock.
+http-body-util = "=0.1.5"
+hyper = { version = "=1.11.1", features = ["client", "http1", "server"] }
+hyper-rustls = { version = "=0.27.10", default-features = false, features = ["http1", "ring", "tls12", "webpki-tokio"] }
+hyper-util = { version = "=0.1.21", features = ["client-legacy", "http1", "tokio"] }
 jiff.workspace = true
 lys-core.workspace = true
 rand.workspace = true
+rustls = { version = "=0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
 serde.workspace = true
 serde_json.workspace = true
 sha1.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 time = { workspace = true, features = ["formatting", "parsing"] }
+tokio = { workspace = true, features = ["io-util"] }
 
 [target.'cfg(unix)'.dependencies]
 rustix.workspace = true
@@ -28,6 +36,10 @@ rustix.workspace = true
 [[bin]]
 name = "lys-home"
 path = "src/main.rs"
+
+[[bin]]
+name = "lys-proxy"
+path = "src/bin/lys-proxy.rs"
 
 [dev-dependencies]
 tempfile.workspace = true

@@ -1,0 +1,312 @@
+//! Bounded capture: the request and response bodies spooled to files while
+//! they are forwarded, the session key read from the request as it passes,
+//! the event stream read as it passes, and the call handed to the sink when
+//! it ends.
+//!
+//! Invariants:
+//! - Capture is bounded by [`Slots`]: at most `limit` calls hold spooled
+//!   bodies not yet recorded. A call admitted with no free slot is still
+//!   forwarded whole; nothing of it is spooled and it is recorded
+//!   `unrecorded`. Its session key is still read, by the bounded
+//!   [`KeyScanner`], so it is recorded under its own session and never under
+//!   `unlinked` for want of a slot.
+//! - A spool that cannot be created or written stops spooling; the bytes go
+//!   on to the client as they came, and the call is recorded `unrecorded`.
+//! - A call ends once: `complete` only when the upstream response ended
+//!   whole, every spool was written and synced, the journal took the call's
+//!   link, and, for an event stream, the grammar says the stream ended whole;
+//!   `cancelled` when the client went before the response ended; `partial`
+//!   when the upstream failed or its stream ended early or malformed. No
+//!   other path reports a call complete.
+//! - The spools hold body bytes only; no header is written anywhere.
+
+use std::fs::File;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
+
+use hyper::body::Bytes;
+
+use crate::proxy::forward::{End, Observer};
+use crate::proxy::journal::{Job, Journal, OpenCall, Sink};
+use crate::proxy::link::{KeyScanner, Link};
+use crate::proxy::stream::StreamReader;
+use crate::record::call::CallStatus;
+
+/// The capture bound: how many calls may hold spooled bodies not yet
+/// recorded.
+#[derive(Clone, Debug)]
+pub struct Slots {
+    limit: usize,
+    used: Arc<AtomicUsize>,
+}
+
+impl Slots {
+    /// A bound of `limit` calls.
+    #[must_use]
+    pub fn new(limit: usize) -> Self {
+        Self {
+            limit,
+            used: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+
+    /// Take a slot, when one is free.
+    #[must_use]
+    pub fn take(&self) -> Option<Slot> {
+        let limit = self.limit;
+        self.used
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| {
+                (n < limit).then_some(n + 1)
+            })
+            .ok()
+            .map(|_| Slot {
+                used: Arc::clone(&self.used),
+            })
+    }
+
+    /// How many slots are held.
+    #[must_use]
+    pub fn in_use(&self) -> usize {
+        self.used.load(Ordering::Acquire)
+    }
+}
+
+/// One held capture slot, freed when dropped: after the call is recorded.
+#[derive(Debug)]
+pub struct Slot {
+    used: Arc<AtomicUsize>,
+}
+
+impl Drop for Slot {
+    fn drop(&mut self) {
+        self.used.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+/// A body spooled to a file.
+#[derive(Debug)]
+struct Spool {
+    path: PathBuf,
+    file: Option<File>,
+}
+
+impl Spool {
+    fn create(path: PathBuf) -> Option<Self> {
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .ok()?;
+        Some(Self {
+            path,
+            file: Some(file),
+        })
+    }
+
+    fn write(&mut self, bytes: &[u8], failed: &mut bool) {
+        if let Some(file) = &mut self.file
+            && file.write_all(bytes).is_err()
+        {
+            self.file = None;
+            *failed = true;
+        }
+    }
+
+    fn close(&mut self, failed: &mut bool) {
+        if let Some(file) = self.file.take()
+            && file.sync_all().is_err()
+        {
+            *failed = true;
+        }
+    }
+}
+
+/// What a call knows while it passes.
+#[derive(Debug, Default)]
+struct CallState {
+    scanner: KeyScanner,
+    slot: Option<Slot>,
+    request: Option<Spool>,
+    response: Option<Spool>,
+    capture_failed: bool,
+    journal_failed: bool,
+    reader: Option<StreamReader>,
+    stream: bool,
+    finished: bool,
+}
+
+/// One call in flight: its journal record, its capture and where it goes
+/// when it ends.
+#[derive(Debug)]
+pub struct Call {
+    open: OpenCall,
+    started: Instant,
+    capture: PathBuf,
+    journal: Journal,
+    sink: Sink,
+    state: Mutex<CallState>,
+}
+
+impl Call {
+    /// A call admitted: its journal record is already durable. With a slot,
+    /// its request is spooled into `capture` as `<call id>.request`.
+    #[must_use]
+    pub fn admit(
+        open: OpenCall,
+        slot: Option<Slot>,
+        capture: &Path,
+        journal: Journal,
+        sink: Sink,
+    ) -> Arc<Self> {
+        let mut state = CallState::default();
+        if slot.is_some() {
+            state.request = Spool::create(capture.join(format!("{}.request", open.call_id)));
+            state.capture_failed = state.request.is_none();
+        }
+        state.slot = slot;
+        Arc::new(Self {
+            open,
+            started: Instant::now(),
+            capture: capture.to_path_buf(),
+            journal,
+            sink,
+            state: Mutex::new(state),
+        })
+    }
+
+    /// The proxy's id for the call.
+    #[must_use]
+    pub fn call_id(&self) -> &str {
+        &self.open.call_id
+    }
+
+    fn with<R>(&self, f: impl FnOnce(&mut CallState) -> R) -> Option<R> {
+        self.state.lock().ok().map(|mut state| f(&mut state))
+    }
+
+    /// The observer of the request body on its way upstream.
+    #[must_use]
+    pub fn request_side(self: &Arc<Self>) -> RequestSide {
+        RequestSide(Arc::clone(self))
+    }
+
+    /// The observer of the response body on its way to the client; the
+    /// response spool is created now, as its head has arrived.
+    #[must_use]
+    pub fn response_side(self: &Arc<Self>, stream: bool) -> ResponseSide {
+        let api = self.open.api;
+        let spool = self.capture.join(format!("{}.response", self.open.call_id));
+        self.with(|s| {
+            s.stream = stream;
+            s.reader = stream.then(|| StreamReader::for_api(api));
+            if s.slot.is_some() && !s.capture_failed {
+                s.response = Spool::create(spool);
+                s.capture_failed = s.response.is_none();
+            }
+        });
+        ResponseSide(Arc::clone(self))
+    }
+
+    fn request_ended(&self) {
+        let link = self.with(|s| {
+            if let Some(spool) = &mut s.request {
+                spool.close(&mut s.capture_failed);
+            }
+            s.scanner.link()
+        });
+        if let Some(link) = link.filter(Link::is_linked) {
+            let mut open = self.open.clone();
+            open.session = link.to_record();
+            if self.journal.write(&open).is_err() {
+                self.with(|s| s.journal_failed = true);
+            }
+        }
+    }
+
+    /// End the call and hand it to the sink; a second end does nothing.
+    pub fn finish(&self, end: End) {
+        let duration_ms = u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX);
+        let job = self.with(|s| {
+            if s.finished {
+                return None;
+            }
+            s.finished = true;
+            for spool in [&mut s.request, &mut s.response].into_iter().flatten() {
+                spool.close(&mut s.capture_failed);
+            }
+            let parts = s.reader.take().and_then(StreamReader::finish);
+            let unspooled = s.slot.is_none() || s.capture_failed || s.journal_failed;
+            let status = match end {
+                End::Dropped => CallStatus::Cancelled,
+                End::Failed => CallStatus::Partial,
+                End::Complete if s.stream && parts.is_none() => CallStatus::Partial,
+                End::Complete if unspooled => CallStatus::Unrecorded,
+                End::Complete => CallStatus::Complete,
+            };
+            let mut call = self.open.clone();
+            call.session = s.scanner.link().to_record();
+            Some(Job {
+                call,
+                status,
+                duration_ms,
+                stream: s.stream,
+                request: s.request.take().map(|spool| spool.path),
+                response: s.response.take().map(|spool| spool.path),
+                parts,
+                slot: s.slot.take(),
+            })
+        });
+        if let Some(job) = job.flatten()
+            && let Err(error) = self.sink.send(job)
+        {
+            eprintln!("lys-proxy: {error}");
+        }
+    }
+}
+
+/// Reads the request body as it goes upstream: the session key, and the
+/// spool when the call holds a slot.
+#[derive(Debug)]
+pub struct RequestSide(Arc<Call>);
+
+impl Observer for RequestSide {
+    fn data(&mut self, bytes: &Bytes) {
+        self.0.with(|s| {
+            s.scanner.feed(bytes);
+            if let Some(spool) = &mut s.request {
+                spool.write(bytes, &mut s.capture_failed);
+            }
+        });
+    }
+
+    fn ended(&mut self, end: End) {
+        if end == End::Complete {
+            self.0.request_ended();
+        }
+    }
+}
+
+/// Reads the response body as it goes to the client: the stream grammar,
+/// and the spool when the call holds a slot; its end ends the call.
+#[derive(Debug)]
+pub struct ResponseSide(Arc<Call>);
+
+impl Observer for ResponseSide {
+    fn data(&mut self, bytes: &Bytes) {
+        self.0.with(|s| {
+            if let Some(reader) = &mut s.reader {
+                reader.feed(bytes);
+            }
+            if let Some(spool) = &mut s.response {
+                spool.write(bytes, &mut s.capture_failed);
+            }
+        });
+    }
+
+    fn ended(&mut self, end: End) {
+        self.0.finish(end);
+    }
+}
