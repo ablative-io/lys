@@ -50,7 +50,38 @@
       ],
       "stories": [
         "S3"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-anchor/Cargo.toml",
+            "change": "modified",
+            "note": "[dependencies] now lists chrono.workspace = true, the workspace's existing chrono 0.4 entry, as the first line of the table"
+          },
+          {
+            "path": "Cargo.lock",
+            "change": "modified",
+            "note": "The lys-anchor package's dependency list now includes \"chrono\", the already-resolved 0.4.45"
+          }
+        ],
+        "how": "Row 1, met: crates/lys-anchor/Cargo.toml line 71 is `chrono.workspace = true`, directly after the [dependencies] header and before [dev-dependencies]. It is the only line of that form. Row 2, met: in Cargo.lock the lys-anchor dependencies are base64 0.22.1, chrono, lys-core, lys-log-store, serde_json, sha2, tempfile, thiserror 2.0.19. Row 3, met: git diff --stat shows 1 insertion and 0 deletions for crates/lys-anchor/Cargo.toml. Row 4, met: the root Cargo.toml is untouched and the workspace chrono entry at line 38 is unchanged.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C1",
+            "done": true,
+            "note": "One added line under [dependencies]; nothing else added or changed."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S3",
+            "satisfied": true,
+            "note": "chrono is available, so admit_at can take DateTime<Utc>."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -81,7 +112,48 @@
       "stories": [
         "S3",
         "S4"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-anchor/src/admission/certificate.rs",
+            "change": "modified",
+            "note": "Imports chrono::{DateTime, Utc} and verify_certificate_chain_at. Adds a public, documented RecognisedCertificate::admit_at with an # Errors section: it matches the three SubmitterContext arms with no wildcard, verifies the credential at the caller's instant, then checks the subject allow-list. AdmissionPolicy::admit now delegates to admit_at at Utc::now(). The module, issued_by and admit docs say the certificate is judged at the instant its caller names (the present through admit) and name verify_certificate_chain_at."
+          }
+        ],
+        "how": "Row 1, met: certificate.rs line 214 has `pub fn admit_at(&self, _submission: &Submission<'_>, context: &SubmitterContext<'_>, at: DateTime<Utc>) -> Result<(), NotAdmitted>`, the only such line. Row 2, met in source, not run: admit_at's /// doc (lines 196-213) has an # Errors section. Its intra-doc links point at public items ([`AdmissionPolicy::admit`], [`NotAdmitted`]); the module doc links [`AdmissionPolicy::admit`], which is in scope through the existing `use`. The cargo doc 0-warning half was not run, per the instructions. Row 3, met: `grep -nw verify_certificate_chain` matches nothing. The only `verify_certificate_chain_at(` call is at line 232 inside admit_at: `verify_certificate_chain_at(credential, &self.issuer_public_key, at)`. Row 4, met: grep -c 'Utc::now()' prints 1, at line 270 inside the AdmissionPolicy impl: `self.admit_at(submission, context, Utc::now())`. Doc prose says 'the present' so the grep count stays exact. Row 5, met: admit's signature is still (&self, &Submission<'_>, &SubmitterContext<'_>) -> Result<(), NotAdmitted>. Row 6, met: lines 225-229 match Unidentified => return Err(NotAdmitted), AssertedBySubmitter(bytes) => *bytes and AuthenticatedByTransport(peer) => peer.certificate(), with no _ arm. Row 7, met: grep -nE 'right now|currently' prints nothing. Row 8, met: no file under crates/lys-core, and neither policy.rs, context.rs nor anchor/append.rs, is modified (git diff --stat lists only the four intended files). admit_at reads no clock and no extension. NotAdmitted, the trait and the constructors are untouched.",
+        "deviation": "The statement parameter of admit_at is bound as `_submission`, because the policy never reads the statement. This is the same binding the base admit impl carried, moved rather than added: admit now binds `submission` and passes it on, so the workspace's count of underscore-prefixed bindings is unchanged. It is disclosed here because the brief bars adding one.",
+        "checklist": [
+          {
+            "id": "C2",
+            "done": true,
+            "note": "admit_at at certificate.rs:214, verifying through verify_certificate_chain_at at :232."
+          },
+          {
+            "id": "C3",
+            "done": true,
+            "note": "admit keeps its signature and calls self.admit_at(submission, context, Utc::now()) at :270."
+          },
+          {
+            "id": "C4",
+            "done": true,
+            "note": "Module doc item 1, the 'What the chain check covers' section, issued_by and admit docs rewritten; no 'right now' or 'currently' remains."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S3",
+            "satisfied": true,
+            "note": "admit_at takes the same submission and context as admit, plus the instant."
+          },
+          {
+            "id": "S4",
+            "satisfied": true,
+            "note": "admit is admit_at at Utc::now(), with the same checks in the same order, so a live request is judged exactly as before."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -114,7 +186,53 @@
       "stories": [
         "S1",
         "S2"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-anchor/src/admission/certificate_tests.rs",
+            "change": "modified",
+            "note": "Adds `use chrono::TimeDelta;`. The 'The passage of time' module-doc bullet now describes judging at two named instants. an_expired_certificate_is_refused issues the same one-second certificate, takes issued_at = expires_at − 1 s, asserts admit_at at issued_at + 500 ms is Ok(()) and then admit_at at issued_at + 2 s is Err(NotAdmitted). There is no sleep."
+          }
+        ],
+        "how": "Row 1, met: grep -rnE 'thread::sleep|tokio::time::sleep' crates/lys-anchor prints nothing (checked). Row 2, met: the test body (from certificate_tests.rs:185) calls policy.admit_at twice, admit zero times, and contains no Utc::now(). Row 3, met: the first assertion is admit_at(&statement(), &asserted(&short_lived.der_bytes), issued_at + TimeDelta::milliseconds(500)) == Ok(()), where issued_at = short_lived.expires_at - TimeDelta::seconds(1). Row 4, met: the second assertion is admit_at(..., issued_at + TimeDelta::seconds(2)) == Err(NotAdmitted). Row 5, not run, per the instructions: there is no sleep and there are two in-memory verifications, so the test should finish well under a second. The instants hold because lys-core's validity_window truncates notAfter to whole seconds and notBefore is issued_at at whole-second DER precision, so expires_at − 1 s equals notBefore. Row 6, reasoned, not run, per the instructions: given Utc::now(), the positive control still passes (now is inside the one-second window just after issuance) and the refusal assertion fails. The other 18 admission tests already go through admit, which is Utc::now(), so they are unaffected and exactly one test fails, at its Err(NotAdmitted) assertion. Row 7, met: grep -c 'waits for a certificate to expire' prints 0. Row 8, met: the diff touches only the module-doc bullet, the use block (the added chrono import) and the test body; context_tests.rs and trivial_tests.rs are untouched. Row 9, not run: 19 admission tests are expected to pass, since only this test changed.",
+        "deviation": "Rows 5, 6 and 9 need cargo runs, and the brief says to run no build or test command. They are argued from source here and left to the workflow's gate. I did not perform the drift injection, so there is nothing to revert.",
+        "checklist": [
+          {
+            "id": "C5",
+            "done": true,
+            "note": "No sleep; Ok(()) at issuance + 500 ms, Err(NotAdmitted) at issuance + 2 s."
+          },
+          {
+            "id": "C6",
+            "done": true,
+            "note": "The grep prints nothing."
+          },
+          {
+            "id": "C7",
+            "done": true,
+            "note": "The bullet now reads 'The passage of time, at named instants' and describes two named instants, with nothing about waiting."
+          },
+          {
+            "id": "C8",
+            "done": true,
+            "note": "The other 18 tests are byte-unchanged; passing is left to the gate."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S1",
+            "satisfied": true,
+            "note": "The 2100 ms sleep is gone and the outcome no longer depends on host load."
+          },
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": "The positive control and the refusal are both judged at explicit instants, so the refusal still requires the window to be consulted."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [

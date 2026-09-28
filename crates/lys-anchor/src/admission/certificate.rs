@@ -51,9 +51,10 @@
 //! certificate exactly two questions, both of which `lys-core` already answers:
 //!
 //! 1. Was it signed by the authority whose public key this policy was
-//!    constructed with, and is it inside its validity window right now?
-//!    (`verify_certificate_chain`, which uses strict Ed25519 verification and
-//!    rejects self-signed certificates.)
+//!    constructed with, and is it inside its validity window at the instant
+//!    its caller names — the present, when it is asked through
+//!    [`AdmissionPolicy::admit`]? (`verify_certificate_chain_at`, which uses
+//!    strict Ed25519 verification and rejects self-signed certificates.)
 //! 2. Optionally: is its subject key one of a set this policy was constructed
 //!    with? (`certificate_subject_public_key`, read **after** the chain
 //!    verified — a key recovered from an unverified certificate is an
@@ -80,7 +81,7 @@
 //!
 //! # What the chain check covers
 //!
-//! One level. `verify_certificate_chain` checks a leaf certificate against a
+//! One level. `verify_certificate_chain_at` checks a leaf certificate against a
 //! single expected issuer key; there is no intermediate handling, because
 //! `lys-core`'s authority issues leaves directly. A deployment with
 //! intermediates does not have a configuration problem here, it has a policy to
@@ -88,7 +89,8 @@
 
 use std::collections::BTreeSet;
 
-use lys_core::ca::{certificate_subject_public_key, verify_certificate_chain};
+use chrono::{DateTime, Utc};
+use lys_core::ca::{certificate_subject_public_key, verify_certificate_chain_at};
 
 use super::context::SubmitterContext;
 use super::policy::{AdmissionPolicy, NotAdmitted};
@@ -148,8 +150,11 @@ pub struct RecognisedCertificate {
 }
 
 impl RecognisedCertificate {
-    /// Admits any certificate this authority issued and that is currently
-    /// within its validity window.
+    /// Admits any certificate this authority issued and whose validity window
+    /// holds the instant its caller names — the present, when the policy is
+    /// asked through [`AdmissionPolicy::admit`], and the named instant when it
+    /// is asked through [`admit_at`](Self::admit_at). Either way the window is
+    /// checked by `verify_certificate_chain_at`.
     ///
     /// The subject is not constrained: whoever the authority was willing to
     /// certify, this anchor is willing to admit. That is the right shape only
@@ -187,24 +192,29 @@ impl RecognisedCertificate {
     pub fn subject_keys(&self) -> Option<&BTreeSet<[u8; 32]>> {
         self.subject_keys.as_ref()
     }
-}
 
-impl AdmissionPolicy for RecognisedCertificate {
     /// Admits a submission whose context carries a certificate from the
-    /// configured authority, currently valid, and — where the policy is
-    /// restricted — over one of the configured subject keys.
+    /// configured authority, inside its validity window at `at`, and — where
+    /// the policy is restricted — over one of the configured subject keys.
+    ///
+    /// This is [`AdmissionPolicy::admit`] with the instant named by the caller
+    /// rather than read from the clock: `admit` is exactly this method at the
+    /// present. Nothing here reads the clock, so the same submission,
+    /// context and instant always get the same answer. The window is checked by
+    /// `verify_certificate_chain_at` at `at`, and at nothing else.
     ///
     /// # Errors
     ///
     /// [`NotAdmitted`], for every one of: no credential at all, a credential
     /// that is not parseable certificate DER, a certificate from another
-    /// authority, a certificate outside its validity window, and a certificate
-    /// over an unlisted subject key. The five are indistinguishable to the
-    /// caller by construction, since there is one value to return.
-    fn admit(
+    /// authority, a certificate whose validity window does not hold `at`, and a
+    /// certificate over an unlisted subject key. The five are indistinguishable
+    /// to the caller by construction, since there is one value to return.
+    pub fn admit_at(
         &self,
         _submission: &Submission<'_>,
         context: &SubmitterContext<'_>,
+        at: DateTime<Utc>,
     ) -> Result<(), NotAdmitted> {
         // Both credential-bearing arms, written out and treated alike. The
         // match is exhaustive with no `_`, so a third provenance could not be
@@ -219,7 +229,7 @@ impl AdmissionPolicy for RecognisedCertificate {
 
         // Chain first. Everything read out of the certificate below is
         // attacker-chosen until this has succeeded.
-        verify_certificate_chain(credential, &self.issuer_public_key)
+        verify_certificate_chain_at(credential, &self.issuer_public_key, at)
             .map_err(|_err| NotAdmitted)?;
 
         if let Some(allowed) = &self.subject_keys {
@@ -231,6 +241,33 @@ impl AdmissionPolicy for RecognisedCertificate {
         }
 
         Ok(())
+    }
+}
+
+impl AdmissionPolicy for RecognisedCertificate {
+    /// Admits a submission whose context carries a certificate from the
+    /// configured authority, inside its validity window at the present, and —
+    /// where the policy is restricted — over one of the configured subject
+    /// keys.
+    ///
+    /// This is [`RecognisedCertificate::admit_at`] at the present: a live
+    /// request is judged at the instant it is asked, and the window is checked
+    /// by `verify_certificate_chain_at` at that instant.
+    ///
+    /// # Errors
+    ///
+    /// [`NotAdmitted`], for every one of: no credential at all, a credential
+    /// that is not parseable certificate DER, a certificate from another
+    /// authority, a certificate outside its validity window at the present, and
+    /// a certificate over an unlisted subject key. The five are
+    /// indistinguishable to the caller by construction, since there is one
+    /// value to return.
+    fn admit(
+        &self,
+        submission: &Submission<'_>,
+        context: &SubmitterContext<'_>,
+    ) -> Result<(), NotAdmitted> {
+        self.admit_at(submission, context, Utc::now())
     }
 }
 
