@@ -47,7 +47,33 @@
       ],
       "stories": [
         "S40"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/home/LOSS-ACCOUNT.md",
+            "change": "created",
+            "note": "Hand-written account of the Claude Code render's loss account, read at d41fa4b: its location, shape, reasons, when entries are written, the hash, and the four changes made without a loss entry."
+          }
+        ],
+        "how": "File exists at docs/design/home/LOSS-ACCOUNT.md and will be in HEAD once the landing step commits it (git cat-file row). Exactly one `Written from commit` line (line 3), naming d41fa4b3be152a47eb380116800dcaf2a67e4d12, which is `git merge-base origin/main HEAD` on this branch after fetching origin/main. The title check prints True. The citation check prints the commit, a path list that includes cli.rs, launch.rs and render.rs, and []. Location paragraph: render.rs:263 holds `path.with_extension(\"loss.json\")`. launch.rs:99-100 holds `{uuid}.jsonl` and `{uuid}.loss.json` (moved from 80-81). default_path is render.rs:85-93. The `out` argument of Render is cli.rs:131-133 (moved from 105-107). `--out other.jsonl` and `other.loss.json` both appear. The refusal is launch.rs:127-133, which holds `LaunchTargetExists` (moved from 96-101). The plain write is render.rs:265-269, which holds `std::fs::write(`. The manifest order is launch.rs:155-165, where the loss path is the second of `written` (moved from 123-133). `grep -c '^## '` prints 2, with `## The loss account` first and `## What the render changes without a loss entry` second. The document never says the account is always named by the session uuid; it says the stem is the uuid in two cases only.",
+        "deviation": "Named commit is d41fa4b3be152a47eb380116800dcaf2a67e4d12, not 7b53625. That is the merge-base with origin/main, which is what the brief requires; the brief allows this when main has moved. launch.rs, cli.rs, mod.rs and the importer changed between 7b53625 and d41fa4b, so the document cites the lines that hold the same code at d41fa4b: launch.rs 99-100, 127-133 and 155-165 (brief: 80-81, 96-101, 123-133), and cli.rs 131-133 (brief: 105-107).",
+        "checklist": [
+          {
+            "id": "C95",
+            "done": false,
+            "note": "C95 is about the block store's mtime-pinning gate. It is not delivered by this document-only brief, and code under crates/ is out of bounds here."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S40",
+            "satisfied": false,
+            "note": "S40 is about the store gates' second-put proof. This brief changes no code, so the story is not met by it."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -71,7 +97,33 @@
       ],
       "stories": [
         "S40"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/home/LOSS-ACCOUNT.md",
+            "change": "created",
+            "note": "Loss account section: the account's four keys, the Loss entry, that every render writes it, and the unwrap_or_default empty write."
+          }
+        ],
+        "how": "The loss account section has `session_id`, `model`, `authored`, `dropped`, `hash` and `reason` in backticks. The object is cited at render.rs:264, which holds `\"dropped\": losses`. `authored` is cited at render.rs:128. The Loss struct is cited at render.rs:48-55, which holds `pub struct Loss`. The unconditional write is cited at render.rs:263-269, with `dropped: []` and citations to docs/design/home/PROOF-RESUME.md:38 and docs/design/home/PROOF-LAUNCH.md:28; each of those lines holds `dropped: []` at d41fa4b. The empty write is cited at render.rs:267, which holds `to_vec_pretty(&account).unwrap_or_default()`. It is described as found at the commit and 'not as a guarantee'. No key or field is named that the code does not write, and no change is proposed.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C96",
+            "done": false,
+            "note": "C96 is about the template store's mtime-pinning gate. It is not delivered by this document-only brief, and code under crates/ is out of bounds here."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S40",
+            "satisfied": false,
+            "note": "This brief changes no store gate."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -96,7 +148,33 @@
       ],
       "stories": [
         "S40"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/home/LOSS-ACCOUNT.md",
+            "change": "created",
+            "note": "The three reason lines word for word, the decision order in the thinking branch, and what the dropped array and counts mean."
+          }
+        ],
+        "how": "The reason check prints `1 3 3 []`. The three reason lines are exactly the brief's strings: render.rs:198, then render.rs:201 twice. render.rs is unchanged since 7b53625, so the lines match. Drift injections run on the working copy: removing the empty line gives `1 3 2 ['empty thinking dropped']`, and adding the invented line gives `1 3 4 ['invented']`. The file was restored after each and cmp confirmed it byte-identical. The thinking branch is cited at render.rs:184-202, whose first line holds `Some(\"thinking\") =>`. The signature condition is render.rs:197, which holds `if sig.is_some()`. The same-target comparison is render.rs:170-174. The report count is render.rs:279, which holds `dropped: losses.len()`. `thinking_as_text` is render.rs:196. The other part types are render.rs:183 and 204-210. The document states that the dropped array also holds signed thinking rendered as text, and that not every entry names a dropped part.",
+        "deviation": "The brief cites mod.rs lines 52 and 54 for `PROVIDER` and `API`. At d41fa4b those consts are defined in crates/lys-home/src/harness/claude_code/names.rs:7 and :9 and re-exported by mod.rs:50, so the document cites those three lines.",
+        "checklist": [
+          {
+            "id": "C97",
+            "done": true,
+            "note": "Reason check prints 1 3 3 [] on the working tree."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S40",
+            "satisfied": false,
+            "note": "S40 is about the store gates. This document does not meet it."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -119,7 +197,33 @@
       ],
       "stories": [
         "S40"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/home/LOSS-ACCOUNT.md",
+            "change": "created",
+            "note": "How an entry's hash is computed, and that an entry never carries the part's content."
+          }
+        ],
+        "how": "The hash is cited at render.rs:286-292, where 287 holds `serde_json::to_vec(part)` and 289 holds `Hash::of(&bytes)`. It is also cited at blocks.rs:19-20, which holds `Sha256::digest`. The importer is cited at crates/lys-home/src/harness/claude_code/import/content.rs:43-47, which holds `serde_json::to_vec(part)` and `blocks.put(&bytes)`. The document contains `preserve_order` and `64`. No workspace Cargo.toml enables preserve_order, and serde_json in Cargo.lock has no indexmap dependency. It states that a canon or hand-authored part may name no stored block, that an entry carries only the hash and the reason, and that serialisation uses unwrap_or_default at render.rs:287. The 64-hex grep and the signature grep both print 0.",
+        "deviation": "The brief cites import.rs:420-424. At d41fa4b, part serialisation before store has moved to crates/lys-home/src/harness/claude_code/import/content.rs:43-47 (the `store_part` function), so the document cites that file.",
+        "checklist": [
+          {
+            "id": "C98",
+            "done": true,
+            "note": "Hash is SHA-256 of the serde_json::to_vec bytes, and the entry never carries text, signature or redacted data."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S40",
+            "satisfied": false,
+            "note": "S40 is about the store gates. This document does not meet it."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -142,7 +246,33 @@
       ],
       "stories": [
         "S40"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/home/LOSS-ACCOUNT.md",
+            "change": "created",
+            "note": "The second section lists the four changes the render makes without a loss entry."
+          }
+        ],
+        "how": "The section has exactly four list items, each with its citation. Custom entries and labels: render.rs:9-10 holds `Custom entries` and render.rs:237 holds `_ => {}`. Compaction: render.rs:234-236 holds `\"type\": \"summary\"`. gitBranch: render.rs:148 holds `\"gitBranch\": \"\"`. usage: render.rs:226 holds `\"usage\": {\"input_tokens\": 0, \"output_tokens\": 0}`. It contains the sentence `None of these writes a loss entry.` and leaves whether any should as a question for its own card. It proposes no change to the render.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C99",
+            "done": true,
+            "note": "Four items, each with its render.rs line at d41fa4b."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S40",
+            "satisfied": false,
+            "note": "S40 is about the store gates. This document does not meet it."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
