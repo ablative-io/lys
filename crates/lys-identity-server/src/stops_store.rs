@@ -192,6 +192,11 @@ impl<S: LeafStore> StopStore<S> {
         self.held.operation(operation)
     }
 
+    /// Every stop kept on `agent`, in the order kept.
+    pub fn of_agent(&self, agent: &str) -> Vec<Stop> {
+        self.held.of_agent(agent).cloned().collect()
+    }
+
     /// Keep `stop`, once every part of it is done. Sent again in the same
     /// words it is kept once and answers what was kept; the same operation
     /// in other words is refused.

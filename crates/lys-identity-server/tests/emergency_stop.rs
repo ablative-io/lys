@@ -257,3 +257,56 @@ async fn only_the_person_responsible_or_the_administrator_stops_an_agent() -> Te
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn a_stop_cut_off_after_its_suspension_binds_its_words_and_is_readable() -> TestResult {
+    let table = Table::set().await?;
+    let operation = operation()?;
+    // The suspension is the stop's first part, kept by the directory under
+    // the stop's operation: the same as a stop cut off before it was kept.
+    let suspended =
+        json!({ "operation": operation, "transition": "suspend", "reason": "leaked its key" });
+    let (status, answer) = table
+        .service
+        .post(
+            &format!("/identities/{}/transitions", table.agent),
+            Some(&table.ada),
+            &suspended,
+        )
+        .await?;
+    assert_eq!(status, 200, "{answer}");
+
+    let changed = json!({ "operation": operation, "reason": "other words" });
+    let answer = table
+        .service
+        .post(&table.path(), Some(&table.ada), &changed)
+        .await?;
+    refused(&answer, 409, "StopReused");
+
+    let same = json!({ "operation": operation, "reason": "leaked its key" });
+    let (status, stopped) = table
+        .service
+        .post(&table.path(), Some(&table.ada), &same)
+        .await?;
+    assert_eq!(status, 200, "{stopped}");
+    assert_eq!(stopped["certificates_withdrawn"], json!([table.serial]));
+
+    let (status, kept) = table
+        .service
+        .get(&format!("/agents/{}/stops", table.agent), Some(&table.bea))
+        .await?;
+    assert_eq!(status, 200, "{kept}");
+    assert_eq!(kept["stops"].as_array().map(Vec::len), Some(1), "{kept}");
+    assert_eq!(kept["stops"][0]["operation"], operation);
+    assert_eq!(kept["stops"][0]["reason"], "leaked its key");
+
+    let answer = table
+        .service
+        .get(
+            &format!("/agents/{}/stops", table.adas_agent),
+            Some(&table.bea),
+        )
+        .await?;
+    refused(&answer, 404, "AgentNotVisible");
+    Ok(())
+}
