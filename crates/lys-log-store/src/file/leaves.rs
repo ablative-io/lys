@@ -187,7 +187,8 @@ pub(super) fn remove_file(path: &Path) -> std::io::Result<()> {
 /// The pin is written after the leaves it covers are durable, so the leaf
 /// just below it is a file in a sound store, and the extent is the first index
 /// at or past the pin with no file. A name one past that is a gap and is
-/// refused. A leaf removed from below the pin is refused when it is read.
+/// refused. A leaf removed from below the pin reads as absent, and the log
+/// refuses it as missing within the extent.
 /// Costs one lookup per unpinned leaf plus two, whatever the log's size.
 ///
 /// When the leaf just below the pin is not a file, the pin is ahead of the
