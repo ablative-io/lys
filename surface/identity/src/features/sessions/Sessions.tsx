@@ -1,3 +1,4 @@
+import { RuntimeSessions } from '../runtime/RuntimeSessions';
 /** Live sign-ins use public session IDs; ending one requires an explicit confirmation. */
 import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -30,6 +31,7 @@ export function Sessions() {
       </select></label>
     </details> : null}
     <SessionList key={person} person={person} />
+    <RuntimeSessions />
   </div>;
 }
 

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { $, $$, click, mount, press, text, unreachable } from './harness';
-import { unmountAll } from './harness';
 import { ADA, REVIEWER, SCRIBE, SERVICE, refused } from './fixtures';
 
 describe("An agent's file", () => {
@@ -44,16 +43,6 @@ describe("An agent's file", () => {
     expect(location.hash).toBe(`#/file/${SCRIBE}/certificate`);
     await press('1', {}, document.body);
     expect($('.tabs a.on')?.textContent).toBe('Role');
-  });
-
-  it('marks every section with no server as not built', async () => {
-    for (const tab of ['memory', 'sessions', 'certificate']) {
-      unmountAll();
-      document.body.innerHTML = '';
-      await mount(`#/file/${SCRIBE}/${tab}`);
-      expect($('.file')?.textContent).toContain('not built yet');
-      expect(unreachable()).toEqual([]);
-    }
   });
 
   it('draws the record from the signed receipts', async () => {

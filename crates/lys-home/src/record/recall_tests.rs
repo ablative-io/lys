@@ -21,7 +21,7 @@ use crate::record::epilogue_tests::{WORDS_ONE, WORDS_TWO, lit_fixture};
 use crate::record::lantern::light;
 use crate::record::lantern_tests::LIGHTER;
 use crate::record::reader_tests::{FIXTURE, TRANSCRIPT_LINE, fixture_home, message, snapshot};
-use crate::record::recall::{RecallReport, recall_by_note, recall_by_point};
+use crate::record::recall::{RecallReport, recall_all, recall_by_note, recall_by_point};
 use crate::record::{Home, now};
 
 type Gate = Result<(), Box<dyn Error>>;
@@ -64,6 +64,7 @@ fn keys(value: &Value) -> Vec<String> {
 /// nothing and printing no transcript.
 fn every_recall(home: &Home) -> Vec<Result<RecallReport, HomeError>> {
     vec![
+        recall_all(home),
         recall_by_note(home, "fold"),
         recall_by_note(home, "FOLD HELD"),
         recall_by_note(home, "cobalt"),
@@ -107,6 +108,15 @@ fn recall_by_note_finds_a_phrase_inside_one_text_only() -> Gate {
             Err(HomeError::EmptyNote { what }) if what == "words"
         ));
     }
+    Ok(())
+}
+
+#[test]
+fn recall_all_lists_every_lantern_of_every_session() -> Gate {
+    let (_dir, home, [l1, l2, _e1, _e2, l3]) = recall_fixture()?;
+    let report = recall_all(&home)?;
+    assert_eq!(ids(&report), [l1.as_str(), l2.as_str(), l3.as_str()]);
+    assert!(report.skipped.is_empty());
     Ok(())
 }
 
@@ -192,7 +202,7 @@ fn every_recall_writes_nothing_and_prints_no_transcript() -> Gate {
     std::fs::write(home.session_path("fixture-broken")?, "not json\n")?;
     let before = snapshot(&home)?;
     let results = every_recall(&home);
-    assert_eq!(results.len(), 11);
+    assert_eq!(results.len(), 12);
     for result in results {
         let text = match result {
             Ok(report) => serde_json::to_string(&report)?,

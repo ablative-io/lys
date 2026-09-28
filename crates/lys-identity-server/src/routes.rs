@@ -101,7 +101,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let service_accounts = ServiceAccountStore::configured(config, Arc::clone(&key), &say)?;
     let reviews = ReviewStore::configured(config, Arc::clone(&key), &*say)?;
     let teams = crate::teams_store::TeamStore::configured(config, key, &say)?;
-    Ok(router(Arc::new(AppState {
+    let state = Arc::new(AppState {
         directory: Mutex::new(directory),
         oidc: Oidc::discover(config).await?,
         sessions: Sessions::new(config.session_seconds, config.secure_cookie),
@@ -133,7 +133,12 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         teams: teams.map(Mutex::new),
         agent_nonces: Mutex::default(),
         say,
-    })))
+    });
+    let configured = crate::configuration_api::routes(config)
+        .merge(crate::memory_api::routes(config))
+        .merge(crate::certificates_api::routes())
+        .with_state(Arc::clone(&state));
+    Ok(router(state).merge(configured))
 }
 
 /// Open the directory `config` names, creating its log when the log's

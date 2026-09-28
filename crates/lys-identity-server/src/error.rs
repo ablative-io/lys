@@ -1,11 +1,9 @@
-//! The mapping of every refusal to an HTTP answer, each by name.
+//! Everything the service refuses, each by name; `error_status` maps each
+//! to its HTTP answer.
 
 use axum::http::StatusCode;
-
 use lys_identity::IdentityError;
 use lys_identity::grants::GrantError;
-
-use crate::error_status::{grant_status, identity_status};
 
 /// Everything the service refuses.
 #[derive(Debug, thiserror::Error)]
@@ -130,6 +128,12 @@ pub enum ServerError {
     MachineReused {
         /// The operation id.
         machine: String,
+    },
+    /// The memory of an agent cannot be read.
+    #[error("MemoryUnavailable: {reason}")]
+    MemoryUnavailable {
+        /// What failed.
+        reason: String,
     },
     /// The provisioning profiles cannot be read or written.
     #[error("ProvisioningUnavailable: {reason}")]
@@ -415,85 +419,4 @@ pub enum ServerError {
         /// What failed.
         reason: String,
     },
-}
-
-impl ServerError {
-    /// The refusal's name: the first word of its message.
-    pub fn name(&self) -> String {
-        let text = self.to_string();
-        text.split(':').next().unwrap_or_default().to_owned()
-    }
-
-    pub(crate) fn status(&self) -> StatusCode {
-        match self {
-            Self::NotSignedIn | Self::AgentSignatureRefused { .. } => StatusCode::UNAUTHORIZED,
-            Self::NotAdmitted { .. }
-            | Self::NoPerson
-            | Self::SetupRequired
-            | Self::Withheld { .. }
-            | Self::MachineNotForAgent
-            | Self::ReviewerOnly => StatusCode::FORBIDDEN,
-            Self::AgentNotVisible
-            | Self::GrantNotVisible
-            | Self::SessionUnknown
-            | Self::RequestUnknown
-            | Self::MachineUnknown
-            | Self::LaunchRecordMissing
-            | Self::ProfileVersionUnknown { .. }
-            | Self::RuntimeSessionUnknown
-            | Self::RoleUnknown
-            | Self::RoleVersionUnknown
-            | Self::HolderUnknown
-            | Self::ServiceAccountUnknown
-            | Self::TeamUnknown
-            | Self::TeamMemberUnknown
-            | Self::CertificateUnknown { .. } => StatusCode::NOT_FOUND,
-            Self::RequestDecided { .. }
-            | Self::RequestHeld { .. }
-            | Self::RequestReused { .. }
-            | Self::MachineReused { .. }
-            | Self::RoleReused { .. }
-            | Self::RoleHeld { .. }
-            | Self::HoldingOver { .. }
-            | Self::HoldingChanged
-            | Self::ProvisioningChanged { .. }
-            | Self::ProvisioningReused { .. }
-            | Self::CertificateReused { .. }
-            | Self::CertificateWithdrawn { .. }
-            | Self::MachineRetired
-            | Self::AgentNotActive { .. }
-            | Self::ProfileNotReviewed { .. }
-            | Self::MachineCannotReach { .. }
-            | Self::MachineWithoutRuntime
-            | Self::LaunchUnrenderable { .. }
-            | Self::RuntimeSessionStarted { .. }
-            | Self::RuntimeSessionStopped { .. }
-            | Self::RuntimeReportReused { .. }
-            | Self::ServiceAccountReused { .. }
-            | Self::ServiceAccountRetired { .. }
-            | Self::ServiceAccountOwnerRetired { .. }
-            | Self::TeamReused { .. }
-            | Self::TeamRetired { .. }
-            | Self::TeamMemberHeld
-            | Self::TeamMemberAbsent
-            | Self::GrantNotDue { .. }
-            | Self::ReviewReused { .. } => StatusCode::CONFLICT,
-            Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
-            Self::SignInFailed { .. } | Self::SecretsUnavailable { .. } => StatusCode::BAD_GATEWAY,
-            Self::ConfigInvalid { .. }
-            | Self::DirectoryUnavailable { .. }
-            | Self::RequestsUnavailable { .. }
-            | Self::NetworkUnavailable { .. }
-            | Self::RolesUnavailable { .. }
-            | Self::ProvisioningUnavailable { .. }
-            | Self::CertificatesUnavailable { .. }
-            | Self::RuntimeUnavailable { .. }
-            | Self::ServiceAccountsUnavailable { .. }
-            | Self::TeamsUnavailable { .. }
-            | Self::ReviewsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
-            Self::SecretsRefused { status, .. } => *status,
-            Self::Identity(error) => identity_status(error),
-            Self::Grant(error) => grant_status(error),
-        }
-    }
 }

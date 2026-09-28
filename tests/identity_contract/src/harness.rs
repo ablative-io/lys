@@ -291,6 +291,7 @@ impl Service {
             network_file: Some(dir.path().join("network.json")),
             roles_file: Some(dir.path().join("roles.json")),
             provisioning_file: Some(dir.path().join("provisioning.json")),
+            homes_dir: Some(dir.path().join("homes")),
             runtime_dir: Some(dir.path().join("runtime")),
             service_accounts_dir: Some(dir.path().join("service-accounts")),
             teams_dir: Some(dir.path().join("teams")),
