@@ -16,7 +16,7 @@ title: Build the directory contract and signed authoritative identity changes
 > **Checklist:**
 > - C11 — People and agents are registered with enduring identifiers and issuer-subject bindings, each agent under the signed-in person responsible for it, and registration issues no login, credential or certificate (ID001_DIRECTORY).
 > - C12 — Every identity change is one signed event through lys-log-store under a jointly reviewed envelope, every answered projection equals replay across the crash boundaries, and a receipt verifies independently (ID001_AUDIT_FAULTS, ID001_RECEIPT).
-> - C13 — Only the configured administrator mutates the directory in step 1; unauthenticated, same-email and wrong issuer-subject callers are refused without effect (ID001_ADMIN).
+> - C13 — Only the configured administrator mutates the directory in step 1; unauthenticated, same-email and wrong issuer-subject callers are refused without effect (ID001_ADMIN). Under the lead's ruling of 27 September 2026 (DIRECTORY-026), one exception: an agent authenticated by its enrolled key may create and end its own session record, and nothing else; every other mutation by a caller who is not an administrator, including an agent acting on another agent's session, is still refused by name.
 > - C14 — The link-audit receiver is built and proved against fixtures before row 03 needs it (ID001_RECEIVER).
 > - C15 — Each identity's lifecycle state is recorded as ADR-011 proposes, every transition one signed event, and the grant path's row is recorded open for Tom with its criteria drafted.
 > **Stories:**
@@ -94,7 +94,7 @@ THE SYSTEM SHALL authenticate the initial directory administrator by an explicit
 - create: tests/identity_contract/
 
 **Checklist:**
-- C13 — Only the configured administrator mutates the directory in step 1; unauthenticated, same-email and wrong issuer-subject callers are refused without effect (ID001_ADMIN).
+- C13 — Only the configured administrator mutates the directory in step 1; unauthenticated, same-email and wrong issuer-subject callers are refused without effect (ID001_ADMIN). Under the lead's ruling of 27 September 2026 (DIRECTORY-026), one exception: an agent authenticated by its enrolled key may create and end its own session record, and nothing else; every other mutation by a caller who is not an administrator, including an agent acting on another agent's session, is still refused by name.
 
 **Stories:**
 - S4 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want to register an agent under my name before it ever runs, with every change to it signed, so that who created it and who answers for it is never reconstructed after the fact.

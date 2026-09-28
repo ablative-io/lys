@@ -390,6 +390,86 @@
           "text": "As a responsible person, I want my agent issued one certificate listing the grants it holds and naming its holder, against a key enrolled for it, so that it carries proof of those grants from its first spawn and a lost key or an expired certificate can be replaced."
         }
       ]
+    },
+    {
+      "name": "Responsible person",
+      "role": "Signs in and provisions agents under their own authority",
+      "stories": [
+        {
+          "id": "S1",
+          "text": "As the responsible person, I want every grant my agent holds to trace back to me, so that withdrawing my authority stops everything derived from it."
+        },
+        {
+          "id": "S4",
+          "text": "As the responsible person, I want to register an agent under my name before it ever runs, with every change to it signed, so that who created it and who answers for it is never reconstructed after the fact."
+        },
+        {
+          "id": "S5",
+          "text": "As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email."
+        },
+        {
+          "id": "S81",
+          "text": "As a responsible person, I want each session of my agent kept as its own record under that one agent, so that starting another session never makes another agent."
+        }
+      ]
+    },
+    {
+      "name": "Operator",
+      "role": "Installs and runs the standalone identity product",
+      "stories": [
+        {
+          "id": "S3",
+          "text": "As the operator, I want to install the identity product's dependencies on one PostgreSQL database whose host I choose, and restart or restore it without losing anyone, so that the product stands alone without Cambium or Manifold."
+        },
+        {
+          "id": "S6",
+          "text": "As the operator, I want the directory's screens to show every refusal, pending audit and outage as it is, so that I never act on a completed state that did not happen."
+        },
+        {
+          "id": "S82",
+          "text": "As the operator, I want to stop a session on the directory, so that its credential is refused even when the agent crashed and never reported its end."
+        },
+        {
+          "id": "S83",
+          "text": "As the operator, I want to list an agent's sessions with their states, so that I can see which of its session credentials are still accepted."
+        }
+      ]
+    },
+    {
+      "name": "Grant holder and reviewer",
+      "role": "Exercises or delegates current authority and verifies its exact origin",
+      "stories": [
+        {
+          "id": "S8",
+          "text": "As a responsible person, I want to give my agent a bounded part of my authority and revoke it, so the same action is allowed before revocation and refused after it."
+        },
+        {
+          "id": "S9",
+          "text": "As a person or agent with use-only permission, I want the service to explain why I cannot pass it on; with explicit pass-on rights I want the same permitted operation available through UI and tools."
+        },
+        {
+          "id": "S10",
+          "text": "As an auditor, I want grant changes and retries tied to one durable signed operation, so restart or an uncertain reply cannot invent, lose or duplicate authority."
+        },
+        {
+          "id": "S11",
+          "text": "As a person granting temporary access, I want its end date and ancestor restrictions enforced, so role changes or reinstatement cannot silently extend it."
+        },
+        {
+          "id": "S12",
+          "text": "As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect."
+        }
+      ]
+    },
+    {
+      "name": "Started agent",
+      "role": "Reports back to the directory and presents its session credential",
+      "stories": [
+        {
+          "id": "S80",
+          "text": "As a started agent, I want to present my session credential to the directory, so that it confirms I am my enduring agent in this session."
+        }
+      ]
     }
   ]
 }

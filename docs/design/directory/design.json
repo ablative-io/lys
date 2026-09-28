@@ -27,7 +27,7 @@
     },
     {
       "id": "P6",
-      "text": "A future execution or fork ID refers to its enduring identity and, for a fork, its parent execution; step 1 reserves that distinction in the contract and implements neither session history nor launch."
+      "text": "A future execution or fork ID refers to its enduring identity and, for a fork, its parent execution; step 1 reserves that distinction in the contract and implements neither session history nor launch.\nBrought forward as step-2 work under the lead's ruling of 27 September 2026: DIRECTORY-026's session record and session credential."
     },
     {
       "id": "P7",
@@ -39,7 +39,7 @@
     },
     {
       "id": "P9",
-      "text": "The initial directory administrator is bootstrapped by an explicitly configured issuer and subject, never by email or first visitor; every other mutation caller is refused in step 1."
+      "text": "The initial directory administrator is bootstrapped by an explicitly configured issuer and subject, never by email or first visitor; every other mutation caller is refused in step 1.\nUnder the lead's ruling of 27 September 2026, P9 gives way narrowly for DIRECTORY-026: an agent authenticated by its enrolled key may create and end its own session record, and nothing else. Every other mutation by a caller who is not an administrator, including an agent acting on another agent's session, is still refused in step 1 by name."
     }
   ],
   "decisions": [
@@ -63,7 +63,9 @@
     "ADR-019",
     "ADR-078",
     "ADR-093",
-    "ADR-094"
+    "ADR-094",
+    "ADR-079",
+    "ADR-080"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -200,6 +202,10 @@
     {
       "text": "Road step 2 onward, except its certificate half, the typed capability claim and its verifier, which ADR-093 makes a goal: arbitrary grants and their enforcement, session launch and stop, credential handles, memory, context assembly, lanterns and anchoring in production",
       "reason": "Revision 5 keeps them out of step 1 (docs/design/identity/briefs/IDENTITY-001.json:29-30); ADR-007 (the start command) and ADR-008 (the certificate on an agent's file) govern what the step-1 screens do not present as working. Step 2 is defined in docs/design/identity/STATEMENT-2026-09-22.md (The road); only its certificate half left this non-goal, under ADR-093."
+    },
+    {
+      "text": "Road step 2 onward: capability certificates, arbitrary grants and their enforcement, session launch and stop, credential handles, memory, context assembly, lanterns and anchoring in production\nBrought forward as step-2 work under the lead's ruling of 27 September 2026: DIRECTORY-026's session record and session credential.",
+      "reason": "Revision 5 keeps them out of step 1 (docs/design/identity/briefs/IDENTITY-001.json:29-30); ADR-007 (the start command) and ADR-008 (the certificate on an agent's file) govern what the step-1 screens do not present as working."
     }
   ],
   "structure": [
@@ -1447,6 +1453,156 @@
       "path": "crates/lys-identity-server/tests/agent_key_replacement_route.rs",
       "note": "the replacement route's acceptance and counted refusals",
       "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "docs/design/WIRE-FORMATS.md",
+      "note": "the wire-format register; gains the proposed, unratified decision-log row for lys/session-start/v1 (R3)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "docs/design/identity/SESSION-CREDENTIAL-REVIEW.md",
+      "note": "the adversarial review of the session credential, the challenge and the lys/session-start/v1 report-back proof, recorded before any session code (R4)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/agent_session/mod.rs",
+      "note": "declarations and re-exports only; named agent_session so it is never confused with the server's operator sign-in session",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/agent_session/record.rs",
+      "note": "the session record: its id, agent directory id, launch record id, credential hash and open or ended state, rebuilt from its events",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/agent_session/credential.rs",
+      "note": "the session credential: 32 random bytes, Zeroizing, redacted Debug, kept only as its SHA-256",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/agent_session/challenge.rs",
+      "note": "the directory-issued challenge: 32 random bytes held for one agent id and one launch record id until used, expired more than 60 seconds after issue by a clock passed in, with a byte snapshot for tests",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/agent_session/proof.rs",
+      "note": "the lys/session-start/v1 message over the agent's directory id, the directory's identifier, the launch record id and the challenge, and its strict verification under the enrolled key, checked first",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/agent_session/events.rs",
+      "note": "the session_started and session_ended payloads",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/agent_session/error.rs",
+      "note": "the named session refusals, proof_invalid carrying one body",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/agent_session/start.rs",
+      "note": "issuing the challenge and starting a session at the agent's report-back (R5)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/agent_session/present.rs",
+      "note": "checking a presented session credential (R6)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/agent_session/end.rs",
+      "note": "the agent's reported end and the administrator's stop (R7)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/agent_session/list.rs",
+      "note": "an agent's sessions with their states (R9)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/agent_session/revoked.rs",
+      "note": "refusing a new session to an agent whose certificate has been revoked, read from the revocation fold (R10)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/tests/agent_session_start.rs",
+      "note": "the challenge, the session start, the signature checked first and the named refusals (R5)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/tests/agent_session_present.rs",
+      "note": "the presentation check (R6)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/tests/agent_second_session.rs",
+      "note": "the second-session proof and the ended session's refusal (R7)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/tests/agent_session_list.rs",
+      "note": "the session listing (R9)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/tests/agent_session_revoked.rs",
+      "note": "the revoked certificate's refusal (R10)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity-server/src/agent_session_routes.rs",
+      "note": "the challenge, report-back, presentation, end, stop and list routes, admitting an agent only to its own session (R8, R9, R10)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "tests/identity_contract/tests/agent_session_routes.rs",
+      "note": "the session routes, the one proof_invalid body, and the stop and list routes' admission (R8, R9, R10)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-026.json",
+      "note": "each session its own directory record with its own credential, started when the agent reports back with a signed challenge (R1 to R10)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-026.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/event.rs",
+      "note": "gains change kinds 7 session_started, 8 session_ended and 9 agent_reported, appended (DIRECTORY-026 R5)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/encoding.rs",
+      "note": "encodes and decodes the three session change kinds without changing an existing kind's bytes (DIRECTORY-026 R5)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/src/provenance.rs",
+      "note": "gains actor method codes 2 (agent, enrolled key) and 3 (agent, session credential), appended (DIRECTORY-026 R5)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity/Cargo.toml",
+      "note": "the session module's dependencies (DIRECTORY-026 R5)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity-server/src/lib.rs",
+      "note": "declares the session routes module (DIRECTORY-026 R8)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "crates/lys-identity-server/src/config.rs",
+      "note": "reads, validates and documents directory_id beside the service's other configured values (DIRECTORY-026 R8)",
+      "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "tests/identity_contract/src/harness.rs",
+      "note": "starts the in-process service with a configured directory_id for the session route tests (DIRECTORY-026 R8)",
+      "brief": "DIRECTORY-026"
     }
   ],
   "inventory": [
@@ -1538,7 +1694,7 @@
   "constraints": [
     {
       "id": "CN1",
-      "text": "Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed. Ruling (ADR-093): CN1 binds DIRECTORY-001's documents-only work."
+      "text": "Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed.\nUnder the lead's ruling of 27 September 2026, CN1 binds only the documents-only planning briefs: from DIRECTORY-003 on, the directory's code briefs create and change code under crates/lys-identity and crates/lys-identity-server, and CN1 does not bind them."
     },
     {
       "id": "CN2",
