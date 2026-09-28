@@ -176,10 +176,18 @@ fn made_hex64() -> String {
     for word in 0..4_u64 {
         let mut hasher = state.build_hasher();
         hasher.write_u64(word);
-        let value = hasher.finish();
-        hex.push_str(&format!("{value:016x}"));
+        push_hex(&mut hex, &hasher.finish().to_be_bytes());
     }
     hex
+}
+
+/// Appends `bytes` to `out` as lowercase hexadecimal, two digits a byte.
+fn push_hex(out: &mut String, bytes: &[u8]) {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    for byte in bytes {
+        out.push(char::from(DIGITS[usize::from(byte >> 4)]));
+        out.push(char::from(DIGITS[usize::from(byte & 0x0f)]));
+    }
 }
 
 fn serve_health(status: u16) -> (u16, Arc<AtomicUsize>) {
@@ -423,15 +431,16 @@ impl Run {
 /// Occurrences of a value in text, both as written and as its lowercase hexadecimal.
 fn occurrences(text: &str, value: &str) -> usize {
     let mut hex = String::new();
-    for byte in value.bytes() {
-        hex.push_str(&format!("{byte:02x}"));
-    }
+    push_hex(&mut hex, value.as_bytes());
     text.matches(value).count() + text.matches(hex.as_str()).count()
 }
 
+/// Names, each with the index of its argv in the record.
+type Named = Vec<(usize, String)>;
+
 /// Every name created by `run --name` or `network create`, and every name removed
 /// by `rm` or `network rm`, each with the index of its argv in the record.
-fn created_and_removed(argvs: &[Vec<String>]) -> (Vec<(usize, String)>, Vec<(usize, String)>) {
+fn created_and_removed(argvs: &[Vec<String>]) -> (Named, Named) {
     let mut created = Vec::new();
     let mut removed = Vec::new();
     for (index, call) in argvs.iter().enumerate() {
