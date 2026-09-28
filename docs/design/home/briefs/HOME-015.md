@@ -16,13 +16,13 @@ title: Hand an outgoing session's letter to a new successor home as inherited me
 > - ADR-017 — A fork is a child session cut from the parent's own lines at a lantern's point, with its ancestry on both sides — A fork resolves a lantern to the session it was lit in, read from the lys.lantern data's lit_in when the record carries it and otherwise by the older-record rule (one holder cuts, several refuse lantern_ambiguous until a session is named), and cuts that session's root-to-point chain at the last assistant message at or before the point, through the index. The child is a new session under the parent's cwd whose header's parentSession is the parent file's path relative to the home, holding each cut entry as the parent file's own line bytes, then one lys.forked_from custom entry as its head naming the parent session, the lantern, the point, the cut entry, whether the coordinate was carried and the carried entry; the parent gains one lys.fork custom entry at its head naming the child. Nothing else is copied and no block is written. Rejected: re-serialising the copied entries (the copy would stop hash-matching the parent's lines), a fork store beside the sessions outside Pi's grammar, cutting at a point no lantern names, and a header field beyond Pi's parentSession.
 > - ADR-058 — A handover is a rule-less lys.inherited entry and the letter's turn copied whole into a new successor home, its inheritance read from its first entry — The letter is one or more entry ids, a run of assistant message entries standing next to each other on the outgoing session's path, in path order. Each entry is copied whole, keeping its id, its timestamp and its message, with only its parent link rewritten to chain onto the successor, and from_entries lists every id in that order. The successor is a new home directory, absent or empty, holding one new session with a fresh id, the outgoing header's cwd and no parentSession. Its first entry is a lys.inherited entry with no rule, then the copied entries, then a session_info whose name is `inherited from <outgoing session id>`, and no field is added to Pi's grammar. The first entry is what says the successor's first memory is inherited; the handover's own report reads it from there and prints inherited true, and the render report and its count of canon examples are unchanged. The canon loader newly refuses by name a canon example whose lys.inherited entry has no rule; a lys.inherited entry in a session of a home is read without that check. Rejected: merging the run into one message (composing the letter), copying one entry (half a letter), a session_info flag (breaks CN4), writing into the outgoing home, and setting parentSession, which ADR-017 keeps for a fork's ancestry.
 > **Checklist:**
-> - C45 — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs.
-> - C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs.
-> - C47 — Home and its impl are defined in crates/lys-home/src/record/home.rs.
-> - C48 — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line.
-> - C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it.
-> - C50 — Every public path lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolves as before the move, and no crate outside lys-home changes.
-> - C51 — Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass.
+> - C45 — A lys.inherited entry's rule may be absent in the type and is skipped when absent, a canon entry with a rule serialises to the same bytes as before, and the canon loader refuses by name a canon example without a rule, naming its entry id and the missing field, which canon add and a render with --canon both reach; a rule-less lys.inherited entry in a session of a home reads cleanly.
+> - C46 — A handover refuses by name before any file is created: a letter entry that is not an assistant message, a letter run whose entries do not stand next to each other on the outgoing path in the order given, a letter entry whose message carries provider `authored`, a letter holding no thinking block, and a successor path that exists and is not an empty directory.
+> - C47 — A handover writes a new successor home holding one session with a fresh id, the outgoing header's cwd and no parentSession, and leaves every file of the outgoing home byte for byte as it was.
+> - C48 — The successor session's first entry is a lys.inherited entry with no rule naming the outgoing session as from_session and curated_by, every letter id in path order as from_entries, the letter's provider, api and model, and the last letter entry's timestamp as curated_at.
+> - C49 — Each letter entry follows in the successor with its id, timestamp and message equal to the source, every thinkingSignature byte for byte, and then one session_info entry named `inherited from <outgoing session id>` with no other field.
+> - C50 — lys-home handover prints one JSON report naming the successor home, the session id and its file, with inherited true read from the successor's first entry, and no transcript content.
+> - C51 — A successor rendered for another model carries each inherited signed thinking block as a text part with one loss-account entry naming it by hash, and rendered for the letter's own model keeps it whole with its signature.
 > - C52 — PROOF-HANDOVER.md records the handover of an elicited letter by ids, hashes and the signature comparison, whether the inherited signed block appears in a resumed continuation's own file on the installed Claude Code beside 2.1.281, and the seeded and plain card counts as not run.
 > **Stories:**
 > - S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
@@ -58,25 +58,10 @@ Structural. `error.rs` gains six named refusals. Each message begins with its na
 - modify: crates/lys-home/src/record/entries.rs
 
 **Checklist:**
-- C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs.
+- C46 — A handover refuses by name before any file is created: a letter entry that is not an assistant message, a letter run whose entries do not stand next to each other on the outgoing path in the order given, a letter entry whose message carries provider `authored`, a letter holding no thinking block, and a successor path that exists and is not an empty directory.
 
 **Stories:**
 - S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
-
-#### R1 — Execution record
-
-**Dev (recorded):**
-
-- Status: implemented
-- How: Each refusal carries only session ids, entry ids or a path; the gate each_refusal_begins_with_its_name_and_names_what_it_refuses checks every acceptance line and INHERITED_FROM.
-- Deviation: Built by hand on hand/HOME-015 at the lead's direction, not through card_build_v3; clippy and tests ran on the build machine.
-- Files changed:
-  - modified: `crates/lys-home/src/error.rs` — six named refusals, each beginning with its name and naming ids or the path only
-  - modified: `crates/lys-home/src/record/entries.rs` — CUSTOM_INHERITED documented for a canon example and a handover; INHERITED_FROM declared; no field added to the header, EntryBase or any EntryBody variant
-- Checklist delivery:
-  - [x] C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs. — met; see how
-- Story delivery:
-  - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
 ### R2: Let a handover's lys.inherited entry carry no rule, and make the canon refuse an example without one
 
@@ -103,28 +88,10 @@ Structural, then behaviour. In `record/canon.rs`, `Inherited.rule` becomes `Opti
 - modify: crates/lys-home/src/record/mod.rs
 
 **Checklist:**
-- C45 — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs.
+- C45 — A lys.inherited entry's rule may be absent in the type and is skipped when absent, a canon entry with a rule serialises to the same bytes as before, and the canon loader refuses by name a canon example without a rule, naming its entry id and the missing field, which canon add and a render with --canon both reach; a rule-less lys.inherited entry in a session of a home reads cleanly.
 
 **Stories:**
 - S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
-
-#### R2 — Execution record
-
-**Dev (recorded):**
-
-- Status: implemented
-- How: The rule check sits in canon::load, which canon add and a render with --canon both reach before writing; a session of a home is read by SessionReader, which never checks it. Gates: an_inherited_rule_is_written_when_present_and_skipped_when_absent, the_canon_refuses_an_example_without_a_rule_on_load_add_and_render, a_ruleless_inherited_entry_in_a_session_of_a_home_reads_cleanly. A rule that is present but null is refused as absent.
-- Deviation: Built by hand on hand/HOME-015 at the lead's direction, not through card_build_v3; clippy and tests ran on the build machine.
-- Files changed:
-  - modified: `crates/lys-home/src/record/canon.rs` — Inherited.rule is Option<String>, defaulted and skipped when None; canon::load refuses a lys.inherited entry with no rule by name
-  - modified: `crates/lys-home/src/record/canon_tests.rs` — exactly the two named lines
-  - modified: `crates/lys-home/src/record/mod.rs` — exactly pub mod handover; and mod handover_tests;
-  - created: `crates/lys-home/src/record/handover.rs` — module documentation of the handover invariants
-  - created: `crates/lys-home/src/record/handover_tests.rs` — opens with #![cfg(test)]; the canon and serialisation gates
-- Checklist delivery:
-  - [x] C45 — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs. — met; see how
-- Story delivery:
-  - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
 ### R3: Take a letter from the outgoing session and refuse by name before anything is written
 
@@ -146,25 +113,10 @@ WHEN a handover is asked for with an outgoing home, a from session id, a list of
 - modify: crates/lys-home/src/record/handover_tests.rs
 
 **Checklist:**
-- C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs.
+- C46 — A handover refuses by name before any file is created: a letter entry that is not an assistant message, a letter run whose entries do not stand next to each other on the outgoing path in the order given, a letter entry whose message carries provider `authored`, a letter holding no thinking block, and a successor path that exists and is not an empty directory.
 
 **Stories:**
 - S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
-
-#### R3 — Execution record
-
-**Dev (recorded):**
-
-- Status: implemented
-- How: Every check runs before Home::open touches the successor; the outgoing session is read through SessionReader and Index::read, which write nothing. Gate: every_refusal_is_named_before_anything_is_written counts ten cases and compares every file hash under the outgoing home.
-- Deviation: Built by hand on hand/HOME-015 at the lead's direction, not through card_build_v3; clippy and tests ran on the build machine.
-- Files changed:
-  - modified: `crates/lys-home/src/record/handover.rs` — the checks in order: successor path, session, assistant entries, contiguity on the root-to-head path read through read_head and SessionReader, authored, thinking
-  - modified: `crates/lys-home/src/record/handover_tests.rs` — the ten refusal cases
-- Checklist delivery:
-  - [x] C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs. — met; see how
-- Story delivery:
-  - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
 ### R4: Write the successor home: the lys.inherited entry, the letter copied whole, then the session_info name
 
@@ -185,29 +137,12 @@ WHEN every check of R3 passes, THE SYSTEM SHALL open the successor path as a new
 - modify: crates/lys-home/src/record/handover_tests.rs
 
 **Checklist:**
-- C47 — Home and its impl are defined in crates/lys-home/src/record/home.rs.
-- C48 — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line.
-- C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it.
+- C47 — A handover writes a new successor home holding one session with a fresh id, the outgoing header's cwd and no parentSession, and leaves every file of the outgoing home byte for byte as it was.
+- C48 — The successor session's first entry is a lys.inherited entry with no rule naming the outgoing session as from_session and curated_by, every letter id in path order as from_entries, the letter's provider, api and model, and the last letter entry's timestamp as curated_at.
+- C49 — Each letter entry follows in the successor with its id, timestamp and message equal to the source, every thinkingSignature byte for byte, and then one session_info entry named `inherited from <outgoing session id>` with no other field.
 
 **Stories:**
 - S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
-
-#### R4 — Execution record
-
-**Dev (recorded):**
-
-- Status: implemented
-- How: Gates: the_letter_is_copied_whole_into_a_new_successor_home and an_empty_successor_directory_takes_the_same_four_entries.
-- Deviation: Built by hand on hand/HOME-015 at the lead's direction, not through card_build_v3; clippy and tests ran on the build machine.
-- Files changed:
-  - modified: `crates/lys-home/src/record/handover.rs` — write_successor: the rule-less lys.inherited entry, the letter entries with only parentId rewritten, the session_info name, and the report read back from the first entry
-  - modified: `crates/lys-home/src/record/handover_tests.rs` — the four-entry gates for an absent and an empty successor
-- Checklist delivery:
-  - [x] C47 — Home and its impl are defined in crates/lys-home/src/record/home.rs. — met; see how
-  - [x] C48 — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line. — met; see how
-  - [x] C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it. — met; see how
-- Story delivery:
-  - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
 ### R5: Give lys-home the handover subcommand
 
@@ -224,24 +159,10 @@ WHEN `lys-home handover --home <dir> --from <session> --letter <entry id>... --s
 - modify: crates/lys-home/src/cli.rs
 
 **Checklist:**
-- C50 — Every public path lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolves as before the move, and no crate outside lys-home changes.
+- C50 — lys-home handover prints one JSON report naming the successor home, the session id and its file, with inherited true read from the successor's first entry, and no transcript content.
 
 **Stories:**
 - S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
-
-#### R5 — Execution record
-
-**Dev (recorded):**
-
-- Status: implemented
-- How: Gate: the_handover_subcommand_prints_its_report_and_refuses_by_name.
-- Deviation: Built by hand on hand/HOME-015 at the lead's direction, not through card_build_v3; clippy and tests ran on the build machine.
-- Files changed:
-  - modified: `crates/lys-home/src/cli.rs` — the handover subcommand and HandoverArgs; the module doc lists handover; 454 code lines
-- Checklist delivery:
-  - [x] C50 — Every public path lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolves as before the move, and no crate outside lys-home changes. — met; see how
-- Story delivery:
-  - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
 ### R6: Render the successor for its own model and for another
 
@@ -258,24 +179,10 @@ WHILE rendering a successor for Claude Code, THE SYSTEM SHALL apply R4's rule as
 - modify: crates/lys-home/src/record/handover_tests.rs
 
 **Checklist:**
-- C51 — Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass.
+- C51 — A successor rendered for another model carries each inherited signed thinking block as a text part with one loss-account entry naming it by hash, and rendered for the letter's own model keeps it whole with its signature.
 
 **Stories:**
 - S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
-
-#### R6 — Execution record
-
-**Dev (recorded):**
-
-- Status: implemented
-- How: No render code changed. Gates: a_successor_rendered_for_another_model_carries_its_thinking_as_text and a_successor_rendered_for_its_own_model_keeps_its_signed_thinking.
-- Deviation: Built by hand on hand/HOME-015 at the lead's direction, not through card_build_v3; clippy and tests ran on the build machine.
-- Files changed:
-  - modified: `crates/lys-home/src/record/handover_tests.rs` — the two render gates on a successor written by the handover
-- Checklist delivery:
-  - [x] C51 — Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass. — met; see how
-- Story delivery:
-  - [x] S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it. — served for the handover
 
 ### R7: Write the handover into the record document and render the cluster
 
@@ -293,32 +200,13 @@ Structural. RECORD.md's `lys.inherited` item gains the handover form: the data `
 - modify: docs/design/home/CHECKLIST.md
 
 **Checklist:**
-- C45 — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs.
-- C47 — Home and its impl are defined in crates/lys-home/src/record/home.rs.
-- C48 — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line.
-- C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it.
+- C45 — A lys.inherited entry's rule may be absent in the type and is skipped when absent, a canon entry with a rule serialises to the same bytes as before, and the canon loader refuses by name a canon example without a rule, naming its entry id and the missing field, which canon add and a render with --canon both reach; a rule-less lys.inherited entry in a session of a home reads cleanly.
+- C47 — A handover writes a new successor home holding one session with a fresh id, the outgoing header's cwd and no parentSession, and leaves every file of the outgoing home byte for byte as it was.
+- C48 — The successor session's first entry is a lys.inherited entry with no rule naming the outgoing session as from_session and curated_by, every letter id in path order as from_entries, the letter's provider, api and model, and the last letter entry's timestamp as curated_at.
+- C49 — Each letter entry follows in the successor with its id, timestamp and message equal to the source, every thinkingSignature byte for byte, and then one session_info entry named `inherited from <outgoing session id>` with no other field.
 
 **Stories:**
 - S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
-
-#### R7 — Execution record
-
-**Dev (recorded):**
-
-- Status: implemented
-- How: The cluster was re-rendered with render-cluster.py and sh scripts/design/gate.sh exits 0.
-- Deviation: Built by hand on hand/HOME-015 at the lead's direction, not through card_build_v3; clippy and tests ran on the build machine.
-- Files changed:
-  - modified: `docs/design/home/RECORD.md` — the handover form of lys.inherited, the canon refusal and the five handover refusals
-  - modified: `docs/design/home/design.json` — the notes of the handover, proof and record rows
-  - modified: `docs/design/home/DESIGN.md` — re-rendered
-- Checklist delivery:
-  - [x] C45 — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs. — met; see how
-  - [x] C47 — Home and its impl are defined in crates/lys-home/src/record/home.rs. — met; see how
-  - [x] C48 — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line. — met; see how
-  - [x] C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it. — met; see how
-- Story delivery:
-  - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
 ### R8: Prove the handover on an elicited letter and measure the carry-over of its signed thinking
 
@@ -340,21 +228,6 @@ WHEN the build is complete, THE SYSTEM SHALL write PROOF-HANDOVER.md from runs o
 **Stories:**
 - S5 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
 - S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
-
-#### R8 — Execution record
-
-**Dev (recorded):**
-
-- Status: implemented
-- How: The signatures compare equal byte for byte; the carry-over is absent (0 parts); sent-to-model waits on R10.
-- Deviation: Built by hand on hand/HOME-015 at the lead's direction, not through card_build_v3; clippy and tests ran on the build machine. Claude Code on the build machine was signed out (exit 1, api_error), so the elicitation and the resume ran on the development Mac with the same Claude Code version, 2.1.283, and lys-home ran on the build machine; the files moved between them by scp and were compared by SHA-256. The letter's thinking was written signed with empty thinking text, so rendered for another model it is dropped and named (empty thinking dropped), not carried as a text part; the fixture gate measures the text-part path.
-- Files changed:
-  - created: `docs/design/home/PROOF-HANDOVER.md` — the elicited letter, the handover by ids and hashes, the carry-over, and the card counts as not run
-- Checklist delivery:
-  - [x] C52 — PROOF-HANDOVER.md records the handover of an elicited letter by ids, hashes and the signature comparison, whether the inherited signed block appears in a resumed continuation's own file on the installed Claude Code beside 2.1.281, and the seeded and plain card counts as not run. — met; see how
-- Story delivery:
-  - [x] S5 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught. — served for the handover
-  - [x] S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it. — served for the handover
 
 ## Boundaries
 

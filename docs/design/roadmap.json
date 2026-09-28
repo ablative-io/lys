@@ -523,7 +523,7 @@
     {
       "id": "RM-037",
       "title": "Hand an outgoing session's letter to a new successor home as inherited memory",
-      "status": "briefed",
+      "status": "idea",
       "kind": "feature",
       "summary": "HOME-001 row R12, the handover, built as the lead's answers correct it. lys-home handover reads the outgoing session of a home without owning it and takes a letter: one or more assistant message entries standing next to each other on its path. It writes a new successor home holding one session: a lys.inherited entry with no rule naming the outgoing session and every letter id, then each letter entry copied whole with its thinking blocks and signatures, then a session_info named `inherited from` the outgoing session. It prints a JSON report naming the successor home, the session and its file, with inherited true read from the successor's first entry. A letter entry that is not an assistant message, a run that is not contiguous, an entry that carries provider authored, a letter with no thinking block, and a successor path that holds anything are each refused by name, and nothing is written. The canon loader newly refuses a canon example without a rule. PROOF-HANDOVER.md records the handover of a letter elicited for the purpose on the build machine, whether the installed Claude Code carries the inherited signed block into a resumed continuation's own file beside the version the row named, and the seeded and plain card counts as not run.",
       "provenance": {
