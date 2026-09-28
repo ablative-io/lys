@@ -208,7 +208,7 @@ fn an_https_origin_keeps_the_host_bound_secure_session_cookie() -> Result<(), Bo
         )
         .replace(
             "trusted_proxies = []",
-            "trusted_proxies = [\"192.0.2.1/32\"]",
+            "trusted_proxies = [\"172.29.48.1/32\"]",
         );
     let env = rendered_for(&text)?;
     assert!(
