@@ -2,207 +2,179 @@
 
 ## The words, as they were typed
 
-HOME-001 R7, prove a subscription login through a pass-through proxy.
+The Claude Code render in crates/lys-home/src/harness/claude_code/render.rs writes a default where it cannot shape a record, so a broken session renders to a file that looks whole. The loss account is written with serde_json::to_vec_pretty(&account).unwrap_or_default(), so a serialisation failure writes an empty loss account and the render reports success; the byte measure of a part does the same with to_vec. A message with no role renders with an empty role; a tool result with no toolCallId renders with an empty tool_use_id, no content becomes an empty array and no isError becomes false; a text part with no text, a tool_use part with no id or name or arguments, and a message with no model all render with empty strings or an empty object; a thinking part with no thinking text renders as empty thinking. Each of these is older code, found by the lead reviewing HOME-007 render determinism, and none is in that card's scope. The rule to meet: the render refuses by name what it cannot shape, naming the entry id and the field that was missing or the value that would not serialise, and writes nothing; a default is never written in place of a value the source did not carry. Fixtures: a session whose message carries no role is refused naming the entry and the field; a tool result with no toolCallId is refused the same way; a loss account that cannot serialise is refused and no file is written, proved by an account type whose serialiser returns an error in the test; the existing round-trip and determinism tests keep passing and their pinned hashes do not move, since every fixture they use carries every field. Not in scope: any change to which block kinds are carried or lost, or to the loss account's shape.
 
-Source: docs/design/home/briefs/HOME-001.json at lys main 7b536253, requirement R7, taken as it stands there. Its spec, its three acceptance lines, its files (crates/lys-home/examples/passthrough.rs, docs/design/home/PROOF-PROXY.md, crates/lys-home/Cargo.toml) and checklist C7 are this card's scope; read them from that file.
+Rulings of the lead, Archie, given on 27 September 2026 to the run 9635a408-630c-4a65-93c8-a9c2f4cb56fc in answer to its rounds. That run took every answer and then failed before writing, when the Argus gate refused every tool call of its session. They are settled here, and the author reopens none of them.
 
-In short: examples/passthrough.rs forwards every request unchanged to the provider base URL on its command line and writes only a four-field line per call (method, path, status, duration_ms) to stderr, never a header value or a body byte. One seat whose Claude Code login is a subscription runs through it, and PROOF-PROXY.md records the Claude Code version, completed or failed, the status codes, which headers had to pass, and what failed if it did.
+Yes. The brief corrects the sentence to what the tree does: a message with no role is skipped silently. The refusal replaces that skip for a missing role only. A role that is present but unknown stays skipped as it is today; this card does not change which real sessions render on that ground.
 
-Why this card exists: wJAsjFKC's judgement of crates/lys-home on main leaves R7 open as unbuilt. The build is the example and the proof document, written and run; it is not a proof over code that already exists.
+The rule covers them all, since it is general. An assistant message with no content array, a user message with no content, a single user text part with no text, a missing stopReason and a redacted thinking part with no signature each refuse by name, naming the entry id and the field, exactly like the named cases. Each gets a fixture.
 
-Order: this card builds after R10 (qY9mBz-y). HOME-001 says R7's example shares R10's forward.rs rather than a second transport, so base it on R10 once R10 lands.
+Exempt. gitBranch "", usage {0,0} and stop_sequence null are constants the Claude Code file format requires on every record; they do not stand in place of a value any source carries. The brief lists them by name as format constants, the render's doc comment names them, and the pinned hashes do not move.
 
-The live subscription run needs a seat and a person to watch it; the brief names that step and who runs it, and the loopback acceptance (a fake upstream answering 418 with three chunks) runs in the gate without any provider.
+Yes, a wrongly typed field refuses too, naming the entry id, the field and the type expected. A value copied as it is must be of the type the target field takes. Fixtures: a numeric role, a string content where an array is required, and a non-boolean isError.
 
-These rulings are already given and are settled.
-R10 measures the session key itself and creates PROOF-PROXY.md with that measurement, as its own spec requires, before its linking is built.
-R7 extends the same document afterwards with its live-run section.
-So neither card depends on the other landing to meet its own text: R10 writes the session-key section, R7 appends the live run.
-The brief names the step, and the words were wrong to claim HOME-001 names the person.
-Archie's seat runs it and Archie watches, since HOME-001 gives every requirement except R10 to Archie.
-If Archie names another seat, his word replaces this.
-The live run is a named step after the build, outside the gate.
-Only the loopback acceptance (a fake upstream answering 418 with three chunks) runs in the gate, with no provider.
-Record it against the Claude Code installed now, 2.1.283, and name that version in PROOF-PROXY.md.
-Nobody installs an older version for this.
-Record HOME-001's 2.1.281 line as a finding for the design to update, as Archie ruled for the 2.1.283 pair on 54e28af6.
-The card is done when PROOF-PROXY.md records the live run truthfully, completed or failed, and what failed if it did.
-That is R7's first acceptance.
-A failed run does not tick C7.
-The brief says C7 stays open on a failure and reports the failure to Archie as a finding, and the card never claims C7 on a failed run.
-If forward.rs fails before any upstream response (connection refused, reset, or the stream broken before the status line), the example answers the client 502 Bad Gateway with an empty body, and the call line's status field is 502.
-If it fails after the upstream status and headers have gone to the client, the example closes the client connection, since the status is already sent and cannot change.
-The line then records that upstream status and the duration up to the break.
-In both cases no error text, header value or body byte is written anywhere.
-Tests: a loopback upstream that refuses the connection gives 502 with an empty body and a line with 502; one that sends 200 and two chunks and then resets gives a truncated response to the client and a line with 200.
+Out of this card. The importer's defaults are a known gap, and the brief names them by file and line (import.rs:151, 213-215, 466-474, 508-519) as the remaining half. They belong with card nBeQclbH, the importer records every field it drops, which is held on Tom's word; this card does not touch import.rs.
+
+Keep it as today. In Pi's grammar redacted is optional, and absent means not redacted. So a thinking part with no redacted field is read as not redacted and is never refused. The brief records this as its boundary and keeps the one unwrap_or(false) at render.rs:185. Add one test with a thinking part that has no redacted field and assert that it renders as not redacted.
 
 ## What the survey found, and its angles
 
-Build R7 of HOME-001 on top of R10's shared transport: crates/lys-home/examples/passthrough.rs forwards every request to the provider base URL given on its command line. For each call it writes one four-field line (method, path, status, duration_ms) to stderr and nothing else. It answers 502 with an empty body when the upstream fails before responding, and closes the client connection when the upstream breaks mid-stream. After the build, Archie's seat, with a subscription login on the installed Claude Code 2.1.283, runs through the example, and a live-run section is appended to PROOF-PROXY.md (which R10 creates) saying truthfully whether the run completed or failed, with the status codes, the headers that had to pass, and what failed. C7 is not claimed on a failed run.
+The Claude Code render (crates/lys-home/src/harness/claude_code/render.rs) fills in a default wherever a home record is missing a field or carries the wrong type, so a broken session renders to a file that looks whole. The words, with Archie's rulings of 27 September, ask the render to refuse instead. It names the entry id and the field (and the expected type, when the field is wrongly typed) and writes no file. The loss account and the loss hashes get the same rule: a serialisation failure refuses. A short list of Claude Code format constants and the absent `redacted` field stay as they are, unknown roles are still skipped, the importer is not touched, and every pinned hash stays the same.
 
 ### What the tree holds
 
-- `docs/design/home/briefs/HOME-001.json (requirements[R7], lines ~226-250)` — The card's source: spec, three acceptance lines, files (create examples/passthrough.rs and PROOF-PROXY.md, modify Cargo.toml), checklist C7 and story S5. Read in full.
-- `docs/design/home/briefs/HOME-001.json (requirements[R10])` — R10 says 'R7's example shares forward.rs rather than a second transport (Chippy 323b67d5)' and fixes the transport rules R7 inherits: no retry, retry_canceled_requests(false), no buffering, no byte altered. R10 also creates PROOF-PROXY.md with the session-key measurement.
-- `crates/lys-home/src/proxy/forward.rs` — The shared transport R7 must call. It does not exist on main at 7b53625: there is no src/proxy directory and no HTTP crate in Cargo.lock. It arrives with R10 (qY9mBz-y).
-- `crates/lys-home/src/proxy/forward_tests.rs` — The only test file for forwarding that design.json's structure array lists. The loopback 418/502/reset tests have to live here or inside the example, because the boundary says no path outside the structure is created.
-- `crates/lys-home/Cargo.toml` — Has no [[example]] entry, no examples/ directory, and no async, HTTP or TLS dependency (deps: clap, rand, serde, serde_json, sha1, sha2, thiserror, time; dev: tempfile). R7 adds the example target and any dev-dependencies R10 has not already brought.
-- `crates/lys-home/examples/passthrough.rs` — Does not exist; R7 creates it. Its only writes may be the four-field line. Review reads the file for any path that writes a header value or a body byte.
-- `docs/design/home/PROOF-PROXY.md` — Does not exist on main. R10 creates it with the session-key section; R7 appends the live-run section (version 2.1.283, completed or failed, status codes, headers that had to pass, what failed).
-- `docs/design/home/design.json (structure, constraints CN5, CN3, CN8)` — Structure has 108 rows and is the whole file list; it lists passthrough.rs and PROOF-PROXY.md under HOME-001. CN5: the pass-through forwards every header and the streamed body unchanged, stores nothing but the measurement, and is an example binary, never a service.
-- `docs/design/home/checklist.json and CHECKLIST.md (C7)` — C7: 'One seat with a subscription login completes a call through a pass-through proxy; the measurement is written down.' All 44 checklist items are done:false, including those of cards that have already landed.
-- `docs/design/home/briefs/HOME-001.json (verification)` — Requires PROOF-RESUME.md and PROOF-PROXY.md to 'name Claude Code 2.1.281'. The words overrule this with 2.1.283 and record the 2.1.281 line as a finding for the design.
-- `crates/lys-home/src/record/call.rs` — CallStatus (Complete, Cancelled, Partial, Unrecorded, Lost) is R10's record vocabulary. The example records none of it (stderr line only), but the 502 and mid-stream-break rulings must not leak into what R10's proxy records.
-- `scripts/design/gate.sh` — The design leg: validate, coverage and render-equality over every cluster. PROOF-PROXY.md is committed markdown in the home cluster, and the gate compares each rendered .md with the committed one.
+- `crates/lys-home/src/harness/claude_code/render.rs:138` — `message.get("role").and_then(Value::as_str).unwrap_or("")`. A missing or non-string role falls through to `_ => continue` at line 230 and is skipped silently, not rendered with an empty role. The refusal replaces the skip for a missing or wrongly typed role only; an unknown role string stays skipped.
+- `crates/lys-home/src/harness/claude_code/render.rs:160-168` — The toolResult arm defaults toolCallId to "", content to [] and isError to false through `.cloned().unwrap_or(..)`, with no type check on the values it copies.
+- `crates/lys-home/src/harness/claude_code/render.rs:176-181` — Assistant content: `.and_then(Value::as_array).cloned().unwrap_or_default()`. A missing or non-array content renders as an assistant message with no parts.
+- `crates/lys-home/src/harness/claude_code/render.rs:183` — A text part's text defaults to "".
+- `crates/lys-home/src/harness/claude_code/render.rs:184-203` — Thinking. `redacted` uses unwrap_or(false) at line 185, which the ruling keeps. `thinking` uses unwrap_or("") at line 187, which must refuse. `sig.unwrap_or(Value::Null)` at line 189 writes a null `data` for a redacted part with no signature, which must refuse. `sig.is_some()` at lines 191 and 197 treats a present JSON null as a signature.
+- `crates/lys-home/src/harness/claude_code/render.rs:204-209` — tool_use: id and name default to "" and arguments to {}.
+- `crates/lys-home/src/harness/claude_code/render.rs:213-217` — stopReason: a missing value becomes end_turn through `_ =>`. The same arm maps present values other than toolUse and length (Pi's stop, error, aborted) to end_turn.
+- `crates/lys-home/src/harness/claude_code/render.rs:222` — Assistant model defaults to "".
+- `crates/lys-home/src/harness/claude_code/render.rs:148,225,226` — The format constants the ruling exempts: gitBranch "", stop_sequence null, usage {0,0}. The module doc (lines 1-14) must name them.
+- `crates/lys-home/src/harness/claude_code/render.rs:240-272` — Write order. The rendered file is created and synced (lines 244-262) before the loss account is serialised with to_vec_pretty(..).unwrap_or_default() (line 267), and the seed is written after that (line 271). "Writes nothing" means every refusal must be decided before line 240.
+- `crates/lys-home/src/harness/claude_code/render.rs:286-292` — `loss()` hashes `serde_json::to_vec(part).unwrap_or_default()`, so a failed serialisation would be named by the SHA-256 of empty bytes. It has to return a Result.
+- `crates/lys-home/src/harness/claude_code/render.rs:375-390` — user_parts: a single text part with no text becomes "" (line 383), and a missing or wrongly typed content becomes "" (line 388).
+- `crates/lys-home/src/error.rs` — HomeError is #[non_exhaustive] and carries no transcript content (module doc, CN3). A new named refusal goes here: session, entry id, field, and expected type when the type is wrong. It never carries the value. EntryShape at line 269 is the nearest precedent.
+- `crates/lys-home/src/harness/claude_code/launch.rs:102-113` — render-launch stores the template in the home (`home.templates().put`, line 102) before it calls render_claude_code (line 113). A refused render therefore still leaves a stored template object, although no rendered, loss, mcp, env or instructions file is written.
+- `crates/lys-home/src/cli.rs:253` — The `render` subcommand calls render_claude_code. The CLI's refusal output and exit code for the new error follow from it.
+- `crates/lys-home/src/harness/claude_code/render_tests.rs` — Holds the determinism gates, including the multi_result test at line 397. Its session_of helper (lines 132-156) builds messages that carry role, content, model, provider, api and stopReason, so it stays green. The new refusal fixtures go here or in a sibling test file.
+- `crates/lys-home/tests/claude_code_round_trip.rs:360` — PINNED_FIXTURE_SHA256 798a64be2164b48c30e4e64fa80c4a307687f7808c256e7606be52b2c9f03074 is also recorded in PROOF-RESUME.md, and it must not move.
+- `crates/lys-home/tests/launch_template.rs:32` — Recorded SHA-256 of each file the launch fixture writes. It must not move.
+- `crates/lys-home/tests/fork.rs:73-90` — The fork fixtures' user and assistant helpers carry role, content, model, provider, api and stopReason, so child renders still pass.
+- `crates/lys-home/src/harness/claude_code/import.rs:151,213-215,466-474,508-519` — The importer's own defaults (model "", toolCallId "", isError false, redacted_thinking signature Null, tool_use id/name "", tool_result content []). Out of this card by ruling, and not touched. They mean a broken Claude Code source still arrives in the home fully populated.
+- `docs/design/home/design.json` — Holds the constraints (CN1-CN10, CN9 is determinism), the principles (P1-P10, P7 no transcript in errors) and the structure array (108 rows) that the design gate checks every file path against.
 
 ### What was already decided
 
-- HOME-001 R7 — The pass-through example plus PROOF-PROXY.md. It must not log, store or print a header value or a body byte, and the loopback 418 with three chunks proves the forward path without a provider.
-- HOME-001 R10 — The little proxy. R7's example shares forward.rs. Chippy builds R10 and Archie builds the rest. R10 records the session-key field in PROOF-PROXY.md before its linking is built.
-- HOME-001 purpose — The third proof is that a subscription login survives a pass-through proxy, so the little proxy that records the stream has a place to live.
-- HOME-001 boundaries — No door code changes; the little proxy is lys-home's own binary. No content in any log or report. No credential is copied anywhere. No proof runs against a running session. The structure array is the whole file list.
-- CN5 — The pass-through forwards every header and the streamed body unchanged, stores nothing but the measurement, and is an example binary, never a service.
-- CN3 — Transcript content never appears in output, logs, errors, test names or pages.
-- CN8 — No secret value is written to any file, report, launch line, error or entry by lys-home.
-- C7 — One seat with a subscription login completes a call through a pass-through proxy, and the measurement is written down.
-- S5 — The reviewer wants each path measured on a named harness version with the command recorded, so that a later version changing it is caught.
-- ADR-001 — The door's proxy swaps a handle for the credential. The pass-through example is the place the tee will live; it is not the door.
-- ADR-007 — The product prints commands and never runs agents. The live run is a person's step, not something the card executes.
-- PROOF-FORK.md / PROOF-GIVEN.md / PROOF-LAUNCH.md — Earlier home proofs already record 2.1.283 as the measured version, and they are the pattern for naming the version and the exact commands.
+- ADR-012 — Each render is recorded as a template_render lys.harness_event side leaf naming the written paths. A refused render writes no file, so no event is recorded.
+- ADR-016 — Derived uuids are a frozen UUIDv5 scheme. Nothing in this card may change record_uuid or which ids derive.
+- ADR-017 — A fork child holds the parent's own line bytes and renders like any session. A malformed parent line now makes the child's render refuse instead of rendering defaults.
+- ADR-018 — The seed prompt is written beside the rendered file after the render (render.rs:270-272). A refusal must come before the seed too.
+- CN1 — A render writes a new file only and refuses an existing path by name. The refusals here join that set and follow the same pattern: named, and nothing written.
+- CN3 — No transcript content in errors. The refusal names the entry id, field and expected type, never the offending value.
+- CN9 — The same session head renders to the same bytes. Nothing in this card may change the bytes of a well-formed session.
+- P7 — Transcript contents never appear in an error, a log or a test name. This applies to the new error's Display and to the new test names.
+- HOME-007 — The determinism brief: the render walk is kept deterministic, and the multi_result fixture and PROOF-RESUME hash are pinned. The lead's review of it found these defaults and left them out of its scope.
+- HOME-001 R4/R9 — The original render and CLI whose older code carries these defaults.
 
 ### What was measured
 
-- HTTP, async or TLS crates in Cargo.lock (hyper, tokio, axum, http, rustls, webpki-roots): 0 of 199 locked packages
-- ring in Cargo.lock: 1, pulled in only by rcgen
-- crates/lys-home/src/proxy directory on main 7b53625: absent (R10 not landed)
-- crates/lys-home/examples directory: absent
-- docs/design/home/PROOF-PROXY.md: absent
-- crates/lys-home Rust files / total lines: 61 files / 15,665 lines
-- lys-home runtime dependencies: 8 (clap, rand, serde, serde_json, sha1, sha2, thiserror, time); 1 dev-dependency (tempfile)
-- Installed Claude Code on this Mac: 2.1.283 (Claude Code)
-- HOME-001 requirements: 12 (R1 to R12); R7 has 3 acceptance lines and 3 files
-- R10 acceptance lines: 13; R10 creates 16 files
-- design.json structure rows: 108
-- home checklist items ticked done: 0 of 44
-- Test cases the words require in the gate: 3: 418 with 3 chunks, refused upstream giving 502 and an empty body, 200 with 2 chunks then a reset
-- Fields in the per-call stderr line: 4 (method, path, status, duration_ms)
-- Commit 54e28af6 in this repository: not a valid object; the ruling id is not a lys commit
-- Roadmap rows mentioning R7 or R10: 0 of 11
+- Lines in render.rs (total / code, excluding blank and comment lines): 390 / 306; the limit is 500 lines of code
+- Default sites in render.rs that the rule and the rulings turn into refusals: 17: lines 138, 163, 164, 165, 180, 183, 187, 189, 206, 207, 208, 213-216 (missing stopReason), 222, 267, 287, 383, 388
+- Default sites kept by ruling: 4: redacted unwrap_or(false) at line 185, plus the format constants gitBranch "" (line 148), stop_sequence null (line 225) and usage {0,0} (line 226)
+- Lines in render_tests.rs: 487
+- Lines in error.rs (total / code): 431 / 257
+- Pinned render hash of the multi_result fixture: 798a64be2164b48c30e4e64fa80c4a307687f7808c256e7606be52b2c9f03074 (claude_code_round_trip.rs:360)
+- Committed JSONL fixtures whose message records lack a field this card would refuse: 0 of 2 (tests/fixtures/multi_result.jsonl: 6 records; tests/fixtures/launch/session.jsonl: 4 messages). Every message carries role and content, every assistant carries model and stopReason (or stop_reason), and every tool_result carries tool_use_id, content and is_error.
+- In-code test fixture helpers that build message entries (render_tests session_of, fork.rs user/assistant, canon_tests, seed_tests, lantern tests): All carry role and content; every assistant carries model, provider, api and stopReason
+- Callers of render_claude_code outside tests: 2: cli.rs:253 (render) and launch.rs:113 (render-launch)
+- Highest checklist, story and roadmap ids in the home cluster: C44, S23; the home briefs on disk run HOME-001 to HOME-007 with no HOME-005; the roadmap has RM-001 to RM-010 and RM-016
+- Rows in the home design.json structure array: 108
+- Where the importer writes a redacted_thinking part with no data: import.rs:460: thinkingSignature null, redacted true, thinking ""
 
 ### What it means for the other projects
 
-- aion — The card runs through the chain (brief_card, sign-off, card_build_v3, src_pr, src_land) and its base commit must be R10's landed head. The live run is a named step outside the gate, so the chain needs a place to hold the card between the build landing and Archie's run, or to take the proof document as a follow-on commit. Full gates run on Dean's laptop.
-- cambium — The card sits on the board after R10 (qY9mBz-y). Its done-state is 'PROOF-PROXY.md truthful', not 'C7 ticked', so a failed run shows as done with C7 open and a finding to Archie.
+- cambium — The card lives on its board and runs through brief_card, sign-off, card_build_v3, src_pr and src_land. The held importer card nBeQclbH is named there as the remaining half.
+- aion — The previous run (9635a408) failed when Argus refused its tool calls. This card is dispatched again through aion's chain with the rulings settled; there is no code change in aion.
+- argus — The Argus gate refused every tool call of the earlier run's session. If it refuses again, that is a chain defect to name, not a reason to hand-build the card.
 
 ### The decisions it stands on
 
-- ADR-001 (honour) — The example is a proof-only pass-through, not the door's credential-swapping proxy. It never sees, stores or swaps a credential; the subscription token simply passes through in its header.
-- ADR-004 (honour) — lys-home stands alone: the example and its tests need no door, broker or manifold, and the loopback acceptance needs no provider.
-- ADR-007 (honour) — Nothing in the card launches a seat. The live run is a person's step (Archie's seat), recorded after the build.
--  (new) — A pre-response upstream failure is answered with a synthesised 502 and an empty body, and a mid-stream break closes the client connection. Whether that is the example's rule only or forward.rs's shared rule (and so lys-proxy's) is an observable behaviour R10's 'SHALL NOT alter a byte' does not cover, and it should be written down once it is decided.
+- ADR-016 (honour) — Refusals are added around the walk, and the uuid derivation and every well-formed record's bytes stay as they are.
+- ADR-012 (honour) — A refused render writes no file, so render-launch records no template_render event for it. The event stays a record of files actually written.
+- ADR-017 (honour) — Fork children render through the same function. Their fixtures carry every field, so fork behaviour is unchanged for well-formed parents.
+- ADR-018 (honour) — The seed is still written beside the rendered file, and only after every refusal check has passed.
+-  (new) — A home constraint beside CN9: the Claude Code render never writes a default in place of a value the record did not carry, refuses a missing or wrongly typed field by entry id, field and expected type before writing anything, and names its format constants (gitBranch "", usage {0,0}, stop_sequence null) and its one optional-field reading (absent redacted means not redacted).
 
 ### What it requires
 
-- crates/lys-home/examples/passthrough.rs exists, takes the provider base URL as its one positional argument, and forwards through R10's forward.rs with no second transport.
-- The example's only writes to stdout, stderr or any file are one four-field line per call: method, path, status, duration_ms.
-- No code path in the example writes a header value, a header name list, a body byte or error text anywhere; review reads the file.
-- Against a loopback upstream answering GET / with 418 and a fixed 3-chunk streamed body, the example answers 418 with the same 3 chunks in order.
-- Against a loopback upstream that refuses the connection, the client receives 502 with an empty body, and the call line's status is 502.
-- Against a loopback upstream that sends 200 and two chunks and then resets, the client receives a truncated response, and the call line's status is 200 with the duration up to the break.
-- The three loopback tests run in `cargo test --workspace --all-features` with no provider and no network beyond 127.0.0.1.
-- crates/lys-home/Cargo.toml declares the example (and any dev-dependencies it needs) and passes fmt, both clippy shapes, both doc shapes and tests.
-- PROOF-PROXY.md keeps R10's session-key section and gains a live-run section naming Claude Code 2.1.283, `completed` or `failed`, the status codes seen, the headers that had to pass, what failed if it failed, and the exact commands.
-- The live-run section names the seat (Archie's, unless he names another) and records the run as done with a subscription login, not an API key.
-- On a failed run C7 stays open, the card does not claim it, and the failure goes to Archie as a finding.
-- HOME-001's 2.1.281 verification line is reported as a finding for the design, not silently edited.
-- scripts/design/gate.sh exits 0 with PROOF-PROXY.md changed.
+- A message entry with no role is refused by an error naming the session, the entry id and the field `role`, and no rendered file, loss account or seed is written.
+- A role that is present but unknown is still skipped, and the render succeeds.
+- A numeric role is refused naming the entry id, `role` and the expected type string.
+- A toolResult with no toolCallId is refused naming the entry id and `toolCallId`; a missing content or isError on a toolResult is refused likewise; a non-boolean isError is refused naming the expected type boolean.
+- An assistant message with no content array, or with content of another type, is refused naming the entry id and `content`.
+- A user message with no content, or a single user text part with no text, is refused naming the entry id and the field.
+- A text part with no text; a toolCall part with no id, name or arguments; an assistant message with no model; and an assistant message with no stopReason are each refused naming the entry id and the field.
+- A thinking part with no thinking text is refused, and a redacted thinking part with no thinkingSignature (or one present but not a string) is refused naming the entry id and the field.
+- A thinking part with no redacted field renders as not redacted, asserted by one test.
+- A loss account whose serialiser returns an error is refused through a test account type, and afterwards neither the rendered file, the loss file nor a seed exists.
+- `loss()` refuses instead of hashing empty bytes when a part cannot be serialised.
+- No refusal message carries a transcript value; it carries only the entry id, the field and the expected type.
+- Each case named in the words and in the rulings has its own fixture, and each fixture asserts the named entry id and field.
+- render.rs's module doc names gitBranch "", usage {0,0} and stop_sequence null as format constants.
+- `grep -n 'unwrap_or' crates/lys-home/src/harness/claude_code/render.rs` finds only the redacted reading at the line the ruling keeps.
+- The existing render, round-trip, launch-template and fork tests pass unchanged; PINNED_FIXTURE_SHA256 (798a64be…) and the launch_template recorded hashes are unedited.
+- The full gate passes: fmt, both clippy shapes, tests with all features, both doc shapes and scripts/design/gate.sh.
+- A drift injection that restores one default makes exactly the fixture built for that field fail.
 
 ### What must not change
 
-- No second transport: the example shares forward.rs and does not re-implement forwarding.
-- No request or response body byte is altered, buffered to disk or retried; retry_canceled_requests(false) stays as R10 sets it.
-- No header value, body byte, token or error text appears in the example's output, PROOF-PROXY.md, test names, the dev record or any post.
-- R10's session-key section of PROOF-PROXY.md is not rewritten; R7 only appends.
-- No door code, SECRETS-002 file or credential store is touched; the example is never a service.
-- No older Claude Code is installed for the proof.
-- No file is created outside design.json's structure array.
-- lys-core, lys-log-store and the published crates are untouched.
+- No change to crates/lys-home/src/harness/claude_code/import.rs.
+- No change to which block kinds are carried, turned into text or dropped, and no change to the Loss or loss-account fields.
+- No change to record_uuid, the render namespace or any derived uuid (ADR-016).
+- No change to the bytes rendered from a session that carries every field; the pinned hashes do not move.
+- A present but unknown role stays skipped.
+- gitBranch "", usage {0,0} and stop_sequence null stay as written.
+- An absent `redacted` still reads as not redacted.
+- No transcript content in errors, output, test names or fixtures (CN3, P7).
+- No new dependency.
 
 ### What we must put in place first
 
-- R10 (qY9mBz-y) has landed on main with crates/lys-home/src/proxy/forward.rs, its HTTP/TLS dependencies, and PROOF-PROXY.md holding the session-key section; none of these exist on 7b53625.
-- Archie's seat has a Claude Code subscription login (not an API key) on 2.1.283 and a session that is not the one running the proof.
-- Before PROOF-PROXY.md is finalised, the lead rules on the Host-header and 'which headers had to pass' questions.
+- Answers to the four product decisions (a non-boolean redacted, a present unmapped stopReason, a missing provider or api, and the template stored before a refused launch) before the brief is written, or an explicit ruling that each stays as today.
+- The Argus gate that refused every tool call of run 9635a408 must admit the brief run's session; if not, name it as a chain defect and fix it before dispatching again.
 
 ### The risks
 
-- Forwarding the client's Host header to an HTTPS provider fails or is refused at the edge, which would make the run fail for a reason that says nothing about the subscription login.
-- A TLS client stack (rustls with ring or aws-lc-rs) is not pure Rust, which conflicts with the CLAUDE.md rule that all dependencies are pure Rust; ring is present today only through rcgen.
-- The subscription OAuth refresh goes to a host other than ANTHROPIC_BASE_URL, so a 'completed' run may not prove that refresh survives the proxy. The proof should say which calls were seen.
-- The live-run notes could leak a bearer token or an OAuth header value into PROOF-PROXY.md or the dev record; the file must name headers only.
-- If the 502 mapping is put into forward.rs, lys-proxy's R10 behaviour changes under a card that is not R10's.
-- A test that shells out to `cargo run --example` can be slow or flaky on the gate machine and is hard to keep within the Mac's small-check rule; full gates go to Dean's laptop.
-- R7 could land before R10's PROOF-PROXY.md exists, giving an append with nothing to append to. The order rule prevents this only if the chain bases the card on R10's landed head.
-- The live run is outside the gate and needs a person, so the card could sit 'built but unproven' while its done condition is the truthful proof record.
+- The importer writes thinkingSignature null for a redacted_thinking part with no data (import.rs:460). Under the type ruling, real imported sessions with such a part will now refuse to render where they rendered before.
+- The importer's own defaults (toolCallId "", model "", isError false) remain, so a broken Claude Code source still renders whole through import and render. The file-looks-whole defect is only half closed until nBeQclbH lands.
+- If the failing-serialiser test exercises only a helper, the claim that no file is written is unproven for the render. The account must be serialised before line 244 creates the rendered file, and the test must show that.
+- Refusal errors could leak transcript if they carried the offending value; they must name only the type.
+- Re-shaping user_parts or the stopReason mapping could change well-formed bytes and move the pinned hashes.
+- Adding the checks inline could push render.rs past 500 lines of code (306 today).
+- Canon entries go through the same walk. A canon file with a thin entry, previously rendered, will now refuse the whole render.
 
 ### Still open
 
-- The upstream is HTTPS (api.anthropic.com), so the Host header (and SNI) must name the upstream, not 127.0.0.1:<port>. May the example rewrite Host and drop hop-by-hop headers, and should PROOF-PROXY.md then say that forwarding was not strictly 'unchanged'? The sentence of the words it stands on: "In short: examples/passthrough.rs forwards every request unchanged to the provider base URL on its command line and writes only a four-field line per call (method, path, status, duration_ms) to stderr, never a header value or a body byte.". Why only the lead can settle it: CN5 in docs/design/home/design.json and the R7 spec say every header is forwarded unchanged. A request forwarded with the client's Host to a TLS provider would be refused, so the words cannot be met as written. The answer decides what the proof claims and what the headers line says.
-- How is 'which headers had to pass' measured when the example may print neither header values nor names? Is 'all request headers passed unchanged, none stripped' an acceptable record, or must the run also try with named headers removed (which would need a variant that does not forward unchanged)? The sentence of the words it stands on: "One seat whose Claude Code login is a subscription runs through it, and PROOF-PROXY.md records the Claude Code version, completed or failed, the status codes, which headers had to pass, and what failed if it did.". Why only the lead can settle it: The four-field line gives no header information, so a header-by-header necessity finding can only come from a stripping experiment, and that conflicts with CN5 and with the example forwarding every request unchanged. The lead decides what the proof document asserts.
-- On a completed live run, does this card set C7 to done in checklist.json and re-render CHECKLIST.md, or is C7 ticked elsewhere? The sentence of the words it stands on: "A failed run does not tick C7.". Why only the lead can settle it: R7's files list omits checklist.json and CHECKLIST.md, and none of the home cluster's 44 items has ever been ticked by a landed card. Ticking C7 would touch files outside the card's list, and whether C7 shows done is what a reader of the checklist sees.
-- Should the 502 on a pre-response failure and the connection close on a mid-stream break live in the example only, or in the shared forward.rs so that lys-proxy (R10) behaves the same way? The sentence of the words it stands on: "If forward.rs fails before any upstream response (connection refused, reset, or the stream broken before the status line), the example answers the client 502 Bad Gateway with an empty body, and the call line's status field is 502.". Why only the lead can settle it: R10 says the proxy SHALL NOT alter a byte and records outcomes as partial or unrecorded. If the synthesised 502 goes into forward.rs, every lys-proxy client sees a 502 it would not otherwise get, which changes R10's observable behaviour on a card that is not R10's.
+- A thinking part whose `redacted` field is present but not a boolean: is it refused naming the field and the expected boolean, or read as not redacted as today? The sentence of the words it stands on: "The brief records this as its boundary and keeps the one unwrap_or(false) at render.rs:185.". Why only the lead can settle it: `part.get("redacted").and_then(Value::as_bool).unwrap_or(false)` at render.rs:185 treats an absent value and a wrongly typed value the same. Keeping the line literally lets a non-boolean `redacted` render as unredacted thinking, which contradicts the ruling that a wrongly typed field refuses. The answer decides whether such a session renders, and whether redacted content could render as text.
+- Does a present stopReason other than toolUse, length or stop (Pi's error or aborted) keep rendering as end_turn, or refuse? The sentence of the words it stands on: "The rule to meet: the render refuses by name what it cannot shape, naming the entry id and the field that was missing or the value that would not serialise, and writes nothing; a default is never written in place of a value the source did not carry.". Why only the lead can settle it: render.rs:213-217 maps every present value outside toolUse and length to end_turn through the same `_ =>` arm that catches a missing value. The rulings refuse only a missing stopReason. Real sessions with an aborted or errored turn render today and would stop rendering if the mapping refused.
+- Does an assistant message with no provider or no api refuse, or keep deciding silently that its thinking is not same-model? The sentence of the words it stands on: "The rule to meet: the render refuses by name what it cannot shape, naming the entry id and the field that was missing or the value that would not serialise, and writes nothing; a default is never written in place of a value the source did not carry.". Why only the lead can settle it: render.rs:170-174 reads provider and api only to compare them. A missing one writes no default but silently turns signed thinking into text plus a loss-account entry. Refusing would change which sessions render; keeping it leaves one silent decision on a missing field.
+- When render-launch's render is refused, may the template object it has already stored in the home stay, or must render-launch also store nothing? The sentence of the words it stands on: "The rule to meet: the render refuses by name what it cannot shape, naming the entry id and the field that was missing or the value that would not serialise, and writes nothing; a default is never written in place of a value the source did not carry.". Why only the lead can settle it: launch.rs:102 calls `home.templates().put` before render_claude_code at launch.rs:113. After a refused launch the person finds a new object under templates/ in the home, even though no launch file was written.
 
 ### The units beyond the first
 
-- Update HOME-001 and the home design from 2.1.281 to the measured 2.1.283 (verification line, P6, goals, C6) — The words make the 2.1.281 line a finding for the design. Changing the brief, the design and the rendered markdown is a design-cluster edit that goes through its own review and the design gate, not part of the example.
-- Record the 502 and mid-stream-break rule for lys-proxy in R10's contract, if the lead makes it shared — If the rule belongs in forward.rs, R10's spec and tests must state it for lys-proxy's clients too, and that is R10's surface and Chippy's seam, not R7's.
-- Follow up a failed live run: fix what failed and re-run the subscription proof — A failed run finishes this card truthfully but leaves C7 open. The fix (e.g. header handling or TLS) and the re-run are a new unit sized by what failed.
+- The importer records every field it drops (nBeQclbH) — The importer's defaults at import.rs:151, 213-215, 466-474 and 508-519 are the other half of the same defect, and the ruling puts them on that held card, not on this one.
+- render-launch stores nothing when its render is refused — Only if the lead rules that the template stored at launch.rs:102 before the render must not stay. That changes the launch path's write order, which is outside the render.
 
 ### The smallest complete shape
 
-One PR on R10's landed head. It adds crates/lys-home/examples/passthrough.rs on the shared forward.rs, emitting only the four-field stderr line, answering 502 with an empty body on a pre-response failure and closing the connection on a mid-stream break. It adds the example target to crates/lys-home/Cargo.toml, and the three loopback gate tests (418 with three chunks in order; refused upstream giving 502 and a 502 line; 200 with two chunks then a reset giving a truncated response and a 200 line) in a file design.json already lists. Then Archie's seat runs the live subscription session on Claude Code 2.1.283, and the live-run section is appended to PROOF-PROXY.md (completed or failed, status codes, headers that had to pass, what failed, the exact commands). C7 is claimed only if the run completed, and the 2.1.281 line is reported to Archie as a finding.
+One card (HOME-008 under a new home roadmap row). render.rs shapes every copied field through checked readers that refuse by session, entry id, field and expected type. The loss hashes and the loss account are serialised fallibly before any file is created. The module doc names the three format constants and the absent-redacted reading. HomeError gains one named variant. Fixtures cover every case in the words and the rulings, plus the absent-redacted test and the failing-serialiser account. The home design cluster gains the new constraint, checklist items and a story, with gate.sh green, and every existing pinned hash stays the same.
 
 ## The roadmap row
 
-- **RM-017** — Prove a subscription login through the pass-through example (HOME-001 R7) (feature, idea)
-- Summary: HOME-001 R7 built as its own card on R10's shared forward.rs: crates/lys-home/examples/passthrough.rs takes a loopback listen address and the provider base URL on its command line, forwards every request to that base URL (Host rewritten, the fixed hop-by-hop list dropped, everything else byte for byte) and writes one four-field line per call to stderr and nothing else; it answers 502 with an empty body when forward.rs fails before any upstream response, and closes the client connection on a mid-stream break. Loopback tests gate it with no provider. After the build, one seat with a subscription login on Claude Code 2.1.283 runs through it and PROOF-PROXY.md gains a truthful live-run section; C7 is ticked only on a completed run.
-- Asked by: tom on 2026-09-27T10:02:16+10:00
-- Context: The HOME-001 R7 card on the Lys board, surveyed against lys main 7b53625 where R7 is judged open as unbuilt and R10 (forward.rs, PROOF-PROXY.md) has not landed. The lead's answers settled that the example rewrites Host and SNI and drops the hop-by-hop headers HTTP forbids forwarding, with that definition of unchanged appended to CN5; that the headers record is a record of what passed and not a stripping experiment; that this card ticks C7 in checklist.json and re-renders CHECKLIST.md on a completed run only; and that the 502 and the connection close live in the example while forward.rs stays byte-faithful (ADR-019). A later answer settled that the example takes the loopback listen address as a first positional argument before the base URL, refuses by name when either is missing, malformed or not loopback, and that PROOF-PROXY.md records the address used. A later answer added a requirement that renders the cluster's DESIGN.md, CHECKLIST.md and briefs/HOME-008.md from their JSON with render-cluster.py, never by hand, so the design gate passes. HOME-008 carries those answers.
-- Quote: HOME-001 R7, prove a subscription login through a pass-through proxy.
+- **RM-020** — Make the Claude Code render refuse by name what it cannot shape and write nothing (fix, idea)
+- Summary: The Claude Code render writes a default wherever a home record is missing a field or carries one of the wrong type, and serialises its loss account and the hashes of dropped parts with unwrap_or_default, so a broken session renders to a file that looks whole. The render refuses instead, by session, entry id, field and expected type, before any file is created; stopReason is mapped by one explicit arm per value, with error mapped to the stop_sequence Claude Code writes on its own errored turns and aborted refused; render-launch stores its template only after the render succeeds. Three format constants and the absent `redacted` reading stay, unknown roles stay skipped, the importer is not touched, and every pinned render hash stands.
+- Asked by: tom on 2026-09-27T10:07:00+10:00
+- Context: Filed on the lead's review of HOME-007, which found these defaults in older render code outside that card's scope. The rulings in the quote were given to run 9635a408, which failed before writing when the Argus gate refused its tool calls; the survey of the next run left four questions, answered by the lead for the home line: a present non-boolean redacted refuses and only absence defaults; stopReason has no catch-all arm, error and aborted mapped by measurement of Claude Code's own session files; an assistant message with no provider or api refuses; and render-launch stores its template only after the render succeeds.
+- Quote: The Claude Code render in crates/lys-home/src/harness/claude_code/render.rs writes a default where it cannot shape a record, so a broken session renders to a file that looks whole. The loss account is written with serde_json::to_vec_pretty(&account).unwrap_or_default(), so a serialisation failure writes an empty loss account and the render reports success; the byte measure of a part does the same with to_vec. A message with no role renders with an empty role; a tool result with no toolCallId renders with an empty tool_use_id, no content becomes an empty array and no isError becomes false; a text part with no text, a tool_use part with no id or name or arguments, and a message with no model all render with empty strings or an empty object; a thinking part with no thinking text renders as empty thinking. Each of these is older code, found by the lead reviewing HOME-007 render determinism, and none is in that card's scope. The rule to meet: the render refuses by name what it cannot shape, naming the entry id and the field that was missing or the value that would not serialise, and writes nothing; a default is never written in place of a value the source did not carry. Fixtures: a session whose message carries no role is refused naming the entry and the field; a tool result with no toolCallId is refused the same way; a loss account that cannot serialise is refused and no file is written, proved by an account type whose serialiser returns an error in the test; the existing round-trip and determinism tests keep passing and their pinned hashes do not move, since every fixture they use carries every field. Not in scope: any change to which block kinds are carried or lost, or to the loss account's shape.
 
-Source: docs/design/home/briefs/HOME-001.json at lys main 7b536253, requirement R7, taken as it stands there. Its spec, its three acceptance lines, its files (crates/lys-home/examples/passthrough.rs, docs/design/home/PROOF-PROXY.md, crates/lys-home/Cargo.toml) and checklist C7 are this card's scope; read them from that file.
+Rulings of the lead, Archie, given on 27 September 2026 to the run 9635a408-630c-4a65-93c8-a9c2f4cb56fc in answer to its rounds. That run took every answer and then failed before writing, when the Argus gate refused every tool call of its session. They are settled here, and the author reopens none of them.
 
-In short: examples/passthrough.rs forwards every request unchanged to the provider base URL on its command line and writes only a four-field line per call (method, path, status, duration_ms) to stderr, never a header value or a body byte. One seat whose Claude Code login is a subscription runs through it, and PROOF-PROXY.md records the Claude Code version, completed or failed, the status codes, which headers had to pass, and what failed if it did.
+Yes. The brief corrects the sentence to what the tree does: a message with no role is skipped silently. The refusal replaces that skip for a missing role only. A role that is present but unknown stays skipped as it is today; this card does not change which real sessions render on that ground.
 
-Why this card exists: wJAsjFKC's judgement of crates/lys-home on main leaves R7 open as unbuilt. The build is the example and the proof document, written and run; it is not a proof over code that already exists.
+The rule covers them all, since it is general. An assistant message with no content array, a user message with no content, a single user text part with no text, a missing stopReason and a redacted thinking part with no signature each refuse by name, naming the entry id and the field, exactly like the named cases. Each gets a fixture.
 
-Order: this card builds after R10 (qY9mBz-y). HOME-001 says R7's example shares R10's forward.rs rather than a second transport, so base it on R10 once R10 lands.
+Exempt. gitBranch "", usage {0,0} and stop_sequence null are constants the Claude Code file format requires on every record; they do not stand in place of a value any source carries. The brief lists them by name as format constants, the render's doc comment names them, and the pinned hashes do not move.
 
-The live subscription run needs a seat and a person to watch it; the brief names that step and who runs it, and the loopback acceptance (a fake upstream answering 418 with three chunks) runs in the gate without any provider.
+Yes, a wrongly typed field refuses too, naming the entry id, the field and the type expected. A value copied as it is must be of the type the target field takes. Fixtures: a numeric role, a string content where an array is required, and a non-boolean isError.
 
-These rulings are already given and are settled.
-R10 measures the session key itself and creates PROOF-PROXY.md with that measurement, as its own spec requires, before its linking is built.
-R7 extends the same document afterwards with its live-run section.
-So neither card depends on the other landing to meet its own text: R10 writes the session-key section, R7 appends the live run.
-The brief names the step, and the words were wrong to claim HOME-001 names the person.
-Archie's seat runs it and Archie watches, since HOME-001 gives every requirement except R10 to Archie.
-If Archie names another seat, his word replaces this.
-The live run is a named step after the build, outside the gate.
-Only the loopback acceptance (a fake upstream answering 418 with three chunks) runs in the gate, with no provider.
-Record it against the Claude Code installed now, 2.1.283, and name that version in PROOF-PROXY.md.
-Nobody installs an older version for this.
-Record HOME-001's 2.1.281 line as a finding for the design to update, as Archie ruled for the 2.1.283 pair on 54e28af6.
-The card is done when PROOF-PROXY.md records the live run truthfully, completed or failed, and what failed if it did.
-That is R7's first acceptance.
-A failed run does not tick C7.
-The brief says C7 stays open on a failure and reports the failure to Archie as a finding, and the card never claims C7 on a failed run.
-If forward.rs fails before any upstream response (connection refused, reset, or the stream broken before the status line), the example answers the client 502 Bad Gateway with an empty body, and the call line's status field is 502.
-If it fails after the upstream status and headers have gone to the client, the example closes the client connection, since the status is already sent and cannot change.
-The line then records that upstream status and the duration up to the break.
-In both cases no error text, header value or body byte is written anywhere.
-Tests: a loopback upstream that refuses the connection gives 502 with an empty body and a line with 502; one that sends 200 and two chunks and then resets gives a truncated response to the client and a line with 200.
+Out of this card. The importer's defaults are a known gap, and the brief names them by file and line (import.rs:151, 213-215, 466-474, 508-519) as the remaining half. They belong with card nBeQclbH, the importer records every field it drops, which is held on Tom's word; this card does not touch import.rs.
+
+Keep it as today. In Pi's grammar redacted is optional, and absent means not redacted. So a thinking part with no redacted field is read as not redacted and is never refused. The brief records this as its boundary and keeps the one unwrap_or(false) at render.rs:185. Add one test with a thinking part that has no redacted field and assert that it renders as not redacted.
 - Cluster: home; briefs: HOME-008
-- Notes: Builds after HOME-001 R10 lands (the little proxy's forward.rs and PROOF-PROXY.md's session-key section); R10 is inside RM-005's HOME-001, which also holds R7, so the order is carried by HOME-008's blocked_by rather than a depends_on on RM-005. Further units, not written: Update HOME-001 and the home design from 2.1.281 to the measured 2.1.283 (verification line, P6, goals, C6); Record the 502 and mid-stream-break rule for lys-proxy in R10's contract, if the lead makes it shared; Follow up a failed live run: fix what failed and re-run the subscription proof.
+- Notes: Ids are the next after main's highest and every open brief branch's, checked on 27 September 2026 against origin's brief branches: RM-020, ADR-031, CN13, C83 to C92 and S35 to S37 (open branches reach RM-019, ADR-030, CN12, C82 and S34). The brief id HOME-008 is the one this run was given; two open brief branches (home/54e28af6 and home/5898fcb0) also carry a HOME-008, so whichever lands second is renumbered, as HOME-007 was. Stands on HOME-007's deterministic render (RM-009), already on main at 7b53625, so no roadmap dependency is written; its pinned hash must not move. Further units, not written: The importer records every field it drops (nBeQclbH).
 
 ## The design
 
@@ -254,7 +226,7 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 - ADR-016 — A rendered file's derived uuids are a fixed, versioned contract — Derive every uuid a render needs and the record does not hold as UUIDv5 under the session's namespace and the name `<entry id>#<role>`, with a closed set of roles (`record` first); the session's namespace is UUIDv5 over one fixed lys namespace (32c05904-d1f1-550c-9eee-2f6c8f98b665, itself UUIDv5 of the RFC 9562 URL namespace over `lys/home/claude-code/render-uuid/v1`) and the id of the session being rendered, so the same entry id in two sessions never derives one uuid. Treat the namespace, the session namespace rule, the name form and the roles as frozen: a change is a new version alongside, never a mutation. The fork and launch cards derive by this scheme. Rejected: drawing fresh ids (nondeterministic), keying on a hash of the entry id alone without a namespace, a role and a session (two roles on one entry collide, two sessions with one hand-authored id collide, and it is not reproducible with standard UUID tooling), mixing in the target session id (the record does not hold it), and leaving the scheme mutable until a later card (every recorded hash would move with it).
 - ADR-017 — A fork is a child session cut from the parent's own lines at a lantern's point, with its ancestry on both sides — A fork resolves a lantern to the session it was lit in, read from the lys.lantern data's lit_in when the record carries it and otherwise by the older-record rule (one holder cuts, several refuse lantern_ambiguous until a session is named), and cuts that session's root-to-point chain at the last assistant message at or before the point, through the index. The child is a new session under the parent's cwd whose header's parentSession is the parent file's path relative to the home, holding each cut entry as the parent file's own line bytes, then one lys.forked_from custom entry as its head naming the parent session, the lantern, the point, the cut entry, whether the coordinate was carried and the carried entry; the parent gains one lys.fork custom entry at its head naming the child. Nothing else is copied and no block is written. Rejected: re-serialising the copied entries (the copy would stop hash-matching the parent's lines), a fork store beside the sessions outside Pi's grammar, cutting at a point no lantern names, and a header field beyond Pi's parentSession.
 - ADR-018 — A user-message point is carried as a seed prompt beside the rendered file, never copied into the child — When the point is a user message the cut stops at the assistant message before it and the message is carried, not copied: lys.forked_from records its id with coordinate_carried true and counts, by kind, the parts of it that are not text. The Claude Code render of such a child writes the message's text parts, in order, as a seed prompt beside the rendered file under an in-band marker line naming the parent session, the point and the lantern, and names it in the render report; the template's launch line, printed by render-launch only, passes that file as the resumed session's first prompt. A part that is not text never refuses a fork or a render and never enters the seed. Rejected: copying the user message into the child's chain, refusing a fork for a non-text part, and putting the seed's text in the report or the loss account.
-- ADR-019 — A forward failure is answered by the pass-through example, never by the shared forward.rs — forward.rs stays byte-faithful: when it fails before any upstream response it returns an error to its caller naming the kind (refused, reset, or broken before the status line) and synthesises nothing. The pass-through example maps that error to 502 Bad Gateway with an empty body and writes 502 in its call line; when the upstream breaks after its status and headers have gone to the client, the example closes the client connection and its call line records that status and the duration up to the break. No error text, header value or body byte is written anywhere on either path. Rejected: the 502 inside forward.rs, which would change lys-proxy's observable behaviour.
+- ADR-031 — The Claude Code render refuses by name what it cannot shape and never writes a default in place of a value the record did not carry — Every value the render copies from a message entry must be present and of the type the target field takes; a missing field or a field of another type refuses the render by the session, the entry id, the field and the expected type, and nothing is written. The value itself is never named, except an unmapped stopReason, which is named because it is a protocol value and not transcript. Every serialisation the render needs, the records, the dropped parts it hashes and the loss account, is done before any directory or file is created, and a failure refuses by name. Only three values are written that the record does not carry, and they are format constants Claude Code's file requires on every record: gitBranch "", usage {input_tokens 0, output_tokens 0} and stop_sequence null. Only one field reads a meaning from its absence: a thinking part with no `redacted` field is not redacted, since in Pi's grammar the field is optional and its absence is the source's own statement; a `redacted` present and not a boolean refuses. stopReason is mapped by one explicit arm per value Pi's grammar carries: toolUse to tool_use, length to max_tokens, stop to end_turn, error to stop_sequence (the value Claude Code writes on its own errored turns, measured), and aborted, for which Claude Code writes no value of its own, refuses by name, as does any other value. A present role the render does not know is still skipped. render-launch stores its template in the home only after the render has succeeded. Rejected: rendering a default and naming it in the loss account, refusing only missing fields and copying wrongly typed ones, mapping every unknown stopReason to end_turn, and keeping the template a refused launch had already stored.
 
 ## Goals
 
@@ -281,6 +253,7 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 - Recall by resonance, whispers or vectors, any ranking, dimming lanterns by code churn, Norn's tables and Cambium's lantern screen. — Out of scope of stage 5: recall is by an exact case-folded phrase or by point; each of these is its own retrieval or surface design.
 - Making the Claude Code import deterministic for the same transcript (sidechain labels, the lys.authored mark, compaction ids and side-leaf harness events draw fresh ids). — The importer is out of scope for the deterministic render; determinism is claimed for a render of one session head, not for two imports of one transcript.
 - Rendering tool parts from the stored block, and moving the render's default Claude Code version off 2.1.281. — Both change what a rendered file holds; the deterministic render changes nothing a file holds beyond the determinism.
+- Removing the Claude Code importer's own defaults (model "", toolCallId "", isError false, a redacted_thinking signature of null, tool_use id and name "", tool_result content []) at import.rs:151, 213-215, 466-474 and 508-519. — They are the other half of the file-looks-whole defect and belong to the importer card that records every field it drops; the render refuses what it is given, and the importer is not touched by HOME-008.
 
 ## Structure
 
@@ -394,10 +367,13 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `crates/lys-home/src/harness/claude_code/seed.rs` | the seed prompt of a carried user message: the marker line, the text parts, the seed argument for the template's launch line | HOME-006 |
 | `crates/lys-home/tests/fork.rs` | the fork run as the binary: five forks and five refusals, blocks unchanged, both ancestry sides | HOME-006 |
 | `docs/design/home/PROOF-FORK.md` | the measured fork: Pi's parentSession read, a real session forked, rendered and launched, as hashes, counts and exit codes | HOME-006 |
-| `docs/design/home/briefs/HOME-008.json` | the pass-through brief: HOME-001 R7 on R10's forward.rs, the loopback gate tests and the live subscription run | HOME-008 |
+| `docs/design/home/briefs/HOME-008.json` | the render refuses by name what it cannot shape and writes nothing | HOME-008 |
 | `docs/design/home/briefs/HOME-008.md` | its rendered markdown | HOME-008 |
-| `crates/lys-home/examples/passthrough_tests.rs` | the pass-through example's test module against loopback fakes: 418 in three chunks, headers, the call line, 502, a mid-stream reset | HOME-008 |
-| `docs/design/home/checklist.json` | the checklist, the source CHECKLIST.md is rendered from |  |
+| `crates/lys-home/src/harness/claude_code/render_fields.rs` | the render's checked readers: a field present and of the target's type, or a refusal by entry id, field and expected type; the stopReason arms | HOME-008 |
+| `crates/lys-home/src/harness/claude_code/render_fields_tests.rs` | the checked readers' unit tests | HOME-008 |
+| `crates/lys-home/src/harness/claude_code/render_write.rs` | the render's one write stage: every serialisation decided before any directory or file is created | HOME-008 |
+| `crates/lys-home/src/harness/claude_code/render_write_tests.rs` | the write stage's tests, the failing-serialiser account among them | HOME-008 |
+| `crates/lys-home/src/harness/claude_code/render_refusal_tests.rs` | one fixture per refusal of the render, the absent-redacted reading and the unknown role | HOME-008 |
 
 ## Inventory
 
@@ -418,12 +394,13 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 - **CN2** — A rendered file never carries a provider-native opaque block that came from a different provider or model family than the one it is rendered for; the loss account names each block dropped by hash.
 - **CN3** — Transcript lines (message, tool and compaction content) never appear in output, logs, errors, test names or pages; hashes, counts, offsets and event ids only. A lantern's note and its epilogues are the one exception, printed only by recall, and a recall row never carries a line of the transcript around its point (ADR-015).
 - **CN4** — Every home file parses with Pi's parseSessionEntries at 3d5cbe98 unchanged: the header line first, every entry with id, parentId and timestamp, lys data only inside custom entries.
-- **CN5** — The pass-through proxy forwards every header and the streamed body unchanged and stores nothing but the measurement; it is an example binary, never a service. Unchanged is defined as exactly this: the Host header is rewritten to the upstream's authority and TLS SNI names the same host; the hop-by-hop headers HTTP forbids forwarding are dropped, namely Connection and every header Connection names, Keep-Alive, Proxy-Authenticate, Proxy-Authorization, TE, Trailer, Transfer-Encoding and Upgrade; every other request header, and the body, pass byte for byte. The dropped names are a fixed list in the code, never read from a request (HOME-008).
+- **CN5** — The pass-through proxy forwards every header and the streamed body unchanged and stores nothing but the measurement; it is an example binary, never a service.
 - **CN6** — No Norn crate is a dependency of lys-home and no Norn type is copied into it.
 - **CN7** — Reading the root-to-leaf path of a home file reads only the entries on that path plus the index, never the whole file (Pi loads the whole journal; Chippy 13:33); the head is persisted beside the file, never inferred from the last physical entry on reopen.
 - **CN8** — No secret value is written to any file, report, launch line, error or entry by lys-home; a use-only secret appears only as its handle.
 - **CN9** — A render of the same session head with the same target and the same lys-home version writes the same bytes: the render walks entry order then part order and never a map's or a set's order, reads no clock and no random source, and derives any uuid the record does not hold as UUIDv5 under the session's namespace (UUIDv5 of 32c05904-d1f1-550c-9eee-2f6c8f98b665 over the session id) and the name `<entry id>#<role>` (ADR-016).
 - **CN10** — A fork copies the parent file's own line bytes and writes no block; nothing of the parent's header but cwd, and no credential, handle or launch setting, enters the child; the parent gains one lys.fork entry at its head and no earlier byte of it changes.
+- **CN13** — The Claude Code render never writes a default in place of a value the record did not carry: a missing field, or a field of another type than the target takes, refuses the render by session, entry id, field and expected type before any directory or file is created, and so does a serialisation that fails. The only values written that no record carries are the format constants gitBranch "", usage {input_tokens 0, output_tokens 0} and stop_sequence null, and the only field read from its absence is `redacted`: absent means not redacted (ADR-031).
 
 
 ---
@@ -2042,195 +2019,225 @@ Complete the section of docs/design/home/PROOF-RESUME.md that R3 adds with: the 
 type: brief
 id: HOME-008
 cluster: home
-title: Prove a subscription login through the pass-through example on the shared forward.rs
+title: Make the Claude Code render refuse by name what it cannot shape and write nothing
 ---
 
-# HOME-008: Prove a subscription login through the pass-through example on the shared forward.rs
+# HOME-008: Make the Claude Code render refuse by name what it cannot shape and write nothing
 
 > **Cluster:** home
-> **Blocked by:** HOME-001 R10 (the little proxy) must land on main first: it creates crates/lys-home/src/proxy/forward.rs, error.rs and forward_tests.rs, brings the HTTP, async and TLS dependencies into crates/lys-home/Cargo.toml, and creates docs/design/home/PROOF-PROXY.md holding its session-key section. None of these exists on main at 7b53625. This brief is built on the main R10 lands on., The live run in R7 needs a seat whose Claude Code login is a subscription, not an API key, on the installed Claude Code 2.1.283, in a session that is not the one running the proof, and a person watching it. It is a named step after the build, outside the gate.
 > **Design anchor:**
-> - ADR-001 — Secrets are held behind a handle the door swaps for the credential — A seat holds a short-lived handle bound to its identity. The real credential sits in the door's encrypted store and never leaves the server. The door's proxy checks SpiceDB, swaps the handle for the credential, forwards the call and writes one audit line. Built in Rust inside the door; no OpenBao unless credentials minted on demand are later needed.
-> - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
-> - ADR-007 — The product starts an agent by giving its start command, never by running it — The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.
-> - ADR-019 — A forward failure is answered by the pass-through example, never by the shared forward.rs — forward.rs stays byte-faithful: when it fails before any upstream response it returns an error to its caller naming the kind (refused, reset, or broken before the status line) and synthesises nothing. The pass-through example maps that error to 502 Bad Gateway with an empty body and writes 502 in its call line; when the upstream breaks after its status and headers have gone to the client, the example closes the client connection and its call line records that status and the duration up to the break. No error text, header value or body byte is written anywhere on either path. Rejected: the 502 inside forward.rs, which would change lys-proxy's observable behaviour.
+> - ADR-012 — A harness launch template is kept in the home by hash, and each render is recorded on the session beside its context path — A launch template per harness is a JSON object with named slots (transcript, mcp, env, secrets, instructions) plus flags, stored in the home under templates/ by its SHA-256; lys-home renders a template and a session into files and runtime variables with command mappings in text, prints the launch line and never runs it, and records each render as a sixth lys.harness_event kind, template_render, hung as a side leaf beside the context path with the written paths in a manifest block named by hash. Rejected: a transcript converter or adapter protocol per harness, a template kept outside the home (a seat document of another tool), and a render event that advances the head, which would change the session head hash between two renders of the same session.
+> - ADR-016 — A rendered file's derived uuids are a fixed, versioned contract — Derive every uuid a render needs and the record does not hold as UUIDv5 under the session's namespace and the name `<entry id>#<role>`, with a closed set of roles (`record` first); the session's namespace is UUIDv5 over one fixed lys namespace (32c05904-d1f1-550c-9eee-2f6c8f98b665, itself UUIDv5 of the RFC 9562 URL namespace over `lys/home/claude-code/render-uuid/v1`) and the id of the session being rendered, so the same entry id in two sessions never derives one uuid. Treat the namespace, the session namespace rule, the name form and the roles as frozen: a change is a new version alongside, never a mutation. The fork and launch cards derive by this scheme. Rejected: drawing fresh ids (nondeterministic), keying on a hash of the entry id alone without a namespace, a role and a session (two roles on one entry collide, two sessions with one hand-authored id collide, and it is not reproducible with standard UUID tooling), mixing in the target session id (the record does not hold it), and leaving the scheme mutable until a later card (every recorded hash would move with it).
+> - ADR-017 — A fork is a child session cut from the parent's own lines at a lantern's point, with its ancestry on both sides — A fork resolves a lantern to the session it was lit in, read from the lys.lantern data's lit_in when the record carries it and otherwise by the older-record rule (one holder cuts, several refuse lantern_ambiguous until a session is named), and cuts that session's root-to-point chain at the last assistant message at or before the point, through the index. The child is a new session under the parent's cwd whose header's parentSession is the parent file's path relative to the home, holding each cut entry as the parent file's own line bytes, then one lys.forked_from custom entry as its head naming the parent session, the lantern, the point, the cut entry, whether the coordinate was carried and the carried entry; the parent gains one lys.fork custom entry at its head naming the child. Nothing else is copied and no block is written. Rejected: re-serialising the copied entries (the copy would stop hash-matching the parent's lines), a fork store beside the sessions outside Pi's grammar, cutting at a point no lantern names, and a header field beyond Pi's parentSession.
+> - ADR-018 — A user-message point is carried as a seed prompt beside the rendered file, never copied into the child — When the point is a user message the cut stops at the assistant message before it and the message is carried, not copied: lys.forked_from records its id with coordinate_carried true and counts, by kind, the parts of it that are not text. The Claude Code render of such a child writes the message's text parts, in order, as a seed prompt beside the rendered file under an in-band marker line naming the parent session, the point and the lantern, and names it in the render report; the template's launch line, printed by render-launch only, passes that file as the resumed session's first prompt. A part that is not text never refuses a fork or a render and never enters the seed. Rejected: copying the user message into the child's chain, refusing a fork for a non-text part, and putting the seed's text in the report or the loss account.
+> - ADR-031 — The Claude Code render refuses by name what it cannot shape and never writes a default in place of a value the record did not carry — Every value the render copies from a message entry must be present and of the type the target field takes; a missing field or a field of another type refuses the render by the session, the entry id, the field and the expected type, and nothing is written. The value itself is never named, except an unmapped stopReason, which is named because it is a protocol value and not transcript. Every serialisation the render needs, the records, the dropped parts it hashes and the loss account, is done before any directory or file is created, and a failure refuses by name. Only three values are written that the record does not carry, and they are format constants Claude Code's file requires on every record: gitBranch "", usage {input_tokens 0, output_tokens 0} and stop_sequence null. Only one field reads a meaning from its absence: a thinking part with no `redacted` field is not redacted, since in Pi's grammar the field is optional and its absence is the source's own statement; a `redacted` present and not a boolean refuses. stopReason is mapped by one explicit arm per value Pi's grammar carries: toolUse to tool_use, length to max_tokens, stop to end_turn, error to stop_sequence (the value Claude Code writes on its own errored turns, measured), and aborted, for which Claude Code writes no value of its own, refuses by name, as does any other value. A present role the render does not know is still skipped. render-launch stores its template in the home only after the render has succeeded. Rejected: rendering a default and naming it in the loss account, refusing only missing fields and copying wrongly typed ones, mapping every unknown stopReason to end_turn, and keeping the template a refused launch had already stored.
 > **Checklist:**
-> - C7 — One seat with a subscription login completes a call through a pass-through proxy; the measurement is written down.
-> - C45 — forward.rs returns a named error (refused, reset, or broken before the status line) to its caller when the upstream fails before any response, and synthesises no status, header or body byte.
-> - C46 — Against a loopback upstream answering GET / with 418 and three streamed chunks, the pass-through example answers 418 with the same three chunks in order, with no provider.
-> - C47 — When forwarding fails before any upstream response, the pass-through example answers 502 with an empty body and its call line's status is 502.
-> - C48 — When the upstream breaks after its status and headers were sent, the pass-through example closes the client connection and its call line records that status and the duration up to the break.
-> - C49 — The pass-through example rewrites Host to the upstream's authority, drops the fixed hop-by-hop list, and passes every other request header and the body byte for byte.
-> - C50 — The pass-through example writes one four-field line per call (method, path, status, duration_ms) and no header value, body byte or error text anywhere.
-> - C51 — The home cluster's DESIGN.md, CHECKLIST.md and briefs/HOME-008.md are what scripts/design/render-cluster.py renders from its JSON, and none is edited by hand.
+> - C83 — HomeError names the render's refusals: a field refusal carrying the session, the entry id, the field, the expected type and whether the field was missing; a stopReason refusal carrying the session, the entry id and the value; and a serialisation refusal carrying the session, what would not serialise and the entry id when there is one; none carries a transcript value.
+> - C84 — Every value the Claude Code render copies from a message entry is read through a checked reader that refuses a missing field and a field of another type than the target takes, and no reader substitutes a default; the one field read from its absence is `redacted`, absent meaning not redacted.
+> - C85 — A message entry with no role, or with a role that is not a string, refuses the render by entry id and the field `role`; a role that is a string the render does not know is still skipped and the render succeeds.
+> - C86 — A toolResult with no toolCallId, content or isError, a user message with no content or a single text part with no text, an assistant message with no content array, model, provider, api or stopReason, a text part with no text, a toolCall part with no id, name or arguments, a thinking part with no thinking text, a redacted thinking part with no thinkingSignature, and any of these present with another type than the target takes (a `redacted` or a thinkingSignature among them) each refuse the render by entry id and field, and nothing is written.
+> - C87 — stopReason is mapped by one explicit arm per value: toolUse to tool_use, length to max_tokens, stop to end_turn and error to stop_sequence; aborted and every other value refuse by entry id and the value, and there is no catch-all arm.
+> - C88 — Every serialisation the render needs, the record lines, the hashes of dropped parts and the loss account, is decided before any directory or file is created; a loss account whose serialiser fails refuses the render and no rendered file, loss account or seed exists afterwards.
+> - C89 — Each refusal case has its own fixture asserting the entry id and the field it names; one test renders a thinking part with no `redacted` field as not redacted, and one renders past an unknown role.
+> - C90 — The render's module doc names gitBranch "", usage {input_tokens 0, output_tokens 0} and stop_sequence null as format constants and absence as the only default of `redacted`; the bytes rendered from a session that carries every field and whose assistant stopReasons are toolUse, length or stop do not change; a stopReason of error renders as stop_sequence where it rendered as end_turn, aborted or an unmapped value refuses, and the pinned render hashes, whose fixtures carry only toolUse, length or stop, are unedited.
+> - C91 — render-launch renders before it stores the template, so a refused launch leaves the home's templates directory with the same entries and hashes as before the call.
+> - C92 — The cluster's rendered markdown, briefs/HOME-008.md among it, is what its JSON renders to, and scripts/design/gate.sh exits 0.
 > **Stories:**
-> - S5 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+> - S35 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a session the render cannot shape refused by name with nothing written, never rendered with a default where the record carried no value, so that a rendered file that looks whole is whole.
+> - S36 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each render refusal to name the entry id, the field and the expected type and never the value, with its own fixture, so that I can find the broken entry from the error alone and no transcript reaches it.
+> - S37 (Agent, Runs in a harness and wants to continue somewhere else) — As the agent launching a session, I want a launch whose render is refused to store nothing in the home, so that a launch that wrote no file leaves no template behind.
 
 ## Purpose
 
-HOME-001's third proof is that a subscription login survives a pass-through proxy, so the tee that records the stream has a place to live. HOME-001 R7 is that proof and is unbuilt. This brief builds it on R10's shared transport: the pass-through example, which forwards to the provider base URL on its command line and writes one four-field line per call, gated by loopback tests that need no provider; then one live run with a subscription login through it, recorded truthfully in PROOF-PROXY.md whether it completed or failed.
+The Claude Code render writes a default wherever a home record is missing a field or carries one of the wrong type, and serialises its loss account and the hashes of dropped parts with unwrap_or_default, so a broken session renders to a file that looks whole and the render reports success. This brief makes the render refuse instead, by the session, the entry id, the field and the expected type, before it writes anything, as ADR-031 and CN13 fix it; the three format constants Claude Code's file requires and the absent `redacted` reading are the only values the render writes or reads that the record does not carry. Every session that carries every field and whose assistant stopReasons are toolUse, length or stop renders to the same bytes as before, so every pinned render hash stands; a stopReason of error now renders as stop_sequence where it rendered as end_turn, and aborted or any unmapped value now refuses.
 
 ## Task
 
-Build HOME-001 R7 as its own card, on the main HOME-001 R10 lands on. R7's example shares R10's crates/lys-home/src/proxy/forward.rs and builds no second transport. In order: (1) forward.rs, which R10 creates, returns a named error to its caller when the upstream fails before any response (refused, reset, or broken before the status line) and synthesises nothing, so lys-proxy keeps R10's own behaviour (ADR-019); (2) crates/lys-home/examples/passthrough.rs takes exactly two positional arguments, the loopback address to listen on in the form 127.0.0.1:PORT and then the provider base URL, serves HTTP on that address and forwards every request through forward.rs, rewriting Host and dropping the fixed hop-by-hop list and passing everything else byte for byte; (3) once listening, it writes one four-field line per call (method, path, status, duration_ms) to stderr and nothing else, anywhere, its only other line being a refusal by name of a bad argument before it listens; (4) it answers 502 with an empty body when forward.rs fails before any upstream response, and closes the client connection when the upstream breaks after its status and headers were sent; (5) the loopback tests for (2) to (4) run in `cargo test --workspace --all-features` with no provider; (6) the cluster's markdown, DESIGN.md, CHECKLIST.md and briefs/HOME-008.md, is rendered from its JSON with render-cluster.py, never by hand; (7) after the build, the named live run is made and its section is appended to PROOF-PROXY.md. The card is done when PROOF-PROXY.md records the live run truthfully, completed or failed, and what failed if it did. Split note: C7 and S5 are also claimed by HOME-001, whose R7 is the source this brief builds; C45 to C51 are this brief's alone. The person who runs the example chooses the port and sets ANTHROPIC_BASE_URL to the same address, so the example announces nothing; every gate test drives the example's server through its function that takes a TcpListener the test itself binds. Out of scope: any change to HOME-001.json or to the design's 2.1.281 lines (reported as a finding, not edited), any change to lys-proxy's behaviour, any stripping experiment, and installing any other Claude Code version.
+All of the render is in crates/lys-home/src/harness/claude_code/render.rs. Its defaults, as the tree holds them: role unwrap_or("") at line 138, so a message with no role, or a role that is not a string, is skipped silently by the `_ => continue` arm at line 230; this corrects the card's words, which said such a message renders with an empty role. The refusal replaces that skip for a missing or non-string role only: a role that is a string the render does not know stays skipped, and this card does not change which real sessions render on that ground. toolResult toolCallId "", content [] and isError false at lines 163-165, copied with no type check; assistant content unwrap_or_default at lines 176-181; text "" at line 183; thinking text "" at line 187; a redacted part's missing signature written as null `data` at line 189, and `sig.is_some()` at lines 191 and 197 taking a present JSON null for a signature; toolCall id and name "" and arguments {} at lines 206-208; stopReason: a `_ =>` arm at lines 213-217 that maps a missing value and every value but toolUse and length to end_turn; model "" at line 222; the loss account serialised with to_vec_pretty(..).unwrap_or_default() at line 267 after the rendered file is already created and synced (lines 244-262) and before the seed (line 271); loss() hashing to_vec(part).unwrap_or_default() at line 287; and user_parts writing "" for a single text part with no text (line 383) and for a missing or wrongly typed content (line 388). provider and api (lines 170-174) are read only to compare them, so a missing one silently turned signed thinking into text; that is a default too, and it refuses. Every one of these becomes a refusal decided before line 240, so nothing is written. The three values the render writes that no record carries are format constants Claude Code's file requires on every record and stay as they are: gitBranch "" (line 148), stop_sequence null (line 225) and usage {input_tokens 0, output_tokens 0} (line 226). A thinking part with no `redacted` field reads as not redacted, since in Pi's grammar the field is optional and absent means not redacted; that is this card's boundary, and only absence defaults: the reading at line 185, which today takes a present non-boolean `redacted` for false as well, is changed to tell the two apart, and a present `redacted` that is not a boolean refuses. stopReason gets one arm per value Pi's grammar carries and no catch-all. What `error` and `aborted` map to was measured on Claude Code's own session files, 1100 JSONL files written by Claude Code 2.1.278 to 2.1.283 (2.1.283 installed when measured), the way given.rs measured the version: of the 1463 assistant records Claude Code marks isApiErrorMessage, 1445 carry stop_reason `stop_sequence` (rate_limit, server_error, authentication_failed, oauth_org_not_allowed, unknown and one invalid_request) and 18 carry `refusal` (all invalid_request), so `error` maps to `stop_sequence`, the value Claude Code writes on its own errored turns. For an interrupted turn Claude Code writes no value of its own: the assistant record before its `[Request interrupted by user]` record carries whatever the turn had streamed (tool_use 129, null 59, end_turn 41, stop_sequence 17), so `aborted` refuses by name and a session holding an aborted turn does not render until the Claude Code format has a value for it. Canon entries and fork children go through the same walk, so a canon file or a parent line the render cannot shape now refuses the whole render. The importer's own defaults are the known remaining half of the defect and are not touched here: import.rs:151 (model ""), 213-215 (toolCallId "", isError false), 466-474 (tool_use id and name "", input {}) and 508-519 (tool_result content []), with import.rs:460 writing thinkingSignature null for a redacted_thinking part with no data, which this card now refuses; they belong with the importer card that records every field it drops, which is held. render-launch (launch.rs) stores its template at line 102 before it renders at line 113; it renders first and stores the template only after the render succeeds. Out of scope: import.rs, any change to which block kinds are carried, turned into text or dropped (the `_ => content.push(part.clone())` arm stays), the Loss and loss-account fields, record_uuid and every derived uuid, and any harness but Claude Code.
 
 ## Requirements
 
-### R1: forward.rs names a failure before any upstream response and invents nothing
+### R1: Name the render's refusals in HomeError
 
-IF forwarding fails before any upstream response reaches forward.rs (the connection is refused, the connection is reset, or the stream breaks before the status line), THEN forward.rs SHALL return an error to its caller naming which of those three kinds occurred, as three distinct variants of the proxy's error type in error.rs. forward.rs SHALL NOT synthesise a status, a header or a body byte on that path, SHALL NOT answer 502 itself, SHALL NOT retry (retry_canceled_requests(false) stays as R10 sets it), and SHALL NOT put an error's source text, a header value or a body byte into the error it returns. lys-proxy's observable behaviour is unchanged by this requirement.
+Add three variants to HomeError in crates/lys-home/src/error.rs, each documented and each naming no transcript value: RenderField { session: String, entry: String, field: &'static str, expected: &'static str, missing: bool }, whose Display reads `render of session <session> refused entry <entry>: field <field> is missing, expected <expected>` when missing is true and `render of session <session> refused entry <entry>: field <field> is not <expected>` when it is false; RenderStopReason { session: String, entry: String, value: String }, whose Display reads `render of session <session> refused entry <entry>: stopReason <value> has no Claude Code value`; and RenderUnserialisable { session: String, what: &'static str, entry: Option<String>, source: serde_json::Error }, whose Display names the session, what would not serialise and the entry when there is one, with the serde error as its #[source]. The expected type is one of `string`, `array`, `boolean`, `object` and `array or string`. The variants SHALL NOT carry the value of a field, a part's text or any entry's data; SHALL NOT change any existing variant; and SHALL NOT add a dependency.
 
 **Acceptance:**
-- A test in forward_tests.rs binds a TcpListener on 127.0.0.1:0, reads its port and drops the listener, then forwards GET / to http://127.0.0.1:<that port>: the call returns the refused variant of the proxy's error type, and no response value (no status, no header, no body byte) is returned to the caller.
-- `grep -nE '502|BAD_GATEWAY' crates/lys-home/src/proxy/forward.rs` prints nothing.
-- `grep -n 'retry' crates/lys-home/src/proxy/forward.rs` prints exactly the one line holding `retry_canceled_requests(false)`.
+- A unit test builds RenderField { session: "s", entry: "x1", field: "toolCallId", expected: "string", missing: true } and asserts its Display equals `render of session s refused entry x1: field toolCallId is missing, expected string`.
+- A unit test builds RenderField { session: "s", entry: "x1", field: "isError", expected: "boolean", missing: false } and asserts its Display equals `render of session s refused entry x1: field isError is not boolean`.
+- A unit test builds RenderStopReason { session: "s", entry: "x1", value: "halted" } and asserts its Display equals `render of session s refused entry x1: stopReason halted has no Claude Code value`.
+- `git diff 7b53625 -- crates/lys-home/src/error.rs` shows only added lines.
 
 **Files:**
-- modify: crates/lys-home/src/proxy/error.rs
-- modify: crates/lys-home/src/proxy/forward.rs
-- modify: crates/lys-home/src/proxy/forward_tests.rs
+- modify: crates/lys-home/src/error.rs
 
 **Checklist:**
-- C45 — forward.rs returns a named error (refused, reset, or broken before the status line) to its caller when the upstream fails before any response, and synthesises no status, header or body byte.
+- C83 — HomeError names the render's refusals: a field refusal carrying the session, the entry id, the field, the expected type and whether the field was missing; a stopReason refusal carrying the session, the entry id and the value; and a serialisation refusal carrying the session, what would not serialise and the entry id when there is one; none carries a transcript value.
 
-### R2: The pass-through example forwards through forward.rs
+**Stories:**
+- S36 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each render refusal to name the entry id, the field and the expected type and never the value, with its own fixture, so that I can find the broken entry from the error alone and no transcript reaches it.
 
-Write crates/lys-home/examples/passthrough.rs, declared in crates/lys-home/Cargo.toml as an example target with `test = true` and with the package's automatic example discovery off, so its sibling test file crates/lys-home/examples/passthrough_tests.rs is compiled only as its test module. It takes exactly two positional arguments, in this order: the address to listen on, in the form 127.0.0.1:PORT, and the provider base URL. It serves HTTP on that address through a function that takes a bound TcpListener and the base URL, which main calls with the listener it binds and the tests call with a listener they bind. WHEN a request arrives THE SYSTEM SHALL forward it through forward.rs to the base URL joined with the request's path and query, and SHALL return the upstream response's status, headers and streamed body to the client as they arrive. The R7 sentence 'forwards every request unchanged' holds under this definition, which is also appended to CN5: Unchanged is defined as exactly this: the Host header is rewritten to the upstream's authority and TLS SNI names the same host; the hop-by-hop headers HTTP forbids forwarding are dropped, namely Connection and every header Connection names, Keep-Alive, Proxy-Authenticate, Proxy-Authorization, TE, Trailer, Transfer-Encoding and Upgrade; every other request header, and the body, pass byte for byte. The dropped names are one fixed list in the source, never read from a request. THE SYSTEM SHALL NOT build a second transport, SHALL NOT buffer a streamed body before forwarding it, SHALL NOT retry, SHALL NOT store anything, SHALL NOT see, copy, swap or store a credential (it passes in its header like any other), SHALL NOT add a dependency beyond those R10 brings, and SHALL NOT run as a service. IF either argument is missing, the listen address is not an IP address and port, the listen address's IP is not a loopback address, the base URL is not an http or https URL, or the listen address cannot be bound, THEN THE SYSTEM SHALL refuse by name: exit with a nonzero status having written one line to stderr that names the argument at fault (`listen address` or `base URL`) and the fault (`missing`, `malformed`, `not loopback` or `cannot bind`). main is a thin wrapper over one run function that takes the argument list and a stderr writer, parses, binds and serves, and returns the exit code; main passes the process's arguments and stderr and exits with the returned code, and run takes no stdout writer. THE SYSTEM SHALL NOT write the argument's value or an error's source text in that line, SHALL NOT listen on a non-loopback address, SHALL NOT choose a port itself, and SHALL NOT announce the address it listens on.
+### R2: Read every copied field through checked readers
+
+Add crates/lys-home/src/harness/claude_code/render_fields.rs, declared in crates/lys-home/src/harness/claude_code/mod.rs beside render, with readers the render walk uses for every value it copies from a message entry or one of its parts: a string, an array, a boolean, an object, and an array-or-string, each taking the session id, the entry id, the source value and the field name. IF the field is absent, THEN THE SYSTEM SHALL return RenderField with missing true and the reader's expected type. IF the field is present and not of the reader's type, a JSON null included, THEN THE SYSTEM SHALL return RenderField with missing false and the expected type. WHEN the field is present and of the type, THE SYSTEM SHALL return it unchanged. Add one reader for `redacted` that returns false when the field is absent, the boolean when it is a boolean, and RenderField { field: "redacted", expected: "boolean", missing: false } otherwise, and one for stopReason with an explicit arm per value: toolUse gives tool_use, length gives max_tokens, stop gives end_turn and error gives stop_sequence; aborted and every other string return RenderStopReason naming the value; a missing stopReason returns RenderField missing true and one that is not a string RenderField missing false, both expected string. No reader SHALL substitute a default for a missing or wrongly typed value except the absent `redacted`, the stopReason reader SHALL NOT have a catch-all arm that maps to a Claude Code value, and no reader SHALL put the value it read into an error. Unit tests go in crates/lys-home/src/harness/claude_code/render_fields_tests.rs.
 
 **Acceptance:**
-- A loopback fake upstream on 127.0.0.1 answers GET / with status 418 and a chunked body written as three chunks `chunk-1\n`, `chunk-2\n`, `chunk-3\n` with a flush after each; the example's server, started in-process on a listener the test binds with the base URL `http://127.0.0.1:<upstream port>` parsed from the argument list [`passthrough`, `127.0.0.1:<example port>`, `http://127.0.0.1:<upstream port>`], answers a client's GET / with status 418 and the body `chunk-1\nchunk-2\nchunk-3\n`, in that order.
-- The client sends POST /v1/messages?beta=true with Host `127.0.0.1:<example port>`, `Connection: x-lys-hop`, `x-lys-hop: 1`, `Keep-Alive: timeout=5`, `TE: trailers`, `Proxy-Authorization: Basic eDp5`, `x-lys-pass: 7` and the body `{"a":1}`; the loopback upstream records exactly one request, with path and query `/v1/messages?beta=true`, Host `127.0.0.1:<upstream port>`, no `connection`, `x-lys-hop`, `keep-alive`, `te` or `proxy-authorization` header, `x-lys-pass: 7`, and the body bytes `{"a":1}`.
-- passthrough.rs holds the dropped names as one constant list, and `grep -ciE 'upgrade|trailer|transfer-encoding|proxy-authenticate' crates/lys-home/examples/passthrough.rs` counts only lines of that list.
-- `git diff` of crates/lys-home/Cargo.toml over the card's commits adds `autoexamples = false` and one `[[example]]` block naming `passthrough` with `test = true`, and adds no dependency line.
-- The tests call the run function directly with each argument list below and an in-memory buffer as its stderr writer; for each, run returns a nonzero exit code and the buffer holds exactly the one line named beside it and nothing else: [`passthrough`] gives `listen address: missing`; [`passthrough`, `127.0.0.1:47001`] gives `base URL: missing`; [`passthrough`, `not an address`, `http://127.0.0.1:47002`] gives `listen address: malformed`; [`passthrough`, `0.0.0.0:47001`, `http://127.0.0.1:47002`] gives `listen address: not loopback`; [`passthrough`, `127.0.0.1:47001`, `not a url`] gives `base URL: malformed`.
-- With a 127.0.0.1 listener the test binds and holds open, calling the run function with [`passthrough`, `127.0.0.1:<that listener's port>`, `http://127.0.0.1:<another port>`] and an in-memory stderr buffer returns a nonzero exit code, and the buffer holds exactly the one line `listen address: cannot bind` and nothing else.
-- main's body is one call to the run function with the process's arguments and stderr followed by `std::process::exit` with its result, and `grep -nE 'stdout|print!|println!' crates/lys-home/examples/passthrough.rs` prints nothing, so no path writes to stdout.
-- Parsing [`passthrough`, `127.0.0.1:47001`, `https://127.0.0.1:47002`] yields the listen address 127.0.0.1:47001 and the base URL https://127.0.0.1:47002, with no error, so an https base URL is accepted.
+- The string reader over {"text": 3} for field `text` in entry `x1` returns RenderField { entry: "x1", field: "text", expected: "string", missing: false }.
+- The string reader over {} for field `text` returns RenderField with missing true and expected `string`; over {"text": null} it returns missing false.
+- The array-or-string reader returns the value unchanged for {"content": "a"} and for {"content": []}, and returns expected `array or string`, missing false, for {"content": 5}.
+- The redacted reader returns false for {}, true for {"redacted": true} and RenderField { field: "redacted", expected: "boolean", missing: false } for {"redacted": "yes"}.
+- The stopReason reader maps toolUse, length, stop and error to tool_use, max_tokens, end_turn and stop_sequence; returns RenderStopReason with value `aborted` for aborted and value `halted` for halted; and returns RenderField { field: "stopReason", expected: "string" } with missing true for {} and missing false for {"stopReason": 1}.
+- `grep -n 'unwrap_or' crates/lys-home/src/harness/claude_code/render_fields.rs` prints nothing.
 
 **Files:**
-- create: crates/lys-home/examples/passthrough.rs
-- create: crates/lys-home/examples/passthrough_tests.rs
-- modify: crates/lys-home/Cargo.toml
+- create: crates/lys-home/src/harness/claude_code/render_fields.rs
+- create: crates/lys-home/src/harness/claude_code/render_fields_tests.rs
+- modify: crates/lys-home/src/harness/claude_code/mod.rs
 
 **Checklist:**
-- C46 — Against a loopback upstream answering GET / with 418 and three streamed chunks, the pass-through example answers 418 with the same three chunks in order, with no provider.
-- C49 — The pass-through example rewrites Host to the upstream's authority, drops the fixed hop-by-hop list, and passes every other request header and the body byte for byte.
+- C84 — Every value the Claude Code render copies from a message entry is read through a checked reader that refuses a missing field and a field of another type than the target takes, and no reader substitutes a default; the one field read from its absence is `redacted`, absent meaning not redacted.
+- C87 — stopReason is mapped by one explicit arm per value: toolUse to tool_use, length to max_tokens, stop to end_turn and error to stop_sequence; aborted and every other value refuse by entry id and the value, and there is no catch-all arm.
 
-### R3: One four-field line per call, and nothing else written
+**Stories:**
+- S35 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a session the render cannot shape refused by name with nothing written, never rendered with a default where the record carried no value, so that a rendered file that looks whole is whole.
 
-WHEN a call ends, THE SYSTEM SHALL write exactly one line to stderr: a JSON object with exactly the four keys `method`, `path`, `status` and `duration_ms`, where `path` is the request path without its query string, `status` is the status sent to the client, and `duration_ms` is the whole milliseconds from the request's arrival to the call's end. The line is written through one function whose writer main gives as stderr and a test gives as a buffer. THE SYSTEM SHALL NOT write a header value, a header name, a query string, a body byte or error text to stderr, stdout or any file, and once it is listening SHALL NOT write any line other than the call line; the only other line it ever writes is R2's refusal by name, before it listens.
+### R3: Shape every rendered record from checked fields and refuse what the render cannot shape
+
+WHEN the render walks a message entry, THE SYSTEM SHALL read through R2's readers: role (string); for a toolResult, toolCallId (string), content (array or string) and isError (boolean); for a user message, content (array or string), and for a content array of exactly one text part, that part's text (string); for an assistant message, provider, api and model (string), content (array) and stopReason; for an assistant text part, text (string); for a toolCall part, id and name (string) and arguments (object); for a thinking part, redacted by the redacted reader, thinkingSignature (string, absent allowed and a JSON null refused), thinking (string), and, when redacted is true, thinkingSignature required. IF any reader refuses, THEN THE SYSTEM SHALL return that refusal naming the home session's header id and the entry, before any directory or file is created, and the first field in entry order then field order is the one named. WHEN the role is a string other than user, toolResult and assistant, THE SYSTEM SHALL skip the entry as today. WHEN every field is present and of its type and every assistant stopReason is toolUse, length or stop, THE SYSTEM SHALL write the same bytes as before this card. WHEN an assistant stopReason is error, THE SYSTEM SHALL write that record's stop_reason as stop_sequence, where before this card it wrote end_turn, and every other byte as before. IF an assistant stopReason is aborted or any value R2 does not map, THEN THE SYSTEM SHALL refuse, where before this card it wrote end_turn. The module doc of render.rs SHALL name gitBranch "", usage {input_tokens 0, output_tokens 0} and stop_sequence null as the Claude Code format constants written on every record, and absence as the only default of `redacted`. THE SYSTEM SHALL NOT change which block kinds are carried, turned into text or dropped, SHALL NOT change the Loss or loss-account fields, record_uuid or any derived uuid, and SHALL NOT change import.rs.
 
 **Acceptance:**
-- In the 418 test of R2 the line buffer holds exactly one line, which parses as a JSON object with exactly four keys: `method` is `GET`, `path` is `/`, `status` is 418 and `duration_ms` is an unsigned integer.
-- In the header test of R2 the line's `path` is `/v1/messages` and the buffer contains none of the strings `beta`, `x-lys-pass`, `eDp5` and `{"a":1}`.
-- A call whose request carries the header `x-lys-sentinel: SENTINEL-HEADER` and the body `SENTINEL-BODY`, answered by the upstream with the body `SENTINEL-REPLY`, leaves a line buffer containing none of the strings `SENTINEL-HEADER`, `SENTINEL-BODY`, `SENTINEL-REPLY` and `x-lys-sentinel`.
-- `grep -nE 'println!|print!|eprint!|dbg!|std::fs|File::|tracing|log::' crates/lys-home/examples/passthrough.rs` prints nothing, and `grep -c 'writeln!' crates/lys-home/examples/passthrough.rs` prints 2: one inside the call-line function and one inside the refusal function of R2.
+- `grep -n 'unwrap_or' crates/lys-home/src/harness/claude_code/render.rs` prints nothing.
+- The module doc (the leading `//!` lines) of render.rs contains `gitBranch`, `usage`, `stop_sequence` and `redacted`.
+- The existing tests in render_tests.rs, tests/claude_code_round_trip.rs, tests/launch_template.rs and tests/fork.rs pass with no edit to them other than R5's additions to claude_code_round_trip.rs and R6's to launch_template.rs.
+- The pinned fixtures carry no stopReason but the three whose bytes do not move: `grep -rhoE '"stopReason": ?"[A-Za-z]+"' crates/lys-home/tests/fixtures crates/lys-home/tests/launch_template.rs crates/lys-home/tests/fork.rs | sort -u` prints only `stop`, `toolUse` or `length` values, and the Claude Code fixture behind PINNED_FIXTURE_SHA256 reaches the render through import.rs, whose stop_reason returns only toolUse, length and stop and is unchanged by the last line; `git diff 7b53625 -- crates/lys-home/tests/claude_code_round_trip.rs crates/lys-home/tests/launch_template.rs | grep -E '^-.*[0-9a-f]{64}'` prints nothing.
+- `git diff 7b53625 -- crates/lys-home/src/harness/claude_code/import.rs crates/lys-home/src/harness/claude_code/seed.rs` prints nothing.
 
 **Files:**
-- modify: crates/lys-home/examples/passthrough.rs
-- modify: crates/lys-home/examples/passthrough_tests.rs
+- modify: crates/lys-home/src/harness/claude_code/render.rs
 
 **Checklist:**
-- C50 — The pass-through example writes one four-field line per call (method, path, status, duration_ms) and no header value, body byte or error text anywhere.
+- C85 — A message entry with no role, or with a role that is not a string, refuses the render by entry id and the field `role`; a role that is a string the render does not know is still skipped and the render succeeds.
+- C86 — A toolResult with no toolCallId, content or isError, a user message with no content or a single text part with no text, an assistant message with no content array, model, provider, api or stopReason, a text part with no text, a toolCall part with no id, name or arguments, a thinking part with no thinking text, a redacted thinking part with no thinkingSignature, and any of these present with another type than the target takes (a `redacted` or a thinkingSignature among them) each refuse the render by entry id and field, and nothing is written.
+- C87 — stopReason is mapped by one explicit arm per value: toolUse to tool_use, length to max_tokens, stop to end_turn and error to stop_sequence; aborted and every other value refuse by entry id and the value, and there is no catch-all arm.
+- C90 — The render's module doc names gitBranch "", usage {input_tokens 0, output_tokens 0} and stop_sequence null as format constants and absence as the only default of `redacted`; the bytes rendered from a session that carries every field and whose assistant stopReasons are toolUse, length or stop do not change; a stopReason of error renders as stop_sequence where it rendered as end_turn, aborted or an unmapped value refuses, and the pinned render hashes, whose fixtures carry only toolUse, length or stop, are unedited.
 
-### R4: 502 before any upstream response, a closed connection after one
+**Stories:**
+- S35 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a session the render cannot shape refused by name with nothing written, never rendered with a default where the record carried no value, so that a rendered file that looks whole is whole.
 
-IF forward.rs returns its pre-response error (refused, reset, or broken before the status line), THEN THE SYSTEM SHALL answer the client 502 Bad Gateway with an empty body and SHALL write the call line with `status` 502. IF the upstream breaks after its status and headers have gone to the client, THEN THE SYSTEM SHALL close the client connection without completing the body, and SHALL write the call line with that upstream status and `duration_ms` up to the break. In both cases THE SYSTEM SHALL NOT write error text, a header value or a body byte anywhere, SHALL NOT send a body on the 502, SHALL NOT change a status already sent, and SHALL NOT retry. This mapping lives in the example only (ADR-019).
+### R4: Decide every serialisation before anything is written
+
+Add crates/lys-home/src/harness/claude_code/render_write.rs holding the render's one write stage, which render_claude_code calls for all its writing: it takes the rendered path, the record values, the loss account as any value implementing serde::Serialize, and the seed with its path when there is one. Before it creates the render directory or any file, THE SYSTEM SHALL serialise every record compactly with serde_json::to_string, one line per record followed by a newline, as render.rs writes them before this card, and the loss account, alone, with serde_json::to_vec_pretty. THE SYSTEM SHALL NOT pretty-print a record line. render.rs SHALL create no directory or file and write no seed itself: every write of the render goes through the stage. IF a serialisation fails, THEN THE SYSTEM SHALL return RenderUnserialisable naming what would not serialise, and SHALL NOT create the directory, the rendered file, the loss account or the seed. loss() in render.rs SHALL return Result<Loss, HomeError>, returning RenderUnserialisable with the entry id when the part cannot be serialised, and every caller SHALL propagate it with `?`. The production loss account SHALL be the same JSON object, with the same keys and values, serialised to the same bytes as before this card. THE SYSTEM SHALL NOT hash empty bytes in place of a part, and SHALL NOT write a loss account of zero bytes.
 
 **Acceptance:**
-- The example's server started in-process with the base URL of a 127.0.0.1 port whose listener the test bound and dropped answers a client's GET / with status 502 and a body of 0 bytes, and the line buffer holds exactly one line whose `status` is 502 and which has exactly the four keys.
-- A loopback upstream answers GET / with status 200 and a chunked body, writes the chunks `part-1` and `part-2`, waits 200 ms and then resets the connection (SO_LINGER 0, no terminating chunk); the client receives status 200, reads the bytes `part-1part-2`, and then its body read ends in an error instead of a complete body; the line buffer holds exactly one line whose `status` is 200 and whose `duration_ms` is at least 200.
-- In both tests above the line buffer holds no text beyond the one JSON line.
+- A test in render_write_tests.rs defines an account type whose Serialize returns serde's custom error, calls the write stage with one record, that account, a seed and a rendered path `nested/r.jsonl` under a fresh temporary directory, and asserts the result is RenderUnserialisable with what `loss account`, and that `nested/`, `nested/r.jsonl`, `nested/r.loss.json` and the seed path do not exist.
+- The same call with the account replaced by a serde_json object succeeds and writes all three files.
+- In that succeeding call, the rendered file is, byte for byte, serde_json::to_string of the record followed by one newline, and the loss account is, byte for byte, serde_json::to_vec_pretty of the object.
+- `grep -nE 'std::fs|OpenOptions|create_dir|write_seed|sync_all|io::Write' crates/lys-home/src/harness/claude_code/render.rs` prints nothing, and `grep -n 'render_write::' crates/lys-home/src/harness/claude_code/render.rs` prints at least one line.
+- loss() is declared returning Result<Loss, HomeError>.
+- `grep -n 'unwrap_or' crates/lys-home/src/harness/claude_code/render_write.rs` prints nothing.
+- tests/launch_template.rs passes with its RECORDED hash of `00000000-0000-4000-8000-000000000001.loss.json` still 460f96f14dad62da55296f49be6dee44a82c5bf4a810ee3859190d83dd923a26.
 
 **Files:**
-- modify: crates/lys-home/examples/passthrough.rs
-- modify: crates/lys-home/examples/passthrough_tests.rs
+- create: crates/lys-home/src/harness/claude_code/render_write.rs
+- create: crates/lys-home/src/harness/claude_code/render_write_tests.rs
+- modify: crates/lys-home/src/harness/claude_code/render.rs
+- modify: crates/lys-home/src/harness/claude_code/mod.rs
 
 **Checklist:**
-- C47 — When forwarding fails before any upstream response, the pass-through example answers 502 with an empty body and its call line's status is 502.
-- C48 — When the upstream breaks after its status and headers were sent, the pass-through example closes the client connection and its call line records that status and the duration up to the break.
+- C88 — Every serialisation the render needs, the record lines, the hashes of dropped parts and the loss account, is decided before any directory or file is created; a loss account whose serialiser fails refuses the render and no rendered file, loss account or seed exists afterwards.
 
-### R5: The loopback tests run in the gate with no provider
+**Stories:**
+- S35 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a session the render cannot shape refused by name with nothing written, never rendered with a default where the record carried no value, so that a rendered file that looks whole is whole.
 
-The tests of R2, R3 and R4 live in crates/lys-home/examples/passthrough_tests.rs as the example's test module and the test of R1 in crates/lys-home/src/proxy/forward_tests.rs. WHEN `cargo test --workspace --all-features` runs, THE SYSTEM SHALL run all of them against loopback fakes on 127.0.0.1. THE SYSTEM SHALL NOT reach any provider or any address other than 127.0.0.1, SHALL NOT be skipped by `#[ignore]` or a feature gate, and SHALL NOT name a test after a header value or a body string.
+### R5: Prove each refusal with its own fixture
+
+Add crates/lys-home/src/harness/claude_code/render_refusal_tests.rs. Each test builds a home session `thin` holding a well-formed user entry `u1` then one entry `x1` under it that carries every field but the one under test, renders it with session id aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa, cwd /w, model claude-opus-5-5, version 2.1.281 and out `r.jsonl` in an empty temporary directory, and asserts the error variant, entry `x1`, the field, the expected type and missing, and that the temporary directory is still empty. One test per case: a message with no role; role 12345; a toolResult with no toolCallId; with no content; with no isError; with isError "maybe"; a user message with no content; a user message whose content is one text part with no text; an assistant message with no content; with content "fixture words" where an array is required; with no model; with no provider; with no api; with no stopReason; with stopReason aborted; with stopReason halted; an assistant text part with no text; a toolCall part with no id; with no name; with no arguments; a thinking part with no thinking; a redacted thinking part with no thinkingSignature; a thinking part whose thinkingSignature is null; and a thinking part with redacted "yes". Add passing tests: an entry with role `narrator` is skipped and the render succeeds with one record; a same-model thinking part with thinking and thinkingSignature and no `redacted` field renders as a `thinking` block with its signature, not as `redacted_thinking`; stopReason stop, toolUse, length and error render as end_turn, tool_use, max_tokens and stop_sequence. Add to tests/claude_code_round_trip.rs one test that runs `render` through lys_home::cli::run on a home whose session holds a message with no role and asserts the RenderField error and that the out path does not exist. No test name, fixture value or error SHALL carry transcript content, and no refusal's Display SHALL contain the value under test.
 
 **Acceptance:**
-- `cargo test -p lys-home --all-features --example passthrough` reports at least 5 passed tests and 0 ignored: the 418 test, the header test, the sentinel test, the 502 test and the mid-stream reset test.
-- `grep -rnE 'https?://' crates/lys-home/examples/passthrough_tests.rs` prints only lines whose URL host is 127.0.0.1.
-- `grep -c '#\[ignore' crates/lys-home/examples/passthrough_tests.rs crates/lys-home/src/proxy/forward_tests.rs` prints 0 for each file.
+- Each of the 24 refusal tests passes and asserts entry `x1`; the 22 RenderField tests assert the field, in order role, role, toolCallId, content, isError, isError, content, text, content, content, model, provider, api, stopReason, text, id, name, arguments, thinking, thinkingSignature, thinkingSignature, redacted, and the 2 RenderStopReason tests assert a Display containing `stopReason`.
+- The role-12345 test asserts expected `string`, missing false and that the Display does not contain `12345`; the isError-"maybe" test asserts expected `boolean` and that the Display does not contain `maybe`; the content-"fixture words" test asserts expected `array` and that the Display does not contain `fixture words`.
+- The aborted and halted tests assert RenderStopReason with value `aborted` and `halted`.
+- Every refusal test asserts that the temporary directory holds 0 entries after the call.
+- The narrator test asserts the report's records equals 1.
+- The absent-redacted test asserts the rendered assistant record's content[0].type is `thinking`, its signature is the fixture's, the file does not contain `redacted_thinking`, and thinking_kept equals 1.
+- The stopReason mapping test asserts the four rendered stop_reason values in order: end_turn, tool_use, max_tokens, stop_sequence.
+- The CLI test asserts RenderField with entry id, field `role` and missing true, and that the out path does not exist.
+- `git diff 7b53625 -- crates/lys-home/tests/claude_code_round_trip.rs` shows only added lines, so PINNED_FIXTURE_SHA256 stays 798a64be2164b48c30e4e64fa80c4a307687f7808c256e7606be52b2c9f03074.
+- Restoring `.cloned().unwrap_or(Value::String(String::new()))` on toolCallId makes exactly the no-toolCallId test fail, and restoring `.and_then(Value::as_bool).unwrap_or(false)` on redacted makes exactly the redacted-"yes" test fail; both are recorded as drift injections in the dev record.
 
 **Files:**
-- modify: crates/lys-home/examples/passthrough_tests.rs
+- create: crates/lys-home/src/harness/claude_code/render_refusal_tests.rs
+- modify: crates/lys-home/src/harness/claude_code/mod.rs
+- modify: crates/lys-home/tests/claude_code_round_trip.rs
 
 **Checklist:**
-- C46 — Against a loopback upstream answering GET / with 418 and three streamed chunks, the pass-through example answers 418 with the same three chunks in order, with no provider.
-- C47 — When forwarding fails before any upstream response, the pass-through example answers 502 with an empty body and its call line's status is 502.
-- C48 — When the upstream breaks after its status and headers were sent, the pass-through example closes the client connection and its call line records that status and the duration up to the break.
+- C85 — A message entry with no role, or with a role that is not a string, refuses the render by entry id and the field `role`; a role that is a string the render does not know is still skipped and the render succeeds.
+- C86 — A toolResult with no toolCallId, content or isError, a user message with no content or a single text part with no text, an assistant message with no content array, model, provider, api or stopReason, a text part with no text, a toolCall part with no id, name or arguments, a thinking part with no thinking text, a redacted thinking part with no thinkingSignature, and any of these present with another type than the target takes (a `redacted` or a thinkingSignature among them) each refuse the render by entry id and field, and nothing is written.
+- C87 — stopReason is mapped by one explicit arm per value: toolUse to tool_use, length to max_tokens, stop to end_turn and error to stop_sequence; aborted and every other value refuse by entry id and the value, and there is no catch-all arm.
+- C89 — Each refusal case has its own fixture asserting the entry id and the field it names; one test renders a thinking part with no `redacted` field as not redacted, and one renders past an unknown role.
 
-### R6: Render the cluster's markdown from its JSON
+**Stories:**
+- S36 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each render refusal to name the entry id, the field and the expected type and never the value, with its own fixture, so that I can find the broken entry from the error alone and no transcript reaches it.
 
-Structure: docs/design/home/briefs/HOME-008.md is created, and docs/design/home/DESIGN.md and docs/design/home/CHECKLIST.md are re-rendered, by the method's scripts/design/render-cluster.py from the cluster's JSON as it stands, so DESIGN.md carries ADR-019 and CN5's definition of unchanged, and CHECKLIST.md carries C45 to C51. THE SYSTEM SHALL NOT edit a rendered markdown file by hand, SHALL NOT change the cluster's JSON documents in this requirement, and SHALL NOT change a rendered file other than these three.
+### R6: Store the launch template only after its render succeeds
+
+WHEN render-launch runs, THE SYSTEM SHALL call render_claude_code before home.templates().put, so the template is stored only after the render has succeeded. IF the render is refused, THEN THE SYSTEM SHALL return the refusal and SHALL NOT store the template, write the MCP, env or instructions file, or record a template_render event. THE SYSTEM SHALL NOT change the files, the manifest or the event of a launch whose render succeeds.
 
 **Acceptance:**
-- `python3 scripts/design/render-cluster.py docs/design/home` run from the repository root at the branch head leaves `git status --porcelain docs/design/home` printing nothing.
-- `grep -c 'ADR-019' docs/design/home/DESIGN.md` prints a number greater than 0, and `grep -c 'Unchanged is defined as exactly this' docs/design/home/DESIGN.md` prints 1.
-- For each of the ids C45, C46, C47, C48, C49, C50 and C51, `grep -c '<id>' docs/design/home/CHECKLIST.md` prints at least 1.
-- `sh scripts/design/gate.sh` exits 0 from the repository root.
+- A test in tests/launch_template.rs runs one successful render-launch of the fixture template into a first out directory, records the templates directory's file names and their SHA-256, appends to the fixture session a message entry with no role, runs render-launch with a template whose instructions differ into a second empty out directory, and asserts exit status 1, stderr containing `field role`, empty stdout, the second out directory holding 0 entries, and the templates directory holding the same file names with the same SHA-256 as recorded.
+- The same test asserts the session holds one lys.harness_event entry after both calls.
+- The existing launch_template tests pass with RECORDED unedited.
+
+**Files:**
+- modify: crates/lys-home/src/harness/claude_code/launch.rs
+- modify: crates/lys-home/tests/launch_template.rs
+
+**Checklist:**
+- C91 — render-launch renders before it stores the template, so a refused launch leaves the home's templates directory with the same entries and hashes as before the call.
+
+**Stories:**
+- S37 (Agent, Runs in a harness and wants to continue somewhere else) — As the agent launching a session, I want a launch whose render is refused to store nothing in the home, so that a launch that wrote no file leaves no template behind.
+
+### R7: Regenerate the cluster's rendered markdown
+
+Regenerate docs/design/home's rendered markdown with render-cluster.py so DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/HOME-008.md are what their JSON renders to. THE SYSTEM SHALL NOT edit a rendered markdown file by hand, and SHALL NOT change any other brief's markdown beyond what rendering gives.
+
+**Acceptance:**
+- `sh scripts/design/gate.sh` exits 0.
+- docs/design/home/briefs/HOME-008.md exists and contains `HOME-008`.
 
 **Files:**
 - create: docs/design/home/briefs/HOME-008.md
 - modify: docs/design/home/DESIGN.md
 - modify: docs/design/home/CHECKLIST.md
+- modify: docs/design/home/USER-STORIES.md
 
 **Checklist:**
-- C51 — The home cluster's DESIGN.md, CHECKLIST.md and briefs/HOME-008.md are what scripts/design/render-cluster.py renders from its JSON, and none is edited by hand.
-
-### R7: The live subscription run, appended to PROOF-PROXY.md
-
-After the build lands, as a named step outside the gate: the seat of the lead who owns the home line (or another seat that lead names) runs Claude Code 2.1.283, the version installed now, logged in with a subscription and not an API key, with ANTHROPIC_BASE_URL pointing at the example, which forwards to https://api.anthropic.com; that lead watches. The card appends one live-run section to docs/design/home/PROOF-PROXY.md, below R10's session-key section, which it leaves byte for byte. The section SHALL record: the Claude Code version 2.1.283; the login kind as subscription; the seat that ran it; the listen address the example was given; the exact commands (the example's command line, with that listen address and https://api.anthropic.com as its two arguments, and the Claude Code launch line with ANTHROPIC_BASE_URL set to http:// and that same address); the outcome as `completed` or `failed`; every call line the run produced as method, path and status in the order written; the headers record, which is that every end-to-end request header the client sent passed unchanged and none was removed, that Host was rewritten to the upstream's authority, and the fixed list of hop-by-hop names dropped, copied from the source's list; and, on a failed run, the failing call's status code and the provider's error kind as Claude Code reported it. The section SHALL carry a finding that HOME-001's verification names Claude Code 2.1.281 while the run was measured on 2.1.283, for the design to update. WHEN the outcome is completed, the card SHALL set C7 to done in docs/design/home/checklist.json, re-render docs/design/home/CHECKLIST.md with the method's render-cluster.py, and name C7 beside the run, all in the card's own commit. IF the outcome is failed, THEN the card SHALL leave C7 open, SHALL NOT claim C7, and SHALL report the failure to that lead as a finding. The card SHALL NOT write a header value, a token, a body byte or error text into PROOF-PROXY.md or the dev record, SHALL NOT claim in its own added lines that the request was forwarded untouched, SHALL NOT run a variant that strips headers, SHALL NOT install another Claude Code version, SHALL NOT rewrite R10's section, and SHALL NOT edit HOME-001.json.
-
-**Acceptance:**
-- `git diff` of docs/design/home/PROOF-PROXY.md over the card's commits shows added lines only.
-- The live-run section contains the lines `Claude Code: 2.1.283` and `Login: subscription`, one line naming the seat, one line `Listen address: 127.0.0.1:<port>`, and the two commands in code blocks: the example's command line with that address and `https://api.anthropic.com` as its two arguments, and the Claude Code launch line setting ANTHROPIC_BASE_URL to `http://127.0.0.1:<port>` with the same port.
-- The live-run section contains exactly one line beginning `Outcome: `, and its value is one word from the set {`completed`, `failed`}.
-- The live-run section lists the call lines as method, path and status, one row per line the example wrote during the run, in the order written.
-- The live-run section states that every end-to-end request header passed unchanged and none was removed, that Host was rewritten, and names the dropped headers as Connection and every header Connection names, Keep-Alive, Proxy-Authenticate, Proxy-Authorization, TE, Trailer, Transfer-Encoding and Upgrade; and `git diff <card base>..HEAD -- docs/design/home/PROOF-PROXY.md | grep '^+' | grep -v '^+++' | grep -ci 'untouched'` prints 0, where <card base> is the main commit the card branches from, so only the card's added lines are counted.
-- `git diff <card base>..HEAD -- docs/design/home/PROOF-PROXY.md | grep '^+' | grep -v '^+++' | grep -cE 'Bearer |sk-ant-|x-api-key:'` prints 0, counting only the lines the card adds, with <card base> as above.
-- The live-run section contains a finding paragraph naming HOME-001's verification line on 2.1.281 against the measured 2.1.283, and `git diff` over the card's commits shows docs/design/home/briefs/HOME-001.json unchanged.
-- With `Outcome: completed`: C7 in docs/design/home/checklist.json has `done` true, `python3 scripts/design/render-cluster.py docs/design/home` leaves `git status` clean, and the live-run section names C7.
-- With `Outcome: failed`: C7 in docs/design/home/checklist.json has `done` false, the section names the failing status code and the provider's error kind, and the section does not name C7 as met.
-
-**Files:**
-- modify: docs/design/home/PROOF-PROXY.md
-- modify: docs/design/home/checklist.json
-- modify: docs/design/home/CHECKLIST.md
-
-**Checklist:**
-- C7 — One seat with a subscription login completes a call through a pass-through proxy; the measurement is written down.
+- C92 — The cluster's rendered markdown, briefs/HOME-008.md among it, is what its JSON renders to, and scripts/design/gate.sh exits 0.
 
 **Stories:**
-- S5 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+- S36 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each render refusal to name the entry id, the field and the expected type and never the value, with its own fixture, so that I can find the broken entry from the error alone and no transcript reaches it.
 
 ## Boundaries
 
-- No second transport: the example forwards through R10's forward.rs and re-implements no forwarding.
-- forward.rs synthesises no status, header or body byte; the 502 and the connection close live in the example only, and lys-proxy's behaviour does not change (ADR-019).
-- No request or response body byte is altered, buffered to disk or retried; retry_canceled_requests(false) stays as R10 sets it.
-- No header value, header name list, query string, body byte, token or error text appears in the example's output, PROOF-PROXY.md, a test name, the dev record or any post.
-- R10's session-key section of PROOF-PROXY.md is not rewritten; this brief only appends.
-- No door code, SECRETS-002 file or credential store is touched; the example never sees, copies or swaps a credential and is never a service.
-- No older Claude Code is installed for the proof, and no run strips headers.
-- HOME-001.json and the design's 2.1.281 lines are not edited; the mismatch is reported as a finding.
-- The card launches no agent: the live run is a person's step after the build (ADR-007).
-- No file is created outside design.json's structure array; lys-core, lys-log-store and the published crates are untouched.
+- No change to crates/lys-home/src/harness/claude_code/import.rs; its defaults at lines 151, 213-215, 466-474 and 508-519 are the remaining half and belong to the importer card.
+- No change to which block kinds are carried, turned into text or dropped, and no change to the Loss or loss-account fields.
+- No change to record_uuid, the render namespace or any derived uuid (ADR-016).
+- No change to the bytes rendered from a session that carries every field and whose assistant stopReasons are toolUse, length or stop; a stopReason of error changes from end_turn to stop_sequence and aborted or an unmapped value refuses, and nothing else changes; record lines stay compact, one per line; PINNED_FIXTURE_SHA256 and the launch_template RECORDED hashes are not edited.
+- A role that is a string the render does not know stays skipped.
+- gitBranch "", usage {input_tokens 0, output_tokens 0} and stop_sequence null stay as written; they are format constants.
+- An absent `redacted` reads as not redacted and is never refused; a present non-boolean one refuses.
+- No transcript content in an error, the output, a test name or a fixture (CN3, P7); an unmapped stopReason is the one value a refusal names.
+- No new dependency.
+- The design's structure array is the whole file list; a path outside it is not created.
 
 ## Verification
 
-- From the repository root: `python3 scripts/design/validate.py docs/design/home` and `python3 scripts/design/check-coverage.py docs/design/home` exit 0.
-- From the repository root: `cargo fmt --all`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo clippy --all-targets -- -D warnings`, `cargo test --workspace --all-features`, `cargo doc --no-deps --all-features` and `cargo doc --no-deps` exit 0.
-- From the repository root: `sh scripts/design/gate.sh` exits 0 with PROOF-PROXY.md changed.
-- `cargo test -p lys-home --all-features --example passthrough` prints the five loopback tests of R5 and the refusal tests of R2 as passed and 0 ignored.
-- crates/lys-home/examples/passthrough.rs and passthrough_tests.rs each hold at most 500 lines of code, counted without comments and blank lines.
-- Read crates/lys-home/examples/passthrough.rs against R3: the only writes are the call-line function's `writeln!` and the refusal function's `writeln!`, and no code path passes a header value, a body byte, an argument's value or an error's text to either.
-- Read PROOF-PROXY.md's live-run section against R7: every figure is a version, a command, a status code, a method, a path, a header name or a count.
+- From the repository root: cargo fmt --all leaves the tree unchanged.
+- cargo clippy --all-targets --all-features -- -D warnings and cargo clippy --all-targets -- -D warnings exit 0.
+- cargo test --workspace --all-features exits 0 and lists R1's, R2's, R4's, R5's and R6's tests as passed.
+- cargo doc --no-deps --all-features and cargo doc --no-deps exit 0 with no warnings.
+- sh scripts/design/gate.sh exits 0.
+- grep -n 'unwrap_or' crates/lys-home/src/harness/claude_code/render.rs crates/lys-home/src/harness/claude_code/render_fields.rs crates/lys-home/src/harness/claude_code/render_write.rs prints nothing.
+- git diff 7b53625 -- crates/lys-home/src/harness/claude_code/import.rs prints nothing.
+- Each of render.rs, render_fields.rs and render_write.rs holds under 500 lines of code, excluding tests, comments and blank lines.
 
