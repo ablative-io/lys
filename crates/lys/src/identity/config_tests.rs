@@ -174,6 +174,16 @@ fn clients_are_distinct_and_never_rauthys_own() {
 }
 
 #[test]
+fn an_install_that_names_its_app_client_cambium_still_reads() -> Result<(), Box<dyn Error>> {
+    let text = EXAMPLE.replace("[clients.app]", "[clients.cambium]");
+    let config = parse(&text)?;
+    let app = parse(EXAMPLE)?.clients.app;
+    assert!(app.is_some(), "the example names an app client");
+    assert_eq!(config.clients.app, app);
+    Ok(())
+}
+
+#[test]
 fn unknown_fields_and_a_third_client_are_refused() {
     let text = format!("{EXAMPLE}\n[clients.other]\nid = \"other\"\n");
     assert!(refused_as(&text, ErrorKind::ConfigInvalid));
