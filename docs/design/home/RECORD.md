@@ -258,24 +258,38 @@ a later ship from the target carries the arrivals onward.
 
 ## The rendered uuid
 
-A Claude Code record's `uuid` is the entry's own id when that id is
-uuid-shaped (36 characters, hex with `-` at 8, 13, 18 and 23), so an imported
-session keeps its source's uuids. Any other id, the importer's `<uuid>-r<i>`
-for a tool result split from a record with more than one, a hand-authored id,
-a canon id, derives as UUID version 5 (RFC 9562) under the session's namespace
-over the name `<entry id>#<role>`; the session's namespace is UUIDv5 of the
-fixed lys render namespace `32c05904-d1f1-550c-9eee-2f6c8f98b665` (itself
-UUIDv5 of the URL namespace over `lys/home/claude-code/render-uuid/v1`) over
-the id of the session being rendered, so the same entry id in two sessions
-never derives one uuid, and the target session id, which the record does not
-hold, never enters it. The roles are closed: `record`, the record's `uuid`;
-the next record's parentUuid, a summary's leafUuid and an assistant's `msg_`
-id follow from it. A derived uuid carries version nibble 5 where Claude
-Code's own carry 4. Nothing random and no clock enters a render, every
+A Claude Code record's `uuid` follows one rule. An entry id that is
+uuid-shaped (36 characters, hex with `-` at 8, 13, 18 and 23)
+passes through unchanged as the record's `uuid`, so an imported session keeps
+its source's uuids. Any other entry id, the importer's `<uuid>-r<i>` for a tool result
+split from a record with more than one, a hand-authored id, a canon id,
+derives as UUID version 5 (RFC 9562) under the session's namespace over the
+name `<entry id>#<role>`, which for the record's own `uuid` is
+`<entry id>#record`. The session's namespace is UUIDv5 of the fixed lys
+render namespace `32c05904-d1f1-550c-9eee-2f6c8f98b665` (itself UUIDv5 of the
+URL namespace over `lys/home/claude-code/render-uuid/v1`) over the
+home session's own id, the id in the home session's header that the render is
+called with, so the same entry id in two sessions rendered into one Claude
+Code directory never derives one uuid. The render target's session id, the
+one the rendered file's `sessionId` carries, is not held by the record and
+never enters the derivation. The roles are closed: `record`, the record's
+`uuid`; the next record's parentUuid, a summary's leafUuid and an assistant's
+`msg_` id follow from it. A derived uuid carries version nibble 5 where
+Claude Code's own carry 4. Nothing random and no clock enters a render, every
 timestamp is the entry's own, and the walk takes entry order then part
 order, so the same session head with the same target writes the same bytes
 (CN9, ADR-016); the namespace, the name form and the roles are fixed, and a
 change is a new version alongside.
+
+The test vector, one entry id in two home sessions, which
+`record_md_states_the_rendered_uuid_rule_with_the_vector_the_render_derives`
+reads from this table and renders:
+
+| session id | entry id | uuid |
+|---|---|---|
+| `one` | `e1` | `83871c7a-20b7-5baa-8f66-8d8f4201d90d` |
+| `two` | `e1` | `96533416-b648-5185-ac85-c3b7c51203c9` |
+
 ## Forks
 
 A fork (HOME-006) cuts from the session a lantern was lit in, read from
