@@ -196,6 +196,9 @@ The witness keeps its per-origin memory in memory, as ADR-100 records. WitnessPr
 | `crates/lys-identity/src/grants/recovery.rs` | GrantLedger, whose entries is the audit read of every leaf. | LYSLOGSTORE-006 |
 | `crates/lys-identity/src/grants/authority.rs` | Grants, whose events is the audit read of every leaf. | LYSLOGSTORE-006 |
 | `crates/lys-identity/src/checkpoints.rs` | Removed by LYSLOGSTORE-006, as a receipt coordinate comes from the tiles. | LYSLOGSTORE-006 |
+| `crates/lys-anchor-cli/src/commands/anchor/submit.rs` | Its documentation links to Log name FrontierLog or lys log audit. | LYSLOGSTORE-007 |
+| `crates/lys-anchor/src/upward/fixture.rs` | Its documentation links to Log name FrontierLog or lys log audit. | LYSLOGSTORE-007 |
+| `crates/lys-log-store/src/frontier_log_tests.rs` | Its documentation links to Log name FrontierLog or lys log audit. | LYSLOGSTORE-007 |
 
 ## Inventory
 

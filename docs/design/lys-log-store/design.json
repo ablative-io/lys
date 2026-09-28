@@ -644,6 +644,21 @@
       "path": "crates/lys-identity/src/checkpoints.rs",
       "note": "Removed by LYSLOGSTORE-006, as a receipt coordinate comes from the tiles.",
       "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-anchor-cli/src/commands/anchor/submit.rs",
+      "note": "Its documentation links to Log name FrontierLog or lys log audit.",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/upward/fixture.rs",
+      "note": "Its documentation links to Log name FrontierLog or lys log audit.",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-log-store/src/frontier_log_tests.rs",
+      "note": "Its documentation links to Log name FrontierLog or lys log audit.",
+      "brief": "LYSLOGSTORE-007"
     }
   ],
   "inventory": [
