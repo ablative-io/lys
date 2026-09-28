@@ -72,6 +72,47 @@ Structural. Write docs/design/identity/CAPABILITY-CLAIM.md as the design round's
 **Stories:**
 - S114 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a stranger verifying lys artifacts, I want the capability claim format specified, attacked and ratified before anything is signed under it, with every shipped format left byte-identical, so that no historical verification breaks.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: The draft states the claim format, its placement and its verifier's refusals as prose a second party can check against. It proposes .2.1 under the .2 family arc and leaves .1 and .2 themselves unused. In this round the design leg failed only because the rendered brief markdown lagged its JSON. Re-rendering it fixes the cause, and gate.sh exits 0.
+- Deviation: I ran scripts/design/render-cluster.py and scripts/design/gate.sh to fix the failed design leg and to confirm the fix. I also ran git fetch plus read-only git show and cat-file on origin/main to re-run the brief's blocked_by checks. I ran no cargo command and made no commit.
+- Files changed:
+  - created: `docs/design/identity/CAPABILITY-CLAIM.md` — The draft of lys/agent-capability/v1 under the proposed OID 1.3.6.1.4.1.66364.2.1. It covers the deterministic CBOR (keys 1 content type, 2 holder, 3 grants; each grant has 1 id and 2 not-before, and 3 not-after only when the window has an end; grants sorted by id, no duplicates) and the RFC 7093 method 1 Authority Key Identifier. It gives verify_agent_capability's refusal order and the pinned vectors. Unchanged this round.
+  - modified: `docs/design/WIRE-FORMATS.md` — The two ratification sentences are replaced, a pointer to the draft is added, and a D7 PROPOSED row is added. D1 to D6 are byte-identical. Unchanged this round.
+  - modified: `docs/PEN-REGISTRATION.md` — Only the .2 row changed. It now names .2.1 as proposed for lys/agent-capability/v1 and keeps its stated purpose, including 'allocated when the agent-identity design lands'. The status cell stays Reserved. Unchanged this round.
+  - modified: `docs/design/directory/briefs/DIRECTORY-031.md` — Re-rendered from DIRECTORY-031.json after the workflow wrote this round's review blocks, so the design gate's byte comparison passes.
+  - modified: `docs/design/directory/briefs/DIRECTORY-031.json` — Holds the dev and review blocks the workflow wrote. I did not edit it by hand.
+- Checklist delivery:
+  - [x] C249 — docs/design/identity/CAPABILITY-CLAIM.md proposes lys/agent-capability/v1 under the proposed OID 1.3.6.1.4.1.66364.2.1, alongside the unchanged .1 extension transport, stating its transport, assertion, encoding, issuer key identifier (the 20-byte RFC 7093 method 1 keyid, a new issuer-key fingerprint), scope, verifier check, rendering consumer, revocation, issuer and anchor, and status; docs/design/WIRE-FORMATS.md carries it as PROPOSED and both of its ratification sentences name the owning lead with a second reader, with D1 to D6 unchanged; and the .2 row of docs/PEN-REGISTRATION.md keeps .2 a family arc and records .2.1 for the typed capability claim. — The draft is written and the pointers are added. The .2 row stays Reserved and D7 stays PROPOSED.
+- Story delivery:
+  - [x] S114 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a stranger verifying lys artifacts, I want the capability claim format specified, attacked and ratified before anything is signed under it, with every shipped format left byte-identical, so that no historical verification breaks. — A stranger can read the proposed format, its OID and its refusals in the draft before any code exists.
+
+**Review (recorded):**
+
+- Alignment: fixed
+- Acceptance verdicts:
+  - [x] docs/design/identity/CAPABILITY-CLAIM.md exists, and its second-level headings, read in order, are exactly: Transport, Assertion, Encoding, Issuer key identifier, Scope, Verifier check, Rendering consumer, Revocation, Issuer and anchor, Status. — grep '^## ' prints Transport|Assertion|Encoding|Issuer key identifier|Scope|Verifier check|Rendering consumer|Revocation|Issuer and anchor|Status, in that order.
+  - [x] The draft contains each of the literal strings `lys/agent-capability/v1`, `1.3.6.1.4.1.66364.2.1`, `2.5.29.35`, `RFC 7093`, `verify_agent_capability`, `certificate_chain_invalid`, `issuer_key_mismatch`, `claim_version_unknown`, `claim_malformed`, `claim_holder_mismatch`, `claim_grant_mismatch` and `certificate expired`, and contains neither `claim_expired` nor `claim_not_yet_valid`. — grep -cF counts 3,4,3,1,3,2,1,2,2,1,1,1; claim_expired 0; claim_not_yet_valid 0.
+  - [x] The draft's hex vector for the fixture claim (holder id `agent-01`; grant `grant-01` with not-before 1800000000 and not-after 1800086400; grant `grant-02` with not-before 1800000000 and not-after 1802592000) is exactly a301776c79732f6167656e742d6361706162696c6974792f763102686167656e742d30310382a301686772616e742d3031021a6b49d200031a6b4b2380a301686772616e742d3032021a6b49d200031a6b715f00 (84 bytes). — The hex is present (grep -cF 1). My own Python CBOR encoder produced these exact 84 bytes.
+  - [x] The draft's hex vector for the claim of holder `agent-01` listing no grant is exactly a301776c79732f6167656e742d6361706162696c6974792f763102686167656e742d30310380 (38 bytes), and its hex vector for the claim of holder `agent-01` listing only grant `grant-01` with not-before 1800000000 and no end is exactly a301776c79732f6167656e742d6361706162696c6974792f763102686167656e742d30310381a201686772616e742d3031021a6b49d200 (55 bytes). — Both are present (grep -cF 1 each). My own encoder output 38 and 55 bytes identical to them.
+  - [x] The draft's hex Authority Key Identifier extension value for the Ed25519 issuer key derived from the 32-byte seed of 0x07 bytes is exactly 30168014324be2dea8bc44461b0233e51fa48902ed6b1cc6 (24 bytes), whose last 20 bytes are the first 20 bytes of the SHA-256 of that key's 44-byte DER SubjectPublicKeyInfo, and the draft states that this issuer-key fingerprint is new and is not the SHA-256 of a certificate's DER. — The hex is present. OpenSSL 3.6 `pkey -pubout -outform DER` on the 0x07 seed, piped to shasum -a 256, gives a hash beginning 324be2dea8bc44461b0233e51fa48902ed6b1cc6. CAPABILITY-CLAIM.md:155 says 'The issuer-key fingerprint is new, defined here. It is not lys's existing' certificate fingerprint.
+  - [x] `git diff --numstat` of docs/design/WIRE-FORMATS.md against the brief's base commit reports 4 added lines and 2 deleted lines, the deleted lines being the opening paragraph's line and the paragraph under the decision log at the base commit. — `git diff --numstat 14e834a` prints '4 2 docs/design/WIRE-FORMATS.md'. The removed lines are line 3 ('> **Why this document exists.**') and the 'Ratified decisions get their status flipped' paragraph.
+  - [x] docs/design/WIRE-FORMATS.md contains the sentence `Ratification is a deliberate decision of the owning lead with a second reader, recorded on the card with both names and the reasons and in the decision log at the bottom of this file, never inferred from a build going green.` and does not contain `Ratification is a deliberate human decision`. — grep -cF prints 1 for the new sentence and 0 for the old one.
+  - [x] docs/design/WIRE-FORMATS.md contains `ratification remains a decision of the owning lead with a second reader, recorded on the card with both names and the reasons, never inferred from a build going green.` and does not contain `ratification remains a recorded human decision`. — grep -cF prints 1 for the new phrase and 0 for the old one.
+  - [x] The rows D1 to D6 of docs/design/WIRE-FORMATS.md's decision log are byte-identical to the base commit's. — `git diff -U0 14e834a` shows no -/+ line matching '^[-+]| D[1-6] ' (count 0).
+  - [x] The line added after the not-started paragraph of docs/design/WIRE-FORMATS.md contains `docs/design/identity/CAPABILITY-CLAIM.md`. — WIRE-FORMATS.md:44 is the '> **Proposed 2026-09-27 (DIRECTORY-031):**' line. It follows 'and how it is revoked.' and contains the path.
+  - [x] docs/design/WIRE-FORMATS.md's decision log gains exactly one row containing `lys/agent-capability/v1`; that row contains `1.3.6.1.4.1.66364.2.1` and `PROPOSED` and does not contain `RATIFIED`, and its D number is one more than the highest D number the log held at the base commit. — Exactly one '| D' row contains lys/agent-capability/v1. It is D7 (the base log ended at D6), carries the OID and PROPOSED, and has no RATIFIED.
+  - [x] `git diff --numstat` of docs/PEN-REGISTRATION.md against the brief's base commit reports 1 added line and 1 deleted line; the deleted line is the sub-arc table's row whose first cell is .2, the added line is that row rewritten, whose first cell is still .2, it contains `.2.1`, `lys/agent-capability/v1`, `family arc` and `which issuer vouched, runtime identity, session binding`, and its last cell reads exactly `Reserved`, as the deleted row's did; and `git diff --stat` against the base commit for crates/ prints nothing. — numstat is '1 1'. The -/+ rows both start '| `.2` |' and end '| Reserved |', and the + row carries all four strings. `git diff --stat 14e834a -- crates/` prints 0 lines.
+- Checklist verified: C249
+- Issues:
+  - The design leg failed as measured: DIRECTORY-031.md was stale again because the workflow wrote the round's dev and review blocks into DIRECTORY-031.json after the developer re-rendered. gate.sh exited 1 with 'rendered markdown differs … DIRECTORY-031.md'. The chain must re-render the cluster after it writes the blocks, or this recurs every round.
+  - S114 is not satisfied by R1 alone. It needs R2's attack and R3's ratification.
+- Fixes:
+  - Re-ran python3 scripts/design/render-cluster.py docs/design/directory. A second render is byte-identical, validate and check-coverage are clean, and sh scripts/design/gate.sh now exits 0.
+
 ### R2: Attack the draft before ratification is asked for
 
 WHEN R1's draft is complete, THE SYSTEM SHALL have it reviewed adversarially by a party other than its author, before ratification is asked for, and record the review in docs/design/identity/CAPABILITY-CLAIM-REVIEW.md with the commit of the draft it reviewed. The review SHALL hold at least the following entries, building each attack as concrete bytes against the draft and naming the draft's refusal that defeats it, and SHALL enter any further attack its reviewer builds in the same way: forgery (a claim in a certificate not signed by any key of the verifier's set); cross-format confusion (the operator JSON `{"role":"admin"}`, as `lys ca issue --claims` embeds it, placed under 1.3.6.1.4.1.66364.2.1; a v1 claim's bytes placed only under 1.3.6.1.4.1.66364.1; a lys/delegation/v1 artifact's bytes and a lys/attestation/v2 payload's bytes each placed under 1.3.6.1.4.1.66364.2.1); malleability (the fixture claim re-encoded with a grant's not-before in a longer integer form, and re-encoded with its two grants in the other order and with one grant listed twice, and a grant with no end re-encoded with key 3 present as null); field transposition (the holder id placed as a listed grant id and a grant id placed as the holder id); issuer substitution (an Authority Key Identifier naming a second trusted issuer key inside a certificate signed by the first, a certificate carrying no Authority Key Identifier, and an Authority Key Identifier whose keyIdentifier is the full 32-byte SHA-256 of the signing key's SubjectPublicKeyInfo); downgrade (a content type naming lys/agent-capability/v0, and a map with key 1 absent); replay (a valid claim for one agent presented in a certificate whose subject is another agent, and a valid claim presented for a grant it does not list); expiry (an instant one second past the certificate's own notAfter); and timing oracle (for each comparison verify_agent_capability makes, the Authority Key Identifier against the signing key's fingerprint, the holder against the subject, the grant acted under against the listed grant ids and the instant against the certificate's own window, either a timing attack built as bytes and the refusal or property that defeats it, or the statement, with its reason, that both operands are public so the comparison exposes no secret to time; and the same for the signature check, which is lys-core's unchanged verify_certificate_chain_at). IF an attack succeeds against the draft, THEN THE SYSTEM SHALL amend the draft and repeat that attack against the amended draft, and SHALL NOT ask for ratification while any attack stands. The review SHALL NOT be written by the draft's author, SHALL NOT be a light-model pass, and SHALL NOT change code.
@@ -91,6 +132,31 @@ WHEN R1's draft is complete, THE SYSTEM SHALL have it reviewed adversarially by 
 
 **Stories:**
 - S114 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a stranger verifying lys artifacts, I want the capability claim format specified, attacked and ratified before anything is signed under it, with every shipped format left byte-identical, so that no historical verification breaks.
+
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Not done. The review needs a committed draft to cite by commit id, and a reviewer who is not the draft's author.
+- Deviation: Blocked on two things. First, the draft reaches a commit only through the chain (src_pr, src_land), and this round forbids me from committing. Second, the review must be written by a party other than the draft's author. I wrote the draft, and a subagent of this session is the same party, so writing CAPABILITY-CLAIM-REVIEW.md here would fail the acceptance. The fix is the chain landing R1 and then dispatching the review to an independent reviewer.
+- Checklist delivery:
+  - [ ] C250 — docs/design/identity/CAPABILITY-CLAIM-REVIEW.md records an adversarial review of the draft by a party other than its author, holding at least the forgery, cross-format confusion, malleability, transposition, issuer substitution, downgrade, replay and expiry attacks, each built as bytes and defeated by a named refusal of the draft, and a timing-oracle entry that, for each comparison the verifier makes, builds a timing attack and names what defeats it or states why both operands are public. — Waiting for the draft to land and for an independent reviewer.
+- Story delivery:
+  - [ ] S114 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a stranger verifying lys artifacts, I want the capability claim format specified, attacked and ratified before anything is signed under it, with every shipped format left byte-identical, so that no historical verification breaks. — No review yet.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] docs/design/identity/CAPABILITY-CLAIM-REVIEW.md names its reviewer and the draft's author, and the two are different parties. — The file does not exist.
+  - [ ] The review holds at least these nineteen named entries: forgery; operator JSON under 1.3.6.1.4.1.66364.2.1; a v1 claim only under .1; lys/delegation/v1 bytes; lys/attestation/v2 payload bytes; malleability by integer form; malleability by grant order; malleability by a grant listed twice; malleability by a null end; transposition; Authority Key Identifier naming another trusted key; Authority Key Identifier absent; Authority Key Identifier of 32 bytes; downgrade to v0; downgrade by absent key 1; replay under another agent's certificate; replay for an unlisted grant; expiry one second past the certificate's notAfter; timing oracle. Each entry but the timing oracle carries its attack bytes in hex and the name of the draft's refusal that defeats it. — No review file exists.
+  - [ ] The timing-oracle entry names each of the four comparisons verify_agent_capability makes (Authority Key Identifier against the signing key's fingerprint, holder against subject, grant acted under against the listed grant ids, instant against the certificate's own window) and the signature check, and for each either carries a timing attack's bytes in hex with what defeats it, or states that both operands are public values and gives the reason. — No review file exists.
+  - [ ] Every entry of the review, each of the nineteen named entries and any further entry its reviewer adds, records the outcome `defeated`, and no entry records any other outcome. — No review file exists.
+  - [ ] The review records a commit id, and docs/design/identity/CAPABILITY-CLAIM.md at that commit is byte-identical to the draft at the commit where the review lands. — The draft is untracked ('?? docs/design/identity/CAPABILITY-CLAIM.md'), so no commit of it exists.
+- Issues:
+  - Land R1's draft through the chain (src_pr, src_land) so that a commit of docs/design/identity/CAPABILITY-CLAIM.md exists.
+  - Have a party other than the draft's author write docs/design/identity/CAPABILITY-CLAIM-REVIEW.md. It must name both parties and record the draft's commit id. It must hold the nineteen named entries, each with its attack hex and the refusal that defeats it, and a timing-oracle entry covering the four comparisons and the signature check. Every outcome must be `defeated`.
 
 ### R3: Record the format's ratification in the decision log and the register's .2 row
 
@@ -113,6 +179,33 @@ WHEN the ratification of lys/agent-capability/v1 and of its OID 1.3.6.1.4.1.6636
 
 **Stories:**
 - S114 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a stranger verifying lys artifacts, I want the capability claim format specified, attacked and ratified before anything is signed under it, with every shipped format left byte-identical, so that no historical verification breaks.
+
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Not done. The D7 and .2 status flips wait for the landed review and a recorded ratification.
+- Deviation: Blocked. The check `git show origin/main:docs/design/identity/CAPABILITY-CLAIM-REVIEW.md` exits 128, and the card records no ratification by the owning lead with a second reader. The boundaries forbid flipping to RATIFIED or `In use (.2.1)` before then. D7 still reads PROPOSED and the .2 row still reads Reserved.
+- Checklist delivery:
+  - [ ] C251 — Once the owning lead and a second reader have ratified lys/agent-capability/v1 on the card, the format's row in docs/design/WIRE-FORMATS.md's decision log reads RATIFIED with the date, both names and the reasons the card records, and the .2 row of docs/PEN-REGISTRATION.md reads In use (.2.1), with no other line of either file changed. — Waiting for R2 and the ratification record.
+- Story delivery:
+  - [ ] S114 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a stranger verifying lys artifacts, I want the capability claim format specified, attacked and ratified before anything is signed under it, with every shipped format left byte-identical, so that no historical verification breaks. — The format is not ratified.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] `git diff --numstat` of docs/design/WIRE-FORMATS.md between R3's commit and its parent reports 1 added line and 1 deleted line; the deleted line is the decision-log row containing `lys/agent-capability/v1` and `PROPOSED`; the added line has the same D number, contains `lys/agent-capability/v1`, `1.3.6.1.4.1.66364.2.1` and `RATIFIED`, does not contain `PROPOSED`, and contains the date, the two ratifiers' names and their reasons as the card records them; every cell of the added row other than its status cell is byte-identical to the deleted row's. — No R3 commit exists, and D7 reads PROPOSED.
+  - [ ] At R3's commit, `git show <commit>:docs/design/WIRE-FORMATS.md | grep -c -E '^\| D[0-9]+ \|.*lys/agent-capability/v1.*RATIFIED'` prints 1, and the same command with PROPOSED in place of RATIFIED prints 0. — No R3 commit exists.
+  - [ ] The rows D1 to D6 of docs/design/WIRE-FORMATS.md's decision log at R3's commit are byte-identical to its parent's. — No R3 commit exists.
+  - [ ] `git diff --numstat` of docs/PEN-REGISTRATION.md between R3's commit and its parent reports 1 added line and 1 deleted line; the deleted line is the sub-arc table's row whose first cell is .2 and whose last cell reads exactly `Reserved`; the added line's first cell is .2, its last cell reads exactly `In use (.2.1)`, and every cell other than the last is byte-identical to the deleted row's; `git show <commit>:docs/PEN-REGISTRATION.md | grep -c -F '| In use (.2.1) |'` prints 1. — No R3 commit exists. The .2 row reads Reserved.
+  - [ ] `git diff --stat` between R3's commit and its parent names only docs/design/WIRE-FORMATS.md and docs/PEN-REGISTRATION.md. — No R3 commit exists.
+  - [ ] At R3's parent, `git show <parent>:docs/design/identity/CAPABILITY-CLAIM-REVIEW.md` exits 0, and the review at that commit has no entry whose outcome is other than `defeated`. — The review does not exist.
+- Issues:
+  - Land R2's review with every entry defeated.
+  - Obtain the ratification of lys/agent-capability/v1 by the owning lead with a second reader, recorded on the card with both names, the date and the reasons.
+  - Then, in one commit touching only WIRE-FORMATS.md and PEN-REGISTRATION.md, flip D7's status to RATIFIED and the .2 row's status to `In use (.2.1)`.
 
 ### R4: Define the typed claim and its strict encoding in lys-identity
 
@@ -142,6 +235,31 @@ Define in crates/lys-identity/src/capability/claim.rs the claim of lys/agent-cap
 **Stories:**
 - S113 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want to read from an agent's certificate what it was granted at issuance and have a holder, a grant or an instant outside that refused, so that a signed claim is never taken as checked when nothing checked it.
 
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Not done.
+- Deviation: Blocked on R3. At origin/main 412bc52, the grep for a D row with lys/agent-capability/v1 and RATIFIED prints 0. The boundaries also forbid signing or freezing anything under the format before ratification. DIRECTORY-006's grants/types.rs and the lys-identity crate now exist on main, so R3 is the only blocker left for R4.
+- Checklist delivery:
+  - [ ] C252 — lys-identity encodes the claim of holder id and every grant held at issuance, each with its grant id and its window as it stood then, the list empty when the agent held none and a grant's end absent when it has none, to the vectors pinned in the draft, refuses every non-canonical, unordered, duplicated, unknown-member, missing-member and trailing-byte payload with claim_malformed, and refuses another content type with claim_version_unknown. — Waiting for R3.
+- Story delivery:
+  - [ ] S113 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want to read from an agent's certificate what it was granted at issuance and have a holder, a grant or an instant outside that refused, so that a signed claim is never taken as checked when nothing checked it. — No codec yet.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] Encoding the fixture claim (holder id `agent-01`; grant `grant-01` with not-before 1800000000 and not-after 1800086400; grant `grant-02` with not-before 1800000000 and not-after 1802592000) yields exactly the hex a301776c79732f6167656e742d6361706162696c6974792f763102686167656e742d30310382a301686772616e742d3031021a6b49d200031a6b4b2380a301686772616e742d3032021a6b49d200031a6b715f00; the test holds that hex as a literal and does not import it from the crate. — crates/lys-identity does not exist.
+  - [ ] Encoding the fixture claim built with its grants given in the order grant-02, grant-01 yields the same hex, and decoding that vector returns a claim equal to the fixture claim. — Not implemented.
+  - [ ] Encoding the claim of holder `agent-01` listing no grant yields exactly the hex a301776c79732f6167656e742d6361706162696c6974792f763102686167656e742d30310380, and encoding the claim of holder `agent-01` listing only grant `grant-01` with not-before 1800000000 and no end yields exactly the hex a301776c79732f6167656e742d6361706162696c6974792f763102686167656e742d30310381a201686772616e742d3031021a6b49d200; decoding each returns a claim equal to the one encoded, the first listing no grant and the second's grant-01 having no end; the test holds both hex literals itself. — Not implemented.
+  - [ ] Thirteen malformed inputs are each refused with claim_malformed: the bytes 7b7d (JSON `{}`), the vector with keys 1 and 2 in the order 2, 1, grant-01's not-before 1800000000 written in the 9-byte form 1b000000006b49d200, an indefinite-length map (first byte bf), an added top-level key 4, key 3 absent, key 1 absent, one trailing byte 00, grant-01's not-after equal to its not-before, the two grants in the order grant-02, grant-01, grant-01 listed twice, an added key 4 in grant-01's entry, and the open-ended vector with key 3 written as null (a301776c79732f6167656e742d6361706162696c6974792f763102686167656e742d30310381a301686772616e742d3031021a6b49d20003f6); the test asserts that thirteen claim_malformed cases ran. — Not implemented.
+  - [ ] The vector with content type lys/agent-capability/v2 and the vector with content type lys/agent-capability/v0 are each refused with claim_version_unknown, and each message contains its content type; the test asserts two claim_version_unknown cases ran. — Not implemented.
+  - [ ] A drift injection that removes only the grant-order check makes exactly one test fail, the malformed-input test, on its out-of-order case. — Not implemented.
+- Issues:
+  - Once R3's ratification, DIRECTORY-003 and DIRECTORY-006 R1 are on main, implement the claim type and its strict encoder and decoder in crates/lys-identity. Include the literal-hex vector tests, the 13 claim_malformed cases, the 2 claim_version_unknown cases and the grant-order drift injection.
+
 ### R5: Enrol one Ed25519 public key per agent beside its agent record
 
 WHEN the admitted operator (DIRECTORY-003 R3) calls POST /identity/agents/{agent_id}/key with one Ed25519 public key for a registered agent that has no enrolled key, THE SYSTEM SHALL enrol that key as the agent's one public key, keyed by the agent's directory id and held beside the agent record in the directory's store, as one signed directory event of kind agent_key_enrolled naming the agent and the key, committed before the call returns (P4, P5). IF the caller is not admitted, the agent id names no registered agent, the key is not a valid 32-byte Ed25519 public key, or the agent already has an enrolled key, THEN THE SYSTEM SHALL refuse with not_admitted, agent_not_registered, invalid_agent_key or agent_key_already_enrolled respectively, record no event and leave any enrolled key unchanged. The enrol route SHALL NOT overwrite an enrolled key, SHALL NOT accept private key material, and SHALL NOT change the files of DIRECTORY-003's agent record; THE SYSTEM SHALL NOT take an agent's key from a certificate-signing request or from any issuance call.
@@ -168,6 +286,31 @@ WHEN the admitted operator (DIRECTORY-003 R3) calls POST /identity/agents/{agent
 
 **Stories:**
 - S115 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want my agent issued one certificate listing the grants it holds and naming its holder, against a key enrolled for it, so that it carries proof of those grants from its first spawn and a lost key or an expired certificate can be replaced.
+
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Not done.
+- Deviation: Blocked. The brief's own DIRECTORY-003 execution-record check at origin/main prints 'not landed at 412bc5234c2eaff103a77c724094c148b9436a5a' and exits 1. The card branch is also based on 7b53625, which has none of the identity crates.
+- Checklist delivery:
+  - [ ] C253 — The operator enrols one Ed25519 public key per agent, keyed by the agent's directory id and held beside the agent record, once, as one signed directory event; a second enrolment is refused and no key is taken from an issuance call. — Waiting for DIRECTORY-003's execution record to read landed.
+- Story delivery:
+  - [ ] S115 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want my agent issued one certificate listing the grants it holds and naming its holder, against a key enrolled for it, so that it carries proof of those grants from its first spawn and a lost key or an expired certificate can be replaced. — No enrolment yet.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] For a registered agent agent-01 with no enrolled key, the admitted operator's enrol call with the 32-byte Ed25519 public key K1 makes the directory's enrolled key for agent-01 read K1 and adds exactly one event to the directory, an event of kind agent_key_enrolled naming agent-01 and K1; after reopening the directory, the enrolled key still reads K1. — No lys-identity crate or directory service exists.
+  - [ ] A second enrol call for agent-01 with the key K2 refuses with agent_key_already_enrolled, records no event, and the enrolled key for agent-01 still reads K1. — Not implemented.
+  - [ ] An enrol call by an unauthenticated caller refuses with not_admitted and records no event. — Not implemented.
+  - [ ] An enrol call for agent-99, which is not registered, refuses with agent_not_registered and records no event. — Not implemented.
+  - [ ] An enrol call for registered agent agent-02 with a 31-byte key refuses with invalid_agent_key, records no event, and agent-02 still has no enrolled key; the test asserts four refusal cases ran across this line and the three before it. — Not implemented.
+  - [ ] A drift injection that removes only the already-enrolled check makes exactly one test fail, the second-enrol case. — Not implemented.
+- Issues:
+  - Once DIRECTORY-003 (agent record, admitted operator, signed event envelope) is on main, implement key enrolment with its event, its four refusals and the drift injection.
 
 ### R6: Issue an enduring agent its certificate through the directory's issuance route, under an issuer key in the service's custody, and log it as an issuance leaf
 
@@ -215,6 +358,47 @@ THE SYSTEM SHALL hold the directory's issuer key only inside the directory servi
 **Stories:**
 - S115 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want my agent issued one certificate listing the grants it holds and naming its holder, against a key enrolled for it, so that it carries proof of those grants from its first spawn and a lost key or an expired certificate can be replaced.
 
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Not done.
+- Deviation: Blocked on R4 and R5, and on DIRECTORY-013. crates/lys-identity/src/revocation/append.rs and fold.rs are absent at origin/main. deploy/identity/config.example.toml is now present on main.
+- Checklist delivery:
+  - [ ] C254 — When the operator calls the directory's issuance route with an active agent's certificate-signing request, the directory issues that enduring agent a certificate, subject its directory id, carrying exactly one lys/agent-capability/v1 claim listing every grant it holds at issuance, an empty list when it holds none, under an issuer key held in the service's custody and named in the certificate's Authority Key Identifier by its 20-byte issuer-key fingerprint so that `openssl verify -CAfile` finds the issuer, for the window asked for or the configured default of 30 days and never past the configured maximum of 90 days, appended to the certificate log as the revocation card's issuance leaf, as one directory event naming the certificate it follows; it refuses an agent that is not active, an agent holding a current certificate, one not expired, not under a replaced key and not held revoked by the revocation fold (naming it and its expiry), an agent with no enrolled key (agent_key_not_enrolled), a request whose key does not match the enrolled key (key_mismatch) and an issuance whose leaf is not appended; nothing issues when a grant is given. — Waiting for R4, R5 and DIRECTORY-013.
+- Story delivery:
+  - [ ] S115 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want my agent issued one certificate listing the grants it holds and naming its holder, against a key enrolled for it, so that it carries proof of those grants from its first spawn and a lost key or an expired certificate can be replaced. — No issuance yet.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] Reading a 32-byte seed file with mode 0600 yields an issuer whose public key equals the Ed25519 public key the test derives from those 32 bytes itself. — Not implemented.
+  - [ ] A file with mode 0640 refuses with issuer_key_permissions, a file with mode 0604 refuses with issuer_key_permissions, a 31-byte file with mode 0600 refuses with issuer_key_length, and a missing path refuses with issuer_key_missing; each message contains the path and not the seed's hex, and the test asserts four refusal cases ran. — Not implemented.
+  - [ ] The Debug output of the loaded issuer and of each of the four refusals contains neither the seed's lowercase hex nor its standard base64. — Not implemented.
+  - [ ] An active agent agent-01 holding grants grant-01 and grant-02, whose enrolled key is the key of a certificate-signing request with common name agent-01, issued through POST /identity/agents/agent-01/certificate by the admitted operator asking for lifetime 86400, shorter than the default, returns a certificate whose subject common name is agent-01, which lys-core's verify_certificate_chain_at accepts at its own notBefore plus 60 seconds against the directory's issuer public key, whose notAfter minus its notBefore is 86400 seconds, whose extension under 1.3.6.1.4.1.66364.2.1 decodes with R4 to holder agent-01 listing grant-01 and grant-02, each with the time window the directory records for it, whose extension under 2.5.29.35 is non-critical and whose value is 30168014 followed by the first 20 bytes of the SHA-256 of the directory issuer key's DER SubjectPublicKeyInfo, which the test computes itself from that key's public bytes, and which carries no extension under 1.3.6.1.4.1.66364.1; the directory records exactly one issuance event, of kind agent_certificate_issued, naming agent-01 and the SHA-256 of the returned DER. — Not implemented.
+  - [ ] The certificate log after that call holds exactly one more leaf than before, an issuance leaf whose certificate DER is the returned DER byte for byte; DIRECTORY-013's fold over the log holds that certificate issued and not revoked; and after a revocation leaf for it is appended with DIRECTORY-013's append under the directory's issuing identity, the fold holds it revoked. — Not implemented.
+  - [ ] Writing that certificate and the directory issuer's lys-core issuer_certificate_der each as PEM, `openssl verify -CAfile` with the issuer certificate on the agent certificate exits 0, and `openssl x509 -text` on the agent certificate prints an Authority Key Identifier whose hex equals the Subject Key Identifier it prints for the issuer certificate. — Not implemented.
+  - [ ] The configuration example deploy/identity/config.example.toml names the issuer key file's path, the certificate log's path, the default lifetime 2592000 and the maximum lifetime 7776000, and contains no 64-character hexadecimal string. — deploy/ does not exist.
+  - [ ] For active agent agent-08, holding no grant, with an enrolled key and no certificate, a call with no lifetime asked for returns a certificate whose extension under 1.3.6.1.4.1.66364.2.1 decodes with R4 to holder agent-08 listing no grant, and records one issuance event. — Not implemented.
+  - [ ] For active agent agent-09, holding only grant grant-09 whose window the directory records with a start and no end, with an enrolled key and no certificate, a call returns a certificate whose extension under 1.3.6.1.4.1.66364.2.1 decodes with R4 to holder agent-09 listing grant-09 with that start and no end. — Not implemented.
+  - [ ] With the shipped configuration, issuing to active agent agent-05, holding grant grant-05 with an enrolled key and no certificate, with no lifetime asked for returns a certificate whose notAfter minus its notBefore is 2592000 seconds. — Not implemented.
+  - [ ] For active agent agent-06, holding grant grant-06 with an enrolled key and no certificate, a call asking for lifetime 7776001 refuses with lifetime_above_maximum, whose message contains `7776000`, returns no certificate bytes, appends no leaf and records no event, and a following call for agent-06 asking for lifetime 7776000 returns a certificate whose notAfter minus its notBefore is 7776000 seconds. — Not implemented.
+  - [ ] Calling the route for agent-01 while registered, while suspended and while retired each refuses with agent_not_active, returns no certificate bytes and leaves the directory's event count and the certificate log's leaf count unchanged; the test asserts three cases ran. — Not implemented.
+  - [ ] For active agent agent-04 holding grant grant-04 with no enrolled key, a call with a request whose common name is agent-04 refuses with agent_key_not_enrolled, whose message contains `enrol the agent's key first`, returns no certificate bytes, appends no leaf and records no event. — Not implemented.
+  - [ ] A request with common name agent-01 signed by an Ed25519 key other than agent-01's enrolled key refuses with key_mismatch, returns no certificate bytes, appends no leaf and records no event. — Not implemented.
+  - [ ] A second call for agent-01 with the injected clock at the first certificate's notBefore plus 3600 seconds refuses with agent_certificate_current, whose message contains the first certificate's SHA-256 in lowercase hex and its notAfter in decimal seconds since the Unix epoch, returns no certificate bytes and leaves one issuance event and one issuance leaf. — Not implemented.
+  - [ ] A call for agent-01 with the injected clock at the first certificate's notAfter plus one second issues a new certificate, and its issuance event names the first certificate's SHA-256 as the certificate it follows. — Not implemented.
+  - [ ] For active agent agent-07, holding grant grant-07 with an enrolled key and a current certificate, after a revocation leaf for that certificate is appended with DIRECTORY-013's append under the directory's issuing identity, a call for agent-07 with the injected clock at that certificate's notBefore plus 3600 seconds issues a new certificate, and its issuance event names the revoked certificate's SHA-256 as the certificate it follows. — Not implemented.
+  - [ ] A request with common name agent-02 presented for agent-01 refuses with request_subject_mismatch; lifetime 0 refuses with lifetime_invalid; an unauthenticated caller refuses with not_admitted; each appends no leaf and records no event. — Not implemented.
+  - [ ] Granting grant-01 to active agent agent-03, which has an enrolled key and no certificate, records no issuance event, appends no leaf and issues no certificate. — Not implemented.
+  - [ ] A failure injected at the certificate log's append refuses with issuance_leaf_not_appended and no certificate bytes, and after reopening, the directory holds no issuance event for that call. — Not implemented.
+  - [ ] A failure injected at the issuance event's commit refuses with issuance_not_recorded and no certificate bytes, and after reopening, the directory holds no issuance event for that call. — Not implemented.
+  - [ ] A drift injection that removes only the current-certificate check makes exactly one test fail, the second-call case. — Not implemented.
+- Issues:
+  - Once R4, R5, DIRECTORY-013 (issuance leaf, append, fold) and DIRECTORY-002's deploy/identity/config.example.toml are on main, implement issuer key loading, the issuance route, the issuance leaf and event, every listed refusal, the openssl interop check and the drift injection.
+
 ### R7: Replace an enrolled key by an audited act that is never an overwrite
 
 WHEN the admitted operator calls POST /identity/agents/{agent_id}/key/replacement naming the agent's enrolled key as the old key and one Ed25519 public key as the new key, THE SYSTEM SHALL make the new key the agent's enrolled key as one signed directory event of kind agent_key_replaced naming the agent, the old key and the new key, committed before the call returns (P4, P5), keeping the enrolment event and every earlier replacement event in the directory's history; from that event on, a certificate whose subject public key is the old key is not current, so issuance for the agent proceeds (R6). IF the caller is not admitted, the agent has no enrolled key, the new key is not a valid 32-byte Ed25519 public key, or the named old key is not the enrolled key, THEN THE SYSTEM SHALL refuse with not_admitted, agent_key_not_enrolled, invalid_agent_key or key_replacement_mismatch respectively, record no event and leave the enrolled key unchanged. THE SYSTEM SHALL NOT replace a key through the enrol route, SHALL NOT delete or rewrite the enrolment event or an earlier replacement event, and SHALL NOT accept private key material.
@@ -241,6 +425,31 @@ WHEN the admitted operator calls POST /identity/agents/{agent_id}/key/replacemen
 
 **Stories:**
 - S115 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want my agent issued one certificate listing the grants it holds and naming its holder, against a key enrolled for it, so that it carries proof of those grants from its first spawn and a lost key or an expired certificate can be replaced.
+
+#### R7 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Not done.
+- Deviation: Blocked on R5 and R6.
+- Checklist delivery:
+  - [ ] C255 — Replacing an agent's enrolled key is one audited directory event naming the old and new key, never an overwrite; an old key that is not the enrolled one is refused with key_replacement_mismatch, and a certificate under the replaced key is no longer current. — Waiting for R5 and R6.
+- Story delivery:
+  - [ ] S115 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want my agent issued one certificate listing the grants it holds and naming its holder, against a key enrolled for it, so that it carries proof of those grants from its first spawn and a lost key or an expired certificate can be replaced. — No key replacement yet.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] For agent-01 enrolled with K1, a replacement call naming old key K1 and new key K2 makes the enrolled key read K2 and adds exactly one event of kind agent_key_replaced naming agent-01, K1 and K2; after reopening the directory, the enrolled key reads K2 and the enrolment event naming K1 is still in its history. — Not implemented.
+  - [ ] A replacement call for agent-01 naming old key K3, which is not its enrolled key, refuses with key_replacement_mismatch, records no event and leaves the enrolled key unchanged. — Not implemented.
+  - [ ] A replacement call for registered agent agent-02, which has no enrolled key, refuses with agent_key_not_enrolled and records no event. — Not implemented.
+  - [ ] A replacement call by an unauthenticated caller refuses with not_admitted, and one naming a 31-byte new key refuses with invalid_agent_key; each records no event, and the test asserts four refusal cases ran across this line and the two before it. — Not implemented.
+  - [ ] For active agent agent-01 holding grant grant-01 and a current certificate issued under K1 with lifetime 86400, after the replacement from K1 to K2, an issuance call with the injected clock at that certificate's notBefore plus 3600 seconds and a request under K2 issues a certificate whose issuance event names the first certificate's SHA-256 as the certificate it follows, and an issuance call at the same instant with a request under K1 refuses with key_mismatch. — Not implemented.
+  - [ ] A drift injection that removes only the old-key comparison makes exactly one test fail, the K3 case. — Not implemented.
+- Issues:
+  - Once R5 and R6 exist, implement audited key replacement with its event, its four refusals, the re-issuance case and the drift injection.
 
 ### R8: Name verify_agent_capability and make it refuse what the claim does not cover
 
@@ -275,6 +484,42 @@ WHEN verify_agent_capability is given a certificate's DER, a set of trusted issu
 
 **Stories:**
 - S113 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want to read from an agent's certificate what it was granted at issuance and have a holder, a grant or an instant outside that refused, so that a signed claim is never taken as checked when nothing checked it.
+
+#### R8 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Not done.
+- Deviation: Blocked on R3, R4 and R6. `git diff --stat 14e834a -- crates/` still prints nothing, so crates/lys-core and crates/lys are untouched.
+- Checklist delivery:
+  - [ ] C256 — verify_agent_capability finds the signing key in a set of trusted issuer keys before it reads the claim and refuses an Authority Key Identifier that is absent or names another key (issuer_key_mismatch), a malformed claim, an unknown version, a holder other than the subject, a grant the claim does not list, and an instant outside the certificate's own window, each by a named refusal, with the refusal legs counted; a listed grant's window is never checked as live. — Waiting for R3, R4 and R6.
+- Story delivery:
+  - [ ] S113 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want to read from an agent's certificate what it was granted at issuance and have a holder, a grant or an instant outside that refused, so that a signed claim is never taken as checked when nothing checked it. — No verifier yet.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] A certificate from the test anchor (an issuer identity built in the test from 32 bytes of 0x07, never in any configuration) for subject agent-01, issued with ttl 86400, carrying the fixture claim of R4 under 1.3.6.1.4.1.66364.2.1 and the Authority Key Identifier value 30168014324be2dea8bc44461b0233e51fa48902ed6b1cc6 under 2.5.29.35, verified at its own notBefore plus 60 seconds against the set holding only the test anchor's key, returns that claim for grant grant-01 and returns it for grant grant-02; call this the first certificate, and nb and na its own notBefore and notAfter as read from it. — verify_agent_capability does not exist.
+  - [ ] A test-anchor certificate like the first whose claim lists grant-01 with not-before 1 and not-after 1000, verified at nb+60 for grant grant-01, returns that claim, because a listed grant's window is never checked as live. — Not implemented.
+  - [ ] A certificate issued by R6's issuance function in crates/lys-identity/src/capability/issue.rs under the test anchor, for agent-01 holding grant-01, verified at its own notBefore plus 60 seconds against the set holding only the test anchor's key for grant grant-01, returns a claim whose holder is agent-01 and whose listed grant ids are exactly grant-01. — Not implemented.
+  - [ ] The first certificate verified against the set holding only another Ed25519 key refuses with certificate_chain_invalid, and so does the first certificate verified against the empty set, and so does a certificate from another key whose extensions under 2.5.29.35 and 1.3.6.1.4.1.66364.2.1 are each the single byte 00, proving neither extension was read. — Not implemented.
+  - [ ] A test-anchor certificate like the first whose Authority Key Identifier value is 301680143dba97edb866520d36063a0d9f79576893f3b130, the fingerprint of a second issuer key built in the test from 32 bytes of 0x09, verified at nb+60 against the set holding both keys, refuses with issuer_key_mismatch, and its message contains 324be2dea8bc44461b0233e51fa48902ed6b1cc6 and 3dba97edb866520d36063a0d9f79576893f3b130. — Not implemented.
+  - [ ] A test-anchor certificate like the first with no extension under 2.5.29.35 refuses with issuer_key_mismatch, and its message contains 324be2dea8bc44461b0233e51fa48902ed6b1cc6 and `absent`; one whose Authority Key Identifier value is 30228020324be2dea8bc44461b0233e51fa48902ed6b1cc671e7739af2551e0bfe68f54e, a 32-byte keyIdentifier, also refuses with issuer_key_mismatch. — Not implemented.
+  - [ ] A test-anchor certificate whose extension under 1.3.6.1.4.1.66364.2.1 is the operator JSON `{"role":"admin"}` refuses with claim_malformed, and so does one that carries a valid v1 claim only under 1.3.6.1.4.1.66364.1. — Not implemented.
+  - [ ] A test-anchor certificate whose claim carries content type lys/agent-capability/v2 refuses with claim_version_unknown, and its message contains `lys/agent-capability/v2`. — Not implemented.
+  - [ ] A test-anchor certificate with subject agent-01 whose claim names holder agent-02 refuses with claim_holder_mismatch, and its message contains `agent-01` and `agent-02`; a claim under subject agent-01 whose holder is `grant-01` and whose one listed grant id is `agent-01` also refuses with claim_holder_mismatch. — Not implemented.
+  - [ ] The first certificate verified at nb+60 for grant grant-03 refuses with claim_grant_mismatch, and its message contains `grant-03`, `grant-01` and `grant-02`. — Not implemented.
+  - [ ] The first certificate verified at na+1 refuses with certificate_chain_invalid, and its message contains `certificate expired`; verified at nb-1 it refuses with certificate_chain_invalid, and its message contains `certificate not yet valid`; the test asserts that fourteen refusal cases ran across this line and the seven before it and none was accepted. — Not implemented.
+  - [ ] Given the set holding the test anchor's key and the second issuer key built from 32 bytes of 0x09, a certificate from the test anchor and one from the second issuer, each for agent-01 listing grant-01 with an Authority Key Identifier naming its own signer, are each accepted at their own notBefore plus 60 seconds and return their claims, and a like certificate from a third issuer built from 32 bytes of 0x0b refuses with certificate_chain_invalid; the test asserts two acceptances and one refusal ran. — Not implemented.
+  - [ ] A test-anchor certificate like the first whose claim lists no grant, verified at nb+60 for grant grant-01, refuses with claim_grant_mismatch, and its message contains `grant-01`; one whose claim lists only grant-01 with not-before 1 and no end, verified at nb+60 for grant grant-01, returns that claim; the test asserts one refusal and one acceptance ran. — Not implemented.
+  - [ ] A drift injection that removes only the final check of the instant against the certificate's own window makes exactly one test fail, the expiry test holding the na+1 and nb-1 cases. — Not implemented.
+  - [ ] A drift injection that removes only the listed-grant check makes exactly one test fail, the grant-03 case. — Not implemented.
+  - [ ] A drift injection that removes only the comparison of a present keyIdentifier with the signing key's fingerprint makes exactly one test fail, the 0x09 Authority Key Identifier case. — Not implemented.
+  - [ ] `git diff --stat` against the brief's base commit for crates/lys-core and crates/lys prints nothing, and `cargo test --workspace --all-features` passes every existing lys-core wire-vector and conformance test unchanged. — The first half holds (`git diff --stat 14e834a -- crates/` prints nothing), and the workflow's tests leg exited 0. The row is still not met, because the verifier it belongs to does not exist.
+- Issues:
+  - Once R3, R4 and R6 exist, implement verify_agent_capability in crates/lys-identity with every listed acceptance and refusal case, the case-count assertions and the three drift injections.
 
 ## Boundaries
 

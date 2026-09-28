@@ -103,7 +103,129 @@
       ],
       "stories": [
         "S114"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/identity/CAPABILITY-CLAIM.md",
+            "change": "created",
+            "note": "The draft of lys/agent-capability/v1 under the proposed OID 1.3.6.1.4.1.66364.2.1. It covers the deterministic CBOR (keys 1 content type, 2 holder, 3 grants; each grant has 1 id and 2 not-before, and 3 not-after only when the window has an end; grants sorted by id, no duplicates) and the RFC 7093 method 1 Authority Key Identifier. It gives verify_agent_capability's refusal order and the pinned vectors. Unchanged this round."
+          },
+          {
+            "path": "docs/design/WIRE-FORMATS.md",
+            "change": "modified",
+            "note": "The two ratification sentences are replaced, a pointer to the draft is added, and a D7 PROPOSED row is added. D1 to D6 are byte-identical. Unchanged this round."
+          },
+          {
+            "path": "docs/PEN-REGISTRATION.md",
+            "change": "modified",
+            "note": "Only the .2 row changed. It now names .2.1 as proposed for lys/agent-capability/v1 and keeps its stated purpose, including 'allocated when the agent-identity design lands'. The status cell stays Reserved. Unchanged this round."
+          },
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-031.md",
+            "change": "modified",
+            "note": "Re-rendered from DIRECTORY-031.json after the workflow wrote this round's review blocks, so the design gate's byte comparison passes."
+          },
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-031.json",
+            "change": "modified",
+            "note": "Holds the dev and review blocks the workflow wrote. I did not edit it by hand."
+          }
+        ],
+        "how": "The draft states the claim format, its placement and its verifier's refusals as prose a second party can check against. It proposes .2.1 under the .2 family arc and leaves .1 and .2 themselves unused. In this round the design leg failed only because the rendered brief markdown lagged its JSON. Re-rendering it fixes the cause, and gate.sh exits 0.",
+        "deviation": "I ran scripts/design/render-cluster.py and scripts/design/gate.sh to fix the failed design leg and to confirm the fix. I also ran git fetch plus read-only git show and cat-file on origin/main to re-run the brief's blocked_by checks. I ran no cargo command and made no commit.",
+        "checklist": [
+          {
+            "id": "C249",
+            "done": true,
+            "note": "The draft is written and the pointers are added. The .2 row stays Reserved and D7 stays PROPOSED."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S114",
+            "satisfied": true,
+            "note": "A stranger can read the proposed format, its OID and its refusals in the draft before any code exists."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "fixed",
+        "acceptance": [
+          {
+            "criterion": "docs/design/identity/CAPABILITY-CLAIM.md exists, and its second-level headings, read in order, are exactly: Transport, Assertion, Encoding, Issuer key identifier, Scope, Verifier check, Rendering consumer, Revocation, Issuer and anchor, Status.",
+            "met": true,
+            "evidence": "grep '^## ' | paste prints Transport|Assertion|Encoding|Issuer key identifier|Scope|Verifier check|Rendering consumer|Revocation|Issuer and anchor|Status"
+          },
+          {
+            "criterion": "The draft contains each of the literal strings `lys/agent-capability/v1`, `1.3.6.1.4.1.66364.2.1`, `2.5.29.35`, `RFC 7093`, `verify_agent_capability`, `certificate_chain_invalid`, `issuer_key_mismatch`, `claim_version_unknown`, `claim_malformed`, `claim_holder_mismatch`, `claim_grant_mismatch` and `certificate expired`, and contains neither `claim_expired` nor `claim_not_yet_valid`.",
+            "met": true,
+            "evidence": "grep -cF counts 3,4,3,1,3,2,1,2,2,1,1,1; claim_expired 0, claim_not_yet_valid 0"
+          },
+          {
+            "criterion": "The draft's hex vector for the fixture claim (holder id `agent-01`; grant `grant-01` with not-before 1800000000 and not-after 1800086400; grant `grant-02` with not-before 1800000000 and not-after 1802592000) is exactly a301776c79732f6167656e742d6361706162696c6974792f763102686167656e742d30310382a301686772616e742d3031021a6b49d200031a6b4b2380a301686772616e742d3032021a6b49d200031a6b715f00 (84 bytes).",
+            "met": true,
+            "evidence": "grep -cF prints 1. My independent Python CBOR encoder outputs these same 84 bytes."
+          },
+          {
+            "criterion": "The draft's hex vector for the claim of holder `agent-01` listing no grant is exactly a301776c79732f6167656e742d6361706162696c6974792f763102686167656e742d30310380 (38 bytes), and its hex vector for the claim of holder `agent-01` listing only grant `grant-01` with not-before 1800000000 and no end is exactly a301776c79732f6167656e742d6361706162696c6974792f763102686167656e742d30310381a201686772616e742d3031021a6b49d200 (55 bytes).",
+            "met": true,
+            "evidence": "grep -cF prints 1 for each. My independent encoder outputs 38 and 55 bytes identical to them."
+          },
+          {
+            "criterion": "The draft's hex Authority Key Identifier extension value for the Ed25519 issuer key derived from the 32-byte seed of 0x07 bytes is exactly 30168014324be2dea8bc44461b0233e51fa48902ed6b1cc6 (24 bytes), whose last 20 bytes are the first 20 bytes of the SHA-256 of that key's 44-byte DER SubjectPublicKeyInfo, and the draft states that this issuer-key fingerprint is new and is not the SHA-256 of a certificate's DER.",
+            "met": true,
+            "evidence": "The hex is present. /opt/homebrew/bin/openssl pkey -pubout -outform DER | shasum -a 256 gives 324be2dea8bc44461b0233e51fa48902ed6b1cc6… CAPABILITY-CLAIM.md:155 reads 'The issuer-key fingerprint is new, defined here. It is not lys's existing…'"
+          },
+          {
+            "criterion": "`git diff --numstat` of docs/design/WIRE-FORMATS.md against the brief's base commit reports 4 added lines and 2 deleted lines, the deleted lines being the opening paragraph's line and the paragraph under the decision log at the base commit.",
+            "met": true,
+            "evidence": "git diff --numstat 14e834a prints '4 2 docs/design/WIRE-FORMATS.md'. The diff removes line 3 (the 'Why this document exists' line) and the 'Ratified decisions get their status flipped' paragraph."
+          },
+          {
+            "criterion": "docs/design/WIRE-FORMATS.md contains the sentence `Ratification is a deliberate decision of the owning lead with a second reader, recorded on the card with both names and the reasons and in the decision log at the bottom of this file, never inferred from a build going green.` and does not contain `Ratification is a deliberate human decision`.",
+            "met": true,
+            "evidence": "grep -cF prints 1 and 0"
+          },
+          {
+            "criterion": "docs/design/WIRE-FORMATS.md contains `ratification remains a decision of the owning lead with a second reader, recorded on the card with both names and the reasons, never inferred from a build going green.` and does not contain `ratification remains a recorded human decision`.",
+            "met": true,
+            "evidence": "grep -cF prints 1 and 0"
+          },
+          {
+            "criterion": "The rows D1 to D6 of docs/design/WIRE-FORMATS.md's decision log are byte-identical to the base commit's.",
+            "met": true,
+            "evidence": "git diff -U0 14e834a | grep -cE '^[-+]\\| D[1-6] ' prints 0"
+          },
+          {
+            "criterion": "The line added after the not-started paragraph of docs/design/WIRE-FORMATS.md contains `docs/design/identity/CAPABILITY-CLAIM.md`.",
+            "met": true,
+            "evidence": "In the diff hunk at line 44, the '> **Proposed 2026-09-27 (DIRECTORY-031):**' line follows 'and how it is revoked.' and contains the path."
+          },
+          {
+            "criterion": "docs/design/WIRE-FORMATS.md's decision log gains exactly one row containing `lys/agent-capability/v1`; that row contains `1.3.6.1.4.1.66364.2.1` and `PROPOSED` and does not contain `RATIFIED`, and its D number is one more than the highest D number the log held at the base commit.",
+            "met": true,
+            "evidence": "grep -E '^\\| D[0-9]+ \\|' | grep -c lys/agent-capability/v1 prints 1. The row is D7 (the base ended at D6), carries the OID and 'PROPOSED — 2026-09-27', and has no RATIFIED."
+          },
+          {
+            "criterion": "`git diff --numstat` of docs/PEN-REGISTRATION.md against the brief's base commit reports 1 added line and 1 deleted line; the deleted line is the sub-arc table's row whose first cell is .2, the added line is that row rewritten, whose first cell is still .2, it contains `.2.1`, `lys/agent-capability/v1`, `family arc` and `which issuer vouched, runtime identity, session binding`, and its last cell reads exactly `Reserved`, as the deleted row's did; and `git diff --stat` against the base commit for crates/ prints nothing.",
+            "met": true,
+            "evidence": "numstat prints '1 1'. Both the - and + rows start '| `.2` |' and end '| Reserved |', and the + row carries all four strings. git diff --stat 14e834a -- crates/ prints 0 lines."
+          }
+        ],
+        "checklist": [
+          "C249"
+        ],
+        "stories": [],
+        "issues": [
+          "The design leg failed as measured because DIRECTORY-031.md was stale against the JSON the workflow updated after the developer's render. gate.sh exited 1 with 'rendered markdown differs … DIRECTORY-031.md'. The chain must render the cluster after it writes the dev and review blocks, or this recurs every round.",
+          "S114 is not satisfied by R1 alone. It also needs R2's attack and R3's ratification."
+        ],
+        "fixes": [
+          "Ran python3 scripts/design/render-cluster.py docs/design/directory twice. The second render is byte-identical (cmp), validate and check-coverage exit 0, and sh scripts/design/gate.sh now exits 0."
+        ]
+      }
     },
     {
       "id": "R2",
@@ -128,7 +250,64 @@
       ],
       "stories": [
         "S114"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not done. The review needs a committed draft to cite by commit id, and a reviewer who is not the draft's author.",
+        "deviation": "Blocked on two things. First, the draft reaches a commit only through the chain (src_pr, src_land), and this round forbids me from committing. Second, the review must be written by a party other than the draft's author. I wrote the draft, and a subagent of this session is the same party, so writing CAPABILITY-CLAIM-REVIEW.md here would fail the acceptance. The fix is the chain landing R1 and then dispatching the review to an independent reviewer.",
+        "checklist": [
+          {
+            "id": "C250",
+            "done": false,
+            "note": "Waiting for the draft to land and for an independent reviewer."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S114",
+            "satisfied": false,
+            "note": "No review yet."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "docs/design/identity/CAPABILITY-CLAIM-REVIEW.md names its reviewer and the draft's author, and the two are different parties.",
+            "met": false,
+            "evidence": "The file does not exist in the tree or at origin/main (cat-file exits 128)."
+          },
+          {
+            "criterion": "The review holds at least these nineteen named entries: forgery; operator JSON under 1.3.6.1.4.1.66364.2.1; a v1 claim only under .1; lys/delegation/v1 bytes; lys/attestation/v2 payload bytes; malleability by integer form; malleability by grant order; malleability by a grant listed twice; malleability by a null end; transposition; Authority Key Identifier naming another trusted key; Authority Key Identifier absent; Authority Key Identifier of 32 bytes; downgrade to v0; downgrade by absent key 1; replay under another agent's certificate; replay for an unlisted grant; expiry one second past the certificate's notAfter; timing oracle. Each entry but the timing oracle carries its attack bytes in hex and the name of the draft's refusal that defeats it.",
+            "met": false,
+            "evidence": "No review file exists."
+          },
+          {
+            "criterion": "The timing-oracle entry names each of the four comparisons verify_agent_capability makes (Authority Key Identifier against the signing key's fingerprint, holder against subject, grant acted under against the listed grant ids, instant against the certificate's own window) and the signature check, and for each either carries a timing attack's bytes in hex with what defeats it, or states that both operands are public values and gives the reason.",
+            "met": false,
+            "evidence": "No review file exists."
+          },
+          {
+            "criterion": "Every entry of the review, each of the nineteen named entries and any further entry its reviewer adds, records the outcome `defeated`, and no entry records any other outcome.",
+            "met": false,
+            "evidence": "No review file exists."
+          },
+          {
+            "criterion": "The review records a commit id, and docs/design/identity/CAPABILITY-CLAIM.md at that commit is byte-identical to the draft at the commit where the review lands.",
+            "met": false,
+            "evidence": "The draft is untracked (?? in git status), so no commit of it exists."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Land R1's draft through the chain (src_pr, src_land) so that a commit of docs/design/identity/CAPABILITY-CLAIM.md exists.",
+          "Have a party other than the draft's author write docs/design/identity/CAPABILITY-CLAIM-REVIEW.md. It must name both parties and record the draft's commit id. It must hold the nineteen named entries, each with its attack hex and the refusal that defeats it, and a timing-oracle entry covering the four comparisons and the signature check. Every outcome must be `defeated`."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R3",
@@ -155,7 +334,70 @@
       ],
       "stories": [
         "S114"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not done. The D7 and .2 status flips wait for the landed review and a recorded ratification.",
+        "deviation": "Blocked. The check `git show origin/main:docs/design/identity/CAPABILITY-CLAIM-REVIEW.md` exits 128, and the card records no ratification by the owning lead with a second reader. The boundaries forbid flipping to RATIFIED or `In use (.2.1)` before then. D7 still reads PROPOSED and the .2 row still reads Reserved.",
+        "checklist": [
+          {
+            "id": "C251",
+            "done": false,
+            "note": "Waiting for R2 and the ratification record."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S114",
+            "satisfied": false,
+            "note": "The format is not ratified."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "`git diff --numstat` of docs/design/WIRE-FORMATS.md between R3's commit and its parent reports 1 added line and 1 deleted line; the deleted line is the decision-log row containing `lys/agent-capability/v1` and `PROPOSED`; the added line has the same D number, contains `lys/agent-capability/v1`, `1.3.6.1.4.1.66364.2.1` and `RATIFIED`, does not contain `PROPOSED`, and contains the date, the two ratifiers' names and their reasons as the card records them; every cell of the added row other than its status cell is byte-identical to the deleted row's.",
+            "met": false,
+            "evidence": "No R3 commit exists, and D7 reads PROPOSED."
+          },
+          {
+            "criterion": "At R3's commit, `git show <commit>:docs/design/WIRE-FORMATS.md | grep -c -E '^\\| D[0-9]+ \\|.*lys/agent-capability/v1.*RATIFIED'` prints 1, and the same command with PROPOSED in place of RATIFIED prints 0.",
+            "met": false,
+            "evidence": "Against origin/main the RATIFIED grep prints 0. No R3 commit exists."
+          },
+          {
+            "criterion": "The rows D1 to D6 of docs/design/WIRE-FORMATS.md's decision log at R3's commit are byte-identical to its parent's.",
+            "met": false,
+            "evidence": "No R3 commit exists."
+          },
+          {
+            "criterion": "`git diff --numstat` of docs/PEN-REGISTRATION.md between R3's commit and its parent reports 1 added line and 1 deleted line; the deleted line is the sub-arc table's row whose first cell is .2 and whose last cell reads exactly `Reserved`; the added line's first cell is .2, its last cell reads exactly `In use (.2.1)`, and every cell other than the last is byte-identical to the deleted row's; `git show <commit>:docs/PEN-REGISTRATION.md | grep -c -F '| In use (.2.1) |'` prints 1.",
+            "met": false,
+            "evidence": "No R3 commit exists. The .2 row reads Reserved."
+          },
+          {
+            "criterion": "`git diff --stat` between R3's commit and its parent names only docs/design/WIRE-FORMATS.md and docs/PEN-REGISTRATION.md.",
+            "met": false,
+            "evidence": "No R3 commit exists."
+          },
+          {
+            "criterion": "At R3's parent, `git show <parent>:docs/design/identity/CAPABILITY-CLAIM-REVIEW.md` exits 0, and the review at that commit has no entry whose outcome is other than `defeated`.",
+            "met": false,
+            "evidence": "The review does not exist (exit 128 at origin/main)."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Land R2's review with every entry defeated.",
+          "Obtain the ratification of lys/agent-capability/v1 by the owning lead with a second reader, recorded on the card with both names, the date and the reasons.",
+          "Then, in one commit touching only WIRE-FORMATS.md and PEN-REGISTRATION.md, flip D7's status to RATIFIED and the .2 row's status to `In use (.2.1)`."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R4",
@@ -189,7 +431,68 @@
       ],
       "stories": [
         "S113"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not done.",
+        "deviation": "Blocked on R3. At origin/main 412bc52, the grep for a D row with lys/agent-capability/v1 and RATIFIED prints 0. The boundaries also forbid signing or freezing anything under the format before ratification. DIRECTORY-006's grants/types.rs and the lys-identity crate now exist on main, so R3 is the only blocker left for R4.",
+        "checklist": [
+          {
+            "id": "C252",
+            "done": false,
+            "note": "Waiting for R3."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S113",
+            "satisfied": false,
+            "note": "No codec yet."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "Encoding the fixture claim (holder id `agent-01`; grant `grant-01` with not-before 1800000000 and not-after 1800086400; grant `grant-02` with not-before 1800000000 and not-after 1802592000) yields exactly the hex a301776c79732f6167656e742d6361706162696c6974792f763102686167656e742d30310382a301686772616e742d3031021a6b49d200031a6b4b2380a301686772616e742d3032021a6b49d200031a6b715f00; the test holds that hex as a literal and does not import it from the crate.",
+            "met": false,
+            "evidence": "No capability codec exists on this branch (base 14e834a has no crates/lys-identity)."
+          },
+          {
+            "criterion": "Encoding the fixture claim built with its grants given in the order grant-02, grant-01 yields the same hex, and decoding that vector returns a claim equal to the fixture claim.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Encoding the claim of holder `agent-01` listing no grant yields exactly the hex a301776c79732f6167656e742d6361706162696c6974792f763102686167656e742d30310380, and encoding the claim of holder `agent-01` listing only grant `grant-01` with not-before 1800000000 and no end yields exactly the hex a301776c79732f6167656e742d6361706162696c6974792f763102686167656e742d30310381a201686772616e742d3031021a6b49d200; decoding each returns a claim equal to the one encoded, the first listing no grant and the second's grant-01 having no end; the test holds both hex literals itself.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Thirteen malformed inputs are each refused with claim_malformed: the bytes 7b7d (JSON `{}`), the vector with keys 1 and 2 in the order 2, 1, grant-01's not-before 1800000000 written in the 9-byte form 1b000000006b49d200, an indefinite-length map (first byte bf), an added top-level key 4, key 3 absent, key 1 absent, one trailing byte 00, grant-01's not-after equal to its not-before, the two grants in the order grant-02, grant-01, grant-01 listed twice, an added key 4 in grant-01's entry, and the open-ended vector with key 3 written as null (a301776c79732f6167656e742d6361706162696c6974792f763102686167656e742d30310381a301686772616e742d3031021a6b49d20003f6); the test asserts that thirteen claim_malformed cases ran.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "The vector with content type lys/agent-capability/v2 and the vector with content type lys/agent-capability/v0 are each refused with claim_version_unknown, and each message contains its content type; the test asserts two claim_version_unknown cases ran.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A drift injection that removes only the grant-order check makes exactly one test fail, the malformed-input test, on its out-of-order case.",
+            "met": false,
+            "evidence": "Not implemented."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Once R3's ratification, DIRECTORY-003 and DIRECTORY-006 R1 are on main, implement the claim type and its strict encoder and decoder in crates/lys-identity. Include the literal-hex vector tests, the 13 claim_malformed cases, the 2 claim_version_unknown cases and the grant-order drift injection."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R5",
@@ -222,7 +525,68 @@
       ],
       "stories": [
         "S115"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not done.",
+        "deviation": "Blocked. The brief's own DIRECTORY-003 execution-record check at origin/main prints 'not landed at 412bc5234c2eaff103a77c724094c148b9436a5a' and exits 1. The card branch is also based on 7b53625, which has none of the identity crates.",
+        "checklist": [
+          {
+            "id": "C253",
+            "done": false,
+            "note": "Waiting for DIRECTORY-003's execution record to read landed."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S115",
+            "satisfied": false,
+            "note": "No enrolment yet."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "For a registered agent agent-01 with no enrolled key, the admitted operator's enrol call with the 32-byte Ed25519 public key K1 makes the directory's enrolled key for agent-01 read K1 and adds exactly one event to the directory, an event of kind agent_key_enrolled naming agent-01 and K1; after reopening the directory, the enrolled key still reads K1.",
+            "met": false,
+            "evidence": "Not implemented, and DIRECTORY-003 is not landed."
+          },
+          {
+            "criterion": "A second enrol call for agent-01 with the key K2 refuses with agent_key_already_enrolled, records no event, and the enrolled key for agent-01 still reads K1.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "An enrol call by an unauthenticated caller refuses with not_admitted and records no event.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "An enrol call for agent-99, which is not registered, refuses with agent_not_registered and records no event.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "An enrol call for registered agent agent-02 with a 31-byte key refuses with invalid_agent_key, records no event, and agent-02 still has no enrolled key; the test asserts four refusal cases ran across this line and the three before it.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A drift injection that removes only the already-enrolled check makes exactly one test fail, the second-enrol case.",
+            "met": false,
+            "evidence": "Not implemented."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Once DIRECTORY-003's execution record reads landed, implement key enrolment with its event, its four refusals and the drift injection."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R6",
@@ -274,7 +638,148 @@
       ],
       "stories": [
         "S115"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not done.",
+        "deviation": "Blocked on R4 and R5, and on DIRECTORY-013. crates/lys-identity/src/revocation/append.rs and fold.rs are absent at origin/main. deploy/identity/config.example.toml is now present on main.",
+        "checklist": [
+          {
+            "id": "C254",
+            "done": false,
+            "note": "Waiting for R4, R5 and DIRECTORY-013."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S115",
+            "satisfied": false,
+            "note": "No issuance yet."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "Reading a 32-byte seed file with mode 0600 yields an issuer whose public key equals the Ed25519 public key the test derives from those 32 bytes itself.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A file with mode 0640 refuses with issuer_key_permissions, a file with mode 0604 refuses with issuer_key_permissions, a 31-byte file with mode 0600 refuses with issuer_key_length, and a missing path refuses with issuer_key_missing; each message contains the path and not the seed's hex, and the test asserts four refusal cases ran.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "The Debug output of the loaded issuer and of each of the four refusals contains neither the seed's lowercase hex nor its standard base64.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "An active agent agent-01 holding grants grant-01 and grant-02, whose enrolled key is the key of a certificate-signing request with common name agent-01, issued through POST /identity/agents/agent-01/certificate by the admitted operator asking for lifetime 86400, shorter than the default, returns a certificate whose subject common name is agent-01, which lys-core's verify_certificate_chain_at accepts at its own notBefore plus 60 seconds against the directory's issuer public key, whose notAfter minus its notBefore is 86400 seconds, whose extension under 1.3.6.1.4.1.66364.2.1 decodes with R4 to holder agent-01 listing grant-01 and grant-02, each with the time window the directory records for it, whose extension under 2.5.29.35 is non-critical and whose value is 30168014 followed by the first 20 bytes of the SHA-256 of the directory issuer key's DER SubjectPublicKeyInfo, which the test computes itself from that key's public bytes, and which carries no extension under 1.3.6.1.4.1.66364.1; the directory records exactly one issuance event, of kind agent_certificate_issued, naming agent-01 and the SHA-256 of the returned DER.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "The certificate log after that call holds exactly one more leaf than before, an issuance leaf whose certificate DER is the returned DER byte for byte; DIRECTORY-013's fold over the log holds that certificate issued and not revoked; and after a revocation leaf for it is appended with DIRECTORY-013's append under the directory's issuing identity, the fold holds it revoked.",
+            "met": false,
+            "evidence": "Not implemented, and DIRECTORY-013 is absent."
+          },
+          {
+            "criterion": "Writing that certificate and the directory issuer's lys-core issuer_certificate_der each as PEM, `openssl verify -CAfile` with the issuer certificate on the agent certificate exits 0, and `openssl x509 -text` on the agent certificate prints an Authority Key Identifier whose hex equals the Subject Key Identifier it prints for the issuer certificate.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "The configuration example deploy/identity/config.example.toml names the issuer key file's path, the certificate log's path, the default lifetime 2592000 and the maximum lifetime 7776000, and contains no 64-character hexadecimal string.",
+            "met": false,
+            "evidence": "Not on this branch."
+          },
+          {
+            "criterion": "For active agent agent-08, holding no grant, with an enrolled key and no certificate, a call with no lifetime asked for returns a certificate whose extension under 1.3.6.1.4.1.66364.2.1 decodes with R4 to holder agent-08 listing no grant, and records one issuance event.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "For active agent agent-09, holding only grant grant-09 whose window the directory records with a start and no end, with an enrolled key and no certificate, a call returns a certificate whose extension under 1.3.6.1.4.1.66364.2.1 decodes with R4 to holder agent-09 listing grant-09 with that start and no end.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "With the shipped configuration, issuing to active agent agent-05, holding grant grant-05 with an enrolled key and no certificate, with no lifetime asked for returns a certificate whose notAfter minus its notBefore is 2592000 seconds.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "For active agent agent-06, holding grant grant-06 with an enrolled key and no certificate, a call asking for lifetime 7776001 refuses with lifetime_above_maximum, whose message contains `7776000`, returns no certificate bytes, appends no leaf and records no event, and a following call for agent-06 asking for lifetime 7776000 returns a certificate whose notAfter minus its notBefore is 7776000 seconds.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Calling the route for agent-01 while registered, while suspended and while retired each refuses with agent_not_active, returns no certificate bytes and leaves the directory's event count and the certificate log's leaf count unchanged; the test asserts three cases ran.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "For active agent agent-04 holding grant grant-04 with no enrolled key, a call with a request whose common name is agent-04 refuses with agent_key_not_enrolled, whose message contains `enrol the agent's key first`, returns no certificate bytes, appends no leaf and records no event.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A request with common name agent-01 signed by an Ed25519 key other than agent-01's enrolled key refuses with key_mismatch, returns no certificate bytes, appends no leaf and records no event.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A second call for agent-01 with the injected clock at the first certificate's notBefore plus 3600 seconds refuses with agent_certificate_current, whose message contains the first certificate's SHA-256 in lowercase hex and its notAfter in decimal seconds since the Unix epoch, returns no certificate bytes and leaves one issuance event and one issuance leaf.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A call for agent-01 with the injected clock at the first certificate's notAfter plus one second issues a new certificate, and its issuance event names the first certificate's SHA-256 as the certificate it follows.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "For active agent agent-07, holding grant grant-07 with an enrolled key and a current certificate, after a revocation leaf for that certificate is appended with DIRECTORY-013's append under the directory's issuing identity, a call for agent-07 with the injected clock at that certificate's notBefore plus 3600 seconds issues a new certificate, and its issuance event names the revoked certificate's SHA-256 as the certificate it follows.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A request with common name agent-02 presented for agent-01 refuses with request_subject_mismatch; lifetime 0 refuses with lifetime_invalid; an unauthenticated caller refuses with not_admitted; each appends no leaf and records no event.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Granting grant-01 to active agent agent-03, which has an enrolled key and no certificate, records no issuance event, appends no leaf and issues no certificate.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A failure injected at the certificate log's append refuses with issuance_leaf_not_appended and no certificate bytes, and after reopening, the directory holds no issuance event for that call.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A failure injected at the issuance event's commit refuses with issuance_not_recorded and no certificate bytes, and after reopening, the directory holds no issuance event for that call.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A drift injection that removes only the current-certificate check makes exactly one test fail, the second-call case.",
+            "met": false,
+            "evidence": "Not implemented."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Once R4, R5 and DIRECTORY-013's append and fold are on main, implement the issuer key loader, the issuance route, the issuance leaf and event, and every refusal and drift injection listed."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R7",
@@ -307,7 +812,68 @@
       ],
       "stories": [
         "S115"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not done.",
+        "deviation": "Blocked on R5 and R6.",
+        "checklist": [
+          {
+            "id": "C255",
+            "done": false,
+            "note": "Waiting for R5 and R6."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S115",
+            "satisfied": false,
+            "note": "No key replacement yet."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "For agent-01 enrolled with K1, a replacement call naming old key K1 and new key K2 makes the enrolled key read K2 and adds exactly one event of kind agent_key_replaced naming agent-01, K1 and K2; after reopening the directory, the enrolled key reads K2 and the enrolment event naming K1 is still in its history.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A replacement call for agent-01 naming old key K3, which is not its enrolled key, refuses with key_replacement_mismatch, records no event and leaves the enrolled key unchanged.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A replacement call for registered agent agent-02, which has no enrolled key, refuses with agent_key_not_enrolled and records no event.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A replacement call by an unauthenticated caller refuses with not_admitted, and one naming a 31-byte new key refuses with invalid_agent_key; each records no event, and the test asserts four refusal cases ran across this line and the two before it.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "For active agent agent-01 holding grant grant-01 and a current certificate issued under K1 with lifetime 86400, after the replacement from K1 to K2, an issuance call with the injected clock at that certificate's notBefore plus 3600 seconds and a request under K2 issues a certificate whose issuance event names the first certificate's SHA-256 as the certificate it follows, and an issuance call at the same instant with a request under K1 refuses with key_mismatch.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A drift injection that removes only the old-key comparison makes exactly one test fail, the K3 case.",
+            "met": false,
+            "evidence": "Not implemented."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "After R5 and R6, implement the audited key replacement with its refusals and the old-key drift injection."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R8",
@@ -347,7 +913,123 @@
       ],
       "stories": [
         "S113"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not done.",
+        "deviation": "Blocked on R3, R4 and R6. `git diff --stat 14e834a -- crates/` still prints nothing, so crates/lys-core and crates/lys are untouched.",
+        "checklist": [
+          {
+            "id": "C256",
+            "done": false,
+            "note": "Waiting for R3, R4 and R6."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S113",
+            "satisfied": false,
+            "note": "No verifier yet."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "A certificate from the test anchor (an issuer identity built in the test from 32 bytes of 0x07, never in any configuration) for subject agent-01, issued with ttl 86400, carrying the fixture claim of R4 under 1.3.6.1.4.1.66364.2.1 and the Authority Key Identifier value 30168014324be2dea8bc44461b0233e51fa48902ed6b1cc6 under 2.5.29.35, verified at its own notBefore plus 60 seconds against the set holding only the test anchor's key, returns that claim for grant grant-01 and returns it for grant grant-02; call this the first certificate, and nb and na its own notBefore and notAfter as read from it.",
+            "met": false,
+            "evidence": "verify_agent_capability does not exist."
+          },
+          {
+            "criterion": "A test-anchor certificate like the first whose claim lists grant-01 with not-before 1 and not-after 1000, verified at nb+60 for grant grant-01, returns that claim, because a listed grant's window is never checked as live.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A certificate issued by R6's issuance function in crates/lys-identity/src/capability/issue.rs under the test anchor, for agent-01 holding grant-01, verified at its own notBefore plus 60 seconds against the set holding only the test anchor's key for grant grant-01, returns a claim whose holder is agent-01 and whose listed grant ids are exactly grant-01.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "The first certificate verified against the set holding only another Ed25519 key refuses with certificate_chain_invalid, and so does the first certificate verified against the empty set, and so does a certificate from another key whose extensions under 2.5.29.35 and 1.3.6.1.4.1.66364.2.1 are each the single byte 00, proving neither extension was read.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A test-anchor certificate like the first whose Authority Key Identifier value is 301680143dba97edb866520d36063a0d9f79576893f3b130, the fingerprint of a second issuer key built in the test from 32 bytes of 0x09, verified at nb+60 against the set holding both keys, refuses with issuer_key_mismatch, and its message contains 324be2dea8bc44461b0233e51fa48902ed6b1cc6 and 3dba97edb866520d36063a0d9f79576893f3b130.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A test-anchor certificate like the first with no extension under 2.5.29.35 refuses with issuer_key_mismatch, and its message contains 324be2dea8bc44461b0233e51fa48902ed6b1cc6 and `absent`; one whose Authority Key Identifier value is 30228020324be2dea8bc44461b0233e51fa48902ed6b1cc671e7739af2551e0bfe68f54e, a 32-byte keyIdentifier, also refuses with issuer_key_mismatch.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A test-anchor certificate whose extension under 1.3.6.1.4.1.66364.2.1 is the operator JSON `{\"role\":\"admin\"}` refuses with claim_malformed, and so does one that carries a valid v1 claim only under 1.3.6.1.4.1.66364.1.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A test-anchor certificate whose claim carries content type lys/agent-capability/v2 refuses with claim_version_unknown, and its message contains `lys/agent-capability/v2`.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A test-anchor certificate with subject agent-01 whose claim names holder agent-02 refuses with claim_holder_mismatch, and its message contains `agent-01` and `agent-02`; a claim under subject agent-01 whose holder is `grant-01` and whose one listed grant id is `agent-01` also refuses with claim_holder_mismatch.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "The first certificate verified at nb+60 for grant grant-03 refuses with claim_grant_mismatch, and its message contains `grant-03`, `grant-01` and `grant-02`.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "The first certificate verified at na+1 refuses with certificate_chain_invalid, and its message contains `certificate expired`; verified at nb-1 it refuses with certificate_chain_invalid, and its message contains `certificate not yet valid`; the test asserts that fourteen refusal cases ran across this line and the seven before it and none was accepted.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Given the set holding the test anchor's key and the second issuer key built from 32 bytes of 0x09, a certificate from the test anchor and one from the second issuer, each for agent-01 listing grant-01 with an Authority Key Identifier naming its own signer, are each accepted at their own notBefore plus 60 seconds and return their claims, and a like certificate from a third issuer built from 32 bytes of 0x0b refuses with certificate_chain_invalid; the test asserts two acceptances and one refusal ran.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A test-anchor certificate like the first whose claim lists no grant, verified at nb+60 for grant grant-01, refuses with claim_grant_mismatch, and its message contains `grant-01`; one whose claim lists only grant-01 with not-before 1 and no end, verified at nb+60 for grant grant-01, returns that claim; the test asserts one refusal and one acceptance ran.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A drift injection that removes only the final check of the instant against the certificate's own window makes exactly one test fail, the expiry test holding the na+1 and nb-1 cases.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A drift injection that removes only the listed-grant check makes exactly one test fail, the grant-03 case.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A drift injection that removes only the comparison of a present keyIdentifier with the signing key's fingerprint makes exactly one test fail, the 0x09 Authority Key Identifier case.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "`git diff --stat` against the brief's base commit for crates/lys-core and crates/lys prints nothing, and `cargo test --workspace --all-features` passes every existing lys-core wire-vector and conformance test unchanged.",
+            "met": false,
+            "evidence": "The first half holds: git diff --stat 14e834a -- crates/ prints nothing. The workflow's tests leg also exited 0 on this tree. The row is still unmet because no verifier exists for it to guard."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "After R3, R4 and R6, implement verify_agent_capability with every listed refusal, the case counts and the three drift injections, leaving crates/lys-core and crates/lys untouched."
+        ],
+        "fixes": []
+      }
     }
   ]
 }
