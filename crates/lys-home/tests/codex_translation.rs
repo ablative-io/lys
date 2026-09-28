@@ -10,22 +10,23 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 
+use lys_home::Hash;
 use lys_home::cli::{Cli, Command, run};
-use lys_home::cli_lantern::LanternAction;
 use lys_home::cli_translate::TranslateArgs;
-use lys_home::{Entry, EntryBase, EntryBody, Hash, Home};
 
 use terms::{Walk, off_path_losses, on_path_losses, sidechain_losses};
+
+#[path = "codex_translation/kinds.rs"]
+mod kinds;
+
+use kinds::{add_beside_and_at_head, every_kind_fixture};
 
 #[path = "codex_translation/terms.rs"]
 mod terms;
 
 type Gate = Result<(), Box<dyn Error>>;
-
-#[path = "codex_translation/stability.rs"]
-mod stability;
 
 const STAMP: &str = "2026-01-01T00:00:00.000Z";
 
@@ -237,184 +238,6 @@ fn foreign_thinking_renders_as_text() -> Gate {
     Ok(())
 }
 
-/// The fixture of `every_row_names_its_kinds_and_reason`, and the main
-/// chain's last message, where a live session's head stands.
-fn every_kind_fixture() -> (Vec<Value>, String) {
-    let id = |n: u32| uuid(n);
-    let records = vec![
-        rec(&id(1), None, Chain::Main, &user(&json!("fixture question"))),
-        rec(
-            &id(2),
-            Some(&id(1)),
-            Chain::Main,
-            &assistant(&json!([text("fixture answer")])),
-        ),
-        rec(
-            &id(10),
-            None,
-            Chain::Agent("b1"),
-            &user(&json!("fixture b1 task")),
-        ),
-        rec(
-            &id(11),
-            Some(&id(10)),
-            Chain::Agent("b1"),
-            &assistant(&json!([
-            {"type": "tool_use", "id": "toolu_b", "name": "Bash", "input": {}}])),
-        ),
-        rec(
-            &id(12),
-            Some(&id(11)),
-            Chain::Agent("b1"),
-            &user(&json!([
-            {"type": "tool_result", "tool_use_id": "toolu_b", "content": "fixture b1 out"}])),
-        ),
-        json!({"type": "summary", "summary": "fixture summary", "leafUuid": id(2), "timestamp": STAMP}),
-        json!({"type": "system", "subtype": "compact_boundary", "uuid": id(20), "parentUuid": null,
-            "isSidechain": false, "timestamp": STAMP}),
-        rec(
-            &id(21),
-            Some(&id(20)),
-            Chain::Main,
-            &user(&json!([text("fixture after"),
-            {"type": "image", "source": {"type": "url", "url": "https://example.invalid/a.png"}},
-            {"type": "document", "source": {"type": "text", "data": "fixture document"}}])),
-        ),
-        rec(
-            &id(22),
-            Some(&id(21)),
-            Chain::Main,
-            &assistant(&json!([
-            {"type": "redacted_thinking", "data": "fixture-redacted"},
-            {"type": "thinking", "thinking": ""},
-            {"type": "tool_use", "name": "Bash", "input": {}}])),
-        ),
-        rec(
-            &id(23),
-            Some(&id(22)),
-            Chain::Main,
-            &user(&json!([
-            {"type": "tool_result", "content": "fixture orphan"}])),
-        ),
-        json!({"type": "attachment", "uuid": id(24), "parentUuid": id(23), "isSidechain": false,
-            "timestamp": STAMP, "attachment": {"type": "skill_listing"}}),
-        rec(
-            &id(25),
-            Some(&id(24)),
-            Chain::Main,
-            &assistant(&json!([text("fixture last")])),
-        ),
-        rec(
-            &id(30),
-            None,
-            Chain::Agent("a1"),
-            &assistant(&json!([
-            {"type": "redacted_thinking", "data": "fixture-a1-redacted"},
-            {"type": "tool_use", "id": "toolu_a", "name": "Bash", "input": {}}])),
-        ),
-        rec(
-            &id(31),
-            Some(&id(30)),
-            Chain::Agent("a1"),
-            &user(&json!([
-            {"type": "tool_result", "tool_use_id": "toolu_a", "content": "fixture a1 out"},
-            base64_image()])),
-        ),
-        json!({"type": "attachment", "uuid": id(32), "parentUuid": id(31), "isSidechain": true,
-            "timestamp": STAMP, "attachment": {"type": "skill_listing"}}),
-        rec(
-            &id(40),
-            None,
-            Chain::Unlabelled,
-            &user(&json!("fixture stray")),
-        ),
-        rec(
-            &id(41),
-            Some(&id(40)),
-            Chain::Unlabelled,
-            &assistant(&json!([text("fixture stray answer")])),
-        ),
-    ];
-    (records, id(25))
-}
-
-fn entry(id: &str, parent: &str, body: EntryBody) -> Entry {
-    Entry {
-        base: EntryBase {
-            id: id.to_owned(),
-            parent_id: Some(parent.to_owned()),
-            timestamp: STAMP.to_owned(),
-        },
-        body,
-    }
-}
-
-/// The additions after import: four entries beside the path, three at the
-/// head, then one lantern lit at the head.
-fn add_beside_and_at_head(home: &Path, head: &str) -> Gate {
-    let owned = Home::read(home)?;
-    {
-        let mut s = owned.open_session("s1")?;
-        s.move_head(Some(head))?;
-        s.append_beside(EntryBody::Label {
-            target_id: head.to_owned(),
-            label: Some("note".to_owned()),
-        })?;
-        s.append_beside(EntryBody::Compaction {
-            summary: "fixture off".to_owned(),
-            first_kept_entry_id: head.to_owned(),
-            tokens_before: 0,
-            rest: Map::new(),
-        })?;
-        s.append_beside(EntryBody::BranchSummary {
-            from_id: head.to_owned(),
-            summary: "fixture off branch".to_owned(),
-            rest: Map::new(),
-        })?;
-        s.append_beside(EntryBody::ModelChange {
-            provider: "fixture".to_owned(),
-            model_id: "fixture-model".to_owned(),
-        })?;
-        s.append_entry(&entry(
-            "bs1",
-            head,
-            EntryBody::BranchSummary {
-                from_id: head.to_owned(),
-                summary: "fixture branch".to_owned(),
-                rest: Map::new(),
-            },
-        ))?;
-        s.append_entry(&entry(
-            "cm1",
-            "bs1",
-            EntryBody::CustomMessage {
-                custom_type: "ext".to_owned(),
-                content: json!([text("fixture custom"), base64_image()]),
-                rest: Map::new(),
-            },
-        ))?;
-        s.append_entry(&entry(
-            "bx1",
-            "cm1",
-            EntryBody::Message {
-                message: json!({"role": "bashExecution", "content": "fixture bash"}),
-            },
-        ))?;
-    }
-    run(Cli {
-        command: Command::Lantern {
-            action: LanternAction::Light {
-                home: home.to_path_buf(),
-                session: "s1".to_owned(),
-                point: "bx1".to_owned(),
-                note: "fixture note".to_owned(),
-                by: "fixture-lighter".to_owned(),
-            },
-        },
-    })?;
-    Ok(())
-}
-
 #[test]
 fn every_row_names_its_kinds_and_reason() -> Gate {
     let (records, head) = every_kind_fixture();
@@ -453,5 +276,53 @@ fn every_row_names_its_kinds_and_reason() -> Gate {
         rows(&account, "lost").len(),
         on_path + left + beside + carried + unlabelled
     );
+    Ok(())
+}
+
+#[test]
+fn second_translation_gives_equal_bytes() -> Gate {
+    let (records, head) = every_kind_fixture();
+    let (dir, home) = import(&records)?;
+    add_beside_and_at_head(&home, &head)?;
+    let (first_lines, first, first_path) = translate(&home, &dir.path().join("o1"))?;
+    let (second_lines, mut second, second_path) = translate(&home, &dir.path().join("o2"))?;
+    assert_eq!(
+        serde_json::to_vec(&first_lines)?,
+        serde_json::to_vec(&second_lines)?
+    );
+    let lost = second["lost"].as_array_mut().ok_or("no lost")?;
+    let before = lost.len();
+    lost.retain(|row| row["kind"] != "lys.translation");
+    assert_eq!(lost.len() + 1, before);
+    assert_eq!(serde_json::to_vec(&first)?, serde_json::to_vec(&second)?);
+    assert_eq!(sha(&first_path)?, sha(&second_path)?);
+    Ok(())
+}
+
+#[test]
+fn claude_code_render_is_unchanged_by_hash() -> Gate {
+    let (records, head) = every_kind_fixture();
+    let (dir, home) = import(&records)?;
+    add_beside_and_at_head(&home, &head)?;
+    let render = |name: &str| -> Result<PathBuf, Box<dyn Error>> {
+        let out = dir.path().join(name);
+        run(Cli {
+            command: Command::Render {
+                home: home.clone(),
+                session: "s1".to_owned(),
+                uuid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa".to_owned(),
+                cwd: "/w".to_owned(),
+                model: "claude-fixture".to_owned(),
+                out: Some(out.clone()),
+                version: "2.1.281".to_owned(),
+                canon: None,
+            },
+        })?;
+        Ok(out)
+    };
+    let a = render("a.jsonl")?;
+    translate(&home, &dir.path().join("o"))?;
+    let b = render("b.jsonl")?;
+    assert_eq!(sha(&a)?, sha(&b)?);
     Ok(())
 }

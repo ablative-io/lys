@@ -13,23 +13,25 @@
 //! translating.
 
 use std::error::Error;
-use std::path::Path;
 
 use serde_json::{Map, Value, json};
-use tempfile::TempDir;
 
 use crate::cli::{Cli, Command, run as cli_run};
 use crate::cli_fork::ForkArgs;
 use crate::cli_lantern::LanternAction;
 use crate::harness::codex::account::part_hash;
-use crate::harness::codex::rollout::translate;
-use crate::harness::codex::rollout_tests::{lines, read_json, text_of};
-use crate::record::Home;
+use crate::harness::codex::rollout_tests::text_of;
 use crate::record::entries::{CUSTOM_FORKED_FROM, EntryBody};
 
-type Gate = Result<(), Box<dyn Error>>;
+mod fixtures;
 
-mod sidechain_losses;
+use fixtures::{
+    Chain, agent_label, assistant, image, main_chain, rec, rows, sidechain_fixture, translated,
+    user,
+};
+pub(crate) use fixtures::{import, settle};
+
+type Gate = Result<(), Box<dyn Error>>;
 
 const U1: &str = "10000000-0000-4000-8000-000000000001";
 const A1: &str = "10000000-0000-4000-8000-000000000002";
@@ -42,134 +44,6 @@ const U2: &str = "10000000-0000-4000-8000-000000000003";
 const U3: &str = "10000000-0000-4000-8000-000000000004";
 const SYS: &str = "40000000-0000-4000-8000-000000000001";
 const LABEL_STAMP: &str = "2026-01-01T00:00:10.000Z";
-
-fn image() -> Value {
-    json!({"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "iVBORw0KGgo="}})
-}
-
-/// Which chain a record is on.
-#[derive(Clone, Copy)]
-enum Chain<'a> {
-    /// The main chain.
-    Main,
-    /// A sidechain whose records carry this agent id.
-    Agent(&'a str),
-    /// A sidechain whose records carry no agent id.
-    Unlabelled,
-}
-
-/// One Claude Code record on the chain named.
-fn rec(uuid: &str, parent: Option<&str>, chain: Chain<'_>, message: &Value) -> Value {
-    let role = message["role"].as_str().map_or("user", |r| r);
-    let side = !matches!(chain, Chain::Main);
-    let stamp = if side && parent.is_none() {
-        LABEL_STAMP
-    } else {
-        "2026-01-01T00:00:01.000Z"
-    };
-    let mut record = json!({"parentUuid": parent, "isSidechain": side, "userType": "external",
-        "cwd": "/w", "sessionId": "s", "version": "2.1.281", "uuid": uuid, "timestamp": stamp,
-        "type": role, "message": message});
-    if let Chain::Agent(agent) = chain {
-        record["agentId"] = json!(agent);
-    }
-    record
-}
-
-fn user(content: &Value) -> Value {
-    json!({"role": "user", "content": content})
-}
-
-fn assistant(content: &Value) -> Value {
-    json!({"role": "assistant", "model": "claude-fixture", "content": content,
-        "stop_reason": "end_turn", "usage": {"input_tokens": 1, "output_tokens": 1}})
-}
-
-fn main_chain() -> Vec<Value> {
-    vec![
-        rec(U1, None, Chain::Main, &user(&json!("fixture question"))),
-        rec(
-            A1,
-            Some(U1),
-            Chain::Main,
-            &assistant(&json!([{"type": "text", "text": "fixture answer"}])),
-        ),
-    ]
-}
-
-/// Import the records into session `s1` of a fresh home.
-pub(crate) fn import(records: &[Value]) -> Result<(TempDir, Home), Box<dyn Error>> {
-    let dir = tempfile::tempdir()?;
-    let source = dir.path().join("source.jsonl");
-    let mut text = String::new();
-    for record in records {
-        text.push_str(&serde_json::to_string(record)?);
-        text.push('\n');
-    }
-    std::fs::write(&source, text)?;
-    let home = dir.path().join("home");
-    cli_run(Cli {
-        command: Command::Import {
-            home: home.clone(),
-            claude_code: source,
-            session: "s1".to_owned(),
-        },
-    })?;
-    Ok((dir, Home::read(home)?))
-}
-
-/// Move the head of `session` back to the main chain's leaf.
-pub(crate) fn settle(home: &Home, session: &str, leaf: &str) -> Gate {
-    home.open_session(session)?.move_head(Some(leaf))?;
-    Ok(())
-}
-
-/// Translate `session` into `out` and read the rollout's lines and the account.
-fn translated(
-    home: &Home,
-    session: &str,
-    out: &Path,
-) -> Result<(Vec<Value>, Value), Box<dyn Error>> {
-    let mut s = home.open_session(session)?;
-    let done = translate(&mut s, out, "0.156.0", Some("UTC"))?;
-    Ok((lines(&done.rollout)?, read_json(&done.account)?))
-}
-
-fn rows<'a>(account: &'a Value, list: &str) -> Vec<&'a Value> {
-    account[list].as_array().into_iter().flatten().collect()
-}
-
-/// The id of the `agent <name>` label entry.
-fn agent_label(home: &Home, name: &str) -> Result<String, Box<dyn Error>> {
-    let reader = home.read_session("s1")?;
-    for id in reader.ids() {
-        if let EntryBody::Label {
-            label: Some(label), ..
-        } = reader.entry(id)?.body
-            && label == format!("agent {name}")
-        {
-            return Ok(id.to_owned());
-        }
-    }
-    Err("no agent label".into())
-}
-
-fn sidechain_fixture() -> Vec<Value> {
-    let mut records = main_chain();
-    records.push(rec(
-        S1,
-        None,
-        Chain::Agent("a1"),
-        &user(&json!("fixture sub-question")),
-    ));
-    records.push(rec(
-        S2,
-        Some(S1),
-        Chain::Agent("a1"),
-        &assistant(&json!([{"type": "text", "text": "fixture sub-answer"}])),
-    ));
-    records
-}
 
 #[test]
 fn sidechain_is_carried_as_marked_text() -> Gate {
@@ -452,5 +326,87 @@ fn forked_child_opens_on_the_point() -> Gate {
         lost[0]["reason"],
         "image part 1 not carried: a carried prompt holds text parts only"
     );
+    Ok(())
+}
+
+#[test]
+fn sidechain_image_is_lost_with_its_reason() -> Gate {
+    let mut records = main_chain();
+    records.push(rec(
+        S1,
+        None,
+        Chain::Agent("a1"),
+        &user(&json!([{"type": "text", "text": "look"}, image()])),
+    ));
+    let (dir, home) = import(&records)?;
+    settle(&home, "s1", A1)?;
+    let (lines, account) = translated(&home, "s1", &dir.path().join("o"))?;
+    let text = lines
+        .iter()
+        .filter_map(text_of)
+        .find(|t| t.starts_with("<SIDECHAIN "))
+        .ok_or("no sidechain item")?;
+    assert!(text.contains("look"));
+    assert!(!serde_json::to_string(&lines)?.contains("base64"));
+    let lost = rows(&account, "lost");
+    assert_eq!(lost.len(), 1);
+    assert_eq!(lost[0]["hash"], json!(part_hash(&image())));
+    assert_eq!(lost[0]["kind"], "image");
+    assert_eq!(
+        lost[0]["reason"],
+        "image part 1 not carried: marked text holds text only"
+    );
+    Ok(())
+}
+
+/// The record after the `summary` hangs under a `system` boundary record,
+/// as Claude Code writes one after a compaction: the importer places a
+/// system record with no parent under the chain's leaf, the compaction, so
+/// the user record after it continues the chain past the compaction.
+#[test]
+fn sidechain_under_a_compacted_entry_is_lost() -> Gate {
+    let mut records = sidechain_fixture();
+    records.push(
+        json!({"type": "summary", "summary": "fixture compaction", "leafUuid": A1,
+        "timestamp": "2026-01-01T00:00:04.000Z"}),
+    );
+    records.push(
+        json!({"type": "system", "subtype": "compact_boundary", "uuid": SYS, "parentUuid": null,
+        "isSidechain": false, "timestamp": "2026-01-01T00:00:05.000Z"}),
+    );
+    records.push(rec(
+        U3,
+        Some(SYS),
+        Chain::Main,
+        &user(&json!("fixture after")),
+    ));
+    let (dir, home) = import(&records)?;
+    let label = agent_label(&home, "a1")?;
+    let compaction = {
+        let s = home.open_session("s1")?;
+        s.path()?
+            .0
+            .into_iter()
+            .find(|e| matches!(e.body, EntryBody::Compaction { .. }))
+            .ok_or("no compaction on the path")?
+            .base
+            .id
+    };
+    let (lines, account) = translated(&home, "s1", &dir.path().join("o"))?;
+    assert!(
+        !lines
+            .iter()
+            .filter_map(text_of)
+            .any(|t| t.starts_with("<SIDECHAIN"))
+    );
+    let reason = format!("left off the context path by compaction {compaction}");
+    for id in [label.as_str(), S1, S2] {
+        let found: Vec<&Value> = rows(&account, "lost")
+            .into_iter()
+            .filter(|row| row["entry"] == id)
+            .collect();
+        assert_eq!(found.len(), 1, "{id}");
+        assert_eq!(found[0]["reason"], json!(reason));
+    }
     Ok(())
 }
