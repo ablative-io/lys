@@ -20,10 +20,17 @@ pub struct SecretRelation {
 
 type Key = (String, String, Relation);
 
+/// One relation as held: who granted it, and when its window ends.
+#[derive(Debug, Clone)]
+struct Held {
+    granted_by: Option<String>,
+    ends_at_ms: Option<i64>,
+}
+
 /// In-process relations.
 #[derive(Debug, Default)]
 pub struct LocalGrants {
-    relations: RwLock<BTreeMap<Key, Option<String>>>,
+    relations: RwLock<BTreeMap<Key, Held>>,
 }
 
 impl LocalGrants {
@@ -39,12 +46,22 @@ impl LocalGrants {
 
     /// Records `kind` for the relation's pair, replacing any earlier grant.
     pub fn grant_as(&self, kind: Relation, relation: SecretRelation) {
+        self.grant_until(kind, relation, None);
+    }
+
+    /// Records `kind` for the relation's pair as a grant whose window ends
+    /// at `ends_at_ms`, replacing any earlier grant. A lease cut under it
+    /// may end no later than that.
+    pub fn grant_until(&self, kind: Relation, relation: SecretRelation, ends_at_ms: Option<i64>) {
         self.relations
             .write()
             .unwrap_or_else(PoisonError::into_inner)
             .insert(
                 (relation.identity, relation.secret, kind),
-                relation.granted_by,
+                Held {
+                    granted_by: relation.granted_by,
+                    ends_at_ms,
+                },
             );
     }
 
@@ -69,10 +86,16 @@ impl LocalGrants {
             .read()
             .unwrap_or_else(PoisonError::into_inner);
         match relations.get(&(identity.to_owned(), secret.to_owned(), kind)) {
-            Some(Some(person)) => Ok(Permitted {
+            Some(Held {
+                granted_by: Some(person),
+                ends_at_ms,
+            }) => Ok(Permitted {
                 person: person.clone(),
+                ends_at_ms: *ends_at_ms,
             }),
-            Some(None) => Err(Denied {
+            Some(Held {
+                granted_by: None, ..
+            }) => Err(Denied {
                 reason: "the grant traces to no person".to_owned(),
                 no_person_root: true,
             }),

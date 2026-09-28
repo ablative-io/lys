@@ -3,13 +3,19 @@
 
 use std::path::PathBuf;
 
+mod accounts;
+mod lease;
 mod lending;
 mod name;
+mod oauth;
 mod owner;
 mod revocation;
 mod service;
 
+pub use accounts::AccountsRefusal;
+pub use lease::LeaseRefusal;
 pub use lending::LendingRefusal;
+pub use oauth::OAuthRefusal;
 pub use owner::OwnerChangeRefusal;
 pub use revocation::RevocationRefusal;
 pub use service::ServiceRefusal;
@@ -145,14 +151,9 @@ pub enum SecretsError {
         /// The account.
         account: String,
     },
-    /// Every account of the secret is resting.
-    #[error(
-        "NoAccountAvailable: every account of {secret} is resting (act: return an account to service)"
-    )]
-    NoAccountAvailable {
-        /// The secret.
-        secret: String,
-    },
+    /// No account of the secret can serve.
+    #[error(transparent)]
+    Accounts(#[from] AccountsRefusal),
     /// A name is empty, too long, or holds a control character.
     #[error(
         "InvalidName: {what} {name:?} {reason} (act: use a non-empty printable name of at most 128 bytes)"
@@ -207,6 +208,14 @@ pub enum SecretsError {
         handle: String,
         /// The identity that presented it.
         presenter: String,
+    },
+    /// The presentation carries no signature.
+    #[error(
+        "PresentationUnsigned: the presentation for handle {handle} carries no signature (act: sign the presentation with the key registered for the handle's identity)"
+    )]
+    PresentationUnsigned {
+        /// The handle id.
+        handle: String,
     },
     /// The presentation's signature did not verify against the holder's key.
     #[error(
@@ -365,6 +374,12 @@ pub enum SecretsError {
     /// A derived or issued handle refused by the rules of lending.
     #[error(transparent)]
     Lending(#[from] LendingRefusal),
+    /// A lease refused for its bounds.
+    #[error(transparent)]
+    Lease(#[from] LeaseRefusal),
+    /// An OAuth grant's refresh refused.
+    #[error(transparent)]
+    OAuth(#[from] OAuthRefusal),
     /// A provider revocation's confirmation refused.
     #[error(transparent)]
     Revocation(#[from] RevocationRefusal),

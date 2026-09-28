@@ -105,7 +105,9 @@ async fn proxy(State(shared): State<Arc<Shared>>, request: Request) -> Response 
 }
 
 /// The handle and the presentation a request carries, the presentation
-/// bound to the digest of this very request.
+/// bound to the digest of this very request. A request with no
+/// `lys-presentation` header carries an unsigned presentation, which the
+/// broker refuses as `PresentationUnsigned` once it has found the handle.
 pub(crate) fn signed(
     parts: &axum::http::request::Parts,
     body: &[u8],
@@ -120,17 +122,17 @@ pub(crate) fn signed(
         body,
     )
     .map_err(bad)?;
-    let unsigned = || SecretsError::PresentationInvalid {
+    let malformed = || SecretsError::PresentationInvalid {
         handle: String::new(),
     };
     let token = header(&parts.headers, "lys-handle")
         .and_then(from_hex)
         .ok_or_else(|| bad(SecretsError::HandleUnknown))?;
     let presentation = Presentation::from_wire(
-        header(&parts.headers, "lys-handle-id").ok_or_else(|| bad(unsigned()))?,
-        header(&parts.headers, "lys-operation").ok_or_else(|| bad(unsigned()))?,
-        header(&parts.headers, "lys-signed-at").ok_or_else(|| bad(unsigned()))?,
-        header(&parts.headers, "lys-presentation").ok_or_else(|| bad(unsigned()))?,
+        header(&parts.headers, "lys-handle-id").ok_or_else(|| bad(malformed()))?,
+        header(&parts.headers, "lys-operation").ok_or_else(|| bad(malformed()))?,
+        header(&parts.headers, "lys-signed-at").ok_or_else(|| bad(malformed()))?,
+        header(&parts.headers, "lys-presentation"),
         request,
     )
     .map_err(bad)?;
@@ -206,7 +208,7 @@ async fn forward(
     };
     let admitted = {
         let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
-        broker.admit_use(&token, &presentation, reserve)
+        broker.admit_use_for(&token, &presentation, secret, reserve)
     }
     .map_err(|error| (StatusCode::FORBIDDEN, error))?;
     let ticket = match admitted {

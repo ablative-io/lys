@@ -223,9 +223,10 @@ impl<P: PermissionCheck> Broker<P> {
     ///
     /// The presentation and lease refusals of a use, `LendingNotPermitted`
     /// when the holder neither owns the secret nor holds the right to lend
-    /// it, `PermissionDenied` when `child` may not use it, and
-    /// `BeyondAncestry` when a bound reaches past the handle above, and
-    /// `LendingTooDeep` below the deepest line the broker counts.
+    /// it, `PermissionDenied` when `child` may not use it, `LeaseBeyondGrant`
+    /// when `not_after_ms` is past the window of the grant `child` uses it
+    /// under, `BeyondAncestry` when a bound reaches past the handle above,
+    /// and `LendingTooDeep` below the deepest line the broker counts.
     pub fn derive(
         &mut self,
         token: &HandleToken,
@@ -268,13 +269,17 @@ impl<P: PermissionCheck> Broker<P> {
                 reason,
             });
         }
-        if let Err(denied) = self.permissions.may_use(&child.identity, &parent.secret) {
-            return Err(SecretsError::PermissionDenied {
-                holder: child.identity.clone(),
-                secret: parent.secret.clone(),
-                reason: denied.reason,
-            });
-        }
+        let permit = match self.permissions.may_use(&child.identity, &parent.secret) {
+            Ok(permit) => permit,
+            Err(denied) => {
+                return Err(SecretsError::PermissionDenied {
+                    holder: child.identity.clone(),
+                    secret: parent.secret.clone(),
+                    reason: denied.reason,
+                });
+            }
+        };
+        super::within_grant(&parent.secret, not_after_ms, &permit)?;
         let uses_left = parent.max_uses.saturating_sub(parent.used);
         let spend_left = parent.spend_cap.map(|cap| {
             cap.saturating_sub(

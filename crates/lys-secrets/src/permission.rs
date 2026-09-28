@@ -6,6 +6,10 @@
 pub struct Permitted {
     /// The person at the root of the grant chain.
     pub person: String,
+    /// When the grant's window ends, in milliseconds since the epoch, so a
+    /// lease cut under it ends no later; `None` for a grant with no end of
+    /// its own.
+    pub ends_at_ms: Option<i64>,
 }
 
 /// A refusal, with the reason the permission source gave.

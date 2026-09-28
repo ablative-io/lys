@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 use super::{EntryClass, SecretStore, check_name};
-use crate::error::SecretsError;
+use crate::error::{AccountsRefusal, SecretsError};
 use crate::keys::StoreKey;
 use crate::secret::Secret;
 
@@ -130,8 +130,10 @@ impl SecretStore {
             .order
             .get(ring.current)
             .filter(|account| !ring.resting.contains(*account))
-            .ok_or_else(|| SecretsError::NoAccountAvailable {
-                secret: secret.to_owned(),
+            .ok_or_else(|| {
+                SecretsError::from(AccountsRefusal::AllResting {
+                    secret: secret.to_owned(),
+                })
             })?;
         let entry = if account == "primary" {
             secret.to_owned()
@@ -146,18 +148,33 @@ impl SecretStore {
     ///
     /// # Errors
     ///
-    /// `SecretUnknown`, and `NoAccountAvailable` when every account rests.
+    /// `SecretUnknown`, and `AccountsRested` when every account rests or
+    /// every account but the one in use does, which then stays in use.
     pub(crate) fn next_account(&mut self, secret: &str) -> Result<String, SecretsError> {
         if self.entry(secret).is_none() {
             return Err(SecretsError::SecretUnknown {
                 name: secret.to_owned(),
             });
         }
-        let ring = self.index.accounts.get_mut(secret).ok_or_else(|| {
-            SecretsError::NoAccountAvailable {
+        let none_to_move_to = || {
+            SecretsError::from(AccountsRefusal::NoneToMoveTo {
                 secret: secret.to_owned(),
-            }
-        })?;
+            })
+        };
+        let ring = self
+            .index
+            .accounts
+            .get_mut(secret)
+            .ok_or_else(none_to_move_to)?;
+        if ring
+            .order
+            .iter()
+            .all(|account| ring.resting.contains(account))
+        {
+            return Err(SecretsError::from(AccountsRefusal::AllResting {
+                secret: secret.to_owned(),
+            }));
+        }
         let len = ring.order.len();
         let next = (1..len)
             .map(|step| (ring.current + step) % len)
@@ -166,16 +183,8 @@ impl SecretStore {
                     .get(*at)
                     .is_some_and(|account| !ring.resting.contains(account))
             })
-            .ok_or_else(|| SecretsError::NoAccountAvailable {
-                secret: secret.to_owned(),
-            })?;
-        let account =
-            ring.order
-                .get(next)
-                .cloned()
-                .ok_or_else(|| SecretsError::NoAccountAvailable {
-                    secret: secret.to_owned(),
-                })?;
+            .ok_or_else(none_to_move_to)?;
+        let account = ring.order.get(next).cloned().ok_or_else(none_to_move_to)?;
         if let Some(current) = ring.order.get(ring.current) {
             ring.resting.insert(current.clone());
         }
@@ -189,7 +198,7 @@ impl SecretStore {
     ///
     /// # Errors
     ///
-    /// `SecretUnknown`, and `NoAccountAvailable` when every account rests.
+    /// `SecretUnknown`, and `AccountsRested` when every account rests.
     pub(crate) fn take_turn(&mut self, secret: &str) -> Result<(String, String), SecretsError> {
         if self.entry(secret).is_none() {
             return Err(SecretsError::SecretUnknown {
@@ -212,6 +221,54 @@ impl SecretStore {
             }
         }
         Ok(taken)
+    }
+
+    /// Rests `account` of `secret`, taking it out of service. When it is the
+    /// one in use, the turn passes to the next account not resting, if any;
+    /// with every account resting, the next use, spawn or ask is refused as
+    /// `AccountsRested` until one is restored.
+    ///
+    /// # Errors
+    ///
+    /// `SecretUnknown`, and `AccountUnknown`.
+    pub(crate) fn rest_account(&mut self, secret: &str, account: &str) -> Result<(), SecretsError> {
+        if self.entry(secret).is_none() {
+            return Err(SecretsError::SecretUnknown {
+                name: secret.to_owned(),
+            });
+        }
+        let ring = self
+            .index
+            .accounts
+            .entry(secret.to_owned())
+            .or_insert_with(|| Ring {
+                order: vec!["primary".to_owned()],
+                current: 0,
+                resting: BTreeSet::new(),
+            });
+        if !ring.order.iter().any(|held| held == account) {
+            return Err(SecretsError::AccountUnknown {
+                secret: secret.to_owned(),
+                account: account.to_owned(),
+            });
+        }
+        ring.resting.insert(account.to_owned());
+        if ring
+            .order
+            .get(ring.current)
+            .is_some_and(|current| current == account)
+        {
+            let len = ring.order.len();
+            let next = (1..len).map(|step| (ring.current + step) % len).find(|at| {
+                ring.order
+                    .get(*at)
+                    .is_some_and(|held| !ring.resting.contains(held))
+            });
+            if let Some(next) = next {
+                ring.current = next;
+            }
+        }
+        self.write_index()
     }
 
     /// Returns a resting account to service.

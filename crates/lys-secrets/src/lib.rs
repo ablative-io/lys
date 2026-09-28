@@ -30,7 +30,10 @@ pub use broker::{
     PRESENTATION_SKEW_MS, RevocationState, RevokeOutcome, SNAPSHOT_EVERY, SecretSettings,
     SnapshotReport, Ticket, UpstreamRevocation, UseError, Used,
 };
-pub use error::{OwnerChangeRefusal, RevocationRefusal, SecretsError, ServiceRefusal};
+pub use error::{
+    AccountsRefusal, LeaseRefusal, OAuthRefusal, OwnerChangeRefusal, RevocationRefusal,
+    SecretsError, ServiceRefusal,
+};
 pub use handle::{
     HandleId, HandleToken, Holder, IssuedHandle, Presentation, new_operation_id, request_digest,
 };

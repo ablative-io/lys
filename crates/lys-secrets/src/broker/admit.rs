@@ -1,8 +1,10 @@
 //! Admission: the checks a presented handle passes, in the one order that
-//! gives one named refusal per attack.
+//! gives one named refusal per attack: the digest lookup, then the
+//! presentation (unsigned, then not verifying, then replayed or stale), then
+//! the lease (its uses, its window, its scope), then the permission.
 
 use crate::encoding::{Canonical, ct_eq, hex, sha256, unhex};
-use crate::error::SecretsError;
+use crate::error::{LeaseRefusal, SecretsError};
 use crate::handle::{HandleToken, Presentation, check_operation_id};
 use crate::permission::PermissionCheck;
 
@@ -48,13 +50,20 @@ impl<P: PermissionCheck> Broker<P> {
     }
 
     /// The handle `token` names, when `presentation` is signed for it by the
-    /// key it is bound to.
+    /// key it is bound to. A presentation with no signature is refused as
+    /// `PresentationUnsigned`; one that does not verify, for any reason, as
+    /// the one `PresentationInvalid`.
     pub(super) fn presented(
         &self,
         token: &HandleToken,
         presentation: &Presentation,
     ) -> Result<&HandleRecord, SecretsError> {
         let record = self.find(token).ok_or(SecretsError::HandleUnknown)?;
+        if presentation.attestation.is_none() {
+            return Err(SecretsError::PresentationUnsigned {
+                handle: record.id.clone(),
+            });
+        }
         let key: [u8; 32] = unhex(&record.holder_key)
             .and_then(|bytes| bytes.try_into().ok())
             .ok_or_else(|| SecretsError::StoreCorrupt {
@@ -97,6 +106,26 @@ impl<P: PermissionCheck> Broker<P> {
         Ok(())
     }
 
+    /// Whether `asked` is inside the lease's scope: the secret the lease
+    /// names, or one of its accounts. A handle presented for any other
+    /// secret is refused as `OutsideScope`.
+    pub(super) fn within_lease(
+        &self,
+        record: &HandleRecord,
+        asked: &str,
+    ) -> Result<(), SecretsError> {
+        let named = asked == record.secret
+            || self.store.account_parent(asked) == Some(record.secret.as_str());
+        if named {
+            return Ok(());
+        }
+        Err(SecretsError::from(LeaseRefusal::OutsideScope {
+            handle: record.id.clone(),
+            secret: record.secret.clone(),
+            asked: asked.to_owned(),
+        }))
+    }
+
     /// Whether the handle's identity still holds the use relation.
     pub(super) fn permitted(&self, record: &HandleRecord) -> Result<(), SecretsError> {
         self.within_scope(&record.identity, &record.secret)
@@ -121,6 +150,7 @@ impl<P: PermissionCheck> Broker<P> {
         presentation: &Presentation,
         (operation, mark): (&str, &str),
         reserve: u64,
+        asked: Option<&str>,
     ) -> Result<Admission, SecretsError> {
         let record = self.presented(token, presentation)?;
         check_operation_id(&presentation.operation_id)?;
@@ -137,6 +167,9 @@ impl<P: PermissionCheck> Broker<P> {
             return Err(SecretsError::LeaseExhausted {
                 handle: record.id.clone(),
             });
+        }
+        if let Some(asked) = asked {
+            self.within_lease(record, asked)?;
         }
         self.permitted(record)?;
         let reserved = match record.spend_cap {
