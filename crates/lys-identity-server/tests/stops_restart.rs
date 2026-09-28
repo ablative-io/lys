@@ -32,7 +32,37 @@ fn stop(operation: &str, reason: &str, at: u64) -> Stop {
         sessions_asked: vec!["op-9".to_owned()],
         credentials_ended: None,
         credentials_refused: Some("SecretsUnavailable: not configured".to_owned()),
+        done: true,
     }
+}
+
+#[test]
+fn a_stop_asked_binds_its_words_before_it_is_done() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("stops");
+    let mut store = StopStore::open(&path, key(dir.path())?)?;
+    assert_eq!(store.ask(stop("op-1", "leaked its key", 5))?, None);
+    assert!(matches!(
+        store.ask(stop("op-1", "other words", 6)),
+        Err(ServerError::StopReused { .. })
+    ));
+    assert!(matches!(
+        store.keep(stop("op-1", "other words", 6)),
+        Err(ServerError::StopReused { .. })
+    ));
+    assert_eq!(store.ask(stop("op-1", "leaked its key", 7))?, None);
+    drop(store);
+
+    let mut store = StopStore::open(&path, key(dir.path())?)?;
+    assert!(store.recorded("op-1").is_some_and(|asked| !asked.done));
+    let done = store.keep(stop("op-1", "leaked its key", 8))?;
+    assert!(done.done);
+    assert_eq!(
+        store.ask(stop("op-1", "leaked its key", 9))?,
+        Some(done.clone())
+    );
+    assert_eq!(store.keep(stop("op-1", "leaked its key", 9))?, done);
+    Ok(())
 }
 
 #[test]
