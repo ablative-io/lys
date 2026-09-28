@@ -14,8 +14,16 @@
 //! from, or when it is the root authority. A refusal that would name a grant
 //! or identity the caller may not see is answered with its name and without
 //! the record.
+//!
+//! Road step 2 holds: every check, why and who-can question is answered by
+//! `SpiceDB` through the step-2 engine, and a change is answered only once
+//! the engine's projection has applied it. A configuration that names no
+//! `SpiceDB` gRPC address has no engine, and every grant route is then
+//! refused `spicedb_grpc_absent`: no grant is ever decided in this process.
+//! The administrator's admission by its configured issuer and subject never
+//! asks `SpiceDB`.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, PoisonError};
 
@@ -23,7 +31,9 @@ use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use lys_identity::grants::{ExerciseRequest, GrantError, Grants, MemoryRelationships, Model};
+use lys_identity::grants::{
+    ExerciseRequest, GrantError, Grants, MemoryRelationships, Model, Recorded,
+};
 use lys_identity::projection::Projection;
 use lys_identity::signer::load_service_key;
 use lys_identity::{IdentityId, PersonId};
@@ -31,16 +41,20 @@ use lys_log_store::FileLeafStore;
 
 use crate::error::ServerError;
 use crate::grant_contract::{
-    ActionBody, DelegateBody, GrantList, GrantView, HolderView, ModelView, PAGE_MAX, PermitView,
-    RecordedView, RevokeBody, RootBody, WhoBody, WhoPage, grant_id,
+    ActionBody, DelegateBody, GrantList, GrantView, ModelView, PAGE_MAX, PermitView, RecordedView,
+    RevokeBody, RootBody, WhoBody, WhoPage, grant_id,
 };
 use crate::grant_sight::{as_seen_by, sees, sees_with, visible_or};
+use crate::grants_explain::{engine, who_page};
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
-use crate::spicedb::{Relationships, SpiceDb, SpiceDbSettings};
+use crate::spicedb::engine::Engine;
+use crate::spicedb::freshness::Fresh;
+use crate::spicedb::{SpiceDbError, SpiceDbSettings};
 
-/// The grants as the service holds them.
-pub type GrantState = Grants<FileLeafStore, Relationships>;
+/// The grants as the service holds them. The in-process relationships keep
+/// only the grants' own bookkeeping: no decision is made from them.
+pub type GrantState = Grants<FileLeafStore, MemoryRelationships>;
 
 /// What the grants are opened from.
 pub struct GrantSetup {
@@ -52,12 +66,26 @@ pub struct GrantSetup {
     pub key_file: PathBuf,
     /// The model grants are judged against.
     pub model: Model,
-    /// The permission engine the grants are mirrored into, if one is named.
+    /// The `SpiceDB` the configuration names, shown on the connections
+    /// screen; no grant is written or decided through these settings.
     pub spicedb: Option<SpiceDbSettings>,
+    /// The step-2 engine, which answers every grant and permission check;
+    /// absent when the configuration names no `SpiceDB` gRPC address, and
+    /// every grant route is then refused.
+    pub engine: Option<Engine>,
+    /// Why there is no engine, when there is none: what the configuration
+    /// names in place of a `SpiceDB` gRPC address.
+    pub engine_absent: String,
 }
 
 impl GrantSetup {
     fn open(&self, root_authority: PersonId) -> Result<GrantState, ServerError> {
+        if self.engine.is_none() {
+            return Err(SpiceDbError::GrpcAbsent {
+                reason: self.engine_absent.clone(),
+            }
+            .into());
+        }
         if !self.log_dir.exists() {
             FileLeafStore::create(&self.log_dir, &self.log_origin).map_err(|error| {
                 ServerError::ConfigInvalid {
@@ -66,21 +94,13 @@ impl GrantSetup {
             })?;
         }
         let log_dir = self.log_dir.clone();
-        let relationships = match &self.spicedb {
-            Some(settings) => Relationships::SpiceDb(SpiceDb::open(settings, &self.model)?),
-            None => Relationships::Memory(MemoryRelationships::default()),
-        };
-        let mut grants = Grants::open(
+        Ok(Grants::open(
             Box::new(move || FileLeafStore::open(&log_dir)),
             load_service_key(&self.key_file)?,
-            relationships,
+            MemoryRelationships::default(),
             self.model.clone(),
             root_authority,
-        )?;
-        if self.spicedb.is_some() {
-            grants.project()?;
-        }
-        Ok(grants)
+        )?)
     }
 }
 
@@ -92,6 +112,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/grants/roots", post(issue_root))
         .route("/grants/check", post(check))
         .route("/grants/why", post(why))
+        .route("/grants/explain", post(crate::grants_explain::explain))
         .route("/grants/who", post(who))
         .route("/grants/{id}", get(read))
         .route("/grants/{id}/revoke", post(revoke))
@@ -136,28 +157,14 @@ pub(crate) fn with_grants<T>(
     })
 }
 
-/// Refuse unless the permission engine, where one is named, gives the caller
-/// the action on the resource. The grants' own decision is made first and
-/// nothing is recorded, so a refusal the grants name is answered by its name.
-fn engine_permits(
-    grants: &mut GrantState,
-    directory: &Projection,
-    request: &ExerciseRequest,
-    at: u64,
-) -> Result<(), GrantError> {
-    if matches!(grants.relationships(), Relationships::Memory(_)) {
-        return Ok(());
-    }
-    let permit = grants.explain(directory, request, at, None)?;
-    let Relationships::SpiceDb(engine) = grants.relationships() else {
-        return Ok(());
-    };
-    if engine.check(&request.resource, &request.action, request.caller, at)? {
-        return Ok(());
-    }
-    Err(GrantError::PermissionAbsent {
-        grant: permit.grant.to_string(),
-    })
+/// Answer a recorded change once the step-2 engine's projection has applied
+/// it.
+fn settled(
+    state: &AppState,
+    judged: &Judged<'_>,
+    recorded: Recorded,
+) -> Result<Recorded, GrantError> {
+    engine(state)?.settle(judged.grants, judged.root, recorded)
 }
 
 /// The identity the signed-in caller's login is bound to, person or agent.
@@ -234,6 +241,7 @@ async fn issue_root(
         let recorded = judged
             .grants
             .issue_root(judged.directory, &request, now())?;
+        let recorded = settled(&state, &judged, recorded)?;
         Ok(Json(RecordedView::from(&recorded)))
     })
 }
@@ -254,7 +262,11 @@ async fn delegate(
                 grant: request.source.to_string(),
             },
         )?;
-        match judged.grants.delegate(judged.directory, &request, now()) {
+        match judged
+            .grants
+            .delegate(judged.directory, &request, now())
+            .and_then(|recorded| settled(&state, &judged, recorded))
+        {
             Ok(recorded) => Ok(Json(RecordedView::from(&recorded))),
             Err(error) => Err(as_seen_by(&judged, caller, error)),
         }
@@ -279,7 +291,11 @@ async fn revoke(
                 grant: id.to_string(),
             },
         )?;
-        match judged.grants.revoke(&request, now()) {
+        match judged
+            .grants
+            .revoke(&request, now())
+            .and_then(|recorded| settled(&state, &judged, recorded))
+        {
             Ok(recorded) => Ok(Json(RecordedView::from(&recorded))),
             Err(error) => Err(as_seen_by(&judged, caller, error)),
         }
@@ -302,9 +318,14 @@ async fn check(
             resource,
             action,
         };
-        let at = now();
-        let decided = engine_permits(&mut *judged.grants, judged.directory, &request, at)
-            .and_then(|()| judged.grants.check(judged.directory, &request, at, None));
+        let decided = engine(&state).and_then(|engine| {
+            let reached = engine.catch_up(judged.grants, judged.root)?;
+            let evaluator = Fresh::new(engine.evaluator(), &reached);
+            let at = engine.evaluator().now();
+            judged
+                .grants
+                .check_with(judged.directory, &request, &evaluator, at)
+        });
         match decided {
             Ok(permit) => Ok(Json(PermitView::from(&permit))),
             Err(error) => Err(as_seen_by(&judged, caller, error)),
@@ -326,10 +347,15 @@ async fn why(
             resource,
             action,
         };
-        match judged
-            .grants
-            .explain(judged.directory, &request, now(), None)
-        {
+        let decided = engine(&state).and_then(|engine| {
+            let reached = engine.catch_up(judged.grants, judged.root)?;
+            let evaluator = Fresh::new(engine.evaluator(), &reached);
+            let at = engine.evaluator().now();
+            judged
+                .grants
+                .decide(judged.directory, &request, &evaluator, at)
+        });
+        match decided {
             Ok(permit) => Ok(Json(PermitView::from(&permit))),
             Err(error) => Err(as_seen_by(&judged, caller, error)),
         }
@@ -346,59 +372,17 @@ async fn who(
             reason: format!("page_size is 1 to {PAGE_MAX}"),
         });
     }
-    let (route, resource, action) = body.question.parts()?;
-    let at = now();
+    let (_, resource, action) = body.question.parts()?;
     with_grants(&state, |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
-        let after = body.after.as_deref();
-        let mut known = HashMap::new();
-        let holders: BTreeSet<(String, IdentityId)> = judged
-            .grants
-            .book()
-            .on_resource(&resource)
-            .filter(|record| {
-                record.grant().actions().contains(&action)
-                    && sees_with(&judged, caller, record, &mut known)
-            })
-            .map(|record| {
-                let holder = record.grant().holder();
-                (holder.to_string(), holder)
-            })
-            .filter(|(text, _)| after.is_none_or(|after| text.as_str() > after))
-            .collect();
-        // A holder is on a page only when its own grant permits the action,
-        // and the page names a next holder only when a later holder permits.
-        let (page, more) = {
-            let mut permitted = holders.into_iter().filter_map(|(text, holder)| {
-                let request = ExerciseRequest {
-                    caller: holder,
-                    route,
-                    resource: resource.clone(),
-                    action: action.clone(),
-                };
-                judged
-                    .grants
-                    .explain(judged.directory, &request, at, None)
-                    .ok()
-                    .map(|permit| HolderView {
-                        holder: text,
-                        permit: PermitView::from(&permit),
-                    })
-            });
-            let page: Vec<HolderView> = permitted.by_ref().take(body.page_size).collect();
-            let more = page.len() == body.page_size && permitted.next().is_some();
-            (page, more)
-        };
-        let next = if more {
-            page.last().map(|last| last.holder.clone())
-        } else {
-            None
-        };
-        Ok(Json(WhoPage {
-            holders: page,
-            revision: judged.grants.revision(),
-            complete: next.is_none(),
-            next,
-        }))
+        let question = (&resource, &action);
+        Ok(Json(who_page(
+            engine(&state)?,
+            &judged,
+            caller,
+            question,
+            body.after.as_deref(),
+            body.page_size,
+        )?))
     })
 }

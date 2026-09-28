@@ -14,6 +14,7 @@ import { Settings } from './features/settings/Settings';
 import { People } from './features/people/People';
 import { Manage } from './features/people/Manage';
 import { IssueRoot } from './features/grants/IssueRoot';
+import { PermissionWhy } from './features/grants/PermissionWhy';
 import { Model } from './features/access/Model';
 import { Graph } from './features/access/Graph';
 import { Resources } from './features/access/Resources';
@@ -37,6 +38,7 @@ export function AppRoutes() {
       <Route path="/reviews" element={<Reviews />} />
       <Route path="/requests" element={<Requests />} />
       <Route path="/people" element={<People />} />
+      <Route path="/file/:id/why" element={<PermissionWhy />} />
       <Route path="/file/:id/:tab?" element={<IdentityFile />} />
       <Route path="/me" element={<You />} />
       <Route path="/settings/:sec?" element={<Settings />} />

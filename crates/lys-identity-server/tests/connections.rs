@@ -23,9 +23,14 @@ async fn configured_connections_are_not_a_health_claim() -> TestResult {
     assert_eq!(connections.len(), 3);
     assert_eq!(connections[0]["state"], "configured");
     assert_eq!(connections[0]["endpoint"], service.issuer.issuer());
-    assert_eq!(connections[1]["state"], "local");
+    // Every grant question is asked of SpiceDB, and the harness gives the
+    // service a disposable SpiceDB of its own.
+    let spicedb = service
+        .spicedb_endpoint()
+        .ok_or("the harness started no SpiceDB for the service")?;
+    assert_eq!(connections[1]["state"], "configured");
+    assert_eq!(connections[1]["endpoint"], format!("http://{spicedb}"));
     assert_eq!(connections[2]["state"], "unconfigured");
-    assert!(connections[1]["endpoint"].is_null());
     assert!(connections[2]["endpoint"].is_null());
     for entry in connections {
         let object = entry.as_object().ok_or("connection is not an object")?;
@@ -62,6 +67,8 @@ async fn configured_projection_is_reported_without_reading_its_key_or_connecting
             endpoint: "does-not-exist.invalid:8089".to_owned(),
             key_file: std::path::PathBuf::from("/unreadable-connection-test-key"),
             mirror: "test".to_owned(),
+            grpc: None,
+            max_updates_per_write: 1000,
         }),
         |_| Ok(()),
     )

@@ -14,6 +14,9 @@ pub enum ServerError {
     /// A grant refusal, from the grants' one authority owner.
     #[error(transparent)]
     Grant(#[from] GrantError),
+    /// `SpiceDB` could not be reached, refused a call, or holds another schema.
+    #[error(transparent)]
+    SpiceDb(#[from] crate::spicedb::SpiceDbError),
     /// The caller has no live session.
     #[error("NotSignedIn: sign in through the configured issuer first")]
     NotSignedIn,

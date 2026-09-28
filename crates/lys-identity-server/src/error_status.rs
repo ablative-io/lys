@@ -50,7 +50,9 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
         | GrantError::OperationUnresolved { .. }
         | GrantError::ProjectionPending { .. }
         | GrantError::StaleDecision { .. }
-        | GrantError::PermissionEngineUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
+        | GrantError::PermissionEngineUnavailable { .. }
+        | GrantError::EngineUnanswered { .. }
+        | GrantError::ProjectionRefused { .. } => StatusCode::SERVICE_UNAVAILABLE,
         GrantError::OperationReused { .. }
         | GrantError::GrantExists { .. }
         | GrantError::AlreadyRevoked { .. } => StatusCode::CONFLICT,
@@ -144,7 +146,8 @@ impl ServerError {
             | Self::TeamsUnavailable { .. }
             | Self::StopsUnavailable { .. }
             | Self::SignInProvidersUnavailable { .. }
-            | Self::ReviewsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
+            | Self::ReviewsUnavailable { .. }
+            | Self::SpiceDb(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),

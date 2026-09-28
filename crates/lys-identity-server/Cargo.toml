@@ -12,30 +12,38 @@ publish = false
 [dependencies]
 axum.workspace = true
 base64.workspace = true
+hyper-util.workspace = true
 lys-core.workspace = true
 lys-home.workspace = true
 lys-identity.workspace = true
 lys-log-store.workspace = true
 openidconnect.workspace = true
+prost.workspace = true
+prost-types.workspace = true
 rand.workspace = true
 reqwest.workspace = true
+rustls.workspace = true
+rustls-rustcrypto.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tokio-rustls.workspace = true
+tonic.workspace = true
+tonic-prost.workspace = true
+tower.workspace = true
 tracing.workspace = true
+webpki-roots.workspace = true
+zeroize.workspace = true
+
+[build-dependencies]
+prost-build.workspace = true
+protox.workspace = true
 
 [dev-dependencies]
 identity-contract = { path = "../../tests/identity_contract" }
 tempfile.workspace = true
-
-# The target that needs a running permission database runs only when it is
-# named, never under `cargo test --workspace --all-features`.
-[[test]]
-name = "identity_spicedb"
-path = "tests/identity_spicedb.rs"
-test = false
 
 [lints]
 workspace = true

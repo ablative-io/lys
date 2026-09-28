@@ -4,3 +4,4 @@ pub mod fake_issuer;
 pub mod fake_rauthy;
 pub mod fixtures;
 pub mod harness;
+pub mod spicedb;

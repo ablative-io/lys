@@ -299,7 +299,7 @@ async fn a_check_records_its_use_and_an_explanation_records_nothing() -> TestRes
         )
         .await?;
     assert_eq!(status, 403, "{refused}");
-    assert_eq!(refused["refusal"], "NotHeld", "{refused}");
+    assert_eq!(refused["refusal"], "no_grant", "{refused}");
     assert_eq!(
         revision(&service, &ada_cookie).await?,
         before + 1,

@@ -28,6 +28,8 @@ use crate::oidc::Oidc;
 use crate::reviews_store::ReviewStore;
 use crate::service_accounts_store::ServiceAccountStore;
 use crate::session::{Sessions, now};
+use crate::spicedb::Engine;
+use crate::spicedb::schema::Started;
 
 /// Everything a request is served from.
 pub struct AppState {
@@ -90,6 +92,50 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
 /// it read and how much it holds, and the grant log when the grants are
 /// opened on their first use.
 pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
+    let step_two = config
+        .spicedb
+        .as_ref()
+        .filter(|settings| settings.grpc.is_some());
+    let engine = match step_two {
+        None => {
+            tracing::warn!(
+                reason = %engine_absent(config),
+                "no SpiceDB gRPC address is configured, and every grant route is refused spicedb_grpc_absent"
+            );
+            None
+        }
+        Some(settings) => {
+            let (engine, started) = Engine::start(settings, &config.grant_log_dir)?;
+            say(match started {
+                Started::Written => "spicedb schema written from schema.zed",
+                Started::Unchanged => "spicedb schema already schema.zed, nothing written",
+            });
+            Some(engine)
+        }
+    };
+    service_engaged(config, say, engine).await
+}
+
+/// What `config` names in place of a `SpiceDB` gRPC address.
+fn engine_absent(config: &Config) -> String {
+    match &config.spicedb {
+        Some(settings) => format!(
+            "the configuration names SpiceDB's gateway at {} and no grpc address",
+            settings.endpoint
+        ),
+        None => "the configuration names no SpiceDB".to_owned(),
+    }
+}
+
+/// As `service_saying`, with the step-2 `engine` given rather than started
+/// from the configuration: every grant and permission check is answered by
+/// it, and every grant route is refused `spicedb_grpc_absent` when it is
+/// absent.
+pub async fn service_engaged(
+    config: &Config,
+    say: Say,
+    engine: Option<Engine>,
+) -> Result<Router, ServerError> {
     let mut directory = open_directory(config)?;
     say(&format!("directory log {}", directory.log()?.start()));
     let key = Arc::new(load_service_key(&config.event_key_file)?);
@@ -122,6 +168,8 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
             key_file: config.event_key_file.clone(),
             model: config.grant_model()?,
             spicedb: config.spicedb.clone(),
+            engine,
+            engine_absent: engine_absent(config),
         },
         secrets: config
             .secrets

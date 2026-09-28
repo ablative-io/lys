@@ -23,7 +23,9 @@ async fn configuration_is_the_effective_startup_view_without_secrets() -> TestRe
     assert_eq!(body["sign_in"]["provider_origin"], service.issuer.issuer());
     assert!(body["sign_in"]["session_seconds"].as_u64().is_some());
     assert!(body["sign_in"]["secure_cookie"].as_bool().is_some());
-    assert_eq!(body["permissions"]["projection"], "local");
+    // Every grant question is asked of SpiceDB: the harness gives the
+    // service a disposable SpiceDB of its own.
+    assert_eq!(body["permissions"]["projection"], "spicedb");
     assert_eq!(body["secrets"]["configured"], false);
     assert_eq!(body["storage"]["directory_format"], "signed_leaf_log");
     let text = body.to_string();

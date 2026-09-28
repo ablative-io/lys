@@ -23,6 +23,8 @@ installs use test identities and test provider registrations only.
 
 SpiceDB's step-1 role, in one sentence: in step 1 SpiceDB is installed, migrated, backed up and health-checked against the shared PostgreSQL database, and it enforces nothing, because no component asks it for a permission decision or writes a grant to it, and live capability policy and its enforcement stay with road step 2.
 
+SpiceDB's step-2 role, in one sentence: from road step 2 on, SpiceDB answers every grant and permission check the identity server makes and holds the directory's relations, projected from the signed directory log, and the administrator's admission by its configured issuer and subject is the one check that never asks it.
+
 It answers no check for any identity, holds no grant or relationship of the
 directory, gates nothing through the lifecycle state DIRECTORY-003 records, and
 running it is not permission enforcement. `lys identity health` reads its readiness

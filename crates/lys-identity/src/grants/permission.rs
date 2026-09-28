@@ -8,13 +8,32 @@
 //! derived from it. The relationships are derived from committed grant events
 //! only, in log order, and the store's revision is the number of events it
 //! reflects, so a decision can require the revision a change made.
+//!
+//! Road step 2 answers the grant question behind this decision with an
+//! [`Evaluator`]: [`Grants::decide`] asks it exactly once and admits nothing
+//! it does not permit. The book only names what was decided, the grant a
+//! permit rests on or the reason for a refusal; it never turns a refusal
+//! into a permit. The directory's lifecycle rule stands in front of it: a
+//! caller the directory does not record as active is refused
+//! `IdentityNotActive` before `SpiceDB` is asked, and a permit is refused the
+//! same way when a holder on the grant's path is no longer active or answered
+//! for by the person the directory records.
 
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex, PoisonError};
 
+use lys_log_store::LeafStore;
+
+use super::admission::{active, holders_active};
+use super::authority::{ExerciseRequest, Grants, Permit};
 use super::error::GrantError;
-use super::types::{Grant, GrantId, Resource, Source};
+use super::events::GrantChange;
+use super::lineage::Lineage;
+use super::projection::{GrantBook, GrantRecord};
+use super::revocation::unrevoked;
+use super::types::{Action, Grant, GrantId, Resource, Source};
 use crate::id::IdentityId;
+use crate::projection::Projection;
 
 /// The permission model the relationships follow, in the `SpiceDB` schema
 /// language. Each resource kind is defined beside these with one relation per
@@ -223,4 +242,191 @@ pub fn confirm(held: &BTreeSet<Relationship>, path: &[GrantId], at: u64) -> Resu
         }
     }
     Ok(())
+}
+
+/// The grant question the permission decision asks its evaluator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Question<'a> {
+    /// The identity asked about.
+    pub subject: IdentityId,
+    /// The object acted on.
+    pub resource: &'a Resource,
+    /// The action.
+    pub action: &'a Action,
+}
+
+/// The evaluator's answer to one grant question.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Answer {
+    /// Whether the evaluator permits.
+    pub permitted: bool,
+    /// The log position the evaluator's relationships stand at.
+    pub revision: u64,
+}
+
+/// What answers the grant question behind the permission decision: in road
+/// step 2, `SpiceDB` through the identity server's one evaluator.
+pub trait Evaluator {
+    /// Answer `question` with one evaluation, the committed grant events
+    /// being those `book` holds up to log position `committed`. A question
+    /// the evaluator cannot answer now is refused by name, never guessed.
+    fn evaluate(
+        &self,
+        book: &GrantBook,
+        committed: u64,
+        question: &Question<'_>,
+    ) -> Result<Answer, GrantError>;
+}
+
+/// The refusal when no grant covers the question, `no_grant`.
+fn no_grant(question: &Question<'_>) -> GrantError {
+    GrantError::NoGrant {
+        identity: question.subject.to_string(),
+        resource: question.resource.to_string(),
+        action: question.action.to_string(),
+    }
+}
+
+/// The grants `question`'s identity holds carrying its action on its resource.
+fn candidates<'a>(book: &'a GrantBook, question: &Question<'a>) -> impl Iterator<Item = &'a Grant> {
+    let (resource, action) = (question.resource, question.action);
+    book.held_by(question.subject)
+        .map(GrantRecord::grant)
+        .filter(move |grant| grant.resource() == resource && grant.actions().contains(action))
+}
+
+/// The live grant a permitted decision about `question` rests on, with its
+/// ancestry: the first of the identity's grants for the question whose
+/// ancestry holds no withdrawn grant.
+pub fn resting<'a>(book: &'a GrantBook, question: &Question<'a>) -> Option<(&'a Grant, Lineage)> {
+    candidates(book, question).find_map(|grant| {
+        let lineage = book.lineage(grant.id()).ok()?;
+        unrevoked(book, &lineage).ok()?;
+        Some((grant, lineage))
+    })
+}
+
+/// The reason a refused decision about `question` at `at` names, read from
+/// the book: `permission_revoked` with the withdrawn grant when a committed
+/// revoke withdrew a grant on the path, else the ended or unstarted grant,
+/// else `no_grant`.
+pub fn refusal(book: &GrantBook, question: &Question<'_>, at: u64) -> GrantError {
+    let mut ended = None;
+    for grant in candidates(book, question) {
+        let Ok(lineage) = book.lineage(grant.id()) else {
+            continue;
+        };
+        let withdrawn = lineage.path.iter().find(|id| {
+            book.record(**id)
+                .is_some_and(|record| record.revoked().is_some())
+        });
+        if let Some(withdrawn) = withdrawn {
+            return GrantError::PermissionRevoked {
+                grant: withdrawn.to_string(),
+            };
+        }
+        if let Some((ended_at, by)) = lineage.ends
+            && at >= ended_at
+        {
+            ended.get_or_insert(GrantError::Expired {
+                grant: by.to_string(),
+                ended_at,
+            });
+        }
+        let unstarted = lineage.path.iter().find_map(|id| {
+            let held = book.grant(*id)?;
+            (at < held.window().starts_at()).then(|| GrantError::NotStarted {
+                grant: id.to_string(),
+                starts_at: held.window().starts_at(),
+            })
+        });
+        if let Some(unstarted) = unstarted {
+            ended.get_or_insert(unstarted);
+        }
+    }
+    ended.unwrap_or_else(|| no_grant(question))
+}
+
+impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
+    /// The permission decision answered by `evaluator`: exactly one
+    /// evaluation, and nothing recorded. A permit names the live grant it
+    /// rests on; a refusal names the withdrawn grant when a committed revoke
+    /// is the reason, else the ended or unstarted grant, else `no_grant`.
+    /// A caller `directory` does not record as active is refused before the
+    /// evaluator is asked, and a permit whose path holds an identity that is
+    /// no longer active is refused by that identity's state.
+    pub fn decide(
+        &mut self,
+        directory: &Projection,
+        request: &ExerciseRequest,
+        evaluator: &dyn Evaluator,
+        at: u64,
+    ) -> Result<Permit, GrantError> {
+        self.settle_log().ok();
+        let question = Question {
+            subject: request.caller,
+            resource: &request.resource,
+            action: &request.action,
+        };
+        self.unresolved_for(&question)?;
+        active(directory, request.caller)?;
+        let answer = evaluator.evaluate(&self.book, self.folded, &question)?;
+        if !answer.permitted {
+            return Err(refusal(&self.book, &question, at));
+        }
+        let Some((grant, lineage)) = resting(&self.book, &question) else {
+            return Err(no_grant(&question));
+        };
+        holders_active(&self.book, directory, &lineage.path)?;
+        Ok(Permit {
+            grant: grant.id(),
+            path: lineage.path,
+            root_person: lineage.root_person,
+            actions: grant.actions().clone(),
+            model_version: grant.parts().model_version,
+            revision: answer.revision,
+            use_event: None,
+        })
+    }
+
+    /// As [`Grants::decide`], at the moment the action is taken: a permitted
+    /// decision records the use.
+    pub fn check_with(
+        &mut self,
+        directory: &Projection,
+        request: &ExerciseRequest,
+        evaluator: &dyn Evaluator,
+        at: u64,
+    ) -> Result<Permit, GrantError> {
+        let mut permit = self.decide(directory, request, evaluator, at)?;
+        permit.use_event = Some(self.record_use(request.caller, permit.grant, request.route, at));
+        Ok(permit)
+    }
+
+    /// Refuse while an append the question depends on is uncertain.
+    fn unresolved_for(&self, question: &Question<'_>) -> Result<(), GrantError> {
+        let Some(held) = self.ledger.uncertain() else {
+            return Ok(());
+        };
+        let unresolved = || GrantError::OperationUnresolved {
+            operation: held.operation.to_string(),
+            grant: held.grant.to_string(),
+        };
+        match held.event.change() {
+            GrantChange::Issue(grant)
+                if grant.holder() == question.subject && grant.resource() == question.resource =>
+            {
+                Err(unresolved())
+            }
+            GrantChange::Revoke { grant, .. } => {
+                let on_path = candidates(&self.book, question).any(|candidate| {
+                    self.book
+                        .lineage(candidate.id())
+                        .is_ok_and(|lineage| lineage.path.contains(grant))
+                });
+                if on_path { Err(unresolved()) } else { Ok(()) }
+            }
+            GrantChange::Issue(_) | GrantChange::Use { .. } => Ok(()),
+        }
+    }
 }

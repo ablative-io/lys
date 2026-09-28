@@ -1,6 +1,7 @@
 //! Human-rooted grants: the application grant contract, its model, its
 //! admission, its signed events and their projections, and the one authority
-//! owner every route calls.
+//! owner every route calls. How a grant is written in `SpiceDB` is the pure
+//! mapping in `relationships`, and the identity server writes it.
 
 pub mod admission;
 pub mod authority;
@@ -16,6 +17,7 @@ pub mod projection;
 pub mod receipt;
 pub mod recovery;
 mod refusal_codec;
+pub mod relationships;
 pub mod revocation;
 mod state;
 #[cfg(any(test, feature = "test-support"))]
@@ -25,14 +27,17 @@ pub mod types;
 pub use admission::{DelegateRequest, RootRequest, Route};
 pub use authority::{ExerciseRequest, Grants, Permit, Recorded, RevokeRequest};
 pub use codec::{GRANT_ENVELOPE, MEMBERS, decode_grant, encode_grant};
-pub use error::GrantError;
+pub use error::{GrantError, ProjectionRefusal};
 pub use events::{
     GrantChange, GrantEvent, SignedGrantEvent, decode_event_body, encode_event_body,
     sign_grant_event, verify_grant_event,
 };
 pub use lineage::Lineage;
 pub use model::{Model, Within};
-pub use permission::{MemoryRelationships, ObjectRef, Relationship, RelationshipStore, SCHEMA};
+pub use permission::{
+    Answer, Evaluator, MemoryRelationships, ObjectRef, Question, Relationship, RelationshipStore,
+    SCHEMA,
+};
 pub use projection::{GrantBook, GrantRecord, LastUse, Revocation};
 pub use receipt::{GrantReceipt, verify_grant_receipt};
 pub use recovery::{GrantLedger, Uncertain};

@@ -216,7 +216,8 @@ fn grant_freshness_a_stale_engine_never_permits_after_a_committed_revoke() -> Te
             .check(directory, &exercise, now, Some(required)),
         Err(GrantError::StaleDecision {
             required,
-            projected: engine.revision()?
+            projected: engine.revision()?,
+            grant: None,
         }),
         "a caller presenting the required revision gets no permit from the old state"
     );

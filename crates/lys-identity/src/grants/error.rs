@@ -361,15 +361,20 @@ pub enum GrantError {
         /// The index of its event.
         index: u64,
     },
-    /// The permission relationships are older than the revision the decision needs.
+    /// The permission relationships are older than the revision the decision
+    /// needs. In road step 2 the revisions are log positions, and the refusal
+    /// names the grant the unapplied event changes.
     #[error(
-        "StaleDecision: the decision needs revision {required} and the permission relationships stand at {projected}"
+        "StaleDecision: the decision needs revision {required} and the permission relationships stand at {projected}{}",
+        affected(.grant.as_deref())
     )]
     StaleDecision {
         /// The revision required.
         required: u64,
         /// The revision projected.
         projected: u64,
+        /// The grant the unapplied event changes, when one does.
+        grant: Option<String>,
     },
     /// The permission engine could not be read or written.
     #[error("PermissionEngineUnavailable: {reason}")]
@@ -383,7 +388,119 @@ pub enum GrantError {
         /// The grant.
         grant: String,
     },
+    /// A delegation asks for an end later than its source grant's. It is
+    /// refused before anything is committed, never clamped.
+    #[error(
+        "delegation_outlives_source: the delegation asks for expiry {requested}, later than {source_grant}, which ends at {source_ends}; nothing is committed"
+    )]
+    DelegationOutlivesSource {
+        /// The end requested.
+        requested: String,
+        /// The source grant.
+        source_grant: String,
+        /// When the source ends.
+        source_ends: u64,
+    },
+    /// A committed grant event the permission projection refuses: no
+    /// relationship is written for it, and no later event is applied.
+    #[error(
+        "projection_refused: the grant event at log position {position} is not projected, and no later event is applied: {refusal}"
+    )]
+    ProjectionRefused {
+        /// The event's log position.
+        position: u64,
+        /// Why it is refused.
+        refusal: ProjectionRefusal,
+    },
+    /// The permission engine gave no answer to a permission check, so nothing is admitted.
+    #[error(
+        "permission_engine_unavailable: {reason}; nothing is admitted without the permission engine's answer"
+    )]
+    EngineUnanswered {
+        /// What the engine, or the way to it, reported.
+        reason: String,
+    },
+    /// The permission engine answered that a caveat's context was missing, so
+    /// the answer is neither yes nor no and nothing is admitted.
+    #[error(
+        "permission_conditional: the permission engine answered CONDITIONAL_PERMISSION for {identity} to {action} on {resource}, so a caveat's context was missing; nothing is admitted"
+    )]
+    PermissionConditional {
+        /// The identity checked.
+        identity: String,
+        /// The action.
+        action: String,
+        /// The resource.
+        resource: String,
+    },
+    /// A grant on the path was withdrawn by a committed revoke.
+    #[error(
+        "permission_revoked: {grant} was withdrawn by a committed revoke, and nothing through it is admitted"
+    )]
+    PermissionRevoked {
+        /// The withdrawn grant.
+        grant: String,
+    },
+    /// No grant covers the question.
+    #[error("no_grant: no grant gives {identity} {action} on {resource}")]
+    NoGrant {
+        /// The identity asked about.
+        identity: String,
+        /// The resource.
+        resource: String,
+        /// The action.
+        action: String,
+    },
     /// A directory refusal met while judging a grant.
     #[error(transparent)]
     Identity(#[from] IdentityError),
+}
+
+/// Why the permission projection refuses a committed grant event. Each names
+/// the event's log position, and the projector stops before the event.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ProjectionRefusal {
+    /// A committed delegation asks for an end later than its source grant's:
+    /// a corrupt or foreign event, since admission refuses it by name.
+    #[error(
+        "projection_expiry_past_source: the delegation at log position {position} asks for expiry {requested}, later than {source_grant}, which ends at {source_ends}"
+    )]
+    ExpiryPastSource {
+        /// The event's log position.
+        position: u64,
+        /// The source grant.
+        source_grant: String,
+        /// When the source ends.
+        source_ends: u64,
+        /// The end the event asks for.
+        requested: String,
+    },
+    /// A committed grant names neither a source grant nor issue by the
+    /// directory's root authority, so it would stand on nothing.
+    #[error(
+        "projection_standing_missing: the grant {grant} at log position {position} names neither a source grant nor issue by the directory's root authority"
+    )]
+    StandingMissing {
+        /// The event's log position.
+        position: u64,
+        /// The grant.
+        grant: String,
+    },
+    /// A committed grant event the grant book refused when it was folded.
+    #[error(
+        "projection_event_refused: the grant event at log position {position} was refused when it was folded: {reason}"
+    )]
+    Refused {
+        /// The event's log position.
+        position: u64,
+        /// The book's refusal.
+        reason: String,
+    },
+}
+
+/// The words a stale decision adds when it names the grant it waits on.
+fn affected(grant: Option<&str>) -> String {
+    grant.map_or_else(String::new, |grant| {
+        format!("; the unapplied event changes {grant}")
+    })
 }
