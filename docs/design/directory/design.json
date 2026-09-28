@@ -2610,6 +2610,26 @@
       "path": "surface/identity/src/api.ts",
       "note": "DIRECTORY-046 R7: The screens choose the right route first and fetch independent reads together",
       "brief": "DIRECTORY-046"
+    },
+    {
+      "path": "rules/no-app-names.yml",
+      "note": "DIRECTORY-048 R7: the ast-grep rule that refuses an app named in Lys code",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "sgconfig.yml",
+      "note": "DIRECTORY-048 R7: the ast-grep configuration; gains the rule that refuses an app named in Lys code",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys/src/cli/mcp.rs",
+      "note": "DIRECTORY-049 R7: the Lys MCP server over standard input and output: three tools over the published registration API",
+      "brief": "DIRECTORY-049"
+    },
+    {
+      "path": "crates/lys/tests/mcp_stdio.rs",
+      "note": "DIRECTORY-049 R7: the MCP server driven over standard input and output, each tool call carrying the caller's own token or agent signature",
+      "brief": "DIRECTORY-049"
     }
   ],
   "inventory": [
