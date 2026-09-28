@@ -2,8 +2,8 @@
   "cluster": "directory",
   "title": "The standalone identity directory, with every grant rooted in a person",
   "intention": "An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change. Cambium later uses this issuer, keeping its participant ids (row 06); that direction is recorded here while row 06 stays the non-goal recorded below, and this sentence does not promise it.",
-  "problem": "IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands.",
-  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5. Row 6.4 of docs/design/identity/CONFORMANCE.md, issuance entered in a transparency log and verified offline by anyone, is carried by DIRECTORY-031 on the lys-log-store log that `lys log` keeps (ADR-081): `lys ca issue` enters every certificate it produces as one leaf holding its DER before anything is written, the issuer holds only the CA key, the log's operator makes the inclusion artifact with `lys log prove inclusion`, and `lys ca issuer-cert` gives the stranger the issuer certificate `openssl verify` needs.",
+  "problem": "IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands. DIRECTORY-002 will install the maintained Rauthy, SpiceDB and one PostgreSQL database, but no gate leg starts the Rauthy container and checks it, and the release row holds that gap as a blocker. A leg declared only in docs/design/project.json would not reach a directory round either, because a round reads this cluster's gate.",
+  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.\n\nThe Rauthy readiness leg (DIRECTORY-009) closes the release row's missing Rauthy check without touching landing. It is one demand-cadence leg, rauthy-ready, declared in docs/design/project.json and in this cluster's gate, and a round never runs it unless asked. Until the method can request a demand leg, a person runs its command at the venue. Its command is one standard-library Python script under scripts/identity-gates/. The script reads the vendor/rauthy pin from git and the two image digests from DIRECTORY-002's deploy/identity/versions.json, so no digest is duplicated. It accepts only a Rauthy image whose OCI revision label equals the pin (ADR-009), set by a build of the pin at the venue. An image with no revision label is refused, and the refusal names the build command that makes one. That makes a pin move refuse until an image of the new pin exists, instead of passing while checking other software. It starts that image against its own scratch PostgreSQL container (ADR-005), so nothing is configured and no other service is needed (ADR-004). Every object carries a per-run name and label, and only that run's objects are removed. Rauthy's port is read from its own container, never assumed. Secrets are generated per run and reach the runtime only through private env files. The leg is a check, not a provisioning engine: it leaves nothing behind. A Rust test run by the tests leg drives the script against a stub runtime, keying its secret search on what the runtime received.",
   "principles": [
     {
       "id": "P1",
@@ -86,7 +86,8 @@
     "Every decision still open for Tom is recorded as open and decided nowhere in this cluster. Decided under ADR-078: the grant representation was ruled by the owning lead, Archie, with Apollo as second reader, on Waffles' ruling of 12:13 on Tom's word of 12:12 that technical formats are the owning lead's with a second reader.",
     "Every grant and permission check the standalone identity server makes is answered by SpiceDB behind DIRECTORY-006's permission decision, the administrator's admission being the one named exception, a call after a committed revoke is never admitted, and the screen answers why an identity can and why it cannot do a thing from the server's answer (DIRECTORY-025, ADR-078).",
     "Road step 2's certificate half (defined in docs/design/identity/STATEMENT-2026-09-22.md, The road; brought into this cluster by ADR-093): an enduring agent's certificate states what it was granted at issuance in a typed, versioned claim, lys/agent-capability/v1, a new format under its own proposed OID 1.3.6.1.4.1.66364.2.1 alongside the unchanged shipped .1 extension transport, and a named verifier, verify_agent_capability, checks the chain against a set of trusted issuer keys, reads the claim and refuses what it does not cover (DIRECTORY-031).",
-    "DIRECTORY-034 draws the access graph (conformance 8.3) with grant edges and every reachability from Access's answers, and responsible people and resource parents as recorded, holding no permission rule of its own (ADR-098)."
+    "DIRECTORY-034 draws the access graph (conformance 8.3) with grant edges and every reachability from Access's answers, and responsible people and resource parents as recorded, holding no permission rule of its own (ADR-098).",
+    "The rauthy-ready leg is declared with cadence demand in docs/design/project.json and in this cluster's gate, both files validate, and the leg exits 0 at the venue only on Rauthy's ready answer (DIRECTORY-009)."
   ],
   "non_goals": [
     {
@@ -220,6 +221,22 @@
     {
       "text": "The graph's rail entry and g h shortcut",
       "reason": "The shell card AL4OyeKG registers every screen's route and key; DIRECTORY-034 adds only the graph's deep links and its Show in graph links."
+    },
+    {
+      "text": "A demand leg for SpiceDB readiness on the shared database",
+      "reason": "DIRECTORY-002 also installs SpiceDB, but the readiness leg's words name only Rauthy and its scratch database."
+    },
+    {
+      "text": "Building a Rauthy image from the vendor/rauthy pin",
+      "reason": "The leg accepts only an image whose own build set its revision label to the pin, and the upstream v0.36.2 image carries no such label. Building that image is heavy venue work, and the readiness leg's card does not do it."
+    },
+    {
+      "text": "A way for the method to request a demand leg and record its outcome",
+      "reason": "It lives in the design-system repository and changes the ledger for every project; design-system card 9jJgCzeG carries it, together with the acceptance line that a round records rauthy-ready as Unmeasured on a venue declaring no tool:docker."
+    },
+    {
+      "text": "Adding the readiness leg to .land/gates.sh",
+      "reason": "The land gate script is not changed; a demand leg never enters landing."
     }
   ],
   "structure": [
@@ -1987,6 +2004,26 @@
       "path": "docs/design/directory/briefs/DIRECTORY-034.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-034"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-009.json",
+      "note": "the Rauthy readiness leg brief",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "docs/design/project.json",
+      "note": "the lys design project file; gains the rauthy-ready demand leg",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "scripts/identity-gates/rauthy_ready.py",
+      "note": "the rauthy-ready leg's command: start the pinned Rauthy against a scratch PostgreSQL, pass on its ready answer, remove what it made",
+      "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "crates/lys/tests/rauthy_ready_leg.rs",
+      "note": "runs the rauthy-ready script against a stub runtime; counts refusals, cleanup and searched secrets",
+      "brief": "DIRECTORY-009"
     }
   ],
   "inventory": [
@@ -2085,6 +2122,22 @@
     {
       "path": "scripts/verify_inclusion.py",
       "note": "the stranger's inclusion checker for lys/log-inclusion-proof/v1: Python standard library only, exit 0 verified, 1 usage or I/O, 2 verification failed, an optional expected-root-base64 third argument; it does not check the checkpoint's signature and says so. Read, never changed"
+    },
+    {
+      "path": "docs/design/project.json",
+      "note": "the lys design project file at main 7b53625: one tree, the rust-build shorthand, seven legs all cadence round, and the roots map"
+    },
+    {
+      "path": "scripts/design/schemas/project.schema.json",
+      "note": "the project schema: a leg is name, command, requires (at least one) and cadence (round or demand), the command run with no shell"
+    },
+    {
+      "path": "scripts/design/gate.sh",
+      "note": "the design leg: validates docs/design/project.json and every cluster, checks coverage and the rendered markdown"
+    },
+    {
+      "path": ".land/gates.sh",
+      "note": "the land gate script: the design leg and the six cargo gates; not changed by DIRECTORY-009"
     }
   ],
   "constraints": [

@@ -34,10 +34,10 @@
 
 **S12.** As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
 
-## Graph viewer — Looks at who can reach what on the access graph
+## Release reviewer — Closes the release's missing Rauthy check with a measurement
 
-**S121.** As a person signed in to the directory, I want to see what I may see as a graph, with my own reach drawn from Access's answers and the recorded containment and responsible people, so that what the graph shows is what the directory would decide.
+**S13.** As the release reviewer, I want a gate leg I can ask for that starts the pinned Rauthy against a scratch database and passes only when it answers ready, so that the release's Rauthy blocker is closed by a measured result rather than a claim.
 
-**S122.** As a directory administrator holding the visibility permission, I want to ask the graph who can reach a resource and see Access's answer with its model version and the time it was drawn, so that I can review reach without the screen inventing any of it.
+## Operator — Runs the Rauthy readiness leg at the venue
 
-**S123.** As a reviewer of conformance row 8.3, I want tests that compare every drawn edge with the real evaluator and prove the graph module holds no rule, so that the graph cannot drift from Access unnoticed.
+**S14.** As the operator running the readiness leg, I want every missing prerequisite refused by name, so that I know exactly what to put in place and never mistake a skipped check for a pass.

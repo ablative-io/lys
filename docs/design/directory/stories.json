@@ -594,6 +594,26 @@
           "text": "As a reviewer of conformance row 8.3, I want tests that compare every drawn edge with the real evaluator and prove the graph module holds no rule, so that the graph cannot drift from Access unnoticed."
         }
       ]
+    },
+    {
+      "name": "Release reviewer",
+      "role": "Closes the release's missing Rauthy check with a measurement",
+      "stories": [
+        {
+          "id": "S13",
+          "text": "As the release reviewer, I want a gate leg I can ask for that starts the pinned Rauthy against a scratch database and passes only when it answers ready, so that the release's Rauthy blocker is closed by a measured result rather than a claim."
+        }
+      ]
+    },
+    {
+      "name": "Operator",
+      "role": "Runs the Rauthy readiness leg at the venue",
+      "stories": [
+        {
+          "id": "S14",
+          "text": "As the operator running the readiness leg, I want every missing prerequisite refused by name, so that I know exactly what to put in place and never mistake a skipped check for a pass."
+        }
+      ]
     }
   ]
 }

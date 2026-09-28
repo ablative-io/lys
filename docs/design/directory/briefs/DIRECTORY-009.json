@@ -1,17 +1,13 @@
 {
   "id": "DIRECTORY-009",
   "cluster": "directory",
-  "title": "Refuse by name every directory act that would give a sign-in identity to an agent",
+  "title": "Start the pinned Rauthy against a scratch PostgreSQL in a demand gate leg and pass only when it answers ready",
   "depends_on": [
-    "DIRECTORY-004",
-    "DIRECTORY-006"
+    "DIRECTORY-002"
   ],
   "blocked_by": [
-    "Sign-off of this brief before it is dispatched (DIRECTORY-001 boundary: no row brief is dispatched until it has been reviewed).",
-    "DIRECTORY-004 landed on lys main, checked by a command anyone can run: git clone https://github.com/ablative-io/lys.git lys-check && cd lys-check && git ls-tree origin/main vendor/rauthy prints a commit other than dd61ac3c84d6b238108dc8438b53043b5177a662, and git ls-tree -r --name-only origin/main -- docs/design/identity/PROVIDER-LINK-CONTRACT.md docs/design/identity/reports/IDENTITY-001-links.md prints both paths. Until both hold, this brief is not dispatched.",
-    "DIRECTORY-006 landed on lys main, checked by a command anyone can run: in the same clone, git ls-tree -r --name-only origin/main -- crates/lys-identity/src/grants/admission.rs crates/lys-identity-server/src/grants.rs crates/lys-identity-server/src/routes.rs crates/lys-identity/tests/grant_delegation.rs crates/lys-identity-server/tests/grant_explanations.rs prints all five paths. crates/lys-identity-server/src/routes.rs is created by DIRECTORY-005 R1 and modified by DIRECTORY-006 R5, and R4 below modifies it, so its presence on lys main is checked here. Until it does, this brief is not dispatched.",
-    "The binding registration path of DIRECTORY-003 R1 and its link-audit receiver (R4) are named by DIRECTORY-003's reviewed file manifest, which does not exist yet; R1, R3 and R4 below reconcile their call sites to that manifest before dispatch, and a missing seam is a named dispatch blocker, never a new seam invented here.",
-    "Finding against DIRECTORY-004 (recorded in this brief's task): its link path has no call that asks lys-identity by issuer-subject pair before the fork links. That check does not exist yet: R4 creates it on the lys-identity side (crates/lys-identity-server/src/sign_in_link_check.rs), and the fork-side call, which passes the authenticated person on whose behalf it asks, and its acceptance line are carried by DIRECTORY-004 and the fork-owned brief it waits on."
+    "DIRECTORY-002 has landed and records the two members R1 reads: a stranger checks it with git cat-file -e origin/main:deploy/identity/versions.json, which exits 0 only once the file is on main, and then with `git show origin/main:deploy/identity/versions.json | python3 -c \"import json,re,sys; d=json.load(sys.stdin); ok=isinstance(d,dict) and isinstance(d.get('rauthy_image_id'),str) and isinstance(d.get('postgres_image'),str) and re.fullmatch(r'sha256:[0-9a-f]{64}',d['rauthy_image_id']) is not None and re.fullmatch(r'[^@\\s]+@sha256:[0-9a-f]{64}',d['postgres_image']) is not None; sys.exit(0 if ok else 1)\"`, which exits 0 only when that file is a JSON object whose rauthy_image_id matches sha256: followed by 64 lowercase hexadecimal characters and whose postgres_image matches <repository>@sha256: followed by 64 lowercase hexadecimal characters. This brief reads that file and duplicates neither value.",
+    "An image built from ablative-io/rauthy at the vendor/rauthy pin exists at the venue, and that build itself set its org.opencontainers.image.revision label to the pin commit. deploy/identity/versions.json records that image by its local image ID, the sha256 content ID that docker image inspect --format '{{.Id}}' prints, beside the pinned revision, and never as <repo>@sha256:<digest>; no registry is involved and the image is never pushed or pulled. A stranger checks it with docker image inspect --format '{{index .Config.Labels \"org.opencontainers.image.revision\"}}' on the Rauthy image ID in versions.json, which prints the output of git rev-parse HEAD:vendor/rauthy only once that image is in place. Measured at main 7b53625: the pin is dd61ac3c84d6b238108dc8438b53043b5177a662, and the upstream ghcr.io/sebadob/rauthy:0.36.2 image (sha256:f7d3c501402165e023edbd958b032b41c9cfdac5ea7f8ca7d62217327145577e) carries no org.opencontainers.image.revision label, so R1 refuses it as rauthy_revision_mismatch. A label written onto an image not built from the pin is refused as a source, and there is no fallback. Building the image is venue work outside this brief."
   ],
   "checklist": [
     "C31",
@@ -19,161 +15,49 @@
     "C33",
     "C34",
     "C35",
-    "C36"
+    "C36",
+    "C37"
   ],
   "stories": [
     "S13",
-    "S14",
-    "S15",
-    "S16",
-    "S17"
+    "S14"
   ],
   "design_anchor": [
-    "ADR-001",
-    "ADR-003",
     "ADR-004",
-    "ADR-009",
-    "ADR-011",
-    "ADR-019"
+    "ADR-005",
+    "ADR-009"
   ],
-  "purpose": "State and test conformance row 1.2 of docs/design/identity/CONFORMANCE.md: a sign-in identity is never lent to or held by an agent. A sign-in identity is a provider account (issuer plus subject, P1) linked to a person in the directory, through which that person signs in; sign-in identities belong to people only (ADR-019). IDENTITY-001 was to state this and never did, and no brief tests it; this brief carries the statement and its tests instead of amending IDENTITY-001 (CN1). The directory holds sign-in identities beside people (DIRECTORY-004) and gives grants to agents (DIRECTORY-006), so the refusal sits at the two acts the directory owns: linking a provider account to an agent, and delegating a sign-in identity. Each is refused by name, writes nothing, and one counted test over the store then finds no agent record carrying a sign-in identity. The third act, issuing an agent a credential derived from a person's sign-in session, is the broker's (ADR-001): this brief states it as a finding against SECRETS-002 and does not enforce it. This brief names row 1.2 as the row it passes; row 1.2 is met in full only when the broker's line (task, finding 1) also passes. The one named exception is the harness login token, which reaches a seat's process under the ruling recorded at docs/design/identity/STATEMENT-2026-09-22.md:43 and docs/design/identity/STATEMENT-2026-09-22.md:167 and docs/design/identity/PROVISIONING-2026-09-22.md:18; it never passes through anything lys issues, links or delegates, it is not redefined here, and the rule governs everything lys itself gives an agent.",
-  "task": "Build R1 to R7 in order, after DIRECTORY-004 and DIRECTORY-006 have landed on lys main (blocked_by gives the command that checks each). R1 classifies an issuer-subject pair from the directory's signed history; R2 is the one refusal value and its two views; R3 refuses a sign-in identity as an agent's binding and accepts an agent's own machine account; R4 is the lys-identity check the link path asks before a person links a provider account; R5 refuses delegating a sign-in identity at DIRECTORY-006 admission; R6 serves the reason 'sign-in identity' on the cannot-give list and the two refusal views at the grant seam; R7 proves every refusal writes nothing and that no agent record carries a sign-in identity. Every path is relative to the repository root (CN3).\n\nThe rule. Sign-in identities belong to people only. Nothing an agent holds or presents is ever a person's sign-in session or token. A sign-in identity is never a thing anyone can give, to an agent or to another person; row 1.2 is the agent case, and the person-recipient case follows from the same rule. An agent's own machine account, bound to the agent and to no person, is a service account under row 1.3's separate list and stays allowed as its DIRECTORY-003 R1 issuer-subject binding. A provider account once linked to a person stays refused as any agent's binding after it is unlinked, whether the agent is that person's or anyone else's; the directory keeps the unlink on the record, and the refusal names the account as a former sign-in identity. When an agent's own machine account is bound first and a person later tries to link that same provider account, the agent's binding stands and the person's link is refused by name; nothing is ever withdrawn silently to make room. A service-access grant (for example Google Drive consented through the same account the person signs in with) is a separate record under SECRETS-002 R4, delegated under DIRECTORY-006's own rules; delegating it gives the agent that service's access, never the person's sign-in or session, and this brief does not refuse it.\n\nThe named exception. The harness login token reaches a seat's process under the ruling recorded at docs/design/identity/STATEMENT-2026-09-22.md:43 and docs/design/identity/STATEMENT-2026-09-22.md:167 and docs/design/identity/PROVISIONING-2026-09-22.md:18 (SECRETS-002 R5). It is the one named exception, it never passes through anything lys issues, links or delegates, and this brief neither overturns nor redefines it.\n\nFinding 1, against SECRETS-002, carried by the broker's card. Issuing credentials is the broker's (ADR-001), so the third refusal is a rule the broker enforces, not a directory seam. Its acceptance line, for the broker's card to carry: the broker refuses to issue an agent any credential derived from a person's sign-in session; a credential request for an agent that presents a person's sign-in token is refused by name, the refusal names the act, the agent and the sign-in identity, and the request issues nothing. Row 1.2 is met in full only when that line passes.\n\nFinding 2, against DIRECTORY-004, carried by DIRECTORY-004 and the fork-owned brief it waits on. DIRECTORY-004's link path has no call that asks lys-identity by issuer-subject pair before the fork links, and the fork knows only Rauthy users, so it cannot see an agent's binding. Its acceptance line: the fork's call passes the issuer-subject pair and the authenticated person on whose behalf it asks, because R4 chooses the refusal's view by that person; with an agent's own machine account bound to issuer https://github.com and subject gh-7 in lys-identity, a person's attempt to link that account in the fork is refused by name with R4's refusal in the view R4 chooses for that person, and the fork creates no link.\n\nThe screen. The cannot-give list is row 2.4's screen, carried by Cambium card jAfmblAP on the delegation screen; this brief supplies only the server's reason (R6) and does no screen work.\n\nIn: the classification, the refusal and its views, the two directory refusals, the pre-link check, the cannot-give reason and the store test. Out: the broker's refusal (finding 1), the fork-side call (finding 2), any screen, any change to CONFORMANCE.md or to IDENTITY-001, and any change to lys-core or a published wire format.",
+  "purpose": "DIRECTORY-002 will install the maintained Rauthy, SpiceDB and one PostgreSQL database, but no gate leg starts the Rauthy container and checks it, and the release row holds that gap as a blocker. This brief adds one gate leg, cadence demand, to the lys design project file and to the directory cluster's gate. The leg starts the Rauthy pinned in vendor/rauthy in a container against a scratch PostgreSQL container, waits for Rauthy's readiness answer, then stops and removes everything it made. It passes only on that answer, refuses by name when the runtime or an image is missing, and lets no secret into its output. A test run by a round leg proves the last of these by searching the output for every secret value the runtime received.",
+  "task": "Write the leg's command as one standard-library Python script at scripts/identity-gates/rauthy_ready.py (R1). Write a Rust integration test at crates/lys/tests/rauthy_ready_leg.rs that runs the script against a stub container runtime and counts what fired (R2). Append the leg to docs/design/project.json (R3) and to the directory cluster's design.json gate (R4). How a person asks for the leg until the method can: from the repository root on the venue, run `python3 scripts/identity-gates/rauthy_ready.py`. The request path inside the method's ledger is design-system card 9jJgCzeG and is out of scope here. That card also carries the acceptance line that a round records rauthy-ready as Unmeasured, with a reason containing 'requires tool:docker', on a venue declaring no tool:docker. This brief does not claim that line, and it lands without it. In scope: the one script, the one test file, one appended leg in each of the two design files, and the directory cluster's rendered markdown that render-cluster.py rewrites from the amended design.json. Out of scope: .land/gates.sh, which is not changed; every existing leg; any round-cadence leg; SpiceDB; building or pulling any image; moving the vendor/rauthy pin; any file under deploy/identity/, which is DIRECTORY-002's and is read, never written. The script is a check, not a provisioning engine: it installs nothing durable, and every object it creates is removed before it exits. That keeps it clear of DIRECTORY-002's boundary against a Python or shell provisioning engine. It reads the image references DIRECTORY-002 records and provisions nothing that DIRECTORY-002's lys identity subcommands own.",
   "requirements": [
     {
       "id": "R1",
-      "title": "Classify an issuer-subject pair from the directory's signed history",
-      "spec": "THE SYSTEM SHALL classify an issuer-subject pair, from the directory's signed events, as exactly one of: a current sign-in identity (linked to a person now, naming that person), a former sign-in identity (linked to a person once and since unlinked, naming that person), an agent's service account (bound to an agent and never to a person, naming that agent), or unbound. A person's registration binding and every provider link the DIRECTORY-003 R4 receiver records count as linked to a person; an unlink the receiver records moves the pair to former and never back to unbound. The classification SHALL be derived from the replayed log, so it is the same after reopen. It SHALL NOT use email, display name or provider-side account labels to decide anything (P1), and SHALL NOT drop a former sign-in identity from the projection on unlink, retirement of the person, or replay.",
+      "title": "Start the pinned Rauthy against a scratch PostgreSQL container, pass only on its ready answer, and remove everything the leg made",
+      "spec": "WHEN python3 scripts/identity-gates/rauthy_ready.py runs, THE SYSTEM SHALL do the following, in order. The versions file is deploy/identity/versions.json under the repository the script lives in, unless the one optional argument --versions-file <path> names another file, which is then read instead; the script takes no other argument. (1) Read the vendor/rauthy pin as the commit git rev-parse HEAD:vendor/rauthy prints in the repository the script lives in; the submodule need not be initialised. (2) Read from the versions file, a JSON object, two top-level string members: rauthy_image_id, the Rauthy image's local image ID (sha256: followed by 64 lowercase hexadecimal characters, as docker image inspect --format '{{.Id}}' prints it), and postgres_image, the PostgreSQL image's digest reference (<repository>@sha256: followed by 64 lowercase hexadecimal characters). DIRECTORY-002's R1 records image digests in deploy/identity/versions.json but names no members for them, so DIRECTORY-002 must record these two under exactly these names. (3) Check that the container runtime answers: the docker client is on PATH and docker version reaches its daemon. (4) Check that each image is present locally with docker image inspect: first the Rauthy image ID, and only when that succeeds, the PostgreSQL digest reference. (5) Read the Rauthy image's org.opencontainers.image.revision label and compare it with the pin. (6) Create one network, one PostgreSQL container and one Rauthy container. Each carries the name lys-rauthy-ready-<run>-<role>, where <run> is a random hexadecimal identifier drawn for that run, and the label io.lys.gate.rauthy-ready=<run>. The PostgreSQL container publishes no host port. The Rauthy container publishes its HTTP port only on 127.0.0.1, with a host port the runtime picks. Every docker run carries --pull never. (7) Wait until docker exec pg_isready succeeds in the PostgreSQL container. (8) Read the Rauthy container's published port with docker port and poll http://127.0.0.1:<that port>/auth/v1/health. The Rauthy container is started with HEALTH_CHECK_DELAY_SECS=0, so the early answer Rauthy gives inside that delay cannot count. (9) Pass only when that endpoint answers HTTP 200 with a JSON body whose db_healthy and cache_healthy are both true, printing one line beginning 'ready:' to stdout and exiting 0. (10) On every exit path, pass, refusal, failure or interruption by SIGINT or SIGTERM, stop and remove each container with its anonymous volumes, then the network, then the private temporary directory. The removal goes by the exact names this run created. The leg generates five secret values from Python's secrets module and hands them to the runtime only through --env-file files created with mode 0600 in that temporary directory. The five are the PostgreSQL password (POSTGRES_PASSWORD for PostgreSQL, PG_PASSWORD for Rauthy), ENC_KEYS, BOOTSTRAP_ADMIN_PASSWORD_PLAIN, HQL_SECRET_RAFT and HQL_SECRET_API. IF the docker client is absent from PATH, THEN THE SYSTEM SHALL refuse as container_runtime_missing, and it SHALL do the same when docker version cannot reach the daemon. IF docker image inspect of the Rauthy image ID fails, THEN THE SYSTEM SHALL refuse as image_missing. The refusal names rauthy, that image ID and the pin it was built from, then the one command that produces an image carrying that pin, `docker buildx build --label org.opencontainers.image.revision=<pin> --load .`, run in the Rauthy source checked out at the pin, with <pin> written out as the pin commit, followed by the check that reads the ID back, `docker image inspect --format '{{.Id}}' <image ID>`, with <image ID> written out. That refusal SHALL NOT contain the word 'pull'. IF the PostgreSQL image is not present locally, THEN THE SYSTEM SHALL refuse as image_missing, naming postgres and the digest reference, and SHALL tell the operator to pull that digest reference before running. IF the revision label is absent, THEN THE SYSTEM SHALL refuse as rauthy_revision_mismatch. The refusal says the image carries no revision label, contains the word 'absent', names the pin, and names the build command that makes a labelled image: `docker buildx build --label org.opencontainers.image.revision=<pin> --load .`, run in the Rauthy source checked out at the pin, with <pin> written out as the pin commit. IF the revision label differs from the pin, THEN THE SYSTEM SHALL refuse as rauthy_revision_mismatch, naming the label's value and the pin. IF git cannot read the pin, THEN THE SYSTEM SHALL refuse as rauthy_pin_unreadable. IF the versions file is absent or is not a JSON object, THEN THE SYSTEM SHALL refuse as versions_unreadable, naming the file's path. IF rauthy_image_id or postgres_image is missing, is not a string, or does not have the form step (2) gives it, THEN THE SYSTEM SHALL refuse as versions_unreadable, naming the file's path and each such member. That check (2) runs before check (3), so it needs no container runtime. IF pg_isready has not succeeded within 60 seconds, THEN THE SYSTEM SHALL refuse as readiness_timeout, naming postgres and the bound. IF Rauthy has not answered ready within 60 seconds, THEN THE SYSTEM SHALL refuse as readiness_timeout, naming rauthy and the bound. IF a runtime command the leg issues exits non-zero, THEN THE SYSTEM SHALL refuse as runtime_step_failed, naming the step and the exit status. Every refusal is one line on stderr of the form 'refused: <name>: <detail>' and exits 1. All checks (1) to (5) complete before anything is created, so a refusal among them creates nothing. THE SYSTEM SHALL NOT pull, build, tag or relabel an image, SHALL NOT refer to the Rauthy image by a <repo>@sha256:<digest> reference, and it SHALL NOT accept an image with no revision label on any other evidence. THE SYSTEM SHALL NOT exit 0 on any path except the ready answer, and it SHALL NOT report a missing prerequisite as a skip. THE SYSTEM SHALL NOT probe a fixed port or any port read from another container. THE SYSTEM SHALL NOT stop, remove, or connect to any container, network or volume it did not create in this run. THE SYSTEM SHALL NOT print a secret value, container logs, docker inspect output of a container, the runtime's own stdout or stderr, or the contents of an env file. THE SYSTEM SHALL NOT pass a secret value on a command line. THE SYSTEM SHALL NOT start SpiceDB, and it SHALL NOT write any file outside its private temporary directory. THE SYSTEM SHALL NOT write the versions file, and SHALL NOT fall back to deploy/identity/versions.json when --versions-file names a file that cannot be read.",
       "acceptance": [
-        "With issuer https://accounts.google.com and subject g-100 linked to person P, the classifier returns current sign-in identity naming P.",
-        "After the receiver records P's unlink of that pair, the classifier returns former sign-in identity naming P; after the store is closed and reopened, it still returns former sign-in identity naming P.",
-        "With issuer https://accounts.google.com and subject svc-a bound to agent A and to no person, the classifier returns agent's service account naming A.",
-        "A pair with issuer https://accounts.google.com and subject g-999 that no event names returns unbound, including when P's recorded email is the email of the g-999 account in the fixture.",
-        "The test counts the four classes it exercised and asserts the count is 4."
+        "On a venue with docker, the image named by rauthy_image_id and the image named by postgres_image in deploy/identity/versions.json present locally, and the Rauthy image's org.opencontainers.image.revision label equal to git rev-parse HEAD:vendor/rauthy, running `python3 scripts/identity-gates/rauthy_ready.py` from the repository root exits 0 and prints exactly one stdout line beginning 'ready:'.",
+        "On that venue, `docker ps -aq --filter label=io.lys.gate.rauthy-ready` prints 0 lines after the passing run, and `docker network ls -q --filter label=io.lys.gate.rauthy-ready` prints 0 lines after the passing run.",
+        "On that venue, `docker volume ls -q | wc -l` prints the same number before and after the passing run.",
+        "On that venue, `docker ps -a --format '{{.ID}} {{.State}} {{.Label \"io.lys.gate.rauthy-ready\"}}'` lines whose label field is empty are identical before and after the passing run.",
+        "On a machine whose PATH holds python3 and git but no docker, running `python3 scripts/identity-gates/rauthy_ready.py` from the repository root exits 1, prints no 'ready:' line, and prints to stderr a line beginning 'refused: container_runtime_missing'.",
+        "With the vendor/rauthy pin at dd61ac3c84d6b238108dc8438b53043b5177a662, running `python3 scripts/identity-gates/rauthy_ready.py --versions-file <f>` from the repository root on that venue, where <f> is a file written for this measurement holding a JSON object whose rauthy_image_id is the local image ID of an image present on the venue that carries no org.opencontainers.image.revision label, such as the upstream ghcr.io/sebadob/rauthy:0.36.2 image, and whose postgres_image is a digest reference present on the venue, exits 1 with a stderr line beginning 'refused: rauthy_revision_mismatch'. That line contains 'absent', contains dd61ac3c84d6b238108dc8438b53043b5177a662, and contains 'docker buildx build --label org.opencontainers.image.revision=dd61ac3c84d6b238108dc8438b53043b5177a662'. Afterwards `docker ps -aq --filter label=io.lys.gate.rauthy-ready` prints 0 lines. `git status --porcelain -- deploy/identity` prints the same lines before and after the run.",
+        "With the vendor/rauthy pin at dd61ac3c84d6b238108dc8438b53043b5177a662, running `python3 scripts/identity-gates/rauthy_ready.py --versions-file <f>` from the repository root on that venue, where <f> is a file written for this measurement holding a JSON object whose rauthy_image_id is sha256: followed by 64 lowercase hexadecimal characters naming no image present on the venue, and whose postgres_image is a digest reference present on the venue, exits 1 with a stderr line beginning 'refused: image_missing'. That line contains 'rauthy', that image ID, 'docker buildx build --label org.opencontainers.image.revision=dd61ac3c84d6b238108dc8438b53043b5177a662 --load .' and \"docker image inspect --format '{{.Id}}'\", and it contains 'pull' 0 times. Afterwards `docker ps -aq --filter label=io.lys.gate.rauthy-ready` prints 0 lines. `git status --porcelain -- deploy/identity` prints the same lines before and after the run.",
+        "On that venue, `docker image ls -q --no-trunc | sort` prints identical lines before and after the passing run.",
+        "On any machine with python3 and git, with or without docker, running `python3 scripts/identity-gates/rauthy_ready.py --versions-file <f>` from the repository root, where <f> holds a JSON object with postgres_image set to a digest reference and no rauthy_image_id member, exits 1, prints no 'ready:' line, and prints to stderr a line beginning 'refused: versions_unreadable' that contains <f> and 'rauthy_image_id' and does not contain 'postgres_image'.",
+        "On any machine with python3 and git, running the same command with <f> naming a path that does not exist exits 1 with a stderr line beginning 'refused: versions_unreadable' that contains <f>, and `git status --porcelain -- deploy/identity` prints the same lines before and after the run.",
+        "With the vendor/rauthy pin at dd61ac3c84d6b238108dc8438b53043b5177a662 and --versions-file <f>, where <f> holds a JSON object whose rauthy_image_id is sha256: followed by 64 zeros, an ID naming no image on the venue, and whose postgres_image is a digest reference present on the venue, the run exits 1 with a stderr line beginning 'refused: image_missing' that contains sha256: followed by 64 zeros; the ID read came from <f>, not from deploy/identity/versions.json."
       ],
       "files": {
         "create": [
-          "crates/lys-identity/src/sign_in_identity.rs",
-          "crates/lys-identity/tests/sign_in_classification.rs"
+          "scripts/identity-gates/rauthy_ready.py"
         ],
-        "modify": [
-          "crates/lys-identity/src/lib.rs"
-        ],
+        "modify": [],
         "delete": []
       },
       "checklist": [
-        "C31"
-      ],
-      "stories": [
-        "S13"
-      ]
-    },
-    {
-      "id": "R2",
-      "title": "Define the sign-in identity refusal and its two views",
-      "spec": "THE SYSTEM SHALL define one refusal for acts that would give a sign-in identity away. It names the act (link to an agent, or delegate), the recipient and its kind (agent or person), and the sign-in identity (provider and subject, current or former), and it states the literal sentence 'sign-in identities belong to people only'. WHEN the refusal is returned to the sign-in identity's owner or to a directory administrator (DIRECTORY-003 R3), THE SYSTEM SHALL show the provider and subject. WHEN it is returned to anyone else, THE SYSTEM SHALL show the act, the recipient and its kind, and that a sign-in identity is involved, and SHALL state the literal sentence 'sign-in identities belong to people only'. The view for anyone else SHALL NOT carry the provider or the subject in any form: not in its text, its Display, its Debug, its serialised response or its error code, which SHALL be the same whichever provider and subject are involved. This is what DIRECTORY-006 R5 requires of a why-refused response: it names the blocking condition without disclosing another identity's protected records.",
-      "acceptance": [
-        "For act delegate, recipient agent A, sign-in identity issuer https://accounts.google.com subject g-100 owned by P: the owner view shown to P contains https://accounts.google.com and g-100, and so does the administrator view shown to the configured administrator.",
-        "The same refusal shown to person Q contains the act delegate, agent A, the kind agent, the words sign-in identity and the literal sentence 'sign-in identities belong to people only', and neither https://accounts.google.com nor g-100 appears in any of its Display, its Debug and its serialised JSON.",
-        "The redacted views of two refusals that differ only in the sign-in identity (issuer https://accounts.google.com subject g-100, and issuer https://github.com subject gh-200) serialise to byte-identical JSON with the same error code.",
-        "A refusal for a former sign-in identity shown to its owner names it as a former sign-in identity."
-      ],
-      "files": {
-        "create": [
-          "crates/lys-identity/src/sign_in_refusal.rs",
-          "crates/lys-identity/tests/sign_in_refusal_views.rs"
-        ],
-        "modify": [
-          "crates/lys-identity/src/lib.rs"
-        ],
-        "delete": []
-      },
-      "checklist": [
+        "C33",
+        "C34",
         "C35"
-      ],
-      "stories": [
-        "S16",
-        "S17"
-      ]
-    },
-    {
-      "id": "R3",
-      "title": "Refuse a sign-in identity as an agent's binding and accept an agent's own machine account",
-      "spec": "WHEN a caller asks the DIRECTORY-003 R1 binding API to bind an issuer-subject pair to an agent, and R1 classifies the pair as a current or former sign-in identity, THE SYSTEM SHALL refuse with R2's refusal for the act link to an agent, naming the agent and the sign-in identity, and SHALL write no event. This holds whether the agent's responsible person is the sign-in identity's owner or anyone else. WHEN the pair is unbound, THE SYSTEM SHALL accept it as the agent's own machine account, a service account under row 1.3's separate list, as DIRECTORY-003 R1 does today. THE SYSTEM SHALL NOT withdraw, move or alter any existing binding to make room, and SHALL NOT manufacture a human login for the agent (P3).",
-      "acceptance": [
-        "Binding issuer https://accounts.google.com subject svc-a, linked to no person, to agent A is accepted: the log gains exactly one event and R1 then returns agent's service account naming A.",
-        "Binding issuer https://accounts.google.com subject g-100, linked to person P, to agent A whose responsible person is P is refused with the sign-in identity refusal naming act link to an agent, agent A and the sign-in identity, and the log's length is unchanged.",
-        "The same binding to agent B whose responsible person is Q is refused the same way, and the log's length is unchanged.",
-        "After P links then unlinks issuer https://github.com subject gh-200, binding that pair to agent A is refused by name as a former sign-in identity, and binding it to agent B is refused the same way; the log's length is unchanged by both.",
-        "The test counts one accepted case and four refused cases, and asserts both counts."
-      ],
-      "files": {
-        "create": [
-          "crates/lys-identity/tests/sign_in_agent_binding.rs"
-        ],
-        "modify": [
-          "crates/lys-identity/src/lib.rs"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C31"
-      ],
-      "stories": [
-        "S13",
-        "S15"
-      ]
-    },
-    {
-      "id": "R4",
-      "title": "Answer the link path's question before a person links a provider account",
-      "spec": "WHEN the link path asks lys-identity, by issuer-subject pair, whether a person may link that provider account, and R1 classifies the pair as an agent's service account, THE SYSTEM SHALL refuse by name. The refusal SHALL say the provider account is bound to an agent as that agent's service account, and SHALL name the act that answers it: the agent's responsible person or a directory administrator withdraws that binding first, and then the person links. The link path SHALL supply the authenticated person on whose behalf it asks, and the refusal's view SHALL be chosen by that person: WHEN that person is the agent's responsible person or a directory administrator (DIRECTORY-003 R3), the refusal SHALL name which agent holds the binding; WHEN that person is anyone else, the refusal SHALL say only that the provider account is bound to an agent as its service account and SHALL NOT name or identify the agent in its text, its Display, its Debug, its serialised response or its error code, as DIRECTORY-006 R5 keeps a refusal from disclosing another identity's protected records. THE SYSTEM SHALL NOT withdraw the agent's binding, SHALL NOT write any event, and SHALL answer only a caller authenticated as the link-audit source the DIRECTORY-003 R4 receiver already admits. WHEN the pair is bound to no agent, THE SYSTEM SHALL answer that lys-identity holds no agent binding for it, and SHALL NOT decide anything the fork's own refusals decide (DIRECTORY-004 R1). The check is new: it does not exist in DIRECTORY-004, and R4 creates it, served by the standalone identity server beside the receiver; the fork-side call, which supplies the pair and the authenticated person, is finding 2 in the task.",
-      "acceptance": [
-        "With issuer https://github.com subject gh-7 bound to agent B, whose responsible person is Q, as B's service account, the check asked on behalf of person P, who is not B's responsible person and not an administrator, returns the refusal: it states the account is bound to an agent as that agent's service account and names the act that answers it: the binding withdrawn first by one of the two who may withdraw it, the agent's responsible person and a directory administrator, and then the person's link; agent B's enduring id and name appear in none of its Display, its Debug and its serialised JSON; the log's length is unchanged and R1 still returns agent's service account naming B.",
-        "In a second store, created only in this test, the same issuer https://github.com subject gh-7 is bound instead to agent C, whose responsible person is also Q, as C's service account; the check asked on behalf of P in that store and the check asked on behalf of P in the first store, where B holds the binding, return redacted views that serialise to byte-identical JSON with the same error code.",
-        "The same check asked on behalf of B's responsible person Q, and again on behalf of the configured administrator, returns the refusal naming agent B as the holder of the binding, and the log's length is unchanged.",
-        "The check for issuer https://github.com subject gh-8, bound to no agent, returns that lys-identity holds no agent binding for it, and the log's length is unchanged.",
-        "An unauthenticated caller and a caller authenticated as anything other than the link-audit source are each refused by name, and neither receives an answer about gh-7.",
-        "The test counts the six cases it drove (the three views of the agent-bound refusal, the unbound pair and the two refused callers) and asserts the count is 6."
-      ],
-      "files": {
-        "create": [
-          "crates/lys-identity-server/src/sign_in_link_check.rs",
-          "crates/lys-identity-server/tests/sign_in_link_check.rs"
-        ],
-        "modify": [
-          "crates/lys-identity-server/src/routes.rs"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C32"
-      ],
-      "stories": [
-        "S15"
-      ]
-    },
-    {
-      "id": "R5",
-      "title": "Refuse delegating a sign-in identity at grant admission, for every recipient",
-      "spec": "WHEN a delegation request reaches DIRECTORY-006 R2 admission and its offered source resolves in the directory to a person's sign-in identity rather than to a grant, THE SYSTEM SHALL refuse with R2's refusal for the act delegate, naming the recipient, the recipient's kind and the sign-in identity, before any mutation, whether the recipient is an agent or a person. The offered source is the value in the request's source grant member, the DIRECTORY-006 R1 member that names what is passed on; every other member is formed as for any delegation. Admission SHALL resolve that value against the directory before its unknown-parent refusal: a value that names a grant resolves to that grant, and a value that is instead an issuer-subject pair, in the form DIRECTORY-003 R1 uses for an external binding, which R1 of this brief classifies as a current or former sign-in identity resolves to that person's sign-in identity. So the request 'P delegates that sign-in identity to A' is a delegation request whose actor is P, whose recipient is A and whose source grant member holds P's issuer-subject pair. Such a request reaches admission through DIRECTORY-006 R1's contract unchanged: the source grant member R1 proposes is a directory reference, and GRANT_CONTRACT parses it as well-formed lineage whether it names a grant or an issuer-subject pair; GRANT_CONTRACT's malformed-lineage refusal is only for a value that is not a well-formed directory reference. So a request whose source grant member holds a well-formed issuer-subject pair passes the parse and reaches R2 admission, where resolution finds the sign-in identity and this requirement refuses it by name. THE SYSTEM SHALL NOT add a source kind or any member to DIRECTORY-006 R1's grant contract to do this. A service-access grant consented through the same provider account the person signs in with is a separate record (SECRETS-002 R4); THE SYSTEM SHALL admit or refuse it by DIRECTORY-006's own rules only, and SHALL NOT refuse it because it shares an account with a sign-in identity.",
-      "acceptance": [
-        "Person P, who signs in with issuer https://accounts.google.com subject g-100, delegates that sign-in identity to P's agent A, by a delegation request whose source grant member holds issuer https://accounts.google.com subject g-100: refused with the sign-in identity refusal naming act delegate, recipient A and kind agent, and zero grant events are written; the refusal returned is the sign-in identity refusal and not GRANT_CONTRACT's malformed-lineage refusal.",
-        "P delegates the same sign-in identity to person Q: refused naming act delegate, recipient Q and kind person, and zero grant events are written.",
-        "P sends a delegation request to agent A whose source grant member holds a value that is not a well-formed directory reference: it is refused at the GRANT_CONTRACT parse with GRANT_CONTRACT's malformed-lineage refusal, not the sign-in identity refusal, and zero grant events are written.",
-        "P holds a Google Drive service-access grant consented through issuer https://accounts.google.com subject g-100, with pass-on authority for agents; P delegates it to agent A: accepted, exactly one grant event is written, and A's new grant names the Drive grant as its source.",
-        "The test counts three refusals (two sign-in identity refusals and one malformed-lineage refusal) and one acceptance, and asserts both counts."
-      ],
-      "files": {
-        "create": [
-          "crates/lys-identity/tests/grant_sign_in_identity.rs"
-        ],
-        "modify": [
-          "crates/lys-identity/src/grants/admission.rs"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C33"
       ],
       "stories": [
         "S13",
@@ -181,53 +65,84 @@
       ]
     },
     {
-      "id": "R6",
-      "title": "Serve the reason 'sign-in identity' on the cannot-give list and the two views at the grant seam",
-      "spec": "WHEN a person asks DIRECTORY-006 R5's explanation seam what they cannot give to a recipient, THE SYSTEM SHALL list each of that person's current sign-in identities with the reason 'sign-in identity', whoever the recipient is. THE SYSTEM SHALL NOT list another person's sign-in identities to them. WHEN the grant seam returns R5's refusal, THE SYSTEM SHALL choose R2's view by the caller: the owner and a directory administrator see the provider and subject, and anyone else sees the redacted view. The list is shown to a person by Cambium card jAfmblAP on the delegation screen, which uses this reason; THE SYSTEM SHALL NOT add or change any screen file.",
+      "id": "R2",
+      "title": "Run the leg against a stub runtime in a round-leg test, counting refusals, cleanup, the probe and every secret it searched for",
+      "spec": "THE SYSTEM SHALL add the Rust integration test crates/lys/tests/rauthy_ready_leg.rs, run by the tests leg (cargo test --workspace --all-features), which runs `python3 scripts/identity-gates/rauthy_ready.py` as a child process from the repository root. PATH starts with a temporary directory holding a stub docker executable that the test writes. The stub appends every argv it receives to a record file. When it receives --env-file, it copies that file's contents into the record, so the record holds what the runtime was actually given. The test writes its own versions file in its temporary directory, a JSON object whose rauthy_image_id is sha256: followed by 64 hexadecimal characters of the test's making and whose postgres_image is a digest reference of the test's making, and runs the child as `python3 scripts/identity-gates/rauthy_ready.py --versions-file <that file>`. Every image ID and reference the stub answers for and every case asserts on is the one written in that file. The stub answers version, image inspect, the revision label or its absence, network create, run, exec pg_isready, port, stop, rm and network rm as the case under test directs. The port it reports belongs to a std::net::TcpListener the test runs on 127.0.0.1, which answers /auth/v1/health as the case directs and counts the requests it receives. The test reads the expected pin itself with git rev-parse HEAD:vendor/rauthy. The secret values it searches for SHALL be the ones the stub record shows the runtime received for POSTGRES_PASSWORD, PG_PASSWORD, ENC_KEYS, BOOTSTRAP_ADMIN_PASSWORD_PLAIN, HQL_SECRET_RAFT and HQL_SECRET_API, and never values the test or the script substitutes. The test SHALL search the child's complete stdout and stderr for each distinct value, both as written and as its lowercase hexadecimal. IF python3 or git is absent from the test's environment, THEN THE TEST SHALL fail naming the absent tool, and it SHALL NOT skip. THE TEST SHALL NOT start a real container, reach a real daemon, or open any port except its own listener. THE TEST SHALL NOT write a fixed credential, token or key value into the test source. THE TEST SHALL NOT be marked #[ignore]. THE TEST SHALL NOT write, create or delete anything under deploy/identity/.",
       "acceptance": [
-        "Person P with sign-in identities issuer https://accounts.google.com subject g-100 and issuer https://github.com subject gh-200 asks what P cannot give to agent A: the response lists exactly those two, each with reason sign-in identity.",
-        "The same question with recipient person Q lists the same two, each with reason sign-in identity.",
-        "Q's sign-in identity issuer https://accounts.google.com subject g-300 appears in neither of P's responses.",
-        "Agent A, holding pass-on authority from P, asks the grant seam to delegate P's sign-in identity g-100 to agent B: A receives the redacted view, whose body contains neither https://accounts.google.com nor g-100; the same refusal read by P and by the configured administrator contains both.",
-        "No file under surface/ changes in this brief's diff."
+        "Case ready: the listener answers 200 with {\"db_healthy\":true,\"cache_healthy\":true}. The child exits 0, stdout holds one line beginning 'ready:', and the listener counted at least 1 request.",
+        "Case ready, secrets: the stub record yields exactly 5 distinct secret values, and the test asserts that count equals 5. The child's stdout and stderr contain each of the 5 values 0 times.",
+        "Search control: the same search function, run over the stub record's env-file text, finds each of the 5 values at least once, proving the search fires.",
+        "Case ready, cleanup: every name the stub record shows in a run --name or network create argument appears in a later rm or network rm argument. The count of names created equals the count removed, and every removed name begins lys-rauthy-ready-.",
+        "Case ready, no pull: the stub record holds 0 argv whose first argument is pull, and each of its 2 run argv carries --pull never.",
+        "Case no runtime: PATH holds only python3 and git. The child exits 1, stderr holds a line beginning 'refused: container_runtime_missing', and stdout holds no 'ready:' line.",
+        "Case no Rauthy image: stub image inspect fails for the Rauthy image ID recorded in the versions file the case supplies. The child exits 1, stderr holds a line beginning 'refused: image_missing' that contains 'rauthy', that image ID, and 'docker buildx build --label org.opencontainers.image.revision=' followed by the pin the test read and ' --load .'. That line contains 'pull' 0 times, and the stub record holds 0 run argv.",
+        "Case no PostgreSQL image: stub image inspect fails for the PostgreSQL reference. The child exits 1, stderr holds a line beginning 'refused: image_missing' that contains 'postgres' and 'pull', and the stub record holds 0 run argv.",
+        "Case revision differs: the stub reports the Rauthy image ID present, and its label is 0000000000000000000000000000000000000000. The child exits 1, stderr holds a line beginning 'refused: rauthy_revision_mismatch', and the stub record holds 0 run argv.",
+        "Case revision absent: the stub reports no org.opencontainers.image.revision label. The child exits 1, stderr holds a line beginning 'refused: rauthy_revision_mismatch' that contains 'absent', the pin the test read, and 'docker buildx build --label org.opencontainers.image.revision=', and the stub record holds 0 run argv.",
+        "Case never ready: the listener answers 500 for every request. The child exits 1 and stderr holds a line beginning 'refused: readiness_timeout' that contains 'rauthy'. Every name the stub saw created was removed, and the 5 secret values occur 0 times in stdout and stderr.",
+        "The test file declares exactly 10 #[test] functions, one for each of the 10 cases above: ready; ready, secrets; ready, cleanup; ready, no pull; no runtime; no Rauthy image; no PostgreSQL image; revision differs; revision absent; never ready. The search control is not a #[test] of its own: it runs inside the ready, secrets test. cargo test --workspace --all-features reports each of the 10 as passed. After the test run, `git status --porcelain -- deploy/identity` prints the same lines as before it."
       ],
       "files": {
         "create": [
-          "crates/lys-identity-server/tests/grant_cannot_give.rs"
-        ],
-        "modify": [
-          "crates/lys-identity-server/src/grants.rs"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C34",
-        "C35"
-      ],
-      "stories": [
-        "S14",
-        "S16",
-        "S17"
-      ]
-    },
-    {
-      "id": "R7",
-      "title": "Prove every refusal writes nothing and no agent record carries a sign-in identity",
-      "spec": "WHEN any refusal of R3, R4 or R5 is returned, THE SYSTEM SHALL leave the directory's log length and its projection unchanged. After those refusals, one test over the store SHALL enumerate every agent record, from the projection and again from a replay of the log after reopen, and SHALL find that no agent's binding is classified by R1 as a current or former sign-in identity and that no grant an agent holds has a sign-in identity as its source. The test lives in the lys-identity-server crate, which depends on lys-identity, so it drives all seven refusals, R4's through the server with R4's gh-7 fixture; lys-identity gains no dependency on the server. The test SHALL NOT pass over zero agents: it counts the agent records it inspected and the refusals it drove, and asserts both.",
-      "acceptance": [
-        "Before and after each refusal case of R3, R4 and R5 the test records the log's length and a digest of the projection; for each of the seven refusal cases (the four of R3, R4's agent-bound refusal asked on behalf of P, and the two of R5) the two values are equal, and the test asserts it counted 7 refusals.",
-        "After the seven refusals, R3's accepted binding of issuer https://accounts.google.com subject svc-a to agent A (responsible person P) and R4's fixture binding of issuer https://github.com subject gh-7 to agent B (responsible person Q), the store holds agents A and B; the test inspects every agent record, asserts it inspected 2, and finds for each agent zero bindings classified as a current sign-in identity, zero bindings classified as a former sign-in identity and zero held grants whose source is a sign-in identity.",
-        "After the store is closed and reopened, the same enumeration over the replayed log inspects 2 agent records and finds the same zero counts."
-      ],
-      "files": {
-        "create": [
-          "crates/lys-identity-server/tests/sign_in_store.rs"
+          "crates/lys/tests/rauthy_ready_leg.rs"
         ],
         "modify": [],
         "delete": []
       },
       "checklist": [
+        "C34",
+        "C35",
         "C36"
+      ],
+      "stories": [
+        "S14"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Declare the leg in the lys design project file with cadence demand",
+      "spec": "docs/design/project.json gains exactly one leg, appended as the last entry of trees[0].legs: {\"name\": \"rauthy-ready\", \"command\": \"python3 scripts/identity-gates/rauthy_ready.py\", \"requires\": [\"tool:python3\", \"tool:docker\", \"tool:git\"], \"cadence\": \"demand\"}. Its requires list names the tools the command uses, in the tool:<name> spelling the other legs use. The seven existing legs keep their bytes and their order, the shorthand map and the roots map are unchanged, and no other tree is added. THE SYSTEM SHALL NOT add a round-cadence leg. THE SYSTEM SHALL NOT change .land/gates.sh. THE SYSTEM SHALL NOT change scripts/design/gate.sh or scripts/design/schemas/project.schema.json. The ledger's record of rauthy-ready as Unmeasured, with a reason containing 'requires tool:docker', on a venue declaring no tool:docker is measured by design-system card 9jJgCzeG, which carries that acceptance line; this requirement does not claim it.",
+      "acceptance": [
+        "`python3 scripts/design/validate.py docs/design/project.json` exits 0 with the new leg present.",
+        "`sh scripts/design/gate.sh` exits 0.",
+        "In docs/design/project.json, trees[0].legs has 8 entries. The 8th equals the leg in this requirement's spec, and its cadence is demand. Entries 1 to 7 are equal to their values at main 7b53625, and the count of legs with cadence round is 7.",
+        "`git diff --quiet 7b53625 -- .land/gates.sh scripts/design/gate.sh scripts/design/schemas/project.schema.json` exits 0."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/project.json"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C31",
+        "C37"
+      ],
+      "stories": [
+        "S13"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Carry the same demand leg into the directory cluster's gate",
+      "spec": "docs/design/directory/design.json's gate gains the same leg, {\"name\": \"rauthy-ready\", \"command\": \"python3 scripts/identity-gates/rauthy_ready.py\", \"requires\": [\"tool:python3\", \"tool:docker\", \"tool:git\"], \"cadence\": \"demand\"}, appended as the last leg of the gate entry whose tree is \".\", so directory rounds carry it. docs/design/directory/DESIGN.md is re-rendered from the JSON with scripts/design/render-cluster.py docs/design/directory, and every rendered file it writes is committed beside its JSON. No other leg, tree or field of the gate changes. THE SYSTEM SHALL NOT give the leg any cadence but demand. THE SYSTEM SHALL NOT change any other field of design.json in this requirement.",
+      "acceptance": [
+        "`python3 scripts/design/validate.py docs/design/directory` exits 0 with the new leg present in design.json's gate.",
+        "In docs/design/directory/design.json, the gate entry with tree \".\" has exactly one leg named rauthy-ready. That leg's command, requires and cadence equal the leg in docs/design/project.json, and its cadence is demand.",
+        "`python3 scripts/design/check-coverage.py docs/design/directory` exits 0, and `sh scripts/design/gate.sh` reports no rendered-markdown difference for docs/design/directory."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/directory/design.json",
+          "docs/design/directory/DESIGN.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C32",
+        "C37"
       ],
       "stories": [
         "S13"
@@ -235,20 +150,24 @@
     }
   ],
   "boundaries": [
-    "SHALL NOT change docs/design/identity/briefs/IDENTITY-001.json, docs/design/identity/briefs/IDENTITY-001.md or docs/design/identity/CONFORMANCE.md (CN1).",
-    "SHALL NOT change SECRETS-002 R5 or the harness login token exception, and SHALL NOT redefine that token as anything other than what it is.",
-    "SHALL NOT build the broker's refusal (finding 1) or any credential issuance; issuance is the broker's (ADR-001).",
-    "SHALL NOT add a seam that exists only to refuse: the refusals sit in the binding seam DIRECTORY-003 owns, the admission seam DIRECTORY-006 owns, and the lys-identity side of the link path's pre-link check, which does not exist yet and which R4 creates as the check the link path asks; the fork side of that check is finding 2.",
-    "SHALL NOT add or change any screen file; the cannot-give list is shown by Cambium card jAfmblAP.",
-    "SHALL NOT change lys-core, its published wire formats or lys/delegation/v1, and SHALL NOT add a member or source kind to DIRECTORY-006 R1's grant contract.",
-    "SHALL NOT refuse an agent's own machine account, linked to no person, as its DIRECTORY-003 R1 binding.",
-    "SHALL NOT withdraw, move or alter any existing binding or grant to make a refused act succeed.",
-    "SHALL NOT change any existing brief's id, requirements, estimates or dependency order."
+    ".land/gates.sh is not changed, and no leg of this brief enters landing.",
+    "No round-cadence leg is added, and no existing leg of docs/design/project.json or of the directory gate is changed or reordered.",
+    "The leg never pulls, builds, tags or relabels an image. The Rauthy image it accepts is one whose revision label its own build set from the pin, and building that image is venue work outside this brief.",
+    "The vendor/rauthy pin is not moved, and the submodule is not initialised by the leg.",
+    "Nothing under deploy/identity/ is written; the leg reads deploy/identity/versions.json and duplicates no digest.",
+    "SpiceDB is neither started nor checked.",
+    "The method's request path for demand legs, and the ledger's Unmeasured record for rauthy-ready, belong to design-system card 9jJgCzeG; they are named and not done here.",
+    "No credential, token or key value is written in code, tests, fixtures or documents; every secret is generated per run and discarded.",
+    "No container, network or volume the leg did not create in its own run is stopped, removed or probed.",
+    "lys-core, its wire formats and every published crate are unchanged; the test adds no dependency to crates/lys.",
+    "Builds, test batteries and the full gate run at the venue, never on the development machine."
   ],
   "verification": [
+    "From the repository root: cargo fmt --check; cargo clippy --all-targets --all-features -- -D warnings; cargo clippy --all-targets -- -D warnings; cargo test --workspace --all-features; cargo doc --no-deps --all-features; cargo doc --no-deps, all clean.",
     "From the repository root: sh scripts/design/gate.sh exits 0.",
-    "At implementation time, from the exact revision: cargo fmt --check; cargo clippy --all-targets --all-features -- -D warnings; cargo clippy --all-targets -- -D warnings; cargo test --workspace --all-features; cargo doc --no-deps --all-features; cargo doc --no-deps. Report each refusal case and each counted leg the tests exercised.",
-    "Drift injection, each failing exactly one test file, the one built for the check, and no other. First: make R2's redacted view carry an error code that varies with the sign-in identity's provider and subject without containing either; exactly one test file fails, crates/lys-identity/tests/sign_in_refusal_views.rs (its byte-identical case), because no other test compares redacted views across two sign-in identities, and R6's redacted-view case checks only that the body lacks the provider and subject. Second: make R4's redacted view name agent B, the agent that holds the binding; exactly one test file fails, crates/lys-identity-server/tests/sign_in_link_check.rs (its agent-bound case asked on behalf of P, and its second-store byte-identical case), because crates/lys-identity-server/tests/sign_in_store.rs, which drives R4's refusal with the same gh-7 fixture, records only the log's length and the projection's digest around it, never its content. Revert both.",
-    "Before reporting row 1.2 passed, confirm the broker's card carries finding 1's acceptance line and that it passes; until then row 1.2 is reported as met by the directory and awaiting the broker."
+    "From the repository root: git diff --stat between the commit the build starts from and the build's head lists only scripts/identity-gates/rauthy_ready.py, crates/lys/tests/rauthy_ready_leg.rs, docs/design/project.json, docs/design/directory/design.json and docs/design/directory/DESIGN.md.",
+    "On the venue: run `python3 scripts/identity-gates/rauthy_ready.py` from the repository root once and record its exit status and output beside the before-and-after runtime counts R1 names.",
+    "On a machine without docker on PATH: run `python3 scripts/identity-gates/rauthy_ready.py` from the repository root once and record the refusal line.",
+    "A search of every file this brief touches finds no credential, token or key value."
   ]
 }
