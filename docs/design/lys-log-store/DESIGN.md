@@ -1,0 +1,114 @@
+---
+type: design
+cluster: lys-log-store
+title: lys-log-store: a named leaf is a whole, flushed leaf
+---
+
+# lys-log-store: a named leaf is a whole, flushed leaf
+
+> **Cluster:** lys-log-store
+
+## Intention
+
+A leaf that has a name in the file store is a leaf the store committed: every byte written, flushed to disk, and linked into place by an operation that could not have replaced anyone else's leaf. A reader, a reopening log, or a consumer settling an uncertain append can read a named leaf back and trust that it is whole, without asking how the write that made it ended.
+
+Partial state still exists, because crashes still happen, but it lives only under hidden temporary names that are never counted as leaves and never touched by an open. A read-only open stays read-only: it counts the named leaves without flushing, so a log on read-only media opens as it did, and a handle it returns refuses to write a leaf or a pin by name. A reader of a log a crash left one leaf ahead of its pin opens at the pinned head and is told that a writable open repairs it; only a writable open repairs.
+
+## Problem
+
+FileLeafStore::put_leaf creates the leaf file under its final 20-digit name and then writes and flushes it. A crash or a failed write in between leaves a torn or unflushed leaf under a final name. The in-memory extent does not count it, but the next open does, and Log::open's one-leaf-ahead repair pins it into the tree. A write whose flush fails also leaves bytes in the page cache that read back as if they were durable. A failure after the leaf is named but before put_leaf returns leaves the extent behind the disk, so the next append at that index is refused as LeafAlreadyWritten: the store reports its own leaf as another writer's. The identity directory (DIRECTORY-003) commits every identity change through this store and settles an uncertain append by reading the leaf back, so it cannot land while a named leaf can be torn.
+
+## Solution
+
+put_leaf keeps its existing index checks, then writes the leaf's bytes to a hidden (dot-prefixed) temporary file in leaves/, flushes it, and links it to the leaf's final name with an operation that refuses to replace an existing entry. The temporary name is `.<pid>-<index padded to 20 digits>-<sequence>.tmp`; the sequence is supplied by the caller, and put_leaf supplies it from a process-wide counter while tests supply their own from zero. The file is created with create_new and never truncated; a name already taken is skipped for the next sequence, so a leftover never blocks a write and is never replaced. An existing final name is still LeafAlreadyWritten, raised by the link instead of by create_new. A write that fails before a successful link, including a link refused as LeafAlreadyWritten, removes this writer's own temporary file before returning, so a failed write leaves nothing behind. The successful link is the commit point (ADR-059), and LeafAlreadyWritten keeps meaning another writer only (ADR-060): the extent advances past the leaf whatever happens next. put_leaf then removes the temporary name and flushes leaves/. A failure to remove the temporary name still returns Ok, because the leaf is whole and named and the leftover is ignored. A failure to flush leaves/ returns a new named error, StoreError::LeafDurabilityUncertain carrying the index and the failed flush's std::io::Error as its source, its message naming both, and the store handle refuses every further put_leaf with that error until it is reopened.
+
+The flush at open is the writer's act. FileLeafStore::open flushes leaves/ before it counts, so a leaf that is named at a writable open is durable, and a reopen after an uncertain flush counts the leaf; Log::open's existing one-leaf-ahead repair then pins it. When that flush fails, open fails with Io naming the directory and the flush, because a writer that cannot make a named leaf durable does not go on to write beside it. A reader opens with FileLeafStore::open_read_only, which performs every check open performs except the flush and counts the named leaves, so a store handed to Anchor::open_read_only on read-only media opens as it does today. put_leaf on a handle from open_read_only returns a new StoreError::ReadOnly naming the store's directory and the act, and writes nothing; only a handle from FileLeafStore::open writes a leaf. pin on such a handle refuses as ReadOnly too, because a pin is a write, so the one-leaf-ahead repair is not a read-only act. Log gains open_at_pin, which checks a store exactly as Log::open does but, finding it one leaf ahead of the pin, opens at the pinned head without pinning, reports the tree size a writable open repairs to through pending_repair, and while that repair is pending refuses every append with a new StoreError::RepairPending, whose message says the log has a pending repair that a writable open must make before any append and names the pin's tree size and the leaf count it saw, so the store never reports its own leaf as another writer's and Poisoned keeps its one meaning, an append that failed after storing its leaf on this handle. Anchor::open_read_only opens its log with Log::open_at_pin, whichever store it is handed, so it never repairs; AnchorStatus carries the pending repair, and its notice says in words that one leaf stands ahead of the pin and that a writable open repairs it. Only Log::open through a writable handle performs the repair. Anchor::open_read_only's doc example and lys-anchor's read-only tests open their store with FileLeafStore::open_read_only, so the one read-only path is the one they exercise. contiguous_extent keeps skipping every dot-prefixed name, so a leftover temporary file is never counted, and open never deletes or changes it. The invariant is written into file.rs's module docs as the second party the tests answer to; the trait contract in store.rs names the new error on put_leaf.
+
+A write failure between creating the temporary file and linking it is exercised through a test-only fault seam inside FileLeafStore, compiled only under cfg(test), which fails a chosen step of put_leaf or of open, a test-only constructor arming the open-time step before the leaves are counted: the temporary file's write, the temporary file's flush, the temporary name's removal, the leaves/ flush after the link, or the leaves/ flush at open, the last two with an injected error of kind TimedOut and message `injected leaves directory flush failure`. No caller outside the crate, and no build other than the crate's own tests, can reach it.
+
+The on-disk layout, the LeafStore trait's methods, Log's append order and Log::open's repair are unchanged (CN1 to CN3). Log::append returns put_leaf's error before it poisons, so after LeafDurabilityUncertain its tree lags the store by one leaf; the store's by-name refusal stops a second append on that handle, and Log::open's repair folds the leaf in after a reopen. DIRECTORY-003 records in its depends_on that it waits on this cluster's first brief.
+
+## Principles
+
+- **P1** — A name is a commitment: a file under a 20-digit leaf name is always a whole, flushed leaf, and only hidden temporary files may be partial.
+- **P2** — The no-replace link is the commit point: after it succeeds the leaf is this writer's, and the store never reports its own leaf as another writer's.
+- **P3** — Open observes; it never deletes or changes a file in the store's directory. Only a writable open flushes leaves/, and a read-only open never flushes.
+- **P4** — A failure is reported under the name of what actually happened: another writer is LeafAlreadyWritten, an unflushed directory after a successful link is LeafDurabilityUncertain, a write on a read-only handle is ReadOnly, and none of them is Io.
+
+## Decisions
+
+- ADR-059 — A named leaf in the file store is a whole, flushed leaf, and the no-replace link is its commit point — A file under a 20-digit leaf name is always a whole, flushed leaf; only dot-prefixed temporary files in leaves/ may be partial. A leaf is written and flushed in a hidden temporary file, then linked to its final name by an operation that refuses to replace, then the temporary name is removed and leaves/ is flushed. The successful link is the commit point: the extent advances past the leaf whatever happens next. A failed temporary-name removal still returns Ok; a failed leaves/ flush returns StoreError::LeafDurabilityUncertain carrying the index, and the handle refuses further appends with it until reopened. A writable open flushes leaves/ before counting and fails with Io when that flush fails; a read-only open (FileLeafStore::open_read_only) counts the named leaves without flushing; neither counts, deletes or changes a leftover temporary file. Rejected: naming the leaf first and writing into it (today's torn-leaf shape); deleting leftover temporary files at open, which would make a read-only open mutate the store; flushing at a read-only open, which would turn a status on read-only media into an error; and reporting a post-link failure as Io, which left the extent behind and made the next append report the store's own leaf as LeafAlreadyWritten.
+- ADR-060 — LeafAlreadyWritten means another writer holds the index, and the store never reports its own leaf as another writer's — LeafAlreadyWritten is returned only when the index is behind the extent or the no-replace link finds the final name taken by an entry this call did not link. Once this call's link succeeds the extent advances past the leaf whatever happens next, so no later step of the same call and no later call on the same handle reports that leaf as LeafAlreadyWritten; a post-link failure that leaves durability in doubt is LeafDurabilityUncertain (ADR-059). Rejected: reporting a post-link failure as Io and leaving the extent behind, which made the next append report the store's own leaf as LeafAlreadyWritten; and treating LeafAlreadyWritten as a resume signal a caller may retry through.
+
+## Goals
+
+- After a put_leaf that fails before its link, no file exists under that leaf's 20-digit name, no temporary file of this writer's remains in leaves/, and a reopen reports the same extent as before the write.
+- A reopen with a leftover hidden temporary file in leaves/ counts exactly the named leaves and leaves the temporary file byte-identical.
+- A second writer that put_leafs an index another writer has already linked receives LeafAlreadyWritten for that index, the first writer's bytes are unchanged, and no temporary file of the second writer's remains.
+- A leaves/ flush failure after the link returns LeafDurabilityUncertain with the index and the flush error as its source, the next put_leaf on that handle is refused with it, and after a reopen the leaf counts and the next put_leaf goes to the following index.
+- A read-only open of a directory whose leaves/ flush fails returns the store with the named leaves counted, and a writable open of it returns Io and leaves every file byte-identical.
+- put_leaf on a handle from FileLeafStore::open_read_only returns ReadOnly naming the store's directory, and the directory holds no new file.
+- Every Anchor::open_read_only call in lys-anchor's doc examples and read-only tests opens its store with FileLeafStore::open_read_only.
+- pin on a handle from FileLeafStore::open_read_only returns ReadOnly and leaves state.json byte-identical.
+- Anchor::open_read_only over a store one leaf ahead of its pin opens at the pinned head, leaves state.json byte-identical, and its status says that a writable open repairs it; a writable open over the same store repairs and pins.
+- Every leg of the gate array passes.
+
+## Non-Goals
+
+- Clearing leftover hidden temporary files that a crash stranded — A further unit: an explicit maintenance act that runs only while holding the write lock. Open never deletes anything; put_leaf removes only its own temporary file after its own failed write.
+- Changing DIRECTORY-003 or its uncertain-append reconciliation — DIRECTORY-003 treats LeafDurabilityUncertain as uncertain and settles by reading the leaf back in its own card; it lands after this one.
+- Changing the on-disk layout or the LeafStore trait's methods — The layout is kept byte-identical so earlier stores open, and the trait's absent operations are the crate's reason to exist.
+- Directory flushing on non-unix targets — fsync_dir stays a no-op there, as file.rs already says; nothing in this work changes that scope.
+- Repairing a store found one leaf ahead of its pin through a read-only open — A pin is a write: pin through a handle from FileLeafStore::open_read_only refuses as ReadOnly, and Anchor::open_read_only opens at the pinned head and reports the pending repair instead. Only Log::open through a writable handle performs the one-leaf-ahead repair.
+
+## Structure
+
+| Path | Note | Brief |
+|------|------|-------|
+| `crates/lys-log-store/src/error.rs` | StoreError; gains LeafDurabilityUncertain { index, source }, ReadOnly { path, operation } and RepairPending { pinned_tree_size, leaves } | LYSLOGSTORE-001 |
+| `crates/lys-log-store/src/store.rs` | the LeafStore contract; put_leaf's errors name LeafDurabilityUncertain | LYSLOGSTORE-001 |
+| `crates/lys-log-store/src/file.rs` | FileLeafStore: leaf_temp_name, create_leaf_temp, write_leaf_temp and put_leaf_with taking a caller-supplied sequence, temporary file created with create_new, flush, no-replace link, own-temporary cleanup on failure, commit point, open-time flush at a writable open, open_read_only and its handle's ReadOnly refusal of put_leaf and pin, module-doc invariant, cfg(test) fault seam | LYSLOGSTORE-001 |
+| `crates/lys-log-store/src/file_tests.rs` | the file store's gates; gains the eighteen new tests of LYSLOGSTORE-001 R8, the drift-injection table, and module docs that name the no-replace link instead of create_new | LYSLOGSTORE-001 |
+| `crates/lys-log-store/src/log.rs` | Log; gains open_at_pin and pending_repair, and Log::append refuses with RepairPending while a repair is pending; Log::open and its repair unchanged | LYSLOGSTORE-001 |
+| `crates/lys-log-store/src/log_tests.rs` | Log's gates; gains the open_at_pin test | LYSLOGSTORE-001 |
+| `crates/lys-anchor/src/anchor/read_only.rs` | Anchor::open_read_only; opens its log with Log::open_at_pin, its docs say it never repairs, and its two doc examples open the store with FileLeafStore::open_read_only | LYSLOGSTORE-001 |
+| `crates/lys-anchor/src/anchor/read_only_tests.rs` | Anchor::open_read_only's gates; their store is opened with FileLeafStore::open_read_only, and they gain the one-leaf-ahead reader and writable-repair tests | LYSLOGSTORE-001 |
+| `crates/lys-anchor/src/anchor/status.rs` | AnchorStatus; gains pending_repair and pending_repair_notice | LYSLOGSTORE-001 |
+| `crates/lys-anchor/tests/standalone_is_complete.rs` | its read-only open of the anchor takes a store from FileLeafStore::open_read_only | LYSLOGSTORE-001 |
+| `docs/design/lys-log-store/BACKENDS.md` | criteria a second LeafStore backend must satisfy; unchanged |  |
+| `docs/design/lys-log-store/design.json` | this design | LYSLOGSTORE-001 |
+| `docs/design/lys-log-store/DESIGN.md` | rendered from design.json by render-cluster.py | LYSLOGSTORE-001 |
+| `docs/design/lys-log-store/checklist.json` | the checklist | LYSLOGSTORE-001 |
+| `docs/design/lys-log-store/CHECKLIST.md` | rendered checklist | LYSLOGSTORE-001 |
+| `docs/design/lys-log-store/stories.json` | the user stories | LYSLOGSTORE-001 |
+| `docs/design/lys-log-store/USER-STORIES.md` | rendered stories | LYSLOGSTORE-001 |
+| `docs/design/lys-log-store/briefs/LYSLOGSTORE-001.json` | the brief: a named leaf is whole and flushed | LYSLOGSTORE-001 |
+| `docs/design/lys-log-store/briefs/LYSLOGSTORE-001.md` | its rendered markdown | LYSLOGSTORE-001 |
+| `docs/design/directory/briefs/DIRECTORY-003.json` | the identity directory's contract brief; its depends_on gains LYSLOGSTORE-001 |  |
+| `docs/design/directory/briefs/DIRECTORY-003.md` | DIRECTORY-003 rendered from its JSON |  |
+
+## Inventory
+
+- `crates/lys-log-store/src/file.rs` — 462 lines, 315 code lines. put_leaf opens the final leaf path with create_new, then write_all, sync_all and fsync_dir; a failure after create_new leaves a named leaf the next open counts. contiguous_extent already skips names starting with '.'. write_state uses a fixed, non-hidden state.json.tmp and rename. fsync_dir is a no-op on non-unix. No fault-injection seam.
+- `crates/lys-log-store/src/file_tests.rs` — 22 tests. create_new_alone_refuses_a_leaf_this_store_never_saw isolates the filesystem absent-check; an_unexpected_leaves_entry_is_detected_but_dotfiles_are_ignored covers .DS_Store only. The module docs carry the drift-injection tables.
+- `crates/lys-log-store/src/error.rs` — StoreError, #[non_exhaustive], 13 variants; LeafAlreadyWritten documented as two writers claiming one position; Poisoned belongs to Log's pin-failure case. No read-only variant.
+- `crates/lys-log-store/src/store.rs` — The LeafStore contract: durable on return, write-once, contiguous at open; LeafAlreadyWritten is a conflict meaning another writer, not a resume signal.
+- `crates/lys-log-store/src/log.rs` — Log::open rebuilds from leaves and repairs exactly one leaf ahead of the pin through the store's pin; Log::append poisons only after put_leaf returns Ok. No open that leaves a store one leaf ahead as it found it.
+- `docs/design/lys-log-store/BACKENDS.md` — The cluster's only document before this design: the criteria a backend satisfies.
+- `docs/design/directory/briefs/DIRECTORY-003.json` — The dependent card: R2 commits every identity change through lys-log-store's file storage and reconciles an uncertain write (ID001_AUDIT_FAULTS). depends_on is DIRECTORY-002 only; it lands after LYSLOGSTORE-001.
+- `crates/lys/src/commands/log/store.rs` — A writer's caller of FileLeafStore::open; picks up the open-time flush and its Io on failure, unchanged in code.
+- `crates/lys-anchor-cli/src/commands/anchor/open.rs` — A writer's caller of FileLeafStore::open; picks up the open-time flush and its Io on failure, unchanged in code.
+- `crates/lys-anchor/src/anchor/read_only.rs` — Anchor::open_read_only takes a store its caller opened and opens its log with Log::open, so it repairs a store one leaf ahead through the store's pin; it has no production caller. Its two doc examples (one of them compile_fail) open the store with FileLeafStore::open.
+- `crates/lys-anchor/src/anchor/read_only_tests.rs` — Its read_only helper and a_reader_refuses_a_log_with_no_genesis_leaf_exactly_as_open_does pass FileLeafStore::open(dir) to Anchor::open_read_only.
+- `crates/lys-anchor/tests/standalone_is_complete.rs` — One Anchor::open_read_only call, taking FileLeafStore::open(dir).
+- `crates/lys-anchor/src/anchor/status.rs` — AnchorStatus, #[non_exhaustive]: origin, root, posture and recovered_to; nothing reports a repair that is pending rather than done.
+
+## Constraints
+
+- **CN1** — The on-disk layout does not change: log.json, state.json, leaves/<20-digit index> holding the raw RFC 6962 preimage, and the lys/log-dir/v1 marker. Stores written by earlier versions still open.
+- **CN2** — The LeafStore trait's methods do not change; no fork, merge, delete, truncate or rewrite is added.
+- **CN3** — Log's append order (leaf durable before the pin moves) and Log::open's one-leaf-ahead repair do not change; Log::open through a writable handle is the only open that repairs.
+- **CN4** — StoreError::LeafAlreadyWritten means another writer holds the index, and only that.
+- **CN5** — No unsafe code, no new dependency, and no unwrap, expect, panic, todo, unimplemented or unreachable in library code.
+- **CN6** — crates/lys-log-store/src/file.rs stays under 500 lines of code, excluding tests, comments and blank lines.
+- **CN7** — The fault seam, and the constructor that opens with a fault armed, compile only under cfg(test); no public item and no non-test build can reach them.

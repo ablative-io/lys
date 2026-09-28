@@ -1238,6 +1238,44 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-059",
+      "title": "A named leaf in the file store is a whole, flushed leaf, and the no-replace link is its commit point",
+      "status": "decided",
+      "scope": "lys-log-store",
+      "date": "2026-09-27",
+      "decided_by": "The card's words and the lead's answers to its survey; recorded with LYSLOGSTORE-001",
+      "context": "FileLeafStore created a leaf file under its final 20-digit name and then wrote it, so a crash or failed write left a torn leaf that the next open counted and Log::open's one-leaf-ahead repair pinned, and a failure after naming left the extent behind the disk so the store later refused its own leaf as another writer's. BACKENDS.md criterion 1 (durable on return) says nothing about what a named leaf is between a write's start and its return. DIRECTORY-003's uncertain append settles by reading a leaf back and needs a named leaf to mean a committed one.",
+      "decision": "A file under a 20-digit leaf name is always a whole, flushed leaf; only dot-prefixed temporary files in leaves/ may be partial. A leaf is written and flushed in a hidden temporary file, then linked to its final name by an operation that refuses to replace, then the temporary name is removed and leaves/ is flushed. The successful link is the commit point: the extent advances past the leaf whatever happens next. A failed temporary-name removal still returns Ok; a failed leaves/ flush returns StoreError::LeafDurabilityUncertain carrying the index, and the handle refuses further appends with it until reopened. A writable open flushes leaves/ before counting and fails with Io when that flush fails; a read-only open (FileLeafStore::open_read_only) counts the named leaves without flushing; neither counts, deletes or changes a leftover temporary file. Rejected: naming the leaf first and writing into it (today's torn-leaf shape); deleting leftover temporary files at open, which would make a read-only open mutate the store; flushing at a read-only open, which would turn a status on read-only media into an error; and reporting a post-link failure as Io, which left the extent behind and made the next append report the store's own leaf as LeafAlreadyWritten.",
+      "quote": "",
+      "consequences": [
+        "StoreError gains LeafDurabilityUncertain, carrying the index and the failed flush's io error as its source (ADR-060 keeps LeafAlreadyWritten for another writer).",
+        "FileLeafStore::open performs a directory flush and fails with Io when it fails, and FileLeafStore::open_read_only never flushes; neither deletes or rewrites a file.",
+        "Leftover temporary files accumulate after crashes until a separate maintenance act, run only while holding the write lock, clears them.",
+        "The on-disk layout and the LeafStore trait's methods are unchanged; the invariant is local state, not a wire contract.",
+        "DIRECTORY-003 treats LeafDurabilityUncertain as uncertain and settles by reading the leaf back, and lands after LYSLOGSTORE-001."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-060",
+      "title": "LeafAlreadyWritten means another writer holds the index, and the store never reports its own leaf as another writer's",
+      "status": "decided",
+      "scope": "lys-log-store",
+      "date": "2026-09-27",
+      "decided_by": "The card's words and the lead's answers to its survey; recorded with LYSLOGSTORE-001",
+      "context": "store.rs's contract says LeafAlreadyWritten is a conflict, not a resume signal: a refusal at N means another writer holds that position. FileLeafStore named a leaf before put_leaf returned, so a failure after naming left the extent behind the disk and the next put_leaf at that index was refused as LeafAlreadyWritten, the store reporting its own leaf as another writer's. A consumer settling an uncertain append (DIRECTORY-003) would then read a conflict where there was none.",
+      "decision": "LeafAlreadyWritten is returned only when the index is behind the extent or the no-replace link finds the final name taken by an entry this call did not link. Once this call's link succeeds the extent advances past the leaf whatever happens next, so no later step of the same call and no later call on the same handle reports that leaf as LeafAlreadyWritten; a post-link failure that leaves durability in doubt is LeafDurabilityUncertain (ADR-059). Rejected: reporting a post-link failure as Io and leaving the extent behind, which made the next append report the store's own leaf as LeafAlreadyWritten; and treating LeafAlreadyWritten as a resume signal a caller may retry through.",
+      "quote": "",
+      "consequences": [
+        "LeafAlreadyWritten's documentation in error.rs and store.rs keeps meaning another writer only.",
+        "A handle that returned LeafDurabilityUncertain refuses further appends with that error, never with LeafAlreadyWritten, until it is reopened.",
+        "A second backend satisfying BACKENDS.md reports its own uncertain write under a distinct name, never as LeafAlreadyWritten."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
