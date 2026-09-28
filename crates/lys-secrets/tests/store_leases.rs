@@ -38,6 +38,7 @@ fn sec3_store_refusals_lease_beyond_grant() -> TestResult {
         relation("agent:kit", "token"),
         Some(NOW_MS + 2_000),
     );
+    grants.grant_as(Relation::Lend, relation("agent:noor", "token"));
     let mut broker = world.broker(grants)?;
     broker.seal("token", GRANTOR, &Secret::from_slice(b"value-one"))?;
 
