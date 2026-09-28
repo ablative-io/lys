@@ -360,3 +360,149 @@ fn validate_origin_matches_what_a_checkpoint_would_accept() {
     }
     assert_eq!(bad_origins.len(), 3, "an empty list would pass vacuously");
 }
+
+/// Every file under `dir`, dot-prefixed names included, with its bytes, so a
+/// test can say an open added, removed and changed nothing.
+fn tree_bytes(dir: &Path) -> std::collections::BTreeMap<std::path::PathBuf, Vec<u8>> {
+    let mut files = std::collections::BTreeMap::new();
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(next) = pending.pop() {
+        for entry in std::fs::read_dir(&next).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                pending.push(path);
+            } else {
+                let bytes = std::fs::read(&path).unwrap();
+                files.insert(path, bytes);
+            }
+        }
+    }
+    files
+}
+
+#[test]
+fn a_log_opens_over_a_read_only_store_at_its_pin_and_changes_no_byte() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut log = open_file_log(&dir);
+    log.append(b"leaf-0").unwrap();
+    log.append(b"leaf-1").unwrap();
+    drop(log);
+    let before = tree_bytes(&dir);
+    let read = Log::open(FileLeafStore::open_read_only(&dir).unwrap()).unwrap();
+    assert_eq!(read.tree().len(), 2);
+    assert_eq!(read.recovered_to(), None);
+    assert_eq!(tree_bytes(&dir), before, "the read-only open changed no file");
+}
+
+#[test]
+fn a_read_only_store_two_leaves_past_its_pin_is_refused_without_a_write() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut log = open_file_log(&dir);
+    let state_at_creation = std::fs::read(dir.join("state.json")).unwrap();
+    log.append(b"leaf-0").unwrap();
+    log.append(b"leaf-1").unwrap();
+    drop(log);
+    std::fs::write(dir.join("state.json"), &state_at_creation).unwrap();
+    let before = tree_bytes(&dir);
+    let store = FileLeafStore::open_read_only(&dir).unwrap();
+    assert_eq!(store.extent(), 2);
+    let err = Log::open(store).unwrap_err();
+    assert!(
+        matches!(
+            err,
+            StoreError::PinMismatch {
+                pinned_size: 0,
+                rebuilt_size: 2,
+                ..
+            }
+        ),
+        "{err}"
+    );
+    assert_eq!(tree_bytes(&dir), before, "the refusal changed no file");
+}
+
+#[test]
+fn a_writable_open_repairs_a_store_one_leaf_past_its_pin() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut log = open_file_log(&dir);
+    log.append(b"leaf-0").unwrap();
+    let state_after_one = std::fs::read(dir.join("state.json")).unwrap();
+    log.append(b"leaf-1").unwrap();
+    drop(log);
+    // A crash between storing the leaf and advancing the pin.
+    std::fs::write(dir.join("state.json"), &state_after_one).unwrap();
+    let store = FileLeafStore::open(&dir).unwrap();
+    assert_eq!(store.extent(), 2);
+    assert_eq!(store.pinned().tree_size, 1);
+    drop(store);
+    let repaired = Log::open(FileLeafStore::open(&dir).unwrap()).unwrap();
+    assert_eq!(repaired.tree().len(), 2);
+    assert_eq!(repaired.recovered_to(), Some(2));
+    drop(repaired);
+    let read = FileLeafStore::open_read_only(&dir).unwrap();
+    assert_eq!(read.extent(), 2);
+    assert_eq!(read.pinned().tree_size, 2);
+}
+
+#[test]
+fn a_torn_leaf_inside_the_pinned_prefix_is_refused_with_both_trees() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut log = open_file_log(&dir);
+    for leaf in [b"leaf-0", b"leaf-1", b"leaf-2"] {
+        log.append(leaf).unwrap();
+    }
+    let root_after_three = log.tree().root().to_parts().0;
+    drop(log);
+    std::fs::write(leaf_path(&dir, 1), b"lea").unwrap();
+    let state_before = std::fs::read(dir.join("state.json")).unwrap();
+    let leaves = [b"leaf-0".to_vec(), b"lea".to_vec(), b"leaf-2".to_vec()];
+    let torn_root = AppendOnlyTree::<RawLeaf>::reconstruct_from_raw_leaves(&leaves)
+        .root()
+        .to_parts()
+        .0;
+    let pinned_b64 = STANDARD.encode(root_after_three);
+    let rebuilt_b64 = STANDARD.encode(torn_root);
+    let err = reopen(&dir).unwrap_err();
+    assert!(
+        matches!(
+            &err,
+            StoreError::PinMismatch { pinned_size: 3, pinned_root, rebuilt_size: 3, rebuilt_root }
+                if *pinned_root == pinned_b64 && *rebuilt_root == rebuilt_b64
+        ),
+        "{err}"
+    );
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "stored leaves rebuild to tree size 3 with root {rebuilt_b64}, but the pinned state \
+             is tree size 3 with root {pinned_b64}"
+        )
+    );
+    assert_eq!(
+        std::fs::read(dir.join("state.json")).unwrap(),
+        state_before,
+        "a refused open pins nothing"
+    );
+}
+
+#[test]
+fn a_torn_leaf_just_past_the_pin_is_repaired_and_reported() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut log = open_file_log(&dir);
+    log.append(b"leaf-0").unwrap();
+    log.append(b"leaf-1").unwrap();
+    drop(log);
+    std::fs::write(leaf_path(&dir, 2), b"lea").unwrap();
+    let repaired = reopen(&dir).unwrap();
+    assert_eq!(repaired.recovered_to(), Some(3));
+    assert_eq!(repaired.tree().len(), 3);
+    drop(repaired);
+    let reread = reopen(&dir).unwrap();
+    assert_eq!(reread.recovered_to(), None);
+    assert_eq!(reread.tree().len(), 3);
+}
