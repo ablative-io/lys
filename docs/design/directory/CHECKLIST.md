@@ -263,7 +263,7 @@
 - [ ] **C344** — Every Lys binary answers --version with its build commit (DIRECTORY-045 R1).
 - [ ] **C345** — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2); the configuration and compose files move with the binaries, an install made before it is adopted, and an upgrade stopped part-way is finished or put back (DIRECTORY-045 R5 to R7).
 - [ ] **C346** — The install and the server say which build is running (DIRECTORY-045 R3).
-- [ ] **C347** — Prove it on the live install (DIRECTORY-045 R4).
+- [ ] **C347** — Prove the upgrade on a scratch install in the round; the live install is upgraded and recorded after landing (DIRECTORY-045 R4).
 
 ## Hot paths do their work once (DIRECTORY-046)
 
@@ -352,7 +352,7 @@
 
 ## A receipt's checkpoint is signed (DIRECTORY-058)
 
-- [ ] **C403** — The receipts route answers its checkpoint as a note signed by the service key, signed once per append, with its origin read from configuration (DIRECTORY-058 R1).
+- [ ] **C403** — The receipts route answers its checkpoint as a note signed by the service key, signed at open, at each committed append and at each settle that adopts leaves, under the log's own origin (DIRECTORY-058 R1).
 - [ ] **C404** — One function verifies a receipt answer against a pinned key with a named refusal for each failure; a forged tree around a genuine event is refused (DIRECTORY-058 R2).
 
 ## Installed audit sender
@@ -363,3 +363,17 @@
 - [ ] **C408** — Generated sender configuration names separate TLS trust and receipt trust and a declared positive response-body bound.
 - [ ] **C409** — Scratch installation proves signed observation acceptance and named transport, identity and response refusals.
 - [ ] **C410** — DIRECTORY-045 R5 retains sender credentials and swaps/restores sender configuration, trust material and mounts with the chosen binaries.
+
+## Lys needs no app and every app can find it (DIRECTORY-059)
+
+- [ ] **C411** — A start reads its credentials from Lys's own broker, and no route reaches an app for them (DIRECTORY-059 R1).
+- [ ] **C412** — Lys writes a discovery record any app can find (DIRECTORY-059 R2).
+- [ ] **C413** — Any registered app reads Lys's people, seats and agents (DIRECTORY-059 R3).
+- [ ] **C414** — Signing out of Lys signs the person out at the issuer, and the issuer tells every registered app (DIRECTORY-059 R4).
+- [ ] **C415** — An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code (DIRECTORY-059 R5).
+
+## The runner holds each session's holder key (DIRECTORY-060)
+
+- [ ] **C418** — A runner session's handles are issued to a key the runner made for it in memory, before anything is spawned (DIRECTORY-060 R1).
+- [ ] **C419** — The runner signs a presentation only for a peer proved by credentials and ancestry to be the session the handle was issued to, on macOS and Linux (DIRECTORY-060 R2).
+- [ ] **C420** — The harness and lys mcp get every presentation from the runner and hold no key (DIRECTORY-060 R3).

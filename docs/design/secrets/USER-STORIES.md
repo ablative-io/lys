@@ -12,6 +12,8 @@
 
 **S19.** As the person an agent acts for under a lease, I want to revoke the lease and see issuing stopped at once and the confirmation from the system behind shown pending until it comes, so that I know what has stopped and what is still unconfirmed.
 
+**S167.** As a person starting an agent, I want its session's handles issued to a key only its runner holds, so that the agent can use every handle it is launched with and no key is ever handed to it.
+
 ## AI Agent — Uses a handle for its outbound calls and reads its sealed records
 
 **S4.** As an agent, I want to make my call with my handle and have the proxy swap in the credential, refreshing an expired OAuth token itself, so that I can do my work without ever seeing a credential.

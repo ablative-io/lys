@@ -85,8 +85,8 @@
       "spec": "Behavioural. The anchor opens, creates, opens read-only and writes its genesis through FrontierLog opened from its tiles. Its tree size, root and checkpoint come from the frontier. Its inclusion artifacts (anchor/artifact.rs line 142, anchor/submit.rs line 180) and the witness fixture's consistency proofs (witness/fixture.rs line 163) come from LYSLOGSTORE-006's tile proofs through R2's builders. A leaf is read from the store only when an artifact names it. Everything the anchor answers is byte-for-byte what it answers today.",
       "acceptance": [
         "Every existing lys-anchor test passes unchanged in what it asserts.",
-        "With every leaf file under the pin removed, an anchor of 100,000 leaves opens, and opens read-only, as before.",
-        "With every leaf file under the pin removed but one early leaf, an inclusion artifact for that leaf is answered."
+        "With every leaf file under the pin removed but the last, an anchor of 100,000 leaves opens, and opens read-only, as before.",
+        "With every leaf file under the pin removed but the last and one early leaf, an inclusion artifact for that leaf is answered."
       ],
       "files": {
         "create": [],
@@ -128,7 +128,7 @@
       "spec": "Behavioural. The lys log store (crates/lys/src/commands/log/store.rs) opens through FrontierLog from the tiles. Status, checkpoint, append and prove (prove.rs lines 54 and 93 to 94) use its size, its root, its tile proofs through R2's builders and single leaf reads, and so does ca_log.rs (line 182). The revocation append functions (crates/lys-identity/src/revocation/append.rs, from line 30) take a FrontierLog. What each command prints is unchanged. Its open no longer calls FileLeafStore::audit_leaves (store.rs line 52), which lists the name of every leaf. That listing moves into R5's lys log audit.",
       "acceptance": [
         "Every existing test of these commands and of revocation append passes unchanged in what it asserts.",
-        "With the leaf files under the pin removed, apart from the one leaf prove names, lys log status, checkpoint, append and prove over a log of 100,000 leaves each answer as before."
+        "With the leaf files under the pin removed, apart from the last and the one leaf prove names, lys log status, checkpoint, append and prove over a log of 100,000 leaves each answer as before."
       ],
       "files": {
         "create": [],
@@ -168,7 +168,7 @@
         "Over a log with one altered tile, lys log audit names that tile.",
         "Over a sound log, lys log audit exits 0.",
         "No type in the workspace holds every leaf of a log, which the removal of Log and a search in the gate for its name show.",
-        "cargo doc in the gate (.land/gates.sh lines 51 to 52) warns on no link to Log."
+        "The gate's cargo doc (.land/gates.sh lines 51 to 52) warns on no link to Log."
       ],
       "files": {
         "create": [
@@ -203,7 +203,7 @@
     {
       "id": "R6",
       "title": "A gate test fails when an open reads a leaf under the pin",
-      "spec": "Behavioural. Tests run every open this card touches after removing every leaf file under the pin other than one an answer names, as LYSLOGSTORE-006 R4 does. A read of a removed leaf fails and names it, so the removal is the count, and it reaches the lys log store through store::open(dir), which is fixed to FileLeafStore at store.rs line 50. The frontier log's open is tested in crates/lys-log-store/tests. The anchor's opens, full and read-only, are tested in crates/lys-anchor/tests. The lys log store's open is tested inside the lys binary crate, in crates/lys/src/commands/log/store_tests.rs, since lys has no library target. A service store with a snapshot is tested in crates/lys-identity-server/tests. All run in the full Lys gate. The anchor and lys log legs fail on main before this card, and the service leg already passes there and guards it.",
+      "spec": "Behavioural. Tests run every open this card touches after removing every leaf file under the pin other than the last one and one an answer names, as LYSLOGSTORE-006 R4 does. The last leaf file under the pin also stays, because FileLeafStore::open finds its extent by probing for it (crates/lys-log-store/src/file/leaves.rs lines 198 to 205), and without it the open falls back to listing every leaf. A read of a removed leaf fails and names it, so the removal is the count, and it reaches the lys log store through store::open(dir), which is fixed to FileLeafStore at store.rs line 50. The frontier log's open is tested in crates/lys-log-store/tests. The anchor's opens, full and read-only, are tested in crates/lys-anchor/tests. The lys log store's open is tested inside the lys binary crate, in crates/lys/src/commands/log/store_tests.rs, since lys has no library target. A service store with a snapshot is tested in crates/lys-identity-server/tests. All run in the full Lys gate. The anchor and lys log legs fail on main before this card, and the service leg already passes there and guards it.",
       "acceptance": [
         "Run against main before this card, the anchor leg fails naming a removed leaf.",
         "Run against main before this card, the lys log leg fails naming a missing leaf.",

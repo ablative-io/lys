@@ -60,6 +60,8 @@
 
 **S111.** As the operator, I want the exact release installed on a node I name and shown to me as a staging install, so that I can accept the product standalone before anything is cut over.
 
+**S165.** As an operator, I want Lys to start agents with their credentials, tell apps where it is and sign people out of every app, with no app needing to run, so that Lys and each app work on their own and together.
+
 ## Verifier — Checks a recorded identity change without the operator's cooperation
 
 **S7.** As a verifier, I want to check a recorded identity change against a checkpoint and key with standard tooling, so that the directory's history does not rest on the operator's word.
@@ -131,6 +133,8 @@
 ## Started agent — Reports back to the directory and presents its session credential
 
 **S80.** As a started agent, I want to present my session credential to the directory, so that it confirms I am my enduring agent in this session.
+
+**S168.** As an agent started by Lys, I want every handle I am launched with to work, without ever holding the key that presents for it.
 
 ## Stranger — Checks an issued certificate and its log entry offline, holding nothing from lys
 

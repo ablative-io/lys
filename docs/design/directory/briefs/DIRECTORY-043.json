@@ -75,7 +75,7 @@
     {
       "id": "R3",
       "title": "Directory writes never block an async worker",
-      "spec": "Behavioural. crates/lys-identity-server/src/routes.rs:231. with_directory() takes a std Mutex and runs the mutation, a leaf file write with fsync and on cadence a snapshot, inside the async handler, so every directory route waits behind one fsync on a tokio worker. Run the locked section on a single writer thread fed by a channel (or spawn_blocking), with reads served without waiting on a write in progress where the state allows it.",
+      "spec": "Behavioural. crates/lys-identity-server/src/routes.rs:257. with_directory() takes a std Mutex and runs the mutation, a leaf file write with fsync and on cadence a snapshot, inside the async handler, so every directory route waits behind one fsync on a tokio worker. Run the locked section on a single writer thread fed by a channel (or spawn_blocking), with reads served without waiting on a write in progress where the state allows it.",
       "acceptance": [
         "A test holds a directory write inside a blocked counting filesystem and shows a concurrent directory read route answers before the write is released.",
         "No std::sync::MutexGuard is held across an .await in routes.rs, shown by clippy's await_holding_lock lint enabled for the crate and green."

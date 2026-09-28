@@ -1724,7 +1724,7 @@
       "quote": "how is an average person supposed to do it?",
       "consequences": [
         "An ordinary person installs Lys without a terminal.",
-        "The signing identity for the app is Tom's Apple developer identity, held as a secret by handle; building the app without it is refused by name.",
+        "The signing identity for the app is Tom's Apple developer identity, held as a secret by handle; building a release app without it is refused by name. An explicit development build is locally signed and named Lys (development), never the release name; it is not notarised and is not release evidence.",
         "The container engine is still required until Tom decides otherwise; the app guides the person through it."
       ],
       "supersedes": [],
@@ -1738,7 +1738,7 @@
       "date": "2026-09-28",
       "decided_by": "Archie, lead of the Lys identity line, 28 September 2026, after the exit watch race was proved on the landing gate; Waffles asked for the comparison with the spawn's file actions",
       "context": "The starter opened and took the exit lock and handed it to the service. A process started by another thread of the starter carries a copy of that descriptor until its exec, and the lock stays held in the copy. The watch side was fixed by a shared lock released by name; the start side remained.",
-      "decision": "The service is started through `lys identity hold`, which opens the lock, takes it and execs the service. Refused: code run between fork and exec (unsafe, async-signal-safe calls only); the spawn's file actions with O_EXLOCK (macOS and BSD only, a foreign call in an unsafe block, no equal on Linux).",
+      "decision": "The service is started through `lys identity hold`, which opens the lock, takes it without waiting, says held on its standard output and execs the service. The starter reads that handshake to its end and only then writes the pid file, which names the service because exec keeps the pid. The holder uses safe standard library calls only and is the same on macOS and Linux. Refused are code run between fork and exec (unsafe, async-signal-safe calls only) and the spawn's file actions with O_EXLOCK (macOS and BSD only, a foreign call in an unsafe block, no equal on Linux).",
       "quote": "",
       "consequences": [
         "The starter never holds the exit lock, so no process it starts can carry a copy.",
@@ -1780,6 +1780,43 @@
         "The whole-log proof tree and its in-memory hashes are removed.",
         "A missing or wrong tile is refused by name, never rebuilt quietly.",
         "Serving the log as static tiles later needs no new storage."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-124",
+      "title": "A signing key is used inside the secrets broker, which signs typed members under a purpose's domain and never gives the key out",
+      "status": "decided",
+      "scope": "secrets",
+      "date": "2026-09-28",
+      "decided_by": "Archie as secrets lead, for the signing need DIRECTORY-049 R7 found",
+      "context": "An agent signs its requests to lys-identity-server with its certificate key. Reading that key out of the broker at each call breaks the broker's rule that a secret's value never leaves it.",
+      "decision": "A secret may be sealed as a signing key with one purpose from a closed list. The broker signs for a live, admitted handle, builds the bytes to sign itself from typed members with the same function the verifier uses, and answers a COSE_Sign1 signature and the public key only.",
+      "quote": "",
+      "consequences": [
+        "A signing key has no value-bearing use, and every value route and command refuses it by name.",
+        "The bytes of an agent request are built by one function in lys-core, shared by the signer and the verifier.",
+        "Every signature is on the broker's audit record as an ordinary use line, with no digest and no key, and counts against its lease after a reopen.",
+        "lys-core's rule that no constructor takes private key material is lifted for Ed25519Identity::from_seed alone, which takes the seed wrapped in Zeroizing."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-125",
+      "title": "An agent session's holder key is held by the runner, and a session proves itself by peer credentials and ancestry",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-28",
+      "decided_by": "Waffles, ruling on docs/design/directory/HOLDER-KEY-OPTIONS.md",
+      "context": "A broker handle is usable only with presentations signed by its holder key, and nothing gives an agent session one, so every handle an agent is launched with is unusable.",
+      "decision": "The runner makes one holder key per session in memory. A start becomes key, then issue, then spawn. The harness and lys mcp ask the runner for single presentations over its socket. The session is proved by peer credentials plus the process ancestry reaching the session's own root pid, checked on every connection, on macOS and Linux both, through a named maintained dependency and with no unsafe in Lys code.",
+      "quote": "Option A. The runner holds one key per session. A named refusal on macOS is out. The inherited descriptor is rejected.",
+      "consequences": [
+        "The broker gains a route that issues a handle bound to a named public key (SECRETS-008).",
+        "The runner gains a per-session key and a presentation act in a brief after DIRECTORY-050.",
+        "DIRECTORY-049 R7 and R8 depend on that brief."
       ],
       "supersedes": [],
       "superseded_by": ""

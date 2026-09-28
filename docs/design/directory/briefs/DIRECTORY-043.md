@@ -73,7 +73,7 @@ Behavioural. runtime_state.rs:200, requests_state.rs:70, certificates_store.rs:1
 
 ### R3: Directory writes never block an async worker
 
-Behavioural. crates/lys-identity-server/src/routes.rs:231. with_directory() takes a std Mutex and runs the mutation, a leaf file write with fsync and on cadence a snapshot, inside the async handler, so every directory route waits behind one fsync on a tokio worker. Run the locked section on a single writer thread fed by a channel (or spawn_blocking), with reads served without waiting on a write in progress where the state allows it.
+Behavioural. crates/lys-identity-server/src/routes.rs:257. with_directory() takes a std Mutex and runs the mutation, a leaf file write with fsync and on cadence a snapshot, inside the async handler, so every directory route waits behind one fsync on a tokio worker. Run the locked section on a single writer thread fed by a channel (or spawn_blocking), with reads served without waiting on a write in progress where the state allows it.
 
 **Acceptance:**
 - A test holds a directory write inside a blocked counting filesystem and shows a concurrent directory read route answers before the write is released.

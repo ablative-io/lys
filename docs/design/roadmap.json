@@ -1983,7 +1983,7 @@
       "id": "RM-081",
       "title": "Sign and decompress once: the issuer certificate per authority and one key decompression per verify",
       "status": "briefed",
-      "kind": "efficiency",
+      "kind": "fix",
       "summary": "Every certificate the authority issues rebuilds and self-signs its own issuer certificate (an extra Ed25519 signature and DER encode per issue), and every Ed25519 verification in Lys decompresses the public key twice. Both sit under every certificate and every signature check.",
       "provenance": {
         "requested_by": "tom",
@@ -2008,7 +2008,7 @@
       "id": "RM-082",
       "title": "Identity server reads without repeated work: reviews, requests, issuance key, served screens, record reads and the screens' calls",
       "status": "briefed",
-      "kind": "efficiency",
+      "kind": "fix",
       "summary": "Six per-request paths in the identity server and two in its screens do work that is thrown away or repeated: whole-lineage walks before a cheap filter, linear scans over every request ever asked, a key file re-read per certificate, blocking file reads inside async handlers, a whole-record clone to serialise, and screens making serial or refused calls.",
       "provenance": {
         "requested_by": "tom",
@@ -2033,7 +2033,7 @@
       "id": "RM-083",
       "title": "Memory view reads without deep copies or per-lantern rescans",
       "status": "briefed",
-      "kind": "efficiency",
+      "kind": "fix",
       "summary": "Every memory view request deep-copies stored JSON before decoding it, and rescans every epilogue once per lantern cloning its text.",
       "provenance": {
         "requested_by": "tom",
@@ -2343,7 +2343,7 @@
       "kind": "feature",
       "summary": "Make the identity audit connection an installed part of Lys without manual credential handling. Waffles approved the split and scope on 28 September 2026 at 20:22 Melbourne; this brief owns only the Lys side.",
       "provenance": {
-        "asked_by": "Waffles on Tom's authority",
+        "requested_by": "Waffles on Tom's authority",
         "date": "2026-09-28",
         "quote": "Split it in two, one brief per repository.",
         "context": "Cambium review d3e3146b and id reservation 6f40503f, corrected by f39b5d70."
@@ -2434,6 +2434,81 @@
         "commits": []
       },
       "depends_on": [],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-099",
+      "title": "Lys finds its own credentials, says where it is, serves its members to any app and signs out everywhere, needing no app to run",
+      "status": "briefed",
+      "kind": "fix",
+      "summary": "Start credentials come from Lys's own broker, a discovery record, a member feed for any app and back-channel sign-out, with no app needed to run.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-28T22:48:00+10:00",
+        "quote": "",
+        "context": "Tom's 21:34 rule that Lys and every app integrate natively and neither depends on the other."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [],
+        "briefs": [
+          "DIRECTORY-059"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-100",
+      "title": "The broker issues a handle bound to a public key a service names, for a person's agent",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "POST /_lys/handles/issue derives a handle under one the agent holds, for a holder that acts for the person acted for, so an agent session's handles are bound to the runner's per-session key.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-28T23:28:00+10:00",
+        "quote": "a SECRETS card for a broker route that issues a handle to a given public key",
+        "context": "Waffles's ruling on the holder-key options note."
+      },
+      "links": {
+        "cluster": "secrets",
+        "decisions": [
+          "ADR-125"
+        ],
+        "briefs": [
+          "SECRETS-008"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-101",
+      "title": "The runner holds one holder key per agent session and signs its presentations",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Start becomes key, then issue, then spawn, and the runner socket gains a present act proved by peer credentials and ancestry.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-28T23:28:00+10:00",
+        "quote": "a new brief, not an amendment to 050",
+        "context": "Waffles's ruling on the holder-key options note."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-125"
+        ],
+        "briefs": [
+          "DIRECTORY-060"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-100"
+      ],
       "notes": "Written by hand."
     }
   ]

@@ -17,7 +17,7 @@ title: Name every build, and upgrade a running identity install in place with a 
 > - C344 — Every Lys binary answers --version with its build commit (DIRECTORY-045 R1).
 > - C345 — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2); the configuration and compose files move with the binaries, an install made before it is adopted, and an upgrade stopped part-way is finished or put back (DIRECTORY-045 R5 to R7).
 > - C346 — The install and the server say which build is running (DIRECTORY-045 R3).
-> - C347 — Prove it on the live install (DIRECTORY-045 R4).
+> - C347 — Prove the upgrade on a scratch install in the round; the live install is upgraded and recorded after landing (DIRECTORY-045 R4).
 > **Stories:**
 > - S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
 
@@ -27,7 +27,7 @@ A person running the identity product cannot tell which build is running, and ca
 
 ## Task
 
-Stamp the build commit into every Lys binary, add `lys identity upgrade`, surface the running build in /authority and the screens, and prove it by upgrading the live install.
+Stamp the build commit into every Lys binary, add `lys identity upgrade`, surface the running build in /authority and the screens, and prove the upgrade on a scratch install in the round, with the live install upgraded and recorded by the landing lead after landing.
 
 ## Requirements
 
@@ -95,19 +95,20 @@ Behavioural. `lys identity install` and `lys identity upgrade` write install/bui
 **Stories:**
 - S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
 
-### R4: Prove it on the live install
+### R4: Prove the upgrade on a scratch install in the round, and on the live install after landing
 
-Evidence. On the machine the live install runs on, build lys, lys-identity-server and lys-secrets at the card's head on the build machine through the card's own round, then run `lys identity upgrade --from` that build against the live install, and show that the `build` member of the running server's /api/authority answer equals the card's head. Record the before and after commits and the upgrade's printed lines in docs/design/directory/PROOF-UPGRADE.md. Secrets and passwords never appear in it. The live install was made before this card (R6), so the proof starts with its first move, and the sign-in page still keeps its session over plain http after the upgrade (the cookie setting carried by R5). The live service serves the screens at /authority and the server's answer at /api/authority, so the proof reads /api/authority.
+Evidence, in two parts. In the round: the upgrade tests drive `upgrade` end to end against a scratch install each test makes in its own temporary directory (build A's binaries running with the configuration and compose files A renders, then build B's), through the engine that brings the compose services to their definition, so neither a container runtime nor the live install is needed. The build machine has neither, and the round never reaches the live install or its state directory. After landing: the lead who lands the card upgrades the live install with the landed build's `lys identity upgrade --from`, and commits docs/design/directory/PROOF-UPGRADE.md to main naming the installed commit before, the landed commit after, the upgrade's printed lines, the `build` member of http://localhost:8490/api/authority, and the cookie setting in the install's compose environment. Secrets and passwords never appear in it. The live install was made before this card (R6), so that upgrade starts with its first move. The round does not write PROOF-UPGRADE.md.
 
 **Acceptance:**
-- PROOF-UPGRADE.md names the installed commit before, the head commit after, and quotes the upgrade's lines; `curl -s http://localhost:8490/api/authority` shows the head commit.
-- After the upgrade, signing in on the live install in a browser keeps the session, and the compose environment holds the cookie setting the new build renders.
-
-**Files:**
-- create: docs/design/directory/PROOF-UPGRADE.md
+- A test starts build A on a scratch install in a temporary directory, upgrades it to build B, and asserts that the recorded build and every binary's --version name B, that the configuration key and compose environment value only B renders are in place, and that config.previous/ holds A's files.
+- A test in which build B exits before it is ready asserts that A is running again, A is the recorded build, and A's configuration and compose files are back in place.
+- No test or leg of the round needs a container runtime.
+- No test or leg of the round needs a listener on port 8490.
+- No test or leg of the round needs the live install's state directory.
+- Each test removes its temporary install when it ends.
 
 **Checklist:**
-- C347 — Prove it on the live install (DIRECTORY-045 R4).
+- C347 — Prove the upgrade on a scratch install in the round; the live install is upgraded and recorded after landing (DIRECTORY-045 R4).
 
 **Stories:**
 - S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
@@ -190,4 +191,4 @@ Behavioural. Before the first stop, an upgrade writes an intent record (install/
 ## Verification
 
 - The full Lys gate and the surface checks exit 0 at the card's head, measured by the card round.
-- The live upgrade of R4 is recorded in PROOF-UPGRADE.md and /api/authority on the live install names the head commit.
+- The upgrade tests of R4 pass in the round's test leg on a build machine with no container runtime and no live install.

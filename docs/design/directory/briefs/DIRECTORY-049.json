@@ -6,7 +6,9 @@
     "DIRECTORY-047",
     "DIRECTORY-048",
     "DIRECTORY-050",
-    "SECRETS-006"
+    "DIRECTORY-060",
+    "SECRETS-006",
+    "SECRETS-008"
   ],
   "blocked_by": [],
   "checklist": [
@@ -214,10 +216,14 @@
     {
       "id": "R7",
       "title": "Agents reach it with 'lys mcp', signing with their own key",
-      "spec": "Behavioural. 'lys mcp --agent ID' serves MCP over stdio and forwards each call to the server as a request signed for the agent. It never holds the agent's private key: it sends the agent's key handle and the request's typed members (method, path, the body's digest, the signing instant and the nonce) to lys-secrets under the agent_request purpose; the broker builds the bytes to sign itself, signs under its ordinary admission (SECRETS-006) and returns the signature only. No digest or bytes composed by 'lys mcp' are ever signed. Nothing is written to a file, an argument or the environment. The launch template (launch_template.rs) renders it into an agent's MCP configuration as 'identity (this service)' when its profile asks for it.",
+      "spec": "Behavioural. 'lys mcp --agent ID' serves MCP over stdio and forwards each call to the server as a request signed for the agent. It never holds the agent's certificate key. For each call it sends POST /_lys/signature to lys-secrets (SECRETS-006 R2, SECRETS-006.md line 73) with the agent's key handle (R8), the purpose agent_request and the request's members as SECRETS-006 spells them. The members are method, path, body_digest, signed_at_ms and nonce. The member body_digest is the SHA-256 of the request body as 64 lower-case hex characters. The member nonce is at least 16 bytes as hex. The broker builds the bytes to sign itself with lys_core::agent_request::payload and answers a COSE_Sign1 as hex. 'lys mcp' puts that hex as the fourth word of the lys-agent-signature header, the form agent_signature.rs lines 5 to 8 describe and the server verifies. No digest or bytes composed by 'lys mcp' are ever signed. The signature request is itself a handle route, so 'lys mcp' takes its lys-handle and presentation headers from one answer of the runner's present act through crates/lys-runner/src/present_client.rs (DIRECTORY-060 R3), reached at the socket the environment names as LYS_RUNNER_SOCKET. 'lys mcp' holds no holder key, reads no handle token from the environment, and keeps no token past the one request. Nothing is written to a file, an argument or the environment. The launch template (launch_template.rs) renders it into an agent's MCP configuration as 'identity (this service)' when its profile asks for it.",
       "acceptance": [
         "An agent launched from a profile asking for it lists the three tools and reads its own identity.",
-        "The 'lys mcp' process never receives key material: the broker call answers a signature, and a test on the process's memory-held values and its arguments finds no key.",
+        "Each call 'lys mcp' forwards carries a lys-agent-signature header whose fourth word is the COSE_Sign1 hex the broker answered, and the server accepts it.",
+        "Each POST /_lys/signature 'lys mcp' sends carries the lys-handle and presentation headers of one present answer from the runner, and the broker admits it.",
+        "'lys mcp' holds no Ed25519Identity and reads no key file and no handle token.",
+        "The broker's answer to 'lys mcp' holds a signature and a public key and no private key.",
+        "A test on the 'lys mcp' process's memory-held values and its arguments finds no bytes of the agent's certificate key.",
         "The rendered configuration and the process arguments carry no key material, checked by a test.",
         "A withdrawn certificate refuses the next call by name."
       ],
@@ -229,6 +235,35 @@
         "modify": [
           "crates/lys/src/cli.rs",
           "crates/lys-identity-server/src/launch_template.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C373"
+      ],
+      "stories": [
+        "S153"
+      ]
+    },
+    {
+      "id": "R8",
+      "title": "The agent's key handle is derived for its session's key at start",
+      "spec": "Behavioural. When a profile asks for 'identity (this service)', the launch record names the agent's certificate key handle among the agent's held handles, as a HandleName with its id, its secret and its env member LYS_AGENT_KEY_HANDLE (launch_template.rs lines 24 to 31). The start of DIRECTORY-060 R1 derives a session handle under that held handle through POST /_lys/handles/issue (SECRETS-008 R1), with under set to the held handle's id and holder_key set to the session's public key, on behalf of the person starting the agent, before anything is spawned. The derived handle takes the uses, the end and the spend left on the held handle, and ends when the held handle is dropped. The launch template is rendered with the derived id in place of the held id, as 060 R1 says, so LYS_AGENT_KEY_HANDLE carries the derived id. The session's environment carries that derived id and LYS_RUNNER_SOCKET, and no token and no key. 'lys mcp' reads the handle id from LYS_AGENT_KEY_HANDLE and refuses agent_key_handle_missing by name at start when it is absent. A refused derive ends the start by name, as 060 R1 says, and nothing is spawned.",
+      "acceptance": [
+        "A session started from a profile asking for 'identity (this service)' has LYS_AGENT_KEY_HANDLE set to a handle id, and a present for it from inside the session is admitted by the broker.",
+        "The session's environment holds no handle token and no key bytes, checked by a test.",
+        "'lys mcp' started without LYS_AGENT_KEY_HANDLE refuses agent_key_handle_missing.",
+        "A profile that does not ask for it launches with no agent key handle.",
+        "The parent of the handle LYS_AGENT_KEY_HANDLE names is the agent's held certificate key handle.",
+        "LYS_AGENT_KEY_HANDLE never holds the held handle's own id.",
+        "The derived handle's end equals the held handle's end.",
+        "Dropping the held certificate key handle makes the next present for the derived handle refused by the broker."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/launch_template.rs",
+          "crates/lys/src/cli/mcp.rs"
         ],
         "delete": []
       },

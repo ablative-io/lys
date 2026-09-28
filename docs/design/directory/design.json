@@ -2868,81 +2868,6 @@
       "brief": "DIRECTORY-053"
     },
     {
-      "path": "crates/lys/src/package.rs",
-      "note": "R1: `lys package app` builds the app and disk image",
-      "brief": "DIRECTORY-054"
-    },
-    {
-      "path": "crates/lys/src/package_tests.rs",
-      "note": "R1: `lys package app` builds the app and disk image",
-      "brief": "DIRECTORY-054"
-    },
-    {
-      "path": "packaging/macos/Info.plist",
-      "note": "R1: `lys package app` builds the app and disk image",
-      "brief": "DIRECTORY-054"
-    },
-    {
-      "path": "packaging/macos/Lys.icns",
-      "note": "R1: `lys package app` builds the app and disk image",
-      "brief": "DIRECTORY-054"
-    },
-    {
-      "path": "crates/lys-app/Cargo.toml",
-      "note": "R2: Opening the app installs and shows every step on a Lys page",
-      "brief": "DIRECTORY-054"
-    },
-    {
-      "path": "crates/lys-app/src/main.rs",
-      "note": "R2: Opening the app installs and shows every step on a Lys page",
-      "brief": "DIRECTORY-054"
-    },
-    {
-      "path": "crates/lys-app/src/progress.rs",
-      "note": "R2: Opening the app installs and shows every step on a Lys page",
-      "brief": "DIRECTORY-054"
-    },
-    {
-      "path": "crates/lys-app/src/progress_tests.rs",
-      "note": "R2: Opening the app installs and shows every step on a Lys page",
-      "brief": "DIRECTORY-054"
-    },
-    {
-      "path": "surface/identity/src/features/install/InstallProgress.tsx",
-      "note": "R2: Opening the app installs and shows every step on a Lys page",
-      "brief": "DIRECTORY-054"
-    },
-    {
-      "path": "crates/lys-app/src/engine.rs",
-      "note": "R3: The container engine, guided in plain words",
-      "brief": "DIRECTORY-054"
-    },
-    {
-      "path": "crates/lys-app/src/engine_tests.rs",
-      "note": "R3: The container engine, guided in plain words",
-      "brief": "DIRECTORY-054"
-    },
-    {
-      "path": "crates/lys-app/src/login_item.rs",
-      "note": "R4: Start at login, reopen, upgrade and uninstall",
-      "brief": "DIRECTORY-054"
-    },
-    {
-      "path": "crates/lys-app/src/login_item_tests.rs",
-      "note": "R4: Start at login, reopen, upgrade and uninstall",
-      "brief": "DIRECTORY-054"
-    },
-    {
-      "path": "surface/identity/src/features/account/Uninstall.tsx",
-      "note": "R4: Start at login, reopen, upgrade and uninstall",
-      "brief": "DIRECTORY-054"
-    },
-    {
-      "path": "docs/design/directory/reports/DIRECTORY-054-fresh-account.md",
-      "note": "R5: Proof on a fresh macOS account",
-      "brief": "DIRECTORY-054"
-    },
-    {
       "path": "crates/lys/src/identity/upgrade/render.rs",
       "note": "R5: The configuration and compose files move with the binaries",
       "brief": "DIRECTORY-045"
@@ -3218,16 +3143,6 @@
       "brief": "DIRECTORY-052"
     },
     {
-      "path": "crates/lys-install/Cargo.toml",
-      "note": "R2: Opening the app installs and shows every step on a Lys page",
-      "brief": "DIRECTORY-054"
-    },
-    {
-      "path": "crates/lys-install/src/lib.rs",
-      "note": "R2: Opening the app installs and shows every step on a Lys page",
-      "brief": "DIRECTORY-054"
-    },
-    {
       "path": "crates/lys-identity-server/src/verified_caller.rs",
       "note": "The one extractor that turns a verified request into the caller every handler takes",
       "brief": "DIRECTORY-049"
@@ -3341,6 +3256,956 @@
       "path": "crates/lys-secrets/src/audit/codec.rs",
       "note": "The broker's audit log codec: its kinds are one list the decoder matches, entered in the workspace kinds registry so go-back can compare kind sets.",
       "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys/src/identity/install/exit_wait_tests.rs",
+      "note": "Exit watch tests, calling start_detached with the holder.",
+      "brief": "DIRECTORY-057"
+    },
+    {
+      "path": "crates/lys/src/identity/install_tests.rs",
+      "note": "Install tests, calling start_detached with the holder.",
+      "brief": "DIRECTORY-057"
+    },
+    {
+      "path": "crates/lys-identity-server/src/broker_handles.rs",
+      "note": "R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/src/broker_handles_tests.rs",
+      "note": "R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/start_with_own_broker.rs",
+      "note": "R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-secrets/src/access.rs",
+      "note": "R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-secrets/src/bin/lys-secrets/callers.rs",
+      "note": "R1: A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys/src/identity/install/discovery.rs",
+      "note": "R2: Lys writes a discovery record any app can find",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys/src/identity/install/discovery_tests.rs",
+      "note": "R2: Lys writes a discovery record any app can find",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/src/app_members_api.rs",
+      "note": "R3: Any registered app reads Lys's people, seats and agents",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/app_members.rs",
+      "note": "R3: Any registered app reads Lys's people, seats and agents",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/src/backchannel_logout.rs",
+      "note": "R4: Signing out of Lys signs the person out of every registered app",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/backchannel_logout.rs",
+      "note": "R4: Signing out of Lys signs the person out of every registered app",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/src/sessions_api.rs",
+      "note": "R4: Signing out of Lys signs the person out of every registered app",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-secrets/tests/held_states.rs",
+      "note": "A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-secrets/src/bin/lys-secrets/serve.rs",
+      "note": "A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-secrets/src/bin/lys-secrets/view.rs",
+      "note": "A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/src/issuer_sign_out.rs",
+      "note": "Signing out of Lys ends the person's sessions at the issuer, and the issuer tells every registered app",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_connect.rs",
+      "note": "An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/apps_connect.rs",
+      "note": "An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "surface/identity/src/features/apps/ConnectRequest.tsx",
+      "note": "An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/src/session.rs",
+      "note": "Signing out of Lys signs the person out at the issuer, and the issuer tells every registered app",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "surface/identity/src/features/sessions/Sessions.tsx",
+      "note": "Signing out of Lys signs the person out at the issuer, and the issuer tells every registered app",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity/src/log.rs",
+      "note": "The receipts route answers a signed checkpoint",
+      "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys-identity/src/error.rs",
+      "note": "One function verifies a receipt against a pinned key",
+      "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys-identity/src/receipt.rs",
+      "note": "One function verifies a receipt against a pinned key",
+      "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys-core/src/checkpoint/note.rs",
+      "note": "One function verifies a receipt against a pinned key",
+      "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys-core/src/checkpoint/note_tests.rs",
+      "note": "One function verifies a receipt against a pinned key",
+      "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys-secrets/src/service.rs",
+      "note": "A start reads its credentials from Lys's own broker, and no route reaches an app for them",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity/tests/uncertain_support/mod.rs",
+      "note": "The receipts route answers a signed checkpoint",
+      "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys-identity/tests/signed_head_settle.rs",
+      "note": "The receipts route answers a signed checkpoint",
+      "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys-identity/tests/support/mod.rs",
+      "note": "The receipts route answers a signed checkpoint",
+      "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys/src/identity/install/detached.rs",
+      "note": "a detached start through the holder",
+      "brief": "DIRECTORY-057"
+    },
+    {
+      "path": "docs/design/directory/HOLDER-KEY-OPTIONS.md",
+      "note": "options for agent session holder keys, for a ruling before DIRECTORY-049 R8 and a DIRECTORY-050 amendment",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-runner/src/session_key.rs",
+      "note": "the runner's session holder key",
+      "brief": "DIRECTORY-060"
+    },
+    {
+      "path": "crates/lys-runner/tests/session_key.rs",
+      "note": "the runner's session holder key",
+      "brief": "DIRECTORY-060"
+    },
+    {
+      "path": "crates/lys-core/src/keys/identity.rs",
+      "note": "the runner's session holder key",
+      "brief": "DIRECTORY-060"
+    },
+    {
+      "path": "crates/lys-runner/src/peer.rs",
+      "note": "the runner's session holder key",
+      "brief": "DIRECTORY-060"
+    },
+    {
+      "path": "crates/lys-runner/tests/present.rs",
+      "note": "the runner's session holder key",
+      "brief": "DIRECTORY-060"
+    },
+    {
+      "path": "crates/lys-runner/src/present_client.rs",
+      "note": "the runner's session holder key",
+      "brief": "DIRECTORY-060"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-060.json",
+      "note": "the runner's session holder key brief",
+      "brief": "DIRECTORY-060"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-060.md",
+      "note": "the runner's session holder key brief",
+      "brief": "DIRECTORY-060"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/exchange.rs",
+      "note": "The exchange of bin/, the configuration and the screens with what is kept, undoing its own renames on a failure.",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/exchange_tests.rs",
+      "note": "Tests of the exchange with a rename step that fails on a chosen call.",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys-identity-server/src/kinds.rs",
+      "note": "The registry of every signed log kind lys-identity-server folds.",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys-secrets/src/bin/lys-secrets/kinds.rs",
+      "note": "The registry of every audit log kind lys-secrets folds.",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys-install/Cargo.toml",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/config.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/config/validate.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/config_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/configure.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/configure_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/credentials.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/credentials_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/error.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/error_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/health.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/install.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/install/deployment.template.toml",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/install/detached.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/install/exit_wait.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/install/exit_wait_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/install/held_start.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/install/held_start_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/install/layout.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/install/server_config.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/install/services.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/install/start_race_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/install/surface.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/install_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/lib.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/loopback_http.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/loopback_http_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/output.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/output_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/prepare.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/prepare_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/private_files.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/rauthy.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/themes.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/themes_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/upgrade.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/upgrade/back.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/upgrade/exchange.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/upgrade/exchange_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/upgrade_back_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/upgrade_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "Cargo.lock",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "Cargo.toml",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/Cargo.toml",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/commands/mod.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/install.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/mod.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/main.rs",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "deploy/identity/theme-map.md",
+      "note": "R1: Extract the install library without changing its behaviour",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/commands/output.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/commands/output_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/config.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/config/validate.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/config_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/configure.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/configure_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/credentials.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/credentials_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/error.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/error_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/health.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/install/deployment.template.toml",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/install/detached.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/install/exit_wait.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/install/exit_wait_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/install/held_start.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/install/held_start_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/install/layout.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/install/server_config.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/install/services.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/install/start_race_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/install/surface.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/install_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/loopback_http.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/loopback_http_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/prepare.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/prepare_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/private_files.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/rauthy.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/themes.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/themes_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/back.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/exchange.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/exchange_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade_back_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade_tests.rs",
+      "note": "R1: Extract the install library without changing its behaviour (old path removed after relocation)",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/Cargo.toml",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/build.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/bundle.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/bundle_tests.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/flow.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/flow_tests.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/launcher.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/launcher_tests.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/main.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/main_tests.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/progress.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/progress_tests.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/refusal.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/server.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/server_tests.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/steps.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/steps_tests.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "surface/identity/src/features/install/InstallProgress.tsx",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "surface/identity/tests/install-progress.test.tsx",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "surface/identity/src/App.tsx",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/engine.rs",
+      "note": "R3: The container engine, guided in plain words",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/engine_tests.rs",
+      "note": "R3: The container engine, guided in plain words",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/engine_wait.rs",
+      "note": "R3: The container engine, guided in plain words",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/engine_wait_tests.rs",
+      "note": "R3: The container engine, guided in plain words",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/install/engine_path.rs",
+      "note": "R3: The container engine, guided in plain words",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/install/engine_path_tests.rs",
+      "note": "R3: The container engine, guided in plain words",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/login_item.rs",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/login_item_tests.rs",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/uninstall.rs",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/uninstall_tests.rs",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-identity-server/src/uninstall_api.rs",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-identity-server/src/uninstall_api_tests.rs",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "surface/identity/src/features/account/Uninstall.tsx",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "surface/identity/tests/uninstall.test.tsx",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-identity-server/src/error.rs",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-identity-server/src/error_status.rs",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-identity-server/src/lib.rs",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-identity-server/src/routes.rs",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "surface/identity/src/features/me/You.tsx",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "surface/identity/tests/fixtures.ts",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/package.rs",
+      "note": "R5: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/package_tests.rs",
+      "note": "R5: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "packaging/macos/Info.plist",
+      "note": "R5: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "packaging/macos/Lys.icns",
+      "note": "R5: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-home/build.rs",
+      "note": "R5: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-home/tests/version.rs",
+      "note": "R5: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-identity-server/build.rs",
+      "note": "R5: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/version.rs",
+      "note": "R5: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-secrets/build.rs",
+      "note": "R5: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-secrets/tests/version.rs",
+      "note": "R5: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/build.rs",
+      "note": "R5: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/cli.rs",
+      "note": "R5: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/commands/error.rs",
+      "note": "R5: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/commands/error_tests.rs",
+      "note": "R5: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/tests/version.rs",
+      "note": "R5: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "docs/design/directory/reports/DIRECTORY-054-fresh-account.md",
+      "note": "R6: Prepare the fresh-account proof and its evidence record",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "docs/design/directory/reports/DIRECTORY-054-open-items.md",
+      "note": "R6: Prepare the fresh-account proof and its evidence record",
+      "brief": "DIRECTORY-054"
     }
   ],
   "inventory": [
@@ -3468,7 +4333,7 @@
   "constraints": [
     {
       "id": "CN1",
-      "text": "Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed."
+      "text": "Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed. DIRECTORY-054, under ADR-120, is implementation work within the exact requirement file walls of its reviewed brief; the documents-only boundary does not apply to those files. CN9 still requires a reviewed revision before any additional file is edited."
     },
     {
       "id": "CN2",
