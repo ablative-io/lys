@@ -87,8 +87,8 @@ function File({ data, tab, reload }: { data: FileData; tab: string; reload: () =
             {kind === 'agent' && x.state === 'active' ? (
               <a className="btn primary" data-act="start" href={'#/file/' + encodeURIComponent(x.id) + '/provisioning'} title="Prepare a start from the reviewed profile">Start…</a>
             ) : null}
-            {kind === 'agent' && x.state === 'active' ? (
-              <EmergencyStop id={x.id} stopped={reload} />
+            {kind === 'agent' && (x.state === 'active' || x.state === 'suspended') ? (
+              <EmergencyStop id={x.id} active={x.state === 'active'} stopped={reload} />
             ) : null}
           </div>
         </div>

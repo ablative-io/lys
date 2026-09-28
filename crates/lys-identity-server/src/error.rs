@@ -361,6 +361,20 @@ pub enum ServerError {
     /// No team by that id was ever created.
     #[error("TeamUnknown: no team by that id was ever created")]
     TeamUnknown,
+    /// The emergency stops cannot be kept or read.
+    #[error("StopsUnavailable: {reason}")]
+    StopsUnavailable {
+        /// Why.
+        reason: String,
+    },
+    /// The operation id already names an emergency stop sent in other words.
+    #[error(
+        "StopReused: operation `{operation}` already names an emergency stop in other words: send this stop under a new operation id"
+    )]
+    StopReused {
+        /// The operation id.
+        operation: String,
+    },
     /// The operation id already names a team act sent in other words.
     #[error(
         "TeamReused: operation `{operation}` already names a team act in other words: send this act under a new operation id"

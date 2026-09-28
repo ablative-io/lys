@@ -61,6 +61,8 @@ pub mod setup;
 pub mod spicedb;
 mod spicedb_http;
 pub mod stop_api;
+pub mod stops_state;
+pub mod stops_store;
 pub mod teams_api;
 pub mod teams_state;
 pub mod teams_store;
