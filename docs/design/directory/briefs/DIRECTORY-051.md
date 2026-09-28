@@ -23,7 +23,7 @@ title: Lys tracks every agent session's tokens, context and time, and holds its 
 
 ## Purpose
 
-Tom, 28 September 2026 19:50 to 19:51, on Dot: 'Argus is not going to be able to do what we need, to be able to track budgets and token usage, time, goals and everything like that through Lys. We're going to completely rewrite that, in Rust.' Argus keeps crashing, and the budgets and goals our agents run under must live with their identity, grants and sessions, in Lys. Tom, 19:51: 'Not the day-to-day operational tasks. That will still go into Cambium. But I want to start setting budgets and goals and expectations and deliverables that need to be done, and I think the only way to do that is through Lys.'
+Tom, 28 September 2026 19:50 to 19:51, on Dot: 'Argus is not going to be able to do what we need, to be able to track budgets and token usage, time, goals and everything like that through Lys. We're going to completely rewrite that, in Rust.' Argus keeps crashing, and the budgets and goals our agents run under must live with their identity, grants and sessions, in Lys. Tom, 19:51: 'Not the day-to-day operational tasks. That will still go into Cambium. But I want to start setting budgets and goals and expectations and deliverables that need to be done, and I think the only way to do that is through Lys.' Amended 28 September 2026 20:45 by Waffles after Archie's review of the brief against the tree.
 
 ## Task
 
@@ -33,12 +33,13 @@ Measure each running session's usage from its transcript; let budgets be set on 
 
 ### R1: Usage measured from the transcript, per turn
 
-Behavioural. For each session the runner holds, Lys follows the harness transcript the home keeps (lys-home) as it grows and records per turn: input, output and cache tokens, context in use against the model's window from the model's own figure, the turn's instant, and the account it was paid from. Following is driven by the file's change notification, never a poll. A transcript line it cannot read is recorded as unread with its offset and reason, never skipped silently. GET /agents/{id}/usage and GET /runtime/sessions/{id}/usage answer totals and per-turn rows, paged.
+Behavioural. For each session the runner holds, Lys follows the harness transcript the home keeps (lys-home) as it grows and records per turn: input, output and cache tokens, context in use against the model's window from the model's own figure, the turn's instant, and the account it was paid from. Following is driven by the file's change notification, never a poll. A transcript line it cannot read is recorded as unread with its offset and reason, never skipped silently. GET /agents/{id}/usage and GET /runtime/sessions/{id}/usage answer totals and per-turn rows, paged. The transcript lives on the machine the session runs on, so the follower runs in the runner (DIRECTORY-050) and sends the server usage rows of figures only (turn, tokens in and out, cache, context used, instants), never transcript text. The context window comes from the agent's profile, declared, with no default; a profile without one is refused window_undeclared. The account comes from the runner's rotation record. The card creates rules/ast-grep/no-poll.yml (a loop around a sleep, or an interval timer, outside tests) and lists it, and it is seen red on a poll written to prove it before it is removed.
 
 **Acceptance:**
 - A recorded Claude Code transcript fixture yields the exact per-turn tokens and context figures, checked against hand-counted values.
 - An unreadable line is listed with its offset and reason.
-- A growing transcript adds rows as it grows, with no poll in the code (ast-grep).
+- rules/ast-grep/no-poll.yml exists, fires on a proof poll, and passes on the card's tree.
+- No usage row holds transcript text.
 
 **Files:**
 - create: crates/lys-identity-server/src/usage_api.rs
@@ -46,6 +47,7 @@ Behavioural. For each session the runner holds, Lys follows the harness transcri
 - create: crates/lys-identity-server/src/usage_store.rs
 - create: crates/lys-home/src/harness/claude_code/usage.rs
 - create: crates/lys-identity-server/tests/usage.rs
+- create: rules/ast-grep/no-poll.yml
 - modify: crates/lys-identity-server/src/routes.rs
 
 **Checklist:**
@@ -56,7 +58,7 @@ Behavioural. For each session the runner holds, Lys follows the harness transcri
 
 ### R2: Budgets on agents, teams and people
 
-Behavioural. A budget names its holder (agent, team or person), its measure (context percent, tokens per period, running time per period), its limit, and its act (compact, stop or tell), set by the responsible person or an administrator. A narrower holder's budget applies before a wider one's; the tightest reached budget acts. Budgets are log events with versions, readable and changeable through the API.
+Behavioural. A budget names its holder (agent, team or person), its measure (context percent, tokens per period, running time per period), its limit, and its act (compact, stop or tell), set by the responsible person or an administrator. A narrower holder's budget applies before a wider one's; the tightest reached budget acts. Budgets are log events with versions, readable and changeable through the API. A budget's period names its time zone explicitly; there is no machine default, and a period without a zone is refused zone_missing.
 
 **Acceptance:**
 - A team budget applies to every agent in the team unless an agent's own is tighter.
@@ -76,7 +78,7 @@ Behavioural. A budget names its holder (agent, team or person), its measure (con
 
 ### R3: A reached budget acts once
 
-Behavioural. When a measured figure reaches a budget, Lys does the budget's act once per crossing: compact sends the harness's compaction command through the runner at the next turn boundary; stop ends the session through the runner and reports it confirmed; tell delivers a notice to the responsible person. Each act leaves a receipt naming the budget, the figure and the instant. A compaction that does not bring context under the limit is reported, not retried in a loop.
+Behavioural. When a measured figure reaches a budget, Lys does the budget's act once per crossing: compact sends the harness's compaction command through the runner at the next turn boundary; stop ends the session through the runner and reports it confirmed; tell delivers a notice to the responsible person. Each act leaves a receipt naming the budget, the figure and the instant. A compaction that does not bring context under the limit is reported, not retried in a loop. A notice ('tell') is a record shown on the Usage screen and read through the API; Lys sends nothing outward.
 
 **Acceptance:**
 - Crossing a context budget sends one compaction at the next turn boundary.
@@ -96,13 +98,15 @@ Behavioural. When a measured figure reaches a budget, Lys does the budget's act 
 
 ### R4: Goals, expectations and deliverables, with deadlines and reminders
 
-Behavioural. A goal on an agent or a team is one of three kinds: a goal (an outcome), an expectation (a standard its work is held to) or a deliverable (a named thing handed over, with the evidence that proves it: a landed commit, a document, a passing check). Each has words, a deadline, a state (open, met, missed, dropped) and reminders (before the deadline, at intervals, or on events such as a compaction). Lys delivers each reminder into the agent's live session through the runner, with the goal's words and time left, and records the delivery or its refusal. Reminders are timers held in the log so a restart keeps them; none is lost or fired twice. Day-to-day operational tasks stay in the product that runs them; Lys holds only these three kinds.
+Behavioural. A goal on an agent or a team is one of three kinds: a goal (an outcome), an expectation (a standard its work is held to) or a deliverable (a named thing handed over, with the evidence that proves it: a landed commit, a document, a passing check). Each has words, a deadline, a state (open, met, missed, dropped) and reminders (before the deadline, at intervals, or on events such as a compaction). Lys delivers each reminder into the agent's live session through the runner, with the goal's words and time left, and records the delivery or its refusal. Reminders are timers held in the log so a restart keeps them; none is lost or fired twice. Day-to-day operational tasks stay in the product that runs them; Lys holds only these three kinds. Only the item's responsible person, or the holder of a relation the plan names for it, may mark a goal, expectation or deliverable met; the agent it judges may never mark its own, refused not_your_judgement. Lys calls no app, so evidence is recorded as a claim by the person who marks it, in those words, naming them. A reminder that fell due while the server was down fires once at start, recorded as late with both the due and the fired instant.
 
 **Acceptance:**
 - A reminder due at a set instant is typed into the session at that instant, once.
 - A restart between setting and firing still fires it once.
 - Marking a goal met stops its reminders.
 - A deliverable is marked met only with its evidence named; without it the mark is refused evidence_missing.
+- The judged agent marking its own deliverable met is refused not_your_judgement.
+- A reminder due during a stop fires once at start, recorded late with both instants.
 
 **Files:**
 - create: crates/lys-identity-server/src/goals_api.rs

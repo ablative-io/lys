@@ -2815,6 +2815,136 @@
       "path": "crates/lys-home/src/record/given.rs",
       "note": "DIRECTORY-052 R3: the given record lists a member's starting memories and opening conversation",
       "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_api.rs",
+      "note": "R1: An app is a record, registered through the API and approved on a Lys screen",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_state.rs",
+      "note": "R1: An app is a record, registered through the API and approved on a Lys screen",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_store.rs",
+      "note": "R1: An app is a record, registered through the API and approved on a Lys screen",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/apps.rs",
+      "note": "R1: An app is a record, registered through the API and approved on a Lys screen",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "surface/identity/src/features/apps/Apps.tsx",
+      "note": "R1: An app is a record, registered through the API and approved on a Lys screen",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "surface/identity/src/features/apps/apps.css",
+      "note": "R1: An app is a record, registered through the API and approved on a Lys screen",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/schema.rs",
+      "note": "R2: An app's schema: its own kinds, actions, relations and parents, checked on entry",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/schema_tests.rs",
+      "note": "R2: An app's schema: its own kinds, actions, relations and parents, checked on entry",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_binding.rs",
+      "note": "R2: An app's schema: its own kinds, actions, relations and parents, checked on entry",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/model.rs",
+      "note": "R2: An app's schema: its own kinds, actions, relations and parents, checked on entry",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/apps_schema.rs",
+      "note": "R3: Schema changes are versioned, dry-run first, and never strand a grant",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/grants_batch.rs",
+      "note": "R5: Apps check many permissions at once and list what a subject may act on",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-identity-server/src/openapi.rs",
+      "note": "R6: One OpenAPI document, generated, describes every route",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/openapi.rs",
+      "note": "R6: One OpenAPI document, generated, describes every route",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-openapi/Cargo.toml",
+      "note": "R6: One OpenAPI document, generated, describes every route",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-openapi/src/lib.rs",
+      "note": "R6: One OpenAPI document, generated, describes every route",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-identity-server/src/error_status.rs",
+      "note": "R6: One OpenAPI document, generated, describes every route",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "rules/ast-grep/no-app-names.yml",
+      "note": "R7: Lys depends on no app",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-core/src/attestation/mod.rs",
+      "note": "R7: Lys depends on no app",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys/src/identity/install/deployment.template.toml",
+      "note": "R7: Lys depends on no app",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "surface/styles/tokens.css",
+      "note": "R7: Lys depends on no app",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-identity-server/src/receipts_api.rs",
+      "note": "R4: Type, keys, read, wait, resize and compact through Lys",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-identity/src/provisioning.rs",
+      "note": "R5: Account rotation on usage limit",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "crates/lys-identity-server/src/stop_api.rs",
+      "note": "R6: Wake with a message; stop through the runner",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "surface/identity/src/features/runtime/Sessions.tsx",
+      "note": "R7: Sessions screen: see, type to and stop every agent",
+      "brief": "DIRECTORY-050"
+    },
+    {
+      "path": "rules/ast-grep/no-poll.yml",
+      "note": "R1: Usage measured from the transcript, per turn",
+      "brief": "DIRECTORY-051"
     }
   ],
   "inventory": [

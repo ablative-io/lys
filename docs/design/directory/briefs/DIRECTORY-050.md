@@ -25,7 +25,7 @@ title: Lys runs and drives the agents it starts: its own background terminal, or
 
 ## Purpose
 
-Tom, 28 September 2026 19:48, on Dot: 'I've decided that I want this to actually handle the launching of agents, either through a background terminal of its own or plugging into something else. I want it to be able to do all of the things that Argus can do currently through herdr, and what was supposed to be done through manifold.' Today Lys gives a start command and never runs it, so every agent still needs a person at a terminal or another tool that Lys cannot rely on.
+Tom, 28 September 2026 19:48, on Dot: 'I've decided that I want this to actually handle the launching of agents, either through a background terminal of its own or plugging into something else. I want it to be able to do all of the things that Argus can do currently through herdr, and what was supposed to be done through manifold.' Today Lys gives a start command and never runs it, so every agent still needs a person at a terminal or another tool that Lys cannot rely on. Amended 28 September 2026 20:45 by Waffles after Archie's review of the brief against the tree.
 
 ## Task
 
@@ -35,12 +35,14 @@ Add a runner: a background process on each machine that holds each started agent
 
 ### R1: Lys's own runner: each agent in its own background pseudo-terminal
 
-Behavioural. New crate lys-runner and the command 'lys runner' (started by install as a login item beside the server, as the server is). It holds each session in its own pseudo-terminal with a scrollback of a configured size in bytes, keeps running when every screen is closed, and records each session's exit status and instant. Sessions survive a restart of lys-identity-server; a restart of the runner reports every session it held as ended, never as running. It listens only on a Unix socket in the install's run folder at mode 0600, and accepts only the server's signed requests.
+Behavioural. New crate lys-runner and the command 'lys runner' (started by install as a login item beside the server, as the server is). It holds each session in its own pseudo-terminal with a scrollback of a configured size in bytes, keeps running when every screen is closed, and records each session's exit status and instant. Sessions survive a restart of lys-identity-server; a restart of the runner reports every session it held as ended, never as running. It listens only on a Unix socket in the install's run folder at mode 0600, and accepts only the server's signed requests. The runner may run on any machine: it dials the server (never the reverse) over the machine's authenticated connection, signing each request with the machine's own key as DIRECTORY-029's machine records name it, so an agent can run on another laptop. Its local control socket stays a Unix socket, mode 0600. The runner is one of the install's units (DIRECTORY-045): a restart of the runner ends every session it holds, and an upgrade says so, naming the running sessions, before its first stop. After a runner crash, sessions it held are reported ended_by_runner_restart with the instant the restart found them gone and no exit status; none is invented.
 
 **Acceptance:**
 - A started session keeps running after the server restarts, and its output is still readable.
 - A runner restart reports its old sessions ended with their instants.
 - A request not signed by the server is refused runner_request_unsigned.
+- A runner on a second machine, dialling the server with that machine's key, starts an agent the server asked for.
+- A runner killed and restarted reports its sessions ended_by_runner_restart with no exit status.
 
 **Files:**
 - create: crates/lys-runner/Cargo.toml
@@ -104,7 +106,7 @@ Behavioural. POST /agents/{id}/start on a machine with a runner renders the comm
 
 ### R4: Type, keys, read, wait, resize and compact through Lys
 
-Behavioural. Routes under /runtime/sessions/{id}: input (text, optionally followed by Enter), keys (named keys), read (the last N lines or bytes, with a cursor to read on from), wait (until a pattern appears in new output, answering when it does, with the matched text; the caller may give up by closing the request, and nothing in Lys ends it on a clock), resize, and compact (sends the harness's compaction command as its profile names it). Each act requires the operate relation on the agent, is refused by name without it, and leaves a receipt naming the caller and the act, never the text typed when the profile marks the session sensitive.
+Behavioural. Routes under /runtime/sessions/{id}: input (text, optionally followed by Enter), keys (named keys), read (the last N lines or bytes, with a cursor to read on from), wait (until a pattern appears in new output, answering when it does, with the matched text; the caller may give up by closing the request, and nothing in Lys ends it on a clock), resize, and compact (sends the harness's compaction command as its profile names it). Each act requires the operate relation on the agent, is refused by name without it, and leaves a receipt naming the caller and the act, never the text typed when the profile marks the session sensitive. A receipt for typed text carries its length and its SHA-256 digest, never the text, for every profile. read with a cursor older than the kept scrollback is refused cursor_expired naming the oldest cursor held; wait takes a literal string unless the caller asks for a regular expression by name.
 
 **Acceptance:**
 - Typing a line into a shell session and reading it back shows the line and its output.
@@ -126,7 +128,7 @@ Behavioural. Routes under /runtime/sessions/{id}: input (text, optionally follow
 
 ### R5: Account rotation on usage limit
 
-Behavioural. An agent's profile may name an ordered list of account handles held by the secrets broker and the words that mean a usage limit. When a session prints them, Lys ends it and starts it again on the next account in the list, resuming its session record, and records the move; at the list's end it stops, reports accounts_exhausted, and does not wrap round. Account values reach only the session's environment through the broker and never a route, a log or a receipt.
+Behavioural. An agent's profile may name an ordered list of account handles held by the secrets broker and the words that mean a usage limit. When a session prints them, Lys ends it and starts it again on the next account in the list, resuming its session record, and records the move; at the list's end it stops, reports accounts_exhausted, and does not wrap round. Account values reach only the session's environment through the broker and never a route, a log or a receipt. A usage limit is taken from the harness's own signal where it has one (its exit status or structured event), not from words in the terminal, so an agent quoting the words rotates nothing; for a harness with no such signal, the profile declares the words and the brief's record says rotation there can be tripped by quoted text. Accounts are credentials over one session store per agent: rotation changes the credential the harness runs with, never where its sessions and transcripts live, so a rotated session resumes.
 
 **Acceptance:**
 - A session printing the limit words moves to the next account and resumes.

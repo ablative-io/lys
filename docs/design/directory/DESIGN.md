@@ -655,6 +655,32 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `surface/identity/src/features/team-plans/team-plans.css` | R5: Teams screen | DIRECTORY-052 |
 | `surface/identity/src/features/apps/SchemaBench.tsx` | R8: Build an app's permission template on a Lys screen | DIRECTORY-048 |
 | `crates/lys-home/src/record/given.rs` | DIRECTORY-052 R3: the given record lists a member's starting memories and opening conversation | DIRECTORY-052 |
+| `crates/lys-identity-server/src/apps_api.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `crates/lys-identity-server/src/apps_state.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `crates/lys-identity-server/src/apps_store.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `crates/lys-identity-server/tests/apps.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `surface/identity/src/features/apps/Apps.tsx` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `surface/identity/src/features/apps/apps.css` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `crates/lys-identity/src/grants/schema.rs` | R2: An app's schema: its own kinds, actions, relations and parents, checked on entry | DIRECTORY-048 |
+| `crates/lys-identity/src/grants/schema_tests.rs` | R2: An app's schema: its own kinds, actions, relations and parents, checked on entry | DIRECTORY-048 |
+| `crates/lys-identity-server/src/apps_binding.rs` | R2: An app's schema: its own kinds, actions, relations and parents, checked on entry | DIRECTORY-048 |
+| `crates/lys-identity/src/grants/model.rs` | R2: An app's schema: its own kinds, actions, relations and parents, checked on entry | DIRECTORY-048 |
+| `crates/lys-identity-server/tests/apps_schema.rs` | R3: Schema changes are versioned, dry-run first, and never strand a grant | DIRECTORY-048 |
+| `crates/lys-identity-server/tests/grants_batch.rs` | R5: Apps check many permissions at once and list what a subject may act on | DIRECTORY-048 |
+| `crates/lys-identity-server/src/openapi.rs` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `crates/lys-identity-server/tests/openapi.rs` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `crates/lys-openapi/Cargo.toml` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `crates/lys-openapi/src/lib.rs` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `crates/lys-identity-server/src/error_status.rs` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `rules/ast-grep/no-app-names.yml` | R7: Lys depends on no app | DIRECTORY-048 |
+| `crates/lys-core/src/attestation/mod.rs` | R7: Lys depends on no app | DIRECTORY-048 |
+| `crates/lys/src/identity/install/deployment.template.toml` | R7: Lys depends on no app | DIRECTORY-048 |
+| `surface/styles/tokens.css` | R7: Lys depends on no app | DIRECTORY-048 |
+| `crates/lys-identity-server/src/receipts_api.rs` | R4: Type, keys, read, wait, resize and compact through Lys | DIRECTORY-050 |
+| `crates/lys-identity/src/provisioning.rs` | R5: Account rotation on usage limit | DIRECTORY-050 |
+| `crates/lys-identity-server/src/stop_api.rs` | R6: Wake with a message; stop through the runner | DIRECTORY-050 |
+| `surface/identity/src/features/runtime/Sessions.tsx` | R7: Sessions screen: see, type to and stop every agent | DIRECTORY-050 |
+| `rules/ast-grep/no-poll.yml` | R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
 
 ## Inventory
 
