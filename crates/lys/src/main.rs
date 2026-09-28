@@ -11,6 +11,7 @@
 
 mod cli;
 mod commands;
+mod identity;
 
 use std::process::ExitCode;
 
@@ -42,6 +43,14 @@ fn main() -> ExitCode {
                 json,
             ),
         },
+        Command::Identity(identity_command) => match identity_command {
+            identity::IdentityCommand::Prepare { config } => identity::prepare::run(&config, json),
+            identity::IdentityCommand::Configure { config } => {
+                identity::configure::run(&config, json)
+            }
+            identity::IdentityCommand::Health { config } => identity::health::run(&config, json),
+        }
+        .map_err(commands::error::CliError::from),
         Command::Log(log_command) => match log_command {
             LogCommand::Init { dir, origin } => commands::log::init::run(&dir, &origin, json),
             LogCommand::Status { dir } => commands::log::status::run(&dir, json),
@@ -87,14 +96,30 @@ fn main() -> ExitCode {
                 validity,
                 validity_days,
                 out,
+                issuer_out,
+                log,
+                log_key,
+                leaf_out,
+                artifact_out,
             } => commands::duration::validity_window(validity_days, validity.as_deref()).and_then(
                 |ttl| {
+                    let entry = commands::ca_log::LogEntry::from_flags(
+                        log.as_deref(),
+                        log_key.as_deref(),
+                        leaf_out.as_deref(),
+                        artifact_out.as_deref(),
+                    )?;
+                    let outputs = commands::ca::IssueOutputs {
+                        certificate: &out,
+                        issuer_certificate: issuer_out.as_deref(),
+                        log: entry,
+                    };
                     commands::ca::issue(
                         &key,
                         &subject,
                         claims.as_deref(),
                         ttl,
-                        &out,
+                        &outputs,
                         request.as_deref(),
                         json,
                     )

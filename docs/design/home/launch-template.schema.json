@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ablative-io/lys/docs/design/home/launch-template.schema.json",
+  "title": "Claude Code launch template",
+  "description": "One JSON object a home keeps by its SHA-256 and renders into the files a Claude Code launch needs (HOME-002 R1). Nothing in it is interpreted, expanded or executed; the transcript slot is filled by resuming the rendered file by path with --fork-session.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["harness", "flags", "slots"],
+  "properties": {
+    "harness": {
+      "description": "The harness this template renders for.",
+      "const": "claude-code"
+    },
+    "flags": {
+      "description": "The extra Claude Code arguments the launch line carries, in order.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "slots": {
+      "description": "The five slots, all required; a slot outside them is refused by name.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transcript", "mcp", "env", "secrets", "instructions"],
+      "properties": {
+        "transcript": {
+          "description": "How this harness fills the transcript slot: the rendered file resumed by path.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fill", "canon"],
+          "properties": {
+            "fill": { "const": "resume-by-path" },
+            "canon": {
+              "description": "A canon file whose examples render first, or null.",
+              "type": ["string", "null"]
+            }
+          }
+        },
+        "mcp": {
+          "description": "Written verbatim as the MCP configuration file; carries mcpServers.",
+          "type": "object"
+        },
+        "env": {
+          "description": "Environment variable name to string value.",
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "secrets": {
+          "description": "Secrets by handle. A use-only secret is written as its handle and nothing else; a readable secret is refused until SECRETS-002 builds the reader.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["use_only", "readable", "reader"],
+          "properties": {
+            "use_only": { "$ref": "#/$defs/secret_list" },
+            "readable": { "$ref": "#/$defs/secret_list" },
+            "reader": {
+              "description": "The broker reader's command mapping, in text; empty until the secrets rows fill it, and never substituted into a launch line by HOME-002.",
+              "type": "string"
+            }
+          }
+        },
+        "instructions": {
+          "description": "The text appended to the system prompt.",
+          "type": "string"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "secret_list": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["env", "handle"],
+        "properties": {
+          "env": { "type": "string", "description": "The environment variable the secret fills." },
+          "handle": { "type": "string", "description": "The handle the door swaps for the credential." }
+        }
+      }
+    }
+  }
+}

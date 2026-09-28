@@ -37,13 +37,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::{DateTime, Timelike, Utc};
-use ed25519_dalek::{Signature, VerifyingKey};
 use rcgen::{
-    BasicConstraints, Certificate, CertificateParams, CustomExtension, IsCa, KeyPair, PKCS_ED25519,
+    BasicConstraints, Certificate, CertificateParams, CustomExtension, IsCa, KeyPair,
+    KeyUsagePurpose, PKCS_ED25519,
 };
 use time::OffsetDateTime;
-use x509_parser::oid_registry::OID_SIG_ED25519;
-use x509_parser::prelude::{FromDer, X509Certificate};
 
 use crate::ca::certificate::{CertifiedKey, IssuedCertificate};
 use crate::ca::rcgen_bridge::{IdentitySigner, PresentedKey, distinguished_name};
@@ -51,6 +49,10 @@ use crate::ca::request::verify_certificate_request;
 use crate::error::{TrustError, TrustResult};
 use crate::hex_lower;
 use crate::keys::Ed25519Identity;
+
+mod verify;
+
+pub use verify::{verify_certificate_chain, verify_certificate_chain_at};
 
 /// Issues X.509 certificates signed by an Ed25519 root identity.
 #[derive(Debug)]
@@ -206,6 +208,23 @@ impl CertificateAuthority {
         verify_certificate_chain(cert_der, &self.identity.public_key_bytes())
     }
 
+    /// The DER of this authority's self-signed issuer certificate, whose
+    /// subject is the issuer name every certificate it issues carries.
+    ///
+    /// It lets a third party check an issued certificate with standard X.509
+    /// tooling, such as `openssl verify -CAfile`, holding nothing from lys.
+    /// It is public: it carries the issuer's public key and a signature, never
+    /// the seed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TrustError::CertificateGeneration`] if the issuer
+    /// certificate cannot be built or signed.
+    pub fn issuer_certificate_der(&self) -> TrustResult<Vec<u8>> {
+        let issuer_key = self.issuer_key_pair()?;
+        Ok(self.issuer_certificate(&issuer_key)?.der().to_vec())
+    }
+
     /// Builds an rcgen [`KeyPair`] backed by this authority's identity through
     /// a [`RemoteKeyPair`](rcgen::RemoteKeyPair) adapter, so the private seed
     /// is never serialised.
@@ -216,8 +235,20 @@ impl CertificateAuthority {
         })
     }
 
-    /// Builds the self-signed in-memory issuer certificate whose subject DN is
-    /// derived from this authority's public key.
+    /// Builds the self-signed issuer certificate whose subject DN is derived
+    /// from this authority's public key.
+    ///
+    /// It is the trust anchor [`Self::issuer_certificate_der`] hands out, so
+    /// every field that matters to a relying party is set explicitly rather
+    /// than left to rcgen's defaults:
+    ///
+    /// - basic constraints: a CA with path length 0, so it can sign end-entity
+    ///   certificates and nothing that could itself sign;
+    /// - key usage, marked critical: `keyCertSign` and `cRLSign` only;
+    /// - validity: from the moment it is built until [`ISSUER_NOT_AFTER`].
+    ///
+    /// None of this reaches the certificates it signs: rcgen takes only the
+    /// issuer's distinguished name and key identifier method from it.
     fn issuer_certificate(&self, issuer_key: &KeyPair) -> TrustResult<Certificate> {
         let mut params = CertificateParams::new(Vec::<String>::new()).map_err(|e| {
             TrustError::CertificateGeneration {
@@ -226,7 +257,14 @@ impl CertificateAuthority {
         })?;
         let common_name = hex_lower(&self.identity.public_key_bytes());
         params.distinguished_name = distinguished_name(&common_name);
-        params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+        params.is_ca = IsCa::Ca(BasicConstraints::Constrained(0));
+        params.key_usages = vec![KeyUsagePurpose::KeyCertSign, KeyUsagePurpose::CrlSign];
+        params.not_before = to_offset_date_time(Utc::now())?;
+        params.not_after = OffsetDateTime::from_unix_timestamp(ISSUER_NOT_AFTER).map_err(|e| {
+            TrustError::CertificateGeneration {
+                reason: format!("issuer certificate notAfter is out of range: {e}"),
+            }
+        })?;
         params
             .self_signed(issuer_key)
             .map_err(|e| TrustError::CertificateGeneration {
@@ -234,6 +272,19 @@ impl CertificateAuthority {
             })
     }
 }
+
+/// The issuer certificate's `notAfter`, in seconds since the Unix epoch:
+/// `99991231235959Z`, the value RFC 5280 section 4.1.2.5 gives a certificate
+/// with no well-defined expiration date.
+///
+/// `lys ca issue` puts no ceiling on a certificate's window of its own; the
+/// only ceiling is the encoding, since `GeneralizedTime` carries a four-digit
+/// year, so no certificate this authority signs can be valid past this
+/// instant. An issuer that expired first would make `openssl verify` refuse
+/// certificates that are still inside their own windows. The issuer stays
+/// bounded in practice by the certificates it signs, each of which carries
+/// its own window.
+const ISSUER_NOT_AFTER: i64 = 253_402_300_799;
 
 /// Validates the issuance inputs and computes the certificate's validity
 /// window as `(notBefore, notAfter)`.
@@ -298,146 +349,6 @@ fn leaf_params(
     params.not_after = to_offset_date_time(expires_at)?;
     params.custom_extensions = extensions;
     Ok(params)
-}
-
-/// Verifies a certificate's Ed25519 signature against an expected issuer key
-/// and checks the validity window at the current time (`Utc::now()`).
-///
-/// Thin wrapper over [`verify_certificate_chain_at`]; see it for the full
-/// list of checks.
-///
-/// # Errors
-///
-/// See [`verify_certificate_chain_at`].
-pub fn verify_certificate_chain(cert_der: &[u8], issuer_public_key: &[u8; 32]) -> TrustResult<()> {
-    verify_certificate_chain_at(cert_der, issuer_public_key, Utc::now())
-}
-
-/// Verifies a certificate's Ed25519 signature against an expected issuer key
-/// and checks that `at` falls within the certificate's validity window.
-///
-/// Parses `cert_der`, rejects self-signed certificates (issuer equal to
-/// subject), confirms the signature algorithm is Ed25519, recovers the
-/// to-be-signed DER and 64-byte signature, verifies the signature with
-/// `ed25519-dalek` **strict** verification, and finally rejects the
-/// certificate if `at` lies outside its `notBefore`/`notAfter` window
-/// (boundaries inclusive, per X.509). x509-parser's `verify_signature` is
-/// deliberately not used — for Ed25519 it routes to ring's non-strict
-/// verification.
-///
-/// Strict verification (`verify_strict`) rejects signature malleability and
-/// small-order/torsion issuer keys, which plain `verify` accepts. This crate
-/// is an audit trust foundation: non-repudiation requires that a certificate
-/// has a unique valid signature under the issuer key, and weak keys — for
-/// which signatures can be forged for arbitrary payloads — must be
-/// categorically rejected.
-///
-/// The self-signed rejection compares the raw subject and issuer DN bytes.
-/// That is a heuristic defence-in-depth screen, not a security boundary —
-/// the Ed25519 signature check against the caller-supplied issuer key is the
-/// real boundary. The heuristic has a known false positive: a certificate
-/// legitimately issued by the authority for a caller-chosen subject equal to
-/// the authority's hex-pubkey common name is rejected here even though its
-/// signature would verify.
-///
-/// This function says nothing about who controls the certificate's *subject*
-/// key. It verifies that this issuer signed this certificate. Concluding that
-/// the subject key is held by the named subject additionally requires that the
-/// certificate was issued through
-/// [`CertificateAuthority::issue_certificate_for_request`], where possession
-/// was proven at issuance time.
-///
-/// # Errors
-///
-/// Returns [`TrustError::CertificateParsing`] if `cert_der` cannot be parsed,
-/// and [`TrustError::CertificateVerification`] if the certificate is
-/// self-signed, is not Ed25519-signed, carries a malformed signature or
-/// issuer key, the signature does not strictly verify, or `at` is outside
-/// the validity window (the reason distinguishes `expired` from
-/// `not yet valid` and names the violated boundary instant).
-pub fn verify_certificate_chain_at(
-    cert_der: &[u8],
-    issuer_public_key: &[u8; 32],
-    at: DateTime<Utc>,
-) -> TrustResult<()> {
-    let (_, certificate) =
-        X509Certificate::from_der(cert_der).map_err(|e| TrustError::CertificateParsing {
-            reason: format!("failed to parse certificate DER: {e:?}"),
-        })?;
-
-    // Heuristic screen only — see the rustdoc above. The signature check
-    // below is the actual security boundary.
-    if certificate.subject().as_raw() == certificate.issuer().as_raw() {
-        return Err(TrustError::CertificateVerification {
-            reason: "self-signed certificate rejected (issuer equals subject)".to_string(),
-        });
-    }
-
-    if certificate.signature_algorithm.algorithm != OID_SIG_ED25519 {
-        return Err(TrustError::CertificateVerification {
-            reason: "certificate signature algorithm is not Ed25519".to_string(),
-        });
-    }
-
-    let tbs = certificate.tbs_certificate.as_ref();
-    let signature_bytes: &[u8] = &certificate.signature_value.data;
-    let signature_array: &[u8; 64] =
-        signature_bytes
-            .try_into()
-            .map_err(|_err| TrustError::CertificateVerification {
-                reason: format!(
-                    "certificate signature must be 64 bytes for Ed25519, got {}",
-                    signature_bytes.len()
-                ),
-            })?;
-    let signature = Signature::from_bytes(signature_array);
-
-    let verifying_key = VerifyingKey::from_bytes(issuer_public_key).map_err(|_err| {
-        TrustError::CertificateVerification {
-            reason: "issuer public key is not a valid Ed25519 point".to_string(),
-        }
-    })?;
-
-    verifying_key
-        .verify_strict(tbs, &signature)
-        .map_err(|_err| TrustError::CertificateVerification {
-            reason: "certificate signature did not verify against the issuer public key"
-                .to_string(),
-        })?;
-
-    check_validity_window(&certificate, at)
-}
-
-/// Rejects `at` instants outside the certificate's `notBefore`/`notAfter`
-/// window (boundaries inclusive, per X.509 semantics).
-fn check_validity_window(certificate: &X509Certificate<'_>, at: DateTime<Utc>) -> TrustResult<()> {
-    let validity = certificate.validity();
-    let not_before = datetime_from_asn1_timestamp(validity.not_before.timestamp(), "notBefore")?;
-    let not_after = datetime_from_asn1_timestamp(validity.not_after.timestamp(), "notAfter")?;
-
-    if at < not_before {
-        return Err(TrustError::CertificateVerification {
-            reason: format!(
-                "certificate not yet valid: notBefore is {not_before}, checked at {at}"
-            ),
-        });
-    }
-    if at > not_after {
-        return Err(TrustError::CertificateVerification {
-            reason: format!("certificate expired: notAfter was {not_after}, checked at {at}"),
-        });
-    }
-    Ok(())
-}
-
-/// Converts an ASN.1 validity timestamp (seconds since the Unix epoch) into a
-/// chrono UTC instant.
-fn datetime_from_asn1_timestamp(timestamp: i64, field: &str) -> TrustResult<DateTime<Utc>> {
-    DateTime::<Utc>::from_timestamp(timestamp, 0).ok_or_else(|| TrustError::CertificateParsing {
-        reason: format!(
-            "certificate {field} timestamp {timestamp} is outside the representable date range"
-        ),
-    })
 }
 
 /// Converts a chrono UTC instant into the `time` type rcgen's validity fields

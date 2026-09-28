@@ -188,4 +188,31 @@ pub trait LeafStore {
     /// [`StoreError::PinRootChanged`]: crate::StoreError::PinRootChanged
     /// [`StoreError::Io`]: crate::StoreError::Io
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()>;
+
+    /// The snapshot last written with [`put_snapshot`](Self::put_snapshot),
+    /// or `None` if none was.
+    ///
+    /// Opaque to the store: the bytes are a signed snapshot of the log owner's
+    /// folded state (see [`crate::snapshot`]), which the owner checks before
+    /// believing any of it. A store returns them exactly as they were written.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::Io`] if the snapshot exists but cannot be read.
+    ///
+    /// [`StoreError::Io`]: crate::StoreError::Io
+    fn snapshot(&self) -> StoreResult<Option<Vec<u8>>>;
+
+    /// Durably replaces the snapshot with `bytes`.
+    ///
+    /// Like the pin, this is local state rather than log content, and a crash
+    /// during the write leaves either the previous snapshot or the new one,
+    /// whole, never a mixture. Nothing about the log's leaves or pin changes.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::Io`] if the write cannot be made durable.
+    ///
+    /// [`StoreError::Io`]: crate::StoreError::Io
+    fn put_snapshot(&mut self, bytes: &[u8]) -> StoreResult<()>;
 }

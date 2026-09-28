@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on [`Anchor::open_read_only`] and [`Anchor::root`].
 //!
 //! # What is checked where
@@ -33,7 +33,7 @@ use tempfile::TempDir;
 
 use crate::AnchorConfig;
 use crate::admission::{AcceptAll, SubmitterContext};
-use crate::error::AnchorError;
+use crate::error::{AnchorError, GenesisError};
 use crate::keys::{FileSigner, Signer};
 use crate::wire::Submission;
 
@@ -149,7 +149,9 @@ fn a_reader_refuses_a_log_with_no_genesis_leaf_exactly_as_open_does() {
         FileLeafStore::open(dir).unwrap(),
         AnchorConfig::unconfigured(),
     ) {
-        Err(AnchorError::NoGenesisLeaf { origin }) => assert_eq!(origin, ORIGIN),
+        Err(AnchorError::Genesis(GenesisError::NoGenesisLeaf { origin })) => {
+            assert_eq!(origin, ORIGIN);
+        }
         other => panic!("a genesis-less log must be refused, got {other:?}"),
     }
 }

@@ -8,7 +8,7 @@
 //! nothing is added to Pi's grammar. lys's own data rides in [`EntryBody::Custom`]
 //! under the `lys.*` custom types named below.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 
 /// The custom type of a harness-local event (a hook outcome, a permission
@@ -19,8 +19,117 @@ pub const CUSTOM_CALL: &str = "lys.call";
 /// The custom type marking a session as authored by hand: a demonstration,
 /// never a history of tools that ran.
 pub const CUSTOM_AUTHORED: &str = "lys.authored";
-/// The custom type marking an entry inherited from another session.
+/// The custom type marking entries inherited from another session: both a
+/// canon example, whose data states the rule it shows, and a handover, the
+/// first entry of a successor session, whose data carries no rule.
 pub const CUSTOM_INHERITED: &str = "lys.inherited";
+/// The prefix of the `session_info` name a handover writes, followed by the
+/// outgoing session's id.
+pub const INHERITED_FROM: &str = "inherited from ";
+/// The custom type of the context record: what a session was given at
+/// render, as paths, lengths and hashes (see [`crate::record::given`]).
+pub const CUSTOM_GIVEN: &str = "lys.given";
+/// The custom type of a given statement: one entry under a `lys.given`
+/// entry naming the block that holds a `lys/attestation/v2` over that
+/// record's canonical bytes (see [`crate::record::given_statement`]).
+pub const CUSTOM_GIVEN_STATEMENT: &str = "lys.given_statement";
+/// The custom type of a lantern (HOME-004): a note plus a point in this
+/// session, lit on purpose, that a later session walks back to.
+pub const CUSTOM_LANTERN: &str = "lys.lantern";
+/// The custom type of an epilogue on a lantern: further words on its note,
+/// appended after it, never rewritten into it.
+pub const CUSTOM_LANTERN_EPILOGUE: &str = "lys.lantern_epilogue";
+/// The custom type of a fork's mark in the parent (HOME-006): one entry
+/// appended at the parent's head naming the child session cut from it.
+pub const CUSTOM_FORK: &str = "lys.fork";
+/// The custom type of a fork's ancestry in the child (HOME-006): the first
+/// entry the fork writes after the copied chain, naming the parent session,
+/// the lantern, the point and the cut.
+pub const CUSTOM_FORKED_FROM: &str = "lys.forked_from";
+
+/// The custom type of a translation's side leaf (HOME-009 R6): one entry
+/// beside the context path naming a rollout written for another harness by
+/// its thread, the head and the hashes of the rollout and its loss account.
+pub const CUSTOM_TRANSLATION: &str = "lys.translation";
+
+/// What a `lys.lantern` entry carries in `custom.data`. `lit_by` is a
+/// self-declared name, as the canon's curator is, not a verified identity.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LanternData {
+    /// The entry id of the point the lantern marks: an entry of the same
+    /// session that is neither a lantern nor an epilogue.
+    pub point: String,
+    /// The note, byte for byte as written.
+    pub note: String,
+    /// Who lit it, as they named themselves.
+    pub lit_by: String,
+    /// When, RFC 3339 as the record's clock writes it.
+    pub lit_at: String,
+    /// The session that held the point when the lantern was lit: the one
+    /// the light act appended it to. `None` when the key is absent, as in
+    /// every lantern lit before HOME-014; a present value that is not a
+    /// string, null included, is kept as it is and never read as absent.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_lit_in"
+    )]
+    pub lit_in: Option<LitIn>,
+}
+
+/// A recorded `lit_in` as it stands in a lantern's data: a JSON string,
+/// which may name a session, or any other JSON value, null included, which
+/// names none and is kept so it can be refused by name.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum LitIn {
+    /// A JSON string: a session id, once checked against the home.
+    Session(String),
+    /// Any other JSON value, null included.
+    Other(Value),
+}
+
+/// Read whatever value a present `lit_in` key carries as `Some`, so a
+/// present null stays distinct from an absent key, which `default` reads
+/// as `None`.
+pub(crate) fn present_lit_in<'de, D>(deserializer: D) -> Result<Option<LitIn>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    LitIn::deserialize(deserializer).map(Some)
+}
+
+/// The part of a `lys.lantern` entry's data the fork reads: the point, who
+/// lit it, and the recorded `lit_in` when there is one. It requires neither
+/// `note` nor `lit_at` and allows other keys, so an older record whose data
+/// is exactly `{point, note, lit_by}` reads as a lantern; [`LanternData`]
+/// keeps the full shape for lighting and recall.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+pub struct LanternHeld {
+    /// The entry id of the point the lantern marks.
+    pub point: String,
+    /// Who lit it, as they named themselves.
+    pub lit_by: String,
+    /// The recorded lit-in session, as [`LanternData::lit_in`] reads it.
+    #[serde(default, deserialize_with = "present_lit_in")]
+    pub lit_in: Option<LitIn>,
+}
+
+/// What a `lys.lantern_epilogue` entry carries in `custom.data`. `added_by`
+/// is a self-declared name, not a verified identity.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EpilogueData {
+    /// The entry id of the lantern, in the same session, the words belong to.
+    pub lantern: String,
+    /// The further words, byte for byte as written.
+    pub words: String,
+    /// Who added them, as they named themselves.
+    pub added_by: String,
+    /// When, RFC 3339 as the record's clock writes it.
+    pub added_at: String,
+}
 
 /// The first line of a session file.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

@@ -1,0 +1,81 @@
+# Deployment configuration for `lys identity prepare`, `configure` and `health`.
+#
+# Copy this file, edit the copy, and pass it with --config. It holds addresses,
+# names and choices only. No credential is ever written here: credentials live in
+# owner-only files under state_dir, which prepare creates.
+
+[deployment]
+# The node this development instance is installed on, as the operator names it.
+node = "dev-node"
+# The compose project name; every container, volume and network carries it.
+project = "lys-identity"
+# The private state directory, relative to this file. prepare creates it mode 700.
+state_dir = "state"
+# The test identity Rauthy bootstraps as its administrator. Test identities only.
+admin_email = "admin@identity.test"
+
+[issuer]
+# The public origin browsers reach Rauthy at. The issuer is this origin followed
+# by /auth/v1/, trailing slash included; relying parties compare it exactly.
+#
+# Local origin: plain http is accepted only for a loopback host, as below.
+# TLS origin: name the https origin a TLS-terminating proxy serves, for example
+#   public_origin = "https://id.example.test"
+#   trusted_proxies = ["10.0.0.0/8"]
+# Rauthy then runs in proxy mode behind it and trusts forwarded headers only
+# from the listed proxies.
+public_origin = "http://localhost:8480"
+# The loopback port Rauthy's HTTP listener is published on.
+listen_port = 8480
+# Where lys reaches Rauthy's admin API: loopback http only.
+admin_url = "http://127.0.0.1:8480"
+trusted_proxies = []
+
+[database]
+# One PostgreSQL service and one database, shared by Rauthy and SpiceDB under
+# separate roles and schemas (deploy/identity/postgres-init.sql).
+#
+# bundled = true runs the compose file's own PostgreSQL service, which answers
+# to the host name postgres. A database on a network device is named by its own
+# address with bundled = false, for example host = "192.0.2.10"; nothing assumes
+# the operator's machine, and no local address is substituted when it is absent.
+bundled = true
+host = "postgres"
+port = 5432
+name = "identity"
+# disable, prefer or require. Use require for a database on another device.
+tls = "disable"
+# The host:port this machine reaches the same database at, for lys identity health.
+check_address = "127.0.0.1:55432"
+# The loopback port the bundled service is published on.
+publish_port = 55432
+
+[spicedb]
+# Loopback ports SpiceDB is published on. health reads /healthz on the HTTP port.
+grpc_port = 50051
+http_port = 58443
+
+[credentials]
+# generate: prepare creates each missing credential once and reuses it after.
+# provided: every credential file must already be in state_dir; a missing one is
+# refused by name as secret_missing.
+source = "generate"
+
+[clients.platform]
+# The platform's own confidential client: PKCE S256, themed identity orange.
+id = "lys-platform"
+name = "Lys Platform"
+redirect_uris = ["http://localhost:8490/auth/callback"]
+post_logout_redirect_uris = ["http://localhost:8490/"]
+token_alg = "EdDSA"
+challenges = ["S256"]
+
+[clients.cambium]
+# Cambium's confidential client: RS256, which the Cambium verifier requires,
+# themed Cambium green. PKCE for Cambium is a separate decision for row 06.
+id = "cambium"
+name = "Cambium"
+redirect_uris = ["http://localhost:8400/auth/oidc/callback"]
+post_logout_redirect_uris = ["http://localhost:8400/"]
+token_alg = "RS256"
+challenges = []

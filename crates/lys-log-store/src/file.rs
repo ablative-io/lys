@@ -7,9 +7,16 @@
 //! - `leaves/<20-digit zero-padded index>` — one file per leaf, raw bytes
 //!   verbatim. **The leaf file IS the RFC 6962 preimage**, so
 //!   `(printf '\x00'; cat leaf-file) | shasum -a 256` is the leaf hash. A
-//!   stranger with `shasum` can check a leaf without lys.
+//!   stranger with `shasum` can check a leaf without lys. A leaf is written
+//!   to a hidden temporary file (`leaves/.<pid>-<index>-<sequence>.tmp`),
+//!   flushed, and only then linked to its final name by an operation that
+//!   refuses to replace an existing leaf. A leaf name therefore never refers
+//!   to a torn or unflushed file, and a leftover temporary file from a crash
+//!   is never counted as a leaf.
 //! - `state.json` — the pinned `(tree_size, root)`, rewritten atomically after
 //!   every append.
+//! - `snapshot.bin` — the log owner's signed snapshot, if one was written,
+//!   replaced atomically in the same way.
 //!
 //! This layout is **local state, not a wire contract**: nothing durable is
 //! signed under it and it may change between lys versions. The format marker
@@ -58,6 +65,20 @@ use serde::{Deserialize, Serialize};
 use crate::error::{StoreError, StoreResult};
 use crate::store::{LeafStore, PinnedRoot};
 
+mod leaves;
+
+#[cfg(test)]
+use leaves::{LEAF_TEMP_ATTEMPTS, leaf_temp_name};
+use leaves::{
+    contiguous_extent, fsync_dir, link_leaf, next_process_sequence, probed_extent, remove_file,
+    sync_dir, write_leaf_temp,
+};
+
+mod left_behind;
+mod snapshot_slot;
+
+pub use left_behind::LeftBehind;
+
 /// Detection marker in `log.json`. A local-state version tag, not a wire
 /// contract.
 const LOG_DIR_FORMAT: &str = "lys/log-dir/v1";
@@ -96,7 +117,28 @@ pub struct FileLeafStore {
     origin: String,
     extent: u64,
     pinned: PinnedRoot,
+    /// The leaf whose directory flush failed on this handle, if any. While set,
+    /// every append is refused until the store is reopened.
+    durability_uncertain: Option<u64>,
+    /// The temporary names this handle could not remove after a link, in the
+    /// order it met them.
+    left_behind: Vec<LeftBehind>,
 }
+
+/// The two steps after a leaf is linked, kept as functions so that a test can
+/// make either one fail.
+struct AfterLink {
+    /// Removes the temporary name the leaf was written under.
+    remove_temp: fn(&Path) -> std::io::Result<()>,
+    /// Flushes the leaves directory so the leaf's name is durable.
+    flush_dir: fn(&Path) -> std::io::Result<()>,
+}
+
+/// The real steps after a link.
+const AFTER_LINK: AfterLink = AfterLink {
+    remove_temp: remove_file,
+    flush_dir: sync_dir,
+};
 
 impl std::fmt::Debug for FileLeafStore {
     /// Summarizes the store without reading or dumping leaf content.
@@ -146,15 +188,17 @@ impl FileLeafStore {
             origin: config.origin,
             extent: 0,
             pinned,
+            durability_uncertain: None,
+            left_behind: Vec::new(),
         })
     }
 
     /// Opens the store at `dir`, establishing contiguity and reading the pin.
     ///
-    /// Leaf *contents* are not read here — that is the caller's business — but
-    /// the index set is enumerated and required to be exactly `0..n`, because
-    /// [`LeafStore::extent`] promises contiguity and a promise checked later is
-    /// not a promise.
+    /// Leaf *contents* are not read here — that is the caller's business. The
+    /// extent is found from the pin forward, so opening costs the same however
+    /// long the log is; [`FileLeafStore::audit_leaves`] enumerates every name
+    /// when a whole-folder check is wanted.
     ///
     /// # Errors
     ///
@@ -184,11 +228,37 @@ impl FileLeafStore {
             tree_size: state.tree_size,
             root: decode_pinned_root(dir, &state.root_hash)?,
         };
+        // A leaf name linked just before a crash may not yet be durable; the
+        // flush makes every name counted below one that survives.
+        fsync_dir(&dir.join("leaves"))?;
         Ok(Self {
             dir: dir.to_path_buf(),
             origin: config.origin,
-            extent: contiguous_extent(dir)?,
+            extent: probed_extent(dir, pinned.tree_size)?,
             pinned,
+            durability_uncertain: None,
+            left_behind: Vec::new(),
+        })
+    }
+
+    /// Reads every name in `leaves/` and checks it is exactly `0..extent`.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::Corrupt`] naming the unexpected entry, the gap, or an
+    /// extent other than the one this handle holds, and [`StoreError::Io`] on
+    /// filesystem failure.
+    pub fn audit_leaves(&self) -> StoreResult<()> {
+        let listed = contiguous_extent(&self.dir)?;
+        if listed == self.extent {
+            return Ok(());
+        }
+        Err(StoreError::Corrupt {
+            path: self.dir.clone(),
+            reason: format!(
+                "the leaves folder holds {listed} leaves but this store's extent is {}",
+                self.extent
+            ),
         })
     }
 
@@ -197,11 +267,76 @@ impl FileLeafStore {
         &self.dir
     }
 
+    /// The temporary names this handle could not remove after linking a
+    /// leaf, each with the leaf it held and what the removal answered. Every
+    /// leaf named here is stored: only its temporary name is still there.
+    pub fn left_behind(&self) -> &[LeftBehind] {
+        &self.left_behind
+    }
+
     /// Path of the leaf file for `index`.
     fn leaf_path(&self, index: u64) -> PathBuf {
         self.dir
             .join("leaves")
             .join(format!("{index:0LEAF_NAME_WIDTH$}"))
+    }
+
+    /// Writes the leaf at `index` with `write_contents` supplying its bytes.
+    ///
+    /// The bytes go to a hidden temporary file in `leaves/`, which is flushed
+    /// and only then linked to the leaf's final name, so no leaf name ever
+    /// refers to a partly written or unflushed file. The link refuses to
+    /// replace an existing leaf: that is the second, independent absent-check
+    /// below the in-memory extent, catching a leaf this store never saw —
+    /// another writer appending to the same directory — which the extent cached
+    /// at open cannot know about. The directory is flushed after the link so
+    /// the name itself is durable.
+    ///
+    /// The link is the commit point: once it succeeds the extent advances
+    /// whatever happens next. A temporary name that cannot be removed is left
+    /// for open to skip, and the append still succeeds. A directory that cannot
+    /// be flushed is reported as [`StoreError::LeafDurabilityUncertain`] and
+    /// halts this handle.
+    ///
+    /// `next_sequence` supplies the sequence numbers for temporary names, so
+    /// that a test can say which names a write will try.
+    fn put_leaf_with(
+        &mut self,
+        index: u64,
+        write_contents: impl FnOnce(&mut std::fs::File) -> std::io::Result<()>,
+        after_link: &AfterLink,
+        next_sequence: &mut impl FnMut() -> u64,
+    ) -> StoreResult<()> {
+        if let Some(uncertain) = self.durability_uncertain {
+            return Err(StoreError::ReopenRequired { index: uncertain });
+        }
+        if index < self.extent {
+            return Err(StoreError::LeafAlreadyWritten { index });
+        }
+        if index > self.extent {
+            return Err(StoreError::LeafWouldLeaveGap {
+                index,
+                next: self.extent,
+            });
+        }
+        let leaves_dir = self.dir.join("leaves");
+        let tmp_path = write_leaf_temp(&leaves_dir, index, write_contents, next_sequence)?;
+        link_leaf(&tmp_path, &self.leaf_path(index), index)?;
+        self.extent += 1;
+        // The leaf is committed under its final name, and open skips a hidden
+        // temporary name, so a name left behind here fails no append. It is
+        // kept by name with its reason.
+        if let Err(source) = (after_link.remove_temp)(&tmp_path) {
+            self.left_behind.push(LeftBehind {
+                index,
+                path: tmp_path,
+                source,
+            });
+        }
+        (after_link.flush_dir)(&leaves_dir).map_err(|source| {
+            self.durability_uncertain = Some(index);
+            StoreError::LeafDurabilityUncertain { index, source }
+        })
     }
 }
 
@@ -219,56 +354,23 @@ impl LeafStore for FileLeafStore {
             return Ok(None);
         }
         let path = self.leaf_path(index);
-        std::fs::read(&path)
-            .map(Some)
-            .map_err(|source| StoreError::Io {
+        match std::fs::read(&path) {
+            Ok(bytes) => Ok(Some(bytes)),
+            Err(source) if source.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(source) => Err(StoreError::Io {
                 context: format!("failed to read leaf file {}", path.display()),
                 source,
-            })
+            }),
+        }
     }
 
     fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
-        if index < self.extent {
-            return Err(StoreError::LeafAlreadyWritten { index });
-        }
-        if index > self.extent {
-            return Err(StoreError::LeafWouldLeaveGap {
-                index,
-                next: self.extent,
-            });
-        }
-        let path = self.leaf_path(index);
-        // `create_new` is a SECOND, independent absent-check, below the
-        // in-memory extent: it catches a leaf file this store never saw —
-        // another process appending to the same directory — which the extent
-        // it cached at open cannot possibly know about.
-        let mut file = match std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path)
-        {
-            Ok(file) => file,
-            Err(source) if source.kind() == std::io::ErrorKind::AlreadyExists => {
-                return Err(StoreError::LeafAlreadyWritten { index });
-            }
-            Err(source) => {
-                return Err(StoreError::Io {
-                    context: format!("failed to create leaf file {}", path.display()),
-                    source,
-                });
-            }
-        };
-        file.write_all(bytes).map_err(|source| StoreError::Io {
-            context: format!("failed to write leaf file {}", path.display()),
-            source,
-        })?;
-        file.sync_all().map_err(|source| StoreError::Io {
-            context: format!("failed to flush leaf file {} to disk", path.display()),
-            source,
-        })?;
-        fsync_dir(&self.dir.join("leaves"))?;
-        self.extent += 1;
-        Ok(())
+        self.put_leaf_with(
+            index,
+            |file| file.write_all(bytes),
+            &AFTER_LINK,
+            &mut next_process_sequence,
+        )
     }
 
     fn pinned(&self) -> PinnedRoot {
@@ -295,6 +397,14 @@ impl LeafStore for FileLeafStore {
         write_state(&self.dir, pin)?;
         self.pinned = pin;
         Ok(())
+    }
+
+    fn snapshot(&self) -> StoreResult<Option<Vec<u8>>> {
+        snapshot_slot::read(&self.dir)
+    }
+
+    fn put_snapshot(&mut self, bytes: &[u8]) -> StoreResult<()> {
+        snapshot_slot::write(&self.dir, bytes)
     }
 }
 
@@ -371,91 +481,8 @@ fn write_durably(path: &Path, contents: &[u8]) -> StoreResult<()> {
     })
 }
 
-/// Fsyncs a directory so that entries created or renamed inside it are durable.
-///
-/// Unix only: opening a directory as a file is not portable, and on platforms
-/// where it is unavailable the file fsyncs above still apply while the
-/// *directory entry* carries the platform's own weaker guarantee. Said plainly
-/// rather than papered over, because a durability claim that quietly does not
-/// hold on some target is worse than one scoped to where it does.
-#[cfg(unix)]
-fn fsync_dir(dir: &Path) -> StoreResult<()> {
-    std::fs::File::open(dir)
-        .and_then(|handle| handle.sync_all())
-        .map_err(|source| StoreError::Io {
-            context: format!("failed to flush directory {} to disk", dir.display()),
-            source,
-        })
-}
-
-#[cfg(not(unix))]
-fn fsync_dir(_dir: &Path) -> StoreResult<()> {
-    Ok(())
-}
-
-/// Enumerates `leaves/` and returns the contiguous extent.
-///
-/// Entries beginning with `.` are ignored — they can never be leaf names,
-/// which are exactly 20 digits, so ignoring them cannot mask a missing or
-/// extra leaf. Any other unexpected entry is corruption. The index set must be
-/// exactly `0..n`.
-fn contiguous_extent(dir: &Path) -> StoreResult<u64> {
-    let leaves_dir = dir.join("leaves");
-    let entries = std::fs::read_dir(&leaves_dir).map_err(|source| StoreError::Io {
-        context: format!("failed to read leaves directory {}", leaves_dir.display()),
-        source,
-    })?;
-    let mut indices: Vec<u64> = Vec::new();
-    for entry in entries {
-        let entry = entry.map_err(|source| StoreError::Io {
-            context: format!("failed to read leaves directory {}", leaves_dir.display()),
-            source,
-        })?;
-        let name = entry.file_name();
-        let Some(name) = name.to_str() else {
-            return Err(invalid_leaf_entry(dir, &name.to_string_lossy()));
-        };
-        if name.starts_with('.') {
-            continue;
-        }
-        if name.len() != LEAF_NAME_WIDTH || !name.bytes().all(|b| b.is_ascii_digit()) {
-            return Err(invalid_leaf_entry(dir, name));
-        }
-        let Ok(index) = name.parse::<u64>() else {
-            return Err(invalid_leaf_entry(dir, name));
-        };
-        if !entry.path().is_file() {
-            return Err(invalid_leaf_entry(dir, name));
-        }
-        indices.push(index);
-    }
-    indices.sort_unstable();
-    for (expected, &index) in (0u64..).zip(indices.iter()) {
-        if index != expected {
-            return Err(StoreError::Corrupt {
-                path: dir.to_path_buf(),
-                reason: format!(
-                    "leaves are not contiguous: expected leaf index {expected}, found {index}"
-                ),
-            });
-        }
-    }
-    u64::try_from(indices.len()).map_err(|_source| StoreError::Corrupt {
-        path: dir.to_path_buf(),
-        reason: format!("{} leaves is more than u64 can index", indices.len()),
-    })
-}
-
-/// Builds the corruption error for an unexpected `leaves/` entry.
-fn invalid_leaf_entry(dir: &Path, name: &str) -> StoreError {
-    StoreError::Corrupt {
-        path: dir.to_path_buf(),
-        reason: format!(
-            "unexpected entry {name:?} in leaves/: leaf names are exactly {LEAF_NAME_WIDTH} \
-             decimal digits"
-        ),
-    }
-}
+#[cfg(test)]
+mod left_behind_tests;
 
 #[cfg(test)]
 #[path = "file_tests.rs"]

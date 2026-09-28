@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the tree-over-storage layer.
 //!
 //! # A second implementation, so the trait is a seam and not a shape
@@ -38,6 +38,7 @@ struct MemStore {
     origin: String,
     leaves: Vec<Vec<u8>>,
     pinned: PinnedRoot,
+    snapshot: Option<Vec<u8>>,
     /// A [`Cell`] so a test can arm it through `Log::store()`'s shared
     /// reference — the alternative was a test-only `store_mut` on the public
     /// [`Log`], and a type does not grow API to suit its tests.
@@ -51,6 +52,7 @@ impl MemStore {
             origin: origin.to_string(),
             leaves: Vec::new(),
             pinned: PinnedRoot { tree_size, root },
+            snapshot: None,
             fail_next_pin: std::cell::Cell::new(false),
         }
     }
@@ -104,6 +106,15 @@ impl LeafStore for MemStore {
             });
         }
         self.pinned = pin;
+        Ok(())
+    }
+
+    fn snapshot(&self) -> StoreResult<Option<Vec<u8>>> {
+        Ok(self.snapshot.clone())
+    }
+
+    fn put_snapshot(&mut self, bytes: &[u8]) -> StoreResult<()> {
+        self.snapshot = Some(bytes.to_vec());
         Ok(())
     }
 }
@@ -305,6 +316,12 @@ fn a_store_that_breaks_its_contiguity_promise_is_named_as_the_culprit() {
             self.0
         }
         fn pin(&mut self, _pin: PinnedRoot) -> StoreResult<()> {
+            Ok(())
+        }
+        fn snapshot(&self) -> StoreResult<Option<Vec<u8>>> {
+            Ok(None)
+        }
+        fn put_snapshot(&mut self, _bytes: &[u8]) -> StoreResult<()> {
             Ok(())
         }
     }

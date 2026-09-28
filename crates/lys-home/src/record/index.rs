@@ -21,6 +21,10 @@ use crate::error::HomeError;
 use crate::record::blocks::sync_dir;
 use crate::record::entries::{Entry, SessionHeader};
 
+mod head;
+
+pub use head::{read_head, read_header, write_head};
+
 /// One row of the index: where an entry's line lies.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IndexRow {
@@ -78,9 +82,23 @@ impl Index {
     }
 
     /// Load the index beside a session file, verifying it against the file's
-    /// length; rebuild it from the file when it is missing or stale. Returns
-    /// the header, the index, and whether a rebuild happened.
+    /// length; rebuild it from the file when it is missing or stale, and write
+    /// the rebuilt index beside the file. Returns the header, the index, and
+    /// whether a rebuild happened. This is the owner's load; a reader that
+    /// must write nothing uses [`Index::read`].
     pub fn load(session_file: &Path) -> Result<(SessionHeader, Self, bool), HomeError> {
+        let (header, index, rebuilt) = Self::read(session_file)?;
+        if rebuilt {
+            index.write_all()?;
+        }
+        Ok((header, index, rebuilt))
+    }
+
+    /// The index of a session file without writing anything: the cached
+    /// index beside the file when it is this file's, otherwise one built in
+    /// memory by scanning the file, left unwritten. Returns the header, the
+    /// index, and whether it was built by scanning.
+    pub fn read(session_file: &Path) -> Result<(SessionHeader, Self, bool), HomeError> {
         let (header, header_len) = read_header(session_file)?;
         let file_len = fs::metadata(session_file)
             .map_err(|e| HomeError::io("measuring the session file", session_file, e))?
@@ -99,8 +117,33 @@ impl Index {
                 Err(e) => return Err(e),
             }
         }
-        let index = Self::rebuild(session_file, header_len)?;
+        let index = Self::scan(session_file, header_len)?;
         Ok((header, index, true))
+    }
+
+    /// The cached index beside a session file when it is this file's, and
+    /// `None` when it is not: a row that does not parse, or rows the cached
+    /// read refuses (`from_cached`). Never scans the session file and
+    /// writes nothing, so a stale index is reported as stale rather than
+    /// rebuilt in memory (HOME-019 R2). An index file that cannot be opened
+    /// is refused by path.
+    pub(crate) fn cached_only(session_file: &Path) -> Result<Option<Self>, HomeError> {
+        let (_, header_len) = read_header(session_file)?;
+        let file_len = fs::metadata(session_file)
+            .map_err(|e| HomeError::io("measuring the session file", session_file, e))?
+            .len();
+        let index_file = Self::index_path(session_file);
+        match Self::read_rows(&index_file) {
+            Ok(rows) => Ok(Self::from_cached(
+                session_file,
+                index_file,
+                rows,
+                header_len,
+                file_len,
+            )),
+            Err(HomeError::Malformed { .. }) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 
     /// The cached rows as an index, when they are one: each row starts where
@@ -169,8 +212,9 @@ impl Index {
         Ok(rows)
     }
 
-    /// Scan the session file once and write a fresh index beside it.
-    fn rebuild(session_file: &Path, header_len: u64) -> Result<Self, HomeError> {
+    /// Scan the session file once into an index held in memory; nothing is
+    /// written. [`Index::load`] writes the result beside the file.
+    fn scan(session_file: &Path, header_len: u64) -> Result<Self, HomeError> {
         let mut reader = BufReader::new(
             fs::File::open(session_file)
                 .map_err(|e| HomeError::io("opening the session file", session_file, e))?,
@@ -232,7 +276,6 @@ impl Index {
             offset += len;
         }
         index.end = offset;
-        index.write_all()?;
         Ok(index)
     }
 
@@ -315,6 +358,12 @@ impl Index {
         self.by_id.get(id).map(|&i| &self.rows[i])
     }
 
+    /// Every row, in file order.
+    #[must_use]
+    pub fn rows(&self) -> &[IndexRow] {
+        &self.rows
+    }
+
     /// The last row appended.
     #[must_use]
     pub fn last(&self) -> Option<&IndexRow> {
@@ -390,68 +439,6 @@ impl Index {
         }
         Ok((out, read))
     }
-}
-
-/// Read the persisted head: `Some(id)`, `None` when the head is the header
-/// (no entries or moved before the first), or the last indexed entry when no
-/// head file exists.
-pub fn read_head(session_file: &Path, index: &Index) -> Result<Option<String>, HomeError> {
-    let path = Index::head_path(session_file);
-    match fs::read_to_string(&path) {
-        Ok(text) => {
-            let id = text.trim();
-            Ok(if id.is_empty() {
-                None
-            } else {
-                Some(id.to_owned())
-            })
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            Ok(index.last().map(|r| r.id.clone()))
-        }
-        Err(e) => Err(HomeError::io("reading the head", &path, e)),
-    }
-}
-
-/// Persist the head: written whole to a temporary file and renamed into place.
-pub fn write_head(session_file: &Path, head: Option<&str>) -> Result<(), HomeError> {
-    let path = Index::head_path(session_file);
-    let tmp = path.with_extension("head.tmp");
-    {
-        let mut file =
-            fs::File::create(&tmp).map_err(|e| HomeError::io("creating the head", &tmp, e))?;
-        file.write_all(head.unwrap_or("").as_bytes())
-            .map_err(|e| HomeError::io("writing the head", &tmp, e))?;
-        file.write_all(b"\n")
-            .map_err(|e| HomeError::io("writing the head", &tmp, e))?;
-        file.sync_all()
-            .map_err(|e| HomeError::io("syncing the head", &tmp, e))?;
-    }
-    fs::rename(&tmp, &path).map_err(|e| HomeError::io("placing the head", &path, e))?;
-    sync_dir(parent_dir(&path))
-}
-
-/// The header line of a session file and its length in bytes.
-pub fn read_header(session_file: &Path) -> Result<(SessionHeader, u64), HomeError> {
-    let mut reader = BufReader::new(
-        fs::File::open(session_file)
-            .map_err(|e| HomeError::io("opening the session file", session_file, e))?,
-    );
-    let mut line = Vec::new();
-    let read = reader
-        .read_until(b'\n', &mut line)
-        .map_err(|e| HomeError::io("reading the session file", session_file, e))?;
-    if read == 0 {
-        return Err(HomeError::NoHeader {
-            path: session_file.to_path_buf(),
-            reason: "the file is empty".to_owned(),
-        });
-    }
-    let header: SessionHeader = serde_json::from_slice(&line).map_err(|e| HomeError::NoHeader {
-        path: session_file.to_path_buf(),
-        reason: e.to_string(),
-    })?;
-    Ok((header, read as u64))
 }
 
 fn sibling(session_file: &Path, suffix: &str) -> PathBuf {

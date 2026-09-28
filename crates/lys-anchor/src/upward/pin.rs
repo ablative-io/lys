@@ -114,7 +114,7 @@ pub struct UpwardPin {
 ///
 /// # Errors
 ///
-/// - [`AnchorError::Checkpoint`](crate::AnchorError::Checkpoint) if the child
+/// - [`SigningError::Checkpoint`](crate::SigningError::Checkpoint) if the child
 ///   could not sign a checkpoint over its own log. Nothing was submitted.
 /// - Otherwise exactly [`Anchor::submit`]'s errors, from the parent:
 ///   [`AnchorError::NotAdmitted`](crate::AnchorError::NotAdmitted) if the

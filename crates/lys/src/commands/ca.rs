@@ -45,8 +45,11 @@ use lys_core::ca::{
     encode_extension, verify_certificate_chain_at,
 };
 
+use crate::commands::ca_log::LogEntry;
 use crate::commands::error::{CliError, CliResult};
-use crate::commands::files::{read_file, write_file};
+use crate::commands::files::{
+    StagedFile, read_file, refuse_existing, refuse_shared_paths, write_file,
+};
 use crate::commands::hex::{hex_lower, parse_hex_32};
 use crate::commands::key::load_identity;
 use crate::commands::output::Emitter;
@@ -133,8 +136,51 @@ pub fn request(key: &Path, subject: &str, out: &Path, json: bool) -> CliResult<(
     Ok(())
 }
 
+/// Where an issuance writes what it produces.
+#[derive(Debug)]
+pub struct IssueOutputs<'a> {
+    /// The PEM certificate.
+    pub certificate: &'a Path,
+    /// The issuer's self-signed PEM certificate, for standard X.509 tooling.
+    pub issuer_certificate: Option<&'a Path>,
+    /// The transparency log the certificate is entered in before it is written.
+    pub log: Option<LogEntry<'a>>,
+}
+
+impl IssueOutputs<'_> {
+    /// Every output path this issuance writes, each with what it holds.
+    fn named(&self) -> Vec<(&'static str, &Path)> {
+        let mut named = vec![("certificate file", self.certificate)];
+        if let Some(path) = self.issuer_certificate {
+            named.push(("issuer certificate file", path));
+        }
+        if let Some(entry) = &self.log {
+            named.push(("leaf file", entry.leaf_out));
+            named.push(("inclusion proof artifact", entry.artifact_out));
+        }
+        named
+    }
+}
+
 /// `lys ca issue --key <path> --subject <name> [--request <file>]
-/// [--claims <file>] (--validity <window> | --validity-days <n>) --out <file>`.
+/// [--claims <file>] (--validity <window> | --validity-days <n>) --out <file>
+/// [--issuer-out <file>] [--log <dir> --log-key <path> --leaf-out <file>
+/// --artifact-out <file>]`.
+///
+/// With `--log`, the certificate is entered in that transparency log as one
+/// leaf whose bytes are its DER, and nothing else, before anything is written.
+/// The leaf file and the inclusion-proof artifact are written beside it, so a
+/// third party verifies the entry with `scripts/verify_inclusion.py` and the
+/// certificate with `openssl verify` against `--issuer-out`. A log that cannot
+/// be opened, or refuses the entry, stops the issuance before the certificate
+/// is written, so no certificate this command writes is missing from its log.
+///
+/// Every output is refused, before anything is signed or appended, if it
+/// already exists or shares a path with another output. Each is written to a
+/// flushed temporary file and renamed into place, so none is ever torn. With
+/// `--log`, the certificate, issuer certificate and leaf are staged before the
+/// append; a failure after it names the entry and the command that recovers
+/// its artifact, and never signs again (see [`crate::commands::ca_log`]).
 ///
 /// `ttl` is the already-resolved validity window; the two flags are reconciled
 /// in [`crate::commands::duration::validity_window`] so this function has one
@@ -153,17 +199,25 @@ pub fn request(key: &Path, subject: &str, out: &Path, json: bool) -> CliResult<(
 /// claims file is not valid JSON, [`CliError::PemParse`] if the request is not
 /// a PEM `CERTIFICATE REQUEST` block, and [`CliError::Trust`] if the library
 /// rejects the issuance parameters, rejects the request's proof of possession,
-/// or signing fails.
+/// or signing fails. [`CliError::OutputExists`] and
+/// [`CliError::OutputPathShared`] refuse outputs before anything is signed;
+/// [`CliError::LoggedButUnwritten`] reports a failure after the log entry.
 pub fn issue(
     key: &Path,
     subject: &str,
     claims: Option<&Path>,
     ttl: Duration,
-    out: &Path,
+    outputs: &IssueOutputs<'_>,
     request_path: Option<&Path>,
     json: bool,
 ) -> CliResult<()> {
+    let named = outputs.named();
+    refuse_shared_paths(&named)?;
+    for &(what, path) in &named {
+        refuse_existing(path, what)?;
+    }
     let identity = load_identity(key)?;
+    let opened = outputs.log.as_ref().map(LogEntry::open).transpose()?;
 
     let extensions = match claims {
         Some(claims_path) => {
@@ -211,8 +265,27 @@ pub fn issue(
         }
     };
 
-    let pem_text = pem::encode_certificate(&issued.der_bytes);
-    write_file(out, pem_text.as_bytes(), "certificate file")?;
+    let mut staged = vec![StagedFile::stage(
+        outputs.certificate,
+        pem::encode_certificate(&issued.der_bytes).as_bytes(),
+        "certificate file",
+    )?];
+    if let Some(path) = outputs.issuer_certificate {
+        let issuer_pem = pem::encode_certificate(&authority.issuer_certificate_der()?);
+        staged.push(StagedFile::stage(
+            path,
+            issuer_pem.as_bytes(),
+            "issuer certificate file",
+        )?);
+    }
+    let entered = if let Some(log) = opened {
+        Some(log.enter(&issued.der_bytes, staged)?)
+    } else {
+        for file in staged {
+            file.place()?;
+        }
+        None
+    };
 
     let mut emit = Emitter::new(json);
     emit.field("issued certificate for subject", "subject", subject);
@@ -252,8 +325,19 @@ pub fn issue(
     emit.field(
         "certificate written",
         "certificate_path",
-        out.display().to_string(),
+        outputs.certificate.display().to_string(),
     );
+    if let Some(path) = outputs.issuer_certificate {
+        emit.field(
+            "issuer certificate written",
+            "issuer_certificate_path",
+            path.display().to_string(),
+        );
+    }
+    match &entered {
+        Some(entered) => entered.report(&mut emit),
+        None => emit.field("transparency log", "log", "none"),
+    }
     emit.finish();
     Ok(())
 }

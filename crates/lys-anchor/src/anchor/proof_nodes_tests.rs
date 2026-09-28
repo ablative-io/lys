@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on [`proof_nodes`].
 //!
 //! # Where the second party comes from
@@ -52,7 +52,7 @@ fn a_length_that_is_not_a_whole_number_of_digests_is_refused() {
     for len in RAGGED_LENGTHS {
         let err = proof_nodes(&vec![0x5a_u8; len]).expect_err("a ragged length is not a path");
         assert!(
-            matches!(err, AnchorError::MalformedInclusionPath { byte_len } if byte_len == len),
+            matches!(err, AnchorError::Proof(ProofError::MalformedInclusionPath { byte_len }) if byte_len == len),
             "a ragged length must be refused by name and report itself, got: {err}"
         );
         refused += 1;

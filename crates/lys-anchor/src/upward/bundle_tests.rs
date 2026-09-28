@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on [`bundle_for`] — the **producer's** two refusals and the shape of
 //! what it emits.
 //!
@@ -45,7 +45,7 @@ use base64::engine::general_purpose::STANDARD;
 use lys_core::bundle::{MAX_LINKS, VERIFICATION_BUNDLE_FORMAT};
 
 use crate::admission::{AcceptAll, SubmitterContext};
-use crate::error::AnchorError;
+use crate::error::{AnchorError, CascadeError, ProofError};
 use crate::wire::Submission;
 
 use super::super::pin::fixture::{Node, STATEMENT, child_with_statement, parent};
@@ -96,7 +96,7 @@ fn a_cascade_one_link_past_the_cap_is_refused() {
     let past_cap = vec![staged.pinned.clone(); MAX_LINKS + 1];
     let refused = bundle_for(&staged.child.anchor, staged.index, &past_cap);
     match refused {
-        Err(AnchorError::CascadeTooDeep { links, max, .. }) => {
+        Err(AnchorError::Cascade(CascadeError::CascadeTooDeep { links, max, .. })) => {
             // Keyed on what the call was handed and what the code read, not on
             // literals this test could keep in step with by editing both.
             assert_eq!(links, past_cap.len());
@@ -138,12 +138,12 @@ fn a_checkpoint_that_moved_under_the_anchor_is_refused() {
         std::slice::from_ref(&staged.pinned),
     );
     match refused {
-        Err(AnchorError::CascadeJoinMismatch {
+        Err(AnchorError::Cascade(CascadeError::CascadeJoinMismatch {
             pinned_tree_size,
             artifact_tree_size,
             leaf_index,
             ..
-        }) => {
+        })) => {
             assert_eq!(leaf_index, staged.index);
             assert_eq!(pinned_tree_size, staged.pinned.checkpoint.body.tree_size());
             assert_eq!(artifact_tree_size, staged.child.anchor.tree_size());
@@ -169,11 +169,11 @@ fn an_index_the_log_lacks_is_refused() {
 
     let refused = bundle_for(&staged.child.anchor, past_the_end, &[]);
     match refused {
-        Err(AnchorError::NoSuchLeaf {
+        Err(AnchorError::Proof(ProofError::NoSuchLeaf {
             leaf_index,
             tree_size,
             ..
-        }) => {
+        })) => {
             assert_eq!(leaf_index, past_the_end);
             assert_eq!(tree_size, staged.child.anchor.tree_size());
         }

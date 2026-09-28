@@ -81,3 +81,155 @@ From PROOF-FEWSHOT.md's continuation (`<scratch>/proof5/fewshot/60d9c850-….jso
 ## Pi's reader on the record (R1 acceptance)
 
 Recorded in PROOF-CANON.md with the canon file, since both are the same check: `parseSessionEntries` from the checkout at `3d5cbe98`, run under node against `home/sessions/real1.jsonl` and the canon.
+
+## The deterministic render (HOME-007)
+
+The render is one function of the session head, the target and the lys-home
+version: the same inputs give the same bytes, so a rendered file is told by
+its hash. This section pins that on a synthetic fixture and re-measures the
+session above.
+
+### The fixture's hash (R3)
+
+`crates/lys-home/tests/fixtures/multi_result.jsonl`, six synthetic records
+(SHA-256 `5e9c37f955dee54b215c30adeec521ae4f5827fb80d1b9bb0d395f3daee497fc`):
+a question, an assistant record with two tool_use parts, a user record of
+exactly two tool_result parts, an assistant record with one tool_use, a user
+record of one tool_result beside its own text, and the answer. Built from
+lys-home at `287207d` (the derivation landed at `a2d6d2c`; first measured on the
+same tree before the branch was rebased, and equal again after) and run from
+the repository root, `<scratch>` a fresh directory:
+
+```
+lys-home import --home <scratch>/home --claude-code crates/lys-home/tests/fixtures/multi_result.jsonl --session multi
+lys-home render --home <scratch>/home --session multi --uuid aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa --cwd /elsewhere --model claude-opus-5-5 --version 2.1.281 --out <scratch>/a.jsonl
+lys-home render --home <scratch>/home --session multi --uuid aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa --cwd /elsewhere --model claude-opus-5-5 --version 2.1.281 --out <scratch>/b.jsonl
+shasum -a 256 <scratch>/a.jsonl <scratch>/b.jsonl
+```
+
+| field | value |
+| --- | --- |
+| import | 6 records, 11 entries, 9 blocks new |
+| each render | 8 records, `dropped` 0 |
+| `a.jsonl` | `798a64be2164b48c30e4e64fa80c4a307687f7808c256e7606be52b2c9f03074` |
+| `b.jsonl` | equal to `a.jsonl` |
+| `a.loss.json`, `b.loss.json` | `4d9fd3712492331879273558a96c18eecbeb77aa42215100e7d14faff1542f2e`, equal |
+
+`tests/claude_code_round_trip.rs` runs the same import and render through
+`lys_home::cli::run` and asserts the rendered file's SHA-256 equals that
+constant, written in the test and never computed from the render it checks,
+and that this document contains it once. Drift injections, both run in the card's
+worktree on the tree of `b19c3df` with `cargo test -p lys-home`, the code put
+back afterwards:
+
+- R2, `record::fresh_id` put back in place of the derivation in
+  `record_uuid` (`--lib the_multi_result_fixture`): the fixture test fails at
+  `render_tests.rs:452` with `assertion \`left == right\` failed: two renders,
+  one SHA-256`, left `a672a1e45f9f5e6118becf4870ca0cd154c07c72088e44f6de2220ad5688279d`,
+  right `f012d1af8cf106e2258fc1fd0f4ebf367d9856ce457e626306f81576e0adc766`
+  (two random renders; the values differ on every run), `0 passed; 1 failed`.
+  Run over the whole render test module the same injection also fails the
+  UUIDv5 vector tests, the salt test, the kept-id test, the source-scan test
+  and the earlier determinism test, six in all, each on its own rule.
+- R3, one hex digit of the value above changed in this document
+  (`--test claude_code_round_trip`): exactly the pinned-hash test fails, on
+  `PROOF-RESUME.md records the pinned constant once`, `3 passed; 1 failed`.
+
+### The cause (R4)
+
+At `0073b966`, `record_uuid` in `crates/lys-home/src/harness/claude_code/render.rs`
+gave every entry id that is not uuid-shaped a fresh random uuid through
+`record::fresh_id` on each render, and that value became the next record's
+parentUuid, a summary's leafUuid and an assistant's `msg_` id. The importer
+writes such ids as `<uuid>-r<i>` for every tool result of a user record
+except a last one that stands alone, so any user record with more than one
+tool_result, and any single tool_result beside the user's own text,
+triggered it. No map or set order and no clock was a cause: the walk is
+entry order along the context path then part order, serde_json objects
+serialise with sorted keys, and every timestamp is the entry's own. The
+launch template card had since replaced `fresh_id` with a shaping of the
+SHA-256 of the entry id alone, deterministic but in no namespace, with no
+role, version nibble 4 like Claude Code's own uuids, and one value for the
+same entry id in any two sessions.
+
+The derivation now: UUID version 5 under the session's namespace over the
+name `<entry id>#<role>`, where the session's namespace is UUIDv5 of the
+lys render namespace `32c05904-d1f1-550c-9eee-2f6c8f98b665` (UUIDv5 of the
+URL namespace over `lys/home/claude-code/render-uuid/v1`) over the id of the
+session being rendered. The role the multi-result case uses is `record`
+(`...#record`), for the fixture's two `-r0` entries
+(`33333333-3333-4333-8333-333333333333-r0` and
+`55555555-5555-4555-8555-555555555555-r0` under session `multi`, which give
+`d0426444-d38e-5376-aef6-035f7c3634e1` and
+`dcc867fa-10a3-5142-89a0-38367729ae4b`; Python's `uuid.uuid5` agrees).
+
+### The PROOF-RESUME source rendered twice (R4)
+
+The source above (SHA-256 `793f4e87ea4608b2ddfb9d5dcbf1197d4245bde7ed1612630339a1cc1f6d15df`
+before), imported once with `lys-home import --home <scratch>/resume/home
+--claude-code <source> --session real1` (242 records, 205 entries, 81 blocks,
+as in the first import above) and rendered twice with one command to two out
+paths, `<scratch>/resume/rendered/a.jsonl` then `b.jsonl`, built from
+lys-home at `e7adda5`:
+
+```
+lys-home render --home <scratch>/resume/home --session real1 --uuid 478d9617-9050-453d-bb94-b84385905aed --cwd "<session cwd>" --model claude-opus-5 --out <scratch>/resume/rendered/<a or b>.jsonl
+```
+
+| field | value |
+| --- | --- |
+| each render | 81 records, `thinking_kept` 17, `thinking_as_text` 0, `dropped` 0 |
+| `a.jsonl` | `ae1c9f19f296d54d342246834feea65fa1311db355e24de65a885ab57ed31deb` |
+| `b.jsonl` | `ae1c9f19f296d54d342246834feea65fa1311db355e24de65a885ab57ed31deb` (equal) |
+| `a.loss.json`, `b.loss.json` | `f1cd31c54818ecffcb4f095c28c8af2b94bd6e15d60f623d76f4d3fa1098c1d9`, equal |
+| source user records with more than one tool_result | 0 (of 32 user records) |
+| source user records mixing a tool_result with other parts | 0 |
+| entries on the imported context path whose id is not uuid-shaped | 0 (147 entries on the path: 81 messages, 66 custom events at their place on the chain) |
+
+Where these are 0 the render holds no derived uuid: every record's uuid is
+its source's, so these equal hashes and the resume below show no regression
+and do not exercise the derivation. The fixture section above is what
+exercises it.
+
+### The resume of the first render (R4)
+
+The file resumed is the first of the two renders above, `a.jsonl`, the one
+whose hash is recorded as
+`ae1c9f19f296d54d342246834feea65fa1311db355e24de65a885ab57ed31deb`. Run
+from `<scratch>/resume/elsewhere`, a directory that is neither the rendered
+file's directory nor the session's cwd, on the Claude Code installed here;
+`claude --version` on the same run printed `2.1.283 (Claude Code)`. A first
+attempt minutes earlier exited 1 with the account's session limit reached
+(Claude Code had still copied 64 records into a fork of 87 lines before the
+refusal; `resume-check` on it reported `repeated_tool_use_ids` 0); the run
+recorded is the one after the limit lifted.
+
+```
+claude --version
+claude -p --resume <scratch>/resume/rendered/a.jsonl --fork-session --strict-mcp-config --mcp-config '{"mcpServers":{}}' --max-turns 1 --output-format json "How many messages did you say were carried over? Reply with only the number."
+```
+
+| field | value |
+| --- | --- |
+| exit | 0 (`is_error` false, `num_turns` 1, 3,760 ms) |
+| the fork's uuid | `6c58f067-5206-45be-943f-a41ae046dde9` |
+| where the fork was written | `~/.claude/projects/<slug dir>/6c58f067-5206-45be-943f-a41ae046dde9.jsonl`, `<slug dir>` the run directory's slug, as the earlier fork was |
+| fork lines | 94: 64 records copied from the rendered file (same uuids), the new turn (1 user, 1 assistant on `claude-opus-5`), and 28 of Claude Code's own records (15 attachment, 3 mode, 3 atis-latch, 3 last-prompt, 2 queue-operation, 1 system, 1 cost-state) |
+| answer | 3 bytes, not recorded here |
+| stderr | one 157-byte notice that stdin was not redirected; nothing else |
+| rendered file after | `ae1c9f19f296d54d342246834feea65fa1311db355e24de65a885ab57ed31deb`, unchanged |
+| source hash after | `793f4e87ea4608b2ddfb9d5dcbf1197d4245bde7ed1612630339a1cc1f6d15df`, unchanged |
+
+`lys-home resume-check <scratch>/resume/rendered/a.jsonl <fork>`:
+
+| field | value |
+| --- | --- |
+| rendered_records | 81 |
+| forked_records | 94 |
+| forked_new_records | 30 |
+| repeated_tool_use_ids | 0 |
+| new_tool_uses | 0 |
+| exit | 0 |
+
+As with the resume above, 2.1.283 copied the 64 user and text records and
+none of the 17 signed thinking records.

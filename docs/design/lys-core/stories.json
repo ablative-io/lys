@@ -1,0 +1,45 @@
+{
+  "cluster": "lys-core",
+  "personas": [
+    {
+      "name": "Card author",
+      "role": "Landing work in lys",
+      "stories": [
+        {
+          "id": "S30",
+          "text": "As a card author landing work in lys, I want the gate to refuse an unwrap, a lint bypass, a dropped Result or logic in a mod.rs so that a rule break is caught before review rather than by a reviewer's memory."
+        }
+      ]
+    },
+    {
+      "name": "Test writer",
+      "role": "Writing tests in sibling files",
+      "stories": [
+        {
+          "id": "S31",
+          "text": "As a test writer, I want a test file recognised as test code by a marker it carries so that I can unwrap in test helpers without an #[allow]."
+        }
+      ]
+    },
+    {
+      "name": "Lead",
+      "role": "Trusting the gate",
+      "stories": [
+        {
+          "id": "S32",
+          "text": "As the lead for lys, I want proof that the unwrap rule fires so that a green leg means the rule held and not that nothing was measured."
+        }
+      ]
+    },
+    {
+      "name": "Reader of the design",
+      "role": "Tracing the earlier lys-core design",
+      "stories": [
+        {
+          "id": "S33",
+          "text": "As a reader of the lys-core design, I want the hand-written pre-method documents kept under their own names so that the earlier design and the citations of it survive the method's render."
+        }
+      ]
+    }
+  ]
+}

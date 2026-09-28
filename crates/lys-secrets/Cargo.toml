@@ -1,0 +1,35 @@
+[package]
+name = "lys-secrets"
+description = "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "lys-secrets-demo"
+path = "src/bin/lys-secrets-demo.rs"
+
+[dependencies]
+axum.workspace = true
+clap.workspace = true
+lys-core.workspace = true
+lys-identity.workspace = true
+lys-identity-server.workspace = true
+lys-log-store.workspace = true
+rand.workspace = true
+rustix.workspace = true
+serde.workspace = true
+reqwest = { workspace = true, features = ["rustls-tls"] }
+serde_json.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+zeroize.workspace = true
+
+[lints]
+workspace = true

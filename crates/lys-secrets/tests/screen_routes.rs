@@ -1,0 +1,348 @@
+//! The screen routes as the served binary answers them over HTTP: a broker
+//! made and seeded with the product's own commands, `serve` started on a
+//! loopback port, and every request signed on a person's behalf by a screen
+//! service the broker trusts, with the library's own signer.
+
+mod support;
+
+use reqwest::Method;
+use serde_json::{Value, json};
+use support::served::{
+    HIDDEN, OTHER, OWNED, OWNER, Seeded, Served, TestResult, names, percent_encoded,
+};
+
+#[test]
+fn the_listing_holds_only_what_the_person_may_discover() -> TestResult {
+    let served = Served::start(Seeded::new()?)?;
+
+    let (status, body) = served.ask(&Method::GET, "/_lys/secrets", b"", OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let listed = names(&serde_json::from_str(&body)?);
+    assert_eq!(listed, vec![OWNED.to_owned()], "{body}");
+
+    let (status, body) = served.ask(&Method::GET, "/_lys/secrets", b"", OTHER)?;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(
+        names(&serde_json::from_str(&body)?),
+        vec![HIDDEN.to_owned()]
+    );
+    Ok(())
+}
+
+const SCOPE_CHANGE: &str = "screen-scope-change-01";
+const RECIPIENTS_CHANGE: &str = "screen-recipients-change-01";
+
+#[test]
+fn only_the_owner_changes_a_secret() -> TestResult {
+    let served = Served::start(Seeded::new()?)?;
+
+    let scope = serde_json::to_vec(&json!({
+        "secret": OWNED, "scope": "personal:person-other", "operation": SCOPE_CHANGE
+    }))?;
+    let (status, body) = served.ask(&Method::POST, "/_lys/scope", &scope, OTHER)?;
+    assert_eq!(status, 403, "{body}");
+    assert!(body.starts_with("LendingNotPermitted:"), "{body}");
+
+    let recipients = serde_json::to_vec(&json!({
+        "secret": OWNED, "recipients": "people_only", "operation": RECIPIENTS_CHANGE
+    }))?;
+    let (status, body) = served.ask(&Method::POST, "/_lys/recipients", &recipients, OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let answered: Value = serde_json::from_str(&body)?;
+    assert_eq!(
+        answered,
+        json!({
+            "secret": OWNED, "recipients": "people_only",
+            "operation": RECIPIENTS_CHANGE, "repeated": false
+        })
+    );
+    Ok(())
+}
+
+#[test]
+fn an_owner_change_is_made_once_per_operation_id() -> TestResult {
+    let served = Served::start(Seeded::new()?)?;
+
+    let unmarked = serde_json::to_vec(&json!({ "secret": OWNED, "recipients": "people_only" }))?;
+    let (status, body) = served.ask(&Method::POST, "/_lys/recipients", &unmarked, OWNER)?;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.starts_with("OperationMissing:"), "{body}");
+
+    let misshapen = serde_json::to_vec(&json!({
+        "secret": OWNED, "recipients": "people_only", "operation": "too short"
+    }))?;
+    let (status, body) = served.ask(&Method::POST, "/_lys/recipients", &misshapen, OWNER)?;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.starts_with("OperationMissing:"), "{body}");
+
+    let recipients = serde_json::to_vec(&json!({
+        "secret": OWNED, "recipients": "people_only", "operation": RECIPIENTS_CHANGE
+    }))?;
+    let (status, body) = served.ask(&Method::POST, "/_lys/recipients", &recipients, OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let (status, body) = served.ask(&Method::POST, "/_lys/recipients", &recipients, OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let again: Value = serde_json::from_str(&body)?;
+    assert_eq!(again["repeated"], json!(true), "{body}");
+
+    let other = serde_json::to_vec(&json!({
+        "secret": OWNED, "recipients": "anyone", "operation": RECIPIENTS_CHANGE
+    }))?;
+    let (status, body) = served.ask(&Method::POST, "/_lys/recipients", &other, OWNER)?;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.starts_with("OperationReused:"), "{body}");
+    assert!(body.contains(RECIPIENTS_CHANGE), "{body}");
+    Ok(())
+}
+
+#[test]
+fn the_settings_route_reads_what_a_change_left() -> TestResult {
+    let served = Served::start(Seeded::new()?)?;
+    let target = format!("/_lys/settings?secret={OWNED}");
+
+    let (status, body) = served.ask(&Method::GET, &target, b"", OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let before: Value = serde_json::from_str(&body)?;
+    assert_eq!(
+        before,
+        json!({ "secret": OWNED, "scope": null, "recipients": "anyone", "last_operation": null })
+    );
+
+    let scope = serde_json::to_vec(&json!({
+        "secret": OWNED, "scope": "personal:person-owner", "operation": SCOPE_CHANGE
+    }))?;
+    let (status, body) = served.ask(&Method::POST, "/_lys/scope", &scope, OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let recipients = serde_json::to_vec(&json!({
+        "secret": OWNED, "recipients": "people_only", "operation": RECIPIENTS_CHANGE
+    }))?;
+    let (status, body) = served.ask(&Method::POST, "/_lys/recipients", &recipients, OWNER)?;
+    assert_eq!(status, 200, "{body}");
+
+    let (status, body) = served.ask(&Method::GET, &target, b"", OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let after: Value = serde_json::from_str(&body)?;
+    assert_eq!(
+        after,
+        json!({
+            "secret": OWNED, "scope": "person/person-owner",
+            "recipients": "people_only", "last_operation": RECIPIENTS_CHANGE
+        })
+    );
+
+    let (status, body) = served.ask(&Method::GET, &target, b"", OTHER)?;
+    assert_eq!(status, 404, "{body}");
+    assert!(body.starts_with("SecretUnknown:"), "{body}");
+
+    let (status, body) = served.ask(&Method::GET, "/_lys/settings?secret=", b"", OWNER)?;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.starts_with("Encoding:"), "{body}");
+    Ok(())
+}
+
+#[test]
+fn the_handles_route_lists_what_a_holder_holds_and_never_the_handle() -> TestResult {
+    let served = Served::start(Seeded::new()?)?;
+    let target = format!("/_lys/handles?holder={OWNER}");
+
+    let (status, body) = served.ask(&Method::GET, &target, b"", OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let answered: Value = serde_json::from_str(&body)?;
+    assert_eq!(answered["holder"], OWNER);
+    let handles = answered["handles"].as_array().ok_or("no handles")?;
+    assert_eq!(handles.len(), 1, "{body}");
+    assert_eq!(handles[0]["id"], served.seeded.owned_handle);
+    assert_eq!(handles[0]["secret"], OWNED);
+    assert_eq!(handles[0]["used"], 0);
+    assert_eq!(handles[0]["dropped"], false);
+    let shown: Vec<&String> = handles[0]
+        .as_object()
+        .ok_or("not an object")?
+        .keys()
+        .collect();
+    assert_eq!(
+        shown,
+        [
+            "dropped",
+            "ended",
+            "id",
+            "max_uses",
+            "not_after_ms",
+            "parent",
+            "secret",
+            "settled",
+            "spend_cap",
+            "upstream",
+            "upstream_reason",
+            "used"
+        ],
+        "no token, digest or key is shown"
+    );
+
+    let (status, body) = served.ask(&Method::GET, &target, b"", OTHER)?;
+    assert_eq!(status, 200, "{body}");
+    let hidden: Value = serde_json::from_str(&body)?;
+    assert_eq!(
+        hidden,
+        json!({ "holder": OWNER, "handles": [] }),
+        "a handle on a secret the asker may not discover is left out"
+    );
+
+    let (status, body) = served.ask(&Method::GET, "/_lys/handles?holder=", b"", OWNER)?;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.starts_with("Encoding:"), "{body}");
+    Ok(())
+}
+
+#[test]
+fn the_revocation_route_reads_a_percent_encoded_handle() -> TestResult {
+    let served = Served::start(Seeded::new()?)?;
+    let owned = served.seeded.owned_handle.clone();
+    let hidden = served.seeded.hidden_handle.clone();
+
+    let target = format!("/_lys/revocation?handle={}", percent_encoded(&owned));
+    let request = served.signed(&Method::GET, &target, b"", OWNER)?;
+    assert!(
+        request
+            .url()
+            .query()
+            .is_some_and(|query| query.contains('%')),
+        "the handle must travel percent-encoded"
+    );
+    let (status, body) = served.send(request)?;
+    assert_eq!(status, 200, "{body}");
+    let answered: Value = serde_json::from_str(&body)?;
+    assert_eq!(
+        answered,
+        json!({
+            "handle": owned,
+            "stopped_here": false,
+            "upstream": "not_asked",
+            "upstream_reason": null,
+        })
+    );
+
+    let target = format!("/_lys/revocation?handle={}", percent_encoded(&hidden));
+    let (status, body) = served.ask(&Method::GET, &target, b"", OWNER)?;
+    assert_eq!(status, 404, "{body}");
+    assert!(body.starts_with("HandleUnknown:"), "{body}");
+
+    let target = format!("/_lys/revocation?handle={owned}&extra=1");
+    let (status, body) = served.ask(&Method::GET, &target, b"", OWNER)?;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.starts_with("Encoding:"), "{body}");
+    Ok(())
+}
+
+const ENDING: &str = "screen-handle-ending-01";
+
+#[test]
+fn a_handle_is_ended_by_the_person_it_is_held_for_once_per_operation_id() -> TestResult {
+    let served = Served::start(Seeded::new()?)?;
+    let owned = served.seeded.owned_handle.clone();
+
+    let ending = serde_json::to_vec(&json!({ "handle": owned, "operation": ENDING }))?;
+    let (status, body) = served.ask(&Method::POST, "/_lys/drop", &ending, OTHER)?;
+    assert_eq!(status, 404, "{body}");
+    assert!(body.starts_with("HandleUnknown:"), "{body}");
+
+    let unmarked = serde_json::to_vec(&json!({ "handle": owned }))?;
+    let (status, body) = served.ask(&Method::POST, "/_lys/drop", &unmarked, OWNER)?;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.starts_with("OperationMissing:"), "{body}");
+
+    let (status, body) = served.ask(&Method::POST, "/_lys/drop", &ending, OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let answered: Value = serde_json::from_str(&body)?;
+    assert_eq!(
+        answered,
+        json!({
+            "handle": owned, "operation": ENDING, "outcome": "ended", "ended": [owned],
+            "stopped_here": true, "upstream": "not_asked", "upstream_reason": null,
+        })
+    );
+
+    let (status, body) = served.ask(&Method::POST, "/_lys/drop", &ending, OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let again: Value = serde_json::from_str(&body)?;
+    assert_eq!(again["outcome"], "repeated", "{body}");
+    assert_eq!(again["ended"], json!([owned]), "{body}");
+
+    let target = format!("/_lys/handles?holder={OWNER}");
+    let (status, body) = served.ask(&Method::GET, &target, b"", OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let listed: Value = serde_json::from_str(&body)?;
+    let held = &listed["handles"][0];
+    assert_eq!(held["dropped"], true, "{body}");
+    assert_eq!(
+        held["ended"],
+        json!({ "by": OWNER, "operation": ENDING, "root": owned }),
+        "{body}"
+    );
+    assert_eq!(held["upstream"], "not_asked", "{body}");
+    Ok(())
+}
+
+#[test]
+fn a_replayed_service_request_is_refused_by_name() -> TestResult {
+    let served = Served::start(Seeded::new()?)?;
+
+    let first = served.signed(&Method::GET, "/_lys/secrets", b"", OWNER)?;
+    let again = first
+        .try_clone()
+        .ok_or("the signed request did not clone")?;
+    let (status, body) = served.send(first)?;
+    assert_eq!(status, 200, "{body}");
+    let (status, body) = served.send(again)?;
+    assert_eq!(status, 403, "{body}");
+    assert!(body.starts_with("ServiceReplayed:"), "{body}");
+    Ok(())
+}
+
+fn audit_asked(served: &Served, target: &str) -> Result<Value, Box<dyn std::error::Error>> {
+    let (status, body) = served.ask(&Method::GET, target, b"", OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    Ok(serde_json::from_str(&body)?)
+}
+
+fn shown(answer: &Value) -> Result<Vec<u64>, Box<dyn std::error::Error>> {
+    answer["lines"]
+        .as_array()
+        .ok_or("no lines")?
+        .iter()
+        .map(|line| line["index"].as_u64().ok_or_else(|| "no index".into()))
+        .collect()
+}
+
+#[test]
+fn the_audit_route_answers_a_window_and_where_it_stands() -> TestResult {
+    let served = Served::start(Seeded::new()?)?;
+
+    let last = audit_asked(&served, "/_lys/audit")?;
+    let size = last["size"].as_u64().ok_or("no size")?;
+    assert!(size >= 2, "the seeding wrote lines: {last}");
+    assert_eq!(
+        last["from"], 0,
+        "a log shorter than a window is read from 0"
+    );
+    assert_eq!(last["older"], Value::Null);
+    let every = shown(&last)?;
+    assert!(every.windows(2).all(|pair| pair[0] < pair[1]), "{last}");
+    assert!(every.iter().all(|index| *index < size), "{last}");
+
+    let before = audit_asked(&served, "/_lys/audit?before=1")?;
+    assert_eq!(before["size"], size);
+    assert_eq!(before["from"], 0);
+    assert!(shown(&before)?.iter().all(|index| *index < 1), "{before}");
+    let none = audit_asked(&served, "/_lys/audit?before=0")?;
+    assert_eq!(shown(&none)?, [0u64; 0]);
+    assert_eq!(none["from"], 0);
+    assert_eq!(none["older"], Value::Null);
+
+    for target in ["/_lys/audit?before=soon", "/_lys/audit?after=1"] {
+        let (status, body) = served.ask(&Method::GET, target, b"", OWNER)?;
+        assert_eq!(status, 400, "{body}");
+        assert!(body.starts_with("Encoding:"), "{body}");
+    }
+    Ok(())
+}

@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the CLI's translation of storage failures.
 //!
 //! The layout, write-once and integrity rules are gated in `lys-log-store`
@@ -56,7 +56,7 @@ fn corruption_keeps_the_stores_specific_reason_and_path() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
     init(&dir);
-    std::fs::write(dir.join("leaves").join("stray.txt"), b"junk").unwrap();
+    std::fs::write(dir.join("leaves").join(format!("{:020}", 1)), b"junk").unwrap();
     let err = open(&dir).unwrap_err();
     match err {
         CliError::LogDirInvalid {
@@ -64,7 +64,7 @@ fn corruption_keeps_the_stores_specific_reason_and_path() {
             ref reason,
         } => {
             assert_eq!(path, &dir);
-            assert!(reason.contains("unexpected entry"), "{reason}");
+            assert!(reason.contains("not contiguous"), "{reason}");
         }
         other => panic!("expected LogDirInvalid, got {other}"),
     }

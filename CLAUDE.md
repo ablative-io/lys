@@ -28,11 +28,28 @@ Future crates (later phases): `lys-anchor` (transparency-ledger service) and `ly
 
 **This is trust infrastructure. Its entire value is that strangers can verify it.** Every design decision serves verifiability-by-third-parties, not cleverness, not performance for its own sake. When choosing between a "better" primitive and the boring interoperable one, choose boring — the verification world speaks SHA-256, Ed25519, and RFC 6962, and a receipt nobody can verify with standard tooling is worthless. Verification must outlive the vendor.
 
+## A start never replays the whole history
+
+A service that keeps a log opens from a signed snapshot of its folded state,
+bound to the log's root, and reads only the entries after it. Snapshots are
+written by entry count, never on a timer. A snapshot that is missing, fails
+its signature, or names another root or log is refused by name, logged, and
+rebuilt from the whole log; never a silent fallback. Every such service has a
+test that counts the entries a restart reads. Opening a store costs the same
+however long its log is.
+
+## No time limits
+
+No timeout, deadline, watchdog or bound in seconds anywhere: not in code, not
+in a test, not in a workflow step, not in a command. A slow run is a defect to
+find at its cause. Something stuck is found by its signal (no progress, a dead
+process), never by a clock.
+
 ## Coding standards
 
 Non-negotiable, enforced by CI (`clippy --all-targets -- -D warnings`):
 
-- **No `unwrap` / `expect` / `panic` / `todo` / `unimplemented` / `unreachable` in library code.** Tests opt out per-module with `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`.
+- **No `unwrap` / `expect` / `panic` / `todo` / `unimplemented` / `unreachable` in library code.** Tests are exempt through `clippy.toml`'s `allow-unwrap-in-tests`, `allow-expect-in-tests` and `allow-panic-in-tests`, which clippy applies to code it knows is test code; a `*_tests.rs` file, a fixture file and an integration test root carry `#![cfg(test)]` as their first line so the whole file is test code.
 - **No silent failures.** Every error handled or propagated with operation-specific context. `thiserror` for the library error type; the CLI may use `anyhow` at the top level only.
 - **Private key material never appears in `Debug`, logs, or error messages.** Redaction is tested, not assumed. Seed buffers are `Zeroizing`.
 - **No file over 500 lines** of code (excluding tests/comments/whitespace). `mod.rs` carries only `pub mod` / `pub use` / module docs. Logic goes in named files; tests in sibling `*_tests.rs` files.
@@ -79,15 +96,27 @@ review. Run the gates anyway.
 
 Once a signature is produced or a leaf is logged under a format, that format is frozen — changing it breaks every historical verification. Domain-separation tags (`lys/attestation/v2`, `lys/sealed-envelope/v1`) and leaf encodings are versioned wire contracts. Evolving one means a new version alongside, never a mutation of the shipped one. This is why the extraction renames the tags *before* anything durable is signed under them.
 
+## How a carded row is built
+
+Tom's rules, in his words, with the date and time each was given.
+
+1. (2026-09-25 22:26, Tom on Dot) "All the cards on Cambium should all be connected up to the Aion workflow, should all be going like that. So he shouldn't be building them directly. There's a whole setup that we did... and you shouldn't be reviewing them." Every carded row goes through its board's chain: brief_card, sign-off, card_build_v3, src_pr, src_land. Nobody hand-builds a carded row, and no lead reviews in place of the chain. If a card will not start, that is a defect in the chain: name what refused and fix the chain.
+2. (2026-09-25 22:29, Tom on Dot) No rush and no corners cut: the full chain on every card. Jev, fmt, clippy pedantic, tests, ast-grep, gate.
+3. (2026-09-25 21:54 and 21:56, Tom on Dot) Heavy builds and full gates go to Dean's laptop. Only small, warm, single-crate checks (a lint, one crate's clippy or tests) run on this Mac, straight away, no queue.
+4. (2026-09-25 22:37, Tom on Dot) Lys identity comes first. "Lys is very important... the whole identity" work.
+5. (2026-09-23 19:23, Tom) Workflow inputs name a repository, a commit, a card and a brief, never a folder.
+6. (2026-09-26 02:40 to 02:43, Tom on Dot) Nobody stops working and nobody waits on Tom, every night. Before any blocker is called Tom's, the seat searches the estate for it itself (files, keys, earlier words, running tools); the Jev key sat on this Mac all night while the whole room waited on him for it. If it truly needs him, everything up to it keeps moving and other work fills the time.
+
 ## Gates before any commit
 
 ```
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo clippy --all-targets -- -D warnings
-cargo test --workspace --all-features
+cargo test --workspace --all-features --no-fail-fast
 cargo doc --no-deps --all-features
 cargo doc --no-deps
+cargo clippy -p lys --all-features --test 'identity_*' -- -D warnings && cargo test -p lys --all-features --no-fail-fast --test 'identity_*'
 ```
 
 All five clean. No exceptions.

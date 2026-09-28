@@ -93,6 +93,506 @@
           "id": "C13",
           "text": "At compaction or retirement the outgoing session's letter to its successor, with its real thinking, becomes the successor's first entry as lys.inherited; it is never authored and replays only to the same provider, api and model; seeded against plain is measured on a card.",
           "done": false
+        },
+        {
+          "id": "C45",
+          "text": "A lys.inherited entry's rule may be absent in the type and is skipped when absent, a canon entry with a rule serialises to the same bytes as before, and the canon loader refuses by name a canon example without a rule, naming its entry id and the missing field, which canon add and a render with --canon both reach; a rule-less lys.inherited entry in a session of a home reads cleanly.",
+          "done": false
+        },
+        {
+          "id": "C46",
+          "text": "A handover refuses by name before any file is created: a letter entry that is not an assistant message, a letter run whose entries do not stand next to each other on the outgoing path in the order given, a letter entry whose message carries provider `authored`, a letter holding no thinking block, and a successor path that exists and is not an empty directory.",
+          "done": false
+        },
+        {
+          "id": "C47",
+          "text": "A handover writes a new successor home holding one session with a fresh id, the outgoing header's cwd and no parentSession, and leaves every file of the outgoing home byte for byte as it was.",
+          "done": false
+        },
+        {
+          "id": "C48",
+          "text": "The successor session's first entry is a lys.inherited entry with no rule naming the outgoing session as from_session and curated_by, every letter id in path order as from_entries, the letter's provider, api and model, and the last letter entry's timestamp as curated_at.",
+          "done": false
+        },
+        {
+          "id": "C49",
+          "text": "Each letter entry follows in the successor with its id, timestamp and message equal to the source, every thinkingSignature byte for byte, and then one session_info entry named `inherited from <outgoing session id>` with no other field.",
+          "done": false
+        },
+        {
+          "id": "C50",
+          "text": "lys-home handover prints one JSON report naming the successor home, the session id and its file, with inherited true read from the successor's first entry, and no transcript content.",
+          "done": false
+        },
+        {
+          "id": "C51",
+          "text": "A successor rendered for another model carries each inherited signed thinking block as a text part with one loss-account entry naming it by hash, and rendered for the letter's own model keeps it whole with its signature.",
+          "done": false
+        },
+        {
+          "id": "C52",
+          "text": "PROOF-HANDOVER.md records the handover of an elicited letter by ids, hashes and the signature comparison, whether the inherited signed block appears in a resumed continuation's own file on the installed Claude Code beside 2.1.281, and the seeded and plain card counts as not run.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "The launch template",
+      "items": [
+        {
+          "id": "C14",
+          "text": "A Claude Code launch template schema in docs/design/home names its five slots (transcript, mcp, env, secrets, instructions), and a template with a slot outside them is refused by that slot's name with nothing written.",
+          "done": false
+        },
+        {
+          "id": "C15",
+          "text": "The home keeps each template it renders as an object under templates/ named by its SHA-256, written once and never rewritten.",
+          "done": false
+        },
+        {
+          "id": "C16",
+          "text": "lys-home render-launch writes the rendered JSONL, its loss account, an MCP configuration file, an environment file and an appended-instructions file into one directory, and a second render of the same template and session writes files with identical SHA-256.",
+          "done": false
+        },
+        {
+          "id": "C17",
+          "text": "The launch line in render-launch's report resumes the rendered file by path with --fork-session and the template's flags, and the tool never runs it.",
+          "done": false
+        },
+        {
+          "id": "C18",
+          "text": "A use-only secret is written as its handle and never its value, and a template marking a secret readable is refused naming secret_reader_unbuilt and SECRETS-002.",
+          "done": false
+        },
+        {
+          "id": "C19",
+          "text": "Every render appends one lys.harness_event of kind template_render beside the context path, naming the template hash, the session head hash and a manifest block of the written paths, and the head does not move.",
+          "done": false
+        },
+        {
+          "id": "C20",
+          "text": "PROOF-LAUNCH.md records the launch measured on the installed Claude Code version: template hash, written paths and hashes, launch line, the rendered file unchanged, where the continuation landed; never transcript content.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "The context record",
+      "items": [
+        {
+          "id": "C21",
+          "text": "Every launch-template render appends one lys.given custom entry after the render event, listing the instruction documents Claude Code will load for the session's working directory and the files the render wrote, in the order measured on the named Claude Code version, each by kind, path, byte length and SHA-256, with the harness name and version, the kinds resolved, the kinds it leaves unlisted, and the environment variable names the template set; never a document's content and never a variable's value.",
+          "done": false
+        },
+        {
+          "id": "C22",
+          "text": "lys-home lists a session's given records with their documents, and checks a listed document against a file on disk by hash, answering matches or differs and never printing either file.",
+          "done": false
+        },
+        {
+          "id": "C23",
+          "text": "The Claude Code version on this Mac, the instruction load order and project slug rule measured from its own behaviour, and one real session render, are written in PROOF-GIVEN.md as paths, counts and hashes only.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Lanterns",
+      "items": [
+        {
+          "id": "C24",
+          "text": "A lantern is a lys.lantern custom entry appended at the session's head, naming an existing entry of that session that is not a lantern or an epilogue as its point, with the note as written, lit-by and lit-at; an epilogue is a lys.lantern_epilogue custom entry naming the lantern's entry id with its words, author and time; both are documented beside the other lys custom entries.",
+          "done": false
+        },
+        {
+          "id": "C25",
+          "text": "Lighting only appends: the session's earlier bytes are unchanged and the head is the lantern; a point that is not an entry of the session, a lantern or epilogue as the point, an empty or whitespace-only note, and a session another owner holds are each refused by name with nothing written.",
+          "done": false
+        },
+        {
+          "id": "C26",
+          "text": "An epilogue is added to a named lantern of a session and appended at that session's head; a lantern the session does not hold and empty or whitespace-only words are each refused by name with nothing written.",
+          "done": false
+        },
+        {
+          "id": "C27",
+          "text": "Recall reads without owning: it takes no session lock and writes no file, and a session it cannot read is skipped and named with its reason while every other session is still listed.",
+          "done": false
+        },
+        {
+          "id": "C28",
+          "text": "Recall by note lists every lantern in the home whose note or one of whose epilogues contains the given words as one phrase, case-folded; recall by point lists every lantern marking a session and entry id, and refuses an unknown session or entry by name; every row is the lantern's id, session, point, lit-by, lit-at, note and its epilogues in order, and never a line of the transcript.",
+          "done": false
+        },
+        {
+          "id": "C29",
+          "text": "Three lys-home subcommands light a lantern, add an epilogue and recall, each printing one JSON report that carries no transcript line.",
+          "done": false
+        },
+        {
+          "id": "C30",
+          "text": "A lantern lives in the home: the rendered Claude Code file of a session carries no lantern or epilogue line, a home file holding them still parses with Pi's parser unchanged, and nothing lights a lantern automatically.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "The deterministic render",
+      "items": [
+        {
+          "id": "C31",
+          "text": "The Claude Code render derives the uuid of a record whose entry id is not uuid-shaped as UUIDv5 over the session's namespace, itself UUIDv5 of 32c05904-d1f1-550c-9eee-2f6c8f98b665 over the id of the session being rendered, and the name `<entry id>#record`, so two sessions with the same non-uuid entry id never collide; render.rs calls no random source and no clock.",
+          "done": false
+        },
+        {
+          "id": "C32",
+          "text": "A fixture session holding a tool record with two results and a tool record with one result beside user text renders twice, to two paths with the same target, into files of equal SHA-256.",
+          "done": false
+        },
+        {
+          "id": "C33",
+          "text": "A test pins the fixture's rendered SHA-256, and PROOF-RESUME.md records the same value with the commands that produce it.",
+          "done": false
+        },
+        {
+          "id": "C34",
+          "text": "The PROOF-RESUME source renders twice from one import with one recorded command into files of equal SHA-256, and PROOF-RESUME.md records that hash and the command.",
+          "done": false
+        },
+        {
+          "id": "C35",
+          "text": "PROOF-RESUME.md names the cause found, the namespace, name form and roles the multi-result case used, and a resume of the rendered file with --fork-session on the installed Claude Code, with the version `claude --version` printed and repeated_tool_use_ids 0.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Forks",
+      "items": [
+        {
+          "id": "C36",
+          "text": "The two fork custom types, lys.forked_from (parent_session, lantern, point, cut_at, coordinate_carried, carried, seed_left_out) and lys.fork (child), are named beside the other lys custom entries and documented in RECORD.md, and neither adds a field to Pi's header or outside custom.data.",
+          "done": false
+        },
+        {
+          "id": "C37",
+          "text": "A fork refuses by name before any file is created: a lantern id no session holds as a lys.lantern entry, an older-record lantern several sessions hold with no session named (lantern_ambiguous, listing them in ascending byte order), a named session that is not the lantern's lit-in session (lantern_not_lit_here), a lantern that sits before any assistant message (nothing_to_fork), and a parent another owner holds; no refusal carries a note, a part's text or any entry's data.",
+          "done": false
+        },
+        {
+          "id": "C38",
+          "text": "A fork resolves a lantern to the session it was lit in, read from its data's lit_in or by the older-record rule when the data carries none, and cuts that session's root-to-point chain, read through the index and never by loading the file, at the last assistant message at or before the point, in file order with every side leaf left out and no entry after the cut.",
+          "done": false
+        },
+        {
+          "id": "C39",
+          "text": "The child session holds each cut entry as the parent file's own line bytes, under the parent's cwd, with the header's parentSession the parent file's path relative to the home; nothing is re-serialised.",
+          "done": false
+        },
+        {
+          "id": "C40",
+          "text": "Ancestry is written on both sides: lys.forked_from is the first entry the fork writes in the child, directly after the copy, and its head; lys.fork is appended at the parent's head naming the child; a user-message point is not copied but carried, its id recorded with coordinate_carried true and its parts that are not text counted by kind.",
+          "done": false
+        },
+        {
+          "id": "C41",
+          "text": "The fork report carries the child, the parent, the lantern, the point, the cut entry, the count of entries copied, the distinct block hashes the copied entries name that the store holds and those it does not, whether the coordinate was carried and the carried entry; never a part's text, a note or any entry's data.",
+          "done": false
+        },
+        {
+          "id": "C42",
+          "text": "A fork writes no block, rewrites no earlier byte of the parent, and copies nothing from the parent but its cwd: no credential, handle or launch setting enters the child.",
+          "done": false
+        },
+        {
+          "id": "C43",
+          "text": "lys-home fork --home --lantern [--session] prints one JSON report on success, exits 1 with the refusal on stderr and nothing on stdout, and takes no point or entry id.",
+          "done": false
+        },
+        {
+          "id": "C44",
+          "text": "Rendering a child whose coordinate was carried writes the carried message's text parts as a seed prompt beside the rendered file under an in-band marker line, the render report names it, the template's launch line (printed by render-launch only) passes it as the first prompt and is never run, and PROOF-FORK.md records a fork launched on the installed Claude Code version as hashes, counts, paths, commands, versions and exit codes only.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "The record module layout",
+      "items": [
+        {
+          "id": "C45",
+          "text": "The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs.",
+          "done": false
+        },
+        {
+          "id": "C46",
+          "text": "Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs.",
+          "done": false
+        },
+        {
+          "id": "C47",
+          "text": "Home and its impl are defined in crates/lys-home/src/record/home.rs.",
+          "done": false
+        },
+        {
+          "id": "C48",
+          "text": "crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line.",
+          "done": false
+        },
+        {
+          "id": "C49",
+          "text": "crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it.",
+          "done": false
+        },
+        {
+          "id": "C50",
+          "text": "Every public path lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolves as before the move, and no crate outside lys-home changes.",
+          "done": false
+        },
+        {
+          "id": "C51",
+          "text": "Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "The lit-in session",
+      "items": [
+        {
+          "id": "C100",
+          "text": "LanternData carries an optional lit_in, the session that held the point when the lantern was lit, keeping a present null and a present non-string value distinct from an absent key, and still refuses an unknown key.",
+          "done": false
+        },
+        {
+          "id": "C101",
+          "text": "The light act writes lit_in as the id of the session at whose head it appends the lantern, and its report carries lit_in beside id, session, point and lit_at.",
+          "done": false
+        },
+        {
+          "id": "C102",
+          "text": "Recall rows carry lit_in beside point, note and lit_by, the lighting session for a lantern the light act lit and null for a lantern whose data has no lit_in, and a lantern whose lit_in is present and not a session id is never listed as a row but skipped by note and refused by point as lit_in_not_a_session with the fork's reason text.",
+          "done": false
+        },
+        {
+          "id": "C103",
+          "text": "The fork reads lit_in through a typed view that does not require lit_at or note and never from a raw JSON key: a lantern with no lit_in resolves by its holders, and a present lit_in that is null, not a string, not a safe session name, or names no session of the home refuses lit_in_not_a_session naming which.",
+          "done": false
+        },
+        {
+          "id": "C104",
+          "text": "The fork's fixtures light L2 with the light act and write by hand only the lanterns the light act cannot produce (O2, M2, N3, the copy N2 and N1 to N4), each named in its test as standing for such a record.",
+          "done": false
+        },
+        {
+          "id": "C105",
+          "text": "RECORD.md and the lys-home README document lit_in, and PROOF-FORK.md keeps its measured older-record sentence with a note that the light act now records lit_in.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Translation to Codex",
+      "items": [
+        {
+          "id": "C58",
+          "text": "lys-home translate-codex takes --home, --session, --out, --codex-version and --zone, writes one rollout under <out>/sessions/YYYY/MM/DD/ named as Codex names its own and one loss account beside it, and prints one JSON report of the two paths and the entry, block, kept, changed and lost counts, never content.",
+          "done": false
+        },
+        {
+          "id": "C59",
+          "text": "An unmeasured Codex version, an unnamed time zone, an unknown time zone, an existing rollout or account path and an entry stamp that is not RFC 3339 are each refused by name before anything is written, with messages saying render for 0.156.0 or card a measurement of the new version, set TZ to an IANA name, choose another --out and re-import the source file; the shared session-exists refusal of the other commands is unchanged.",
+          "done": false
+        },
+        {
+          "id": "C60",
+          "text": "Every text part, tool call and tool result on the context path is carried whole as a Codex message, function_call or function_call_output item, never as a clipped note; a tool result longer than 4,000 characters is carried byte for byte.",
+          "done": false
+        },
+        {
+          "id": "C61",
+          "text": "Readable thinking is carried as output_text and counted changed; redacted and empty thinking are dropped and listed lost by hash with a reason; no signature, redacted data or reasoning item enters the rollout.",
+          "done": false
+        },
+        {
+          "id": "C62",
+          "text": "The loss account lists kept, changed and lost rows by entry id and the hash of each part as the home entry holds it, in walk order; a changed row names its before and after kinds and every field not carried or reshaped (a key beyond those its item carries, a one-item text array written as a string, an assistant turn's model, usage and stop reason), while a tool_use's caller field, dropped at import, is recorded nowhere yet; a lost row names its reason; every entry of the root-to-head path that a compaction leaves off the context path, and every entry descending from one, is a lost row naming that compaction; a message of any other role, a toolCall with no id or name and a toolResult with no toolCallId are lost rows and never given an empty default; every other entry off the path that descends from the path and is not carried is a lost row whatever its type, the harness events under a sidechain, the entries of a sidechain with no agent label, and every other label, compaction, branch summary and model change off the path among them, while a sidechain's agent label is carried in its marker line and counted changed; the account carries no content.",
+          "done": false
+        },
+        {
+          "id": "C63",
+          "text": "The rollout's session_meta holds only id, session_id, timestamp, cwd and cli_version, the thread id is record_uuid of the session head, and the first item is a developer message holding the in-band marker that names the source session id, the source head hash and the Codex version, declares the thread a fork and not that session, and carries no template hash.",
+          "done": false
+        },
+        {
+          "id": "C64",
+          "text": "Each translation appends one lys.translation custom entry beside the context path naming the thread, the head, the head hash, the rollout's relative path and the rollout's and account's SHA-256; the head and the session's earlier bytes do not move, and the Claude Code render of the session is unchanged by SHA-256.",
+          "done": false
+        },
+        {
+          "id": "C65",
+          "text": "The same session head translated into two fresh --out directories gives rollouts of equal SHA-256, and the second account differs from the first only by the one lost row naming the first translation's side leaf.",
+          "done": false
+        },
+        {
+          "id": "C66",
+          "text": "A Codex 0.156.0 rollout recorded in a scratch Codex home outside the repository in at most two attempts of one fixed shell command that reads nothing of the machine, after exactly one request that checks the proof account there can make requests and ends when codex exec exits, is committed as a fixture beside the Claude Code file that mirrors it, neither holding a machine path, an email or a token, and that file imported and translated gives response items equal to the recording's apart from ids and timestamps (id, call_id, turn_id and create_time), every Codex command there run with CODEX_HOME set to the scratch home.",
+          "done": false
+        },
+        {
+          "id": "C67",
+          "text": "PROOF-TRANSLATE.md records, with the seat that ran it and the date, Codex 0.156.0 resuming the translated thread in a scratch Codex home outside the repository and answering from its content, and resuming a translated thread that holds an image, with the proof account named by its role, the start checks, the attempts, each retry in a fresh scratch home, the paths, the rollout's hash before and after the resume, the side leaf's rollout hash, counts and exit statuses, and no transcript text, email or credential.",
+          "done": false
+        },
+        {
+          "id": "C68",
+          "text": "The home design admits exactly one translated pair, Claude Code to Codex, as roadmap stage 4b, and the cluster's rendered markdown is what its JSON renders to.",
+          "done": false
+        },
+        {
+          "id": "C69",
+          "text": "A sidechain is carried as marked text under the entry it hangs from, opening with a line naming its entry id and its agent id, and counted changed, with the agent label that names it counted changed, before label and after marker line, and a part marked text cannot hold, a base64 image included, listed lost with its reason; a branch summary or custom message on the context path is carried as marked developer text under its own marker and counted changed; lanterns, harness events and every other lys entry, render records included, are listed lost by entry id; a child forked at a user message carries that message's text after the walked history as the thread's next user prompt, counted changed with its how, and each of its parts that is not text is listed lost.",
+          "done": false
+        },
+        {
+          "id": "C70",
+          "text": "A base64 image part, in a user message or inside a tool result, is carried as Codex's input_image item with no detail key and counted changed, and Codex 0.156.0 is measured resuming a thread that holds one, with any detail value it needs taken from a rollout 0.156.0 wrote itself and named; an image of any other source is listed lost with its source type and part index and is never fetched.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "The given statement",
+      "items": [
+        {
+          "id": "C118",
+          "text": "render-launch with no key records the lys.given entry with the same data as before, writes no statement, and its report's signing is unsigned.",
+          "done": false
+        },
+        {
+          "id": "C119",
+          "text": "render-launch reports given_sha256, the SHA-256 of the RFC 8785 bytes of the lys.given entry's data, and the template_render event does not carry it.",
+          "done": false
+        },
+        {
+          "id": "C120",
+          "text": "render-launch with a key signs those bytes as a lys/attestation/v2 statement kept as a block named by a lys.given_statement entry under the lys.given entry and as given-statement.cose and given-data.json under --out, and its report's signing is signed.",
+          "done": false
+        },
+        {
+          "id": "C121",
+          "text": "lys verify --attestation accepts the given statement with given-data.json, and refuses a copy with one byte altered with its one message and exit status 1, under a stated command that names the refused file.",
+          "done": false
+        },
+        {
+          "id": "C122",
+          "text": "A stated command compares the verified statement's signer public key with the test key's and exits 0, and exits 1 for a statement signed by a second test key.",
+          "done": false
+        },
+        {
+          "id": "C123",
+          "text": "A byte search of the fixture's statement, payload file, statement block and statement entry finds no fixture secret value and no fixture transcript text.",
+          "done": false
+        },
+        {
+          "id": "C124",
+          "text": "The statement's signed payload hash equals the report's given_sha256 and the SHA-256 recomputed from the lys.given entry in the session file for the same render.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "The request's order",
+      "items": [
+        {
+          "id": "C83",
+          "text": "resolve_given lists a session's documents in the request's order, appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index, with one directory's CLAUDE.md, .claude/CLAUDE.md and CLAUDE.local.md in that order and D/.claude/CLAUDE.md listed once, as user_claude_md, when D/.claude is the config directory.",
+          "done": false
+        },
+        {
+          "id": "C84",
+          "text": "The given_tests.rs unit test and the fixture test in tests/given_record.rs, whose config directory now holds a user CLAUDE.md, each assert that appended_instructions and mcp_config precede user_claude_md.",
+          "done": false
+        },
+        {
+          "id": "C85",
+          "text": "RECORD.md states one rule, that the request's order wins wherever it and the read order differ with the MCP configuration straight after the appended instructions, and names the old order as superseded by the commit that lands HOME-011, told from an entry by its recorded time and never by its harness_version.",
+          "done": false
+        },
+        {
+          "id": "C86",
+          "text": "PROOF-GIVEN.md keeps its earlier text unchanged and appends a re-measurement of the request's order by the committed, unchanged measure.py on the installed Claude Code, with the version `claude --version` printed, naming the old order as superseded.",
+          "done": false
+        },
+        {
+          "id": "C87",
+          "text": "S12 reads `in the order the request gives them`, HOME-003 carries an amendment naming its R2 cross-kind order as superseded, and every rendered markdown file of the home cluster is what its JSON renders to.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Moving a home",
+      "items": [
+        {
+          "id": "C169",
+          "text": "A home's tracked set is enumerated exactly, never by glob: for each session the home lists, `sessions/<id>.jsonl`, `sessions/<id>.index.jsonl` and `sessions/<id>.head`; each `blocks/<hh>/<hash>` and each `templates/<hh>/<hash>` whose name is 64 lowercase hex digits under a directory named by its first two; never a lock file, a temporary, a file at the home root or anything under `.git`.",
+          "done": false
+        },
+        {
+          "id": "C170",
+          "text": "A home is verified strictly, never rebuilt: a missing index, an index that is not its file's, a missing head and a head naming an id its index does not hold are each named per session, and every block and template whose bytes do not hash to its name is named by that name; nothing is written.",
+          "done": false
+        },
+        {
+          "id": "C171",
+          "text": "ship and fetch run the git binary with a pinned environment (no system or global configuration, no hooks, no filters, no line-ending conversion, a fixed identity, the file protocol only), and take a remote only when it is a path on this machine: any ssh remote, https, git or file URL, or hosted service is refused as remote_not_local, with words saying that shipping off this machine waits for stage 3's encryption from the secrets step, and nothing is written.",
+          "done": false
+        },
+        {
+          "id": "C172",
+          "text": "An arrival is a seventh lys.harness_event kind, `arrival`, whose detail carries the source commit, the remote, the ref and a fresh execution id, under the 512-byte data cap; the six existing kinds do not change.",
+          "done": false
+        },
+        {
+          "id": "C173",
+          "text": "lys-home ship initialises the home as a git repository on first use, commits exactly the tracked set, pushes it without force as the one ref `refs/lys/home` to a remote that is a path on this machine, creates a bare repository at a remote path that does not exist, and reports the commit, the ref, the remote and whether it initialised and created; a home unchanged since its last ship reports that commit as unchanged, makes no new commit and pushes it again; the source home's tracked files are byte-identical before and after.",
+          "done": false
+        },
+        {
+          "id": "C174",
+          "text": "ship refuses by name, pushing nothing: a home with no session (empty_home), a remote path that is neither absent nor a bare repository (remote_not_bare, naming the path and what it found), a session whose lock a live owner holds (session_held, with the act 'ship after that seat stops'), a session with no index file (index_missing) or no head file (head_missing), each naming the session, the missing file and the lys-home command that writes it, a stale index (stale_index, in a JSON report naming each session and its reason), a home repository tracking files outside the tracked set (foreign_tracked), and a remote ref the new commit does not descend from (ref_diverged, naming the ref and both commits, the remote's ref unchanged).",
+          "done": false
+        },
+        {
+          "id": "C175",
+          "text": "lys-home fetch refuses a remote that is not a path on this machine (remote_not_local), a target that already holds a home (target_holds_home) and a non-empty target (target_not_empty), each before writing anything, fetches the ref into the target, and the fetched commit's tree hash-matches the source for every session file, index, head, block and template.",
+          "done": false
+        },
+        {
+          "id": "C176",
+          "text": "After fetch each target session's last line is one arrival event hung beside the head, naming the source commit, the remote and ref and a fresh execution id of that session's own; fetch commits those lines as one commit whose only parent is the fetched commit, whose message names the source commit, the remote and the ref, leaving `git status` in the target clean, and a ship from the target carries the arrival; the target's head file is byte-identical to the source's, and every template a template_render event on the target names is held under the target's templates/.",
+          "done": false
+        },
+        {
+          "id": "C177",
+          "text": "When verification fails, fetch prints a JSON report naming each stale index by session and each bad block and template by hash, never by content, records no arrival, and removes exactly the paths it created, deepest first: a target it created is gone, and an empty target that existed before is left existing and empty. When an arrival's append or its commit fails, fetch refuses as arrival_failed and removes exactly the paths it created in the same way.",
+          "done": false
+        },
+        {
+          "id": "C178",
+          "text": "A byte search of every object the shipped ref reaches finds the fixture secret value 0 times, with a control that finds it once where it was planted, and a render of the target records the same session_head as a render of the source.",
+          "done": false
+        },
+        {
+          "id": "C179",
+          "text": "RECORD.md documents the arrival kind and its detail, and that the home directory is a git repository and exactly what it tracks; the crate README documents ship and fetch with their arguments and refusals, and states that no credential lys-home holds is ever written into the home and why ship stays local.",
+          "done": false
+        },
+        {
+          "id": "C180",
+          "text": "A proof document measures a fixture home shipped, fetched, rendered through the launch template and resumed by the printed launch line on Claude Code 2.1.283, as hashes, counts and paths only.",
+          "done": false
         }
       ]
     }

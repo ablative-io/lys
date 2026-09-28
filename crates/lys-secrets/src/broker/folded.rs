@@ -1,0 +1,349 @@
+//! What the broker folds from its audit log: each lease's use count, drop,
+//! operations and spend, who has read which sealed record, a rotation the
+//! log shows starting and not finishing, and each secret's owner changes
+//! applied under an operation id, who ended a handle and under which
+//! operation, and where the provider's part of each revocation stands.
+//!
+//! One function applies one line, and it is the only way a line reaches the
+//! state, at a start and when a snapshot is written alike. So the state a
+//! snapshot carries at a tree size is exactly what folding that many lines
+//! gives, and a start from it ends where a start from the whole log ends.
+//!
+//! The state is the snapshot's payload, in a canonical encoding. It holds
+//! handle ids, identities, record names, operation ids, request marks and
+//! the digests of owner changes, as the audit lines themselves do, and no
+//! secret, token, token digest or key.
+
+use std::collections::{BTreeMap, BTreeSet};
+
+use crate::audit::{AuditKind, AuditLine};
+use crate::encoding::{Canonical, Reader};
+use crate::error::SecretsError;
+
+use super::ending::{self, Ended};
+use super::owner::{self, Operations, Owners};
+use super::revocation::{self, UpstreamRevocation};
+use super::{HandleRecord, ROTATING, lineage, records};
+
+const STATE_FORMAT: &str = "lys-secrets/broker-folded/v3";
+const CONTEXT: &str = "broker snapshot state";
+
+/// The handle records with what the log says of each.
+pub(super) type Handles = BTreeMap<String, HandleRecord>;
+
+/// What the log says of one lease.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct Lease {
+    used: u64,
+    dropped: bool,
+    settled: u64,
+    operations: BTreeMap<String, (String, String)>,
+    open: BTreeMap<String, u64>,
+    ended: Option<Ended>,
+    upstream: UpstreamRevocation,
+}
+
+/// The fold of the audit log's first lines.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(super) struct Folded {
+    leases: BTreeMap<String, Lease>,
+    /// Every (identity, record) pair the log shows read.
+    pub(super) readers: BTreeSet<(String, String)>,
+    /// The change of a rotation the log shows starting and not finishing.
+    pub(super) rotating: Option<String>,
+    /// Each secret's owner changes applied, by secret name.
+    pub(super) owners: Owners,
+}
+
+fn unreadable(reason: impl Into<String>) -> SecretsError {
+    SecretsError::Encoding {
+        context: CONTEXT,
+        reason: reason.into(),
+    }
+}
+
+fn text(reader: &mut Reader<'_>) -> Result<String, SecretsError> {
+    String::from_utf8(reader.field()?.to_vec()).map_err(|_utf8| unreadable("a text is not UTF-8"))
+}
+
+impl Folded {
+    /// The state `handles` hold, with `readers`, `rotating` and `owners`. A
+    /// lease or a secret the log says nothing of is left out.
+    pub(super) fn of(
+        handles: &Handles,
+        readers: &BTreeSet<(String, String)>,
+        rotating: Option<&str>,
+        owners: &Owners,
+    ) -> Self {
+        let leases = handles
+            .iter()
+            .map(|(id, record)| {
+                let lease = Lease {
+                    used: record.used,
+                    dropped: record.dropped,
+                    settled: record.settled,
+                    operations: record.operations.clone(),
+                    open: record.open.clone(),
+                    ended: record.ended.clone(),
+                    upstream: record.upstream.clone(),
+                };
+                (id.clone(), lease)
+            })
+            .filter(|(_id, lease)| *lease != Lease::default())
+            .collect();
+        Self {
+            leases,
+            readers: readers.clone(),
+            rotating: rotating.map(str::to_owned),
+            owners: owners
+                .iter()
+                .filter(|(_secret, operations)| **operations != Operations::default())
+                .map(|(secret, operations)| (secret.clone(), operations.clone()))
+                .collect(),
+        }
+    }
+
+    /// Sets every record of `handles` to what this state says of it, and to
+    /// nothing where it says nothing.
+    pub(super) fn lay_over(&self, handles: &mut Handles) {
+        for (id, record) in handles.iter_mut() {
+            let lease = self.leases.get(id).cloned().unwrap_or_default();
+            record.used = lease.used;
+            record.dropped = lease.dropped;
+            record.settled = lease.settled;
+            record.operations = lease.operations;
+            record.open = lease.open;
+            record.ended = lease.ended;
+            record.upstream = lease.upstream;
+        }
+    }
+
+    /// The state after `line`, over the records `handles`.
+    pub(super) fn apply(
+        handles: &mut Handles,
+        readers: &mut BTreeSet<(String, String)>,
+        rotating: &mut Option<String>,
+        owners: &mut Owners,
+        line: AuditLine,
+    ) {
+        owner::fold(owners, &line);
+        if line.kind == AuditKind::SealedRead && line.outcome == records::READ {
+            if let (Some(identity), Some(record)) = (line.identity, line.secret) {
+                readers.insert((identity, record));
+            }
+            return;
+        }
+        if line.kind == AuditKind::Rotation {
+            *rotating = line.outcome.strip_prefix(ROTATING).map(str::to_owned);
+            return;
+        }
+        let Some(id) = line.handle.clone() else {
+            return;
+        };
+        match line.kind {
+            AuditKind::Drop => {
+                if let Some(record) = handles.get_mut(&id) {
+                    record.dropped = true;
+                }
+                ending::fold(handles, &line);
+            }
+            AuditKind::Refresh => {
+                if let (Some(record), Some(upstream)) =
+                    (handles.get_mut(&id), revocation::upstream_of(&line))
+                {
+                    record.upstream = upstream;
+                }
+            }
+            AuditKind::Use if line.outcome == "admitted" => {
+                if let (Some(operation), Some(mark)) = (&line.operation, &line.request) {
+                    lineage::admitted(handles, &id, (operation, mark), line.spend.unwrap_or(0));
+                }
+            }
+            AuditKind::Settlement => {
+                if let Some(operation) = &line.operation {
+                    lineage::settled(
+                        handles,
+                        &id,
+                        operation,
+                        &line.outcome,
+                        line.spend.unwrap_or(0),
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// The state in its canonical encoding.
+    pub(super) fn encode(&self) -> Result<Vec<u8>, SecretsError> {
+        let count =
+            |len: usize| u64::try_from(len).map_err(|_size| unreadable("a count is past 64 bits"));
+        let mut state = Canonical::new(STATE_FORMAT)?;
+        state.number(count(self.leases.len())?)?;
+        for (id, lease) in &self.leases {
+            state.field(id.as_bytes())?;
+            state.number(lease.used)?;
+            state.field(&[u8::from(lease.dropped)])?;
+            state.number(lease.settled)?;
+            state.number(count(lease.operations.len())?)?;
+            for (operation, (outcome, mark)) in &lease.operations {
+                state.field(operation.as_bytes())?;
+                state.field(outcome.as_bytes())?;
+                state.field(mark.as_bytes())?;
+            }
+            state.number(count(lease.open.len())?)?;
+            for (operation, reserved) in &lease.open {
+                state.field(operation.as_bytes())?;
+                state.number(*reserved)?;
+            }
+            match &lease.ended {
+                None => state.field(&[0])?,
+                Some(ended) => state
+                    .field(&[1])?
+                    .field(ended.by.as_bytes())?
+                    .field(ended.operation.as_bytes())?
+                    .field(ended.root.as_bytes())?,
+            };
+            match &lease.upstream {
+                UpstreamRevocation::NotAsked => state.field(&[0])?,
+                UpstreamRevocation::Unconfirmed(reason) => {
+                    state.field(&[1])?.field(reason.as_bytes())?
+                }
+                UpstreamRevocation::Confirmed => state.field(&[2])?,
+            };
+        }
+        state.number(count(self.readers.len())?)?;
+        for (identity, record) in &self.readers {
+            state.field(identity.as_bytes())?;
+            state.field(record.as_bytes())?;
+        }
+        match &self.rotating {
+            None => state.field(&[0])?,
+            Some(change) => state.field(&[1])?.field(change.as_bytes())?,
+        };
+        state.number(count(self.owners.len())?)?;
+        for (secret, operations) in &self.owners {
+            state.field(secret.as_bytes())?;
+            match &operations.last {
+                None => state.field(&[0])?,
+                Some(last) => state.field(&[1])?.field(last.as_bytes())?,
+            };
+            state.number(count(operations.applied.len())?)?;
+            for (operation, (digest, outcome)) in &operations.applied {
+                state.field(operation.as_bytes())?;
+                state.field(digest.as_bytes())?;
+                state.field(outcome.as_bytes())?;
+            }
+        }
+        Ok(state.into_bytes())
+    }
+
+    /// Reads a state in its canonical encoding.
+    pub(super) fn decode(bytes: &[u8]) -> Result<Self, SecretsError> {
+        let mut reader = Reader::new(bytes, CONTEXT);
+        let format = reader.field()?;
+        if format != STATE_FORMAT.as_bytes() {
+            return Err(unreadable(format!(
+                "the state is of format {:?}, not {STATE_FORMAT}",
+                String::from_utf8_lossy(format)
+            )));
+        }
+        let mut leases = BTreeMap::new();
+        for _lease in 0..reader.number()? {
+            let id = text(&mut reader)?;
+            let used = reader.number()?;
+            let dropped = match reader.field()? {
+                [0] => false,
+                [1] => true,
+                _ => return Err(unreadable("a drop is neither 0 nor 1")),
+            };
+            let settled = reader.number()?;
+            let mut operations = BTreeMap::new();
+            for _operation in 0..reader.number()? {
+                let operation = text(&mut reader)?;
+                let outcome = text(&mut reader)?;
+                operations.insert(operation, (outcome, text(&mut reader)?));
+            }
+            let mut open = BTreeMap::new();
+            for _reservation in 0..reader.number()? {
+                let operation = text(&mut reader)?;
+                open.insert(operation, reader.number()?);
+            }
+            let ended = decode_ended(&mut reader)?;
+            let upstream = match reader.field()? {
+                [0] => UpstreamRevocation::NotAsked,
+                [1] => UpstreamRevocation::Unconfirmed(text(&mut reader)?),
+                [2] => UpstreamRevocation::Confirmed,
+                _ => return Err(unreadable("a provider revocation is none of its three")),
+            };
+            let lease = Lease {
+                used,
+                dropped,
+                settled,
+                operations,
+                open,
+                ended,
+                upstream,
+            };
+            leases.insert(id, lease);
+        }
+        let mut readers = BTreeSet::new();
+        for _reader in 0..reader.number()? {
+            let identity = text(&mut reader)?;
+            readers.insert((identity, text(&mut reader)?));
+        }
+        let rotating = match reader.field()? {
+            [0] => None,
+            [1] => Some(text(&mut reader)?),
+            _ => return Err(unreadable("a rotation is neither absent nor present")),
+        };
+        let owners = decode_owners(&mut reader)?;
+        if !reader.is_done() {
+            return Err(unreadable("bytes follow the state"));
+        }
+        Ok(Self {
+            leases,
+            readers,
+            rotating,
+            owners,
+        })
+    }
+}
+
+/// Who ended a lease, as the state encodes it.
+fn decode_ended(reader: &mut Reader<'_>) -> Result<Option<Ended>, SecretsError> {
+    match reader.field()? {
+        [0] => Ok(None),
+        [1] => {
+            let by = text(reader)?;
+            let operation = text(reader)?;
+            Ok(Some(Ended {
+                by,
+                operation,
+                root: text(reader)?,
+            }))
+        }
+        _ => Err(unreadable("an ending is neither absent nor present")),
+    }
+}
+
+/// Each secret's owner changes, as the state encodes them.
+fn decode_owners(reader: &mut Reader<'_>) -> Result<Owners, SecretsError> {
+    let mut owners = Owners::new();
+    for _secret in 0..reader.number()? {
+        let secret = text(reader)?;
+        let last = match reader.field()? {
+            [0] => None,
+            [1] => Some(text(reader)?),
+            _ => return Err(unreadable("a last operation is neither absent nor present")),
+        };
+        let mut applied = BTreeMap::new();
+        for _operation in 0..reader.number()? {
+            let operation = text(reader)?;
+            let digest = text(reader)?;
+            applied.insert(operation, (digest, text(reader)?));
+        }
+        owners.insert(secret, Operations { last, applied });
+    }
+    Ok(owners)
+}

@@ -1,0 +1,15 @@
+{
+  "harness": "claude-code",
+  "flags": ["--strict-mcp-config"],
+  "slots": {
+    "transcript": {"fill": "resume-by-path", "canon": null},
+    "mcp": {"mcpServers": {}},
+    "env": {"LYS_FIXTURE_MODE": "fixture"},
+    "secrets": {
+      "use_only": [{"env": "LYS_FIXTURE_TOKEN", "handle": "handle-fixture-0001"}],
+      "readable": [],
+      "reader": ""
+    },
+    "instructions": "Fixture instructions: this session was launched from a synthetic fixture.\n"
+  }
+}

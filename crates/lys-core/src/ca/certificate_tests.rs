@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 
 use chrono::{Duration, Utc};
 use ed25519_dalek::{Signer, Verifier};

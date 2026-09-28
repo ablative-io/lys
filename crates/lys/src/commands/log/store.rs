@@ -43,7 +43,9 @@ pub fn init(dir: &Path, origin: &str) -> CliResult<()> {
 /// [`CliError::LogDirInvalid`] with the specific discrepancy on an integrity
 /// failure, and [`CliError::Io`] on filesystem failure.
 pub fn open(dir: &Path) -> CliResult<LogStore> {
-    let log = Log::open(FileLeafStore::open(dir)?).map_err(|err| integrity_failure(dir, err))?;
+    let store = FileLeafStore::open(dir)?;
+    store.audit_leaves()?;
+    let log = Log::open(store).map_err(|err| integrity_failure(dir, err))?;
     if let Some(tree_size) = log.recovered_to() {
         eprintln!("recovered interrupted append: state advanced to {tree_size}");
     }

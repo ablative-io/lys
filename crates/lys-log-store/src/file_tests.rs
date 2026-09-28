@@ -1,10 +1,10 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the file-backed store.
 //!
 //! # The two absent-checks are tested SEPARATELY, on purpose
 //!
 //! [`FileLeafStore::put_leaf`] refuses a re-used index twice over: once against
-//! the cached `extent`, and once via `create_new` at the filesystem. Two checks
+//! the cached `extent`, and once via the no-replace link at the filesystem. Two checks
 //! guarding one rule is how a check rots unnoticed — remove either and the
 //! obvious test (append twice at index 0) still fails, because *the other one*
 //! catches it. A drift injection that leaves the suite red has proven nothing
@@ -14,8 +14,8 @@
 //!
 //! | injection | the only case that fails |
 //! |---|---|
-//! | remove the `index < extent` check | `extent_check_alone_refuses_a_deleted_leafs_index` — the file is *gone*, so `create_new` succeeds and would silently rewrite history |
-//! | remove `create_new` | `create_new_alone_refuses_a_leaf_this_store_never_saw` — the index *is* the next free one, so the extent check is satisfied and another writer's leaf would be clobbered |
+//! | remove the `index < extent` check | `extent_check_alone_refuses_a_deleted_leafs_index` — the file is *gone*, so the link succeeds and would silently rewrite history |
+//! | make the link replace an existing name | `no_replace_link_alone_refuses_a_leaf_this_store_never_saw` — the index *is* the next free one, so the extent check is satisfied and another writer's leaf would be clobbered |
 //!
 //! Both were injected before this landed; each failed exactly one case.
 //!
@@ -54,11 +54,19 @@
 //! an injection that moves a boundary inside a shared condition does not, and
 //! its two failures indict the probe rather than the tests.**
 
+use std::io::Write;
 use std::path::Path;
 
 use super::*;
 
 const ORIGIN: &str = "example.com/lys/store-test";
+
+#[path = "file_tests/after_link.rs"]
+mod after_link;
+#[path = "file_tests/pins.rs"]
+mod pins;
+#[path = "file_tests/probe.rs"]
+mod probe;
 
 fn create(dir: &Path) -> FileLeafStore {
     FileLeafStore::create(dir, ORIGIN).unwrap();
@@ -152,7 +160,7 @@ fn an_empty_leaf_is_legal_and_distinct_from_an_absent_one() {
 #[test]
 fn extent_check_alone_refuses_a_deleted_leafs_index() {
     // Isolates the `index < extent` check: the leaf FILE is removed behind the
-    // store's back, so `create_new` would succeed. Only the extent check can
+    // store's back, so the link would succeed. Only the extent check can
     // refuse this, and it must — writing here would replace a leaf the tree
     // already covers, which is a second history for a settled position.
     let tmp = tempfile::tempdir().unwrap();
@@ -170,8 +178,8 @@ fn extent_check_alone_refuses_a_deleted_leafs_index() {
 }
 
 #[test]
-fn create_new_alone_refuses_a_leaf_this_store_never_saw() {
-    // Isolates the `create_new` check: index 1 IS the next free index as far as
+fn no_replace_link_alone_refuses_a_leaf_this_store_never_saw() {
+    // Isolates the no-replace link: index 1 IS the next free index as far as
     // this store knows, so the extent check passes. A file appearing there
     // after open is another writer, and clobbering it would destroy a leaf this
     // store never knew existed.
@@ -225,204 +233,87 @@ fn a_write_past_the_next_index_is_refused_and_leaves_no_file() {
     assert_eq!(store.extent(), 1);
 }
 
-/// A store with one leaf and the pin already at `(1, [7; 32])`.
-fn store_pinned_at_one(dir: &Path) -> FileLeafStore {
-    let mut store = create(dir);
+/// Names in `leaves/`, sorted, so a test can say exactly what is there.
+fn leaves_entries(dir: &Path) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(dir.join("leaves"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect();
+    names.sort();
+    names
+}
+
+#[test]
+fn a_write_failing_before_the_link_leaves_no_leaf() {
+    // Half the bytes reach the file and then the write fails. Nothing may be
+    // left under a leaf name, because the next open would count it and a torn
+    // leaf would then be pinned as history.
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut store = create(&dir);
     store.put_leaf(0, b"leaf-0").unwrap();
-    store
-        .pin(PinnedRoot {
-            tree_size: 1,
-            root: [7u8; 32],
-        })
-        .unwrap();
-    store
-}
-
-#[test]
-fn the_pin_refuses_going_backwards() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("log");
-    let mut store = store_pinned_at_one(&dir);
     let err = store
-        .pin(PinnedRoot {
-            tree_size: 0,
-            root: [0u8; 32],
-        })
+        .put_leaf_with(
+            1,
+            |file| {
+                file.write_all(b"torn")?;
+                Err(std::io::Error::other("injected write failure"))
+            },
+            &AFTER_LINK,
+            &mut next_process_sequence,
+        )
         .unwrap_err();
-    assert!(
-        matches!(
-            err,
-            StoreError::PinWentBackwards {
-                pinned: 1,
-                requested: 0
-            }
-        ),
-        "{err}"
-    );
-}
-
-#[test]
-fn re_pinning_the_identical_pin_is_permitted() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("log");
-    let mut store = store_pinned_at_one(&dir);
-    store
-        .pin(PinnedRoot {
-            tree_size: 1,
-            root: [7u8; 32],
-        })
-        .expect("an identical re-pin is a no-op, not a failure");
-    assert_eq!(store.pinned().root, [7u8; 32]);
-}
-
-#[test]
-fn the_pin_refuses_a_second_root_at_a_size_it_already_holds() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("log");
-    let mut store = store_pinned_at_one(&dir);
-    // Two different roots at one tree size is equivocation — the thing this
-    // crate exists to make unrepresentable. A size-only monotonicity check does
-    // not catch it, because the size does not go backwards.
-    let err = store
-        .pin(PinnedRoot {
-            tree_size: 1,
-            root: [9u8; 32],
-        })
-        .unwrap_err();
-    assert!(
-        matches!(err, StoreError::PinRootChanged { tree_size: 1, .. }),
-        "{err}"
-    );
+    assert!(matches!(err, StoreError::Io { .. }), "{err}");
+    assert!(!leaf_path(&dir, 1).exists(), "no leaf for a failed write");
     assert_eq!(
-        store.pinned().root,
-        [7u8; 32],
-        "the refused pin must not have taken effect"
+        leaves_entries(&dir),
+        vec![format!("{:020}", 0)],
+        "the temporary file was removed too"
     );
-    // Deliberately NOT asserting the on-disk root here. That would make this
-    // case fail whenever pin *durability* broke, for reasons having nothing to
-    // do with equivocation — and a drift injection cannot tell a bundled test
-    // apart from a specific one. `a_pin_survives_a_reopen` owns durability.
-}
-
-#[test]
-fn a_pin_survives_a_reopen() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("log");
-    let store = store_pinned_at_one(&dir);
-    assert_eq!(store.pinned().root, [7u8; 32]);
-    assert_eq!(FileLeafStore::open(&dir).unwrap().pinned().root, [7u8; 32]);
-}
-
-#[test]
-fn a_gap_in_the_stored_indices_is_detected_at_open() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("log");
-    let mut store = create(&dir);
-    store.put_leaf(0, b"leaf-0").unwrap();
+    assert_eq!(store.extent(), 1, "a failed write does not advance extent");
+    assert_eq!(FileLeafStore::open(&dir).unwrap().extent(), 1);
     store.put_leaf(1, b"leaf-1").unwrap();
-    store.put_leaf(2, b"leaf-2").unwrap();
-    std::fs::remove_file(leaf_path(&dir, 1)).unwrap();
-    let err = FileLeafStore::open(&dir).unwrap_err();
-    assert!(err.to_string().contains("not contiguous"), "{err}");
+    assert_eq!(std::fs::read(leaf_path(&dir, 1)).unwrap(), b"leaf-1");
 }
 
 #[test]
-fn an_unexpected_leaves_entry_is_detected_but_dotfiles_are_ignored() {
+fn a_leftover_temporary_file_is_ignored_at_open() {
+    // A crash between writing the temporary file and linking it leaves the
+    // file behind under its hidden name. It holds a full leaf's bytes, and it
+    // must still not count: only a linked name is a leaf.
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
     let mut store = create(&dir);
     store.put_leaf(0, b"leaf-0").unwrap();
-    std::fs::write(dir.join("leaves").join(".DS_Store"), b"junk").unwrap();
+    let leftover = dir
+        .join("leaves")
+        .join(leaf_temp_name(std::process::id() + 1, 1, 0));
+    std::fs::write(&leftover, b"leaf-1-never-linked").unwrap();
+    let mut reopened = FileLeafStore::open(&dir).unwrap();
+    assert_eq!(reopened.extent(), 1);
+    assert_eq!(reopened.leaf(1).unwrap(), None);
+    reopened.put_leaf(1, b"leaf-1").unwrap();
+    assert_eq!(std::fs::read(leaf_path(&dir, 1)).unwrap(), b"leaf-1");
     assert!(
-        FileLeafStore::open(&dir).is_ok(),
-        "dotfiles must be ignored"
+        leftover.exists(),
+        "open ignores the leftover, it does not own it"
     );
-    std::fs::write(dir.join("leaves").join("stray.txt"), b"junk").unwrap();
-    let err = FileLeafStore::open(&dir).unwrap_err();
-    assert!(err.to_string().contains("unexpected entry"), "{err}");
 }
 
 #[test]
-fn a_malformed_state_file_is_detected() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("log");
-    create(&dir);
-    std::fs::write(dir.join("state.json"), "{\"tree_size\": 0}").unwrap();
-    let err = FileLeafStore::open(&dir).unwrap_err();
-    assert!(err.to_string().contains("state.json is malformed"), "{err}");
-}
-
-#[test]
-fn a_non_canonical_pinned_root_is_detected() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("log");
-    create(&dir);
-    // Read the pinned root back rather than assuming what the empty tree
-    // hashes to: a fixture that encodes a guess about lys-core's Merkle
-    // convention would pass or fail for reasons unrelated to base64 decoding.
-    let state: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(dir.join("state.json")).unwrap()).unwrap();
-    let pinned = state["root_hash"].as_str().unwrap();
-    assert_eq!(STANDARD.decode(pinned).unwrap().len(), 32);
-    std::fs::write(
-        dir.join("state.json"),
-        "{\"tree_size\":0,\"root_hash\":\"c2hvcnQ=\"}",
-    )
-    .unwrap();
-    let err = FileLeafStore::open(&dir).unwrap_err();
-    assert!(err.to_string().contains("exactly 32 bytes"), "{err}");
-}
-
-#[test]
-fn an_unknown_format_marker_is_detected() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("log");
-    create(&dir);
-    let config = std::fs::read_to_string(dir.join("log.json")).unwrap();
-    std::fs::write(
-        dir.join("log.json"),
-        config.replacen(LOG_DIR_FORMAT, "lys/log-dir/v99", 1),
-    )
-    .unwrap();
-    let err = FileLeafStore::open(&dir).unwrap_err();
-    assert!(err.to_string().contains("lys/log-dir/v99"), "{err}");
-}
-
-#[test]
-fn an_unknown_config_field_is_refused_rather_than_ignored() {
-    // `deny_unknown_fields`: a field this version does not understand may be a
-    // newer version's invariant, and ignoring it would silently drop a rule.
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("log");
-    create(&dir);
-    std::fs::write(
-        dir.join("log.json"),
-        format!("{{\"format\":\"{LOG_DIR_FORMAT}\",\"origin\":\"{ORIGIN}\",\"extra\":1}}"),
-    )
-    .unwrap();
-    let err = FileLeafStore::open(&dir).unwrap_err();
-    assert!(err.to_string().contains("log.json is malformed"), "{err}");
-}
-
-#[test]
-fn the_stored_origin_survives_a_reopen_verbatim() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("log");
-    create(&dir);
-    assert_eq!(FileLeafStore::open(&dir).unwrap().origin(), ORIGIN);
-    assert_eq!(FileLeafStore::open(&dir).unwrap().dir(), dir);
-}
-
-#[test]
-fn debug_summarizes_without_leaf_content() {
+fn open_leaves_a_leftover_temporary_file_byte_identical() {
+    // Opening reads; it never deletes or changes anything, so a store opened
+    // read-only stays untouched. The leftover is skipped, not tidied away.
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
     let mut store = create(&dir);
-    store.put_leaf(0, b"secret-looking-leaf-content").unwrap();
-    let rendered = format!("{store:?}");
-    assert!(
-        !rendered.contains("secret-looking-leaf-content"),
-        "{rendered}"
-    );
-    assert!(rendered.contains("extent: 1"), "{rendered}");
+    store.put_leaf(0, b"leaf-0").unwrap();
+    let leftover = dir
+        .join("leaves")
+        .join(leaf_temp_name(std::process::id() + 1, 1, 0));
+    std::fs::write(&leftover, b"half a leaf").unwrap();
+    let before = leaves_entries(&dir);
+    assert_eq!(FileLeafStore::open(&dir).unwrap().extent(), 1);
+    assert_eq!(leaves_entries(&dir), before, "open changed no entry");
+    assert_eq!(std::fs::read(&leftover).unwrap(), b"half a leaf");
 }

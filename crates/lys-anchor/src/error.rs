@@ -31,13 +31,13 @@
 //! every possible submission.
 //!
 //! `Anchor::receipt_for` does take a stranger-choosable index, and
-//! [`AnchorError::NoSuchLeaf`] names the tree size in its message. That is not
+//! [`ProofError::NoSuchLeaf`] names the tree size in its message. That is not
 //! a leak either, and not because the number is unimportant: the tree size is
 //! the second line of every checkpoint the anchor signs and hands out. A
 //! refusal cannot disclose what the artifact it exists to support already
 //! publishes. `Anchor::inclusion_artifact` takes the same stranger-choosable
 //! index and reuses that same refusal for the same reason; its own variant,
-//! [`AnchorError::InclusionArtifact`], is not a verdict on anything a caller
+//! [`ProofError::InclusionArtifact`], is not a verdict on anything a caller
 //! supplied at all — it reports that this anchor failed to build a proof about
 //! its own tree.
 //!
@@ -113,8 +113,19 @@
 //! site, and a variant nothing can construct is a promise in the error surface
 //! consumers actually get.
 
-use lys_core::error::TrustError;
 use lys_log_store::StoreError;
+
+#[cfg(feature = "federation")]
+mod cascade;
+mod genesis;
+mod proof;
+mod signing;
+
+#[cfg(feature = "federation")]
+pub use cascade::CascadeError;
+pub use genesis::GenesisError;
+pub use proof::ProofError;
+pub use signing::SigningError;
 
 /// Errors returned by an [`Anchor`](crate::Anchor) operation.
 ///
@@ -161,475 +172,26 @@ pub enum AnchorError {
     )]
     NotAdmitted,
 
-    /// The log holds no leaves, so it has no genesis leaf and never can.
-    ///
-    /// **Terminal, not a state to initialize out of.** `LeafStore` offers no
-    /// `insert` and no way to rewrite a leaf, so position 0 cannot be filled
-    /// after any other entry exists — and it cannot be filled *now* either
-    /// without deciding, on the log's behalf, what its first entry says.
-    /// [`Anchor::create`](crate::Anchor::create) is where genesis bytes are
-    /// supplied, by the caller, once.
-    #[error(
-        "the log for {origin} has no genesis leaf: an anchor's leaf 0 is written when it is created and can never be inserted afterwards"
-    )]
-    NoGenesisLeaf {
-        /// The origin of the log that was opened, as its store reports it.
-        origin: String,
-    },
+    /// The anchor's genesis leaf could not be written, or does not hold what
+    /// it must; the family names which.
+    #[error(transparent)]
+    Genesis(#[from] GenesisError),
 
-    /// `lys-core` refused to assemble the genesis delegation.
-    ///
-    /// Reachable two ways, and they are not the same fault:
-    ///
-    /// - The claim is one `lys-core`'s own decoder would reject — in practice an
-    ///   origin long enough to push the artifact past the size cap, since the
-    ///   other refusals (an empty origin, an unusable delegated key) are
-    ///   unreachable from a store whose origin was validated at creation and a
-    ///   signer whose key was validated at load.
-    /// - The signature the root signer produced does not verify against the key
-    ///   that signer advertises. That is a broken
-    ///   [`Signer`](crate::Signer) implementation, and it is caught here rather
-    ///   than becoming a leaf 0 nothing can ever verify.
-    ///
-    /// Detailed rather than collapsed, on the rule the module docs set: creation
-    /// is the operator's own act on their own store, with their own key. No
-    /// stranger can drive it and nothing about a stranger's bytes is disclosed.
-    ///
-    /// **Nothing was appended.** The delegation is built and verified before the
-    /// log is touched, because leaf 0 cannot be replaced.
-    ///
-    /// `#[cfg(feature = "unstable-anchor")]` because the delegation format is,
-    /// so the default build has no call site and could not construct this.
-    #[cfg(feature = "unstable-anchor")]
-    #[error("failed to build the genesis delegation for {origin}: {source}")]
-    GenesisDelegation {
-        /// The origin of the log genesis was being written into, as its store
-        /// reports it.
-        origin: String,
-        /// `lys-core`'s reason for refusing to assemble or to verify it.
-        source: TrustError,
-    },
+    /// The anchor could not load its key or produce a signature; the family
+    /// names which.
+    #[error(transparent)]
+    Signing(#[from] SigningError),
 
-    /// Creation was asked to delegate an anchor's operational role **to its own
-    /// root key** — the two signers advertise the same public key.
-    ///
-    /// # Why this is refused rather than merely discouraged
-    ///
-    /// The artifact it would produce is **perfectly valid and completely
-    /// hollow**. It is a well-formed `lys/delegation/v1` domain delegation, it
-    /// verifies, its pair is in the table, and it says the offline root key has
-    /// delegated the operational role to the offline root key. DP16's entire
-    /// reason for two keys — that the key which signs every checkpoint is *not*
-    /// the key an operator can keep air-gapped — is void, and **nothing
-    /// downstream can tell.** There is no verifier that would flag it, because
-    /// there is nothing malformed to flag.
-    ///
-    /// That lands at leaf 0, which `LeafStore` can never correct: no insert, no
-    /// rewrite. So this is refused at the one moment refusing is still possible,
-    /// on exactly the argument that fixes the subject kind in the same
-    /// constructor — a single mis-passed argument must not be able to make an
-    /// anchor permanently mean something other than what it appears to mean.
-    ///
-    /// # Why the check lives here and not in `lys-core`
-    ///
-    /// A delegation whose subject delegates to the signing key is a *format*
-    /// question, and the format has not ruled on it: there may be subjects for
-    /// which self-delegation is meaningful. What is not in question is DP16's
-    /// two-key model, and that model lives in this constructor. So
-    /// `sign_delegation` and `assemble_delegation` still permit it and this
-    /// entry point does not.
-    ///
-    /// Descriptive rather than collapsed, for the same reason as
-    /// [`Self::GenesisDelegation`]: this is an issuing-path fault on the
-    /// operator's own store with the operator's own keys, so naming it costs
-    /// nothing and saves an operator staring at a valid-looking anchor.
-    ///
-    /// **Nothing was appended.** The comparison happens before the claim is
-    /// built.
-    ///
-    /// `#[cfg(feature = "unstable-anchor")]` because the delegation format is,
-    /// so the default build has no call site and could not construct this.
-    #[cfg(feature = "unstable-anchor")]
-    #[error(
-        "the root signer and the operational signer for {origin} advertise the same public key, \
-         so leaf 0 would delegate the operational role to the root key itself: DP16's two-key \
-         model would be void in a delegation nothing can distinguish from an honest one, at the \
-         one position a log can never correct"
-    )]
-    GenesisRootKeyIsOperationalKey {
-        /// The origin of the log genesis was being written into, as its store
-        /// reports it.
-        origin: String,
-    },
+    /// A receipt, an inclusion path or an inclusion artifact could not be
+    /// produced; the family names which.
+    #[error(transparent)]
+    Proof(#[from] ProofError),
 
-    /// Creation was asked to write genesis into a log that already has entries.
-    ///
-    /// Appending here would put the genesis bytes at whatever the next free
-    /// index happens to be, producing a log whose leaf 0 is something else
-    /// entirely while every later check passes. Refused rather than appended:
-    /// there is exactly one position genesis can occupy, and it is taken.
-    #[error(
-        "refusing to write genesis into the log for {origin}: it already holds {tree_size} leaves, and genesis is leaf 0 or nothing"
-    )]
-    GenesisAlreadyWritten {
-        /// The origin of the log that was opened, as its store reports it.
-        origin: String,
-        /// The number of leaves already present.
-        tree_size: u64,
-    },
-
-    /// A log was opened strictly and its leaf 0 is not a genesis delegation from
-    /// the root key the caller named, for this store's own origin.
-    ///
-    /// **This is the variant that exists because creating a DP16 anchor and
-    /// opening one were different guarantees.** `Anchor::open` checks that leaf 0
-    /// exists and reads no byte of it, so a store whose genesis is uninterpreted
-    /// operator bytes — everything a default-features build can create — opens
-    /// indistinguishably from one whose genesis is a delegation.
-    /// `Anchor::open_verifying_genesis` is where that stops, and this is its
-    /// refusal.
-    ///
-    /// # The cause is deliberately not narrowed, and the source says so
-    ///
-    /// `source` is `lys-core`'s single collapsed
-    /// [`TrustError::DelegationVerification`], which is one value for a malformed
-    /// artifact, a non-canonical encoding, a delegation from a different root
-    /// key, one for a different origin, one for a *seat* whose identifier equals
-    /// this origin, and a forged signature alike. That collapse is a
-    /// security property of `lys-core`'s verifier — a delegation verifier is the
-    /// network-exposed surface where a distinguishable error becomes an oracle
-    /// for the verifier's configuration — and this variant carries the value it
-    /// was given rather than inferring a reason nobody supplied it.
-    ///
-    /// Naming the origin costs nothing: it is the first line of every checkpoint
-    /// this anchor signs.
-    ///
-    /// `#[cfg(feature = "unstable-anchor")]` because the delegation format is,
-    /// so the default build has no call site and could not construct this.
-    #[cfg(feature = "unstable-anchor")]
-    #[error(
-        "leaf 0 of the log for {origin} is not a genesis delegation from the named root key for \
-         that origin: {source}"
-    )]
-    GenesisNotADelegation {
-        /// The origin of the log that was opened, as its store reports it —
-        /// which is also the subject value leaf 0 was required to name.
-        origin: String,
-        /// `lys-core`'s single collapsed reason for refusing the delegation.
-        source: TrustError,
-    },
-
-    /// A log was opened strictly and its leaf 0 delegates the operational role
-    /// to the very key that signed it.
-    ///
-    /// The open-time arm of the rule
-    /// [`Self::GenesisRootKeyIsOperationalKey`] enforces at creation, and the
-    /// reason it needs a second arm is that the two paths cannot see the same
-    /// thing. Creation compares two *signers* it was handed. Opening has no
-    /// signers to compare — only the artifact — and the artifact was not
-    /// necessarily written by this crate's constructor. `lys-core` permits
-    /// self-delegation, because whether a subject may delegate to its own signer
-    /// is a format question the format has not ruled on, so nothing between the
-    /// bytes and here would otherwise flag it.
-    ///
-    /// What it would mean if accepted is unchanged from the creation-time
-    /// variant: a perfectly valid, perfectly signed delegation in which DP16's
-    /// entire reason for two keys is void, at the one position a log can never
-    /// correct.
-    ///
-    /// `#[cfg(feature = "unstable-anchor")]` because the delegation format is,
-    /// so the default build has no call site and could not construct this.
-    #[cfg(feature = "unstable-anchor")]
-    #[error(
-        "leaf 0 of the log for {origin} delegates the operational role to its own root key, so \
-         DP16's two-key model is void in an artifact nothing else would flag"
-    )]
-    GenesisDelegatesToTheRootKey {
-        /// The origin of the log that was opened, as its store reports it.
-        origin: String,
-    },
-
-    /// A log was opened strictly and its leaf 0 carries a `sequence` other than
-    /// [`GENESIS_SEQUENCE`](crate::GENESIS_SEQUENCE).
-    ///
-    /// **This checks a convention of this crate, not a property of the format,
-    /// and the distinction is the whole content of the variant.** `lys/delegation/v1`
-    /// marks nothing as genesis; `sequence = 0` is what
-    /// `Anchor::create_with_delegated_genesis` writes, and it writes it because a
-    /// caller-chosen start would open a range below the first delegation into
-    /// which nothing can ever be written. A stranger holding only the artifact
-    /// still cannot conclude from `sequence = 0` that they are looking at the
-    /// first delegation for a subject, and this refusal does not make them able
-    /// to.
-    ///
-    /// The value read is carried rather than written into the message as a
-    /// literal, so an operator is told what was found instead of what was
-    /// expected.
-    ///
-    /// `#[cfg(feature = "unstable-anchor")]` because the delegation format is,
-    /// so the default build has no call site and could not construct this.
-    #[cfg(feature = "unstable-anchor")]
-    #[error(
-        "leaf 0 of the log for {origin} carries sequence {sequence}: this crate writes 0 at \
-         genesis, and a higher start leaves a range below the first delegation that nothing can \
-         ever fill"
-    )]
-    GenesisSequenceIsNotGenesis {
-        /// The origin of the log that was opened, as its store reports it.
-        origin: String,
-        /// The `sequence` leaf 0 actually carried.
-        sequence: u64,
-    },
-
-    /// The anchor's signing key could not be loaded from its file.
-    ///
-    /// The path is carried because `lys-core`'s own reason does not name it —
-    /// `std::fs` errors do not include the path they were raised for — and an
-    /// operator holding "failed to read identity key: No such file or
-    /// directory" has been told everything except the one fact they need.
-    ///
-    /// **A missing file reaches here rather than being repaired.** Generating a
-    /// key for a caller who asked to load one produces an anchor that publishes
-    /// under an identity nobody was ever told about, and reports success while
-    /// doing it.
-    #[error("failed to load the anchor's signing key from {path}: {source}")]
-    SignerKey {
-        /// The key file path, as it was given.
-        path: String,
-        /// `lys-core`'s reason for refusing the key file.
-        source: TrustError,
-    },
-
-    /// A [`Signer`](crate::keys::Signer) declined to produce a signature.
-    ///
-    /// **This variant exists because the trait promises a failure this enum
-    /// could not express.** `Signer::sign` is documented as fallible "for the
-    /// remote custody this trait is shaped for, where the network, the device or
-    /// the operator's authorization can all decline" — but every other variant
-    /// here describes the operator's *own* log or key file, so a remote signer
-    /// had no honest name for its own refusal and had to borrow
-    /// [`SignerKey`](Self::SignerKey), which reports a key-file problem for
-    /// something that is not one.
-    ///
-    /// The gap stopped being hypothetical when genesis-as-delegation landed
-    /// bounded on `Signer` rather than `InProcessSigner`: an offline or remote
-    /// root signer is a real, reachable path now, and it is the one signing call
-    /// in this crate that a network or a human can refuse.
-    ///
-    /// `#[non_exhaustive]` on this enum means a downstream implementor **cannot**
-    /// add a variant themselves, so a trait whose contract promises a failure
-    /// mode obliges the crate that owns the error type to name it. Free text
-    /// rather than a structured cause because the reasons are the implementor's
-    /// domain — an HSM's refusal, a declined touch, a timeout — and inventing a
-    /// taxonomy for devices this crate has never seen would be guessing at
-    /// somebody else's failure modes.
-    #[error("the signer declined to sign: {reason}")]
-    SignerDeclined {
-        /// The signer's own account of why it refused.
-        reason: String,
-    },
-
-    /// The anchor could not sign a checkpoint over its own log.
-    ///
-    /// Every precondition `lys-core` checks here is already satisfied by
-    /// construction — the origin was validated when the store was created, and
-    /// the body is machine-generated — so this variant reports something
-    /// genuinely unexpected rather than a routine refusal. It is propagated
-    /// with its cause instead of being treated as impossible, because a
-    /// precondition that "cannot" fail is exactly the one nobody notices
-    /// changing.
-    #[error("failed to publish a checkpoint for {origin}: {source}")]
-    Checkpoint {
-        /// The origin the checkpoint was being published for.
-        origin: String,
-        /// `lys-core`'s reason for refusing to encode or sign it.
-        source: TrustError,
-    },
-
-    /// A receipt was asked for on a log that holds only its genesis leaf.
-    ///
-    /// **Not an internal limitation being passed on.** RFC 9942 types an
-    /// inclusion path as one-or-more nodes, and the sole leaf of a one-leaf
-    /// tree has an empty path, so no conforming receipt exists to issue —
-    /// `lys-core` refuses to sign one and is right to. Named here rather than
-    /// forwarded because this layer can see the condition coming: it knows the
-    /// tree size before it asks, and "your log has nothing in it but genesis"
-    /// is the sentence an operator can act on, where a message about CDDL
-    /// cardinality is not.
-    ///
-    /// The remedy is to submit something. The condition disappears at the
-    /// first submission and can never return, because a log does not shrink.
-    #[error(
-        "the log for {origin} holds only its genesis leaf ({tree_size}): a conforming receipt needs a tree of at least two leaves, because a one-leaf tree's inclusion path is empty — submit a statement first"
-    )]
-    TreeTooSmallForReceipt {
-        /// The origin of the log a receipt was requested from.
-        origin: String,
-        /// The log's size, which is 1 whenever this variant is produced. Kept
-        /// as a field rather than written into the text as a literal so the
-        /// message reports what was read, not what was expected.
-        tree_size: u64,
-    },
-
-    /// A receipt was asked for at an index the log does not have.
-    ///
-    /// Reported with the size rather than as a bare "not found": an index past
-    /// the end and an index inside a log that has since been truncated are
-    /// very different situations for an operator, and only the size
-    /// distinguishes them. Naming it discloses nothing — the size is the
-    /// second line of every checkpoint this anchor publishes and signs.
-    ///
-    /// **Never a reason to append.** The obliging behaviour — log the
-    /// statement and hand back a receipt for its new index — would answer a
-    /// question about the past with an event in the present, and a caller
-    /// asking "what was at index 9" is not asking for index 9 to be created.
-    #[error("the log for {origin} has no leaf at index {leaf_index}: it holds {tree_size} leaves")]
-    NoSuchLeaf {
-        /// The origin of the log that was asked.
-        origin: String,
-        /// The index that was requested.
-        leaf_index: u64,
-        /// The log's size when it was asked.
-        tree_size: u64,
-    },
-
-    /// An inclusion proof's byte encoding was not a whole number of 32-byte
-    /// digests.
-    ///
-    /// A tree emits whole SHA-256 digests, so this cannot arise from a proof
-    /// this crate produced — which is the reason it is a named refusal and not
-    /// an assumption. The alternative to checking is `chunks_exact` silently
-    /// dropping the short tail, and a receipt signed over a silently shortened
-    /// path is internally consistent, verifies against itself, and attests to
-    /// a root no tree ever held. A malformed proof must be a failure to issue,
-    /// never an issued artifact about a fiction.
-    #[error(
-        "an inclusion proof of {byte_len} bytes is not a whole number of 32-byte digests, so it is not an RFC 6962 path"
-    )]
-    MalformedInclusionPath {
-        /// The length that could not be split into digests.
-        byte_len: usize,
-    },
-
-    /// The anchor could not prove inclusion of one of its own leaves, or could
-    /// not sign the receipt over it.
-    ///
-    /// Covers both halves of issuing a receipt because both are `lys-core`
-    /// refusals about the same request and neither is reachable for an
-    /// in-range index on a well-formed anchor: the index was checked against
-    /// the log before the proof was requested, and the path handed to the
-    /// signer is the one the anchor's own tree produced. Propagated with its
-    /// cause rather than treated as impossible — a precondition that "cannot"
-    /// fail is exactly the one nobody notices changing.
-    #[error(
-        "failed to issue a receipt for leaf {leaf_index} of {origin} at tree size {tree_size}: {source}"
-    )]
-    Receipt {
-        /// The origin of the log the receipt was for.
-        origin: String,
-        /// The index the receipt was requested for.
-        leaf_index: u64,
-        /// The tree size the receipt would have been issued against.
-        tree_size: u64,
-        /// `lys-core`'s reason for refusing to prove or to sign.
-        source: TrustError,
-    },
-
-    /// The anchor could not build the JSON inclusion artifact for one of its
-    /// own leaves.
-    ///
-    /// Separate from [`AnchorError::Receipt`] rather than folded into it,
-    /// because the two failures are not the same failure wearing two names.
-    /// A receipt fails at proving or at COSE signing; an artifact additionally
-    /// fails at the 2^53 JSON-number bound, at checkpoint encoding under the
-    /// origin, and — the one that matters — at `lys-core`'s **build-time
-    /// self-verification**, which runs the third party's whole verification
-    /// path over the artifact before it is returned. An operator told "failed
-    /// to issue a receipt" for a self-verification failure has been pointed at
-    /// the wrong artifact and the wrong code.
-    ///
-    /// **Reachable in practice only if this crate is wrong.** The index is
-    /// checked against the log first, the leaf bytes handed to the builder are
-    /// the ones read back out of that same log at that same index, and the
-    /// origin was validated when the store was created. It is propagated with
-    /// its cause instead of being treated as impossible, for the reason the
-    /// neighbouring variants give: a precondition that "cannot" fail is
-    /// exactly the one nobody notices changing.
-    #[error(
-        "failed to build an inclusion artifact for leaf {leaf_index} of {origin} at tree size {tree_size}: {source}"
-    )]
-    InclusionArtifact {
-        /// The origin of the log the artifact was for.
-        origin: String,
-        /// The index the artifact was requested for.
-        leaf_index: u64,
-        /// The tree size the artifact would have been built against.
-        tree_size: u64,
-        /// `lys-core`'s reason for refusing to build or to self-verify it.
-        source: TrustError,
-    },
-
-    /// A cascade was handed to bundle assembly with more links than
-    /// `lys-core`'s `MAX_LINKS` cap allows.
-    ///
-    /// Refused at assembly rather than emitted, because the workspace already
-    /// knows the answer: `verify_bundle` rejects a bundle past the cap, so
-    /// producing one would hand a caller an artifact nothing can accept. The
-    /// cap exists so an untrusted bundle cannot ask a verifier for unbounded
-    /// work, and a chain this deep is pathological on its own terms — each link
-    /// is one anchor notarizing the one below it.
-    ///
-    /// **`max` is carried as a field rather than written into the text as a
-    /// literal**, so the message reports the cap the code actually enforced
-    /// instead of the one this sentence remembers.
+    /// A verification bundle could not be assembled from a cascade; the
+    /// family names which.
     #[cfg(feature = "federation")]
-    #[error(
-        "refusing to assemble a verification bundle for {origin} from a cascade of {links} links: a verifier accepts at most {max}, so a deeper chain would produce an artifact nothing can check"
-    )]
-    CascadeTooDeep {
-        /// The origin of the log the bundle was being assembled for.
-        origin: String,
-        /// The number of links the cascade held.
-        links: usize,
-        /// The cap, as read from `lys-core` at the point of refusal.
-        max: usize,
-    },
-
-    /// The first link of the cascade does not notarize the checkpoint the
-    /// freshly built inclusion artifact carries.
-    ///
-    /// A bundle's first link is what joins the notarization to the inclusion
-    /// proof: `verify_bundle` requires `links[0].checkpoint` to be
-    /// **byte-identical** to `inclusion_proof.checkpoint`, or the notarization
-    /// is about some other log whose checkpoint also happens to verify.
-    ///
-    /// **The usual cause is an append between the pin and the assembly.** An
-    /// inclusion artifact embeds a checkpoint signed over the tree at the moment
-    /// it is built, so a statement admitted in between moves the artifact to a
-    /// later size while the pinned checkpoint still states the earlier one. Both
-    /// notes are valid and neither is corrupt; they are photographs of one log
-    /// taken at two moments. The remedy is to pin again from the current tree,
-    /// or to assemble the bundle from the artifact taken at the size that was
-    /// pinned.
-    ///
-    /// Both sizes are named because that is what distinguishes this from a pin
-    /// against an entirely different log, and neither discloses anything: a
-    /// tree size is the second line of every checkpoint this anchor signs and
-    /// publishes.
-    #[cfg(feature = "federation")]
-    #[error(
-        "the cascade's first link notarizes a checkpoint of {origin} at tree size {pinned_tree_size}, but the inclusion artifact for leaf {leaf_index} carries one at tree size {artifact_tree_size}: a bundle's first link must notarize the very checkpoint its inclusion proof was verified against"
-    )]
-    CascadeJoinMismatch {
-        /// The origin of the log the bundle was being assembled for.
-        origin: String,
-        /// The index the bundle was being assembled for.
-        leaf_index: u64,
-        /// The tree size the pinned checkpoint committed to.
-        pinned_tree_size: u64,
-        /// The tree size the inclusion artifact's checkpoint committed to.
-        artifact_tree_size: u64,
-    },
+    #[error(transparent)]
+    Cascade(#[from] CascadeError),
 }
 
 /// Convenience alias for `Result<T, AnchorError>`.

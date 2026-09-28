@@ -49,6 +49,61 @@ pub enum StoreError {
         source: std::io::Error,
     },
 
+    /// A leaf was linked under its final name, but the leaves directory could
+    /// not be flushed afterwards, so whether the name survives a crash is
+    /// uncertain.
+    ///
+    /// The link is the commit point: the leaf is written and the store's extent
+    /// already covers it. What is unknown is only its durability, which is why
+    /// this is neither [`StoreError::Io`] (the write did not fail) nor
+    /// [`StoreError::LeafAlreadyWritten`] (no other writer is involved). The
+    /// handle refuses further appends with [`StoreError::ReopenRequired`];
+    /// reopening flushes the directory before counting the leaf.
+    #[error(
+        "leaf {index} was written, but the leaves directory could not be flushed afterwards, so its durability is uncertain; reopen the store: {source}"
+    )]
+    LeafDurabilityUncertain {
+        /// The index of the leaf whose durability is uncertain.
+        index: u64,
+        /// The error from flushing the directory.
+        #[source]
+        source: std::io::Error,
+    },
+
+    /// The store handle refused an append because an earlier leaf's
+    /// durability is uncertain.
+    ///
+    /// Appending past a leaf that might not survive a crash could leave a gap
+    /// after one, so the handle stops accepting leaves until the store is
+    /// reopened, which flushes the leaves directory and counts that leaf.
+    #[error(
+        "refusing to append: the durability of leaf {index} written on this handle is uncertain; reopen the store"
+    )]
+    ReopenRequired {
+        /// The index of the leaf whose durability is uncertain.
+        index: u64,
+    },
+
+    /// Every temporary name tried for a leaf was already taken, so the leaf was
+    /// not written.
+    ///
+    /// A taken name is a leftover and is never replaced, so the write moves on
+    /// to the next one. Finding every name in the bound taken means something
+    /// other than leftovers is creating names in the leaves directory, which is
+    /// worth stopping for rather than trying past.
+    #[error(
+        "refusing to write leaf {index}: all {attempts} temporary names tried in {} were already taken, and a taken name is never replaced",
+        path.display()
+    )]
+    LeafTempNamesTaken {
+        /// The index of the leaf that was not written.
+        index: u64,
+        /// How many names were tried.
+        attempts: u32,
+        /// The leaves directory the names were tried in.
+        path: PathBuf,
+    },
+
     /// A leaf already exists at this index, so the write was refused.
     ///
     /// **This is the write-once rule firing, and it is the intended
@@ -175,6 +230,20 @@ pub enum StoreError {
         index: u64,
         /// The extent the store reported.
         extent: u64,
+    },
+
+    /// A stored frontier does not have one subtree root per set bit of its
+    /// size, so it is not the frontier of any tree of that size.
+    #[error(
+        "a frontier for tree size {size} holds {nodes} subtree roots, but a tree of that size has {expected}"
+    )]
+    FrontierMalformed {
+        /// The tree size the frontier claims.
+        size: u64,
+        /// The number of subtree roots it holds.
+        nodes: usize,
+        /// The number of set bits of `size`.
+        expected: u32,
     },
 
     /// The log refused further use because an earlier append failed partway.

@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 
 use super::*;
 
@@ -94,4 +94,86 @@ fn write_file_error_names_role_and_path() {
     let display = err.to_string();
     assert!(display.contains("attestation file"), "got: {display}");
     assert!(display.contains("out.json"), "got: {display}");
+}
+
+/// The names in `dir`, sorted, so a leftover temporary file shows up.
+fn names_in(dir: &Path) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names
+}
+
+#[test]
+fn a_staged_file_reaches_its_target_only_when_placed() {
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("agent.pem");
+    let staged = StagedFile::stage(&target, b"certificate bytes", "certificate file").unwrap();
+    assert!(!target.exists(), "staging must not touch the target");
+    staged.place().unwrap();
+    assert_eq!(std::fs::read(&target).unwrap(), b"certificate bytes");
+    assert_eq!(names_in(dir.path()), ["agent.pem"]);
+}
+
+#[test]
+fn a_staged_file_dropped_unplaced_leaves_nothing_behind() {
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("agent.pem");
+    drop(StagedFile::stage(&target, b"certificate bytes", "certificate file").unwrap());
+    assert!(names_in(dir.path()).is_empty());
+}
+
+#[test]
+fn staging_into_a_missing_directory_names_the_output_and_its_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("absent").join("proof.json");
+    let err = StagedFile::stage(&target, b"{}", "inclusion proof artifact").unwrap_err();
+    let display = err.to_string();
+    assert!(
+        display.contains("inclusion proof artifact"),
+        "got: {display}"
+    );
+    assert!(display.contains("proof.json"), "got: {display}");
+}
+
+#[test]
+fn an_existing_output_is_refused_by_name() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("agent.pem");
+    std::fs::write(&path, b"already here").unwrap();
+    let err = refuse_existing(&path, "certificate file").unwrap_err();
+    assert!(matches!(
+        err,
+        CliError::OutputExists {
+            what: "certificate file",
+            ..
+        }
+    ));
+    assert!(err.to_string().contains("agent.pem"), "got: {err}");
+    refuse_existing(&dir.path().join("absent.pem"), "certificate file").unwrap();
+}
+
+#[test]
+fn two_outputs_naming_one_path_are_refused_by_name() {
+    let err = refuse_shared_paths(&[
+        ("certificate file", Path::new("out/agent.pem")),
+        ("issuer certificate file", Path::new("out/issuer.pem")),
+        ("leaf file", Path::new("out/./agent.pem")),
+    ])
+    .unwrap_err();
+    assert!(matches!(
+        err,
+        CliError::OutputPathShared {
+            first: "certificate file",
+            second: "leaf file",
+            ..
+        }
+    ));
+    refuse_shared_paths(&[
+        ("certificate file", Path::new("agent.pem")),
+        ("leaf file", Path::new("agent.leaf")),
+    ])
+    .unwrap();
 }
