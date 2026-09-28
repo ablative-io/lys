@@ -1020,6 +1020,31 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "A running install names its build and upgrades in place",
+      "items": [
+        {
+          "id": "C344",
+          "text": "Every Lys binary answers --version with its build commit (DIRECTORY-045 R1).",
+          "done": false
+        },
+        {
+          "id": "C345",
+          "text": "`lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2).",
+          "done": false
+        },
+        {
+          "id": "C346",
+          "text": "The install and the server say which build is running (DIRECTORY-045 R3).",
+          "done": false
+        },
+        {
+          "id": "C347",
+          "text": "Prove it on the live install (DIRECTORY-045 R4).",
+          "done": false
+        }
+      ]
     }
   ]
 }

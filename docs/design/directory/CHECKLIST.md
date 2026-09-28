@@ -257,3 +257,10 @@
 - [ ] **C341** — Stopping a service waits on the platform's exit notification (DIRECTORY-044 R2).
 - [ ] **C342** — Loopback, Rauthy and health exchanges carry no timeout (DIRECTORY-044 R3).
 - [ ] **C343** — The Explain view re-measures on a layout signal (DIRECTORY-044 R4).
+
+## A running install names its build and upgrades in place
+
+- [ ] **C344** — Every Lys binary answers --version with its build commit (DIRECTORY-045 R1).
+- [ ] **C345** — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2).
+- [ ] **C346** — The install and the server say which build is running (DIRECTORY-045 R3).
+- [ ] **C347** — Prove it on the live install (DIRECTORY-045 R4).

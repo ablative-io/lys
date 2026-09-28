@@ -1,0 +1,125 @@
+---
+type: brief
+id: DIRECTORY-045
+cluster: directory
+title: Name every build, and upgrade a running identity install in place with a way back
+---
+
+# DIRECTORY-045: Name every build, and upgrade a running identity install in place with a way back
+
+> **Cluster:** directory
+> **Depends on:** DIRECTORY-044
+> **Blocked by:** DIRECTORY-044 landed on main (it adds the exit and readiness waits this brief's upgrade uses): the build starts only when `git log --oneline origin/main --grep=DIRECTORY-044` names its R1 and R2 commits.
+> **Design anchor:**
+> - ADR-114 — An installed identity product names its build and upgrades itself in place, keeping the previous build to return to — Every Lys binary answers --version with the commit and dirty state it was built from, stamped at build time; a build with no commit to read says so in those words, never a made-up value. `lys identity upgrade` takes a folder of newly built binaries (and optionally a screens package), checks each one's --version, stops the service and the broker by their exit events, swaps the binaries by rename keeping the previous set beside them, starts the new ones and waits for them ready; if any new binary fails to start or become ready, it puts the previous set back, starts it, and fails naming what broke. Data, credentials, configuration and the compose services are never touched by an upgrade. Rejected: making install restart what differs, which would mix a first install's promises with an upgrade's risks; asking people to copy binaries by hand.
+> - ADR-113 — The identity install and its clients wait on signals, never on a clock — A wait ends on the event it is waiting for or on the failure that makes the event impossible: a service is ready when it says so or when a single connection to it succeeds after a readiness event (its log gaining its listening line, observed through the platform's file-change notification), a stopped process is gone when the platform reports its exit (kqueue EVFILT_PROC on macOS, pidfd on Linux), a peer that refuses or closes is an error at once, and nothing carries a timeout. The screen re-measures on a ResizeObserver or animation-frame signal. Rejected: shorter sleeps, which still wait on a clock; keeping timeouts as a safety net, which the rule forbids and which hides a stuck peer's cause.
+> **Checklist:**
+> - C344 — Every Lys binary answers --version with its build commit (DIRECTORY-045 R1).
+> - C345 — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2).
+> - C346 — The install and the server say which build is running (DIRECTORY-045 R3).
+> - C347 — Prove it on the live install (DIRECTORY-045 R4).
+> **Stories:**
+> - S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
+
+## Purpose
+
+A person running the identity product cannot tell which build is running, and cannot take a newer one: install only fills in what is missing and never restarts. So every landing stays invisible until someone swaps binaries by hand. This brief makes every binary name its commit and gives the product one command that upgrades a running install and puts the previous build back if the new one fails.
+
+## Task
+
+Stamp the build commit into every Lys binary, add `lys identity upgrade`, surface the running build in /authority and the screens, and prove it by upgrading the live install.
+
+## Requirements
+
+### R1: Every Lys binary answers --version with its build commit
+
+Behavioural. lys, lys-identity-server, lys-secrets and lys-home each answer --version (and -V) with `NAME VERSION (COMMIT[; dirty])`, stamped at build time from the git tree being built (a build.rs reading `git rev-parse HEAD` and `git status --porcelain`, rerun when .git/HEAD or the index moves). A build with no git tree to read prints `(not built from a git commit)`: never an empty or invented value. lys-identity-server no longer reads a first argument of --version as a configuration path.
+
+**Acceptance:**
+- For each binary, `BIN --version` at the card's head prints its name, the crate version and the 40-character commit of that head, and a test builds from an exported tree without .git and shows the stated words.
+- `lys-identity-server --version` exits 0 and reads no file.
+
+**Files:**
+- create: crates/lys/build.rs
+- create: crates/lys-identity-server/build.rs
+- create: crates/lys-secrets/build.rs
+- create: crates/lys-home/build.rs
+- modify: crates/lys/src/main.rs
+- modify: crates/lys-identity-server/src/main.rs
+- modify: crates/lys-secrets/src/bin/lys-secrets/main.rs
+- modify: crates/lys-home/src/main.rs
+
+**Checklist:**
+- C344 — Every Lys binary answers --version with its build commit (DIRECTORY-045 R1).
+
+**Stories:**
+- S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
+
+### R2: `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure
+
+Behavioural. A new verb `lys identity upgrade --from DIR [--surface PKG] [--root ROOT]`. It refuses by name when ROOT holds no install, when DIR lacks any installed binary, or when a binary's --version cannot be read. It prints the installed and the new commit of each. It stops the service and then the broker, each waiting on its exit event through DIRECTORY-044's exit wait (never a sleep or a timeout); moves bin/ to bin.previous/ (replacing an older bin.previous/) and places the new binaries by copy to a temporary name and rename; places the screens package through the install's existing verify-and-place path when --surface is given, keeping the previous one the same way; starts the broker and then the service and waits for each ready on its readiness event. If a start or readiness fails, it stops what it started, restores bin.previous/ (and the previous screens), starts them, waits for them ready, and exits non-zero naming the failing binary and its log. It never touches data/, credentials, deployment.toml, identity.json or the compose services.
+
+**Acceptance:**
+- A test on a scratch root installs build A (two stub binaries answering --version and readiness), upgrades to build B, and shows B running and A kept in bin.previous/; a second test where B's service exits before ready shows A restored, running and ready, and the named failure.
+- A test shows data/, identity.json and deployment.toml are byte-identical before and after both upgrades.
+- grep -nE 'sleep|timeout' over the new files prints nothing.
+
+**Files:**
+- create: crates/lys/src/identity/upgrade.rs
+- create: crates/lys/src/identity/upgrade_tests.rs
+- modify: crates/lys/src/identity/cli.rs
+- modify: crates/lys/src/identity/install/layout.rs
+
+**Checklist:**
+- C345 — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2).
+
+**Stories:**
+- S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
+
+### R3: The install and the server say which build is running
+
+Behavioural. `lys identity install` and `lys identity upgrade` write install/build.json under the root with each binary's commit and the screens package's digest, and print them. The identity server's GET /authority answer gains a `build` member with its own commit, and the screens show it in the About or settings view that already lists the authority.
+
+**Acceptance:**
+- A test reads /authority from a running server built at the card's head and finds its commit in `build`.
+- A surface test renders the build commit from a stubbed /authority answer.
+
+**Files:**
+- modify: crates/lys/src/identity/install.rs
+- modify: crates/lys-identity-server/src/read_api.rs
+- modify: surface/identity/src/shell/About.tsx
+
+**Checklist:**
+- C346 — The install and the server say which build is running (DIRECTORY-045 R3).
+
+**Stories:**
+- S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
+
+### R4: Prove it on the live install
+
+Evidence. Evidence. On the machine the live install runs on, build lys, lys-identity-server and lys-secrets at the card's head on the build machine through the card's own round, then run `lys identity upgrade --from` that build against the live install, and show the running server's /authority `build` equals the card's head. Record the before and after commits and the upgrade's printed lines in docs/design/directory/PROOF-UPGRADE.md. Secrets and passwords never appear in it.
+
+**Acceptance:**
+- PROOF-UPGRADE.md names the installed commit before, the head commit after, and quotes the upgrade's lines; `curl -s http://localhost:8490/authority` shows the head commit.
+
+**Files:**
+- create: docs/design/directory/PROOF-UPGRADE.md
+
+**Checklist:**
+- C347 — Prove it on the live install (DIRECTORY-045 R4).
+
+**Stories:**
+- S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
+
+## Boundaries
+
+- SHALL NOT add any timeout, deadline, sleep or poll interval.
+- SHALL NOT touch data, credentials, configuration or the compose services in an upgrade.
+- SHALL NOT print or record any secret, password or API key, in output, tests or the proof.
+- SHALL NOT add #[allow], #[ignore] or any bypass; every file stays under 500 lines of code; ast-grep stays at zero hits.
+- Where a file named here does not exist on main at the card's base (About.tsx, a main.rs), the change goes where that concern lives and the dev record names the path.
+
+## Verification
+
+- The full Lys gate and the surface checks exit 0 at the card's head, measured by the card round.
+- The live upgrade of R4 is recorded in PROOF-UPGRADE.md and /authority on the live install names the head commit.

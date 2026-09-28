@@ -480,6 +480,10 @@
         {
           "id": "S146",
           "text": "As the person installing the identity stack, I want the install to go on the moment each service is ready and to name at once the one that died, so that nothing is cut off by a clock and nothing waits longer than the service does."
+        },
+        {
+          "id": "S147",
+          "text": "As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in."
         }
       ]
     }

@@ -1951,6 +1951,33 @@
       },
       "depends_on": [],
       "notes": "Written by hand straight to main; ids the next free on main f003aff. The SpiceDB client's timeouts are DIRECTORY-042 R8's, after DIRECTORY-025."
+    },
+    {
+      "id": "RM-080",
+      "title": "Name every build, and upgrade a running identity install in place with a way back",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "A person running the identity product cannot tell which build is running, and cannot take a newer one: install only fills in what is missing and never restarts. So every landing stays invisible until someone swaps binaries by hand. This brief makes every binary name its commit and gives the product one command that upgrades a running install and puts the previous build back if the new one fails.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T17:15:00+10:00",
+        "quote": "Make sure it is all fully finished and make sure it actually works and meets the point of doing it.",
+        "context": "On 28 September 2026 at 17:1x the live install on Tom's Mac (~/Library/Application Support/lys/identity) ran a server built at 15:12. `lys-identity-server --version` answered ConfigInvalid (it read --version as a config path), so nothing on the machine could say which commit it was, and `lys identity install` run again 'changes only what is missing; nothing is rotated or restarted' (crates/lys/src/identity/install.rs:1-9), so the product has no way to take a newer build. Every landing after an install is invisible to the person using it until someone hand-replaces binaries."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-114"
+        ],
+        "briefs": [
+          "DIRECTORY-045"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-079"
+      ],
+      "notes": "Written by hand straight to main; ids the next free on main."
     }
   ]
 }

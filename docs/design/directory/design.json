@@ -79,7 +79,8 @@
     "ADR-105",
     "ADR-109",
     "ADR-112",
-    "ADR-113"
+    "ADR-113",
+    "ADR-114"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -2518,6 +2519,66 @@
       "path": "surface/identity/src/shell/Explain.tsx",
       "note": "DIRECTORY-044 R4: The Explain view re-measures on a layout signal",
       "brief": "DIRECTORY-044"
+    },
+    {
+      "path": "crates/lys/build.rs",
+      "note": "DIRECTORY-045 R1: Every Lys binary answers --version with its build commit",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys-secrets/build.rs",
+      "note": "DIRECTORY-045 R1: Every Lys binary answers --version with its build commit",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys-home/build.rs",
+      "note": "DIRECTORY-045 R1: Every Lys binary answers --version with its build commit",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys-identity-server/src/main.rs",
+      "note": "DIRECTORY-045 R1: Every Lys binary answers --version with its build commit",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys-secrets/src/bin/lys-secrets/main.rs",
+      "note": "DIRECTORY-045 R1: Every Lys binary answers --version with its build commit",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys-home/src/main.rs",
+      "note": "DIRECTORY-045 R1: Every Lys binary answers --version with its build commit",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade.rs",
+      "note": "DIRECTORY-045 R2: `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade_tests.rs",
+      "note": "DIRECTORY-045 R2: `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/install/layout.rs",
+      "note": "DIRECTORY-045 R2: `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/install.rs",
+      "note": "DIRECTORY-045 R3: The install and the server say which build is running",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "surface/identity/src/shell/About.tsx",
+      "note": "DIRECTORY-045 R3: The install and the server say which build is running",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "docs/design/directory/PROOF-UPGRADE.md",
+      "note": "DIRECTORY-045 R4: Prove it on the live install",
+      "brief": "DIRECTORY-045"
     }
   ],
   "inventory": [

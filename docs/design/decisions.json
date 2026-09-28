@@ -1601,6 +1601,23 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-114",
+      "title": "An installed identity product names its build and upgrades itself in place, keeping the previous build to return to",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-28",
+      "decided_by": "Waffles, under Tom's word on 28 September 2026 that it must actually work and meet the point of doing it; recorded with DIRECTORY-045",
+      "context": "On 28 September 2026 at 17:1x the live install on Tom's Mac (~/Library/Application Support/lys/identity) ran a server built at 15:12. `lys-identity-server --version` answered ConfigInvalid (it read --version as a config path), so nothing on the machine could say which commit it was, and `lys identity install` run again 'changes only what is missing; nothing is rotated or restarted' (crates/lys/src/identity/install.rs:1-9), so the product has no way to take a newer build. Every landing after an install is invisible to the person using it until someone hand-replaces binaries.",
+      "decision": "Every Lys binary answers --version with the commit and dirty state it was built from, stamped at build time; a build with no commit to read says so in those words, never a made-up value. `lys identity upgrade` takes a folder of newly built binaries (and optionally a screens package), checks each one's --version, stops the service and the broker by their exit events, swaps the binaries by rename keeping the previous set beside them, starts the new ones and waits for them ready; if any new binary fails to start or become ready, it puts the previous set back, starts it, and fails naming what broke. Data, credentials, configuration and the compose services are never touched by an upgrade. Rejected: making install restart what differs, which would mix a first install's promises with an upgrade's risks; asking people to copy binaries by hand.",
+      "quote": "Make sure it is all fully finished and make sure it actually works and meets the point of doing it.",
+      "consequences": [
+        "A landing reaches a running install by one command, and the running build can always be named.",
+        "A bad build never leaves the install down: the previous build comes back and the failure is named."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
