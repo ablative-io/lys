@@ -512,8 +512,11 @@ impl Feed {
                 ),
             ));
         }
-        let offset: u64 = offset.parse().map_err(|_unread| {
-            RunnerError::refused("cursor_invalid", "a feed cursor's offset is a number")
+        let offset: u64 = offset.parse().map_err(|error| {
+            RunnerError::refused(
+                "cursor_invalid",
+                format!("a feed cursor's offset is a number: {error}"),
+            )
         })?;
         if offset > self.index.committed {
             return Err(RunnerError::refused(

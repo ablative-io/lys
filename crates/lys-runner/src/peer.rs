@@ -71,7 +71,8 @@ fn unproved(reason: impl Into<String>) -> RunnerError {
 
 #[cfg(target_os = "macos")]
 fn bsd_info(pid: u32) -> Result<libproc::bsd_info::BSDInfo, RunnerError> {
-    let id = i32::try_from(pid).map_err(|_wide| unproved(format!("{pid} is not a process id")))?;
+    let id = i32::try_from(pid)
+        .map_err(|error| unproved(format!("{pid} is not a process id: {error}")))?;
     libproc::proc_pid::pidinfo::<libproc::bsd_info::BSDInfo>(id, 0)
         .map_err(|error| unproved(format!("process {pid} cannot be read: {error}")))
 }
@@ -126,7 +127,8 @@ pub fn peer_of(stream: &UnixStream) -> Result<(u32, u32), RunnerError> {
         .map_err(|error| unproved(format!("the peer's process cannot be read: {error}")))?;
     let (uid, _group) = nix::unistd::getpeereid(stream)
         .map_err(|error| unproved(format!("the peer's user cannot be read: {error}")))?;
-    let pid = u32::try_from(pid).map_err(|_negative| unproved("the peer names no process"))?;
+    let pid = u32::try_from(pid)
+        .map_err(|error| unproved(format!("the peer names no process: {error}")))?;
     Ok((pid, uid.as_raw()))
 }
 
@@ -138,7 +140,7 @@ pub fn peer_of(stream: &UnixStream) -> Result<(u32, u32), RunnerError> {
         nix::sys::socket::getsockopt(stream, nix::sys::socket::sockopt::PeerCredentials)
             .map_err(|error| unproved(format!("the peer's credentials cannot be read: {error}")))?;
     let pid = u32::try_from(credentials.pid())
-        .map_err(|_negative| unproved("the peer names no process"))?;
+        .map_err(|error| unproved(format!("the peer names no process: {error}")))?;
     Ok((pid, credentials.uid()))
 }
 

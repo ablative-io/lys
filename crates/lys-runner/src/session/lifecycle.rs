@@ -447,7 +447,12 @@ fn read_lines(reading: &Reading<'_>, source: &mut SourceState, bodies: &mut Vec<
 pub(crate) fn bound_directory(directory: &str) -> String {
     let given = if directory.is_empty() { "." } else { directory };
     std::fs::canonicalize(given).map_or_else(
-        |_unresolved| given.to_owned(),
+        |error| {
+            crate::error::said(&format!(
+                "{given} does not resolve, and is kept as given: {error}"
+            ));
+            given.to_owned()
+        },
         |path| path.display().to_string(),
     )
 }
