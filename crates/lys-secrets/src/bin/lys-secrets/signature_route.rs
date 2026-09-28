@@ -59,8 +59,8 @@ fn malformed(reason: String) -> (StatusCode, String) {
 fn signable(purpose: &str, members: Value) -> Result<Signable, (StatusCode, String)> {
     match SigningPurpose::parse(purpose).map_err(|error| refused(&error))? {
         SigningPurpose::AgentRequest => {
-            let members: AgentRequestMembers = serde_json::from_value(members)
-                .map_err(|error| malformed(error.to_string()))?;
+            let members: AgentRequestMembers =
+                serde_json::from_value(members).map_err(|error| malformed(error.to_string()))?;
             AgentRequest::new(
                 &members.method,
                 &members.path,
