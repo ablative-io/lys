@@ -240,5 +240,5 @@ pub fn verify_bundle(
 }
 
 #[cfg(test)]
-#[path = "verify_tests.rs"]
+#[path = "verify_tests/mod.rs"]
 mod tests;

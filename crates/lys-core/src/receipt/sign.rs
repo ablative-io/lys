@@ -251,5 +251,5 @@ pub fn verify_receipt_bytes(
 }
 
 #[cfg(test)]
-#[path = "sign_tests.rs"]
+#[path = "sign_tests/mod.rs"]
 mod tests;

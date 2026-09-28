@@ -269,5 +269,5 @@ fn parse_signature_line(line: &str) -> TrustResult<SignatureLine<'_>> {
 }
 
 #[cfg(test)]
-#[path = "note_tests.rs"]
+#[path = "note_tests/mod.rs"]
 mod tests;
