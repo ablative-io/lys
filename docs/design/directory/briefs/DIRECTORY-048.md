@@ -124,6 +124,19 @@ Behavioural. Add apps as log events and a projection (apps_api.rs, apps_state.rs
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
 - S152 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. None of R1's acceptance rows is met by this round. The boundary 'SHALL NOT start this continuation before DIRECTORY-047 R3's provider is complete and green and is present in the card's integrated tree' is not satisfied. crates/lys-identity-server/src/provider.rs is absent at HEAD e495f38. It exists on origin/card/DIRECTORY-047b (f4904598) and origin/card/DIRECTORY-047b-onmain (fac16efd), but neither is an ancestor of HEAD, checked with git merge-base --is-ancestor. The row 'production provider client lookup reaches apps_binding::sign_in_client ... OIDC round trip' depends on that provider directly, and the wall lists provider.rs as 'modify', which cannot be done while the file does not exist. State of the tree: the registrar substitute is still present (apps_api.rs:88 route /apps/registrars, apps_api.rs:509 fn registrar, apps_state.rs:355 registrars). No connector holder kind exists in crates/lys-identity/src (grep for Connector finds nothing). grants_connector.rs does not exist. The rows on register_app authority, the connector identity, compatibility fixtures and the secret shown once on approval via the provider are therefore unmet.
+- Deviation: I implemented nothing, because the brief's own start boundary is not met. To unblock: integrate DIRECTORY-045 and then DIRECTORY-047 (with R3 green) into card/DIRECTORY-048-onmain in dependency order, then resume this session.
+- Checklist delivery:
+  - [ ] C361 — Only a person holding an explicit register_app grant registers an app; approval creates its distinct application-connector identity and binding, and every app permission follows an explicit grant chain back to the super administrator (ADR-126, DIRECTORY-048 R1). — Blocked on DIRECTORY-047 R3 provider being absent from the integrated tree; no connector kind or register_app grant path yet.
+- Story delivery:
+  - [ ] S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys. — Blocked on DIRECTORY-047 R3.
+  - [ ] S152 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen. — Blocked on DIRECTORY-047 R3.
+
 ### R2: An app's schema: its own kinds, actions, relations and parents, checked on entry
 
 Behavioural. A schema is JSON: kinds, each with actions, relations (each carrying a set of the kind's actions) and optional parents (a relation on a parent kind flows to the child, as a workspace's member reaches its channels). Every kind is written '{app}.{kind}'; a kind outside the app's prefix, an action not declared on its kind, a relation carrying an unknown action, a parent cycle or a parent in another app is refused schema_invalid naming the JSON pointer of the fault. Grant creation, delegation and every check refuse kind_not_registered for a kind no approved app declares, and not_your_app when a caller acting for one app names another's kind. The schema is translated to the permission store's definitions under the app's prefix only; no write touches another prefix. The app 'lys' is the one exception to the app.kind form: Lys's own kinds keep their present names, and every other app's kinds carry its prefix. An application connector is bound to its app by an app binding record (connector identity id, app id, bound by, when), written on approval and read by not_your_app. The binding constrains which app the caller represents; it grants no authority. Own-kind access must also pass an explicit ordinary grant check rooted in the super administrator.
@@ -151,6 +164,19 @@ Behavioural. A schema is JSON: kinds, each with actions, relations (each carryin
 **Stories:**
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
 
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by the same start boundary; nothing was changed. The rows on connectors (not_your_app for an authenticated application connector, and the connector-with-no-grant row) need the connector holder kind from R1, which does not exist in the tree. Schema validation from an earlier round is present (crates/lys-identity/src/grants/schema.rs), but this round verified no row of it.
+- Deviation: I made no change because the continuation's start boundary is unmet.
+- Checklist delivery:
+  - [ ] C362 — An app's schema declares kinds under its own prefix, their actions, relations carrying actions and parent kinds; an invalid schema is refused naming the line of the fault (DIRECTORY-048 R2). — Not verified this round; continuation blocked.
+  - [ ] C363 — An app cannot define, change or grant on another app's kinds; the refusal names the owning prefix (DIRECTORY-048 R2). — Needs the connector identity from R1; blocked.
+- Story delivery:
+  - [ ] S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys. — Blocked on DIRECTORY-047 R3.
+
 ### R3: Schema changes are versioned, dry-run first, and never strand a grant
 
 Behavioural. PUT /apps/{app}/schema carries the version it replaces and is refused schema_version_moved when that is not current. POST /apps/{app}/schema/check answers what the change would do without writing: kinds, relations and actions added and removed, and the standing grants each removal would strand. A change that removes a kind or relation with standing grants, or an action a standing grant carries, is refused schema_change_strands_grants naming each relation and its count; it is applied only after those grants are revoked through the ordinary revoke route. A change made by the app's application connector waits for administrator approval on the Apps screen, as registration does. Every version stays readable at GET /apps/{app}/schema?version=N. The apps store is born with its checkpoint beside its log, so a start reads the checkpoint and the tail only, never the whole history.
@@ -172,6 +198,18 @@ Behavioural. PUT /apps/{app}/schema carries the version it replaces and is refus
 **Stories:**
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
 
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by the same start boundary; nothing was changed. The row requiring that 'a change made by the app's application connector waits for administrator approval' needs the connector kind from R1.
+- Deviation: I made no change because the continuation's start boundary is unmet.
+- Checklist delivery:
+  - [ ] C364 — A schema change that would strand standing grants is refused naming the relation and the count; a dry run answers the same without writing (DIRECTORY-048 R3). — Not verified this round; continuation blocked.
+- Story delivery:
+  - [ ] S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys. — Blocked on DIRECTORY-047 R3.
+
 ### R4: Lys's own model is the schema of the app 'lys'
 
 Behavioural. At start, when no 'lys' app exists in the log, the model in grant_model_file is recorded once as the schema of the app 'lys', approved, at the model's version; afterwards the log is the only source and the file is not read again. Lys's own kinds keep their present names, recorded as the 'lys' prefix's kinds, so every existing grant and check answers the same. The 'lys' app cannot be retired and its schema changes only by an administrator. This is the exception R2 names for the app 'lys'.
@@ -191,6 +229,18 @@ Behavioural. At start, when no 'lys' app exists in the log, the model in grant_m
 
 **Stories:**
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
+
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by the same start boundary; nothing was changed. This round verified no row.
+- Deviation: I made no change because the continuation's start boundary is unmet.
+- Checklist delivery:
+  - [ ] C365 — Lys's own model is the schema of the app 'lys'; existing grants and checks answer the same after the move (DIRECTORY-048 R4). — Not verified this round; continuation blocked.
+- Story delivery:
+  - [ ] S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys. — Blocked on DIRECTORY-047 R3.
 
 ### R5: Apps check many permissions at once and list what a subject may act on
 
@@ -213,6 +263,18 @@ Behavioural. POST /grants/check/batch takes up to 500 checks (subject, kind, id,
 
 **Stories:**
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
+
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by the same start boundary; nothing was changed. R5 requires the application connector identity, not a service account, to be the caller the grant engine judges, and that kind does not exist until R1 is built.
+- Deviation: I made no change because the continuation's start boundary is unmet.
+- Checklist delivery:
+  - [ ] C366 — Apps check many permissions and list permitted resources as their own application connector, under explicit grants and their own-kind boundary; neither binding nor prefix ownership grants authority (ADR-126, DIRECTORY-048 R5). — Needs the connector identity; blocked.
+- Story delivery:
+  - [ ] S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys. — Blocked on DIRECTORY-047 R3.
 
 ### R6: One OpenAPI document, generated, describes every route
 
@@ -237,6 +299,18 @@ Behavioural. GET /openapi.json answers an OpenAPI 3.1 document generated from th
 
 **Stories:**
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
+
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by the same start boundary; nothing was changed. The OpenAPI document must describe every route, and the route table changes once the provider routes are integrated and the registrar route is removed, so it cannot be completed before then.
+- Deviation: I made no change because the continuation's start boundary is unmet.
+- Checklist delivery:
+  - [ ] C367 — One OpenAPI document, generated from the routes and types, describes every route; a route without an entry fails the build (DIRECTORY-048 R6). — Not verified this round; continuation blocked.
+- Story delivery:
+  - [ ] S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys. — Blocked on DIRECTORY-047 R3.
 
 ### R7: Lys depends on no app
 
@@ -264,6 +338,18 @@ Structural. Lys depends on no app. It holds no app's name, kind, schema or code;
 **Stories:**
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
 
+#### R7 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by the same start boundary; nothing was changed. This round verified no row.
+- Deviation: I made no change because the continuation's start boundary is unmet.
+- Checklist delivery:
+  - [ ] C368 — Lys holds no app's name or schema in code or configuration and makes no call to any app (DIRECTORY-048 R7). — Not verified this round; continuation blocked.
+- Story delivery:
+  - [ ] S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys. — Blocked on DIRECTORY-047 R3.
+
 ### R8: Build an app's permission template on a Lys screen
 
 Behavioural. Building the template is the requirement; a description of it is not. The Apps screen gains a builder in which a person makes an app's whole permission schema without writing any schema language: add kinds under the app's prefix; give each kind its actions; make relations and tick which actions each carries; set a kind's parents by choosing them; start from a template (owner/editor/viewer on one kind; workspace with members over child kinds; team-scoped resources) and change it. The kinds are drawn as a tree with their relations, editable in place. A test bench beside it lets the person place example people and agents on example resources and ask 'may X do Y to Z', answered by the real permission check against the draft, with the path that allowed or refused it. Saving runs the dry run of R3, lists what would be added and removed and any grants a change would strand, and cannot save a change that strands grants. It saves through the same routes as an upload, so a schema built here and one uploaded through the API are the same record, each editable by the other. Controls are styled from the design tokens, never default ones. The draft being built is held in the builder's own session store, separate from the permission store; the bench's check runs against a scratch copy of the draft loaded into a throwaway namespace of the permission service, so no standing check can see a draft, and the namespace is removed when the bench closes.
@@ -287,6 +373,19 @@ Behavioural. Building the template is the requirement; a description of it is no
 **Stories:**
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
 - S152 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen.
+
+#### R8 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by the same start boundary; nothing was changed. This round verified no row.
+- Deviation: I made no change because the continuation's start boundary is unmet.
+- Checklist delivery:
+  - [ ] C386 — A person builds an app's whole permission template on the Apps screen from templates, tests it on example people and resources against the real check, and saves it; built and uploaded schemas are the same record (DIRECTORY-048 R8). — Not verified this round; continuation blocked.
+- Story delivery:
+  - [ ] S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys. — Blocked on DIRECTORY-047 R3.
+  - [ ] S152 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen. — Blocked on DIRECTORY-047 R3.
 
 ## Boundaries
 
