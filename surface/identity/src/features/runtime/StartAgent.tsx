@@ -1,51 +1,49 @@
-/** The command that starts an agent on a machine. The service checks and records the start; it never runs the command. */
+/** A recorded launch request retains its operation; showing a command never reports a running process. */
 import { useState } from 'react';
-import { operationId, Refused, request, useLoad } from '../../api';
+import { api, operationId, request, useLoad } from '../../api';
+import { readRoles } from '../roles/AssignedRoles';
+import type { Role } from '../roles/contract';
 import type { NetworkView } from '../network/contract';
-
-/** The answer of `POST /agents/{id}/start-command`. */
-export interface StartCommand {
+import { useRoleChange } from '../roles/useRoleChange';
+import { ChangeStatus } from '../roles/ChangeStatus';
+import { Gate } from '../signin/Gate';
+export interface StartAnswer {
   agent: string; machine: string; runtime: string; session: string; provisioning_version: number; harness: string;
-  handles: { id: string; secret: string; env: string }[]; template: string; template_sha256: string; command: string; left_out: string[]; executed: boolean;
+  handles: { env: string; id: string; secret: string }[]; template: string; template_sha256: string; command: string; left_out: string[]; executed: false;
 }
-interface Asked { machine: string; operation: string }
-
-export function StartAgent({ id }: { id: string }) {
-  const key = 'lys.pending.start.' + id;
-  const network = useLoad(() => request<NetworkView>('/network'), 'start-machines:' + id);
-  const [asked, setAsked] = useState<Asked | null>(() => { const raw = sessionStorage.getItem(key); return raw === null ? null : JSON.parse(raw) as Asked; });
-  const [machine, setMachine] = useState(asked?.machine ?? '');
-  const [answer, setAnswer] = useState<StartCommand | null>(null);
-  const [failure, setFailure] = useState('');
-  const [busy, setBusy] = useState(false);
-  const send = async (body: Asked) => {
-    if (busy) return; setBusy(true); setFailure('');
-    sessionStorage.setItem(key, JSON.stringify(body)); setAsked(body);
-    try {
-      const started = await request<StartCommand>('/agents/' + encodeURIComponent(id) + '/start-command', body);
-      if (started.agent !== id || started.session !== body.operation || started.machine !== body.machine || started.executed) throw new Error('The answer did not confirm this start. Its original request is retained.');
-      sessionStorage.removeItem(key); setAsked(null); setAnswer(started);
-    } catch (error) {
-      if (error instanceof Refused && error.status >= 400 && error.status < 500) { sessionStorage.removeItem(key); setAsked(null); }
-      setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));
-    } finally { setBusy(false); }
-  };
-  const machines = network.status === 'ok' ? network.data.machines.filter((entry) => entry.state === 'in_use' && entry.runtime !== null) : [];
-  return <section className="card" aria-label="Start this agent"><h3>Start this agent</h3>
-    <p>Choose a machine. The service checks the agent is active, its profile version is reviewed, the machine may run it and can reach its MCP servers, then records the start and answers the command to run there. It does not run the command.</p>
-    {network.status === 'refused' ? <p className="why-not">{network.refused.refusal.refusal}: {network.refused.message}</p> : null}
-    {network.status === 'ok' && !machines.length ? <p>No registered machine has a runtime installed.</p> : null}
-    {machines.length ? <form onSubmit={(event) => { event.preventDefault(); if (machine && !asked) void send({ machine, operation: operationId() }); }}>
-      <label className="field">Machine<select value={machine} disabled={busy || asked !== null} onChange={(event) => { setMachine(event.target.value); setAnswer(null); }}><option value="">Choose a machine</option>{machines.map((entry) => <option key={entry.id} value={entry.id}>{entry.name} · {entry.runtime}</option>)}</select></label>
-      <button className="btn primary" type="submit" disabled={busy || !machine || asked !== null}>Get start command</button>
-    </form> : null}
-    {asked ? <div role="status"><p>The start on this machine is not confirmed. Its original request is retained.</p><button className="btn" disabled={busy} onClick={() => void send(asked)}>Check original start</button></div> : null}
-    {failure ? <p className="why-not" role="alert">{failure}</p> : null}
-    {answer ? <div role="status"><p>Start recorded as session {answer.session}, from profile version {answer.provisioning_version}, for {answer.harness} on {answer.runtime}. Run this on the machine:</p>
-      <pre style={{ whiteSpace: 'pre-wrap' }}>{answer.command}</pre>
-      {answer.handles.length ? <p>Credential handles it names: {answer.handles.map((handle) => handle.secret + ' as ' + handle.env).join(', ')}.</p> : null}
-      {answer.left_out.length ? <p className="note">Not carried by the command: {answer.left_out.join('; ')}.</p> : null}
-      <details><summary>Launch template</summary><p>SHA-256 {answer.template_sha256}</p><pre style={{ whiteSpace: 'pre-wrap' }}>{answer.template}</pre></details>
-    </div> : null}
+export function StartAgent({ agent }: { agent: string }) {
+  const load = useLoad(async () => ({ me: await api.me(), network: await request<NetworkView>('/network'), roles: await readRoles() }), 'launch-options:' + agent);
+  return <section className="card"><h2>Prepare an agent start</h2><p>This records a start request and gives you its command. You run it on the selected machine. Running is confirmed only by a runtime report.</p>
+    <Gate load={load} title="Start options" ok={({ me, network, roles }) => <StartForm agent={agent} person={me.person.id} network={network} roles={roles.roles} />} />
   </section>;
+}
+function StartForm({ agent, person, network, roles }: { agent: string; person: string; network: NetworkView; roles: Role[] }) {
+  const [machine, setMachine] = useState('');
+  const [answer, setAnswer] = useState<StartAnswer | null>(null);
+  const [copyNotice, setCopyNotice] = useState('');
+  const held = roles.filter((role) => role.holders.some((holder) => holder.holder === agent && holder.state === 'holding')).map((role) => role.id);
+  const machines = network.machines.filter((entry) => entry.state === 'in_use' && entry.runtime !== null && (entry.may_run.some((entry) => entry.id === agent) || entry.may_run_roles?.some((role) => held.includes(role))));
+  const change = useRoleChange<StartAnswer>('lys.pending.start.' + person + '.' + agent, '/agents/' + encodeURIComponent(agent) + '/start-command', (receipt, body) => {
+    const matches = receipt.agent === agent && receipt.machine === body.machine && receipt.session === body.operation && receipt.executed === false && typeof receipt.command === 'string' && receipt.command.length > 0 && Array.isArray(receipt.left_out);
+    if (matches) setAnswer(receipt);
+    return matches;
+  }, () => {});
+  const copy = async () => {
+    if (!answer) return;
+    try { await navigator.clipboard.writeText(answer.command); setCopyNotice('Command copied. This has not started the agent.'); }
+    catch (error) { setCopyNotice('Could not copy: ' + String(error)); }
+  };
+  return <>
+    {!answer ? <form onSubmit={(event) => { event.preventDefault(); if (machine) change.submit({ machine, operation: operationId() }); }}>
+      <label className="field">Machine<select required value={machine} disabled={change.blocked} onChange={(event) => setMachine(event.target.value)}><option value="">Choose where to run</option>{machines.map((entry) => <option key={entry.id} value={entry.id}>{entry.name} · {entry.runtime}</option>)}</select></label>
+      {!machines.length ? <p>No permitted machine with a runtime was returned. <a href="#/network">Manage machines</a>.</p> : null}
+      <button type="submit" className="btn primary" disabled={change.blocked || !machine}>Record start request</button>
+    </form> : <section role="status"><h3>Start recorded — running is unconfirmed</h3><p>Session: <span className="mono">{answer.session}</span></p><p>Profile version {answer.provisioning_version} · {answer.runtime}</p>
+      {answer.left_out.length ? <div className="why-not"><h3>Not carried into this command</h3><ul>{answer.left_out.map((entry, index) => <li key={index}>{entry}</li>)}</ul></div> : null}
+      <label className="field">Command<textarea readOnly rows={4} value={answer.command} /></label><button className="btn" onClick={() => void copy()}>Copy command</button>{copyNotice ? <p role="status">{copyNotice}</p> : null}
+      <details><summary>Launch template and evidence</summary><p>Template hash: {answer.template_sha256}</p><pre>{answer.template}</pre></details>
+      <p><a href={'#/file/' + agent + '/sessions'}>Read runtime reports</a>. Do not start another copy while this start’s outcome is unknown.</p>
+    </section>}
+    <ChangeStatus change={change} />
+  </>;
 }

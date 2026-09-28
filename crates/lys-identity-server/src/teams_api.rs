@@ -11,6 +11,10 @@
 //! sent again in the same words answers the team as it stands and writes
 //! nothing; the same operation in other words is refused `TeamReused`. A
 //! member is a person or an agent the directory holds and has not retired.
+//!
+//! Every act answers the team as it stands now beside `recorded`, the line
+//! its operation was first kept as. A retry therefore reads what it did the
+//! first time, however the team has changed since.
 
 use std::str::FromStr;
 use std::sync::{Arc, PoisonError};
@@ -58,6 +62,31 @@ pub struct TeamView {
     pub created_at: u64,
     /// When it was retired, null while it is in use.
     pub retired_at: Option<u64>,
+}
+
+/// The line an operation was first kept as.
+#[derive(Debug, Clone, Serialize)]
+pub struct Recorded {
+    /// The operation id the act was sent under.
+    pub operation: String,
+    /// `created`, `added`, `removed` or `retired`.
+    pub act: String,
+    /// The member added or removed; null for a creation or a retirement.
+    pub member: Option<String>,
+    /// The login that made it.
+    pub by: Login,
+    /// When it was first kept, in seconds since the Unix epoch.
+    pub at: u64,
+}
+
+/// The answer of every act on a team.
+#[derive(Debug, Clone, Serialize)]
+pub struct TeamChanged {
+    /// The team as it stands now.
+    #[serde(flatten)]
+    pub team: TeamView,
+    /// What this operation was first kept as.
+    pub recorded: Recorded,
 }
 
 /// The answer of `GET /teams`.
@@ -140,6 +169,44 @@ fn view(team: &Team) -> TeamView {
     }
 }
 
+fn recorded(line: &Line) -> Recorded {
+    let (act, member) = match line {
+        Line::Created(_) => ("created", None),
+        Line::Added(changed) => ("added", Some(changed.member.clone())),
+        Line::Removed(changed) => ("removed", Some(changed.member.clone())),
+        Line::Retired(_) => ("retired", None),
+    };
+    let (by, at) = match line {
+        Line::Created(created) => (created.by.clone(), created.at),
+        Line::Added(changed) | Line::Removed(changed) | Line::Retired(changed) => {
+            (changed.by.clone(), changed.at)
+        }
+    };
+    Recorded {
+        operation: line.operation().to_owned(),
+        act: act.to_owned(),
+        member,
+        by,
+        at,
+    }
+}
+
+/// Keep `line` and answer the team as it stands beside the line its
+/// operation was first kept as.
+fn kept(store: &mut TeamStore, line: Line) -> Result<TeamChanged, ServerError> {
+    let operation = line.operation().to_owned();
+    let team = store.keep(line)?;
+    let first = store
+        .recorded(&operation)
+        .ok_or_else(|| ServerError::TeamsUnavailable {
+            reason: format!("operation `{operation}` was kept and is not held"),
+        })?;
+    Ok(TeamChanged {
+        team: view(&team),
+        recorded: recorded(&first),
+    })
+}
+
 fn words(name: &str, text: &str, most: usize) -> Result<String, ServerError> {
     let text = text.trim();
     if text.chars().count() > most {
@@ -163,7 +230,7 @@ async fn create(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     body: Result<Json<CreateBody>, JsonRejection>,
-) -> Result<Json<TeamView>, ServerError> {
+) -> Result<Json<TeamChanged>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let actor = signed_in(&state, &headers)?;
     let id = OperationId::from_str(&body.operation)?.to_string();
@@ -182,7 +249,7 @@ async fn create(
             by: login(actor.binding()),
             at: now(),
         });
-        with_teams(&state, |store| store.keep(line).map(|team| view(&team)))
+        with_teams(&state, |store| kept(store, line))
     })
     .map(Json)
 }
@@ -195,7 +262,7 @@ fn change(
     actor: &Actor,
     id: &str,
     made: impl FnOnce(String, Login) -> Result<Line, ServerError>,
-) -> Result<TeamView, ServerError> {
+) -> Result<TeamChanged, ServerError> {
     let administrator = state.admission.administrator(actor).is_ok();
     with_directory(state, |directory| {
         let projection = directory.projection()?;
@@ -218,7 +285,7 @@ fn change(
                     reason: "only a team's owner or the administrator changes it",
                 });
             }
-            store.keep(line).map(|team| view(&team))
+            kept(store, line)
         })
     })
 }
@@ -261,7 +328,7 @@ async fn add(
     headers: HeaderMap,
     Path(id): Path<String>,
     body: Result<Json<MemberBody>, JsonRejection>,
-) -> Result<Json<TeamView>, ServerError> {
+) -> Result<Json<TeamChanged>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let actor = signed_in(&state, &headers)?;
     let id = team_id(&id)?;
@@ -277,7 +344,7 @@ async fn remove(
     headers: HeaderMap,
     Path((id, member)): Path<(String, String)>,
     body: Result<Json<RetireBody>, JsonRejection>,
-) -> Result<Json<TeamView>, ServerError> {
+) -> Result<Json<TeamChanged>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let actor = signed_in(&state, &headers)?;
     let id = team_id(&id)?;
@@ -292,7 +359,7 @@ async fn retire(
     headers: HeaderMap,
     Path(id): Path<String>,
     body: Result<Json<RetireBody>, JsonRejection>,
-) -> Result<Json<TeamView>, ServerError> {
+) -> Result<Json<TeamChanged>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let actor = signed_in(&state, &headers)?;
     let id = team_id(&id)?;

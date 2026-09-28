@@ -181,11 +181,18 @@ async fn grants(
     Ok(Json(answer))
 }
 
+/// A window of the audit log: the last lines, or with `?before=<index>`
+/// the last before that index. The query is forwarded unchanged.
 async fn audit(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    RawQuery(query): RawQuery,
 ) -> Result<Json<Value>, ServerError> {
-    let answer = ask(&state, &headers, Method::GET, "/_lys/audit", Bytes::new()).await?;
+    let path = query.map_or_else(
+        || "/_lys/audit".to_owned(),
+        |query| format!("/_lys/audit?{query}"),
+    );
+    let answer = ask(&state, &headers, Method::GET, &path, Bytes::new()).await?;
     Ok(Json(answer))
 }
 

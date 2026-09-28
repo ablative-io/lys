@@ -198,6 +198,11 @@ impl<S: LeafStore> TeamStore<S> {
         self.held.team(id)
     }
 
+    /// The line first kept under `operation`.
+    pub fn recorded(&self, operation: &str) -> Option<Line> {
+        self.held.operation(operation)
+    }
+
     /// Keep `line` and answer its team as it then stands. Sent again in the
     /// same words it is kept once; the same operation in other words is
     /// refused, and so is a line the team as it stands does not take.

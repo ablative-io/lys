@@ -119,7 +119,7 @@ impl Table {
 
     fn body(&self) -> Result<Vec<u8>, Box<dyn Error>> {
         Ok(json!({
-            "operation": operation()?, "state": "running", "machine": self.machine,
+            "operation": operation()?, "state": "starting", "machine": self.machine,
             "what": "the agent's own session",
         })
         .to_string()
