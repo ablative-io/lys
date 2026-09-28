@@ -214,7 +214,7 @@ impl SignInProviders {
     }
 
     async fn listed(&self) -> Result<Vec<Listed>, ServerError> {
-        let answer = self.call(reqwest::Method::GET, "/providers", None).await?;
+        let answer = self.call(reqwest::Method::POST, "/providers", None).await?;
         serde_json::from_value(answer).map_err(|error| ServerError::SignInProvidersUnavailable {
             reason: format!("the issuer's provider list could not be read: {error}"),
         })
@@ -244,7 +244,7 @@ impl SignInProviders {
                 .await?;
             }
             None => {
-                self.call(reqwest::Method::POST, "/providers", Some(request))
+                self.call(reqwest::Method::POST, "/providers/create", Some(request))
                     .await?;
             }
         }
