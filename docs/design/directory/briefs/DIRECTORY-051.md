@@ -259,14 +259,17 @@ For paths, inspect only structured Read/Write/Edit file_path and Glob/Grep path 
 
 On denial the runner durably appends one refusal before responding: source id, stable attempt id, proved session, instant, tool, safe target summary, policy version, rule and grantability. Repeated delivery of that attempt reuses the record; a lost reply does not create a new denial attempt. A failure to append never becomes permission; return a named denial with incomplete audit coverage. The client emits Claude Code's hookSpecificOutput PreToolUse deny response with its reason. A non-denial emits no allow override. Unreachable runner or failed peer proof returns deny. An unproved request writes no attributed refusal for a named session. Prove this behavior with fault tests, including a dead runner. The installed hook's integrity and capability are checked before claiming coverage; hook policy is not protection against arbitrary same-user process tampering.
 
-Each agent page shows the authenticated refusal records newest first. The row names the attempted act, refusing rule/check, and a real permission/grantor only where the current server authority establishes one. Hard rules say no grant can allow them. Delivery to the server is by the runner control channel with durable cursor/replay; new GET /agents/{id}/refusals and GET /agents/{id}/refusals/events check visibility on every read/event. Source disconnection or missing coverage is visible; an empty list is not an all-clear. Agent prose and PostToolUseFailure text are not authoritative policy denials. No record contains secret values or unredacted tool bodies. The Codex notify contract has no Lys-owned pre-tool denial hook: show 'refusals are not observed for Codex sessions yet'. Codex tracking and runner stop acts still work, but a profile requiring this pre-tool policy refuses policy_not_supported rather than running unguarded. Process containment is separate card 11VnzLRp, after 050 and051; no screen or receipt calls this hook an OS sandbox. grants.rs gains no code line; use grants_refusals.rs with minimal relocation preserving grant decisions. scripts/file-length.sh must pass.
+Each agent page shows the authenticated refusal records newest first. The row names the attempted act, refusing rule/check, and a real permission/grantor only where the current server authority establishes one. Hard rules say no grant can allow them. Delivery to the server is by the runner control channel with durable cursor/replay; new GET /agents/{id}/refusals and GET /agents/{id}/refusals/events check visibility on every read/event. Source disconnection or missing coverage is visible; an empty list is not an all-clear. Agent prose and PostToolUseFailure text are not authoritative policy denials. No record contains secret values or unredacted tool bodies. The Codex notify contract has no Lys-owned pre-tool denial hook: show 'refusals are not observed for Codex sessions yet'. Codex tracking and runner stop acts still work, but a profile requiring this pre-tool policy refuses policy_not_supported rather than running unguarded. Process containment is separate card 11VnzLRp, after 050 and051; no screen or receipt calls this hook an OS sandbox. grants.rs gains no code line; use grants_refusals.rs with minimal relocation preserving grant decisions. scripts/file-length.sh must pass. The denial acceptance probe uses a fresh test-owned writable directory outside the fixture workspace, named <probe_root>/denied, and target <probe_root>/denied/lys-probe. Before enabling policy, the same user must successfully create that target. Remove the control file, prove absence, then configure the policy against that directory and attempt the same Write through the real hook. A non-writable system directory cannot prove policy enforcement.
 
 **Acceptance:**
-- A permitted person saves a deny-Write-under-/etc policy through the agent page.
+- Without the policy, the same user successfully writes <probe_root>/denied/lys-probe in the test-owned writable directory outside the fixture workspace.
+- The control file is removed before the policy-denial attempt.
+- The target is absent immediately before the policy-denial attempt.
+- A permitted person saves a deny-Write-under-<probe_root>/denied policy through the agent page.
 - The policy editor states that the saved version applies on the next launch.
 - The next scratch launch receives that policy version.
-- A Write attempt for /etc/lys-probe is denied by the Lys PreToolUse hook.
-- The initially absent /etc/lys-probe remains absent after the attempt.
+- A Write attempt for <probe_root>/denied/lys-probe is denied by the Lys PreToolUse hook.
+- The initially absent <probe_root>/denied/lys-probe remains absent after the attempt.
 - The runner log contains exactly one refusal for that attempt.
 - The refusal record names the proved session.
 - The refusal record names the matched rule.
@@ -284,7 +287,7 @@ Each agent page shows the authenticated refusal records newest first. The row na
 - After a confirmed revocation, the next live grant check denies the tool call.
 - An unavailable live grant authority denies with grant_state_unavailable.
 - A non-denial never overrides a native harness refusal.
-- A sibling path such as /etc-other does not match the /etc component prefix.
+- A sibling path such as <probe_root>/denied-other does not match the <probe_root>/denied component prefix.
 - A symlink into a denied prefix is denied by the path rule.
 - An ambiguous path target is denied.
 - A denied WebFetch initial hostname is denied before that tool executes.
