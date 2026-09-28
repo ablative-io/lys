@@ -6,6 +6,7 @@
 //! crate holds sign-in, sessions, admission and the HTTP routes over it.
 
 pub mod admission;
+mod agent_sight;
 pub mod config;
 pub mod configuration_api;
 pub mod connections_api;
@@ -15,6 +16,7 @@ pub mod grant_contract;
 mod grant_sight;
 pub mod grants;
 pub mod link_audit_api;
+pub mod memory_api;
 pub mod network_api;
 pub mod network_store;
 pub mod oidc;

@@ -135,12 +135,26 @@ fn mentions(row: &LanternRow, folded: &str) -> bool {
             .any(|e| e.words.to_lowercase().contains(folded))
 }
 
+/// Every lantern of the home, by session id then file position. A session
+/// that cannot be read is skipped and named.
+pub fn recall_all(home: &Home) -> Result<RecallReport, HomeError> {
+    recall_where(home, |_row| true)
+}
+
 /// Every lantern of the home whose note or one of whose epilogues contains
 /// `words` as one contiguous phrase, case-folded. Blank words are refused
 /// by name. A session that cannot be read is skipped and named.
 pub fn recall_by_note(home: &Home, words: &str) -> Result<RecallReport, HomeError> {
     require_words("words", words)?;
     let folded = words.to_lowercase();
+    recall_where(home, |row| mentions(row, &folded))
+}
+
+/// Every lantern of the home that `keep` keeps.
+fn recall_where(
+    home: &Home,
+    keep: impl Fn(&LanternRow) -> bool,
+) -> Result<RecallReport, HomeError> {
     let mut lanterns = Vec::new();
     let mut skipped = Vec::new();
     for session in home.session_ids()? {
@@ -148,7 +162,7 @@ pub fn recall_by_note(home: &Home, words: &str) -> Result<RecallReport, HomeErro
             .read_session(&session)
             .and_then(|reader| rows_of(home, &reader, &session));
         match rows {
-            Ok(rows) => lanterns.extend(rows.into_iter().filter(|row| mentions(row, &folded))),
+            Ok(rows) => lanterns.extend(rows.into_iter().filter(|row| keep(row))),
             Err(e) => skipped.push(Skipped {
                 session,
                 reason: e.to_string(),

@@ -153,8 +153,10 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         provisioning: provisioning.map(Mutex::new),
         say,
     });
-    let configuration = crate::configuration_api::routes(config).with_state(Arc::clone(&state));
-    Ok(router(state).merge(configuration))
+    let configured = crate::configuration_api::routes(config)
+        .merge(crate::memory_api::routes(config))
+        .with_state(Arc::clone(&state));
+    Ok(router(state).merge(configured))
 }
 
 /// Open the directory `config` names, creating its log when the log's

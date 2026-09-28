@@ -85,6 +85,11 @@ pub struct Config {
     /// `ProvisioningUnavailable`.
     #[serde(default)]
     pub provisioning_file: Option<PathBuf>,
+    /// The directory the homes of the agents are kept in, one home for each
+    /// agent under the agent's id. It is read and never written. Without it
+    /// the memory route answers `MemoryUnavailable`.
+    #[serde(default)]
+    pub homes_dir: Option<PathBuf>,
 }
 
 /// The permission model as its file writes it: a version, and each relation

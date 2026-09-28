@@ -290,6 +290,7 @@ impl Service {
             network_file: Some(dir.path().join("network.json")),
             roles_file: Some(dir.path().join("roles.json")),
             provisioning_file: Some(dir.path().join("provisioning.json")),
+            homes_dir: Some(dir.path().join("homes")),
         };
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;
