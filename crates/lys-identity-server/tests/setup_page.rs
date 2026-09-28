@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use identity_contract::fake_rauthy::{API_KEY, FakeRauthy};
 use identity_contract::harness::{GRANT_MODEL, Service, session_cookie};
 use lys_identity::OperationId;
+use lys_identity_server::accounts::PasswordPolicy;
 use lys_identity_server::setup::SetupSettings;
 use lys_identity_server::sign_in_providers::SignInProvidersSettings;
 use serde_json::{Value, json};
@@ -24,6 +25,21 @@ type TestResult = Result<(), Box<dyn Error>>;
 const CODE: &str = "k3Jd9-first-run-code-Qm2";
 const EMAIL: &str = "ada@example.test";
 const PASSWORD: &str = "Analytical-Engine-1843";
+
+/// Lys's configured password policy, which is no default of Lys's or of
+/// the issuer's: 12 to 48 characters, two digits and one character that is
+/// neither a letter nor a digit.
+fn lys_policy() -> PasswordPolicy {
+    PasswordPolicy {
+        length_min: 12,
+        length_max: 48,
+        lower_case: None,
+        upper_case: None,
+        digits: Some(2),
+        special: Some(1),
+        not_recently_used: None,
+    }
+}
 
 fn hex(bytes: &[u8]) -> String {
     let digits: Vec<String> = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
@@ -59,6 +75,7 @@ async fn table() -> Result<Table, Box<dyn Error>> {
         Some(settings),
         |config| {
             config.administrator = None;
+            config.password_policy = Some(lys_policy());
             config.setup = Some(SetupSettings {
                 code_file: config.log_dir.with_file_name("setup-code"),
                 administrator_file: config.log_dir.with_file_name("administrator.json"),
@@ -133,7 +150,16 @@ async fn the_setup_route_answers_the_setup_screen_for_the_pending_code_only() ->
         Value::Null,
         "no email is filled in for the person"
     );
-    assert_eq!(opened["policy"]["length_min"], 14);
+    assert_eq!(
+        opened["policy"],
+        lys_policy().view(),
+        "the page shows Lys's configured policy before anything is sent"
+    );
+    assert_eq!(opened["policy"]["length_min"], 12);
+    assert_eq!(
+        opened["policy"]["words"],
+        "At least 12 and at most 48 characters, with 2 of the kind: digit, a character that is not a letter or a digit."
+    );
     let wrong = service
         .post("/setup/open", None, &json!({ "code": "not-the-code" }))
         .await?;
@@ -275,6 +301,12 @@ async fn a_wrong_code_makes_nothing_and_a_weak_password_is_refused_before_anythi
     weak["password"] = json!("short");
     let weak = service.post("/setup/administrator", None, &weak).await?;
     refused(&weak, 400, "AccountRefused");
+    let mut one_digit = administrator(CODE, EMAIL)?;
+    one_digit["password"] = json!("Analytical-Engine-1");
+    let one_digit = service
+        .post("/setup/administrator", None, &one_digit)
+        .await?;
+    refused(&one_digit, 400, "AccountRefused");
     let mut unshaped = administrator(CODE, EMAIL)?;
     unshaped["email"] = json!("ada");
     let unshaped = service

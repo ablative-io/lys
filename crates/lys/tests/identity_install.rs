@@ -8,7 +8,9 @@
 //! product, none gives the issuer's loopback port, and every redirect is on
 //! Lys's origin. Then a fixture product is registered in the service
 //! configuration the install wrote and signs a person in through Lys
-//! (`product`). Container-backed: runs only on the identity leg.
+//! (`product`). The install is given a password policy of Lys's own, which
+//! the setup screen shows and the sign-in service enforces (`policy`).
+//! Container-backed: runs only on the identity leg.
 //!
 //! The directory service and the secrets broker answer on the install's
 //! fixed ports, so the test refuses by name when another install holds them
@@ -18,6 +20,8 @@
 //! running this test.
 
 pub mod identity_support;
+#[path = "identity_install/policy.rs"]
+mod policy;
 #[path = "identity_install/product.rs"]
 mod product;
 
@@ -189,7 +193,8 @@ fn headless_path(at: &Path) -> TestResult<String> {
 }
 
 /// The estate's deployment configuration: the shipped template on free
-/// ports, a free network range and a compose project of its own.
+/// ports, a free network range and a compose project of its own, with Lys's
+/// password policy for this install.
 fn deployment(project: &str, rauthy_port: u16) -> TestResult<String> {
     let network = free_network()?;
     Ok(TEMPLATE
@@ -203,7 +208,8 @@ fn deployment(project: &str, rauthy_port: u16) -> TestResult<String> {
         .replace("55432", &free_port()?.to_string())
         .replace("58051", &free_port()?.to_string())
         .replace("58443", &free_port()?.to_string())
-        .replace("172.29.47.", &network))
+        .replace("172.29.47.", &network)
+        + policy::LYS_POLICY)
 }
 
 /// One answer as a browser sees it.
@@ -390,6 +396,7 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
     let opened = serde_json::json!({ "code": code.trim() }).to_string();
     let open = ask("POST", "/api/setup/open", None, Some(&opened))?;
     assert_eq!(open.status, 200, "{}", open.body);
+    policy::setup_shows_lys_policy(&serde_json::from_str(&open.body)?)?;
     read.answer("the opened setup", &open);
     let wrong = ask(
         "POST",
@@ -450,6 +457,7 @@ fn a_first_install_and_a_sign_in_never_name_the_issuer() -> TestResult {
         },
         &mut read,
     )?;
+    policy::issuer_enforces_lys_policy(estate.root.path(), estate.rauthy_port, &mut read)?;
 
     let port = format!(":{}", estate.rauthy_port);
     let mut scanned = 0;

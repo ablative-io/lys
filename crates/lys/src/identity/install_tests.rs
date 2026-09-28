@@ -430,3 +430,34 @@ fn a_new_install_registers_no_product_and_names_no_administrator() -> Result<(),
     assert_eq!(config.deployment.admin_email, None);
     Ok(())
 }
+
+#[test]
+fn the_service_is_given_the_password_policy_the_deployment_states() -> Result<(), Box<dyn Error>> {
+    let root = PathBuf::from("/srv/lys");
+    let layout = Layout::at(root.clone());
+    let text = format!(
+        "{}\n[password_policy]\nlength_min = 12\nlength_max = 48\ndigits = 2\n",
+        render_deployment(None)
+    );
+    let config = DeploymentConfig::parse(&text, root)?;
+    let rendered =
+        server_config::render(&layout, &config, &server_config::Carried::default(), true);
+    assert_eq!(
+        rendered["password_policy"],
+        serde_json::json!({
+            "length_min": 12,
+            "length_max": 48,
+            "lower_case": null,
+            "upper_case": null,
+            "digits": 2,
+            "special": null,
+            "not_recently_used": null,
+        }),
+        "the screens are given the policy the install writes to the sign-in service"
+    );
+    assert_eq!(
+        crate::identity::configure::issuer_policy(&config.password_policy)["include_digits"],
+        2
+    );
+    Ok(())
+}

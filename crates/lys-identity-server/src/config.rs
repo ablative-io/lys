@@ -142,6 +142,12 @@ pub struct Config {
     /// page's routes answer `SetupUnavailable`.
     #[serde(default)]
     pub setup: Option<crate::setup::SetupSettings>,
+    /// Lys's password policy, the one the install wrote to the issuer: the
+    /// setup and account screens show it and it is checked before a password
+    /// is sent. Without it the screens show no policy and the issuer alone
+    /// checks one.
+    #[serde(default)]
+    pub password_policy: Option<crate::accounts::PasswordPolicy>,
     /// The compiled screens the service serves at `/`, its own routes then
     /// answering under `/api`. Without it the routes answer at the root and
     /// no screen is served.
@@ -188,6 +194,11 @@ impl Config {
             ));
         }
         self.link_audit_binding()?;
+        if let Some(policy) = &self.password_policy {
+            policy
+                .validate()
+                .map_err(|reason| invalid(format!("password_policy: {reason}")))?;
+        }
         if self.session_seconds == 0 {
             return Err(invalid("session_seconds is zero"));
         }

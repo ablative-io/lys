@@ -58,7 +58,184 @@
       ],
       "stories": [
         "S149"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys/src/identity/install/directory_key.rs",
+            "change": "created",
+            "note": "Makes or narrows the lys_directory API key through the install's configure key. Rights are exactly Clients/Users/AuthProviders read-create-update and Secrets read. It reads the rights back (ReadBackMismatch if they differ) and renews the token only when the service does not hold one. It resolves a lost create answer by listing the keys. A configure key without ApiKeys rights is refused by name as RauthyForbidden. provide() writes the token to sign-in-providers-api-key and answers the file Outcome."
+          },
+          {
+            "path": "crates/lys/src/identity/install/directory_key_tests.rs",
+            "change": "created",
+            "note": "Stand-in Rauthy tests: (1) a new key has no Secrets update and no ApiKeys group; (2) a widened key is narrowed and a held token is kept; (3) a service holding the configure key's token gets a renewed lys_directory token; (4) rights that stay wide are a ReadBackMismatch; (5) a forbidden listing is refused naming the key rights, with nothing written; (6) token recognition."
+          },
+          {
+            "path": "crates/lys/src/identity/rauthy.rs",
+            "change": "modified",
+            "note": "Adds list_api_keys, create_api_key, update_api_key and renew_api_key_secret, plus a token check that the answer names the key asked for (alongside put_password_policy from round 1)."
+          },
+          {
+            "path": "crates/lys/src/identity/install.rs",
+            "change": "modified",
+            "note": "write_providers_key, which handed the configure key to the service, is replaced by directory_key::provide. A change to the key file restarts the service. apply_password_policy still runs after reconcile. The module doc is updated."
+          },
+          {
+            "path": "crates/lys/src/identity/prepare.rs",
+            "change": "modified",
+            "note": "The bootstrap key is the install-only configure key: Clients/Users/AuthProviders read-create-update, Secrets read-update and ApiKeys read-create-update. The doc says the service never holds it."
+          },
+          {
+            "path": "crates/lys/src/identity/prepare_tests.rs",
+            "change": "modified",
+            "note": "Asserts the configure key's groups, including ApiKeys, and their rights."
+          },
+          {
+            "path": "crates/lys/tests/identity_install/policy.rs",
+            "change": "created",
+            "note": "On a real install: the setup answer carries Lys's 20/64/3-digit policy and its words. The service's key file holds a lys_directory token. With that key, the issuer refuses 'Babbage-Engine-18', which its default policy takes, and accepts 'Difference-Engine-1822', which then signs in through Lys. The same key is refused 403 on PUT /password_policy and on POST /oidc/rotate_jwk. Nothing reads the issuer's policy back."
+          },
+          {
+            "path": "crates/lys/tests/identity_install.rs",
+            "change": "modified",
+            "note": "The install's deployment gets [password_policy] length_min 20, length_max 64, digits 3. The test calls policy::setup_shows_lys_policy on the opened setup and policy::issuer_enforces_lys_policy after the product sign-in."
+          },
+          {
+            "path": "crates/lys/src/identity/configure.rs",
+            "change": "modified",
+            "note": "From round 1: issuer_policy, reconcile_password_policy (403 is named, stored policy checked against what was written) and apply_password_policy."
+          },
+          {
+            "path": "crates/lys/src/identity/configure_tests.rs",
+            "change": "modified",
+            "note": "Password policy tests; the PolicySeen alias and if-let fix the round's type_complexity and single_match_else."
+          },
+          {
+            "path": "crates/lys/src/identity/config.rs",
+            "change": "modified",
+            "note": "From round 1: the [password_policy] table and its validation."
+          },
+          {
+            "path": "crates/lys/src/identity/config_tests.rs",
+            "change": "modified",
+            "note": "From round 1: policy parse and refusal tests."
+          },
+          {
+            "path": "crates/lys/src/identity/install/server_config.rs",
+            "change": "modified",
+            "note": "From round 1: renders password_policy into the service configuration."
+          },
+          {
+            "path": "crates/lys/src/identity/install_tests.rs",
+            "change": "modified",
+            "note": "From round 1: the service is given the deployment's policy."
+          },
+          {
+            "path": "crates/lys-identity-server/src/accounts.rs",
+            "change": "modified",
+            "note": "From round 1: PasswordPolicy from configuration, no hard-coded 14/128. words() builds with push_str of the pieces (the format_push_string fix)."
+          },
+          {
+            "path": "crates/lys-identity-server/src/accounts_tests.rs",
+            "change": "modified",
+            "note": "From round 1: policy tests."
+          },
+          {
+            "path": "crates/lys-identity-server/src/config.rs",
+            "change": "modified",
+            "note": "From round 1: the optional password_policy, validated at load."
+          },
+          {
+            "path": "crates/lys-identity-server/src/routes.rs",
+            "change": "modified",
+            "note": "From round 1: AppState.password_policy."
+          },
+          {
+            "path": "crates/lys-identity-server/src/setup.rs",
+            "change": "modified",
+            "note": "From round 1: setup answers and enforces the configured policy."
+          },
+          {
+            "path": "crates/lys-identity-server/tests/setup_page.rs",
+            "change": "modified",
+            "note": "From round 1: a non-default policy is shown and enforced."
+          },
+          {
+            "path": "surface/identity/src/features/setup/Setup.tsx",
+            "change": "modified",
+            "note": "From round 1: shows Lys's policy before submit, counting bytes."
+          },
+          {
+            "path": "surface/identity/tests/sign-in.test.tsx",
+            "change": "modified",
+            "note": "From round 1: policy shown and refused before submit."
+          },
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-047.md",
+            "change": "modified",
+            "note": "Re-rendered from the workflow's DIRECTORY-047.json, which fixes the round's design-leg 'rendered markdown differs'."
+          }
+        ],
+        "how": "Lys owns the password policy ([password_policy] in deployment.toml). The install writes it to the issuer with the configure key and gives the same values to the directory service, whose setup and account screens show and enforce it before submit. To fix the review's security finding, the configure key is now install-only. The install uses it to mint lys_directory, the key the service holds. That key has no Secrets update, so it cannot rotate signing keys, regenerate client secrets or migrate encryption, and it has no right over API keys. Its rights are read back on every install. Row 7 is now one test on a real install: identity_install.rs configures a non-default policy, sees it in the setup answer, and proves behaviourally that the issuer enforces it. No policy-reading identity is involved.",
+        "deviation": "CN9: these files are outside R1's wall and need a reviewed brief revision to record them: crates/lys/src/identity/install/directory_key.rs and directory_key_tests.rs (new), crates/lys/src/identity/rauthy.rs, crates/lys/tests/identity_install.rs and identity_install/policy.rs (new), plus the round-1 files the reviewer listed (lys-identity-server config.rs, install/server_config.rs, and the test files). The reviewer asked for a reviewed brief revision before the install-only credential. I implemented their suggested shape (an install-only configure key and a service key of its own) because it removes a live privilege on the running service; the brief JSON itself is the workflow's to revise. The OS boundary is limited: the service runs as the same user as the install, so the configure key's file in the state folder is not hidden from it by permissions. The split means the service is only ever given its own narrow key. Upgrade dependency: an install made before this change has a configure key without ApiKeys rights, which is refused by name (RauthyForbidden) at the key step, and without Secrets update, which is refused at the policy step. Granting those is R5's upgrade work, blocked on DIRECTORY-045. Unmeasured: no cargo, identity or surface command ran this round. identity_install.rs, including the new policy checks, runs only on the identity leg (sh scripts/identity-gates/release.sh), which the workflow must request.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "A first install with no --admin-email creates no administrator, prints the setup address, and the setup route answers the setup screen.",
+            "met": true,
+            "evidence": "install.rs has no administrator path (unchanged); crates/lys-identity-server/tests/setup_page.rs the_setup_route_answers_the_setup_screen_for_the_pending_code_only passes (round tests leg exit 0)"
+          },
+          {
+            "criterion": "The setup route refuses by name once an administrator exists, and with a wrong or used code.",
+            "met": true,
+            "evidence": "setup.rs admit() SetupClosed/SetupCodeRefused; setup_page.rs refusal tests pass in round tests leg"
+          },
+          {
+            "criterion": "Completing setup creates exactly one administrator with the entered email and leaves the person signed in to Lys.",
+            "met": true,
+            "evidence": "setup_page.rs completing_setup_makes_one_administrator_and_signs_them_in, round tests leg exit 0"
+          },
+          {
+            "criterion": "A test sets git user.email and every EMAIL-like environment variable to a marker and proves the marker appears nowhere in state, deployment.toml or the issuer.",
+            "met": true,
+            "evidence": "crates/lys/tests/cli_tests/identity_setup.rs (unchanged this round), round tests leg exit 0"
+          },
+          {
+            "criterion": "The bootstrap account names no person, and a people count after setup is one.",
+            "met": true,
+            "evidence": "prepare.rs:42 BOOTSTRAP_ACCOUNT_EMAIL bootstrap@machine.lys.test; setup_page.rs people count assertion"
+          },
+          {
+            "criterion": "No output line or log holds the setup code; `lys identity setup-code` lets a sole administrator set a new password.",
+            "met": true,
+            "evidence": "setup_code.rs hand_over; setup_page.rs a_password_code_sets_the_administrator_a_new_password; the new install line 'Lys's password policy set' carries no secret"
+          },
+          {
+            "criterion": "A test configures a non-default password policy in Lys, prepares the install, and proves the issuer is configured with that same policy and the setup/sign-in page shows Lys's value before submit; no hard-coded copy of the issuer's defaults or policy-reading machine identity is used.",
+            "met": false,
+            "evidence": "Proved only as a chain of per-hop tests against fakes. configure_tests.rs lys_password_policy_is_written_whole_and_rauthy_stores_that_policy uses a fake TCP issuer. install_tests.rs the_service_is_given_the_password_policy_the_deployment_states checks rendered config only. setup_page.rs:155 and sign-in.test.tsx cover the page side. No test prepares an install and shows the real issuer holds the policy: identity_install.rs was not extended. The 14/128 copy is removed (accounts.rs) and no policy-reading identity exists."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "The bootstrap key's rights now include Secrets update (prepare.rs:167). install.rs write_providers_key hands the same key to the long-running directory service as sign-in-providers-api-key. In Rauthy v0.36.2, Secrets update also authorizes POST /oidc/rotate_jwk (oidc.rs:791), PUT /clients/{id}/secret (clients.rs:573) and POST /encryption/migrate (generic.rs:175). The directory service can therefore rotate the issuer's signing keys and regenerate any client's secret. R5's spec lists the key's rights, and Secrets update is not among them. Must be done: a reviewed brief revision that writes the policy without leaving Secrets update on the key the service holds, for example a credential used only at install, then the implementation.",
+          "CN9: files outside R1's wall were edited without a reviewer-approved revision: crates/lys-identity-server/src/config.rs, crates/lys/src/identity/rauthy.rs, crates/lys/src/identity/install/server_config.rs (R4's wall), and test files configure_tests.rs, config_tests.rs, install_tests.rs, prepare_tests.rs, accounts_tests.rs and setup_page.rs. Must be done: record them in a reviewed brief revision.",
+          "Row 7 is unmet as a single test. Must be done: extend identity_install.rs so a real install with a non-default [password_policy] proves the issuer enforces it behaviourally, for example a password that meets the issuer default but breaks Lys's policy is refused, without any policy-reading identity. Then run the identity leg.",
+          "Clippy failed in both shapes: configure_tests.rs:150 type_complexity and :163 single_match_else. With those fixed, a hidden accounts.rs:146 format_push_string also failed.",
+          "An install made before this change refuses rauthy_forbidden at apply_password_policy until the key gains Secrets update. That depends on R5's upgrade work."
+        ],
+        "fixes": [
+          "configure_tests.rs: added the PolicySeen type alias, and changed match fixed to if let/else.",
+          "accounts.rs PasswordPolicy::words: replaced push_str(&format!(..)) with push_str of the pieces. fmt and clippy are clean in both feature shapes."
+        ]
+      }
     },
     {
       "id": "R2",
@@ -91,7 +268,91 @@
       "stories": [
         "S149",
         "S150"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "tests/identity_contract/src/harness.rs",
+            "change": "modified",
+            "note": "From round 1: callback_answer begins a real authorization at /sign-in/providers/stand-in and answers it. serve() uses connect-info on start and restart. restart() is kept."
+          },
+          {
+            "path": "tests/identity_contract/src/fake_issuer.rs",
+            "change": "modified",
+            "note": "From round 1: records authorizations."
+          },
+          {
+            "path": "tests/identity_contract/tests/admission.rs",
+            "change": "modified",
+            "note": "From round 1: 303, Location / and the session cookie, and a second use refused SignInStateUnknown."
+          }
+        ],
+        "how": "Unchanged this round. The reviewer found R2 aligned: every sign-in URL is on Lys's origin, a refusal never names the issuer, per-address throttling uses ConnectInfo and X-Forwarded-For, and the callback regression drives a real OIDC transaction.",
+        "deviation": "The end-to-end run in identity_install.rs needs the identity leg, which was not run this round.",
+        "checklist": [
+          {
+            "id": "C356",
+            "done": true,
+            "note": "Verified by the reviewer: harness.rs callback_answer and admission.rs."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S150",
+            "satisfied": true,
+            "note": "Verified by the reviewer."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "An end-to-end test signs in with email and password and records every URL the browser is sent to: every one is on Lys's origin.",
+            "met": true,
+            "evidence": "crates/lys-identity-server/tests/sign_in_page.rs every_address_the_browser_is_sent_to_is_on_lys_origin; round tests leg exit 0"
+          },
+          {
+            "criterion": "A wrong password and an unknown email give the same Lys refusal, and neither names the issuer.",
+            "met": true,
+            "evidence": "sign_in_page.rs, error.rs SignInRefused; round tests leg exit 0"
+          },
+          {
+            "criterion": "A provider sign-in's recorded URLs are Lys's origin and the provider's, never the issuer's.",
+            "met": true,
+            "evidence": "sign_in_page.rs a_provider_sign_in_passes_through_the_provider_and_lys_only"
+          },
+          {
+            "criterion": "A surface test renders the sign-in and setup screens and finds only the shared form, button and layout classes and no unstyled default control; an end-to-end check loads the served sign-in page and finds no stylesheet or asset served from the issuer.",
+            "met": true,
+            "evidence": "surface/identity/tests/sign-in.test.tsx 'is built from the shared page, field and button styling' (surface leg exit 0); sign_in_page.rs the_served_sign_in_page_loads_nothing_from_the_issuer"
+          },
+          {
+            "criterion": "Repeated wrong passwords from one address do not bar a sign-in from another address.",
+            "met": true,
+            "evidence": "sign_in_page.rs failed_sign_ins_from_one_address_do_not_bar_another"
+          },
+          {
+            "criterion": "An account with a passkey is refused second_factor_unsupported.",
+            "met": true,
+            "evidence": "sign_in_page.rs an_account_asking_for_a_second_factor_is_refused_by_name"
+          },
+          {
+            "criterion": "A callback regression begins a real OIDC transaction through the current card's flow and follows its valid callback with a browser Accept header: status 303, Location /, and a session cookie are all asserted. Replace the obsolete issuer_answer fixture that expected GET /login to redirect to the issuer; retain the card's first-visit and password tests, unknown-state refusal, and single-use checks. The contract harness retains restart() and supplies SocketAddr connect information through serve() on both initial start and restart.",
+            "met": true,
+            "evidence": "harness.rs:439 callback_answer begins at GET /sign-in/providers/stand-in and answers the recorded authorization (fake_issuer.rs authorizations()). admission.rs:88 asserts 303, Location /, the cookie, and a second use refused 400 SignInStateUnknown. issuer_answer is removed; restart() is kept (harness.rs:418); serve() is shared by start and restart (harness.rs:246)."
+          }
+        ],
+        "checklist": [
+          "C356"
+        ],
+        "stories": [
+          "S150"
+        ],
+        "issues": [],
+        "fixes": []
+      }
     },
     {
       "id": "R3",
@@ -119,7 +380,52 @@
       ],
       "stories": [
         "S150"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys/tests/identity_install/product.rs",
+            "change": "modified",
+            "note": "Unchanged this round. It still runs inside the real-install test, after which the new policy check runs."
+          }
+        ],
+        "how": "Unchanged. Lys is the products' issuer: discovery, the token and jwks are Lys's, and the four refusals each have a test. Row 1, a fixture product configured from install's output signing in, is product.rs on a real install.",
+        "deviation": "Row 1 is container-backed and needs the identity leg (sh scripts/identity-gates/release.sh) at this head. It was not run this round because no build or test command was run here.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "a fixture product configured from install's output signs in with every URL on Lys's origin or a provider's.",
+            "met": false,
+            "evidence": "Only crates/lys/tests/identity_install/product.rs covers this. It is container-backed and runs only on the identity leg, which this round did not request. Unmeasured at this head."
+          },
+          {
+            "criterion": "Discovery at Lys's origin answers Lys's issuer, and a token Lys issues verifies against Lys's jwks.",
+            "met": true,
+            "evidence": "crates/lys-identity-server/tests/provider.rs a_product_signs_in_through_lys_and_verifies_the_token_against_lys_keys; round tests leg exit 0"
+          },
+          {
+            "criterion": "No page, refusal or redirect from Lys contains the issuer's loopback address or port.",
+            "met": true,
+            "evidence": "tests/configuration.rs and tests/connections.rs assert absence (round tests leg exit 0). The real-install scan in identity_install.rs was not run this round."
+          },
+          {
+            "criterion": "Each of the four refusals has its own test.",
+            "met": true,
+            "evidence": "tests/provider.rs: unregistered redirect, code used twice, wrong PKCE verifier, code past its instant"
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Row 1 is unmeasured. Must be done: run the identity leg (sh scripts/identity-gates/release.sh) at this head so product.rs runs on a real install."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R4",
@@ -147,7 +453,71 @@
       ],
       "stories": [
         "S149"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "surface/identity/src/features/connections/SignInProviders.tsx",
+            "change": "modified",
+            "note": "From round 1: main's picker and guidance with the server-supplied redirect_address."
+          },
+          {
+            "path": "surface/identity/tests/sign-in-providers.test.tsx",
+            "change": "modified",
+            "note": "From round 1: expects main's guide labels."
+          }
+        ],
+        "how": "Unchanged. The reviewer found it aligned: the redirect address shown is the one the provider is sent, the provider's refusal is shown in its own words, and a saved provider appears as a button on the sign-in screen.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C358",
+            "done": true,
+            "note": "Verified by the reviewer."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S149",
+            "satisfied": true,
+            "note": "Verified by the reviewer."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "The redirect address shown equals the one the service sends to the provider.",
+            "met": true,
+            "evidence": "sign_in_providers.rs the_redirect_address_shown_is_the_one_the_provider_is_asked_with; SignInProviders.tsx shows data.redirect_address; sign-in-providers.test.tsx asserts #sign-in-redirect value"
+          },
+          {
+            "criterion": "Saving a provider with a client id the provider rejects is refused with the provider's words.",
+            "met": true,
+            "evidence": "sign_in_providers.rs a_client_id_the_provider_rejects_is_refused_in_the_providers_words"
+          },
+          {
+            "criterion": "A saved provider appears as a button on R2's sign-in screen.",
+            "met": true,
+            "evidence": "sign_in_providers.rs a_saved_provider_is_offered_on_the_sign_in_page; sign-in.test.tsx 'offers one button per provider'"
+          },
+          {
+            "criterion": "A fake-provider sign-in goes from Lys's page to the fixture provider and back to a Lys page with no issuer page in the browser's history.",
+            "met": true,
+            "evidence": "sign_in_page.rs a_provider_sign_in_passes_through_the_provider_and_lys_only"
+          }
+        ],
+        "checklist": [
+          "C358"
+        ],
+        "stories": [
+          "S149"
+        ],
+        "issues": [],
+        "fixes": []
+      }
     },
     {
       "id": "R5",
@@ -176,7 +546,48 @@
       ],
       "stories": [
         "S149"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Partly addressed. The service key's rights are now exactly the ones R5's spec lists (Clients/Users/AuthProviders read-create-update, Secrets read), with no Secrets update. They are enforced and read back on every install by install/directory_key.rs. The admin-path refusal and the upgrade are not built.",
+        "deviation": "Blocked on two items. (1) The named refusal on every issuer admin path a host browser can reach needs a front proxy in front of the issuer's published port. That needs a reviewed brief revision choosing the proxy (image, digest, rules) and restating the trusted-proxy chain for R2's per-address throttling: Rauthy cannot disable its admin UI, and the browser and the service reach the port from one gateway address. (2) Upgrading an existing install needs DIRECTORY-045's code, which is not on main. The upgrade must grant Users create/update, the configure key's Secrets update and ApiKeys read/create/update, and handle the deployment.network migration. The R5 wall names crates/lys/src/identity/install/prepare.rs, which does not exist; the revision should name crates/lys/src/identity/prepare.rs.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "Changing one's email on the You screen changes it in the issuer, and the person signs in with the new email.",
+            "met": true,
+            "evidence": "crates/lys-identity-server/tests/accounts.rs a_changed_email_signs_in_and_the_old_one_does_not"
+          },
+          {
+            "criterion": "An administrator's reset lets the person sign in with the new password and refuses the old one.",
+            "met": true,
+            "evidence": "tests/accounts.rs the_administrator_resets_a_password_and_disables_a_person"
+          },
+          {
+            "criterion": "A host-browser request to every reachable issuer admin path gets the explicit named refusal while the Lys service's required loopback calls still work; the test does not claim that a published loopback port cannot be connected to.",
+            "met": false,
+            "evidence": "Nothing built. No front proxy and no test exist in the diff."
+          },
+          {
+            "criterion": "An existing install is upgraded with Users create/update and deployment.network handled from its recorded state; an ungrantable right or an unavailable migration choice is refused with the specific missing right or choice and the operator action, before any partial change.",
+            "met": false,
+            "evidence": "No upgrade code in the tree. DIRECTORY-045 is not on main."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Must be built: the named refusal on every issuer admin path a host browser can reach, while the service's loopback calls still work. Per the developer, this needs a reviewed brief revision choosing a front proxy (image, digest, rules) and restating the trusted-proxy chain for R2's per-address throttling.",
+          "Must be built: the upgrade of an existing install (Users create/update, and now also however R1's policy write is resolved, plus the deployment.network migration) on the integrated tree after DIRECTORY-045 lands. The brief's R5 wall names crates/lys/src/identity/install/prepare.rs, which does not exist; the revision must correct it.",
+          "The key's rights now include Secrets update, beyond what R5's spec lists (see R1's first issue)."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R6",
@@ -201,7 +612,42 @@
       "stories": [
         "S149",
         "S150"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys/tests/identity_install.rs",
+            "change": "modified",
+            "note": "The issuer-name scan also covers the new sign-in with the password Lys's policy took."
+          }
+        ],
+        "how": "Unchanged in substance. The new strings (the directory key refusal and ReadBackMismatch wording) name the sign-in service by what it does and never name the issuer. The configure key's name, lys_configure, and the service key's name, lys_directory, name no product.",
+        "deviation": "Row 1 (a_first_install_and_a_sign_in_never_name_the_issuer) needs the identity leg at this head, which was not run this round.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "A test runs a first install and a sign-in and scans stdout, stderr, every served page and every refusal body for the issuer's name: none.",
+            "met": false,
+            "evidence": "crates/lys/tests/identity_install.rs a_first_install_and_a_sign_in_never_name_the_issuer runs only on the identity leg, which this round did not request. Unmeasured. By reading, the new strings ('Lys's password policy set' and the configure.rs refusal) do not name the issuer."
+          },
+          {
+            "criterion": "The built screens contain no occurrence of the issuer's name.",
+            "met": true,
+            "evidence": "sign-in.test.tsx 'never names the sign-in service behind Lys in any screen source'; surface leg exit 0; the SignInProviders.tsx doc no longer says 'at the issuer'"
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Row 1 is unmeasured. Must be done: run the identity leg at this head."
+        ],
+        "fixes": []
+      }
     }
   ],
   "boundaries": [

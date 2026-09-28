@@ -4,8 +4,9 @@
 //! path and never writes outside it. Inside, it writes the deployment
 //! configuration, materialises credentials, starts the compose services,
 //! waits until they answer, registers its own client, generates the service
-//! key and the secrets broker, writes the directory service's configuration
-//! and starts the broker and the service. Running it again changes only
+//! key and the secrets broker, makes the directory service's own API key
+//! (`directory_key`), writes the directory service's configuration and
+//! starts the broker and the service. Running it again changes only
 //! what is missing; nothing is rotated or restarted.
 //!
 //! The install makes no administrator and fills nothing about a person from
@@ -13,6 +14,10 @@
 //! code and hands it to the browser in the setup page's address
 //! (`setup_code`), where the person makes the administrator. Everything it
 //! says names Lys and its parts by what they do, never the issuer.
+//!
+//! The password policy is Lys's, from the deployment configuration: the
+//! install writes it to the sign-in service and into the directory service's
+//! configuration, so what the screens show is what is enforced.
 
 use std::path::{Path, PathBuf};
 
@@ -21,11 +26,11 @@ use lys_core::Ed25519Identity;
 
 use super::config::DeploymentConfig;
 use super::error::{ErrorKind, IdentityError, IdentityResult, in_lys_words};
-use super::prepare::{API_KEY_NAME, API_KEY_SECRET, read_secret};
 use super::private_files::Outcome;
 use super::{configure, prepare, private_files};
 use crate::commands::output::Emitter;
 
+pub mod directory_key;
 pub mod exit_wait;
 pub mod layout;
 pub mod server_config;
@@ -97,19 +102,6 @@ fn service_key(layout: &Layout) -> IdentityResult<Ed25519Identity> {
         )
         .at(&path)
     })
-}
-
-/// Writes the API key the sign-in providers route calls Rauthy with, as
-/// Rauthy reads it: the key's name, a dollar sign and its secret.
-fn write_providers_key(config: &DeploymentConfig) -> IdentityResult<()> {
-    let state = config.state_dir();
-    let credential = read_secret(&state, API_KEY_SECRET)?;
-    let joined = zeroize::Zeroizing::new(format!("{API_KEY_NAME}${}", credential.expose()));
-    private_files::write(
-        &state.join(server_config::PROVIDERS_KEY_FILE),
-        joined.as_bytes(),
-    )?;
-    Ok(())
 }
 
 /// The administrator and the registered products an earlier run's service
@@ -236,6 +228,8 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
     emitter.note("database, sign-in and permission services ready");
     configure::reconcile(&config)?;
     emitter.note("sign-in clients registered");
+    configure::apply_password_policy(&config)?;
+    emitter.note("Lys's password policy set");
     let key = service_key(&layout)?;
     let public = base64::engine::general_purpose::STANDARD.encode(key.public_key_bytes());
     emitter.note(&format!("service key public {public}"));
@@ -248,7 +242,7 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
     }
     let surface_present = layout.surface_dir().join("index.html").is_file();
     write_absent(&layout.grant_model(), layout::GRANT_MODEL)?;
-    write_providers_key(&config)?;
+    let service_key_file = directory_key::provide(&config)?;
     provider_key(&config)?;
     let carried = earlier(&layout)?;
     let rendered = server_config::render(&layout, &config, &carried, surface_present);
@@ -261,7 +255,7 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
         )
     })?;
     let configuration = private_files::write(&layout.service_config(), &encoded)?;
-    let changed = configuration != Outcome::Unchanged;
+    let changed = configuration != Outcome::Unchanged || service_key_file != Outcome::Unchanged;
     let code = if setup_code::has_administrator(&layout)? {
         None
     } else {

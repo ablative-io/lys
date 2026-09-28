@@ -7,13 +7,18 @@
 //! client is never created, changed or deleted, and no other client is
 //! touched. A client secret Rauthy generates goes to an owner-only file in
 //! the state directory and is never printed.
+//!
+//! The password policy is Lys's own, from the deployment configuration, and
+//! is written to Rauthy whole by [`apply_password_policy`]; Rauthy's own
+//! policy is never read, and the policy Rauthy answers it stored must be the
+//! one written.
 
 use std::path::Path;
 
 use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 
-use super::config::{Client, ClientRole, DeploymentConfig};
+use super::config::{Client, ClientRole, DeploymentConfig, PasswordPolicy};
 use super::error::{ErrorKind, IdentityError, IdentityResult};
 use super::prepare::{API_KEY_SECRET, read_secret};
 use super::private_files;
@@ -42,7 +47,7 @@ pub const OPERATIONS_FILE: &str = "configure-operations.json";
 /// One reconciled resource.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Operation {
-    /// `client`, `client_secret` or `theme`.
+    /// `client`, `client_secret`, `theme` or `password_policy`.
     pub kind: &'static str,
     /// The client id.
     pub resource: String,
@@ -251,6 +256,76 @@ fn reconcile_theme(
         id,
         outcome,
     })
+}
+
+/// Lys's `policy` as Rauthy's password policy request carries it. Lys's
+/// policy has no expiry, so `valid_days` is always absent.
+pub fn issuer_policy(policy: &PasswordPolicy) -> Value {
+    json!({
+        "length_min": policy.length_min,
+        "length_max": policy.length_max,
+        "include_lower_case": policy.lower_case,
+        "include_upper_case": policy.upper_case,
+        "include_digits": policy.digits,
+        "include_special": policy.special,
+        "valid_days": null,
+        "not_recently_used": policy.not_recently_used,
+    })
+}
+
+/// Whether `stored`, as Rauthy answers its policy, is `written`: every field
+/// written is stored with the same value, an absent one as absent.
+fn stored_as_written(stored: &Value, written: &Value) -> bool {
+    written.as_object().is_some_and(|fields| {
+        fields
+            .iter()
+            .all(|(key, value)| stored.get(key).unwrap_or(&Value::Null) == value)
+    })
+}
+
+/// Writes Lys's password policy to Rauthy through `api` and checks the
+/// policy Rauthy stored is the one written. A key without the right to
+/// write it is refused by name, with the step that grants it.
+pub fn reconcile_password_policy(
+    api: &RauthyApi,
+    policy: &PasswordPolicy,
+) -> IdentityResult<Operation> {
+    let desired = issuer_policy(policy);
+    let id = operation_id("password_policy", "password_policy", &desired);
+    let stored = api.put_password_policy(&desired).map_err(|error| {
+        if error.kind() == ErrorKind::RauthyForbidden {
+            IdentityError::new(
+                ErrorKind::RauthyForbidden,
+                "write password policy",
+                "password_policy",
+                "the install's configure key lacks the Secrets update right the password policy is written with; upgrading the install grants it to the key",
+            )
+        } else {
+            error
+        }
+    })?;
+    if !stored_as_written(&stored, &desired) {
+        return Err(IdentityError::new(
+            ErrorKind::ReadBackMismatch,
+            "write password policy",
+            "password_policy",
+            "the policy stored differs from Lys's policy",
+        ));
+    }
+    Ok(Operation {
+        kind: "password_policy",
+        resource: "password_policy".to_owned(),
+        id,
+        outcome: "applied",
+    })
+}
+
+/// Writes the password policy `config` declares to Rauthy with the
+/// install's configure key.
+pub fn apply_password_policy(config: &DeploymentConfig) -> IdentityResult<Operation> {
+    let credential = read_secret(&config.state_dir(), API_KEY_SECRET)?;
+    let api = RauthyApi::new(&config.issuer.admin_url, Some(credential))?;
+    reconcile_password_policy(&api, &config.password_policy)
 }
 
 /// Each operation as the operations record writes it.

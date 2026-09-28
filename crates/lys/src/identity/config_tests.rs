@@ -189,3 +189,70 @@ fn a_missing_configuration_file_is_named() {
             && error.to_string().contains("/nonexistent/identity.toml"))
     );
 }
+
+#[test]
+fn lys_owns_the_password_policy_and_a_configured_one_is_taken_whole() -> Result<(), Box<dyn Error>>
+{
+    let absent = parse(EXAMPLE)?;
+    assert_eq!(absent.password_policy, PasswordPolicy::default());
+    assert_eq!(
+        (
+            absent.password_policy.length_min,
+            absent.password_policy.length_max
+        ),
+        (15, 64),
+        "Lys's own policy, NIST SP 800-63B-4 3.1.1.2"
+    );
+    let text = format!(
+        "{EXAMPLE}\n[password_policy]\nlength_min = 12\nlength_max = 48\ndigits = 2\nnot_recently_used = 4\n"
+    );
+    let configured = parse(&text)?.password_policy;
+    assert_eq!(
+        configured,
+        PasswordPolicy {
+            length_min: 12,
+            length_max: 48,
+            lower_case: None,
+            upper_case: None,
+            digits: Some(2),
+            special: None,
+            not_recently_used: Some(4),
+        }
+    );
+    Ok(())
+}
+
+#[test]
+fn a_password_policy_the_sign_in_service_cannot_hold_is_refused_by_field() {
+    let refused = [
+        (
+            "length_min = 7\nlength_max = 48",
+            "password_policy.length_min",
+        ),
+        (
+            "length_min = 12\nlength_max = 11",
+            "password_policy.length_max",
+        ),
+        (
+            "length_min = 12\nlength_max = 129",
+            "password_policy.length_max",
+        ),
+        (
+            "length_min = 12\nlength_max = 48\nspecial = 0",
+            "password_policy.special",
+        ),
+        (
+            "length_min = 12\nlength_max = 48\nnot_recently_used = 11",
+            "password_policy.not_recently_used",
+        ),
+    ];
+    for (table, field) in refused {
+        let text = format!("{EXAMPLE}\n[password_policy]\n{table}\n");
+        let error = parse(&text).err().map(|error| error.to_string());
+        let named = error
+            .as_deref()
+            .is_some_and(|error| error.starts_with("config_invalid") && error.contains(field));
+        assert!(named, "{field}: {error:?}");
+    }
+    assert_eq!(refused.len(), 5);
+}

@@ -77,7 +77,7 @@ fn fake_rauthy(stored: &Theme) -> TestResult<(String, JoinHandle<TestResult<Vec<
     Ok((url, handle))
 }
 
-fn stop(url: &str, handle: JoinHandle<TestResult<Vec<String>>>) -> TestResult<Vec<String>> {
+fn stop<T>(url: &str, handle: JoinHandle<TestResult<T>>) -> TestResult<T> {
     let mut stream = TcpStream::connect(url.trim_start_matches("http://"))?;
     stream.write_all(STOP)?;
     handle
@@ -137,5 +137,118 @@ fn a_theme_that_meets_contrast_is_written_and_read_back() -> TestResult {
             "POST /auth/v1/theme/cambium HTTP/1.1",
         ]
     );
+    Ok(())
+}
+
+/// What the policy stand-in saw once stopped: every request line and the
+/// last body it was sent.
+type PolicySeen = TestResult<(Vec<String>, Vec<u8>)>;
+
+/// A stand-in for Rauthy's password policy endpoint. It answers `status`;
+/// with 200 and no `fixed` answer it stores the body and answers the policy
+/// it stored as Rauthy does, the fields left absent left out. Returns every
+/// request line and the last body it was sent, once stopped.
+fn fake_policy(
+    status: u16,
+    fixed: Option<&'static str>,
+) -> TestResult<(String, JoinHandle<PolicySeen>)> {
+    let listener = TcpListener::bind("127.0.0.1:0")?;
+    let url = format!("http://{}", listener.local_addr()?);
+    let handle = std::thread::spawn(move || -> PolicySeen {
+        let (mut seen, mut sent) = (Vec::new(), Vec::new());
+        for stream in listener.incoming() {
+            let mut stream = stream?;
+            let (line, body) = read_request(&mut stream)?;
+            if line.starts_with("STOP") {
+                break;
+            }
+            seen.push(line);
+            sent.clone_from(&body);
+            let answer = if let Some(fixed) = fixed {
+                fixed.as_bytes().to_vec()
+            } else {
+                let mut stored: Map<String, Value> = serde_json::from_slice(&body)?;
+                stored.retain(|_, value| !value.is_null());
+                serde_json::to_vec(&stored)?
+            };
+            stream.write_all(
+                format!(
+                    "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n",
+                    answer.len()
+                )
+                .as_bytes(),
+            )?;
+            stream.write_all(&answer)?;
+        }
+        Ok((seen, sent))
+    });
+    Ok((url, handle))
+}
+
+/// Lys's configured policy, no default of Lys's or of Rauthy's.
+fn lys_policy() -> PasswordPolicy {
+    PasswordPolicy {
+        length_min: 12,
+        length_max: 48,
+        lower_case: None,
+        upper_case: Some(1),
+        digits: Some(2),
+        special: None,
+        not_recently_used: Some(4),
+    }
+}
+
+#[test]
+fn lys_password_policy_is_written_whole_and_rauthy_stores_that_policy() -> TestResult {
+    let (url, handle) = fake_policy(200, None)?;
+    let api = RauthyApi::new(&url, None)?;
+    let outcome = reconcile_password_policy(&api, &lys_policy());
+    let (seen, sent) = stop(&url, handle)?;
+    let operation = outcome?;
+    assert_eq!(operation.kind, "password_policy");
+    assert_eq!(operation.outcome, "applied");
+    assert_eq!(seen, ["PUT /auth/v1/password_policy HTTP/1.1"]);
+    let sent: Value = serde_json::from_slice(&sent)?;
+    assert_eq!(
+        sent,
+        json!({
+            "length_min": 12,
+            "length_max": 48,
+            "include_lower_case": null,
+            "include_upper_case": 1,
+            "include_digits": 2,
+            "include_special": null,
+            "valid_days": null,
+            "not_recently_used": 4,
+        }),
+        "Rauthy is sent Lys's policy and nothing of its own"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_policy_stored_otherwise_than_written_is_a_read_back_mismatch() -> TestResult {
+    let (url, handle) = fake_policy(200, Some(r#"{"length_min":8,"length_max":48}"#))?;
+    let api = RauthyApi::new(&url, None)?;
+    let outcome = reconcile_password_policy(&api, &lys_policy());
+    stop(&url, handle)?;
+    let error = outcome
+        .err()
+        .ok_or("a policy stored otherwise was accepted")?;
+    assert_eq!(error.kind(), ErrorKind::ReadBackMismatch);
+    Ok(())
+}
+
+#[test]
+fn a_key_that_cannot_write_the_policy_is_refused_naming_the_right() -> TestResult {
+    let forbidden = r#"{"error":"Forbidden","message":"missing access rights"}"#;
+    let (url, handle) = fake_policy(403, Some(forbidden))?;
+    let api = RauthyApi::new(&url, None)?;
+    let outcome = reconcile_password_policy(&api, &lys_policy());
+    let (seen, _) = stop(&url, handle)?;
+    let error = outcome.err().ok_or("a forbidden write was accepted")?;
+    assert_eq!(error.kind(), ErrorKind::RauthyForbidden);
+    assert!(error.to_string().contains("Secrets update"), "{error}");
+    assert_eq!(seen.len(), 1, "one write was asked, and nothing else");
     Ok(())
 }

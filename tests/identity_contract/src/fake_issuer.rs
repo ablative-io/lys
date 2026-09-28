@@ -13,7 +13,9 @@
 //! `POST /pow`, a proof-of-work challenge of difficulty 10; and
 //! `POST /oidc/authorize`, which takes the credentials with the session, the
 //! token and the answered challenge and answers 202 with the address it would
-//! send a browser to. Accounts are held by email with a password; an email
+//! send a browser to. The query of every authorization opened at that first
+//! step is kept, so a test can answer the very authorization a service
+//! began. Accounts are held by email with a password; an email
 //! it holds no account for signs in as the login the test chose. Failed
 //! sign-ins are counted by the address in `X-Forwarded-For`, and an address
 //! with [`FAILURES_BARRED`] of them is answered 429, so a test can see that
@@ -107,6 +109,7 @@ struct Inner {
     upstream: Mutex<HashMap<String, PendingUpstream>>,
     upstream_codes: Mutex<HashMap<String, Login>>,
     provider_redirects: Mutex<Vec<String>>,
+    authorizations: Mutex<Vec<String>>,
 }
 
 /// A provider sign-in the issuer began and has not finished.
@@ -227,6 +230,7 @@ impl FakeIssuer {
             upstream: Mutex::new(HashMap::new()),
             upstream_codes: Mutex::new(HashMap::new()),
             provider_redirects: Mutex::new(Vec::new()),
+            authorizations: Mutex::new(Vec::new()),
         });
         let provider_router = Router::new()
             .route("/authorize", get(provider_authorize))
@@ -334,6 +338,12 @@ impl FakeIssuer {
     /// Every redirect address the stand-in provider was asked with, in order.
     pub fn provider_redirects(&self) -> Vec<String> {
         held(&self.inner.provider_redirects).clone()
+    }
+
+    /// The query of every authorization a service opened at the issuer's
+    /// own sign-in, in order, exactly as the service sent it.
+    pub fn authorizations(&self) -> Vec<String> {
+        held(&self.inner.authorizations).clone()
     }
 
     /// Every `X-Forwarded-For` value a sign-in step carried, in order, none
@@ -480,9 +490,11 @@ struct PageRequest {
 async fn login_page(
     State(inner): State<Shared>,
     headers: HeaderMap,
+    uri: axum::http::Uri,
     Query(request): Query<PageRequest>,
 ) -> Response {
     inner.record(&headers);
+    held(&inner.authorizations).push(uri.query().unwrap_or_default().to_owned());
     if request.client_id != CLIENT_ID || request.code_challenge_method != "S256" {
         return refused("the authorization request is not one this issuer takes");
     }

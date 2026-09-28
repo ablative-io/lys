@@ -7,8 +7,8 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use axum::extract::{Path, Query, State};
-use axum::http::{HeaderMap, header};
-use axum::response::Response;
+use axum::http::{HeaderMap, StatusCode, header};
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::receipt::Receipt;
@@ -45,6 +45,8 @@ pub struct AppState {
     pub setup: Option<crate::setup::SetupSettings>,
     /// One setup act at a time, so one code makes one administrator.
     pub setup_lock: tokio::sync::Mutex<()>,
+    /// Lys's password policy, when the configuration names it.
+    pub password_policy: Option<crate::accounts::PasswordPolicy>,
     /// Live sessions.
     pub sessions: Sessions,
     /// Who is admitted to what.
@@ -135,6 +137,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
             .transpose()?,
         setup: config.setup.clone(),
         setup_lock: tokio::sync::Mutex::new(()),
+        password_policy: config.password_policy.clone(),
         sessions: Sessions::new(config.session_seconds, config.secure_cookie),
         admission: Admission::new(
             crate::setup::administrator(config)?,

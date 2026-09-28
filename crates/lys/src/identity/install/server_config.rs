@@ -52,6 +52,10 @@ pub struct Carried {
 /// The configuration as the service reads it, with the screens served when
 /// `surface` is present.
 ///
+/// Lys's password policy is written as the deployment configuration states
+/// it, the same values the install writes to the sign-in service, so the
+/// setup and account screens show the policy that is enforced.
+///
 /// No administrator is written for a new install: the person makes the
 /// administrator on the setup page, which the `setup` settings configure.
 /// What `carried` names, an earlier configuration's administrator and
@@ -66,6 +70,7 @@ pub fn render(
     let issuer = issuer(config);
     let state = config.state_dir();
     let data = layout.data_dir();
+    let policy = &config.password_policy;
     let dir = |name: &str| Value::String(data.join(name).display().to_string());
     let mut rendered = json!({
         "listen": format!("127.0.0.1:{SERVICE_PORT}"),
@@ -84,6 +89,15 @@ pub fn render(
             "code_file": state.join(super::setup_code::CODE_FILE).display().to_string(),
             "administrator_file": layout.administrator_file().display().to_string(),
             "email": config.deployment.admin_email,
+        },
+        "password_policy": {
+            "length_min": policy.length_min,
+            "length_max": policy.length_max,
+            "lower_case": policy.lower_case,
+            "upper_case": policy.upper_case,
+            "digits": policy.digits,
+            "special": policy.special,
+            "not_recently_used": policy.not_recently_used,
         },
         "link_audit_source": {"issuer": issuer, "subject": LINK_AUDIT_SUBJECT},
         "session_seconds": SESSION_SECONDS,

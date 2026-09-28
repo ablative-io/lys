@@ -11,7 +11,8 @@ import { FirstRunSetup, forgetSetupCode, setupCode } from '../src/features/setup
 import { $, $$, mount, serve, settle, text } from './harness';
 import { ME, SERVICE, ok, refused } from './fixtures';
 
-const POLICY = { length_min: 14, length_max: 128, words: 'At least 14 characters, with a lower-case letter, an upper-case letter and a digit.' };
+/** Lys's configured policy as the service answers it, no default of anyone's. */
+const POLICY = { length_min: 12, length_max: 48, words: 'At least 12 and at most 48 characters, with 2 of the kind: digit.' };
 
 /** Every control on the page is one of the shared ones: fields in `.field`, buttons `.btn`. */
 function unstyled(): string[] {
@@ -112,6 +113,30 @@ describe('Lys setup page', () => {
       display_name: 'Ada Lovelace', email: 'ada@example.test', password: 'Analytical-Engine-1843',
     } }]);
     expect(page.finished()).toBe(1);
+    page.unmount();
+  });
+
+  it('refuses a password outside Lys policy with its words before anything is sent', async () => {
+    const page = await render({
+      'POST /setup/open': ok({ purpose: 'first-run', email: null, policy: POLICY }),
+      'POST /setup/administrator': ok({ person: 'person-1', receipt: {} }),
+    });
+    expect($('#setup-policy')?.textContent).toBe(POLICY.words);
+    await fill({ display_name: 'Ada Lovelace', email: 'ada@example.test', password: 'Engine-1843', confirm: 'Engine-1843' });
+    await submit('Set up Lys');
+    expect($('[role="alert"]')?.textContent).toBe(POLICY.words);
+    const long = 'Analytical-Engine-1843-' + 'x'.repeat(26);
+    await fill({ password: long, confirm: long });
+    await submit('Set up Lys');
+    expect($('[role="alert"]')?.textContent).toBe(POLICY.words);
+    expect(page.posted.filter((entry) => entry.path === '/setup/administrator')).toEqual([]);
+    page.unmount();
+  });
+
+  it('shows no policy when the service names none', async () => {
+    const page = await render({ 'POST /setup/open': ok({ purpose: 'first-run', email: null, policy: null }) });
+    expect($('form[aria-label="Set up Lys"]')).not.toBeNull();
+    expect($('#setup-policy')).toBeNull();
     page.unmount();
   });
 

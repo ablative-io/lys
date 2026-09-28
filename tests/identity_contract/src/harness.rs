@@ -231,8 +231,19 @@ pub async fn session_cookie(signed_in: reqwest::Response) -> Result<String, Box<
         .to_owned())
 }
 
-/// The service `config` describes, answering on `listener`, and a client
-/// that follows no redirect.
+/// Where `answer` sends the browser.
+fn location(answer: &reqwest::Response) -> Result<String, Box<dyn Error>> {
+    Ok(answer
+        .headers()
+        .get(reqwest::header::LOCATION)
+        .ok_or_else(|| format!("{} answered no redirect", answer.url()))?
+        .to_str()?
+        .to_owned())
+}
+
+/// The service `config` describes, answering on `listener` with each
+/// connection's own address, as `main` serves it, and a client that follows
+/// no redirect. Both the first start and every restart serve through here.
 async fn serve(
     listener: tokio::net::TcpListener,
     config: &Config,
@@ -380,6 +391,7 @@ impl Service {
             }),
             provider: None,
             setup: None,
+            password_policy: None,
             surface_dir: None,
         };
         adjust(&mut config);
@@ -416,21 +428,41 @@ impl Service {
         Ok(())
     }
 
-    /// Begin a sign-in and let the issuer answer it as `login`, answering the
-    /// service path the issuer sends the browser back to.
-    pub async fn issuer_answer(&self, login: Login) -> Result<String, Box<dyn Error>> {
-        self.issuer.sign_in_as(login);
-        let to_issuer = self
+    /// Begin a real sign-in through the service's own flow and answer it as
+    /// `login`, answering the service path the answer comes back to.
+    ///
+    /// A provider button on Lys's sign-in page has the service begin its
+    /// own authorization and open it at the issuer's sign-in; the issuer's
+    /// authorize endpoint then answers that very authorization, with the
+    /// state, nonce and PKCE challenge the service sent, so the code the
+    /// answer carries is one the service's token exchange accepts.
+    pub async fn callback_answer(&self, login: Login) -> Result<String, Box<dyn Error>> {
+        let opened = self.issuer.authorizations().len();
+        let to_provider = self
             .client
-            .get(format!("{}/login", self.base))
+            .get(format!("{}/sign-in/providers/stand-in", self.base))
             .send()
             .await?;
-        let authorize = location(&to_issuer)?;
-        let back = self.client.get(authorize).send().await?;
+        let provider = location(&to_provider)?;
+        if !provider.starts_with(self.issuer.provider_base()) {
+            return Err(format!("the provider button sent the browser to {provider}").into());
+        }
+        let begun = self
+            .issuer
+            .authorizations()
+            .get(opened)
+            .cloned()
+            .ok_or("the service opened no authorization at the issuer")?;
+        self.issuer.sign_in_as(login);
+        let back = self
+            .client
+            .get(format!("{}/authorize?{begun}", self.issuer.api()))
+            .send()
+            .await?;
         let url = location(&back)?;
         Ok(url
             .strip_prefix(&self.base)
-            .ok_or_else(|| format!("the issuer sent the browser to {url}"))?
+            .ok_or_else(|| format!("the issuer sent the answer to {url}"))?
             .to_owned())
     }
 

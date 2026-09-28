@@ -5,6 +5,10 @@
  * The setup page is opened by the install with a one-time code in the
  * address fragment. The code is taken from the address once and the address
  * is replaced without it, so it is never left where a person reads it.
+ *
+ * The password policy shown before submit is Lys's own, as the service's
+ * configuration states it; a password is measured as the service measures
+ * it, in bytes of UTF-8.
  */
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -34,7 +38,18 @@ export function forgetSetupCode(): void {
 }
 
 interface Policy { length_min: number; length_max: number; words: string }
-interface Opened { purpose: 'first-run' | 'password'; email: string | null; policy: Policy }
+interface Opened { purpose: 'first-run' | 'password'; email: string | null; policy: Policy | null }
+
+/** Whether `password` is outside the policy's lengths, measured as the service measures it. */
+function outOfLength(policy: Policy | null, password: string): boolean {
+  if (!policy) return password === '';
+  let length = 0;
+  for (const character of password) {
+    const point = character.codePointAt(0) ?? 0;
+    length += point < 0x80 ? 1 : point < 0x800 ? 2 : point < 0x10000 ? 3 : 4;
+  }
+  return length < policy.length_min || length > policy.length_max;
+}
 
 function setupRefusal(failure: unknown): string {
   if (failure instanceof Refused && failure.refusal.refusal === 'SetupClosed') return 'Lys is already set up. Sign in instead.';
@@ -68,7 +83,7 @@ export function FirstRunSetup({ code, done = () => location.replace(SIGNED_IN) }
     const field = (name: string) => String(form.get(name) ?? '');
     const password = field('password');
     if (password !== field('confirm')) { setError('The two passwords are not the same.'); return; }
-    if ([...password].length < opened.policy.length_min) { setError(opened.policy.words); return; }
+    if (outOfLength(opened.policy, password)) { setError(opened.policy?.words ?? 'Enter a password.'); return; }
     const firstRun = opened.purpose === 'first-run';
     const name = field('display_name').trim();
     const email = (opened.email ?? field('email')).trim();
@@ -110,8 +125,8 @@ export function FirstRunSetup({ code, done = () => location.replace(SIGNED_IN) }
       </div> : null}
       <div className="field">
         <label htmlFor="setup-password">Password</label>
-        <input id="setup-password" name="password" type="password" autoComplete="new-password" required disabled={busy} aria-describedby="setup-policy" />
-        <p id="setup-policy" className="note">{opened.policy.words}</p>
+        <input id="setup-password" name="password" type="password" autoComplete="new-password" required disabled={busy} aria-describedby={opened.policy ? 'setup-policy' : undefined} />
+        {opened.policy ? <p id="setup-policy" className="note">{opened.policy.words}</p> : null}
       </div>
       <div className="field">
         <label htmlFor="setup-confirm">Password again</label>

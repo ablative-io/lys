@@ -152,20 +152,23 @@ fn materialise(
     Ok((credential, outcome))
 }
 
-/// The base64 JSON Rauthy reads as its one bootstrap API key: read, create
-/// and update on clients, users and sign-in providers, read on secrets,
-/// nothing else. Users are made and changed by the directory service, on
-/// the setup page and the account screens; providers are what the sign-in
-/// providers route manages.
+/// The base64 JSON Rauthy reads as its one bootstrap API key, the install's
+/// configure key: read, create and update on clients, users, sign-in
+/// providers and API keys, read and update on secrets, nothing else. The
+/// password policy, which Rauthy keeps under secrets, is Lys's own and is
+/// written by the install. The directory service never holds this key: the
+/// install makes it one of its own with the API key rights, without Secrets
+/// update or any right over keys (`install::directory_key`).
 pub fn bootstrap_api_key() -> String {
     let request = serde_json::json!({
         "name": API_KEY_NAME,
         "exp": null,
         "access": [
             {"group": "Clients", "access_rights": ["read", "create", "update"]},
-            {"group": "Secrets", "access_rights": ["read"]},
+            {"group": "Secrets", "access_rights": ["read", "update"]},
             {"group": "Users", "access_rights": ["read", "create", "update"]},
             {"group": "AuthProviders", "access_rights": ["read", "create", "update"]},
+            {"group": "ApiKeys", "access_rights": ["read", "create", "update"]},
         ],
     });
     base64::engine::general_purpose::STANDARD.encode(request.to_string())
