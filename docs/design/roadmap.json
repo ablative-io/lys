@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-28",
+  "updated": "2026-09-29",
   "items": [
     {
       "id": "RM-001",
@@ -2587,6 +2587,33 @@
       },
       "depends_on": [],
       "notes": "Written by hand."
+    },
+    {
+      "id": "RM-105",
+      "title": "Lys controls context and delivers goals through managed harness channels",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Extend 051 with one managed harness control channel, verified turn boundaries, real compaction and reminder admission evidence, no PTY automation, and explicit unknown-outcome reconciliation. Keep tracking and policy in their existing owners. The new Codex event owner is also the integration seam for DIRECTORY-065.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-29T07:32:33+10:00",
+        "quote": "nothing is typed into a terminal",
+        "context": "Tom 07:02 intent relayed in Lys post f4d4e7fa; card k7sAzdWw."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-130"
+        ],
+        "briefs": [
+          "DIRECTORY-064"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-088"
+      ],
+      "notes": "Written by hand. Non-writer Chippy reviews. Builds on DIRECTORY-051; supplies managed Codex reader for065."
     }
   ]
 }

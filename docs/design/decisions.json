@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-28",
+  "updated": "2026-09-29",
   "decisions": [
     {
       "id": "ADR-001",
@@ -1899,6 +1899,25 @@
         "A check that asks /health or /healthz at the root still gets the page and must ask /api/health.",
         "GET /api/health says only that this process is serving, not that its dependencies are ready, which lys identity health reports.",
         "A probe that asks /health, /healthz or /status at the root gets 200 with the page and never reaches the API, so a status-only monitor would report healthy wrongly. Every probe of this service asks /api/health."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-130",
+      "title": "Managed harness channels carry automatic context and reminder acts",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-29",
+      "decided_by": "Tom, direction relayed by Waffles; transport contract authored by Gypsy for non-writer review",
+      "context": "051 owns the tracking and budget/goal models, but its generic runner delivery does not prove a harness boundary and still discusses typing. Tom requires behind-the-scenes acts, with nothing typed into a terminal.",
+      "decision": "064 adds one runner-owned typed control/event channel per managed Claude or Codex session. It reuses 051 operation and usage owners, serialises all inputs at proved boundaries, requires actual harness evidence and retains uncertain outcomes without automatic resend. Legacy PTY sessions remain manual and cannot claim this capability. 065 extends the same Codex event reader for refusal coverage.",
+      "quote": "nothing is typed into a terminal",
+      "consequences": [
+        "051 stores and Usage page are extended, not duplicated.",
+        "An accepted control request is not a completed compaction.",
+        "No source checkout alone establishes installed-harness capability.",
+        "An uncertain pipe write cannot be made exactly-once by a local operation ID."
       ],
       "supersedes": [],
       "superseded_by": ""

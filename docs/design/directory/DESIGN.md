@@ -1043,6 +1043,21 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/tests/containment_forwarder.rs` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
 | `docs/CONTAINMENT-PREPARATION.md` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
 | `scripts/identity-gates/containment-capabilities.sh` | A person watches real native denials and an allowed control. DIRECTORY-062 R6. | DIRECTORY-062 |
+| `crates/lys-runner/src/harness_control.rs` | One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/events.rs` | One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/process.rs` | One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1). | DIRECTORY-064 |
+| `crates/lys-runner/tests/harness_control.rs` | One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/claude.rs` | Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/codex.rs` | Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2). | DIRECTORY-064 |
+| `crates/lys-runner/tests/harness_claude.rs` | Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2). | DIRECTORY-064 |
+| `crates/lys-runner/tests/harness_codex.rs` | Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/context.rs` | Enforce context thresholds at the owned boundary (DIRECTORY-064 R3). | DIRECTORY-064 |
+| `crates/lys-runner/tests/context_control.rs` | Enforce context thresholds at the owned boundary (DIRECTORY-064 R3). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/reminders.rs` | Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4). | DIRECTORY-064 |
+| `crates/lys-runner/tests/reminder_delivery.rs` | Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4). | DIRECTORY-064 |
+| `crates/lys-runner/tests/control_recovery.rs` | Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5). | DIRECTORY-064 |
+| `crates/lys-identity-server/tests/control_receipts.rs` | Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5). | DIRECTORY-064 |
+| `surface/identity/tests/acceptance/agent-control.spec.ts` | Plain controls and a real managed-session proof (DIRECTORY-064 R6). | DIRECTORY-064 |
 
 ## Inventory
 

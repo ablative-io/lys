@@ -4727,6 +4727,81 @@
       "path": "scripts/identity-gates/containment-capabilities.sh",
       "note": "A person watches real native denials and an allowed control. DIRECTORY-062 R6.",
       "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/harness_control.rs",
+      "note": "One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1).",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/harness_control/events.rs",
+      "note": "One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1).",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/harness_control/process.rs",
+      "note": "One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1).",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/tests/harness_control.rs",
+      "note": "One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1).",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/harness_control/claude.rs",
+      "note": "Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2).",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/harness_control/codex.rs",
+      "note": "Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2).",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/tests/harness_claude.rs",
+      "note": "Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2).",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/tests/harness_codex.rs",
+      "note": "Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2).",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/harness_control/context.rs",
+      "note": "Enforce context thresholds at the owned boundary (DIRECTORY-064 R3).",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/tests/context_control.rs",
+      "note": "Enforce context thresholds at the owned boundary (DIRECTORY-064 R3).",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/src/harness_control/reminders.rs",
+      "note": "Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4).",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/tests/reminder_delivery.rs",
+      "note": "Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4).",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-runner/tests/control_recovery.rs",
+      "note": "Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5).",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/control_receipts.rs",
+      "note": "Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5).",
+      "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "surface/identity/tests/acceptance/agent-control.spec.ts",
+      "note": "Plain controls and a real managed-session proof (DIRECTORY-064 R6).",
+      "brief": "DIRECTORY-064"
     }
   ],
   "inventory": [

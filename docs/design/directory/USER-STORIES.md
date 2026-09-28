@@ -273,3 +273,9 @@
 **S170.** As the person responsible for an agent, I want its operating-system sandbox to enforce the same policy as Lys, so a shell or child process cannot bypass my limits.
 
 **S171.** As a person watching an agent, I want to see its actual sandbox and OS-backed refusals, so I can distinguish enforced restrictions from missing coverage.
+
+## Person setting agent context and reminders — Controls agents without a terminal
+
+**S173.** As the person responsible for an agent, I want Lys to compact or stop it at my context limit without terminal typing, so the next turn obeys the limit.
+
+**S174.** As the person setting a goal, I want my saved words delivered at a turn boundary with honest receipts, so a reminder never interrupts a tool or silently arrives twice.
