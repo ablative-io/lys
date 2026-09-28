@@ -2650,6 +2650,26 @@
       "path": "crates/lys/src/identity/upgrade/swap.rs",
       "note": "R7: An upgrade stopped part-way is finished or put back",
       "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "rules/no-app-names.yml",
+      "note": "DIRECTORY-048 R7: Lys depends on no app",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "sgconfig.yml",
+      "note": "DIRECTORY-048 R7: Lys depends on no app",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys/src/cli/mcp.rs",
+      "note": "DIRECTORY-049 R7: Agents reach it with 'lys mcp', signing with their own key",
+      "brief": "DIRECTORY-049"
+    },
+    {
+      "path": "crates/lys/tests/mcp_stdio.rs",
+      "note": "DIRECTORY-049 R7: Agents reach it with 'lys mcp', signing with their own key",
+      "brief": "DIRECTORY-049"
     }
   ],
   "inventory": [

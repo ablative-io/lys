@@ -36,7 +36,11 @@ fn head() -> String {
 
 #[test]
 fn version_names_the_crate_version_and_the_head_commit() -> TestResult {
-    let expected = format!("lys-identity-server {} ({}", env!("CARGO_PKG_VERSION"), head());
+    let expected = format!(
+        "lys-identity-server {} ({}",
+        env!("CARGO_PKG_VERSION"),
+        head()
+    );
     let cwd = tempfile::tempdir()?;
     // A file named like the flag, holding no configuration: the server
     // reading its first argument as a configuration path would fail on it.
@@ -47,7 +51,11 @@ fn version_names_the_crate_version_and_the_head_commit() -> TestResult {
             .arg(flag)
             .current_dir(cwd.path())
             .output()?;
-        assert!(output.status.success(), "lys-identity-server {flag} exited {}", output.status);
+        assert!(
+            output.status.success(),
+            "lys-identity-server {flag} exited {}",
+            output.status
+        );
         let line = String::from_utf8(output.stdout)?;
         let line = line.trim_end();
         assert!(

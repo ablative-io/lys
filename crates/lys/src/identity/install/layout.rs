@@ -132,6 +132,17 @@ impl Layout {
         self.install_dir().join("build.json")
     }
 
+    /// An upgrade under way: its builds and each step as it completes.
+    pub fn upgrade_intent(&self) -> PathBuf {
+        self.install_dir().join("upgrade.json")
+    }
+
+    /// The configuration and compose files an upgrade replaced, kept to
+    /// return to.
+    pub fn config_previous_dir(&self) -> PathBuf {
+        self.root.join("config.previous")
+    }
+
     /// The directory service's configuration.
     pub fn service_config(&self) -> PathBuf {
         self.root.join("identity.json")

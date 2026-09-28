@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use sha2::{Digest, Sha256};
 
 use super::layout::{self, Layout, SERVICE_PORT, data_root, render_deployment};
+use super::log_wait;
 use super::server_config;
 use super::services;
 use super::surface;
@@ -282,7 +283,7 @@ fn a_service_is_ready_within_the_log_event_that_says_so() -> Result<(), Box<dyn 
     let (tell, pid, log) = told_service(dir.path(), script)?;
     let mut checks = 0;
     let mut told = None;
-    services::wait_until("scratch", &log, &pid, &mut || {
+    log_wait::wait_until("scratch", &log, &pid, &mut || {
         checks += 1;
         if told.is_none() {
             told = Some(std::fs::write(&tell, b"go\n"));
@@ -306,7 +307,7 @@ fn a_service_that_exits_unready_is_refused_naming_its_log() -> Result<(), Box<dy
     let script = r#"read told < "$1"; echo giving up; exit 3"#;
     let (tell, pid, log) = told_service(dir.path(), script)?;
     let mut told = None;
-    let outcome = services::wait_until("scratch", &log, &pid, &mut || {
+    let outcome = log_wait::wait_until("scratch", &log, &pid, &mut || {
         if told.is_none() {
             told = Some(std::fs::write(&tell, b"go\n"));
         }

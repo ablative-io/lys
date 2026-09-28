@@ -8,9 +8,13 @@
 //! places the broker's and the service's binaries in its own `bin/` and
 //! starts them from there, and records the build running in
 //! `install/build.json`. Running it again changes only what is missing;
-//! nothing is rotated, a placed binary is never replaced (that is
-//! `lys identity upgrade`'s), and nothing is restarted unless its
-//! configuration changed.
+//! nothing is rotated, and a placed binary is never replaced: that is
+//! `lys identity upgrade`'s.
+//!
+//! Invariants: install first ends an upgrade stopped part-way. It refuses,
+//! before stopping anything, to run from a build other than the one placed.
+//! A process is restarted when its configuration changed or its binary was
+//! just placed, so `install/build.json` always names what runs.
 
 use std::path::{Path, PathBuf};
 
@@ -22,11 +26,13 @@ use super::error::{ErrorKind, IdentityError, IdentityResult};
 use super::prepare::{API_KEY_NAME, API_KEY_SECRET, read_secret};
 use super::private_files::Outcome;
 use super::rauthy::RauthyApi;
-use super::{configure, prepare, private_files, upgrade};
+use super::upgrade::{self, Compose, adopt, swap};
+use super::{configure, prepare, private_files};
 use crate::commands::output::Emitter;
 
 pub mod exit_wait;
 pub mod layout;
+pub mod log_wait;
 pub mod server_config;
 pub mod services;
 pub mod surface;
@@ -109,49 +115,6 @@ fn administrator_subject(config: &DeploymentConfig) -> IdentityResult<String> {
     })
 }
 
-/// How a start is reported: a process that was replaced was restarted.
-fn started_word(started: bool, replace: bool) -> &'static str {
-    match (started, replace) {
-        (true, true) => "restarted with its new configuration",
-        (true, false) => "started",
-        (false, _) => "already running",
-    }
-}
-
-/// Places each binary the install runs into `bin/` from beside the running
-/// `lys`, when it is not there yet. One already there is never replaced:
-/// that is `lys identity upgrade`'s.
-fn place_binaries(layout: &Layout, emitter: &mut Emitter) -> IdentityResult<()> {
-    private_files::ensure_dir(&layout.bin_dir())?;
-    for name in BINARIES {
-        if layout.binary(name).is_file() {
-            continue;
-        }
-        let source = services::sibling(name)?;
-        upgrade::place_binary(&source, &layout.bin_dir(), name)?;
-        emitter.note(&format!("{name} placed in {}", layout.bin_dir().display()));
-    }
-    Ok(())
-}
-
-/// Starts the broker and then the service from `bin/`, each waited on for
-/// ready, restarting a running one when `replace` asks.
-fn start_units(layout: &Layout, emitter: &mut Emitter, replace: bool) -> IdentityResult<()> {
-    for unit in upgrade::units(layout) {
-        let started = upgrade::launch(layout, &unit, replace)?;
-        let at = match unit.ready.answers {
-            Some((port, _)) => format!(" on 127.0.0.1:{port}"),
-            None => String::new(),
-        };
-        emitter.note(&format!(
-            "{} {}{at}",
-            unit.binary,
-            started_word(started, replace)
-        ));
-    }
-    Ok(())
-}
-
 /// Runs `lys identity install`.
 pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     let layout = match &options.root {
@@ -159,6 +122,11 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
         None => Layout::discover()?,
     };
     let mut emitter = Emitter::new(json);
+    let units = upgrade::units(&layout);
+    swap::recover(&layout, &units, &mut Compose, &mut |line| {
+        emitter.note(line);
+    })?;
+    adopt::check_placed_build(&layout, &BINARIES, &services::sibling)?;
     services::require_docker(Path::new("docker"))?;
     private_files::ensure_dir(&layout.root)?;
     for dir in [
@@ -217,9 +185,9 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     })?;
     let configuration = private_files::write(&layout.service_config(), &encoded)?;
     let changed = configuration != Outcome::Unchanged;
-    place_binaries(&layout, &mut emitter)?;
-    start_units(&layout, &mut emitter, changed)?;
-    let build = upgrade::record_build(&layout, &BINARIES, &mut |line| emitter.note(line))?;
+    let build = adopt::settle(&layout, &units, &services::sibling, changed, &mut |line| {
+        emitter.note(line);
+    })?;
     let build = serde_json::to_value(&build).map_err(|error| {
         IdentityError::new(
             ErrorKind::RenderFailed,

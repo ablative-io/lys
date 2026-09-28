@@ -11,5 +11,14 @@ export default defineConfig({
   esbuild: { jsx: 'automatic' },
   server: { proxy },
   preview: { proxy },
-  test: { environment: 'jsdom', include: ['tests/**/*.test.tsx'], setupFiles: ['tests/setup.ts'] },
+  // No test or hook is bounded by a clock (CLAUDE.md, No time limits): 0 turns
+  // Vitest's default 5000 ms and 10000 ms bounds off, so a slow run is found
+  // at its cause and never failed by a timer.
+  test: {
+    environment: 'jsdom',
+    include: ['tests/**/*.test.tsx'],
+    setupFiles: ['tests/setup.ts'],
+    testTimeout: 0,
+    hookTimeout: 0,
+  },
 });

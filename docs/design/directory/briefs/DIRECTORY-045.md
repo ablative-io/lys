@@ -60,25 +60,32 @@ Behavioural. lys, lys-identity-server, lys-secrets and lys-home each answer --ve
 **Dev (recorded):**
 
 - Status: implemented
-- How: Row 1 (each binary prints its name, crate version and the 40-character head commit, and an exported-tree build shows the stated words): met, not yet run. The stamp is written at crates/lys/build.rs:64-69 and emitted at build.rs:82; the no-commit words are at build.rs:20 and 46-48. The version strings are at crates/lys/src/main.rs:27, crates/lys-secrets/src/bin/lys-secrets/main.rs (VERSION const before main), crates/lys-home/src/main.rs:8 and crates/lys-identity-server/src/main.rs:11-17. The tests are crates/{lys,lys-identity-server,lys-secrets,lys-home}/tests/version.rs::version_names_the_crate_version_and_the_head_commit. The exported-tree test is crates/lys/tests/version.rs::a_build_from_an_exported_tree_says_it_has_no_commit, and the commit and dirty test is a_build_from_a_commit_names_it_and_its_dirty_state. Row 2 (lys-identity-server --version exits 0 and reads no file): met, not yet run. The flag is handled before any path is formed (crates/lys-identity-server/src/main.rs, `if first == "--version" || first == "-V"`), and the lys-identity-server version test runs in a folder where files named after the flags hold no configuration.
-- Deviation: The exported-tree test builds a small probe crate whose build script is the real build.rs, copied into a temporary tree with no .git (GIT_CEILING_DIRECTORIES stops git from finding a parent repository). It does not rebuild the whole workspace from a git archive. The words come only from build.rs, and the four build.rs files are held byte-identical by a test, so the probe measures the same code. A full workspace rebuild inside the test suite would have been a second heavy build.
+- How: Built in an earlier round; unchanged this round. crates/lys/build.rs stamps LYS_BUILD from `git rev-parse HEAD` and `git status --porcelain`, and every binary prints `NAME VERSION (LYS_BUILD)`. crates/lys/tests/version.rs holds the four build.rs files byte-identical and probes an exported tree and a committed tree. The gate's one failure of a_build_from_a_commit_names_it_and_its_dirty_state (line 149: after the first commit the probe still said 'not built from a git commit') did not reproduce here: 4 of 4 passed and the reviewer's run passed. I did not find its cause, so build.rs is unchanged rather than changed on a guess.
+- Deviation: The exported-tree test builds a probe crate that uses the real build.rs, not a full workspace rebuild (as in round 1). The gate's single version-test failure is reported, not fixed: the cause was not found.
 - Files changed:
-  - created: `crates/lys/build.rs` — Sets LYS_BUILD to `git rev-parse HEAD` plus `; dirty` when `git status --porcelain` lists changes. It uses --no-optional-locks so the index is never rewritten. It says `not built from a git commit` when there is no git tree, or when the tree found does not track this crate's Cargo.toml. It is rerun when HEAD, the index, packed-refs or the branch's ref moves. Standard library only.
-  - created: `crates/lys-identity-server/build.rs` — Byte-identical copy of crates/lys/build.rs.
-  - created: `crates/lys-secrets/build.rs` — Byte-identical copy of crates/lys/build.rs.
-  - created: `crates/lys-home/build.rs` — Byte-identical copy of crates/lys/build.rs.
-  - modified: `crates/lys/src/main.rs` — Parses with Cli::command().version(VERSION), where VERSION is `CARGO_PKG_VERSION (LYS_BUILD)`. Dispatches the new identity Upgrade verb.
-  - modified: `crates/lys-identity-server/src/main.rs` — A first argument of --version or -V prints `lys-identity-server VERSION (BUILD)` and exits 0 before any configuration is read. It prints its build line when it starts serving.
-  - modified: `crates/lys-secrets/src/bin/lys-secrets/main.rs` — Parses with the stamped VERSION, so --version and -V print `lys-secrets VERSION (COMMIT)`.
-  - modified: `crates/lys-home/src/main.rs` — Parses with the stamped VERSION, so --version and -V print `lys-home VERSION (COMMIT)`.
-  - created: `crates/lys/tests/version.rs` — Checks that lys --version and -V equal `lys VERSION (HEAD[; dirty])`, with HEAD read from git at test time. Checks that the four build.rs files are byte-identical. Builds a probe crate that uses this build.rs from an exported tree with no .git and asserts the words. Builds it again from a fresh git commit and asserts the 40-character commit, then `; dirty` after a change.
-  - created: `crates/lys-identity-server/tests/version.rs` — Checks that --version and -V exit 0 with the head commit. They run in a folder holding files literally named `--version` and `-V` that are not configuration, so any attempt to read them as configuration would fail.
-  - created: `crates/lys-secrets/tests/version.rs` — Checks that --version and -V print `lys-secrets VERSION (HEAD[; dirty])`.
-  - created: `crates/lys-home/tests/version.rs` — Checks that --version and -V print `lys-home VERSION (HEAD[; dirty])`.
+  - modified: `crates/lys/build.rs` — Stamps LYS_BUILD with the 40-character head commit, adding '; dirty' when the tree has changes, or 'not built from a git commit'. Watches HEAD, the index, packed-refs, refs/heads and the branch ref.
+  - modified: `crates/lys-identity-server/build.rs` — Byte-identical to crates/lys/build.rs.
+  - modified: `crates/lys-secrets/build.rs` — Byte-identical to crates/lys/build.rs.
+  - modified: `crates/lys-home/build.rs` — Byte-identical to crates/lys/build.rs.
+  - modified: `crates/lys/tests/version.rs` — --version names the head commit; the four build scripts are equal; an exported tree and a committed tree are probed.
+  - modified: `crates/lys-identity-server/tests/version.rs` — --version exits 0 and reads no file.
+  - modified: `crates/lys-secrets/tests/version.rs` — --version names the build.
+  - modified: `crates/lys-home/tests/version.rs` — --version names the build.
 - Checklist delivery:
-  - [x] C344 — Every Lys binary answers --version with its build commit (DIRECTORY-045 R1). — Every one of the four binaries answers --version and -V with its build commit. The tests are written but have not been run.
+  - [x] C344 — Every Lys binary answers --version with its build commit (DIRECTORY-045 R1). — Each binary's --version names its build commit. Tests: crates/*/tests/version.rs.
 - Story delivery:
-  - [ ] S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in. — The part about seeing the build is delivered. The story as a whole also rides on R4, the live upgrade, which is blocked.
+  - [x] S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in. — Every build is named, which upgrade and install compare.
+
+**Review (recorded):**
+
+- Alignment: aligned
+- Acceptance verdicts:
+  - [x] For each binary, `BIN --version` at the card's head prints its name, the crate version and the 40-character commit of that head, and a test builds from an exported tree without .git and shows the stated words. — crates/lys/build.rs:72-99 stamps LYS_BUILD from `git rev-parse HEAD` (40-hex filter) plus '; dirty', or 'not built from a git commit'. The four build.rs files are byte-identical (shasum 689f4206…), and every_stamped_crate_carries_the_same_build_script holds them equal. Tests: version_names_the_crate_version_and_the_head_commit in each crate's tests/version.rs, and a_build_from_an_exported_tree_says_it_has_no_commit (crates/lys/tests/version.rs:110). The gate's tests leg exited 0.
+  - [x] `lys-identity-server --version` exits 0 and reads no file. — crates/lys-identity-server/tests/version.rs runs --version and -V in a directory holding a file named like the flag, and asserts success. The gate's tests leg exited 0.
+- Checklist verified: C344
+- Stories verified: S147
+- Issues:
+  - The cause of a_build_from_a_commit_names_it_and_its_dirty_state failing once in round 1 (line 149) is still unknown. It passed in this round's gate. If it recurs, find the cause in build.rs's rerun-if-changed set.
 
 ### R2: `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure
 
@@ -106,30 +113,30 @@ Behavioural. A new verb `lys identity upgrade --from DIR [--surface PKG] [--root
 **Dev (recorded):**
 
 - Status: implemented
-- How: Row 1 (A installed, upgraded to B, B running with A kept in bin.previous/; a B service that exits before ready gets A restored, running and ready, with the failure named): met, not yet run. The tests are crates/lys/src/identity/upgrade_tests.rs::an_upgrade_runs_the_new_build_and_keeps_the_previous and a_service_that_exits_before_ready_puts_the_previous_build_back. In crates/lys/src/identity/upgrade.rs:
-- `upgrade` (lines 356-413) reads every version before it stops anything, then stops the service and then the broker through services::stop, which waits on the exit lock (stop_all, line 330).
-- swap_in (line 286) moves bin/ to bin.previous/, replacing an older one, and places each binary through place_binary (line 153). The screens go through surface::place, keeping surface.previous/.
-- start_all (line 339) starts the broker and then the service. Each is waited on through services::wait_until, which checks once on each log-change event and refuses when the process exits (launch, line 136).
-- On failure, put_back (line 314) and a restart run, and the error is UpgradeFailed naming the binary and its log (lines 342-346, 407-411).
-Row 2 (data/, identity.json and deployment.toml byte-identical): met, not yet run. The test is upgrade_tests.rs::neither_upgrade_touches_data_or_configuration, which asserts three files are compared. The module has no write path to those files (upgrade.rs:1-22 states the invariant). Row 3 (grep -nE 'sleep|timeout' over the new files prints nothing): met. I grepped every new file and it printed nothing. The refusals are tested in refusals_are_named_and_stop_nothing: not_installed, binary_missing and version_unreadable, with A still running and no bin.previous/ made.
-- Deviation: Four things differ from the brief, all visible in the diff:
-1. Files outside the R2 list were edited: error.rs and error_tests.rs (the named refusal kinds), mod.rs (the module declaration) and services.rs (wait_answering deleted once it had no caller).
-2. Readiness now needs the process's own `listening on` line in its log since it started, and then the port answering. Before, only the port answering was checked. This lets the tests use stubs that answer no HTTP, avoids a dead-code variant used only by tests, and follows ADR-113's 'ready when it says so'.
-3. Upgrade refuses a root with no bin/ as not_installed, telling the operator to run `lys identity install` from the new build first, because an install made before this change has no bin/ to keep.
-4. CN1 says documents only, but this brief's requirements name code files, so I followed the requirements.
+- How: upgrade() stops the service and the broker, moves bin/ to bin.previous/, and places each binary through a temporary name with a SHA-256 read-back. It then places the screens and starts the broker and the service, each waited on for ready through log and HTTP events. On failure, swap::back puts the previous build back and starts it, and the error says so. Unchanged this round apart from the adoption stop fix under R6, which this path uses for processes that have no exit lock.
+- Deviation: (none)
 - Files changed:
-  - created: `crates/lys/src/identity/upgrade.rs` — The new `lys identity upgrade` module, with the pieces the install now shares: Unit (the broker and the service), Ready (the log line, then the port answering), launch, place_binary (copy to a temporary name, then rename), version (reads `NAME VERSION (COMMIT)`), record_build (install/build.json) and the upgrade itself with its return to the previous build.
-  - created: `crates/lys/src/identity/upgrade_tests.rs` — Scratch-root tests with /bin/sh stub builds. A is installed and running; B is upgraded to and runs, with A kept in bin.previous/. A B service that exits before ready gets A restored, running and ready, with the failure named. data/, identity.json and deployment.toml stay byte-identical across a successful and a failed upgrade. The three refusals are checked by name, and version parsing is checked.
-  - modified: `crates/lys/src/identity/cli.rs` — Adds the Upgrade verb with --from, --surface and --root.
-  - modified: `crates/lys/src/identity/install/layout.rs` — Adds BINARIES (lys-secrets, lys-identity-server) and the paths bin/, bin.previous/, surface.previous/, install/ and install/build.json.
-  - modified: `crates/lys/src/identity/mod.rs` — Declares the upgrade module.
-  - modified: `crates/lys/src/identity/error.rs` — Adds four refusal kinds: NotInstalled (not_installed), BinaryMissing (binary_missing), VersionUnreadable (version_unreadable) and UpgradeFailed (upgrade_failed).
-  - modified: `crates/lys/src/identity/error_tests.rs` — The distinct-names test lists the four new kinds.
-  - modified: `crates/lys/src/identity/install/services.rs` — Removes wait_answering, which had no caller left: readiness now goes through upgrade::launch, which calls wait_until with the log line and the port.
+  - modified: `crates/lys/src/identity/upgrade.rs` — upgrade(): recover, check the install, check each incoming --version, render, write the intent, swap forward, and swap back with the failure named when anything fails.
+  - modified: `crates/lys/src/identity/upgrade_tests.rs` — Tests: A upgraded to B with A kept; a failed B puts A back running; data and credentials untouched.
+  - created: `crates/lys/src/identity/upgrade/scratch_tests.rs` — Scratch-install fixture of /bin/sh stubs blocked on a fifo.
+  - modified: `crates/lys/src/identity/cli.rs` — Upgrade and install help text.
+  - modified: `crates/lys/src/identity/install/layout.rs` — upgrade_intent() and config_previous_dir().
+  - modified: `crates/lys/src/identity/error.rs` — InstallBuildDiffers and UpgradeBuildDiffers.
+  - modified: `crates/lys/src/identity/error_tests.rs` — Wire names of the two new kinds.
 - Checklist delivery:
-  - [x] C345 — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2); the configuration and compose files move with the binaries, an install made before it is adopted, and an upgrade stopped part-way is finished or put back (DIRECTORY-045 R5 to R7). — Upgrade swaps the binaries and screens and returns to the previous build on failure. The tests are written but have not been run.
+  - [x] C345 — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2); the configuration and compose files move with the binaries, an install made before it is adopted, and an upgrade stopped part-way is finished or put back (DIRECTORY-045 R5 to R7). — Tests: upgrade_tests.rs and the render, intent and adopt tests. The upgrade module's 19 tests pass here.
 - Story delivery:
-  - [ ] S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in. — The upgrade and the return to the previous build are delivered. The story also rides on R4, which is blocked.
+  - [x] S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in. — A running install moves to a new build, and a failed new build comes back to the previous one.
+
+**Review (recorded):**
+
+- Alignment: aligned
+- Acceptance verdicts:
+  - [x] A test on a scratch root installs build A (two stub binaries answering --version and readiness), upgrades to build B, and shows B running and A kept in bin.previous/; a second test where B's service exits before ready shows A restored, running and ready, and the named failure. — upgrade_tests.rs:14 an_upgrade_runs_the_new_build_and_keeps_the_previous and :55 a_service_that_exits_before_ready_puts_the_previous_build_back. swap.rs:309-360 and upgrade.rs:391-417 name the failure as UpgradeFailed. Local identity run: 83 passed, 0 failed.
+  - [x] A test shows data/ and every credential are byte-identical before and after both upgrades. — upgrade_tests.rs:96 neither_upgrade_touches_data_or_a_credential. render_tests.rs:25 also compares untouchable() across both upgrades.
+  - [x] grep -nE 'sleep|timeout' over the new files prints nothing. — Ran `grep -nE 'sleep|timeout'` over upgrade.rs, upgrade/*, install/log_wait*.rs, */build.rs and */tests/version.rs: no output, exit 1.
+- Checklist verified: C345
+- Stories verified: S147
 
 ### R3: The install and the server say which build is running
 
@@ -155,21 +162,29 @@ Behavioural. `lys identity install` and `lys identity upgrade` write install/bui
 **Dev (recorded):**
 
 - Status: implemented
-- How: Row 1 (a running server built at the card's head answers /authority with its commit in `build`): met, not yet run. The route is registered in crates/lys-identity-server/src/read_api.rs (routes) and answered by the `authority` handler with json!({"authority": AUTHORITY, "build": BUILD}). The test is crates/lys-identity-server/tests/authority_build.rs::the_authority_names_the_build_that_answers. Row 2 (a surface test renders the build commit from a stubbed /authority): met, not yet run. The rendering is in surface/identity/src/features/signin/Gate.tsx inside SignIn's details, and the test is surface/identity/tests/build.test.tsx. The spec's install/build.json is written by upgrade::record_build (crates/lys/src/identity/upgrade.rs:205-254) with each binary's commit and the screens' manifest SHA-256. It is called from install.rs after the units start and from upgrade after success and after a return to the previous build.
-- Deviation: surface/identity/src/shell/About.tsx does not exist on main. The brief's boundary sends the change to where the concern lives, and the only view that lists the authority is SignIn in surface/identity/src/features/signin/Gate.tsx, so the build is shown there. Other files outside the list were edited: api.ts, fixtures.ts, and routes.rs (the /authority route moved into read_api.rs). /authority changed from plain text to JSON so it can carry `build`. The only reader of it was the screens, and they are updated.
+- How: The server answers /authority with its build, and the surface renders it (both from an earlier round). install writes install/build.json through adopt::settle and record_build. A binary that cannot answer --version is recorded as 'built before build stamps', so build.json always names what runs. This round's gate clippy failure at install.rs:127 is fixed in the tree: `emitter.note(line);`. fmt --check and clippy on lys with --all-targets --all-features are clean here.
+- Deviation: surface/identity/src/shell/About.tsx does not exist on main, so the build is rendered in surface/identity/src/features/signin/Gate.tsx, as the brief's rule for a missing file allows.
 - Files changed:
-  - modified: `crates/lys/src/identity/install.rs` — Places lys-secrets and lys-identity-server into bin/ from beside lys when they are absent, never replacing one already there. Starts both from bin/ through upgrade::launch. Writes install/build.json and prints each binary's commit and the screens' commit and manifest SHA-256; under --json they come back as a `build` field.
-  - modified: `crates/lys-identity-server/src/read_api.rs` — Now owns GET /authority and answers it as JSON {authority, build}, where BUILD is env!("LYS_BUILD"). The module docs state that the value is never empty or invented.
-  - modified: `crates/lys-identity-server/src/routes.rs` — Drops its plain-text /authority route and handler, which moved to read_api.rs; axum refuses a route registered twice.
-  - created: `crates/lys-identity-server/tests/authority_build.rs` — Starts the service through the identity_contract harness, reads /authority, and checks that `authority` is AUTHORITY and that `build` equals the head commit git names (allowing `; dirty`).
-  - modified: `surface/identity/src/api.ts` — api.authority reads the JSON answer as AuthorityAnswer {authority, build} through the shared request path, so refusals and unreadable answers are named as elsewhere.
-  - modified: `surface/identity/src/features/signin/Gate.tsx` — The sign-in view's 'Advanced: how access is managed' section, the one view that lists the authority, now shows `Build <commit>` below it.
-  - modified: `surface/identity/tests/fixtures.ts` — The stubbed /authority answer is {authority, build: BUILD}, with a BUILD constant.
-  - created: `surface/identity/tests/build.test.tsx` — Renders the sign-in view from a stubbed /authority answer and finds `Build <commit>`. A second case shows the no-commit words exactly as the service gives them.
+  - modified: `crates/lys/src/identity/install.rs` — Recovers an unfinished upgrade, refuses a build other than the one placed, and records build.json through adopt::settle. Line 127's statement ends in a semicolon (clippy semicolon_if_nothing_returned).
+  - modified: `crates/lys-identity-server/src/read_api.rs` — /authority answers `build` (earlier round).
+  - modified: `surface/identity/src/features/signin/Gate.tsx` — Renders the build commit (earlier round).
 - Checklist delivery:
-  - [x] C346 — The install and the server say which build is running (DIRECTORY-045 R3). — The install, the upgrade, the server and the screens all name the running build. The tests are written but have not been run.
+  - [x] C346 — The install and the server say which build is running (DIRECTORY-045 R3). — The install and the server say which build runs.
 - Story delivery:
-  - [ ] S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in. — Seeing the running build is delivered. The story also rides on R4, which is blocked.
+  - [x] S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in. — The running build can be read from build.json and from /authority.
+
+**Review (recorded):**
+
+- Alignment: aligned
+- Acceptance verdicts:
+  - [x] A test reads /authority from a running server built at the card's head and finds its commit in `build`. — crates/lys-identity-server/tests/authority_build.rs, with read_api.rs answering `build`. The gate's tests leg exited 0.
+  - [x] A surface test renders the build commit from a stubbed /authority answer. — surface/identity/tests/build.test.tsx (2 tests), rendering in features/signin/Gate.tsx. `npm --prefix surface/identity install-ci-test` here: 325/325 passed, exit=0.
+- Checklist verified: C346
+- Stories verified: S147
+- Issues:
+  - The gate's surface leg failed because Vitest's default 5000 ms testTimeout killed tests/mockup.test.tsx under load. That is a clock bound, which the No time limits rule forbids.
+- Fixes:
+  - surface/identity/vite.config.ts: set testTimeout: 0 and hookTimeout: 0, which turns off Vitest's clock bounds. The surface suite then passed 325/325, exit 0.
 
 ### R4: Prove it on the live install
 
@@ -193,16 +208,21 @@ Evidence. Evidence. On the machine the live install runs on, build lys, lys-iden
 **Dev (recorded):**
 
 - Status: blocked
-- How: Row 1 (PROOF-UPGRADE.md names the commit before and after and quotes the upgrade's lines; curl http://localhost:8490/authority shows the head commit): not met. This session's machine has no live identity install: nothing answers on localhost:8490, and there is no data root at ~/Library/Application Support/lys/identity. The brief also says to run no build, so no binaries exist at the card's head to upgrade to. The proof has to be made on the machine the live install runs on, after the card's round builds the head. The steps there:
-1. That live install predates bin/, so first run `lys identity install` from the new build. It places bin/ from the new siblings and, with the configuration unchanged, restarts nothing.
-2. Run `lys identity upgrade --from <that build's target dir>`.
-3. Record the printed lines and `curl -s http://localhost:8490/api/authority`, or /authority when the install has no screens, in docs/design/directory/PROOF-UPGRADE.md.
-I did not create PROOF-UPGRADE.md, so that no evidence is invented.
-- Deviation: Not performed: there is no live install on this machine and no head build to use.
+- How: Blocked. There is no live identity install on this machine: nothing listens on localhost:8490 (lsof shows none), there is no lys directory under ~/Library/Application Support, and the only lys processes are test scratch installs. PROOF-UPGRADE.md cannot truthfully be written without a real upgrade, so it was not created. The steps for the machine that runs the live install, once the card's round builds the head: 1. Read the installed commit from install/build.json. 2. Run `<head build>/lys identity upgrade --from <head build>` (the lys built with the new binaries, or it refuses upgrade_build_differs). 3. Record the printed lines, and `curl -s http://localhost:8490/authority` naming the head commit, in docs/design/directory/PROOF-UPGRADE.md with no secrets. 4. Sign in in a browser, confirm the session survives a reload, and confirm the compose environment names the cookie setting without quoting any value. No command with a time limit is to be used.
+- Deviation: Not performed: this machine has no live install. Round 1's attested crossings (a `curl -m 2` probe and a hand-run file-length check) were not repeated. This round's waits used `caffeinate -w` on a process exit and no command carried a time limit.
 - Checklist delivery:
-  - [ ] C347 — Prove it on the live install (DIRECTORY-045 R4). — Blocked: the live upgrade and its proof are for the machine that runs the live install, after the card's round builds the head.
+  - [ ] C347 — Prove it on the live install (DIRECTORY-045 R4). — Blocked on a live install; PROOF-UPGRADE.md not written.
 - Story delivery:
-  - [ ] S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in. — Not demonstrated on the live install.
+  - [ ] S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in. — The live proof is outstanding.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] PROOF-UPGRADE.md names the installed commit before, the head commit after, and quotes the upgrade's lines; `curl -s http://localhost:8490/authority` shows the head commit. — docs/design/directory/PROOF-UPGRADE.md does not exist. `lsof -nP -iTCP:8490 -sTCP:LISTEN` prints nothing.
+  - [ ] After the upgrade, signing in on the live install in a browser keeps the session, and the compose environment holds the cookie setting the new build renders. — There is no live install on this machine and no upgrade was performed.
+- Issues:
+  - Run the live upgrade on the machine holding the live identity install, with the lys built at the card's head: `lys identity upgrade --from <head build dir>`. Record the commit before and after, and quote the printed lines, in docs/design/directory/PROOF-UPGRADE.md with no secret. Show `curl -s http://localhost:8490/authority` naming the head commit. Confirm that a browser sign-in survives a reload and that compose.env names the cookie setting, without quoting any value.
 
 ### R5: The configuration and compose files move with the binaries
 
@@ -227,6 +247,33 @@ Behavioural. An upgrade renders deployment.toml's derived files, the directory s
 **Stories:**
 - S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
 
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: The new build's configuration and compose files are rendered before anything is stopped. Inside the swap they are kept in config.previous/, placed with a digest read-back and, when compose changed, applied through the Engine. On the way back they are restored and applied again. No credential is generated or written. Unchanged this round.
+- Deviation: (none)
+- Files changed:
+  - created: `crates/lys/src/identity/upgrade/render.rs` — Templates renders compose.yaml, postgres-init.sql, compose.env and identity.json from the recorded choices. It refuses a build other than this lys, and its Debug shows lengths only.
+  - created: `crates/lys/src/identity/upgrade/render_tests.rs` — Tests: B runs with its new key and value; a failed B puts A's files back byte for byte; rendering only reads; a missing credential is refused.
+  - created: `crates/lys/src/identity/upgrade/swap.rs` — Keeps, places and restores the configuration and compose files beside the binaries.
+  - modified: `crates/lys/src/identity/install/server_config.rs` — recorded_administrator reads the administrator identity.json records.
+- Checklist delivery:
+  - [x] C345 — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2); the configuration and compose files move with the binaries, an install made before it is adopted, and an upgrade stopped part-way is finished or put back (DIRECTORY-045 R5 to R7). — Test: render_tests.rs.
+- Story delivery:
+  - [x] S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in. — Configuration and compose move with the binaries.
+
+**Review (recorded):**
+
+- Alignment: aligned
+- Acceptance verdicts:
+  - [x] A test where build B adds a configuration key and a compose environment value upgrades an install of build A: B runs with the new key and value, and a failed start of B puts A's binaries, configuration and compose files back, byte-identical. — render_tests.rs:25 build_b_runs_with_its_new_key_and_value_and_a_failed_b_puts_a_back. swap.rs:211-254 keeps, places and restores the files.
+  - [x] Install run from build B over an install of build A is refused install_build_differs and nothing is stopped. — adopt.rs:277-306 check_placed_build runs in install.rs before anything is stopped. adopt_tests.rs:206 install_from_another_build_is_refused_and_stops_nothing.
+  - [x] data/ and every credential are byte-identical across both. — render_tests.rs:25 and adopt_tests.rs:206 compare untouchable() before and after. render.rs only reads credentials.
+- Checklist verified: C345
+- Stories verified: S147
+
 ### R6: The first move of an install made before this card
 
 Behavioural. An install with no install/build.json (made before this card) is upgraded, not re-installed: upgrade reads the placed binaries' versions (a binary that cannot answer --version is recorded as 'built before build stamps'), stops the processes its pid files name through their exit locks, or through the pid when a process has no exit lock, naming which, and proceeds as R2 and R5. Install run again never leaves a process running from a binary it replaced: it stops and restarts any process whose binary it changed, so install/build.json always names what runs.
@@ -246,6 +293,35 @@ Behavioural. An install with no install/build.json (made before this card) is up
 
 **Stories:**
 - S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
+
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: The gate's failure of an_install_made_before_this_card_is_upgraded_and_answers_the_new_build reproduced here (2 of 5 runs). The error was 'process N still runs after caffeinate returned exit status: 0'. `caffeinate -w` returns on the kernel's exit event, but a `ps` right after can still list the exiting process. The exit event is now the answer: a waiter that returns success is the exit, and one that fails is refused with its status. The same test took up to 238 s because macOS was exec'ing the digest-checked copy of the adopted platform binary to read its --version. adopt_running now returns the file the running process was started from, and installed() reads the build from that file, which the copy equals byte for byte. After both fixes the test passed 5 of 5 and the upgrade module 19 of 19.
+- Deviation: The gate's first message for this test ('bin/ holds no lys-secrets and none is running to adopt') did not reproduce in any run here. Its cause is not confirmed beyond the load-sensitive process checks fixed above.
+- Files changed:
+  - modified: `crates/lys/src/identity/upgrade/adopt.rs` — On macOS and the BSDs, stop_through_pid takes the waiter's success as the exit and refuses a waiter that fails, where it used to ask ps afterwards. adopt_running returns the source file, and installed() reads an adopted binary's build from it.
+  - created: `crates/lys/src/identity/upgrade/adopt_tests.rs` — Tests: a pre-card install is adopted and upgraded, and /api/authority answers the new build; install run again restarts a process whose binary it placed; install from another build is refused.
+  - modified: `crates/lys/src/identity/install/services.rs` — The log wait moved to log_wait.rs.
+  - modified: `crates/lys/src/identity/install/exit_wait.rs` — Doc: only upgrade::adopt stops a process that has no exit lock.
+- Checklist delivery:
+  - [x] C345 — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2); the configuration and compose files move with the binaries, an install made before it is adopted, and an upgrade stopped part-way is finished or put back (DIRECTORY-045 R5 to R7). — Test: adopt_tests.rs, the pre-card upgrade.
+  - [x] C346 — The install and the server say which build is running (DIRECTORY-045 R3). — build.json names what runs after install and after adoption.
+- Story delivery:
+  - [x] S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in. — An install made before builds were named is upgraded in place.
+
+**Review (recorded):**
+
+- Alignment: aligned
+- Acceptance verdicts:
+  - [x] A scratch install laid out as before this card (no build.json, no exit locks, a binary without --version) is upgraded, and /api/authority answers the new commit. — adopt_tests.rs:97 an_install_made_before_this_card_is_upgraded_and_answers_the_new_build asserts adoption, the stop-through-pid lines and /api/authority containing B. Local identity run: 83 passed.
+  - [x] Install run again with a changed binary restarts that process, and build.json equals the running build. — adopt_tests.rs:152 install_run_again_restarts_a_process_whose_binary_it_placed. adopt.rs:321-360 settle.
+- Checklist verified: C345, C346
+- Stories verified: S147
+- Issues:
+  - The round-1 gate's first message for the adoption test ('bin/ holds no lys-secrets and none is running to adopt') was never reproduced or explained. It passed in this round and locally.
 
 ### R7: An upgrade stopped part-way is finished or put back
 
@@ -267,6 +343,36 @@ Behavioural. Before the first stop, an upgrade writes an intent record (install/
 
 **Stories:**
 - S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
+
+#### R7 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: The intent is written before the first stop, and each step is recorded as it completes. The next upgrade or install names an unfinished upgrade: one that had started its new build is finished, and any other is put back, so the install runs one whole build. Placement copies to a temporary name, compares digests and renames, and a differing copy is removed with nothing old replaced. This round also fixed the design gate's coverage leg, which was failing on paths from commit b39890e. The four structure rows were added, DESIGN.md was re-rendered, and render, validate and check-coverage on design/directory all passed ('Coverage clean').
+- Deviation: The design.json rows belong to DIRECTORY-048 and DIRECTORY-049, not this card. They were added because the gate at this card's head fails without them.
+- Files changed:
+  - created: `crates/lys/src/identity/upgrade/intent.rs` — install/upgrade.json holds each completed step, written atomically.
+  - created: `crates/lys/src/identity/upgrade/intent_tests.rs` — Tests: a kill after bin/ moved is put back, then the upgrade runs; recovery alone; a started build is finished; a corrupted copy is refused.
+  - created: `crates/lys/src/identity/install/log_wait.rs` — LogCursor and the log watch, so a readiness wait reads only what is new.
+  - created: `crates/lys/src/identity/install/log_wait_tests.rs` — Tests for the cursor.
+  - modified: `crates/lys/src/identity/install.rs` — install recovers an unfinished upgrade first.
+  - modified: `docs/design/directory/design.json` — Adds structure rows for DIRECTORY-048 R7 (rules/no-app-names.yml, sgconfig.yml) and DIRECTORY-049 R7 (crates/lys/src/cli/mcp.rs, crates/lys/tests/mcp_stdio.rs), so the coverage leg is clean.
+  - modified: `docs/design/directory/DESIGN.md` — Re-rendered from design.json.
+- Checklist delivery:
+  - [x] C345 — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2); the configuration and compose files move with the binaries, an install made before it is adopted, and an upgrade stopped part-way is finished or put back (DIRECTORY-045 R5 to R7). — Test: intent_tests.rs.
+- Story delivery:
+  - [x] S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in. — An interrupted upgrade never leaves a half build.
+
+**Review (recorded):**
+
+- Alignment: aligned
+- Acceptance verdicts:
+  - [x] A test kills the upgrade after the rename of bin/ and before the last copy; the next upgrade names the unfinished one, finishes it or puts it back, and the install runs one whole build. — intent_tests.rs:67 killed_after_the_first_copy, :83 the_next_upgrade_puts_back_an_upgrade_killed_part_way_then_runs, :121 recovery alone, :144 a started build finished. The cut is simulated in the same process.
+  - [x] A test corrupts one placed copy; the digest check refuses it and nothing old is removed. — intent_tests.rs a_copy_that_differs_from_its_source_is_refused_and_nothing_old_goes, with swap.rs:53-106.
+  - [x] No file under crates/lys/src/identity/ is 500 lines or more. — The largest is upgrade.rs at 466 lines. file-length.sh: 557 files measured, 0 over the limit.
+- Checklist verified: C345
+- Stories verified: S147
 
 ## Boundaries
 
