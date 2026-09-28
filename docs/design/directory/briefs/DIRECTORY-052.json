@@ -3,6 +3,7 @@
   "cluster": "directory",
   "title": "Provision a working team in one act: agents with memories, an opening conversation, a budget, goals, deliverables and a checker",
   "depends_on": [
+    "DIRECTORY-048",
     "DIRECTORY-050",
     "DIRECTORY-051"
   ],
@@ -21,13 +22,13 @@
   "design_anchor": [
     "ADR-119"
   ],
-  "purpose": "Tom, 28 September 2026 19:55, on Dot: 'I want you to be able to provision new agents so we can provision them off with the right memories, with the right few-shot kind of prompting to start it off, and to be able to send them off to do work without having to know that they've got a budget, know that they've got reminders, know that it's actually going to happen, know that things are actually being checked. So I could say, Waffles, we need a team to work on this. And you could provision them, give them a certain budget, and we can start to budget out things properly.' Tom, 19:56: 'So you would provision a few new agents in a hierarchy, set which of my permissions you're assigning, what their budget allowance is, what account they're going to be assigned to. Which also means the secrets need to be storable and accessible.'",
+  "purpose": "Tom, 28 September 2026 19:55, on Dot: 'I want you to be able to provision new agents so we can provision them off with the right memories, with the right few-shot kind of prompting to start it off, and to be able to send them off to do work without having to know that they've got a budget, know that they've got reminders, know that it's actually going to happen, know that things are actually being checked. So I could say, Waffles, we need a team to work on this. And you could provision them, give them a certain budget, and we can start to budget out things properly.' Tom, 19:56: 'So you would provision a few new agents in a hierarchy, set which of my permissions you're assigning, what their budget allowance is, what account they're going to be assigned to. Which also means the secrets need to be storable and accessible.' Amended 28 September 2026 21:05 by Waffles after Archie's read against the tree.",
   "task": "Add team plans: a record that names a team's purpose, budget, deliverables and members; provision it in one all-or-nothing act that creates agents, grants, homes with their starting memories and opening conversation, budgets and goals, and starts them through the runner; hold deliverables to a checker's acceptance with evidence; build, provision and watch plans on a Teams screen and through the API.",
   "requirements": [
     {
       "id": "R1",
       "title": "A team plan record",
-      "spec": "Behavioural. A plan names its purpose, its responsible person, its total budget (tokens and time), its deliverables (each with words, a deadline and the evidence that proves it), and its members; each member names a provisioning profile, the memories it starts with (lantern notes or a predecessor's letter from a named home), an opening conversation (turns authored as lys-home fewshot writes them), its share of the budget, its goals with reminders, and its checker (a person or another member), its place in the team's hierarchy (the member it reports to), the grants it is given (each delegated from the provisioning person's own grants, never beyond them, as the delegation form's cannot-give list says), and the account it runs on (a handle to an account in the secrets broker, or an ordered list of handles for rotation). A plan is refused plan_invalid naming the field when shares exceed the total, a member has no checker, or a deliverable names no evidence.",
+      "spec": "Behavioural. A plan names its purpose, its responsible person, its total budget (tokens and time), its deliverables (each with words, a deadline and the evidence that proves it), and its members; each member names a provisioning profile, the memories it starts with (lantern notes or a predecessor's letter from a named home), an opening conversation (turns authored as lys-home fewshot writes them), its share of the budget, its goals with reminders, and its checker (a person or another member), its place in the team's hierarchy (the member it reports to), the grants it is given (each delegated from the provisioning person's own grants, never beyond them, as the delegation form's cannot-give list says), and the account it runs on (a handle to an account in the secrets broker, or an ordered list of handles for rotation). A plan is refused plan_invalid naming the field when shares exceed the total, a member has no checker, or a deliverable names no evidence. A checker who reports, directly or up the chain, to the member it checks is refused checker_reports_to_member, and two members who check each other are refused checkers_circular: the judged party never holds the pen. A plan's account handle names its kind: a key (a value held by the secrets broker) or a login (a folder of credentials on the runner's machine that never travels and is never copied); rotation over logins is DIRECTORY-050 R5's.",
       "acceptance": [
         "A plan whose member shares exceed its total is refused naming the total.",
         "A member with no checker is refused naming the member.",
@@ -55,10 +56,10 @@
     {
       "id": "R2",
       "title": "Provision in one all-or-nothing act",
-      "spec": "Behavioural. POST /team-plans/{id}/provision creates, under the responsible person's grants: each agent, its grants as the profile names, its home, its budgets (DIRECTORY-051 R2) and goals (R4), then starts each through the runner (DIRECTORY-050 R3). If any step is refused, everything it created is undone and the refusal names the member and the step; a second provision under the same operation id answers what was done and does nothing twice.",
+      "spec": "Behavioural. POST /team-plans/{id}/provision creates, under the responsible person's grants: each agent, its grants as the profile names, its home, its budgets (DIRECTORY-051 R2) and goals (R4), then starts each through the runner (DIRECTORY-050 R3). Provisioning runs in three passes: check every member and step, then create every record, then start every agent, so no agent starts until every member exists. If a step is refused after records exist, each created agent is retired and its grants revoked by recorded acts, so nothing of theirs runs or can be used (a log keeps what happened; nothing is unmade), and the refusal names the member and the step; a second provision under the same operation id answers what was done and does nothing twice.",
       "acceptance": [
         "Provisioning a three-member plan leaves three running agents with their budgets and goals.",
-        "A refusal at the third member leaves nothing of the first two, naming the member and step.",
+        "A refusal at the third member leaves the first two retired with their grants revoked and never started, naming the member and step.",
         "Sending the same operation twice does nothing the second time."
       ],
       "files": {
@@ -82,8 +83,8 @@
       "title": "Starting memories and opening conversation",
       "spec": "Behavioural. Each member's home is created with the memories the plan names copied in as its inherited memory, and its session starts by resuming the opening conversation written for it, so its first turn already holds them. The render records both in the session's given record (lys.given).",
       "acceptance": [
-        "A member's first answer uses a fact only its starting memory holds.",
-        "The given record lists the memories and the opening conversation by hash."
+        "With a fixture harness, the input given to a member's first turn holds its starting memory text and its opening conversation, and no model is called.",
+        "The given record names both by digest."
       ],
       "files": {
         "create": [],
@@ -103,7 +104,7 @@
     {
       "id": "R4",
       "title": "Deliverables met only by the checker, with evidence; spend held to the total",
-      "spec": "Behavioural. A member marks a deliverable ready with its evidence (a commit on a named branch, a document, a check that passed); it is met only when its checker accepts it, and the checker may send it back with words. The team's spend is the sum of its members'; when it reaches the plan's total, every member is stopped or the responsible person told, as the plan says.",
+      "spec": "Behavioural. A member marks a deliverable ready with its evidence (a commit on a named branch, a document, a check that passed); it is met only when its checker accepts it, and the checker may send it back with words. The team's spend is the sum of its members'; when it reaches the plan's total, every member is stopped or the responsible person told, as the plan says. Secrets (R6 in the plan's records): a value given to Lys passes through the identity service to the broker, and the service keeps none of it and never logs that route's body. An agent reaches a secret through the broker's proxy, which adds the credential to the call so the agent never holds it, wherever the harness takes a base address; only a profile whose harness cannot takes it in its environment, and the profile names that.",
       "acceptance": [
         "A deliverable marked ready without evidence is refused evidence_missing.",
         "Only the named checker can accept it.",

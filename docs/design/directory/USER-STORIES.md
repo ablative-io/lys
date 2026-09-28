@@ -70,6 +70,8 @@
 
 **S114.** As a stranger verifying lys artifacts, I want the capability claim format specified, attacked and ratified before anything is signed under it, with every shipped format left byte-identical, so that no historical verification breaks.
 
+**S162.** As a reader of a receipt, I want the checkpoint it is proved against to be signed by the service, so that a proof of inclusion tells me the act is in the service's log and not in a tree somebody built around it.
+
 ## Grant holder and reviewer — Exercises or delegates current authority and verifies its exact origin
 
 **S8.** As a responsible person, I want to give my agent a bounded part of my authority and revoke it, so the same action is allowed before revocation and refused after it.
@@ -216,11 +218,17 @@
 
 **S147.** As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
 
+**S159.** As the person who updated Lys, I want to go back to the build I had before with one command when the new one misbehaves after it started fine, so that a bad update never leaves me stuck.
+
+**S161.** As the person who installed Lys, I want a service that has ended to be seen as ended at once, whatever else Lys was starting at that moment, so that a stop, a restart and an upgrade never wait on or misread a process that is gone.
+
 ## Person setting up Lys for the first time — Installs Lys on their own machine with no terminal knowledge and signs in
 
 **S149.** As an ordinary person setting up Lys, I want one installer, then a Lys page that asks my name, email and password and lets me connect Google, GitHub or Microsoft, so that I am signed in without a terminal, a password file or any page that is not Lys.
 
 **S150.** As someone using any of our products, I want to sign in with Lys everywhere, so that there is one account and one sign-in page, and it is always Lys's.
+
+**S160.** As someone who has never used a terminal, I want to download Lys, open it and be guided in my browser until I am signed in, so that I can set it up for my team myself.
 
 ## Developer of an app that signs in with Lys — Builds a product that uses Lys for sign-in and permissions without Lys knowing about it
 

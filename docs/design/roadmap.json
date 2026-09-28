@@ -2214,6 +2214,104 @@
         "RM-088"
       ],
       "notes": "Written by hand."
+    },
+    {
+      "id": "RM-090",
+      "title": "Go back to the previous build after an upgrade that succeeded, and one build stamp for every binary",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "An install that upgraded and then misbehaves returns to the build it ran before with one command; the four binaries take their build stamp from one shared build script.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-28T20:25:00+10:00",
+        "quote": "You can start on all of that, you can refresh as well.",
+        "context": "Tom asked at 19:47 for his live install to be updated tonight. Waffles' review of DIRECTORY-045's first round (card/DIRECTORY-045 ca11e605) found two gaps: upgrade returns to the previous build only when the upgrade itself fails, and the build stamp is four byte-identical build.rs files held equal by a test."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [],
+        "briefs": [
+          "DIRECTORY-053"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand. Follows DIRECTORY-045."
+    },
+    {
+      "id": "RM-091",
+      "title": "Install Lys by downloading and opening an app, with no terminal",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Lys.app for macOS: open it, watch the install on a Lys page, finish first-run setup, and Lys runs at login; update and uninstall from Lys.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T19:10:00+10:00",
+        "quote": "how is an average person supposed to do it?",
+        "context": "Tom's standing rule of that evening: Lys is the only sign-in for everything and an average person sets it up with no terminal. Found missing by Waffles at 20:22 while reviewing an installer draft."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-120"
+        ],
+        "briefs": [
+          "DIRECTORY-054"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-084"
+      ],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-092",
+      "title": "A service's exit lock is opened only in the service's own process, so no other process ever carries a copy of it",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "A service's exit lock is opened and taken in the service's own process by a holder command, so no process the starter starts can carry a copy of it.",
+      "provenance": {
+        "requested_by": "archie",
+        "date": "2026-09-28T20:40:00+10:00",
+        "quote": "",
+        "context": "Found while landing the combined identity landing: the exit watch race on the landing gate, and the review of the sign-in provider's link-audit sender."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-121"
+        ],
+        "briefs": [
+          "DIRECTORY-057"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-093",
+      "title": "A receipt's checkpoint is signed by the service, so inclusion in it proves the act is in the log",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "The receipts route answers its checkpoint signed by the service key, and one function verifies a receipt answer against a pinned key.",
+      "provenance": {
+        "requested_by": "archie",
+        "date": "2026-09-28T20:40:00+10:00",
+        "quote": "",
+        "context": "Found while landing the combined identity landing: the exit watch race on the landing gate, and the review of the sign-in provider's link-audit sender."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [],
+        "briefs": [
+          "DIRECTORY-058"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
     }
   ]
 }

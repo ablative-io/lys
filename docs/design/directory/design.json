@@ -2612,6 +2612,21 @@
       "brief": "DIRECTORY-046"
     },
     {
+      "path": "sgconfig.yml",
+      "note": "DIRECTORY-048 R7: the ast-grep configuration; gains the rule that refuses an app named in Lys code",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys/src/cli/mcp.rs",
+      "note": "DIRECTORY-049 R7: the Lys MCP server over standard input and output: three tools over the published registration API",
+      "brief": "DIRECTORY-049"
+    },
+    {
+      "path": "crates/lys/tests/mcp_stdio.rs",
+      "note": "DIRECTORY-049 R7: the MCP server driven over standard input and output, each tool call carrying the caller's own token or agent signature",
+      "brief": "DIRECTORY-049"
+    },
+    {
       "path": "crates/lys-runner/Cargo.toml",
       "note": "DIRECTORY-050 R1: Lys's own runner: each agent in its own background pseudo-terminal",
       "brief": "DIRECTORY-050"
@@ -2817,6 +2832,156 @@
       "brief": "DIRECTORY-052"
     },
     {
+      "path": "crates/lys/src/identity/upgrade_back_tests.rs",
+      "note": "R1: `lys identity upgrade --back`",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys-build-stamp/Cargo.toml",
+      "note": "R2: One build stamp",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys-build-stamp/src/lib.rs",
+      "note": "R2: One build stamp",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys-build-stamp/tests/stamp.rs",
+      "note": "R2: One build stamp",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys-secrets/Cargo.toml",
+      "note": "R2: One build stamp",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys-home/Cargo.toml",
+      "note": "R2: One build stamp",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys/tests/version.rs",
+      "note": "R2: One build stamp",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys/src/package.rs",
+      "note": "R1: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/package_tests.rs",
+      "note": "R1: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "packaging/macos/Info.plist",
+      "note": "R1: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "packaging/macos/Lys.icns",
+      "note": "R1: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/Cargo.toml",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/main.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/progress.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/progress_tests.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "surface/identity/src/features/install/InstallProgress.tsx",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/engine.rs",
+      "note": "R3: The container engine, guided in plain words",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/engine_tests.rs",
+      "note": "R3: The container engine, guided in plain words",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/login_item.rs",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/login_item_tests.rs",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "surface/identity/src/features/account/Uninstall.tsx",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "docs/design/directory/reports/DIRECTORY-054-fresh-account.md",
+      "note": "R5: Proof on a fresh macOS account",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/render.rs",
+      "note": "R5: The configuration and compose files move with the binaries",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/render_tests.rs",
+      "note": "R5: The configuration and compose files move with the binaries",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/install/server_config.rs",
+      "note": "R5: The configuration and compose files move with the binaries",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/adopt.rs",
+      "note": "R6: The first move of an install made before this card",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/adopt_tests.rs",
+      "note": "R6: The first move of an install made before this card",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/intent.rs",
+      "note": "R7: An upgrade stopped part-way is finished or put back",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/intent_tests.rs",
+      "note": "R7: An upgrade stopped part-way is finished or put back",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/swap.rs",
+      "note": "R7: An upgrade stopped part-way is finished or put back",
+      "brief": "DIRECTORY-045"
+    },
+    {
       "path": "crates/lys-identity-server/src/apps_api.rs",
       "note": "R1: An app is a record, registered through the API and approved on a Lys screen",
       "brief": "DIRECTORY-048"
@@ -2945,6 +3110,121 @@
       "path": "rules/ast-grep/no-poll.yml",
       "note": "R1: Usage measured from the transcript, per turn",
       "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/setup.rs",
+      "note": "R1: First run is a Lys setup page that asks for the administrator; install fills nothing from the machine",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "surface/identity/src/features/setup/Setup.tsx",
+      "note": "R1: First run is a Lys setup page that asks for the administrator; install fills nothing from the machine",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "crates/lys-identity-server/src/sign_in.rs",
+      "note": "R2: Password sign-in is a Lys page; the browser never reaches the issuer's pages",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "surface/identity/src/features/sign-in/SignIn.tsx",
+      "note": "R2: Password sign-in is a Lys page; the browser never reaches the issuer's pages",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "crates/lys-identity-server/src/provider.rs",
+      "note": "R3: Lys is the OpenID provider every product is registered with",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "crates/lys-identity-server/src/oidc.rs",
+      "note": "R3: Lys is the OpenID provider every product is registered with",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "crates/lys-identity-server/src/sign_in_providers.rs",
+      "note": "R4: Providers are set up inside Lys with every step shown",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "surface/identity/src/features/connections/SignInProviders.tsx",
+      "note": "R4: Providers are set up inside Lys with every step shown",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "surface/identity/src/features/people/Account.tsx",
+      "note": "R5: A person's own account, and administration of accounts, are Lys screens",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "crates/lys-identity-server/src/accounts.rs",
+      "note": "R5: A person's own account, and administration of accounts, are Lys screens",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "crates/lys/src/identity/install/prepare.rs",
+      "note": "R5: A person's own account, and administration of accounts, are Lys screens",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "crates/lys-identity-server/src/error.rs",
+      "note": "R6: Nothing a person reads names the issuer",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "surface/identity/src",
+      "note": "R6: Nothing a person reads names the issuer",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "crates/lys/src/identity/install/held_start.rs",
+      "note": "R2: The holder opens the lock, takes it and becomes the service",
+      "brief": "DIRECTORY-057"
+    },
+    {
+      "path": "crates/lys/src/identity/install/held_start_tests.rs",
+      "note": "R2: The holder opens the lock, takes it and becomes the service",
+      "brief": "DIRECTORY-057"
+    },
+    {
+      "path": "crates/lys/src/identity/install/start_race_tests.rs",
+      "note": "R3: The starter never opens the exit lock",
+      "brief": "DIRECTORY-057"
+    },
+    {
+      "path": "crates/lys-identity-server/src/checkpoint_api.rs",
+      "note": "R1: The receipts route answers a signed checkpoint",
+      "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/receipts_signed.rs",
+      "note": "R1: The receipts route answers a signed checkpoint",
+      "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys-identity/src/receipt_answer.rs",
+      "note": "R2: One function verifies a receipt against a pinned key",
+      "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys-identity/src/receipt_answer_tests.rs",
+      "note": "R2: One function verifies a receipt against a pinned key",
+      "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys-identity-server/src/secrets_api.rs",
+      "note": "R6: Accounts and secrets stored and reached by handle",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-install/Cargo.toml",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-install/src/lib.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
     }
   ],
   "inventory": [

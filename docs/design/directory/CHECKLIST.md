@@ -261,7 +261,7 @@
 ## A running install names its build and upgrades in place
 
 - [ ] **C344** — Every Lys binary answers --version with its build commit (DIRECTORY-045 R1).
-- [ ] **C345** — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2).
+- [ ] **C345** — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2); the configuration and compose files move with the binaries, an install made before it is adopted, and an upgrade stopped part-way is finished or put back (DIRECTORY-045 R5 to R7).
 - [ ] **C346** — The install and the server say which build is running (DIRECTORY-045 R3).
 - [ ] **C347** — Prove it on the live install (DIRECTORY-045 R4).
 
@@ -330,3 +330,27 @@
 - [ ] **C390** — A deliverable is met only when its checker accepts it with the named evidence; the team's spend is held to its total (DIRECTORY-052 R4).
 - [ ] **C391** — A Teams screen builds a plan from a template, provisions it, and shows each member's state, spend, goals and deliverables (DIRECTORY-052 R5).
 - [ ] **C392** — Accounts and secrets are stored once in the broker and assigned to members by handle; values are never shown again (DIRECTORY-052 R6).
+
+## Go back after an upgrade, one build stamp (DIRECTORY-053)
+
+- [ ] **C393** — `lys identity upgrade --back` returns a running install to the build kept in bin.previous (and surface.previous), stopped, swapped, started and waited on for ready exactly as an upgrade is, and records the build now running (DIRECTORY-053 R1).
+- [ ] **C394** — Every Lys binary takes its build stamp from one shared build-support crate; no build.rs is copied (DIRECTORY-053 R2).
+
+## Install Lys by opening an app (DIRECTORY-054)
+
+- [ ] **C395** — `lys package app` builds a signed, notarised Lys.app and disk image holding every Lys binary and the screens package, each stamped with its build; with no signing identity it is refused by name (DIRECTORY-054 R1).
+- [ ] **C396** — Opening Lys.app runs the install service in the process, shows each step on a Lys page in the browser in plain words, and hands over to first-run setup (DIRECTORY-054 R2).
+- [ ] **C397** — A missing or stopped container engine is a Lys page with what to do, and the install continues by itself when the engine appears, on its socket's event (DIRECTORY-054 R3).
+- [ ] **C398** — Lys starts at login, opening the app again opens Lys, a newer app upgrades through DIRECTORY-045, and uninstalling is a Lys screen that keeps data unless the person chooses otherwise (DIRECTORY-054 R4).
+- [ ] **C399** — On a fresh macOS account, a person goes from the downloaded disk image to signed in with no terminal process started and nothing naming the issuer (DIRECTORY-054 R5).
+
+## The exit lock lives in the service only (DIRECTORY-057)
+
+- [ ] **C400** — The three ways to keep the exit lock out of the starter are compared in ADR-121 and the holder command is chosen, with no unsafe code (DIRECTORY-057 R1).
+- [ ] **C401** — A holder command opens the exit lock, takes it and becomes the service by exec, keeping its pid; a program that cannot run is refused by name (DIRECTORY-057 R2).
+- [ ] **C402** — The starter never opens the exit lock; a service that ends at once beside other starts is seen ended every time (DIRECTORY-057 R3).
+
+## A receipt's checkpoint is signed (DIRECTORY-058)
+
+- [ ] **C403** — The receipts route answers its checkpoint as a note signed by the service key, signed once per append, with its origin read from configuration (DIRECTORY-058 R1).
+- [ ] **C404** — One function verifies a receipt answer against a pinned key with a named refusal for each failure; a forged tree around a genuine event is refused (DIRECTORY-058 R2).

@@ -8,7 +8,7 @@ title: Build the directory contract and signed authoritative identity changes
 # DIRECTORY-003: Build the directory contract and signed authoritative identity changes
 
 > **Cluster:** directory
-> **Depends on:** DIRECTORY-002
+> **Depends on:** DIRECTORY-002, LYSLOGSTORE-001
 > **Blocked by:** Waffles' review of this brief before it is dispatched (DIRECTORY-001 boundary: no row brief is dispatched until Waffles has reviewed it), The exact file manifest for crates/lys-identity/, crates/lys-identity-server/ and tests/identity_contract/, reviewed before this row starts; revision 5 requires one for every wholly new module (docs/design/identity/briefs/IDENTITY-001.json:28, docs/design/identity/briefs/IDENTITY-001.json:190) and none is written yet
 > **Design anchor:**
 > - ADR-003 — Everything is pegged to a human authority — A person signs in first; an agent is provisioned under that person with its own identity; the person's permissions are the ceiling and the agent holds an explicit subset; every grant says who may exercise it and who may pass it on; withdrawing the authority stops every grant derived from it. The exact delegation schema is not settled by this decision.

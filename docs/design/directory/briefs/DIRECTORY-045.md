@@ -15,7 +15,7 @@ title: Name every build, and upgrade a running identity install in place with a 
 > - ADR-113 — The identity install and its clients wait on signals, never on a clock — A wait ends on the event it is waiting for or on the failure that makes the event impossible: a service is ready when it says so or when a single connection to it succeeds after a readiness event (its log gaining its listening line, observed through the platform's file-change notification), a stopped process is gone when the platform reports its exit (kqueue EVFILT_PROC on macOS, pidfd on Linux), a peer that refuses or closes is an error at once, and nothing carries a timeout. The screen re-measures on a ResizeObserver or animation-frame signal. Rejected: shorter sleeps, which still wait on a clock; keeping timeouts as a safety net, which the rule forbids and which hides a stuck peer's cause.
 > **Checklist:**
 > - C344 — Every Lys binary answers --version with its build commit (DIRECTORY-045 R1).
-> - C345 — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2).
+> - C345 — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2); the configuration and compose files move with the binaries, an install made before it is adopted, and an upgrade stopped part-way is finished or put back (DIRECTORY-045 R5 to R7).
 > - C346 — The install and the server say which build is running (DIRECTORY-045 R3).
 > - C347 — Prove it on the live install (DIRECTORY-045 R4).
 > **Stories:**
@@ -23,7 +23,7 @@ title: Name every build, and upgrade a running identity install in place with a 
 
 ## Purpose
 
-A person running the identity product cannot tell which build is running, and cannot take a newer one: install only fills in what is missing and never restarts. So every landing stays invisible until someone swaps binaries by hand. This brief makes every binary name its commit and gives the product one command that upgrades a running install and puts the previous build back if the new one fails.
+A person running the identity product cannot tell which build is running, and cannot take a newer one: install only fills in what is missing and never restarts. So every landing stays invisible until someone swaps binaries by hand. This brief makes every binary name its commit and gives the product one command that upgrades a running install and puts the previous build back if the new one fails. Amended 28 September 2026 20:35 by Waffles after Archie's review of the first round (card/DIRECTORY-045 ca11e605): an upgrade that leaves the configuration and compose files behind cannot move an install to any build that adds a configuration key (the server refuses unknown keys), and so cannot carry the sign-in cookie fix, which lives in the compose file; an install made before this card must move to it; and an upgrade stopped part-way must be recoverable.
 
 ## Task
 
@@ -57,11 +57,11 @@ Behavioural. lys, lys-identity-server, lys-secrets and lys-home each answer --ve
 
 ### R2: `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure
 
-Behavioural. A new verb `lys identity upgrade --from DIR [--surface PKG] [--root ROOT]`. It refuses by name when ROOT holds no install, when DIR lacks any installed binary, or when a binary's --version cannot be read. It prints the installed and the new commit of each. It stops the service and then the broker, each waiting on its exit event through DIRECTORY-044's exit wait (never a sleep or a timeout); moves bin/ to bin.previous/ (replacing an older bin.previous/) and places the new binaries by copy to a temporary name and rename; places the screens package through the install's existing verify-and-place path when --surface is given, keeping the previous one the same way; starts the broker and then the service and waits for each ready on its readiness event. If a start or readiness fails, it stops what it started, restores bin.previous/ (and the previous screens), starts them, waits for them ready, and exits non-zero naming the failing binary and its log. It never touches data/, credentials, deployment.toml, identity.json or the compose services.
+Behavioural. A new verb `lys identity upgrade --from DIR [--surface PKG] [--root ROOT]`. It refuses by name when ROOT holds no install, when DIR lacks any installed binary, or when a binary's --version cannot be read. It prints the installed and the new commit of each. It stops the service and then the broker, each waiting on its exit event through DIRECTORY-044's exit wait (never a sleep or a timeout); moves bin/ to bin.previous/ (replacing an older bin.previous/) and places the new binaries by copy to a temporary name and rename; places the screens package through the install's existing verify-and-place path when --surface is given, keeping the previous one the same way; starts the broker and then the service and waits for each ready on its readiness event. If a start or readiness fails, it stops what it started, restores bin.previous/ (and the previous screens), starts them, waits for them ready, and exits non-zero naming the failing binary and its log. It never touches data/ or credentials; the configuration and compose files move with the binaries as R5 says.
 
 **Acceptance:**
 - A test on a scratch root installs build A (two stub binaries answering --version and readiness), upgrades to build B, and shows B running and A kept in bin.previous/; a second test where B's service exits before ready shows A restored, running and ready, and the named failure.
-- A test shows data/, identity.json and deployment.toml are byte-identical before and after both upgrades.
+- A test shows data/ and every credential are byte-identical before and after both upgrades.
 - grep -nE 'sleep|timeout' over the new files prints nothing.
 
 **Files:**
@@ -71,7 +71,7 @@ Behavioural. A new verb `lys identity upgrade --from DIR [--surface PKG] [--root
 - modify: crates/lys/src/identity/install/layout.rs
 
 **Checklist:**
-- C345 — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2).
+- C345 — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2); the configuration and compose files move with the binaries, an install made before it is adopted, and an upgrade stopped part-way is finished or put back (DIRECTORY-045 R5 to R7).
 
 **Stories:**
 - S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
@@ -97,10 +97,11 @@ Behavioural. `lys identity install` and `lys identity upgrade` write install/bui
 
 ### R4: Prove it on the live install
 
-Evidence. Evidence. On the machine the live install runs on, build lys, lys-identity-server and lys-secrets at the card's head on the build machine through the card's own round, then run `lys identity upgrade --from` that build against the live install, and show the running server's /authority `build` equals the card's head. Record the before and after commits and the upgrade's printed lines in docs/design/directory/PROOF-UPGRADE.md. Secrets and passwords never appear in it.
+Evidence. Evidence. On the machine the live install runs on, build lys, lys-identity-server and lys-secrets at the card's head on the build machine through the card's own round, then run `lys identity upgrade --from` that build against the live install, and show the running server's /authority `build` equals the card's head. Record the before and after commits and the upgrade's printed lines in docs/design/directory/PROOF-UPGRADE.md. Secrets and passwords never appear in it. The live install was made before this card (R6), so the proof starts with its first move, and the sign-in page still keeps its session over plain http after the upgrade (the cookie setting carried by R5).
 
 **Acceptance:**
 - PROOF-UPGRADE.md names the installed commit before, the head commit after, and quotes the upgrade's lines; `curl -s http://localhost:8490/authority` shows the head commit.
+- After the upgrade, signing in on the live install in a browser keeps the session, and the compose environment holds the cookie setting the new build renders.
 
 **Files:**
 - create: docs/design/directory/PROOF-UPGRADE.md
@@ -111,10 +112,74 @@ Evidence. Evidence. On the machine the live install runs on, build lys, lys-iden
 **Stories:**
 - S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
 
+### R5: The configuration and compose files move with the binaries
+
+Behavioural. An upgrade renders deployment.toml's derived files, the directory service's configuration and the compose files (compose.yaml and its environment) for the new build, from the install's recorded choices and the new build's templates, inside the swap: the previous ones are kept beside them (config.previous/) and put back with the binaries on failure and by --back (DIRECTORY-053). The compose services whose rendered definition changed are recreated through the engine, waited on for ready, and put back on failure. Running install from a build other than the one placed is refused install_build_differs, naming the placed and the new commit and the upgrade command, never restarting old binaries on a new configuration.
+
+**Acceptance:**
+- A test where build B adds a configuration key and a compose environment value upgrades an install of build A: B runs with the new key and value, and a failed start of B puts A's binaries, configuration and compose files back, byte-identical.
+- Install run from build B over an install of build A is refused install_build_differs and nothing is stopped.
+- data/ and every credential are byte-identical across both.
+
+**Files:**
+- create: crates/lys/src/identity/upgrade/render.rs
+- create: crates/lys/src/identity/upgrade/render_tests.rs
+- modify: crates/lys/src/identity/upgrade.rs
+- modify: crates/lys/src/identity/install.rs
+- modify: crates/lys/src/identity/install/server_config.rs
+- modify: crates/lys/src/identity/install/layout.rs
+
+**Checklist:**
+- C345 — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2); the configuration and compose files move with the binaries, an install made before it is adopted, and an upgrade stopped part-way is finished or put back (DIRECTORY-045 R5 to R7).
+
+**Stories:**
+- S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
+
+### R6: The first move of an install made before this card
+
+Behavioural. An install with no install/build.json (made before this card) is upgraded, not re-installed: upgrade reads the placed binaries' versions (a binary that cannot answer --version is recorded as 'built before build stamps'), stops the processes its pid files name through their exit locks, or through the pid when a process has no exit lock, naming which, and proceeds as R2 and R5. Install run again never leaves a process running from a binary it replaced: it stops and restarts any process whose binary it changed, so install/build.json always names what runs.
+
+**Acceptance:**
+- A scratch install laid out as before this card (no build.json, no exit locks, a binary without --version) is upgraded, and /api/authority answers the new commit.
+- Install run again with a changed binary restarts that process, and build.json equals the running build.
+
+**Files:**
+- create: crates/lys/src/identity/upgrade/adopt.rs
+- create: crates/lys/src/identity/upgrade/adopt_tests.rs
+- modify: crates/lys/src/identity/install/services.rs
+
+**Checklist:**
+- C345 — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2); the configuration and compose files move with the binaries, an install made before it is adopted, and an upgrade stopped part-way is finished or put back (DIRECTORY-045 R5 to R7).
+- C346 — The install and the server say which build is running (DIRECTORY-045 R3).
+
+**Stories:**
+- S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
+
+### R7: An upgrade stopped part-way is finished or put back
+
+Behavioural. Before the first stop, an upgrade writes an intent record (install/upgrade.json: from and to builds, and each step as it completes, written by a temporary name and a rename). Every later upgrade, --back or install first reads it and, when present, finishes the recorded upgrade or puts the previous build back, naming which, before doing anything else. Each placed binary and file is read back and its digest compared with its source before the old one is removed, as the screens already are. A readiness check on a process already running reads its log from the offset it opened at, never from the first byte on each change. upgrade.rs stays under 500 lines by moving the swap, render and adopt into their own modules.
+
+**Acceptance:**
+- A test kills the upgrade after the rename of bin/ and before the last copy; the next upgrade names the unfinished one, finishes it or puts it back, and the install runs one whole build.
+- A test corrupts one placed copy; the digest check refuses it and nothing old is removed.
+- No file under crates/lys/src/identity/ is 500 lines or more.
+
+**Files:**
+- create: crates/lys/src/identity/upgrade/intent.rs
+- create: crates/lys/src/identity/upgrade/intent_tests.rs
+- create: crates/lys/src/identity/upgrade/swap.rs
+- modify: crates/lys/src/identity/upgrade.rs
+
+**Checklist:**
+- C345 — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2); the configuration and compose files move with the binaries, an install made before it is adopted, and an upgrade stopped part-way is finished or put back (DIRECTORY-045 R5 to R7).
+
+**Stories:**
+- S147 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
+
 ## Boundaries
 
 - SHALL NOT add any timeout, deadline, sleep or poll interval.
-- SHALL NOT touch data, credentials, configuration or the compose services in an upgrade.
+- SHALL NOT touch data/ or any credential in an upgrade. The configuration and compose files are rendered for the new build inside the swap and kept and put back with the binaries (R5); nothing else outside bin/, the screens, the logs, the process files and install/build.json is written.
 - SHALL NOT print or record any secret, password or API key, in output, tests or the proof.
 - SHALL NOT add #[allow], #[ignore] or any bypass; every file stays under 500 lines of code; ast-grep stays at zero hits.
 - Where a file named here does not exist on main at the card's base (About.tsx, a main.rs), the change goes where that concern lives and the dev record names the path.
