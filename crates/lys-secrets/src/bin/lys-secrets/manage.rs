@@ -1,8 +1,10 @@
 //! Routes a screen changes a secret through, as the identity its caller
-//! speaks for (see `callers`): a secret's scope and who it may be handed to, both
-//! as its owner, and where a handle's revocation stands. The presentation
-//! is bound to the request's body, so a signed change cannot be replayed
-//! with another body.
+//! speaks for (see `callers`): a secret's scope and who it may be handed
+//! to, both as its owner and each under an operation id the caller made
+//! once for that change, those two settings as they stand with the last
+//! operation id applied, and where a handle's revocation stands. The
+//! presentation is bound to the request's body, so a signed change cannot
+//! be replayed with another body.
 
 use std::sync::{Arc, PoisonError};
 
@@ -10,7 +12,7 @@ use axum::Json;
 use axum::body::Bytes;
 use axum::extract::{Query, Request, State};
 use axum::http::StatusCode;
-use lys_secrets::{HandleId, Recipients, Scope, SecretsError, UpstreamRevocation};
+use lys_secrets::{HandleId, OwnerChanged, Recipients, Scope, SecretsError, UpstreamRevocation};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
@@ -45,18 +47,36 @@ pub struct ScopeChange {
     secret: String,
     /// `personal:<person>`, `team:<name>` or `organisation:<name>`.
     scope: String,
+    /// The id the caller made once for this change.
+    operation: Option<String>,
 }
 
-/// Sets a secret's scope, as its owner.
+/// Whether the change was applied now, or answered from an earlier one.
+fn repeated(changed: &OwnerChanged) -> bool {
+    matches!(changed, OwnerChanged::Repeated { .. })
+}
+
+/// Sets a secret's scope, as its owner, once per operation id.
 pub async fn scope(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
     let (who, asked) = change::<ScopeChange>(&shared, request).await?;
     let scope = Scope::parse(&asked.scope).map_err(|error| refused(&error))?;
     let target = scope.target();
     let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
-    broker
-        .set_scope_via(&who.identity, &asked.secret, scope, who.via.as_deref())
+    let changed = broker
+        .set_scope_via(
+            &who.identity,
+            &asked.secret,
+            scope,
+            who.via.as_deref(),
+            asked.operation.as_deref(),
+        )
         .map_err(|error| refused(&error))?;
-    Ok(Json(json!({ "secret": asked.secret, "scope": target })))
+    Ok(Json(json!({
+        "secret": asked.secret,
+        "scope": target,
+        "operation": asked.operation,
+        "repeated": repeated(&changed),
+    })))
 }
 
 #[derive(Deserialize)]
@@ -65,23 +85,60 @@ pub struct RecipientsChange {
     secret: String,
     /// `anyone` or `people_only`.
     recipients: Recipients,
+    /// The id the caller made once for this change.
+    operation: Option<String>,
 }
 
-/// Sets who a secret may be handed to, as its owner.
+/// Sets who a secret may be handed to, as its owner, once per operation id.
 pub async fn recipients(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
     let (who, asked) = change::<RecipientsChange>(&shared, request).await?;
     let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
-    broker
+    let changed = broker
         .set_recipients_via(
             &who.identity,
             &asked.secret,
             asked.recipients,
             who.via.as_deref(),
+            asked.operation.as_deref(),
         )
         .map_err(|error| refused(&error))?;
-    Ok(Json(
-        json!({ "secret": asked.secret, "recipients": asked.recipients.label() }),
-    ))
+    Ok(Json(json!({
+        "secret": asked.secret,
+        "recipients": asked.recipients.label(),
+        "operation": asked.operation,
+        "repeated": repeated(&changed),
+    })))
+}
+
+/// The query of a settings read: the secret, percent-decoded.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SettingsAsked {
+    secret: String,
+}
+
+/// A secret's scope, who it may be handed to, and the operation id of the
+/// last owner change applied, as they stand, when the caller may discover
+/// it. A screen reads this to settle a change whose
+/// answer it never received.
+pub async fn settings(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
+    let (parts, _body) = request.into_parts();
+    let Query(asked) = Query::<SettingsAsked>::try_from_uri(&parts.uri)
+        .map_err(|error| malformed("query", error.body_text()))?;
+    if asked.secret.is_empty() {
+        return Err(malformed("query", "no secret named".to_owned()));
+    }
+    let who = caller(&shared, &parts, &[])?;
+    let broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
+    let settings = broker
+        .settings(&who.identity, &asked.secret)
+        .map_err(|error| refused(&error))?;
+    Ok(Json(json!({
+        "secret": asked.secret,
+        "scope": settings.scope.map(|scope| scope.target()),
+        "recipients": settings.recipients.label(),
+        "last_operation": settings.last_operation,
+    })))
 }
 
 /// The query of a revocation read: the handle, percent-decoded.

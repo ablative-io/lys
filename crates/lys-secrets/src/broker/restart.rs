@@ -1,10 +1,11 @@
 //! Starting the broker without reading its whole audit log, and the
 //! snapshots that make that possible.
 //!
-//! The broker's leases, readers and unfinished rotation are a fold of the
-//! audit log. A snapshot holds that fold at one tree size, signed by the
-//! audit key and bound to the log's root at that size. A start loads it and
-//! folds only the lines after it, each with its signature checked.
+//! The broker's leases, readers, unfinished rotation and owner changes are
+//! a fold of the audit log. A snapshot holds that fold at one tree size,
+//! signed by the audit key and bound to the log's root at that size. A
+//! start loads it and folds only the lines after it, each with its
+//! signature checked.
 //!
 //! A snapshot that is missing, does not verify, is of another kind or
 //! another log, or is not at the log's root is refused by name in
@@ -103,15 +104,21 @@ impl<P: PermissionCheck> Broker<P> {
         let handles_path = paths.store_dir.join(HANDLES);
         let mut handles = read_handles(&handles_path)?;
         state.lay_over(&mut handles);
-        let (mut readers, mut rotating) = (state.readers, state.rotating);
+        let (mut readers, mut rotating, mut owners) = (state.readers, state.rotating, state.owners);
         let folded = u64::try_from(lines.len()).unwrap_or(u64::MAX);
         let from = audit.len().saturating_sub(folded);
         for recorded in lines {
-            Folded::apply(&mut handles, &mut readers, &mut rotating, recorded.line);
+            Folded::apply(
+                &mut handles,
+                &mut readers,
+                &mut rotating,
+                &mut owners,
+                recorded.line,
+            );
         }
         let sealed = Sealed {
             size: audit.len(),
-            state: Folded::of(&handles, &readers, rotating.as_deref()),
+            state: Folded::of(&handles, &readers, rotating.as_deref(), &owners),
         };
         let rebuilt = audit.start().refusal().is_some();
         let mut broker = Self {
@@ -125,6 +132,7 @@ impl<P: PermissionCheck> Broker<P> {
             handles_path,
             paths: paths.clone(),
             readers,
+            owners,
             sealed,
             every,
             snapshot_failure: None,
@@ -156,15 +164,15 @@ impl<P: PermissionCheck> Broker<P> {
         self.snapshot_report = Some(report);
     }
 
-    /// What the broker holds of its audit log now, each lease's counts and
-    /// every reader, in the encoding a snapshot carries. It holds no secret,
-    /// token, digest or key.
+    /// What the broker holds of its audit log now, each lease's counts,
+    /// every reader and each secret's owner changes, in the encoding a
+    /// snapshot carries. It holds no secret, token, token digest or key.
     ///
     /// # Errors
     ///
     /// `Encoding`.
     pub fn folded(&self) -> Result<Vec<u8>, SecretsError> {
-        Folded::of(&self.handles, &self.readers, None).encode()
+        Folded::of(&self.handles, &self.readers, None, &self.owners).encode()
     }
 
     /// Writes a snapshot when the log has crossed a multiple of the count
@@ -191,10 +199,17 @@ impl<P: PermissionCheck> Broker<P> {
         self.sealed.state.lay_over(&mut handles);
         let mut readers = self.sealed.state.readers.clone();
         let mut rotating = self.sealed.state.rotating.clone();
+        let mut owners = self.sealed.state.owners.clone();
         for recorded in lines {
-            Folded::apply(&mut handles, &mut readers, &mut rotating, recorded.line);
+            Folded::apply(
+                &mut handles,
+                &mut readers,
+                &mut rotating,
+                &mut owners,
+                recorded.line,
+            );
         }
-        let state = Folded::of(&handles, &readers, rotating.as_deref());
+        let state = Folded::of(&handles, &readers, rotating.as_deref(), &owners);
         let size = self
             .audit
             .write_snapshot(&state.encode()?, self.audit_key.identity())?;

@@ -4,13 +4,25 @@
 //! a secret answers exactly as one that is not there, and a secret is
 //! listed only to its owner and the identities it is granted to.
 
-use crate::audit::AuditKind;
-use crate::error::{LendingRefusal, SecretsError};
+use crate::error::SecretsError;
 use crate::handle::{HandleToken, Presentation};
 use crate::permission::PermissionCheck;
-use crate::store::{EntryView, Scope};
+use crate::store::{EntryView, Recipients, Scope};
 
 use super::Broker;
+use super::owner::{Admission, Call, OwnerChanged, SCOPE};
+
+/// A secret's owner settings as they stand.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SecretSettings {
+    /// The scope its owner set; none bounds no one.
+    pub scope: Option<Scope>,
+    /// Who it may be handed to.
+    pub recipients: Recipients,
+    /// The operation id of the last owner change applied, when it carried
+    /// one.
+    pub last_operation: Option<String>,
+}
 
 impl<P: PermissionCheck> Broker<P> {
     /// Whether `identity` stands inside the scope of `secret`: its owner;
@@ -104,7 +116,25 @@ impl<P: PermissionCheck> Broker<P> {
             })
     }
 
-    /// Sets the scope of `secret`, as its owner.
+    /// The owner settings of `secret` as they stand, to an identity that may
+    /// discover it: the scope, when one is set, who it may be handed to, and
+    /// the operation id of the last owner change applied.
+    ///
+    /// # Errors
+    ///
+    /// `SecretUnknown` when no such secret is sealed or `identity` may not
+    /// discover it; the two are not told apart.
+    pub fn settings(&self, identity: &str, secret: &str) -> Result<SecretSettings, SecretsError> {
+        self.metadata(identity, secret)?;
+        Ok(SecretSettings {
+            scope: self.store.scope(secret),
+            recipients: self.store.recipients(secret),
+            last_operation: self.last_operation(secret),
+        })
+    }
+
+    /// Sets the scope of `secret`, as its owner, from the owner's own
+    /// command. The change carries no operation id.
     ///
     /// # Errors
     ///
@@ -116,43 +146,51 @@ impl<P: PermissionCheck> Broker<P> {
         secret: &str,
         scope: Scope,
     ) -> Result<(), SecretsError> {
-        self.set_scope_via(owner, secret, scope, None)
+        self.owns(owner, secret)?;
+        self.apply_scope(owner, secret, scope, None, None)
     }
 
-    /// Sets the scope of `secret`, as its owner, asked through the screen
-    /// service `via` when one carried the owner's word; the audit line
-    /// names it.
+    /// Sets the scope of `secret`, as its owner, under the operation id
+    /// `operation`, asked through the screen service `via` when one carried
+    /// the owner's word; the audit line names both. An id already applied
+    /// to the secret with this same change answers the outcome recorded
+    /// then, and applies nothing.
     ///
     /// # Errors
     ///
-    /// As `set_scope`.
+    /// As `set_scope`, `OperationMissing` for no operation id or one of the
+    /// wrong shape, and `OperationReused` for an id already applied to the
+    /// secret with another change.
     pub fn set_scope_via(
         &mut self,
         owner: &str,
         secret: &str,
         scope: Scope,
         via: Option<&str>,
-    ) -> Result<(), SecretsError> {
-        let owns = self
-            .store
-            .entry(secret)
-            .is_some_and(|entry| entry.owner == owner);
-        if !owns {
-            return Err(SecretsError::from(LendingRefusal::NotPermitted {
-                holder: owner.to_owned(),
-                secret: secret.to_owned(),
-            }));
+        operation: Option<&str>,
+    ) -> Result<OwnerChanged, SecretsError> {
+        self.owns(owner, secret)?;
+        let change = format!("{SCOPE}{}", scope.target());
+        match self.owner_admission(secret, operation, &change)? {
+            Admission::Repeated(outcome) => Ok(OwnerChanged::Repeated { outcome }),
+            Admission::Fresh(call) => {
+                self.apply_scope(owner, secret, scope, via, Some(&call))?;
+                Ok(OwnerChanged::Applied)
+            }
         }
-        let outcome = with_via(format!("scope {}", scope.target()), via);
+    }
+
+    fn apply_scope(
+        &mut self,
+        owner: &str,
+        secret: &str,
+        scope: Scope,
+        via: Option<&str>,
+        call: Option<&Call>,
+    ) -> Result<(), SecretsError> {
+        let outcome = with_via(format!("{SCOPE}{}", scope.target()), via);
         self.store.set_scope(secret, scope)?;
-        self.record(
-            AuditKind::Seal,
-            (None, Some(owner), Some(secret)),
-            None,
-            None,
-            &outcome,
-        )?;
-        Ok(())
+        self.record_owner_change(owner, secret, &outcome, call)
     }
 }
 

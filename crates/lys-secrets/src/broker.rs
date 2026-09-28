@@ -28,6 +28,8 @@ mod folded;
 mod inflight;
 mod lineage;
 mod oauth_grants;
+mod owner;
+pub use owner::OwnerChanged;
 mod records;
 mod restart;
 pub use restart::{SNAPSHOT_EVERY, SnapshotReport};
@@ -35,6 +37,7 @@ mod revocation;
 pub use revocation::{RevocationState, UpstreamRevocation};
 mod rotation;
 mod scope;
+pub use scope::SecretSettings;
 mod spawn;
 mod using;
 
@@ -146,6 +149,8 @@ pub struct Broker<P: PermissionCheck> {
     /// Every (identity, record) pair the log shows read, so a refusal after
     /// a relation's removal is named `RelationRemoved`.
     readers: BTreeSet<(String, String)>,
+    /// Each secret's owner changes the log shows applied.
+    owners: owner::Owners,
     /// The fold of the log's lines at the last snapshot.
     sealed: restart::Sealed,
     /// How many lines the log grows by between snapshots.
@@ -193,6 +198,7 @@ impl<P: PermissionCheck> Broker<P> {
             handles_path: paths.store_dir.join(HANDLES),
             paths: paths.clone(),
             readers: BTreeSet::new(),
+            owners: owner::Owners::new(),
             sealed: restart::Sealed::default(),
             every: SNAPSHOT_EVERY,
             snapshot_failure: None,
