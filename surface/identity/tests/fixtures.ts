@@ -145,6 +145,9 @@ export type Route = Answer | ((body: unknown) => Answer);
 export const ok = (body: unknown): Answer => ({ status: 200, body });
 export const refused = (status: number, refusal: string, reason: string): Answer => ({ status, body: { refusal, reason } });
 
+/** The commit the stubbed service says it was built from. */
+export const BUILD = '0123456789abcdef0123456789abcdef01234567';
+
 /** Every route the screens read, answered as the service answers them. */
 export const SERVICE: Record<string, Route> = {
   '/directory/people': ok(DIRECTORY),
@@ -161,7 +164,7 @@ export const SERVICE: Record<string, Route> = {
   '/service-accounts': ok({ scope: 'personal', service_accounts: [] }),
   ['/agents/' + SCRIBE + '/runtime/sessions']: ok({ sessions: [] }),
   ['/agents/' + REVIEWER + '/runtime/sessions']: ok({ sessions: [] }),
-  '/authority': ok('Step 1 of the directory has one administrator.'),
+  '/authority': ok({ authority: 'Step 1 of the directory has one administrator.', build: BUILD }),
   '/grants': ok({ grants: GRANTS, revision: 7 }),
   '/grants/model': ok(MODEL),
   'POST /grants/why': why,

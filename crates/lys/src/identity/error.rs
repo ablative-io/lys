@@ -54,6 +54,14 @@ pub enum ErrorKind {
     ThemeInvalid,
     /// At least one declared service is not ready.
     Unready,
+    /// The data root holds no install to act on.
+    NotInstalled,
+    /// A binary the install runs is not in the folder named.
+    BinaryMissing,
+    /// A binary's `--version` could not be run or read.
+    VersionUnreadable,
+    /// A new build did not start; the previous one was put back.
+    UpgradeFailed,
 }
 
 impl ErrorKind {
@@ -81,6 +89,10 @@ impl ErrorKind {
             Self::ReadBackMismatch => "read_back_mismatch",
             Self::ThemeInvalid => "theme_invalid",
             Self::Unready => "unready",
+            Self::NotInstalled => "not_installed",
+            Self::BinaryMissing => "binary_missing",
+            Self::VersionUnreadable => "version_unreadable",
+            Self::UpgradeFailed => "upgrade_failed",
         }
     }
 }

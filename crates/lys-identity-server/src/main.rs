@@ -4,7 +4,18 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
+use lys_identity_server::read_api::BUILD;
 use lys_identity_server::{Config, ServerError, service_saying};
+
+/// What `--version` and `-V` print: the name, the crate version and the
+/// commit this binary was built from.
+const VERSION: &str = concat!(
+    "lys-identity-server ",
+    env!("CARGO_PKG_VERSION"),
+    " (",
+    env!("LYS_BUILD"),
+    ")"
+);
 
 async fn serve(config_path: PathBuf) -> Result<(), ServerError> {
     let config = Config::load(&config_path)?;
@@ -25,10 +36,16 @@ async fn serve(config_path: PathBuf) -> Result<(), ServerError> {
 
 #[tokio::main]
 async fn main() -> ExitCode {
-    let Some(config_path) = std::env::args_os().nth(1).map(PathBuf::from) else {
-        eprintln!("usage: lys-identity-server <config.json>");
+    let Some(first) = std::env::args_os().nth(1) else {
+        eprintln!("usage: lys-identity-server <config.json> | --version");
         return ExitCode::from(2);
     };
+    if first == "--version" || first == "-V" {
+        println!("{VERSION}");
+        return ExitCode::SUCCESS;
+    }
+    let config_path = PathBuf::from(first);
+    println!("lys-identity-server build {BUILD}");
     match serve(config_path).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {

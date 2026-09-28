@@ -204,7 +204,6 @@ pub fn open_directory(config: &Config) -> Result<Directory<FileLeafStore>, Serve
 /// The service's routes over `state`.
 pub fn router(state: Shared) -> Router {
     Router::new()
-        .route("/authority", get(authority))
         .route("/login", get(login))
         .route("/callback", get(callback))
         .route("/setup", post(crate::setup::finish))
@@ -310,10 +309,6 @@ pub(crate) fn identity_id(text: &str) -> Result<IdentityId, ServerError> {
     PersonId::from_str(text)
         .map(IdentityId::Person)
         .map_err(ServerError::from)
-}
-
-async fn authority() -> &'static str {
-    AUTHORITY
 }
 
 async fn login(State(state): State<Shared>) -> Result<Response, ServerError> {

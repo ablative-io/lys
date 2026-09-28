@@ -5,6 +5,9 @@ import type { ActionBody, DelegateBody, Grant, GrantList, GrantModel, Permit, Re
 /** The service is reached through the page's own origin, under /api. */
 export const API = '/api';
 
+/** How access is managed, and the commit the answering service was built from. */
+export type AuthorityAnswer = { authority: string; build: string };
+
 /** A refusal the service answered, by name, with its HTTP status. */
 export class Refused extends Error {
   readonly status: number;
@@ -84,11 +87,7 @@ export const api = {
   who: (body: WhoBody) => get<WhoAnswer>('/grants/who', body),
   revoke: (id: string, body: RevokeBody) => get<Recorded>('/grants/' + encodeURIComponent(id) + '/revoke', body),
   callback: (search: string) => get<SignedIn>('/callback' + search),
-  authority: async (): Promise<string> => {
-    const response = await fetch(API + '/authority', { credentials: 'same-origin' });
-    if (!response.ok) throw await refusalOf(response);
-    return response.text();
-  },
+  authority: () => get<AuthorityAnswer>('/authority'),
 };
 
 /** A new operation id, `op-` and 32 hex digits, kept across retries of one change. */
