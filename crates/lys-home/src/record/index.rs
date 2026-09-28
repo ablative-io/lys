@@ -65,6 +65,14 @@ impl Index {
         sibling(session_file, "head")
     }
 
+    /// The block rows file beside a session file, `<stem>.blocks.jsonl`: one
+    /// `{entry, part, hash}` row per content part stored at import (see
+    /// [`crate::record::block_rows`]).
+    #[must_use]
+    pub fn blocks_path(session_file: &Path) -> PathBuf {
+        sibling(session_file, "blocks.jsonl")
+    }
+
     /// The lock file beside a session file: held open by the session's one owner.
     #[must_use]
     pub fn lock_path(session_file: &Path) -> PathBuf {

@@ -96,9 +96,10 @@ impl Home {
     }
 
     /// The ids of every session under `sessions/`, in ascending byte order:
-    /// each regular file named `<id>.jsonl`, except an index file, which is
-    /// one named `<stem>.index.jsonl` whose first line is not a session
-    /// header. A file that cannot be read while listing refuses by path.
+    /// each regular file named `<id>.jsonl`, except an index or block rows
+    /// file, which is one named `<stem>.index.jsonl` or `<stem>.blocks.jsonl`
+    /// whose first line is not a session header. A file that cannot be read
+    /// while listing refuses by path.
     pub fn session_ids(&self) -> Result<Vec<String>, HomeError> {
         reader::session_ids(&self.root.join("sessions"))
     }

@@ -360,9 +360,11 @@ fn sidechain_image_is_lost_with_its_reason() -> Gate {
 }
 
 /// The record after the `summary` hangs under a `system` boundary record,
-/// as Claude Code writes one after a compaction: the importer places a
-/// system record with no parent under the chain's leaf, the compaction, so
-/// the user record after it continues the chain past the compaction.
+/// as Claude Code writes one after a compaction. A boundary whose
+/// `isCompactSummary` record has not been read when a later record names it
+/// becomes a compaction under the chain's leaf, the `summary` compaction,
+/// keeping nothing (HOME-030 R3), so the user record after it continues the
+/// chain past both, and the last compaction on the path is the boundary's.
 #[test]
 fn sidechain_under_a_compacted_entry_is_lost() -> Gate {
     let mut records = sidechain_fixture();
@@ -387,7 +389,7 @@ fn sidechain_under_a_compacted_entry_is_lost() -> Gate {
         s.path()?
             .0
             .into_iter()
-            .find(|e| matches!(e.body, EntryBody::Compaction { .. }))
+            .rfind(|e| matches!(e.body, EntryBody::Compaction { .. }))
             .ok_or("no compaction on the path")?
             .base
             .id

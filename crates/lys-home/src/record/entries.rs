@@ -14,6 +14,11 @@ use serde_json::{Map, Value};
 /// The custom type of a harness-local event (a hook outcome, a permission
 /// mode, a tool completion) attached under the message it followed.
 pub const CUSTOM_HARNESS_EVENT: &str = "lys.harness_event";
+/// The custom type of a compaction's loss entry (HOME-030 R4): the line
+/// directly after a compaction entry, under it as a side leaf, naming by ids,
+/// counts and hashes what the compaction summarised (see
+/// [`crate::record::loss`]).
+pub const CUSTOM_LOSS: &str = "lys.loss";
 /// The custom type of a proxy call record (see [`crate::record::call`]).
 pub const CUSTOM_CALL: &str = "lys.call";
 /// The custom type marking a session as authored by hand: a demonstration,
