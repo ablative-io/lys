@@ -87,7 +87,7 @@ async fn a_browser_coming_back_from_sign_in_is_taken_to_the_screens_signed_in() 
     let back = service.issuer_answer(login(ADMINISTRATOR)).await?;
     let (status, to, cookie) = service.get_page(&back).await?;
     assert_eq!(status, 303, "a browser is sent on, never shown the JSON");
-    assert_eq!(to.as_deref(), Some("/"), "it lands on the screens");
+    assert_eq!(to.as_deref(), Some("/#/me"), "it lands on its own screen");
     assert!(cookie, "and it arrives signed in");
     Ok(())
 }
