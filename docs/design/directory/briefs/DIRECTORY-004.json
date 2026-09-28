@@ -90,5 +90,25 @@
     "From the repository root: python3 scripts/design/validate.py docs/design/directory and python3 scripts/design/check-coverage.py docs/design/directory exit 0.",
     "From the repository root, with submodules checked out: rg -n 'ID001_LINK_PAIR|ID001_LINK_REFUSAL|ID001_LINK_MIGRATION|ID001_LINK_AUDIT' vendor/rauthy finds each identifier in a test, and the fork gate's cargo test log for the pinned commit names each ID001_LINK_* test with its result; a test found but never run fails the check.",
     "ID001_LINK_LIVE, after the row lands (CN5, CN6): a person installs the exact gated fork and shows Tom two linked providers resolving to one person in Rauthy's own account page, signing in through both, then posts a separate install and showing receipt to Tom with the Melbourne pass time, fork ref, artifact hash and observed result. A venue test or screenshot alone does not replace the live demonstration, and DIRECTORY-005 stays blocked until the receipt is recorded."
+  ],
+  "amendments": [
+    {
+      "date": "2026-09-28",
+      "by": "Waffles",
+      "subject": "How the link-audit source authenticates, and how it learns the person",
+      "ruling": "The link-audit source authenticates with the agent request signature the identity server already verifies. It is registered as an agent under a person, and no new token type is added. The identity server serves a lookup from an exact issuer and subject to the person who holds that login, admitted only for the configured link-audit source. Both are built red first in lys, and the fork's sender is wired to these words."
+    },
+    {
+      "date": "2026-09-28",
+      "by": "Archie",
+      "subject": "What the identity server serves today, read from main",
+      "ruling": "On main at 6194599 the link-audit route POST /api/link-audit admits a session cookie only (crates/lys-identity-server/src/routes.rs signed_in, crates/lys-identity-server/src/admission.rs link_audit_source), so an unattended sender has no way in, and no route answers the person who holds a login: Projection::person_for exists in lys-identity and is served nowhere. The request body is person, source_operation_id, change (linked or unlinked), issuer, subject, observer and observed_at, unknown members refused. The receipt answered carries identity, change_kind, payload_commitment, operation and the log coordinate, and does not carry source_operation_id or the observation. The person is never inferred from an email address, and an issuer's user id is never taken to be a person id: the only mapping is a login binding written through POST /api/people/{id}/logins."
+    },
+    {
+      "date": "2026-09-28",
+      "by": "Archie",
+      "subject": "A repeated source operation id answers only the delivery it was made for",
+      "ruling": "Pull request 93 in lys: a source operation id delivered again is answered with its first receipt only when the person and the whole observation (change, issuer, subject, observer, observed_at) equal what was first accepted; otherwise it is refused as LinkSourceSeen and nothing is recorded. The fork's sender still checks identity and change_kind on every acknowledgement."
+    }
   ]
 }
