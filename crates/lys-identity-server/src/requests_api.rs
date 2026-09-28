@@ -89,17 +89,19 @@ pub(crate) fn words(name: &str, text: &str) -> Result<String, ServerError> {
     Ok(text.to_owned())
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct ResourceBody {
+#[schema(as = RequestResourceBody)]
+pub(crate) struct ResourceBody {
     kind: String,
     id: String,
 }
 
 /// A request for access. Every member is required; `ends_at` may be null.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct AskBody {
+#[schema(as = RequestAskBody)]
+pub(crate) struct AskBody {
     operation: String,
     resource: ResourceBody,
     relation: String,

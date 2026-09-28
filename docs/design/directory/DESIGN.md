@@ -681,6 +681,8 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/stop_api.rs` | R6: Wake with a message; stop through the runner | DIRECTORY-050 |
 | `surface/identity/src/features/runtime/Sessions.tsx` | R7: Sessions screen: see, type to and stop every agent | DIRECTORY-050 |
 | `rules/ast-grep/no-poll.yml` | R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys/src/cli/mcp.rs` | DIRECTORY-049 R7: 'lys mcp', the stdio face agents reach the MCP server by, signing with their own key | DIRECTORY-049 |
+| `crates/lys/tests/mcp_stdio.rs` | DIRECTORY-049 R7: 'lys mcp' over stdio, each call signed with the agent's own key | DIRECTORY-049 |
 
 ## Inventory
 

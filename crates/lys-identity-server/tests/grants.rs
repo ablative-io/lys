@@ -351,5 +351,16 @@ async fn a_revoked_grant_names_when_and_at_which_revision_it_was_revoked() -> Te
     assert_eq!(read["revoked"], true, "{read}");
     assert!(read["revoked_at"].is_u64(), "{read}");
     assert_eq!(read["revoked_revision"], json!(after), "{read}");
+    let bea_cookie = service.sign_in(login(BEA)).await?;
+    let question =
+        json!({ "route": "api", "resource": { "kind": "doc", "id": "1" }, "action": "read" });
+    let (status, refused) = service
+        .post("/grants/check", Some(&bea_cookie), &question)
+        .await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(
+        refused["refusal"], "Revoked",
+        "the check names the revocation: {refused}"
+    );
     Ok(())
 }

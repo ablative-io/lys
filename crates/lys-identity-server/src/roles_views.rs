@@ -10,7 +10,7 @@ use crate::roles_records::{Move, Template, Version};
 pub const POLICY: &str = "stays_until_moved";
 
 /// A grant a holder of the role usually needs.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct TemplateView {
     /// What the grant would be on.
     pub resource: ResourceView,
@@ -34,7 +34,8 @@ impl From<&Template> for TemplateView {
 }
 
 /// One version of a role.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(as = RoleVersionView)]
 pub struct VersionView {
     /// Its number, from 1.
     pub number: u32,
@@ -79,7 +80,7 @@ impl From<&Version> for VersionView {
 }
 
 /// A deliberate move of a holder from one version to another.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct MoveView {
     /// The version moved from.
     pub from: u32,
@@ -103,7 +104,8 @@ impl From<&Move> for MoveView {
 }
 
 /// One identity holding a role.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(as = RoleHolderView)]
 pub struct HolderView {
     /// The operation id the holding was assigned with. A move or an end
     /// names it, so neither acts on a later holding of the same holder.
@@ -137,7 +139,7 @@ pub struct HolderView {
 }
 
 /// One role.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct RoleView {
     /// The role's id, which is the operation id it was made with.
     pub id: String,
@@ -154,7 +156,7 @@ pub struct RoleView {
 }
 
 /// The answer of `GET /roles`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct RoleList {
     /// Every role, in the order made.
     pub roles: Vec<RoleView>,
@@ -162,7 +164,7 @@ pub struct RoleList {
 
 /// The answer of a move: the holder as it stands now, and the two versions
 /// side by side, so what changes for the holder can be read.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct MovedView {
     /// The role.
     pub role: String,

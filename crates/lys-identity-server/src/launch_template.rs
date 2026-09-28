@@ -20,7 +20,7 @@ use crate::error::ServerError;
 use crate::provisioning_store::Version;
 
 /// One handle the agent holds, as the start command names it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
 pub struct HandleName {
     /// The handle's id, which is not the handle.
     pub id: String,

@@ -25,7 +25,8 @@ pub const BODY_TIER: f64 = 4.5;
 /// The tier for large text, icons and interface components.
 pub const COMPONENT_TIER: f64 = 3.0;
 
-const AION_BLUE: &str = "#6B96D1";
+/// The shared operations console's blue, which no product wears as its accent.
+const CONSOLE_BLUE: &str = "#6B96D1";
 
 /// The whole declared mapping.
 #[derive(Debug, Deserialize)]
@@ -157,17 +158,17 @@ impl ThemeMapping {
             ));
         }
         let roles: Vec<&str> = self.clients.keys().map(String::as_str).collect();
-        if roles != ["cambium", "platform"] {
+        if roles != ["app", "platform"] {
             return Err(invalid(
                 "clients",
-                "exactly the cambium and platform clients are themed",
+                "exactly the app and platform clients are themed",
             ));
         }
         for (role, client) in &self.clients {
             let product = if role == "platform" {
                 "identity"
             } else {
-                "cambium"
+                "app"
             };
             if client.product != product {
                 return Err(invalid(
@@ -202,10 +203,10 @@ impl ThemeMapping {
                 }
             }
             let accent = &client.dark.accent;
-            if accent.hex.eq_ignore_ascii_case(AION_BLUE) || is_purple(accent.hsl) {
+            if accent.hex.eq_ignore_ascii_case(CONSOLE_BLUE) || is_purple(accent.hsl) {
                 return Err(invalid(
                     role,
-                    "the accent is the product's own, never Aion blue or purple",
+                    "the accent is the product's own, never the console blue or purple",
                 ));
             }
             let pairs = contrast_pairs(&self.apply_to(role, &rauthy_dark_defaults()))?;

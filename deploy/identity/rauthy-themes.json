@@ -8,13 +8,13 @@
     "owner": "Waffles"
   },
   "clients": {
-    "cambium": {
-      "product": "cambium",
+    "app": {
+      "product": "app",
       "dark": {
         "text": { "token": "foundation.text", "hex": "#E8EAEC", "hsl": [210, 10, 92] },
         "bg": { "token": "foundation.ink", "hex": "#0C0E10", "hsl": [210, 14, 5] },
         "bg_high": { "token": "foundation.raised", "hex": "#1E2226", "hsl": [210, 12, 13] },
-        "accent": { "token": "products.cambium.accent", "hex": "#5E8C6A", "hsl": [136, 20, 46] }
+        "accent": { "token": "products.app.accent", "hex": "#5E8C6A", "hsl": [136, 20, 46] }
       }
     },
     "platform": {

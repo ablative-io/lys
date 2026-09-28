@@ -13,7 +13,7 @@ pub const DOMAIN: &str = "lys/identity/runtime-reports-state/v1";
 const FORMAT: &str = "lys-runtime-state/v1";
 
 /// A state a runtime reports a session in.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Reported {
     /// The runtime is starting the session.

@@ -52,7 +52,7 @@ pub struct Issued {
 }
 
 /// A certificate's withdrawal.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Withdrawn {
     /// The certificate withdrawn.

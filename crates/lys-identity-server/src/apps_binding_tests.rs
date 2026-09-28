@@ -1,0 +1,110 @@
+#![cfg(test)]
+//! The provider's lookup of an app's sign-in client: no client completes a
+//! sign-in before its app is approved or after it is retired, and an
+//! approved client only with its own secret and a listed address.
+
+use std::error::Error;
+
+use serde_json::json;
+
+use super::{sha256_hex, sign_in_client};
+use crate::apps_error::AppError;
+use crate::apps_state::{Approved, By, Client, Decided, Held, Line, Registered};
+
+type Outcome = Result<(), Box<dyn Error>>;
+
+const APP: &str = "fixture_notes";
+const SECRET: &str = "a-fixture-client-secret";
+const BACK: &str = "https://app.example.test/signed-in";
+
+fn registered() -> Result<Held, Box<dyn Error>> {
+    let mut held = Held::default();
+    held.hold(Line::Registered(Registered {
+        operation: "register".to_owned(),
+        app: APP.to_owned(),
+        name: "The notes fixture".to_owned(),
+        redirects: vec![BACK.to_owned()],
+        schema: json!({"kinds": {}}),
+        service_account: None,
+        by: By::Start,
+        at: 1,
+    }))?;
+    Ok(held)
+}
+
+fn approved() -> Result<Held, Box<dyn Error>> {
+    let mut held = registered()?;
+    held.hold(Line::Approved(Approved {
+        operation: "approve".to_owned(),
+        app: APP.to_owned(),
+        client: Client {
+            client_id: APP.to_owned(),
+            secret_sha256: sha256_hex(SECRET),
+        },
+        binding: None,
+        by: By::Start,
+        at: 2,
+    }))?;
+    Ok(held)
+}
+
+fn refusal(held: &Held, secret: &str, redirect: &str) -> Result<AppError, Box<dyn Error>> {
+    match sign_in_client(held, APP, secret, redirect) {
+        Ok(_) => Err("the client completed a sign-in".into()),
+        Err(error) => Ok(error),
+    }
+}
+
+#[test]
+fn a_pending_apps_client_cannot_complete_a_sign_in() -> Outcome {
+    let refused = refusal(&registered()?, SECRET, BACK)?;
+    assert!(
+        matches!(refused, AppError::AppNotApproved { .. }),
+        "{refused}"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_approved_client_completes_a_sign_in_with_its_secret_to_a_listed_address() -> Outcome {
+    let held = approved()?;
+    let app = sign_in_client(&held, APP, SECRET, BACK)?;
+    assert_eq!(app.registered.app, APP);
+    Ok(())
+}
+
+#[test]
+fn another_secret_is_refused_and_never_named() -> Outcome {
+    let refused = refusal(&approved()?, "not-the-secret", BACK)?;
+    assert!(
+        matches!(refused, AppError::CredentialRefused { .. }),
+        "{refused}"
+    );
+    assert!(!refused.to_string().contains("not-the-secret"));
+    Ok(())
+}
+
+#[test]
+fn an_address_the_registration_does_not_list_is_refused() -> Outcome {
+    let refused = refusal(&approved()?, SECRET, "https://elsewhere.example.test/")?;
+    assert!(
+        matches!(refused, AppError::RedirectInvalid { .. }),
+        "{refused}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_retired_apps_client_cannot_complete_a_sign_in() -> Outcome {
+    let mut held = approved()?;
+    held.hold(Line::Retired(Decided {
+        operation: "retire".to_owned(),
+        app: APP.to_owned(),
+        reason: String::new(),
+        by: By::Start,
+        at: 3,
+    }))?;
+    let refused = refusal(&held, SECRET, BACK)?;
+    assert!(matches!(refused, AppError::AppRetired { .. }), "{refused}");
+    Ok(())
+}

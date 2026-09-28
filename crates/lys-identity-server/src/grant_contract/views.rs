@@ -13,7 +13,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::routes::hex;
 
 /// What a grant lets its holder pass on, as the answer writes it.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PassOnView {
     /// Exercise only.
@@ -58,7 +58,7 @@ fn route_name(route: Route) -> &'static str {
 }
 
 /// A resource, by kind and id.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ResourceView {
     /// Its kind.
     pub kind: String,
@@ -67,7 +67,7 @@ pub struct ResourceView {
 }
 
 /// When a grant may be exercised.
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, utoipa::ToSchema)]
 pub struct WindowView {
     /// When it starts, in seconds since the Unix epoch.
     pub starts_at: u64,
@@ -77,7 +77,7 @@ pub struct WindowView {
 
 /// When a grant was last seen exercised. Not seen says only that no exercise
 /// was observed at an enforcement point, never that it was never used.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct LastUseView {
     /// Whether an exercise was observed.
     pub seen: bool,
@@ -112,7 +112,7 @@ impl From<LastUse> for LastUseView {
 }
 
 /// A grant, as a caller who may inspect it reads it.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct GrantView {
     /// The grant's id.
     pub id: String,
@@ -183,7 +183,7 @@ impl From<&GrantRecord> for GrantView {
 }
 
 /// The grants a caller may see, at one revision.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct GrantList {
     /// The grants.
     pub grants: Vec<GrantView>,
@@ -192,7 +192,7 @@ pub struct GrantList {
 }
 
 /// Where a recorded change stands in the grant log.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct LogView {
     /// The leaf's index.
     pub index: u64,
@@ -205,7 +205,7 @@ pub struct LogView {
 }
 
 /// A recorded change's receipt.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ReceiptView {
     /// The event version it was signed under.
     pub version: u64,
@@ -224,7 +224,7 @@ pub struct ReceiptView {
 }
 
 /// A recorded change and its receipt.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct RecordedView {
     /// The caller's operation id.
     pub operation: String,
@@ -264,7 +264,7 @@ impl From<&Recorded> for RecordedView {
 
 /// Whether a check's use was recorded. A use that could not be recorded is
 /// named, so a missing record is never read as no use.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct UseEventView {
     /// Whether the use event was recorded.
     pub recorded: bool,
@@ -277,7 +277,7 @@ pub struct UseEventView {
 }
 
 /// A permitted decision and the authority path it rests on.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct PermitView {
     /// Always true: a refusal is answered as a refusal.
     pub permitted: bool,
@@ -325,7 +325,7 @@ impl From<&Permit> for PermitView {
 }
 
 /// One holder on a page of the who-can answer, with its decision.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct HolderView {
     /// The holder.
     pub holder: String,
@@ -335,7 +335,7 @@ pub struct HolderView {
 }
 
 /// One page of the who-can answer.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct WhoPage {
     /// The permitted holders on this page, in holder order.
     pub holders: Vec<HolderView>,
@@ -348,7 +348,7 @@ pub struct WhoPage {
 }
 
 /// The permission model grants are judged against.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ModelView {
     /// The model's version.
     pub version: u64,
@@ -408,7 +408,7 @@ impl<'de> Deserialize<'de> for CannotGiveReasonView {
 
 /// What one cannot-give item is about. A grant or service-account item names
 /// the caller's own grant; a relation item names the relation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "subject", rename_all = "snake_case")]
 pub enum CannotGiveSubjectView {
     /// A grant the caller holds.
@@ -431,19 +431,20 @@ pub enum CannotGiveSubjectView {
 }
 
 /// One thing the caller cannot give, with its one reason. No item carries a standing.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CannotGiveItemView {
     /// What it is.
     #[serde(flatten)]
     pub subject: CannotGiveSubjectView,
     /// The one reason it cannot be given.
+    #[schema(value_type = String)]
     pub reason: CannotGiveReasonView,
     /// Whether it is the grant the form was opened from.
     pub source: bool,
 }
 
 /// Everything the caller cannot give the recipient, in the list's order.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CannotGiveAnswer {
     /// The grant the form was opened from.
     pub source: String,

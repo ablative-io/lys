@@ -1,0 +1,41 @@
+/* The permission template builder, from the design tokens only: every chip,
+   tick, name field and select is drawn here, none left to the browser. */
+.sb { margin-top: 12px; display: grid; gap: 12px; }
+.sb-templates { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.sb-layout { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; align-items: start; }
+.sb-tree { display: grid; gap: 10px; }
+.sb-node { display: grid; gap: 8px; }
+.sb-children { margin-left: 18px; padding-left: 12px; border-left: 1px dashed var(--border-default); display: grid; gap: 8px; }
+.sb-kind { margin: 0; padding: 10px 12px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-card); display: grid; gap: 8px; }
+.sb-kind legend { display: flex; align-items: center; gap: 2px; padding: 0 4px; }
+.sb-prefix { color: var(--text-muted); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; }
+.sb-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.sb-add { display: inline-flex; gap: 4px; align-items: center; }
+.sb-name { background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-sm); color: var(--text-primary); padding: 3px 8px; font: 12.5px "DM Sans", system-ui, sans-serif; min-width: 90px; }
+.sb-name:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+select.sb-name { appearance: none; padding-right: 20px; background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%), linear-gradient(135deg, var(--text-muted) 50%, transparent 50%); background-position: calc(100% - 10px) 50%, calc(100% - 6px) 50%; background-size: 4px 4px; background-repeat: no-repeat; }
+.sb-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-default); background: var(--surface-default); color: var(--text-secondary); font-size: 12px; }
+.sb-chip:hover { background: var(--surface-hover); color: var(--text-primary); }
+.sb-chip:disabled { opacity: .5; cursor: default; }
+.sb-chip button { color: var(--text-muted); padding: 0 2px; }
+.sb-remove { justify-self: start; color: var(--danger); border-color: rgba(248,113,113,.25); }
+.sb-tick { appearance: none; width: 14px; height: 14px; margin: 0; border: 1px solid var(--border-default); border-radius: 3px; background: var(--surface-code); display: inline-grid; place-content: center; cursor: pointer; }
+.sb-tick:checked { background: var(--accent); border-color: var(--accent-deep); }
+.sb-tick:checked::after { content: ""; width: 6px; height: 3px; border: solid #17110b; border-width: 0 0 2px 2px; transform: rotate(-45deg) translate(1px, -1px); }
+.sb-tick:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.sb-relations { border-collapse: collapse; font-size: 12px; }
+.sb-relations th, .sb-relations td { padding: 3px 8px; border-bottom: 1px solid var(--border-subtle); text-align: center; color: var(--text-secondary); font-weight: 500; }
+.sb-relations th[scope="row"] { text-align: left; }
+.sb-bench { padding: 10px 12px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-default); display: grid; gap: 8px; }
+.sb-bench h3 { margin: 0; }
+.sb-examples { display: grid; gap: 6px; }
+.sb-question { padding-top: 6px; border-top: 1px solid var(--border-subtle); }
+.sb-answer { padding: 8px 10px; border-radius: var(--radius-md); border: 1px solid var(--border-default); }
+.sb-answer ol { margin: 4px 0 0; padding-left: 18px; color: var(--text-secondary); }
+.sb-allowed { border-color: var(--ok-glow); background: var(--ok-glow); color: var(--ok); }
+.sb-refused { color: var(--danger); }
+.sb-answer.sb-refused { border-color: rgba(248,113,113,.25); background: var(--surface-card); }
+.sb-save { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; }
+.sb-check { flex-basis: 100%; padding: 8px 10px; border-radius: var(--radius-md); background: var(--surface-card); border: 1px solid var(--border-default); }
+.sb-check ul { margin: 0 0 6px; padding-left: 18px; color: var(--text-secondary); }
+.sb-stranded { color: var(--danger); }

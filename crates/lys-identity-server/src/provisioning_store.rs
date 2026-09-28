@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::ServerError;
 
 /// One MCP server an agent is given.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct McpServer {
     /// Its name.

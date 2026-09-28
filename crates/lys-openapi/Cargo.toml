@@ -1,0 +1,18 @@
+[package]
+name = "lys-openapi"
+description = "The OpenAPI 3.1 document of a lys service, generated from its route table and the types its routes take and answer."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+utoipa.workspace = true
+
+[lints]
+workspace = true
