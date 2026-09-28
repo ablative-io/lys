@@ -19,6 +19,7 @@ import { Graph } from './features/access/Graph';
 import { Resources } from './features/access/Resources';
 import { StartPage } from './features/start/StartDrawer';
 import { Apps } from './features/apps/Apps';
+import { RunningSessions } from './features/runtime/Sessions';
 
 /** Every screen and tab has its own address (conformance 9.1). */
 export function AppRoutes() {
@@ -37,6 +38,7 @@ export function AppRoutes() {
       <Route path="/secrets/:section?" element={<SecretsPage />} />
       <Route path="/vault" element={<SecretsPage />} />
       <Route path="/sessions" element={<Sessions />} />
+      <Route path="/runtime/:session?" element={<RunningSessions />} />
       <Route path="/reviews" element={<Reviews />} />
       <Route path="/requests" element={<Requests />} />
       <Route path="/people" element={<People />} />

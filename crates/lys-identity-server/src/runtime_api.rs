@@ -209,7 +209,7 @@ fn report(
     })
 }
 
-fn view(state: &AppState, tracked: &Tracked) -> Option<SessionView> {
+pub(crate) fn view(state: &AppState, tracked: &Tracked) -> Option<SessionView> {
     let (first, latest) = (tracked.first()?, tracked.latest()?);
     let machine = state.network.as_ref().and_then(|store| {
         let store = store.lock().unwrap_or_else(PoisonError::into_inner);
@@ -365,32 +365,42 @@ async fn agent_sessions(
     .map(Json)
 }
 
+/// Every agent's session the signed-in caller may see, in the order first
+/// reported.
+pub(crate) fn visible_sessions(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<Vec<Tracked>, ServerError> {
+    let actor = signed_in(state, headers)?;
+    with_directory(state, |directory| {
+        let directory = directory.projection()?;
+        let asker = caller(state, headers, directory)?;
+        let administrator = state.admission.administrator(&actor).is_ok();
+        with_runtime(state, |store| {
+            Ok(store
+                .sessions()
+                .iter()
+                .filter(|tracked| {
+                    tracked
+                        .agent
+                        .as_deref()
+                        .is_some_and(|agent| sees(directory, administrator, asker, agent))
+                })
+                .cloned()
+                .collect())
+        })
+    })
+}
+
 async fn sessions(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<SessionsView>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    with_directory(&state, |directory| {
-        let directory = directory.projection()?;
-        let asker = caller(&state, &headers, directory)?;
-        let administrator = state.admission.administrator(&actor).is_ok();
-        with_runtime(&state, |store| {
-            Ok(SessionsView {
-                sessions: store
-                    .sessions()
-                    .iter()
-                    .filter(|tracked| {
-                        tracked
-                            .agent
-                            .as_deref()
-                            .is_some_and(|agent| sees(directory, administrator, asker, agent))
-                    })
-                    .filter_map(|tracked| view(&state, tracked))
-                    .collect(),
-            })
-        })
-    })
-    .map(Json)
+    let sessions = visible_sessions(&state, &headers)?
+        .iter()
+        .filter_map(|tracked| view(&state, tracked))
+        .collect();
+    Ok(Json(SessionsView { sessions }))
 }
 
 async fn found(
