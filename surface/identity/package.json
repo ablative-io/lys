@@ -8,8 +8,10 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "test": "vitest run && node --test scripts/package.test.mjs",
+    "typecheck": "tsc --noEmit",
+    "package": "node scripts/package.mjs",
+    "test:package": "node --test scripts/package.test.mjs"
   },
   "dependencies": {
     "react": "19.3.0",

@@ -151,3 +151,41 @@ describe('Directory mutations', () => {
     expect(text()).toContain('grant-recorded');
   });
 });
+
+
+describe('Uncertain directory change recovery', () => {
+  const operation = 'op-' + 'a'.repeat(32);
+  const key = 'lys.pending.register-agent';
+  const retained = JSON.stringify({ path: '/agents', body: { display_name: 'Original agent' }, operation });
+  async function recover() {
+    const button = [...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Check original change');
+    if (!button) throw new Error('No recovery button');
+    await click(button);
+    await settle();
+  }
+  it('requires an explicit check and reuses exact original operation and body after reload', async () => {
+    sessionStorage.setItem(key, retained);
+    const { posted } = await mount('#/directory/manage?action=agent', { ...SERVICE, 'POST /agents': (body) => recorded(body) });
+    expect(posted).toHaveLength(0);
+    await recover();
+    expect(posted).toEqual([{ path: '/agents', body: { display_name: 'Original agent', operation } }]);
+    expect(sessionStorage.getItem(key)).toBeNull();
+    expect(text()).toContain('Recorded receipt');
+  });
+  it('keeps the original evidence after a recovery refusal', async () => {
+    sessionStorage.setItem(key, retained);
+    await mount('#/directory/manage?action=agent', { ...SERVICE, 'POST /agents': refused(403, 'NotAdmitted', 'permission changed') });
+    await recover();
+    expect(sessionStorage.getItem(key)).toBe(retained);
+    expect(text()).toContain('NotAdmitted');
+    expect(text()).toContain('Check original change');
+  });
+  it.each(['not JSON', JSON.stringify({ path: '/people', body: {}, operation })])('refuses damaged or wrong-form pending evidence without modifying it', async (saved) => {
+    sessionStorage.setItem(key, saved);
+    const { posted } = await mount('#/directory/manage?action=agent', SERVICE);
+    await submit(form('Register an agent'));
+    expect(posted).toHaveLength(0);
+    expect(sessionStorage.getItem(key)).toBe(saved);
+    expect(text()).not.toContain('Check original change');
+  });
+});
