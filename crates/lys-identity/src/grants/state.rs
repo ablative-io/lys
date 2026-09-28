@@ -8,8 +8,10 @@ use crate::state_value::{
     Unreadable, array, decode as decode_value, encode as encode_value, read_uint, tuple, uint,
 };
 
-/// The version of the grant state this crate writes and reads.
-const STATE_VERSION: u64 = 2;
+/// The version of the grant state this crate writes and reads. Version 3
+/// added each grant's count of recorded uses; a version 2 state is refused by
+/// name and the book rebuilt from the whole log.
+const STATE_VERSION: u64 = 3;
 
 /// The state of `book`, the fold of the first `folded` leaves, or why a
 /// refusal it keeps has no stable form.

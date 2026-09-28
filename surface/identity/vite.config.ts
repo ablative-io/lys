@@ -11,5 +11,7 @@ export default defineConfig({
   esbuild: { jsx: 'automatic' },
   server: { proxy },
   preview: { proxy },
-  test: { environment: 'jsdom', include: ['tests/**/*.test.tsx'], setupFiles: ['tests/setup.ts'] },
+  // `tests/**/*.spec.ts` is the acceptance shape: the same jsdom runner, kept
+  // under its own name so an acceptance is not mistaken for a unit test.
+  test: { environment: 'jsdom', include: ['tests/**/*.test.tsx', 'tests/**/*.spec.ts'], setupFiles: ['tests/setup.ts'] },
 });

@@ -65,6 +65,18 @@ PROPOSAL FOR REVIEW, not a settled grant schema: define a typed application gran
 **Stories:**
 - S8 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want to give my agent a bounded part of my authority and revoke it, so the same action is allowed before revocation and refused after it.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: GRANT_CONTRACT: met in code. crates/lys-identity/tests/grant_contract.rs:133 round-trips every member against an independently built CBOR fixture (fixture at :79). :150-240 counts the named refusal cases (MemberUnknown, MemberMissing, LineageMalformed, RecipientKindUnknown), and :248 shows no permission comes from a default. GRANT_MODEL: met. grant_contract.rs:272 judges by model action sets, names nothing by rank and keeps the model version in the decision. GRANT_WIRE_BOUNDARY: NOT met as written. The envelope is explicit (crates/lys-identity/src/grants/codec.rs:27 GRANT_ENVELOPE = application/vnd.lys.grant-event.v1+cbor), no other format is read (grant_contract.rs:332, grant_receipts.rs:215), and lys-core is untouched. But docs/design/identity/GRANT-CONTRACT.md:14 records that the independent review of the envelope, canonical encoding, root-authority bootstrap and lineage semantics has not happened, and the row requires a *reviewed* identifier. The brief's blocked_by also holds R1 until that ratification. Blocker: the independent contract review has to be recorded. I cannot supply it; the reviewer's record goes into GRANT-CONTRACT.md.
+- Deviation: No files changed. The R1 code is already on main (61ed9a7, merged through PR #34), and CN1 forbids code changes in this brief.
+- Checklist delivery:
+  - [ ] C21 — The proposed application grant schema separates exercise and pass-on authority; its additional fields require independent review before dispatch and do not change published crypto formats. — Exercise and pass-on are separate members (GRANT-CONTRACT.md table, key 8), and published crypto is unchanged; the required independent review is not recorded.
+- Story delivery:
+  - [ ] S8 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want to give my agent a bounded part of my authority and revoke it, so the same action is allowed before revocation and refused after it. — Depends on R1's review and R6's screen evidence.
+
 ### R2: Enforce affirmative delegation and bounded ancestry
 
 WHEN a person or agent asks to delegate authority, THE SYSTEM SHALL check the actor's current exercise and delegation rights, requested resource/actions and recipient kind against every effective ancestor, ending at an authorised person. The requested authority SHALL be an explicit subset, never inherited wholesale. A use-only grant, an owner label, missing prohibition or access to the UI SHALL NOT establish pass-on authority. People-only authority SHALL refuse agents even when the person owns that agent. Unknown parents, cycles, wrong responsible persons and attempts to launder authority through a new role, secret handle or sibling grant SHALL refuse before any mutation. An agent that holds explicit pass-on permission may invoke the same operation as a person; being an agent alone is not either a permit or a categorical prohibition. The policy determines recipients rather than the mock-up's sample restriction to the caller's own agents. Provenance: ADR-003; AGENT-PARITY-2026-09-23.md. Conformance 2.1–2.4, 7.3. Secret lending also recognises server-verified real ownership as the affirmative route in docs/design/identity/CONFORMANCE.md at commit 1353c22 row 7.3; a display label is not that ownership record.
@@ -90,6 +102,20 @@ WHEN a person or agent asks to delegate authority, THE SYSTEM SHALL check the ac
 - S8 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want to give my agent a bounded part of my authority and revoke it, so the same action is allowed before revocation and refused after it.
 - S9 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person or agent with use-only permission, I want the service to explain why I cannot pass it on; with explicit pass-on rights I want the same permitted operation available through UI and tools.
 
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: GRANT_USE_VS_LEND: met. crates/lys-identity/tests/grant_delegation.rs:23 exercises use-only and refuses pass-on with zero events. Browser, API and tool route parity is at crates/lys-identity-server/tests/grants.rs:176. GRANT_RECIPIENT: met. grant_delegation.rs:78 covers human-only, agent-only and non-delegable grants for both recipient kinds, including the owner's own agent, with zero mutations on each refusal. GRANT_ANCESTRY: met. grant_delegation.rs:177 refuses a broader resource, a broader action, a forged parent, a cycle (:151), a changed responsible person and a revoked ancestor, and explains a two-hop chain. GRANT_AGENT_PARITY: met. grant_delegation.rs:342 and server tests/grants.rs:176. The logic is in crates/lys-identity/src/grants/admission.rs, lineage.rs and authority.rs. All of this landed in 30f8cc8.
+- Deviation: No files changed; already on main from PR #34.
+- Checklist delivery:
+  - [x] C22 — Delegation requires an explicit permission to delegate to the requested subject kind; use-only, absent policy and owner labels cannot create it. — grant_delegation.rs:23,:78
+  - [x] C23 — Every grant is bounded by a live, acyclic ancestry to a responsible person; scope is evaluated by model actions/resources, never display-name rank. — grant_delegation.rs:177
+- Story delivery:
+  - [ ] S8 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want to give my agent a bounded part of my authority and revoke it, so the same action is allowed before revocation and refused after it. — The story also rides on R1, R4 and R6; R1 and R6 are blocked.
+  - [ ] S9 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person or agent with use-only permission, I want the service to explain why I cannot pass it on; with explicit pass-on rights I want the same permitted operation available through UI and tools. — The backend half is met; the UI half rides on R6, which is blocked.
+
 ### R3: Commit grants and their audit as one replayable operation
 
 THE SYSTEM SHALL record a grant mutation as one signed authoritative event using DIRECTORY-003's reviewed event owner, and derive both the directory projection and the permission projection from that event. A database write followed by best-effort audit is forbidden. Each mutation SHALL carry a stable operation ID; the same ID and payload returns the same logical outcome, while changed payload under that ID refuses. Unknown append or projection outcomes SHALL remain named and retained for reconciliation; the API SHALL NOT manufacture success or issue a fresh operation when acknowledgement is lost. Any read or admission that depends on unresolved authority SHALL refuse naming the affected grant/operation; unrelated authority stays usable. Projection progress SHALL record the minimum revision required for a fresh decision, including across restart. Provenance: directory principlesP4/P5 and ID001_AUDIT_FAULTS; conformance1.4,8.1.
@@ -112,6 +138,18 @@ THE SYSTEM SHALL record a grant mutation as one signed authoritative event using
 
 **Stories:**
 - S10 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As an auditor, I want grant changes and retries tied to one durable signed operation, so restart or an uncertain reply cannot invent, lose or duplicate authority.
+
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: GRANT_DURABILITY: met. crates/lys-identity/tests/grant_faults.rs:267 injects a failure at each append, sync, event and projection boundary and compares every answered read with replay (:206). Unresolved reads are named, and the fault-free control is at :470. GRANT_IDEMPOTENCE: met. grant_faults.rs:423-468 loses the acknowledgement after the leaf, retries, reopens and retries again, leaving one authorising event. A changed payload is refused OperationReused and changes neither projection. GRANT_AUDIT: met. crates/lys-identity/tests/grant_receipts.rs:70 verifies a receipt and rejects each tampering, and :172 shows a refusal never appears as a grant event. The code is in crates/lys-identity/src/grants/events.rs, projection.rs, recovery.rs and commit.rs (landed in 6ea4901).
+- Deviation: No files changed; already on main from PR #34.
+- Checklist delivery:
+  - [x] C24 — Grant changes and their audit share one durable authoritative event; retries and uncertain outcomes preserve operation identity and replay-equivalent projections. — grant_faults.rs:267,:423; grant_receipts.rs:70
+- Story delivery:
+  - [x] S10 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As an auditor, I want grant changes and retries tied to one durable signed operation, so restart or an uncertain reply cannot invent, lose or duplicate authority. — One signed operation per change; retries return the first receipt.
 
 ### R4: Enforce revocation, inherited expiry and current permission decisions
 
@@ -139,6 +177,20 @@ WHEN an ancestor is revoked or expires, THE SYSTEM SHALL refuse fresh exercise a
 - S8 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want to give my agent a bounded part of my authority and revoke it, so the same action is allowed before revocation and refused after it.
 - S11 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person granting temporary access, I want its end date and ancestor restrictions enforced, so role changes or reinstatement cannot silently extend it.
 
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: GRANT_REVOKE: met. crates/lys-identity/tests/grant_revocation.rs:40 revokes a two-hop chain root; every descendant is refused and the independent sibling still succeeds. GRANT_EXPIRY: met. crates/lys-identity/tests/grant_expiry.rs:31 uses a controlled clock at each end boundary, including an earlier ancestor end, and shows no role edit or version move extends a grant. GRANT_FRESHNESS: met. grant_revocation.rs:170: with projection paused after a committed revoke, a caller presenting the required revision gets StaleDecision (:217-221), and after reopen the decision is the named Revoked (:236-245). GRANT_REINSTATE: met. grant_expiry.rs:158 shows reinstatement resurrects neither the revoked nor the expired grant, and no event is invented. The code is in crates/lys-identity/src/grants/revocation.rs, expiry.rs and permission.rs (landed in 23c07e7).
+- Deviation: No files changed; already on main from PR #34.
+- Checklist delivery:
+  - [x] C25 — Revocation stops derived authority while independent authority remains usable; the proposed revision-freshness mechanism is reviewed before dispatch. — grant_revocation.rs:40,:170
+  - [x] C26 — Inherited expiry and provisional end dates are enforced at admission; role changes and reinstatement cannot resurrect expired or revoked authority. — grant_expiry.rs:31,:158
+- Story delivery:
+  - [ ] S8 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want to give my agent a bounded part of my authority and revoke it, so the same action is allowed before revocation and refused after it. — Rides on R1 and R6 as well.
+  - [x] S11 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person granting temporary access, I want its end date and ancestor restrictions enforced, so role changes or reinstatement cannot silently extend it. — grant_expiry.rs:31,:158
+
 ### R5: Expose one authenticated grant and explanation seam
 
 THE SYSTEM SHALL expose typed operations for list/read, delegate, revoke and explain through the standalone identity server, all calling the same authority owner. API/tool access SHALL enforce the same checks as the UI; browser controls are presentation only. A why-permitted response SHALL identify actual authority path, responsible person, effective scope and policy revision; a why-refused response SHALL name the blocking condition without disclosing another identity's protected records. The reverse question, who can exercise this action on this resource, SHALL use the same evaluator and revision, with its own visibility permission. Incomplete pagination SHALL remain explicit. A last-use value reports observed use at named enforcement points; absence is not evidence of never-used. No live Cambium, Aion, Argus or Manifold is required. Conformance 8.1, 8.2, 8.4 and ADR-004.
@@ -163,6 +215,20 @@ THE SYSTEM SHALL expose typed operations for list/read, delegate, revoke and exp
 **Stories:**
 - S9 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person or agent with use-only permission, I want the service to explain why I cannot pass it on; with explicit pass-on rights I want the same permitted operation available through UI and tools.
 - S12 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
+
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: GRANT_API_AUTH: met. crates/lys-identity-server/tests/grants.rs:84 names every refusal and writes nothing, and :176 counts the valid routes. GRANT_EXPLAIN: met. crates/lys-identity-server/tests/grant_explanations.rs:124 shows forward and reverse agreeing, with every holder paged once. :184 shows nothing leaks to an unauthorised querier, and :237 covers completeness. GRANT_STANDALONE: met in the library. crates/lys-identity/tests/grant_revocation.rs:258 refuses an engine outage by name and writes nothing, and the server tests run against a disposable local service. GRANT_LAST_USED: NOT met. LastUse (crates/lys-identity/src/grants/projection.rs:40-52) has NotSeen and Seen, which covers 'not seen' and a source/time (crates/lys-identity/tests/grant_last_used.rs:44, reopen at :101). It has no case for a missing reporting source as distinct from a zero count. The server does serve last use, as LastUseView (crates/lys-identity-server/src/grant_contract/views.rs:79-110, a seen flag with time, route and use-event index), and that view inherits the same gap. The brief's wall file crates/lys-identity-server/src/grant_contract.rs exists as the module directory crates/lys-identity-server/src/grant_contract/ (mod.rs, requests.rs, views.rs), used by crates/lys-identity-server/src/grants.rs:33; the wall names the file form, the tree has the directory form. Blocker per CN1 and CN9: closing the gap needs edits to crates/lys-identity/src/grants/projection.rs (outside R5's wall) and crates/lys-identity-server/src/grants.rs, and the reviewer must approve a brief revision that reconciles the wall to the landed files.
+- Deviation: No files changed. CN1 (documents only) and CN9 (stop and name files outside the wall) forbid the edits that would close GRANT_LAST_USED.
+- Checklist delivery:
+  - [x] C27 — Typed browser/API/agent seams use one authenticated evaluator; forward and reverse explanations name the same authority path and revision without private-record leakage. — grants.rs:176; grant_explanations.rs:124,:184
+  - [ ] C28 — Observed grant usage names its source and time; not seen is not reported as never used. — A missing reporting source is not told apart from a zero count, in LastUse or in the served LastUseView.
+- Story delivery:
+  - [ ] S9 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person or agent with use-only permission, I want the service to explain why I cannot pass it on; with explicit pass-on rights I want the same permitted operation available through UI and tools. — Rides on R6.
+  - [x] S12 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect. — grant_explanations.rs:124,:184
 
 ### R6: Implement the You and delegation screens from the server contract
 
@@ -191,6 +257,21 @@ THE SYSTEM SHALL render the accepted mock-up's You page and delegation form from
 - S8 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want to give my agent a bounded part of my authority and revoke it, so the same action is allowed before revocation and refused after it.
 - S9 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person or agent with use-only permission, I want the service to explain why I cannot pass it on; with explicit pass-on rights I want the same permitted operation available through UI and tools.
 - S12 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
+
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: The screens exist under names other than the wall's: surface/identity/src/features/me/You.tsx, and features/grants/Delegate.tsx, Answer.tsx, GrantCard.tsx, CannotGive.tsx and pendingGrant.ts. The route is /me in surface/identity/src/routes.tsx:41, with types in surface/identity/src/generated/grants.ts. GRANT_SCREEN: partly met. surface/identity/tests/grants.test.tsx:11 and :30 show the source, actions, pass-on and end, but no test switches between two signed-in people or covers the separate administrator route. GRANT_SCREEN_REFUSAL: partly met. grants.test.tsx:79 shows a refusal by name with nothing recorded as given; there is no single matrix covering use-only, excessive scope, people-only, expired ancestor and outage with request and record counts. GRANT_SCREEN_PENDING: met in the unit tests at grants.test.tsx:87 (retry under the same operation), :121 and :141. GRANT_CONFORMANCE: NOT met. No test pins the mock-up hash of docs/design/identity/mockup/index.v5.html, and surface/identity/tests/acceptance/grants.spec.ts does not exist, with no browser runner in surface/identity/package.json. Blocker per CN1 and CN9: the wall's YouGrants.tsx, DelegateGrant.tsx and GrantExplanation.tsx would duplicate the landed You.tsx, Delegate.tsx and Answer.tsx, so the reviewer must reconcile the wall to those files, and approve adding a browser acceptance runner dependency, before the gaps are built.
+- Deviation: No files changed. The wall names files the landed surface does not use, and CN1 forbids surface edits in this brief.
+- Checklist delivery:
+  - [ ] C29 — The You and delegation screens show real server authority, separate service accounts from sign-in identities, and preserve personal versus administrator visibility. — There is no two-person switching evidence and no administrator-route test.
+  - [ ] C30 — The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success. — No mock-up hash pin and no browser acceptance spec.
+- Story delivery:
+  - [ ] S8 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a responsible person, I want to give my agent a bounded part of my authority and revoke it, so the same action is allowed before revocation and refused after it. — Blocked on the R6 gaps.
+  - [ ] S9 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person or agent with use-only permission, I want the service to explain why I cannot pass it on; with explicit pass-on rights I want the same permitted operation available through UI and tools. — Blocked on the R6 gaps.
+  - [ ] S12 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect. — The UI half is blocked on the R6 gaps.
 
 ## Boundaries
 

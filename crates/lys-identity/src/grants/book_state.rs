@@ -1,11 +1,11 @@
 //! The grant book as a snapshot holds it.
 //!
 //! Every grant in its canonical encoding with the index that issued it, its
-//! revocation and its last observed use; every operation with the index it
-//! made; and every refused event's index, operation and refusal in its stable
-//! encoded form. The lineage and resource indexes are not written: each is
-//! the grants' own sources and resources, rebuilt on reading exactly as
-//! [`GrantBook::apply`] builds them.
+//! revocation, its last observed use and its count of recorded uses; every
+//! operation with the index it made; and every refused event's index,
+//! operation and refusal in its stable encoded form. The lineage and resource
+//! indexes are not written: each is the grants' own sources and resources,
+//! rebuilt on reading exactly as [`GrantBook::apply`] builds them.
 
 use ciborium::Value;
 
@@ -40,11 +40,12 @@ fn record(held: &GrantRecord) -> Value {
         uint(held.index),
         nullable(revoked),
         nullable(last_use),
+        uint(held.uses),
     ])
 }
 
 fn read_record(value: Value) -> Result<GrantRecord, Unreadable> {
-    let [grant, index, revoked, last_use] = tuple::<4>(value, "a grant record")?;
+    let [grant, index, revoked, last_use, uses] = tuple::<5>(value, "a grant record")?;
     let Value::Bytes(grant) = grant else {
         return Err("a grant is not a byte string".to_owned());
     };
@@ -76,6 +77,7 @@ fn read_record(value: Value) -> Result<GrantRecord, Unreadable> {
         index: read_uint(&index, "a grant's index")?,
         revoked,
         last_use,
+        uses: read_uint(&uses, "a grant's use count")?,
     })
 }
 

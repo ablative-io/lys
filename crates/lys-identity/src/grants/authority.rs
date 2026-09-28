@@ -9,7 +9,7 @@
 //! `OperationReused`. A decision is made only from relationships at least as
 //! fresh as every change on the authority it rests on.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU64;
 
 use lys_core::Ed25519Identity;
@@ -29,6 +29,7 @@ use super::recovery::GrantLedger;
 use super::revocation::judge_revoke;
 use super::state;
 use super::types::{Action, Grant, GrantId, Resource, Source};
+use super::usage::{self, Unreported};
 use crate::id::{IdentityId, PersonId};
 use crate::log::Reopen;
 use crate::operation::OperationId;
@@ -105,6 +106,7 @@ pub struct Grants<S: LeafStore, R: RelationshipStore> {
     pub(super) book: GrantBook,
     pub(super) folded: u64,
     pub(super) relationships: R,
+    pub(super) unreported: BTreeMap<GrantId, Unreported>,
 }
 
 fn root_matches(request: &RootRequest, grant: &Grant) -> bool {
@@ -179,6 +181,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             book,
             folded,
             relationships,
+            unreported: BTreeMap::new(),
         };
         for (signed, coordinate) in events {
             grants.record_committed(&signed, coordinate)?;
@@ -371,7 +374,11 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         at_least: Option<u64>,
     ) -> Result<Permit, GrantError> {
         let mut permit = self.explain(directory, request, at, at_least)?;
-        permit.use_event = Some(self.record_use(request.caller, permit.grant, request.route, at));
+        let used = self.record_use(request.caller, permit.grant, request.route, at);
+        if let Err(error) = &used {
+            usage::note(&mut self.unreported, permit.grant, request.route, at, error);
+        }
+        permit.use_event = Some(used);
         Ok(permit)
     }
 

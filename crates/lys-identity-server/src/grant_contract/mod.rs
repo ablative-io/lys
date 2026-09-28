@@ -10,5 +10,5 @@ pub use requests::{
 };
 pub use views::{
     GrantList, GrantView, HolderView, LastUseView, LogView, ModelView, PassOnView, PermitView,
-    ReceiptView, RecordedView, ResourceView, UseEventView, WhoPage, WindowView,
+    ReceiptView, RecordedView, ResourceView, UnreportedView, UseEventView, WhoPage, WindowView,
 };
