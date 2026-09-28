@@ -1,6 +1,6 @@
 //! The `lys-home` command line: import, render, fewshot, ingest-call,
 //! resume-check, render-launch, given, given-check, lantern, fork, handover,
-//! ship, fetch. Every command prints one
+//! ship, fetch, compactions. Every command prints one
 //! JSON report of paths, hashes and counts, never transcript, block or body
 //! content. A missing required argument is refused by clap with exit code 2,
 //! naming the argument. A command that refuses exits 1, except `given-check`,
@@ -8,6 +8,8 @@
 //! ([`given`]).
 //! `ship` and `fetch` ([`crate::cli_move`]) print two refusals as reports on
 //! stdout with exit 1: `stale_index` and `verification_failed`.
+//! `compactions` ([`crate::record::compactions`]) prints its whole report
+//! first and exits 1 when anything it checks is missing or unreadable.
 
 mod fewshot;
 pub mod given;
@@ -221,6 +223,15 @@ pub enum Command {
     Ship(ShipArgs),
     /// Fetch a shipped home into a new, empty home and hang an arrival beside each session's head.
     Fetch(FetchArgs),
+    /// List a session's compactions: each loss entry, its span read by id and its blocks checked as held.
+    Compactions {
+        /// The home directory.
+        #[arg(long)]
+        home: PathBuf,
+        /// The session id.
+        #[arg(long)]
+        session: String,
+    },
 }
 
 impl Command {
@@ -248,6 +259,7 @@ pub fn run_with_status(cli: Cli) -> Result<Outcome, HomeError> {
         Command::GivenCheck(args) => given::check(&args),
         Command::Ship(args) => crate::cli_move::run_ship(&args),
         Command::Fetch(args) => crate::cli_move::run_fetch(&args),
+        Command::Compactions { home, session } => compactions(&home, &session),
         other => report(other).map(Outcome::done),
     }
 }
@@ -408,5 +420,18 @@ fn report(command: Command) -> Result<Value, HomeError> {
         }
         Command::Ship(args) => crate::cli_move::run_ship(&args).map(|outcome| outcome.report),
         Command::Fetch(args) => crate::cli_move::run_fetch(&args).map(|outcome| outcome.report),
+        Command::Compactions { home, session } => {
+            compactions(&home, &session).map(|outcome| outcome.report)
+        }
     }
+}
+
+/// `compactions`: the whole report, with exit status 1 when anything it
+/// checks is missing or unreadable.
+fn compactions(home: &std::path::Path, session: &str) -> Result<Outcome, HomeError> {
+    let listing = crate::record::compactions::list_compactions(home, session)?;
+    Ok(Outcome {
+        report: listing.report,
+        status: i32::from(!listing.whole),
+    })
 }

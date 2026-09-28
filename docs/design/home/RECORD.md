@@ -1,8 +1,9 @@
 # The home record
 
 Written for HOME-001 R1, R2 and R6, with HOME-002's render event,
-HOME-003's context record, HOME-004's lanterns, HOME-007's rendered uuid
-and HOME-006's forks. Everything here is local state of a home, not a
+HOME-003's context record, HOME-004's lanterns, HOME-007's rendered uuid,
+HOME-006's forks and HOME-030's block rows, loss entry and Claude Code
+compactions. Everything here is local state of a home, not a
 wire contract; nothing is signed.
 
 ## Pi's grammar, as adopted
@@ -39,6 +40,20 @@ Read from the Pi checkout at `3d5cbe98`
   (`render`, `render-launch`, `ingest-call`, `canon add --from`), even when
   that command then refuses. The session file itself is never written by an
   open.
+- `<id>.blocks.jsonl` (HOME-030 R2): one JSON row per content part stored at
+  import, `{entry, part, hash}`. `entry` is the id of the entry the part went
+  into (for a user record split into tool result messages, the tool result's
+  own entry); `part` is the part's 0-based index in its source record's
+  content, a string content being part 0; `hash` is the SHA-256 hex
+  `BlockStore::put` returned for the part as the source record held it,
+  never one recomputed from the Pi-shaped part. A row names no content, no
+  text and no length of text. The file is appended only, is never part of
+  Pi's grammar (no field is added to the header or to any entry for it), is
+  durable before the import returns, and can be rebuilt from the original
+  file by re-importing its parts through the store. A session imported before
+  it existed has none; a reader then reports that session's blocks as
+  unverified and never guesses them. It is not yet in the shipped tracked
+  set, so a fetched home lists its blocks unverified.
 - Durability order on append: entry line fsynced, then index row fsynced, then
   head renamed. A crash between any two leaves a file whose index is either
   complete or rebuildable, never one that claims an entry it does not hold.
@@ -285,6 +300,51 @@ a later ship from the target carries the arrivals onward.
   the carried message that are not `text` (`{}` when nothing is carried,
   when the content is a string, or when every part is text). Written only
   by `fork`.
+- `lys.loss` (HOME-030 R4): what one compaction summarised, as ids, counts
+  and hashes, never content: no text, thinking, tool input, tool result or
+  summary, and no key named `text`, `content` or `body`. It is the line
+  directly after its compaction entry in the file, with the compaction as its
+  parent: a side leaf off the context path, so the path through the
+  compaction and the context path are unchanged, and it never becomes the
+  file chain's last entry. Its data is `{compaction, first_kept, kept_none,
+  span_first, span_last, entries, messages, tool_calls, tool_results,
+  blocks, entry_bytes, block_bytes, blocks_sha256, tokens_before}`:
+  `compaction` the compaction's entry id; `first_kept` its
+  `firstKeptEntryId`; `kept_none` true exactly when `first_kept` is the
+  compaction's own id; `span_first` and `span_last` the first and last entry
+  ids of the span, both null when the span is empty; `entries` the number of
+  span entries; `messages` the span's message entries (user, assistant and
+  `toolResult`); `tool_calls` the `toolCall` parts in the span's assistant
+  messages; `tool_results` the span's `toolResult` messages; `blocks` the
+  block rows whose entry is in the span; `entry_bytes` the sum of the span
+  entries' line lengths as the index holds them; `block_bytes` the sum of
+  the byte lengths of the blocks those rows name, as held; `blocks_sha256`
+  the SHA-256 hex of those rows' hashes in span order then part order, each
+  followed by one newline; `tokens_before` the compaction's `tokensBefore`.
+  The span is the context the compaction summarised as that context stood,
+  every entry its summary now stands in for: the entries of the compaction's
+  ancestry that Pi's context reading covered at the compaction's parent,
+  less the entries the compaction keeps. On the ancestry, root first, it
+  starts at the root when no compaction entry sits earlier on it; otherwise
+  at the nearest earlier compaction's first kept entry when that entry is on
+  the ancestry (so entries an earlier compaction kept, and that earlier
+  compaction entry itself, are in the span), and at that earlier compaction
+  entry when its first kept entry is itself or is not on the ancestry. It
+  ends at the entry whose child on the ancestry is the first kept entry, or
+  at the compaction's parent when the compaction keeps nothing. For a
+  completing compaction (one whose details carry `completes`) the span is
+  the span of the compaction it completes, and every field but `compaction`
+  and `tokens_before` equals that compaction's loss entry's. The span is one
+  unbroken run of the ancestry, so `span_first`, `span_last` and the parent
+  ids between them name every id in it. Counting: entries off that ancestry
+  (side leaves such as `tool_completed` and permission-mode events, earlier
+  loss entries, sidechains) are not in the span; custom entries on it
+  (attachment and system events, `lys.authored`) count in `entries` only.
+  The span is walked by seeking its entries through the index, never by
+  reading the whole file, and no span entry or block is removed, rewritten
+  or moved. This is not the render's `<uuid>.loss.json`, which accounts for
+  what one render dropped; `lys.loss` accounts for what a compaction left
+  out of the context, in the home.
 - `lys.fork` (HOME-006 R3): `{child}`, the child's session id. Appended at
   the parent's head, which advances to it, once per fork; the parent gains
   this one line and no earlier byte of it changes.
@@ -318,8 +378,9 @@ called with, so the same entry id in two sessions rendered into one Claude
 Code directory never derives one uuid. The render target's session id, the
 one the rendered file's `sessionId` carries, is not held by the record and
 never enters the derivation. The roles are closed: `record`, the record's
-`uuid`; the next record's parentUuid, a summary's leafUuid and an assistant's
-`msg_` id follow from it. A derived uuid carries version nibble 5 where
+`uuid`, and `compact_boundary`, the uuid of the `compact_boundary` record a
+compaction renders as beside its summary record (HOME-030 R6); the next
+record's parentUuid and an assistant's `msg_` id follow from them. A derived uuid carries version nibble 5 where
 Claude Code's own carry 4. Nothing random and no clock enters a render, every
 timestamp is the entry's own, and the walk takes entry order then part
 order, so the same session head with the same target writes the same bytes
@@ -334,6 +395,67 @@ reads from this table and renders:
 |---|---|---|
 | `one` | `e1` | `83871c7a-20b7-5baa-8f66-8d8f4201d90d` |
 | `two` | `e1` | `96533416-b648-5185-ac85-c3b7c51203c9` |
+
+## Claude Code compactions
+
+HOME-030 R3 and R6, measured on Claude Code 2.1.281 files. This corrects
+HOME-001's import, which read only a `summary` record, by measurement: every
+other compacted file holds the pair below.
+
+**Import.** A compaction is a `system` record with subtype
+`compact_boundary` (parentUuid null, `logicalParentUuid` the record before
+it, `compactMetadata` with `trigger`, `preTokens` and, when part of the
+conversation is kept, `preservedSegment` with `headUuid`, `anchorUuid` and
+`tailUuid`), and a `user` record with `isCompactSummary: true` whose
+parentUuid is the boundary's uuid and whose message content is the summary.
+The pair is matched by that parentUuid, never by adjacency, and becomes one
+Pi compaction entry when the summary record is read: its id is the summary
+record's uuid, so a later record naming the summary attaches under it; its
+parent is the boundary's `preservedSegment.tailUuid` when that names an
+entry on record, otherwise its `logicalParentUuid` when that does,
+otherwise the file chain's last entry, so a `tailUuid` naming no entry on
+record is never refused; its summary is the summary record's content;
+`firstKeptEntryId` is the first entry the record named by
+`preservedSegment.headUuid` produced; `tokensBefore` is `preTokens`; the
+timestamp is the summary record's; and its Pi `details` field is
+`{boundaryUuid, summaryUuid}`. The summary's content is stored as a block
+with a row under the compaction's id, part 0. Neither record becomes a
+harness event or a user message; the import report counts compaction
+entries in `compactions` and the records they came from in
+`compaction_sources`. A boundary without `preservedSegment` keeps nothing:
+`firstKeptEntryId` is the compaction's own id. A boundary whose
+`isCompactSummary` record has not been read when a later record names the
+boundary as its parent, or at the end of the file, is imported at that point
+under the boundary's uuid with an empty summary, the boundary's timestamp,
+the same parent, first kept and tokens rules, and details `{boundaryUuid,
+summary_missing: true}`; the file is not refused. An `isCompactSummary`
+record read after that compaction was written is imported as a second
+compaction entry under the summary's uuid whose parent is the first, with
+the first's `firstKeptEntryId` and `tokensBefore` and details
+`{boundaryUuid, summaryUuid, completes}` naming the first in `completes`;
+the first is left unrewritten and keeps `summary_missing`. A `type:"summary"`
+record, the earlier shape, is imported as before: a fresh id under the last
+main-path message, keeping nothing, `tokensBefore` 0. Every compaction entry,
+by any of these paths, becomes the file chain's last entry, so the next
+record without an on-record parent attaches under it and the head is set to
+it when nothing follows; its `lys.loss` entry is written on the next line.
+The one refusal: a `preservedSegment.headUuid` that names no record on
+record when the compaction is written refuses the import naming that uuid,
+as an unknown parentUuid is refused, and nothing of the compaction is
+appended.
+
+**Render.** A context path whose first entry is a compaction renders in the
+shape Claude Code 2.1.281 writes: a `system` record with subtype
+`compact_boundary`, content `Conversation compacted`, level `info`,
+`compactMetadata` `{preTokens}` from `tokensBefore` and parentUuid null;
+then a `user` record with `isCompactSummary` and `isVisibleInTranscriptOnly`
+true and message `{role: user, content: <summary>}` under the boundary; then
+the kept and later records, the first under the summary record. Both carry
+`sessionId`, `cwd`, `version`, `userType`, `isSidechain` and `timestamp` as
+every rendered record does. No `type:"summary"` line is written (HOME-001
+wrote one before the shape was measured, and it left the summary in no
+record the model reads), no custom entry (`lys.loss` included) and no
+`preservedSegment`.
 
 ## Forks
 

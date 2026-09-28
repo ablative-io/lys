@@ -2,7 +2,8 @@
 //! Gates on the staged import (HOME-020 R4): five syncs of the session's own
 //! whatever the record count, the block store's syncs counted beside them, a
 //! part-way import that leaves no session, and its remainder removed by the
-//! next import or open of the id.
+//! next import or open of the id. The block rows of a staged import are
+//! written under the published name and are part of that remainder.
 
 use std::path::{Path, PathBuf};
 
@@ -87,6 +88,9 @@ fn an_import_dropped_before_publish_leaves_no_session_and_the_next_import_remove
     drop(s);
     assert!(!file.exists());
     assert!(staging_path(&file).is_file());
+    assert!(Index::blocks_path(&file).is_file());
+    assert!(!Index::blocks_path(&staging_path(&file)).exists());
+    let left = std::fs::read(Index::blocks_path(&file)).unwrap();
     assert!(!home.session_ids().unwrap().contains(&"multi".to_owned()));
     let report = run(Cli {
         command: Command::Import {
@@ -97,6 +101,7 @@ fn an_import_dropped_before_publish_leaves_no_session_and_the_next_import_remove
     })
     .unwrap();
     assert!(!staging_path(&file).exists());
+    assert_eq!(std::fs::read(Index::blocks_path(&file)).unwrap(), left);
     let entries = report["report"]["entries"].as_u64().unwrap();
     let opened = Session::open(&file).unwrap();
     assert_eq!(opened.len().unwrap() as u64, entries);
@@ -112,6 +117,7 @@ fn an_open_of_an_absent_session_removes_the_staging_file_index_and_head() {
         staging_path(&file),
         Index::index_path(&file),
         Index::head_path(&file),
+        Index::blocks_path(&file),
     ];
     for path in &left {
         std::fs::write(path, b"left part way\n").unwrap();

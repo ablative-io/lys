@@ -96,6 +96,17 @@ pub enum HomeError {
         parent: String,
     },
 
+    /// A Claude Code compaction keeps from a record that is not on record:
+    /// its boundary's `preservedSegment.headUuid` names no record read
+    /// before the compaction is written (HOME-030 R3).
+    #[error("compaction `{compaction}` keeps from `{uuid}`, which is not on record")]
+    UnknownFirstKept {
+        /// The compaction entry's id.
+        compaction: String,
+        /// The uuid `preservedSegment.headUuid` names.
+        uuid: String,
+    },
+
     /// A hash is not 64 lowercase hex characters.
     #[error("not a block hash: `{hash}`")]
     NotAHash {

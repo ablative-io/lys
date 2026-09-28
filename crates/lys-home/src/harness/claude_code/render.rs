@@ -6,8 +6,13 @@
 //! model equal the target's (Pi's rule, transform-messages.ts:95-109);
 //! otherwise readable thinking becomes a text part and an opaque or redacted
 //! block is dropped and named by hash in the loss account beside the file. A
-//! compaction becomes Claude Code's `summary` record. Custom entries (the lys
-//! ones included) and labels do not render. An existing target path is
+//! compaction renders in the shape Claude Code 2.1.281 writes (HOME-030 R6):
+//! a `system` record with subtype `compact_boundary` and parentUuid null,
+//! then a `user` record with `isCompactSummary` carrying the summary under
+//! it, and the kept and later entries after that; never a `summary` line,
+//! which was written before the shape was measured and left the summary in
+//! no record the model reads, and never a `preservedSegment`. Custom entries
+//! (the lys ones, `lys.loss` included) and labels do not render. An existing target path is
 //! refused by name and nothing is written. For a child forked at a user
 //! message the report names the seed file written beside the rendered file
 //! ([`super::seed`]); no launch line is printed here, since a launch line
@@ -195,7 +200,7 @@ struct Walk<'a> {
     session: &'a str,
     target: &'a RenderTarget,
     /// Each record beside the id of the entry it came from; `None` for a
-    /// `summary`.
+    /// record no entry gave.
     records: Vec<(Value, Option<String>)>,
     losses: Vec<Loss>,
     kept: u64,
@@ -205,14 +210,29 @@ struct Walk<'a> {
 }
 
 impl Walk<'_> {
-    /// Shape one entry: a message becomes a record, a compaction a
-    /// `summary`, anything else nothing.
+    /// Shape one entry: a message becomes a record, a compaction its
+    /// boundary record and its summary record, anything else nothing.
     fn entry(&mut self, entry: &Entry) -> Result<(), HomeError> {
         match &entry.body {
             EntryBody::Message { message } => self.message(entry, message),
-            EntryBody::Compaction { summary, .. } => {
-                let record = json!({"type": "summary", "summary": summary, "leafUuid": self.prev});
-                self.records.push((record, None));
+            EntryBody::Compaction {
+                summary,
+                tokens_before,
+                ..
+            } => {
+                let id = entry.id();
+                let boundary = derived_uuid(self.session, id, ROLE_BOUNDARY);
+                let uuid = record_uuid(self.session, id);
+                let [first, second] = compaction_records(
+                    self.target,
+                    &entry.base.timestamp,
+                    (&boundary, &uuid),
+                    summary,
+                    *tokens_before,
+                );
+                self.records.push((first, Some(id.to_owned())));
+                self.records.push((second, Some(id.to_owned())));
+                self.prev = Some(uuid);
                 Ok(())
             }
             _ => Ok(()),
@@ -379,9 +399,13 @@ pub const RENDER_NAMESPACE: [u8; 16] = [
     0x32, 0xc0, 0x59, 0x04, 0xd1, 0xf1, 0x55, 0x0c, 0x9e, 0xee, 0x2f, 0x6c, 0x8f, 0x98, 0xb6, 0x65,
 ];
 
-/// The one role a derived uuid plays so far: the rendered record's `uuid`.
-/// A role never carries `#`, so the last `#` of a name splits it.
+/// The role of a derived uuid that is a rendered record's `uuid`. A role
+/// never carries `#`, so the last `#` of a name splits it.
 pub const ROLE_RECORD: &str = "record";
+
+/// The role of a derived uuid that is the `uuid` of the `compact_boundary`
+/// record a compaction renders as, beside its summary record's.
+pub const ROLE_BOUNDARY: &str = "compact_boundary";
 
 /// A UUID version 5 (RFC 9562): the SHA-1 of the namespace bytes then the
 /// name, its first 16 bytes with the version nibble set to 5 and the variant
@@ -447,9 +471,62 @@ pub fn record_uuid(session_id: &str, id: &str) -> String {
     if is_uuid_shaped(id) {
         id.to_owned()
     } else {
-        let name = format!("{id}#{ROLE_RECORD}");
-        uuid_string(&uuid_v5(&session_namespace(session_id), name.as_bytes()))
+        derived_uuid(session_id, id, ROLE_RECORD)
     }
+}
+
+/// The uuid derived for the entry `id` of session `session_id` in `role`:
+/// UUID version 5 under the session's namespace over `<id>#<role>`.
+#[must_use]
+pub fn derived_uuid(session_id: &str, id: &str, role: &str) -> String {
+    let name = format!("{id}#{role}");
+    uuid_string(&uuid_v5(&session_namespace(session_id), name.as_bytes()))
+}
+
+/// The two records a compaction renders as: the `compact_boundary` record,
+/// parentUuid null, with the compaction's `tokensBefore` as `preTokens`;
+/// then the `isCompactSummary` record under it carrying the summary. `uuids`
+/// is the boundary's uuid then the summary record's.
+fn compaction_records(
+    target: &RenderTarget,
+    timestamp: &str,
+    uuids: (&str, &str),
+    summary: &str,
+    tokens_before: u64,
+) -> [Value; 2] {
+    let (boundary, uuid) = uuids;
+    let boundary_record = json!({
+        "parentUuid": Value::Null,
+        "isSidechain": false,
+        "userType": "external",
+        "cwd": target.cwd,
+        "sessionId": target.session_id,
+        "version": target.version,
+        "gitBranch": "",
+        "type": "system",
+        "subtype": "compact_boundary",
+        "content": "Conversation compacted",
+        "timestamp": timestamp,
+        "uuid": boundary,
+        "level": "info",
+        "compactMetadata": {"preTokens": tokens_before},
+    });
+    let summary_record = json!({
+        "parentUuid": boundary,
+        "isSidechain": false,
+        "userType": "external",
+        "cwd": target.cwd,
+        "sessionId": target.session_id,
+        "version": target.version,
+        "gitBranch": "",
+        "type": "user",
+        "message": {"role": "user", "content": summary},
+        "isCompactSummary": true,
+        "isVisibleInTranscriptOnly": true,
+        "uuid": uuid,
+        "timestamp": timestamp,
+    });
+    [boundary_record, summary_record]
 }
 
 /// A user message's content: a string as it stands, one text part as its

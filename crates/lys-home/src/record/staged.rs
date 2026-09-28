@@ -3,7 +3,9 @@
 //! The import command builds its new session `<id>` in
 //! `sessions/<id>.jsonl.importing`: the header and every entry are written
 //! there with one write per line and no sync, and the index rows and the
-//! head are held in memory. [`Session::publish`] then makes it durable in
+//! head are held in memory. What an import writes beside the session, its
+//! block rows, is named for the published file ([`Session::published_file`]),
+//! never for the staging file. [`Session::publish`] then makes it durable in
 //! this order: one sync of the staging file; the index rows written whole to
 //! `<id>.index.jsonl` through a temporary file, synced and renamed; the head
 //! written once to `<id>.head` the same way; one sync of the sessions
@@ -14,8 +16,9 @@
 //! leaves no session. The next import of `<id>`, and the next
 //! [`Session::open`] of `<id>.jsonl`, each holding the lock, remove
 //! `<id>.jsonl.importing` when it is present and, when `<id>.jsonl` is
-//! absent, `<id>.index.jsonl` and `<id>.head`, and sync the directory after
-//! any removal. A staging file is never listed as a session.
+//! absent, `<id>.index.jsonl`, `<id>.head` and `<id>.blocks.jsonl`, and sync
+//! the directory after any removal. A staging file is never listed as a
+//! session.
 //!
 //! Every other append, and an import into a session already open, keeps the
 //! per-append order: the line, then its index row, then the head, each
@@ -102,6 +105,15 @@ impl Session {
             calls: Mutex::new(None),
             staged: Some(Staged { file, out }),
         })
+    }
+
+    /// The file this session is read from once it is whole: a staged
+    /// session's published name, any other session's own file.
+    #[must_use]
+    pub(crate) fn published_file(&self) -> &Path {
+        self.staged
+            .as_ref()
+            .map_or(self.file.as_path(), |staged| staged.file.as_path())
     }
 
     /// Publish a staged session under its own name, in the order the module
@@ -197,8 +209,8 @@ impl Session {
 }
 
 /// Remove what a part-way staged import of this session left: the staging
-/// file when it is present and, when the session file is absent, its index
-/// and head. The sessions directory is synced after any removal.
+/// file when it is present and, when the session file is absent, its index,
+/// head and block rows. The sessions directory is synced after any removal.
 pub(super) fn clear_remainder(session_file: &Path, counts: &IoCounter) -> Result<(), HomeError> {
     let mut removed = remove_present(&staging_path(session_file))?;
     let present = session_file
@@ -207,6 +219,7 @@ pub(super) fn clear_remainder(session_file: &Path, counts: &IoCounter) -> Result
     if !present {
         removed |= remove_present(&Index::index_path(session_file))?;
         removed |= remove_present(&Index::head_path(session_file))?;
+        removed |= remove_present(&Index::blocks_path(session_file))?;
     }
     if removed {
         sync_dir(parent_dir(session_file))?;
