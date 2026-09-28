@@ -1,6 +1,6 @@
 /** Runtime reads preserve unknown outcomes and require a real stop report before showing stopped. */
 import { describe, expect, it } from 'vitest';
-import { mount, text } from './harness';
+import { $, click, mount, text } from './harness';
 import { SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { RuntimeSession } from '../src/features/runtime/RuntimeSessions';
 const path = '/agents/' + SCRIBE + '/runtime/sessions';
@@ -21,6 +21,13 @@ describe('Runtime sessions', () => {
   it('does not turn no reports into not running', async () => {
     await mount('#/file/' + SCRIBE + '/sessions', { ...SERVICE, [path]: ok({ sessions: [] }) });
     expect(text()).toContain('does not establish whether a process is running');
+  });
+  it('shows found sessions without registering an identity', async () => {
+    const { requests, posted } = await mount('#/people', { ...SERVICE, '/runtime/found': ok({ sessions: [{ ...session, agent: null, shown: 'running' }] }) });
+    posted.length = 0;
+    await click($('button[data-kind="found"]'));
+    expect(requests).toContain('/runtime/found'); expect(posted).toEqual([]);
+    expect(text()).toContain('No identity attached'); expect(text()).toContain('Reported running');
   });
   it('names an unavailable runtime store', async () => {
     await mount('#/file/' + SCRIBE + '/sessions', { ...SERVICE, [path]: refused(503, 'RuntimeUnavailable', 'Store unavailable') });

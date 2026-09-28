@@ -19,7 +19,7 @@ describe('Handle withdrawal', () => {
     const first = await mount('#/file/' + SCRIBE + '/credentials', { ...routes, 'POST /secrets/drop': refused(503, 'SecretsUnavailable', 'Unknown outcome') });
     await click(button('End handle')); await click(button('Confirm end handle'));
     unmountAll(); document.body.innerHTML = '';
-    const next = await mount('#/file/' + SCRIBE + '/credentials', { ...routes, 'POST /secrets/drop': receipt });
+    const next = await mount('#/file/' + SCRIBE + '/credentials', { ...routes, ['/secrets/handles?holder=' + SCRIBE]: ok({ holder: SCRIBE, handles: [{ id: handle, secret: 'calendar', used: 0, max_uses: 4, not_after_ms: 1990000000000, dropped: true, spend_cap: null, settled: 0, parent: null }] }), 'POST /secrets/drop': receipt });
     await click(button('Check original change')); expect(next.posted).toEqual(first.posted); expect(text()).toContain('Use stopped at this broker');
   });
   it('does not accept a receipt for another handle', async () => {

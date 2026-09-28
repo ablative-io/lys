@@ -17,7 +17,7 @@ export function AgentCredentials({ id }: { id: string }) {
     <Gate load={load} title="Credential handles" ok={({ handles }) => handles.length ? <table><thead><tr><th>Secret</th><th>Handle identifier</th><th>Value</th><th>Usage</th><th>Expires</th><th>Recorded state</th><th>Action</th></tr></thead><tbody>{handles.map((handle) => <tr key={handle.id}>
       <td>{handle.secret}</td><td><span className="mono">{handle.id}</span>{handle.parent ? <details><summary>Parent handle</summary>{handle.parent}</details> : null}</td><td>Never shown</td>
       <td>{handle.used} of {handle.max_uses} uses<details><summary>Spend accounting</summary><p>Settled: {handle.settled}</p><p>Recorded cap: {handle.spend_cap === null ? 'none' : handle.spend_cap}</p></details></td>
-      <td>{clock(Math.floor(handle.not_after_ms / 1000))}</td><td>{handle.dropped ? 'Dropped' : 'Not marked dropped'}</td><td>{!handle.dropped && caller.status === 'ok' ? <DropHandle handle={handle.id} person={caller.data.person.id} /> : null}</td>
+      <td>{clock(Math.floor(handle.not_after_ms / 1000))}</td><td>{handle.dropped ? 'Dropped' : 'Not marked dropped'}</td><td>{caller.status === 'ok' ? <DropHandle handle={handle.id} person={caller.data.person.id} dropped={handle.dropped} /> : null}</td>
     </tr>)}</tbody></table> : <p>No handles visible to you were returned for this agent.</p>} />
     {caller.status === 'refused' ? <p className="why-not">{caller.refused.refusal.refusal}: {caller.refused.refusal.reason}</p> : null}
     <p className="note">Usage, expiry and recorded drop state do not promise that a future call will be permitted.</p>
