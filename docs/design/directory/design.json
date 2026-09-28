@@ -57,7 +57,8 @@
     "ADR-026",
     "ADR-027",
     "ADR-028",
-    "ADR-039"
+    "ADR-039",
+    "ADR-056"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -67,7 +68,8 @@
     "DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record.",
     "A revoked certificate fails verification against the certificate log while its history still verifies, with revocation an appended leaf and the live set folded from the log (DIRECTORY-013, ADR-039).",
     "DIRECTORY-007 leaves one verifiable receipt for every sign-in and permission change, verified offline from the log and the service's key alone, with receipts for changes only and test receipts that never pass as real.",
-    "DIRECTORY-009 moves an identity between registered, active, suspended and retired only by signed record, answers its state only by folding those records, refuses a suspended or retired identity at every check and at its next session refresh by state alone, and reads a retired identity's history exactly as a live one's."
+    "DIRECTORY-009 moves an identity between registered, active, suspended and retired only by signed record, answers its state only by folding those records, refuses a suspended or retired identity at every check and at its next session refresh by state alone, and reads a retired identity's history exactly as a live one's.",
+    "CONFORMANCE rows 3.1 and 3.2 are true on the lifecycle record, each tested by at least one acceptance line of DIRECTORY-019, reading the lifecycle-hand brief DIRECTORY-009's record and keeping no copy of it."
   ],
   "non_goals": [
     {
@@ -161,6 +163,14 @@
     {
       "text": "The credential-handle half of the provisioned view.",
       "reason": "provisioned is a view over having any grant and having a handle (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:26-28); no row of this cluster yet brings a credential handle into the directory, so DIRECTORY-009 R6 reads the grant half and leaves the handle half false until the secrets rows bring handles."
+    },
+    {
+      "text": "Giving an agent a new person",
+      "reason": "It is its own card, the one that revises ADR-011's responsible person for life and clears the flag; DIRECTORY-019 only flags that an agent's person is retired (ADR-056)."
+    },
+    {
+      "text": "A screen that shows the needs-a-new-person flag on the people list and the agent file",
+      "reason": "It belongs to a later card; DIRECTORY-019 shows the flag in the lifecycle read and the lifecycle-hand brief's typed read (RM-017), which that screen consumes."
     }
   ],
   "structure": [
@@ -953,6 +963,61 @@
       "path": "crates/lys-identity-server/tests/lifecycle_read.rs",
       "note": "d009_r6_ac1 to d009_r6_ac5",
       "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "docs/design/identity/LIFECYCLE-CONTRACT.md",
+      "note": "the lifecycle contract, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R1 adds its conformance section for rows 3.1 and 3.2",
+      "brief": "DIRECTORY-019"
+    },
+    {
+      "path": "crates/lys-identity/src/lifecycle/mod.rs",
+      "note": "the lifecycle module list, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds the responsible module",
+      "brief": "DIRECTORY-019"
+    },
+    {
+      "path": "crates/lys-identity/src/lifecycle/error.rs",
+      "note": "the lifecycle refusal names, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds lifecycle_agent_without_person",
+      "brief": "DIRECTORY-019"
+    },
+    {
+      "path": "crates/lys-identity/src/lifecycle/causes.rs",
+      "note": "who may cause each transition, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds one line calling the no-person check",
+      "brief": "DIRECTORY-019"
+    },
+    {
+      "path": "crates/lys-identity/tests/lifecycle_support/mod.rs",
+      "note": "the lifecycle test support, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 adds persons with agents to its fixtures",
+      "brief": "DIRECTORY-019"
+    },
+    {
+      "path": "crates/lys-identity-server/src/lifecycle_read.rs",
+      "note": "the typed lifecycle read, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R3 adds the needs_a_new_person field",
+      "brief": "DIRECTORY-019"
+    },
+    {
+      "path": "crates/lys-identity/src/lifecycle/responsible.rs",
+      "note": "the no-person refusal and the needs-a-new-person flag worked out on read (DIRECTORY-019 R2, R3)",
+      "brief": "DIRECTORY-019"
+    },
+    {
+      "path": "crates/lys-identity/tests/lifecycle_no_person.rs",
+      "note": "CONFORMANCE 3.1: an agent recorded with no person is refused by name (DIRECTORY-019 R2)",
+      "brief": "DIRECTORY-019"
+    },
+    {
+      "path": "crates/lys-identity/tests/lifecycle_needs_new_person.rs",
+      "note": "CONFORMANCE 3.1: retiring a person flags every one of their agents as needing a new person, and suspending one flags none (DIRECTORY-019 R3)",
+      "brief": "DIRECTORY-019"
+    },
+    {
+      "path": "crates/lys-identity/tests/lifecycle_walk.rs",
+      "note": "CONFORMANCE 3.2: the walk of all 20 changes of state (DIRECTORY-019 R4)",
+      "brief": "DIRECTORY-019"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/lifecycle_authority.rs",
+      "note": "CONFORMANCE 3.2: the state is authority only and the read says nothing about running (DIRECTORY-019 R5)",
+      "brief": "DIRECTORY-019"
     }
   ],
   "inventory": [

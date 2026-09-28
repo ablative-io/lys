@@ -1023,29 +1023,37 @@
     },
     {
       "id": "RM-032",
-      "title": "Refuse underscore-prefixed bindings in lys and clear each one by what it does",
+      "title": "Flag an agent whose person is retired as needing a new person, and keep the four identity states authority only",
       "status": "idea",
-      "kind": "fix",
-      "summary": "lys calls a _-prefixed unused variable a bypass, not a fix, and nothing enforces it. This item adds rules/ast-grep/no-underscore-binding.yml at severity error, run by the ast-grep leg LYSCORE-001 lands, with a message saying why it refuses. It clears every underscore-prefixed binding the rule reports (303 in 70 files at 7b53625, where the words count 272) by what the binding does. Guards whose directory or state is still used are named and dropped by name, the eight test fixtures that hold a TempDir in an underscore-prefixed field name it and close it where the test ends, discarded errors and unused values, among them TempDirs returned beside an identity already in memory, are left unbound with clippy::map_err_ignore kept, and ignored trait parameters become a bare `_` with every trait unchanged. Behaviour does not change, and the full suite runs the same tests before and after.",
+      "kind": "feature",
+      "summary": "Makes CONFORMANCE rows 3.1 and 3.2 true on the lifecycle record the lifecycle-hand brief DIRECTORY-009 (RM-017) defines, reading its fold and typed read and keeping no copy: an agent recorded with no person is refused by name; an agent's read carries needs_a_new_person, worked out on read from its registration and its person's retire record, true on every one of a retired person's agents, never for a suspended person, with nothing appended and each agent's own state unchanged; every change of state is walked, six admitted and fourteen refused by name; and a test shows the state starts and stops no process and says nothing about running. One brief, DIRECTORY-019, of five rows.",
       "provenance": {
         "requested_by": "tom",
-        "date": "2026-09-27T12:10:45+10:00",
-        "quote": "An underscore-prefixed name is never used to quiet a lint in lys.\n\nTom's rule is that a binding is never renamed with a leading underscore to silence an unused warning.\nThe ast-grep brief 6747ce61 ruled this rule out of its own card, so it gets this one.\n\nThe card adds an ast-grep rule to the lys gate that refuses a new underscore-prefixed binding, and it handles each of the 272 such bindings in the tree today by what the binding does.\nA guard held only to keep something alive gets a real name and is dropped by name where its life should end.\nAn unused trait parameter is either used or the trait is changed so it is not asked for.\nA value that truly has no use is not bound at all.\nThe rule's own words say why it refuses, and the gate runs it with the other ast-grep legs.\nEach change keeps behaviour the same, and the full lys test suite passes before and after.",
-        "context": "The underscore-binding card on the Lys board: the rule that the ast-grep brief 6747ce61 (LYSCORE-001) ruled out of its own card. The lead's five answers to this run's survey (map_err_ignore kept, with the unbound .ok().ok_or form; the bare `_` for ignored trait parameters; the scope is every binding the rule reports, not 272; the card waits for LYSCORE-001; the eight fixture guard fields named and closed in this card) are written into LYSCORE-002."
+        "date": "2026-09-27T13:26:00+10:00",
+        "quote": "An agent whose person is retired shows as needing a new person, and the four identity states are recorded as authority only.\n\nThis card covers the first two rows of section 3 of the identity CONFORMANCE document on lys main 7b536253, Lifecycle, and each row gets at least one acceptance line that tests it on the lifecycle record.\nNo brief on main makes either row true, and the lifecycle-hand brief on its own branch cites neither row.\nThis brief reads that brief's lifecycle record rather than keeping its own copy.\n\nThe first row is that every agent answers to a person.\nWhen that person is retired, each of their agents is flagged in its lifecycle record as needing a new person, and a test retires a person and reads the flag on every one of their agents.\nAn agent with no person is refused by name when it is recorded, and a test shows that refusal.\n\nThe second row is that the identity states are registered, active, suspended and retired.\nA test walks each allowed change of state in the lifecycle record and shows every other change refused by name.\nThe state is authority only.\nA test shows that changing an agent's state starts and stops no process, and that the record says nothing about whether the agent is running.\n\nGiving an agent a new person is out of scope and is its own card.",
+        "context": "The lifecycle conformance card on Cambium's board, run through the brief_card chain at lys main 7b53625. The survey's five questions were answered by the lead for the identity line and are written into DIRECTORY-019 as settled: the flag stands and ADR-011's responsible person for life stays in force until the reassignment card revises it; the flag is worked out on read with nothing appended (the new decision ADR-056); a flagged agent's own state is unchanged; the flag shows in the lifecycle read and the typed read, the screen being a later card; and only a retired person's agents are flagged, never a suspended person's."
       },
       "links": {
-        "cluster": "lys-core",
+        "cluster": "directory",
         "decisions": [
           "ADR-047",
-          "ADR-048"
+          "ADR-048",
+          "ADR-003",
+          "ADR-004",
+          "ADR-007",
+          "ADR-011",
+          "ADR-056"
         ],
         "briefs": [
-          "LYSCORE-002"
+          "LYSCORE-002",
+          "DIRECTORY-019"
         ],
         "commits": []
       },
-      "depends_on": [],
-      "notes": "Further units, not written: 'Offer the underscore-binding rule to Cambium's rule set'. LYSCORE-002 waits on LYSCORE-001 (brief 6747ce61, roadmap RM-029 on draft/lys-core/6747ce61), which lands sgconfig.yml, rules/ast-grep and the ast-grep leg. RM-029 is not in this ledger, so the dependency is carried in the brief's blocked_by rather than in depends_on. Ids: RM-032, ADR-047, ADR-048 and LYSCORE-002 are the next after the highest in every lys brief clone and draft branch checked against 7b53625 (RM-031 and ADR-046 in the home clone c265f6c9; LYSCORE-001 on draft/lys-core/04213a71, 5f185fd4 and 6747ce61). The cluster's C, S, P and CN numbers start after the pre-method documents and both lys-core draft clusters (C75, S24, P5, CN9), so they merge without renumbering."
+      "depends_on": [
+        "RM-001"
+      ],
+      "notes": "Its own row rather than riding RM-001, which carries IDENTITY-001's rows; it depends on RM-001 for DIRECTORY-003. Ids under the ruling that a brief's ids are the next after main's highest and every open branch's: ADR-056, C123 to C127 and S52 to S53 (the open branches reach ADR-055, C122 and S51 in this cluster); RM-032 is kept as the draft's row. The brief id DIRECTORY-019 is the next after main's highest and every open branch's (the open branches reach DIRECTORY-018; the lifecycle-hand brief holds DIRECTORY-009 on brief/directory/lifecycle-hand). DIRECTORY-019 depends on DIRECTORY-009, which creates the lifecycle contract, module and typed read its rows modify; RM-017 is named in its blocked_by rather than in this row's depends_on because RM-017 is not yet on main. The flag stands against ADR-011's responsible person for life and DIRECTORY-003 R1's rule that no request changes it; this card revises neither, and clearing the flag needs the reassignment card, which is the one that revises that rule. Further units, not written: Give an agent whose person is retired a new responsible person; Show the needs-a-new-person flag on the people list and the agent file; CONFORMANCE 3.4: emergency stop revokes tokens and asks sessions to end."
     },
     {
       "id": "RM-036",

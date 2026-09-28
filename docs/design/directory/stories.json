@@ -48,6 +48,10 @@
         {
           "id": "S6",
           "text": "As the operator, I want the directory's screens to show every refusal, pending audit and outage as it is, so that I never act on a completed state that did not happen."
+        },
+        {
+          "id": "S52",
+          "text": "As an operator, I want every agent whose person is retired to show that it needs a new person, so that no agent is left answering to a retired person without anyone seeing it."
         }
       ]
     },
@@ -58,6 +62,10 @@
         {
           "id": "S7",
           "text": "As a verifier, I want to check a recorded identity change against a checkpoint and key with standard tooling, so that the directory's history does not rest on the operator's word."
+        },
+        {
+          "id": "S53",
+          "text": "As a verifier, I want an identity's state to move only along the lifecycle table and to say nothing about running, so that a state is read as authority and never mistaken for whether a process is alive."
         }
       ]
     },

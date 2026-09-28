@@ -2,159 +2,159 @@
 
 ## The words, as they were typed
 
-The brief for this card already stands in the cluster: docs/design/directory/briefs/DIRECTORY-004.json and DIRECTORY-004.md, "Link two upstream providers to one Rauthy person", Row 03 of IDENTITY-001 revision 5, landed with lys PR 6. This card is the one that carries it; its twin PLMigKDB on board 2 was archived into this card. Read DIRECTORY-004 in full and carry it as this card's brief. Keep its two requirements exactly. R1 moves the pin to the gated fork commit that links two providers (Google and GitHub) to one person, with a collision refused rather than merged. R2 writes the provider-link contract and the links report. Keep its boundaries and verification as written, and change nothing the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh) does not require.
+An agent whose person is retired shows as needing a new person, and the four identity states are recorded as authority only.
 
-Facts the brief already settles, which the survey must not reopen, follow. The link lives in the maintained Rauthy fork (ADR-009), never in an upstream contribution. This row is built after DIRECTORY-003 (the directory contract and its link-audit receiver, Row 04) and after DIRECTORY-002 (the install). Every link is recorded through that receiver. The row ends in a live demonstration to Tom (ID001_LINK_LIVE), and a venue test or a screenshot does not replace it. Test identities only; no production key; Tom's acts stay Tom's.
+This card covers the first two rows of section 3 of the identity CONFORMANCE document on lys main 7b536253, Lifecycle, and each row gets at least one acceptance line that tests it on the lifecycle record.
+No brief on main makes either row true, and the lifecycle-hand brief on its own branch cites neither row.
+This brief reads that brief's lifecycle record rather than keeping its own copy.
 
-If the survey finds a sentence of DIRECTORY-004 open or contradicted by the repository as it stands, quote that sentence as a question for the lead rather than rewriting the brief around it.
+The first row is that every agent answers to a person.
+When that person is retired, each of their agents is flagged in its lifecycle record as needing a new person, and a test retires a person and reads the flag on every one of their agents.
+An agent with no person is refused by name when it is recorded, and a test shows that refusal.
+
+The second row is that the identity states are registered, active, suspended and retired.
+A test walks each allowed change of state in the lifecycle record and shows every other change refused by name.
+The state is authority only.
+A test shows that changing an agent's state starts and stops no process, and that the record says nothing about whether the agent is running.
+
+Giving an agent a new person is out of scope and is its own card.
 
 ## What the survey found, and its angles
 
-The words make DIRECTORY-004 ("Link two upstream providers to one Rauthy person", Row 03 of IDENTITY-001 revision 5, landed in PR 6) this card's brief, unchanged. R1 moves the vendor/rauthy pin to a gated commit on the fork's ablative branch where Google and GitHub link to one Rauthy person and a collision is refused, not merged. R2 writes docs/design/identity/PROVIDER-LINK-CONTRACT.md and docs/design/identity/reports/IDENTITY-001-links.md. The brief is not executable yet. Its fork-side work has no brief and no commit. The ablative branch is still at the v0.36.2 base. DIRECTORY-002 (the install) and DIRECTORY-003 (the receiver) are not built in this tree.
+The words ask for a new directory brief that makes CONFORMANCE rows 3.1 and 3.2 true. Row 3.1: every agent has a responsible person, recording an agent without one is refused by name, and when a person is retired each of their agents is flagged as needing a new person. Row 3.2: an identity has exactly four states, only the allowed transitions are admitted and every other one is refused by name, and the state is authority only, so it neither starts nor stops anything and says nothing about running. The brief must build on the lifecycle record from DIRECTORY-009, which sits unmerged on brief/directory/lifecycle-hand, rather than keep its own copy. Giving an agent a new person is left to another card.
 
 ### What the tree holds
 
-- `docs/design/directory/briefs/DIRECTORY-004.json` — The brief the card carries: R1 (the vendor/rauthy pin, acceptance ID001_LINK_PAIR/REFUSAL/MIGRATION/AUDIT) and R2 (the two documents). It has 2 blocked_by entries: the fork-owned brief that does not exist yet, and Waffles' review. Validates OK against brief.schema.json today.
-- `docs/design/directory/briefs/DIRECTORY-004.md` — The rendered twin. gate.sh fails if it drifts from the JSON, so the card must not edit either file unless the method requires it.
-- `vendor/rauthy` — R1's only file. A submodule pinned at dd61ac3c84d6b238108dc8438b53043b5177a662 (v0.36.2), last moved in 146796f. It is not checked out in this clone (git submodule status shows '-'). .gitmodules tracks branch ablative.
-- `docs/design/identity/PROVIDER-LINK-CONTRACT.md` — R2 creates it: the typed contract between the fork's link audit and the DIRECTORY-003 receiver. It does not exist yet.
-- `docs/design/identity/reports/IDENTITY-001-links.md` — R2 creates it: pinned commit, gate result, counted legs per ID001_LINK_* case, and the release-and-advisory check. Neither the file nor the reports/ directory exists yet. DIRECTORY-002 R1 also creates a file there.
-- `docs/design/directory/briefs/DIRECTORY-003.json` — R4 builds the link-audit receiver 'against the reviewed typed contract and fixtures before DIRECTORY-004 needs it'. DIRECTORY-004 R2's acceptance says the receiver's fixtures match PROVIDER-LINK-CONTRACT.md. The two orderings meet here.
-- `docs/design/directory/briefs/DIRECTORY-002.json` — The install that ID001_LINK_LIVE and the report's release-and-advisory check stand on: deploy/identity/*, crates/lys/src/identity/*. None of it exists in the tree (no deploy/ directory).
-- `docs/design/identity/briefs/IDENTITY-001.json` — Revision 5 row 03 at lines 209-262: the rauthy wall at 216-238, the lys wall at 239-243, work at 245-250, estimate at 261. review_decisions choose the same-transaction link audit record/outbox, the 'minimal durable link-audit design selected in row 01' that R1 relies on.
-- `docs/design/identity/RAUTHY-BASELINE.md` — Row 01's evidence (112 lines): provider-field inventory, the three wall additions, no native link event, and 'No final table/transport design chosen and no table added'. Also names the IDENTITY-001-UPSTREAM-AUTH-STATE blocker and Chippy as fork owner with Waffles reviewing.
-- `docs/design/directory/design.json` — The cluster's constraints CN1-CN12. CN4: fork files are named with their owner, never listed. CN5/CN6: ID001_LINK_LIVE is a hold point. CN9: the wall is fixed. CN10: v0.36.2 with an advisory check per install. The non-goal 'Row 03's changes inside the Rauthy fork' is also here. The structure rows assign vendor/rauthy and the two documents to DIRECTORY-004.
-- `scripts/design/gate.sh` — The method gate the words name (validate.py, check-coverage.py, render-cluster.py with a byte comparison of rendered markdown). Exit 0 on the tree as it stands.
-- `ablative-io/rauthy@ablative (Cargo.toml, migrations/, tests/)` — The fork's root Cargo.toml is a virtual workspace with members = ["src/*"], and no tests/ directory exists at the pinned commit. A root-level tests/identity_links/ is therefore not compiled by cargo unless the fork-owned brief wires it. The next migration numbers (postgres V27, hiqlite 32) match the wall's filenames.
+- `docs/design/identity/CONFORMANCE.md:36-37` — Rows 3.1 and 3.2 are the behaviours this card makes true. Both are Kind test, Brief 'LIFECYCLE-STATES (to brief: new)', owner Waffles. Build order step 3 (line 112) groups them with 3.3, 3.4 and 5.1 to 5.6.
+- `origin/brief/directory/lifecycle-hand @ 28e4603: docs/design/directory/briefs/DIRECTORY-009.json` — The lifecycle-hand brief the words say to read and not copy. Its rows are R1 LIFECYCLE-CONTRACT.md, R2 causes.rs, R3 fold.rs/state.rs, R4 gate.rs, R5 the session gate and R6 the typed read. The lifecycle record is the fold of signed transition records (ADR-027). It never cites CONFORMANCE 3.1/3.2, and has zero hits for 'needing', 'new person', 'running' or 'process'.
+- `docs/design/directory/briefs/DIRECTORY-003.json R1 and R5` — R1 records the responsible person in the signed registration event 'for life', says 'No API of this row changes an agent's responsible person', and refuses a registration with no signed-in caller. R5 records the state beside each identity, not enforced, and refuses retired→active, registered→suspended and registered→retired by name. This is where 'an agent with no person is refused when it is recorded' lands. Not landed: execution is null.
+- `docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44,71-95` — The source for the four states and the transition table (retire only from active or suspended) and for the responsible human carried 'for life'. Lines 87-89 say retiring the human makes derived grants refuse. Line 23 ('Running executions stop at their next admission') and line 59 ('Executions as a count of running ones') talk about running beside the state.
+- `docs/design/directory/DESIGN.md (design.json)` — The cluster this card continues. P3 says registration creates no running state. The Structure table gains this brief's paths. The Non-Goals keep suspension semantics and the grant representation open for Tom.
+- `crates/lys-identity/src/lifecycle/ (planned by DIRECTORY-009)` — The code seam for the flag read and the transition-walk tests. It does not exist on main: crates/lys-identity and crates/lys-identity-server are both absent.
+- `docs/design/decisions.json` — Main holds ADR-001 to ADR-018. ADR-027 (fold, never set) and ADR-028 (next-check rule) exist only on the lifecycle-hand branch, so this brief cites decisions that are not yet on main.
+- `docs/design/directory/checklist.json, stories.json, docs/design/roadmap.json` — This brief gains checklist items, stories and a roadmap row. Main has C1-C30 and RM-001 to RM-016. The branches already claim C36-C41, S16-S18 and RM-017 (DIRECTORY-009), and DIRECTORY-007/011/013 sit on other branches, so ids must avoid collisions.
+- `scripts/design/gate.sh, validate.py, check-coverage.py` — The design gate leg this documents-only brief has to pass.
 
 ### What was already decided
 
-- ADR-009 — People sign in through the maintained ablative-io/rauthy fork, branch ablative from v0.36.2 dd61ac3. lys pins an exact commit. Release-tag rebases only; no cherry-picks; no upstream prerequisite.
-- ADR-003 — Everything is pegged to a human authority. Linking providers must never split one person or merge two by email.
-- ADR-005 — The identity database is PostgreSQL. ID001_LINK_MIGRATION covers both Rauthy storages (postgres and hiqlite).
-- ADR-011 — Proposed lifecycle states. A person is registered at first sign-in, so a link must keep the one enduring identity.
-- DIRECTORY-001 — Boundary: no row brief is dispatched until Waffles has reviewed it. The conversion kept IDENTITY-001's files unchanged as the record of revision 5.
-- DIRECTORY-003 — R4 builds the authenticated link-audit receiver against a reviewed typed contract. It dedupes stable operation IDs, returns verifiable receipts and separates issuer observations from human-signed claims (ID001_RECEIVER).
-- DIRECTORY-005 — Depends on DIRECTORY-004 and stays blocked until the ID001_LINK_LIVE receipt is recorded (CN6).
-- directory CN4 — A file in another repository is named in a requirement's spec with its owner, never in files or structure.
-- directory CN5/CN6 — A live demonstration is never a loop acceptance criterion. ID001_LINK_LIVE is a mandatory hold point after row 03.
-- directory CN9 — A row needing a file outside its wall stops. The reviewer approves a brief revision before that file is edited.
-- directory CN10 — Rows 02-05 run on v0.36.2 under Waffles' 15:36:25 ruling. Each development install records a release-and-advisory check.
-- directory non_goal (Row 03 fork changes) — The fork is its own repository and needs its own brief, which does not exist and blocks DIRECTORY-004.
-- directory non_goal (nightly base) — Nightly Rauthy versus waiting for a release carrying #1696/#1728 is OPEN for Tom.
-- IDENTITY-001 row 03 — Revision 5's wall, work, the five ID001_LINK_* acceptances and a 10-hour estimate for the whole row, shared with the fork.
-- IDENTITY-001 review_decisions — Chooses a narrowly scoped same-transaction link audit record or outbox with stable operation IDs and pending/acknowledged state, subject to review of the minimal diff.
-- IDENTITY-001 shared_contract — Receipts carry version, stable operation ID, actor, affected identity, operation, payload commitment and log coordinate. Exact signed encoding is reviewed before use.
-- RM-001 — Briefed: the identity directory, including two upstream providers linked to one person. DIRECTORY-004 is one of its briefs.
-- RM-003 — Idea: a future rebase of the fork, whose acceptance includes 'the provider-link behaviour of DIRECTORY-004 still holds'.
+- ADR-011 — Proposed: four states and five transitions, each a signed audit record. An agent's registering person is its responsible person 'for life'. A retired identity is never reactivated.
+- ADR-003 — Everything is pegged to a human authority, and withdrawing the authority stops every grant derived from it.
+- ADR-007 — The product never runs an agent, it only gives its start command. A started agent reports back to the sessions screen, so 'running' belongs there and not in the lifecycle record.
+- ADR-027 (branch lifecycle-hand only) — The state is folded from signed transition records and never set directly. No API, migration or repair writes a state.
+- ADR-028 (branch lifecycle-hand only) — A suspension or retirement takes effect at the next check. Nothing calls Rauthy to revoke a session.
+- DIRECTORY-009 R1 (branch) — 'no policy causes a transition in this contract: the only automatic effect a suspension or retirement has on other identities is the grant-check one DIRECTORY-006 R4 enforces'.
+- DIRECTORY-003 R1 — The responsible person is recorded at registration. A registration without a signed-in caller is refused. No API changes an agent's responsible person. Registering does not pretend the agent is running.
+- DIRECTORY-003 R5 — State is recorded beside each identity and not enforced (CN11). Out-of-table transitions are refused by name and record nothing.
+- directory P3 — Registration creates no running state and issues no login, credential or certificate.
+- directory Non-Goal (suspension semantics) — What else stops with a suspended identity is OPEN for Tom.
+- CONFORMANCE build order step 3 — Lifecycle and the start command (3.1 to 3.4, 5.1 to 5.6) come after directory grants and delegation.
 
 ### What was measured
 
-- Requirements in DIRECTORY-004: 2 (R1, R2)
-- Acceptance lines: R1: 5 (four ID001_LINK_* plus the pin check); R2: 2
-- Files this repository changes under DIRECTORY-004: 3: modify vendor/rauthy; create PROVIDER-LINK-CONTRACT.md and reports/IDENTITY-001-links.md
-- Fork paths named in R1's spec (the fork-owned wall): 21 entries (20 files + tests/identity_links/)
-- blocked_by entries on DIRECTORY-004: 2
-- DIRECTORY-004 sizes: JSON 9,588 bytes; MD 11,203 bytes
-- Current vendor/rauthy pin: dd61ac3c84d6b238108dc8438b53043b5177a662 (v0.36.2)
-- Remote ablative-io/rauthy refs/heads/ablative: dd61ac3c84d6b238108dc8438b53043b5177a662; ahead_by 0 commits vs the base, so no linking commit exists
-- Upstream latest release (gh api repos/sebadob/rauthy/releases/latest): v0.36.2, published 2026-08-08
-- Highest existing migrations at the pinned commit: postgres V26__client_resource_indicators.sql (26 files); hiqlite 31_client_resource_indicators.sql (31 files). The wall's V27 and 32 are the next numbers.
-- Wall files already present at the pinned commit (sampled): Present: login_finish.rs 5,016 B; login_start.rs 3,698 B; api_types auth_providers.rs 8,119 B; AccOther.svelte 3,636 B; callback +page.svelte 6,827 B. Absent: identity_links.rs, identity_link_audit.rs, AccLinkedProviders.svelte
-- Top-level tests/ directory in the fork at the pin: absent; root Cargo.toml is a virtual workspace with members = ["src/*"]
-- DIRECTORY-003 receiver in this tree: absent (no crates/lys-identity, no crates/lys-identity-server, no tests/identity_contract)
-- DIRECTORY-002 install in this tree: absent (no deploy/ directory, no crates/lys/src/identity)
-- docs/design/identity/reports/ directory: absent
-- sh scripts/design/gate.sh on HEAD 7b53625: exit 0: directory has 7 briefs, 30 checklist items, 12 stories, coverage clean, 6 shared-claim warnings
-- Estimate for the whole row: 10 focused hours (IDENTITY-001.json:261), shared with the fork-owned brief
-- crates in the workspace: 6 (lys, lys-anchor, lys-anchor-cli, lys-core, lys-home, lys-log-store)
+- CONFORMANCE.md length and location of the rows: 118 lines; row 3.1 at line 36, row 3.2 at line 37
+- Briefs on main or on any origin brief/directory, conformance branch that cite 3.1/3.2 or 'needing a new person': 0 (checked main plus 8 branches, including lifecycle-hand)
+- DIRECTORY-009 on lifecycle-hand: 6 rows, 34 acceptance lines, 18 estimated hours, 244 JSON lines; branch base 1756688 is 4 commits behind main 7b53625
+- crates/lys-identity and crates/lys-identity-server on main: 0 files (neither directory exists)
+- DIRECTORY-003 execution status on main: null (not landed)
+- Decisions on main: 18 (ADR-001 to ADR-018); ADR-027 and ADR-028 exist only on lifecycle-hand
+- Directory checklist items on main: 30 (C1 to C30); DIRECTORY-009 claims C36 to C41
+- Roadmap rows on main: 11 (last RM-016); lifecycle-hand adds RM-017
+- Allowed transitions in the tree's table: 6 edges: none→registered, registered→active, active→suspended, suspended→active, active→retired, suspended→retired
+- Mentions of 'needing', 'new person', 'running' or 'process' in DIRECTORY-009.json: 0 each
 
 ### What it means for the other projects
 
-- cambium — The card lives on a Cambium board, and its twin PLMigKDB on board 2 is archived into it. No Cambium code changes: rows 06/07 (connecting Cambium, keeping participant ids) stay a non-goal, and there is no live Cambium participant migration (CN2). The fork-owned brief probably needs its own Cambium card so it goes through the chain.
-- aion — The workflow chain (brief_card, sign-off, card_build_v3, src_pr, src_land) carries this card. Its inputs must name a repository and a commit. The fork work is in ablative-io/rauthy, a different repository, so it needs its own chain run. This card's build is only a pin move plus two documents once the fork commit is gated.
-- method — scripts/design/validate.py, check-coverage.py and render-cluster.py (via gate.sh) come from the design-system method. The brief already passes them; the card needs no method change.
-- argus — Gates run through the queue at the venue (Dean's laptop). IDENTITY-001 records the Argus gate-timeout path as Heimdall's, so gate submission for the fork and this row depends on it.
+- aion — The card runs through the chain (brief_card → sign-off → card_build_v3 → src_pr → src_land). Its inputs name the repository, commit 7b53625 and the card, and it depends on DIRECTORY-009 landing through the same chain.
+- cambium — The card lives on Cambium's board. Nothing in Cambium changes: rows 06 and 07 and the participant-id carry-over stay a non-goal.
 
 ### The decisions it stands on
 
-- ADR-009 (honour) — The pin moves only to a gated commit on the ablative branch. No cherry-pick, no upstream contribution, fork main untouched.
-- ADR-003 (honour) — A collision is refused rather than merged by email, so linking never splits a person or joins two people.
-- ADR-005 (honour) — ID001_LINK_MIGRATION migrates the PostgreSQL storage the install uses, as well as hiqlite, preserving Rauthy user IDs.
-- ADR-011 (honour) — The person registered at first sign-in keeps one enduring identity through provider additions.
-- ADR-010 (honour) — The fork's account-page changes (AccLinkedProviders.svelte and others) take the themed colours; purple is not used.
+- ADR-011 (honour) — This card uses its four states and its transition table unchanged, and adds no fifth state. Tension: 'responsible person for life' against a flag that points to reassignment. That tension goes to the lead and is not superseded here.
+- ADR-003 (honour) — Every agent is pegged to a person. Refusing an agent with no person enforces the root.
+- ADR-007 (honour) — The product never runs an agent. 'Authority only' is the lifecycle-record side of that rule.
+- ADR-027 (honour) — The flag and the state come from the fold and are never set. It is currently decided only on the lifecycle-hand branch.
+- ADR-028 (honour) — The effect of retiring someone shows at the next check, and nothing is revoked at once.
+-  (new) — If the lead chooses a derived flag, a decision should record that 'needs a new person' is a view computed from the agent's registration and its person's retire record, never a stored or appended value. That is the flag's equivalent of 'provisioned is a view'.
 
 ### What it requires
 
-- vendor/rauthy names a commit on ablative-io/rauthy branch ablative, different from dd61ac3, that passed the fork-owned brief's gate and is not a cherry-pick.
-- rg -n 'ID001_LINK_PAIR|ID001_LINK_REFUSAL|ID001_LINK_MIGRATION|ID001_LINK_AUDIT' vendor/rauthy/tests/identity_links finds each of the four identifiers in a test at the pinned commit.
-- docs/design/identity/PROVIDER-LINK-CONTRACT.md exists, names every field the DIRECTORY-003 receiver reads, stable source operation IDs and the pending and acknowledged states, separates issuer observation from person claim, and the receiver's fixtures match it.
-- docs/design/identity/reports/IDENTITY-001-links.md exists and names the pinned fork commit, its gate result, the count of exercised legs for each ID001_LINK_* identifier, and the release-and-advisory check of the development install.
-- The six cargo gates (fmt --check, clippy in both feature shapes, test --workspace --all-features, doc in both feature shapes) pass, run at the venue.
-- sh scripts/design/gate.sh exits 0, with DIRECTORY-004.json and DIRECTORY-004.md unchanged or changed only as the method requires.
-- No files change other than vendor/rauthy and the two R2 documents.
-- ID001_LINK_LIVE is recorded as a hold point after landing. No loop completion claims it, and DIRECTORY-005 stays blocked until Tom's receipt is recorded.
+- A test registers a person and at least two agents under them, retires the person, and reads the needs-a-new-person flag as true on every one of those agents and false on an agent of another person. The test asserts the count of agents flagged.
+- A test attempts to record an agent with no responsible person and asserts a named refusal with 0 records appended.
+- A test walks all 6 allowed transitions on the lifecycle record and asserts each is admitted, then attempts every other pair among none, registered, active, suspended and retired and asserts each is refused by name with the log size unchanged. The test asserts both counts.
+- A test drives every allowed transition and asserts that no process was started or stopped across them.
+- A test or check shows that the lifecycle record's type carries no running, execution or session field.
+- The brief reads DIRECTORY-009's lifecycle record (fold) and adds no state store or copy of the state.
+- Each of CONFORMANCE rows 3.1 and 3.2 is cited by at least one acceptance line of the brief.
+- The brief passes scripts/design/gate.sh (validate.py and check-coverage.py exit 0).
 
 ### What must not change
 
-- R1 and R2 of DIRECTORY-004 are kept exactly. Its boundaries and verification stay as written.
-- No fork file is edited from this repository. Fork changes arrive only as a pin.
-- No cherry-pick, no nightly base, no reset of fork main. Rows 02-05 stay on v0.36.2 (CN10).
-- The IDENTITY-001 files stay unchanged as the record of revision 5.
-- No credential, token or key value appears in code, tests, fixtures, logs or documents. Test identities and test provider registrations only.
-- Decisions open for Tom stay open: nightly versus waiting, grant representation, suspension semantics, service name, anchor choice.
-- lys-core, its cryptographic primitives and its published wire formats are unchanged.
-- The card is not hand-built and no lead reviews in place of the chain. Heavy builds and gates run on Dean's laptop.
+- No API, record or row changes an agent's responsible person. Reassignment is a separate card.
+- No fifth state and no new transition. A retired identity is never reactivated.
+- The state is never set directly (ADR-027), and the flag adds no stored copy of lifecycle state.
+- Nothing in lifecycle starts, stops or observes a process or session (ADR-007, P3).
+- No change to LIFECYCLE-STATES-2026-09-22.md, the IDENTITY-001 files, lys-core, lys-log-store or any shipped wire tag.
+- No call to Rauthy. SpiceDB is asked only through the grant leg.
+- No wall clock in new code, and test identities only (CN2).
 
 ### What we must put in place first
 
-- DIRECTORY-002 built and landed: the standalone install under deploy/identity and the lys identity CLI.
-- DIRECTORY-003 built and landed, including R4's link-audit receiver and its fixtures (crates/lys-identity, crates/lys-identity-server, tests/identity_contract are all absent today).
-- A fork-owned brief written in ablative-io/rauthy for the 21-entry wall, carried by its own card, reviewed by Waffles, built and gated on the ablative branch.
-- A defined fork gate (legs and venue) for ablative-io/rauthy. The upstream workflow uses the rauthy-builder image, just build-wasm and a frontend build, and the fork has none of its own yet.
-- Waffles' review of DIRECTORY-004 before dispatch (blocked_by).
-- Test provider registrations for Google and GitHub, holding no production credentials.
-- The Argus/venue gate path (Heimdall) working for gate submission.
+- DIRECTORY-009 (brief/directory/lifecycle-hand) signed off and merged to main, rebased past 7b53625, so that its lifecycle record, ADR-027/028 and ids exist on main to cite.
+- DIRECTORY-003 landed, with crates/lys-identity and the transition commit path, before any code row of this brief starts.
+- DIRECTORY-009 R3 (the fold) landed before the flag or transition-walk rows can run.
 
 ### The risks
 
-- The ID001_LINK_* grep can pass on files under tests/identity_links/ that the fork's virtual workspace never compiles, so the pin could name tests that never ran.
-- If PROVIDER-LINK-CONTRACT.md is written after the receiver, it may record whatever the receiver does instead of acting as an independent contract (the 'test that only agrees with itself' failure CLAUDE.md warns about).
-- An upstream release carrying #1696/#1728 could appear mid-row, forcing an IDENTITY-002/RM-003 rebase under the linking commits and moving the pin twice.
-- IDENTITY-001-UPSTREAM-AUTH-STATE applies to the v0.36.2 base. A development demonstration could be mistaken for clearance for real sign-in.
-- The fork's migration numbers V27/32 are correct only for v0.36.2. A rebase onto a later release may take those numbers.
-- Link-audit acknowledgement depends on the receiver's receipt format. A format change after the pin lands breaks ID001_LINK_AUDIT.
-- The card may sit unstartable indefinitely, because both blockers (fork-owned brief, DIRECTORY-002/003) are outside it and nothing tracks the fork brief.
+- The flag contradicts ADR-011 and DIRECTORY-003 R1 ('for life'). If this is not settled, the brief is refused at sign-off or fixes a flag that can never clear.
+- Appending per-agent flag records would breach DIRECTORY-009 R1's rule of no automatic effect on other identities, and would add audit lines nobody decided to write.
+- Id collisions: parallel branches already claim DIRECTORY-007/009/011/013, C31-C41, S16-S18, RM-017 and ADR-019 to ADR-028.
+- The code rows are blocked behind DIRECTORY-003 (not landed) and DIRECTORY-009 (not on main), so the card may sit signed-off but unbuildable.
+- In step 1 every agent's responsible person is the configured administrator (DIRECTORY-003 R1), so retiring the administrator flags every agent and may remove the only actor who can register or transition.
+- The table has no registered→retired edge, so a flagged agent still in the registered state can never be retired. That may surprise a reader of 'every other change refused'.
+- 'Starts and stops no process' is hard to show by a test alone, and a weak check (no process observed) only agrees with itself unless it is paired with a structural check.
 
 ### Still open
 
-- Which document is the reviewed link-audit contract the DIRECTORY-003 receiver is built against? Is it DIRECTORY-004 R2's PROVIDER-LINK-CONTRACT.md, written after the receiver it describes, or something DIRECTORY-003 writes first that R2 then only confirms? The sentence of the words it stands on: "R2 writes the provider-link contract and the links report.". Why only the lead can settle it: The two briefs point at each other. DIRECTORY-003 R4 (docs/design/directory/briefs/DIRECTORY-003.json:115) builds the receiver 'against the reviewed typed contract and fixtures before DIRECTORY-004 needs it'. DIRECTORY-004 R2 creates docs/design/identity/PROVIDER-LINK-CONTRACT.md and accepts it when 'the DIRECTORY-003 receiver's fixtures match it'. The answer decides whether R2 authors the contract or records one already built, and so what the receiver's reviewers see first.
-- Which card, on which board, carries the fork-owned brief and its build in ablative-io/rauthy? This card's R1 can only land a pin to a commit that brief has gated, and no such brief or commit exists. The sentence of the words it stands on: "R1 moves the pin to the gated fork commit that links two providers (Google and GitHub) to one person, with a collision refused rather than merged.". Why only the lead can settle it: Tom's rule 1 says every carded row goes through the aion chain, and rule 5 says inputs name a repository and a commit. The linking code lives in a different repository (the ablative branch is at dd61ac3, ahead_by 0). DIRECTORY-004 blocked_by names a fork-owned brief that 'does not yet exist', owned by Chippy with Waffles reviewing. If no card carries it, this card cannot start.
-- Should the fork's ID001_LINK_* tests sit in a compiled crate (so they run under the fork gate) rather than at the root-level tests/identity_links/ the wall names? If so, will the lead approve that wall revision? The sentence of the words it stands on: "Keep its boundaries and verification as written, and change nothing the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh) does not require.". Why only the lead can settle it: At the pinned commit the fork's root Cargo.toml is a virtual workspace with members = ["src/*"] and has no tests/ directory, so cargo would not compile or run files under tests/identity_links/. DIRECTORY-004's verification is a grep ('rg -n ... vendor/rauthy/tests/identity_links finds each identifier in a test'), which passes on files that never run. Under CN9, moving the wall needs an approved brief revision, and the words say to keep the verification as written.
+- ADR-011 and DIRECTORY-003 R1 say an agent keeps its responsible person for life and no API changes it. Does flagging an agent as 'needing a new person' mean this card revises that rule, or should the flag stand while 'for life' stays in force until the reassignment card? The sentence of the words it stands on: "Giving an agent a new person is out of scope and is its own card.". Why only the lead can settle it: docs/design/decisions.json ADR-011 ('carries it as its responsible person for life') and docs/design/directory/briefs/DIRECTORY-003.json R1 ('No API of this row changes an agent's responsible person') rule out the reassignment the flag points to. A reader would see a flag that the recorded design says can never be cleared.
+- Should the flag be computed when the lifecycle record is read (from the agent's registration and its person's retire record, with nothing appended), or should retiring a person append a signed record on each of their agents? The sentence of the words it stands on: "When that person is retired, each of their agents is flagged in its lifecycle record as needing a new person, and a test retires a person and reads the flag on every one of their agents.". Why only the lead can settle it: An appended record puts a new line in each agent's audit history, and DIRECTORY-009 R1 (branch) says retiring someone has no automatic effect on other identities except the grant check. A computed flag leaves the history as it is.
+- When an agent is flagged, does its own state stay unchanged (for example still active, with its grants refusing at the check), or does retiring the person also move the agent to another state? The sentence of the words it stands on: "When that person is retired, each of their agents is flagged in its lifecycle record as needing a new person, and a test retires a person and reads the flag on every one of their agents.". Why only the lead can settle it: The words only say the agent is flagged. DIRECTORY-009 R1 forbids automatic transitions, and LIFECYCLE-STATES lines 87-89 say derived grants refuse. Whether the agent shows as active, suspended or retired changes what an operator sees.
+- Is 'shows' met by the flag in the lifecycle record and the typed read (DIRECTORY-009 R6), with the step-7 screen left to a later card, or must a screen show it in this card? The sentence of the words it stands on: "An agent whose person is retired shows as needing a new person, and the four identity states are recorded as authority only.". Why only the lead can settle it: No identity screen exists on main (the surface/ folder is absent) and DIRECTORY-009 R6 builds only the typed read. Whether a person sees the flag on a screen at landing is a scope boundary.
+- Should an agent whose person is suspended (not retired) also be flagged, or only when the person is retired? The sentence of the words it stands on: "When that person is retired, each of their agents is flagged in its lifecycle record as needing a new person, and a test retires a person and reads the flag on every one of their agents.". Why only the lead can settle it: The words name retirement only, and what stops with a suspended identity is OPEN for Tom (DESIGN.md Non-Goals). A suspended person's agents would or would not show the flag.
 
 ### The units beyond the first
 
-- Fork-owned brief and build: link two providers to one person in ablative-io/rauthy — It lives in a different repository with its own 21-entry wall, owner and gate, and this card's R1 can only pin its gated commit.
-- ID001_LINK_LIVE: install the gated fork and demonstrate two linked providers to Tom — A person performs it after the row lands (CN5/CN6). It is never a loop acceptance, and it unblocks DIRECTORY-005.
-- RM-003 / IDENTITY-002: rebase the fork onto the next hardened upstream release — A separately gated row whose acceptance re-proves DIRECTORY-004's provider-link behaviour on the rebased base.
+- Give an agent whose person is retired a new responsible person — Excluded by the words as its own card, and it needs ADR-011 and DIRECTORY-003 R1's 'for life' rule revised.
+- Show the needs-a-new-person flag on the people list and the agent file — The step-7 screen is not built. DIRECTORY-009 R6 only exposes the typed read the screen consumes.
+- CONFORMANCE 3.4: emergency stop revokes tokens and asks sessions to end — The next row of section 3, a separate LIFECYCLE (new) brief, and it touches running sessions, which this card keeps out of the record.
 
 ### The smallest complete shape
 
-One unit, whole: once DIRECTORY-002 and DIRECTORY-003 have landed and a fork commit on ablative has passed its gate, one lys PR moves vendor/rauthy to that commit and creates PROVIDER-LINK-CONTRACT.md and reports/IDENTITY-001-links.md. The six cargo gates and scripts/design/gate.sh pass. DIRECTORY-004 itself is carried unchanged. After landing comes the ID001_LINK_LIVE hold point for Tom. Neither half stands alone: the report names the pinned commit and its counted legs.
+One documents brief in docs/design/directory (JSON plus rendered MD, with design.json, DESIGN.md, checklist, stories and one roadmap row), depending on DIRECTORY-003 and DIRECTORY-009. Its rows: (1) state rows 3.1 and 3.2 against DIRECTORY-009's lifecycle contract; (2) refuse by name an agent recorded without a responsible person, with a test; (3) the needs-a-new-person flag read from the lifecycle record when the agent's person is retired, with a test that retires a person and reads it on every one of their agents; (4) a transition walk over all 6 allowed edges with every other change refused by name; (5) a test that a state change starts and stops no process and that the record has no running field. It passes the design gate and goes through sign-off, with its code rows blocked on DIRECTORY-003 and DIRECTORY-009 R3 landing.
 
 ## The roadmap row
 
-- **RM-020** — Link two upstream providers to one Rauthy person (feature, idea)
-- Summary: The lys side of IDENTITY-001 revision 5 row 03, carried as DIRECTORY-004: move the vendor/rauthy pin to the gated commit on the fork's ablative branch that links Google and GitHub to one Rauthy person and refuses a collision rather than merging it (R1), and write the fork-side record of the receiver's link-audit contract and the row's links report (R2). R1 waits on a gated fork commit from the fork's own card; R2 waits on DIRECTORY-003's receiver and contract. The row ends in the ID001_LINK_LIVE demonstration, which holds DIRECTORY-005.
-- Asked by: tom on 2026-09-27T10:27:00+10:00
-- Context: The card on the Lys board that carries DIRECTORY-004; its twin PLMigKDB on board 2 was archived into it. Surveyed on lys main 7b53625: the ablative branch of ablative-io/rauthy is still at dd61ac3 (v0.36.2) with no linking commit, the fork's workspace compiles only members under src/, and DIRECTORY-002 and DIRECTORY-003 are not built. The lead for the identity line answered three survey questions: the typed link-audit contract and its fixtures are authored in lys by the DIRECTORY-003 receiver and R2's PROVIDER-LINK-CONTRACT.md records it, with DIRECTORY-003's landing as R2's precondition; no card carries the fork-owned brief yet, so R1 names the fork board's card as its blocker and a gated ablative commit found by git ls-remote as its precondition; and the ID001_LINK_* tests move from the root tests/identity_links/ into a compiled crate under src/, verified by rg together with the fork gate's cargo test log, a wall revision approved under CN9.
-- Quote: The brief for this card already stands in the cluster: docs/design/directory/briefs/DIRECTORY-004.json and DIRECTORY-004.md, "Link two upstream providers to one Rauthy person", Row 03 of IDENTITY-001 revision 5, landed with lys PR 6. This card is the one that carries it; its twin PLMigKDB on board 2 was archived into this card. Read DIRECTORY-004 in full and carry it as this card's brief. Keep its two requirements exactly. R1 moves the pin to the gated fork commit that links two providers (Google and GitHub) to one person, with a collision refused rather than merged. R2 writes the provider-link contract and the links report. Keep its boundaries and verification as written, and change nothing the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh) does not require.
+- **RM-032** — Flag an agent whose person is retired as needing a new person, and keep the four identity states authority only (feature, idea)
+- Summary: Makes CONFORMANCE rows 3.1 and 3.2 true on the lifecycle record the lifecycle-hand brief DIRECTORY-009 (RM-017) defines, reading its fold and typed read and keeping no copy: an agent recorded with no person is refused by name; an agent's read carries needs_a_new_person, worked out on read from its registration and its person's retire record, true on every one of a retired person's agents, never for a suspended person, with nothing appended and each agent's own state unchanged; every change of state is walked, six admitted and fourteen refused by name; and a test shows the state starts and stops no process and says nothing about running. One brief, DIRECTORY-019, of five rows.
+- Asked by: tom on 2026-09-27T13:26:00+10:00
+- Context: The lifecycle conformance card on Cambium's board, run through the brief_card chain at lys main 7b53625. The survey's five questions were answered by the lead for the identity line and are written into DIRECTORY-019 as settled: the flag stands and ADR-011's responsible person for life stays in force until the reassignment card revises it; the flag is worked out on read with nothing appended (the new decision ADR-056); a flagged agent's own state is unchanged; the flag shows in the lifecycle read and the typed read, the screen being a later card; and only a retired person's agents are flagged, never a suspended person's.
+- Quote: An agent whose person is retired shows as needing a new person, and the four identity states are recorded as authority only.
 
-Facts the brief already settles, which the survey must not reopen, follow. The link lives in the maintained Rauthy fork (ADR-009), never in an upstream contribution. This row is built after DIRECTORY-003 (the directory contract and its link-audit receiver, Row 04) and after DIRECTORY-002 (the install). Every link is recorded through that receiver. The row ends in a live demonstration to Tom (ID001_LINK_LIVE), and a venue test or a screenshot does not replace it. Test identities only; no production key; Tom's acts stay Tom's.
+This card covers the first two rows of section 3 of the identity CONFORMANCE document on lys main 7b536253, Lifecycle, and each row gets at least one acceptance line that tests it on the lifecycle record.
+No brief on main makes either row true, and the lifecycle-hand brief on its own branch cites neither row.
+This brief reads that brief's lifecycle record rather than keeping its own copy.
 
-If the survey finds a sentence of DIRECTORY-004 open or contradicted by the repository as it stands, quote that sentence as a question for the lead rather than rewriting the brief around it.
-- Cluster: directory; briefs: DIRECTORY-004
-- Notes: Id under the ruling that a brief's ids are the next after main's highest and every open brief branch's: RM-019 is the highest on brief/home/06103633 at 7b53625, so this row is RM-020. The brief is DIRECTORY-004, already on main and carried by this card, amended in place with the lead's three answers; this row owns it, so RM-001's links.briefs no longer names it (one row owns a brief), and RM-001 keeps DIRECTORY-001, 002, 003 and 005. Further units, not written: Fork-owned brief and build: link two providers to one person in ablative-io/rauthy; ID001_LINK_LIVE: install the gated fork and demonstrate two linked providers to Tom; RM-003 / IDENTITY-002: rebase the fork onto the next hardened upstream release.
+The first row is that every agent answers to a person.
+When that person is retired, each of their agents is flagged in its lifecycle record as needing a new person, and a test retires a person and reads the flag on every one of their agents.
+An agent with no person is refused by name when it is recorded, and a test shows that refusal.
+
+The second row is that the identity states are registered, active, suspended and retired.
+A test walks each allowed change of state in the lifecycle record and shows every other change refused by name.
+The state is authority only.
+A test shows that changing an agent's state starts and stops no process, and that the record says nothing about whether the agent is running.
+
+Giving an agent a new person is out of scope and is its own card.
+- Cluster: directory; briefs: DIRECTORY-019
+- Notes: Its own row rather than riding RM-001, which carries IDENTITY-001's rows; it depends on RM-001 for DIRECTORY-003. Ids under the ruling that a brief's ids are the next after main's highest and every open branch's: ADR-056, C123 to C127 and S52 to S53 (the open branches reach ADR-055, C122 and S51 in this cluster); RM-032 is kept as the draft's row. The brief id DIRECTORY-019 is the next after main's highest and every open branch's (the open branches reach DIRECTORY-018; the lifecycle-hand brief holds DIRECTORY-009 on brief/directory/lifecycle-hand). DIRECTORY-019 depends on DIRECTORY-009, which creates the lifecycle contract, module and typed read its rows modify; RM-017 is named in its blocked_by rather than in this row's depends_on because RM-017 is not yet on main. The flag stands against ADR-011's responsible person for life and DIRECTORY-003 R1's rule that no request changes it; this card revises neither, and clearing the flag needs the reassignment card, which is the one that revises that rule. Further units, not written: Give an agent whose person is retired a new responsible person; Show the needs-a-new-person flag on the people list and the agent file; CONFORMANCE 3.4: emergency stop revokes tokens and asks sessions to end.
 
 ## The design
 
@@ -202,6 +202,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
 - ADR-010 — Every product shares one design and keeps its own accent; the identity product's is orange — The identity screens follow Aion's structure, typography, spacing and interaction, and Rauthy's client themes take the same colours, with no build dependency on Cambium or Aion. Each product keeps its own accent within the estate colour family: Cambium green, Aion blue and black, Argus light blue, Haematite mustard. The identity product's accent is orange (accent #D4975A, deep #A86B2E, wash #3D2A17 in the estate colour tokens), set apart from Manifold's copper. No product is silently made Aion-blue, and purple is not used.
 - ADR-011 — An identity is registered, active, suspended or retired — An identity is in one of four states: registered (exists in the directory, no grants, no credential handle, may not act), active (may act within its grants), suspended (kept whole, grants kept but not effective) and retired (permanent, history kept, never reactivated; a new identity is made instead). Register, activate, suspend, reinstate and retire are the only transitions, each one signed audit record naming the authenticated actor and their provenance, the identity, from, to, when and reason. Having a grant or a credential is a fact beside the state, not a state. A person is registered by first sign-in; an agent is registered by a signed-in person, who carries it as its responsible person for life and may cause every transition of their own agents. Source: docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:71-95.
+- ADR-056 — Needs a new person is a view worked out on read from an agent's registration and its person's retire record, never stored or appended — An agent's needs-a-new-person flag is worked out each time its lifecycle record is read, from the responsible person its registration names and that person's retire record: it is true when that person's folded state is retired and false otherwise, a suspended person included. Nothing is appended to any agent's history, no transition is made on the agent, the agent keeps its own state, and no responsible person changes. The flag records a fact, that the agent's person is retired; clearing it needs the reassignment card, which is the one that revises ADR-011's responsible person for life. Rejected: a signed flag record appended on each agent when its person is retired; moving the agent to another state with its person.
 
 ## Goals
 
@@ -210,6 +211,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - Every decision still open for Tom is recorded as open and decided nowhere in this cluster.
 - The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6).
 - DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record.
+- CONFORMANCE rows 3.1 and 3.2 are true on the lifecycle record, each tested by at least one acceptance line of DIRECTORY-019, reading the lifecycle-hand brief DIRECTORY-009's record and keeping no copy of it.
 
 ## Non-Goals
 
@@ -224,6 +226,8 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - The examples in AGENT-PARITY-2026-09-23 (abilities with an assignment or project, seat provisioning within a budget, private and shared notes) — Tom gave them as not yet decided (docs/design/identity/AGENT-PARITY-2026-09-23.md:11-15); they are never turned into requirements.
 - A production Cambium auth cutover, and any upstream Rauthy contribution as a prerequisite — Revision 5 forbids both before scratch acceptance, review and Gypsy's coordinated install (docs/design/identity/briefs/IDENTITY-001.json:31).
 - A shared design-system package extracted for every product — Tom left it as a thing to look at, not a row (ADR-010).
+- Giving an agent a new person — It is its own card, the one that revises ADR-011's responsible person for life and clears the flag; DIRECTORY-019 only flags that an agent's person is retired (ADR-056).
+- A screen that shows the needs-a-new-person flag on the people list and the agent file — It belongs to a later card; DIRECTORY-019 shows the flag in the lifecycle read and the lifecycle-hand brief's typed read (RM-017), which that screen consumes.
 
 ## Structure
 
@@ -325,6 +329,17 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `surface/identity/src/generated/index.ts` | Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch | DIRECTORY-006 |
 | `docs/design/directory/briefs/DIRECTORY-008.json` | the grant brief residue after PR 6: DIRECTORY-005's verification line, three inventory rows and the intention sentence, as requirements on the documents | DIRECTORY-008 |
 | `docs/design/directory/briefs/DIRECTORY-008.md` | rendered markdown | DIRECTORY-008 |
+| `docs/design/identity/LIFECYCLE-CONTRACT.md` | the lifecycle contract, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R1 adds its conformance section for rows 3.1 and 3.2 | DIRECTORY-019 |
+| `crates/lys-identity/src/lifecycle/mod.rs` | the lifecycle module list, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds the responsible module | DIRECTORY-019 |
+| `crates/lys-identity/src/lifecycle/error.rs` | the lifecycle refusal names, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds lifecycle_agent_without_person | DIRECTORY-019 |
+| `crates/lys-identity/src/lifecycle/causes.rs` | who may cause each transition, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds one line calling the no-person check | DIRECTORY-019 |
+| `crates/lys-identity/tests/lifecycle_support/mod.rs` | the lifecycle test support, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 adds persons with agents to its fixtures | DIRECTORY-019 |
+| `crates/lys-identity-server/src/lifecycle_read.rs` | the typed lifecycle read, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R3 adds the needs_a_new_person field | DIRECTORY-019 |
+| `crates/lys-identity/src/lifecycle/responsible.rs` | the no-person refusal and the needs-a-new-person flag worked out on read (DIRECTORY-019 R2, R3) | DIRECTORY-019 |
+| `crates/lys-identity/tests/lifecycle_no_person.rs` | CONFORMANCE 3.1: an agent recorded with no person is refused by name (DIRECTORY-019 R2) | DIRECTORY-019 |
+| `crates/lys-identity/tests/lifecycle_needs_new_person.rs` | CONFORMANCE 3.1: retiring a person flags every one of their agents as needing a new person, and suspending one flags none (DIRECTORY-019 R3) | DIRECTORY-019 |
+| `crates/lys-identity/tests/lifecycle_walk.rs` | CONFORMANCE 3.2: the walk of all 20 changes of state (DIRECTORY-019 R4) | DIRECTORY-019 |
+| `crates/lys-identity-server/tests/lifecycle_authority.rs` | CONFORMANCE 3.2: the state is authority only and the read says nothing about running (DIRECTORY-019 R5) | DIRECTORY-019 |
 
 ## Inventory
 
@@ -951,7 +966,7 @@ title: Link two upstream providers to one Rauthy person
 
 > **Cluster:** directory
 > **Depends on:** DIRECTORY-003
-> **Blocked by:** The card on the ablative-io/rauthy fork's own board for the two-provider link, not yet raised, which carries the fork-owned brief for row 03's Rauthy changes (vendor/rauthy, branch ablative; maintenance owner Chippy, Waffles reviewing, docs/design/identity/RAUTHY-BASELINE.md:39) and its build through the fork's own chain. No card carries that brief yet and this brief does not write it or build the linking code. R1 does not start until that card has landed a gated commit on the ablative branch; R2 does not wait on it, DIRECTORY-003's landing, including R4's link-audit receiver and the typed contract and fixtures it authors: the precondition of R2, checked by git ls-tree origin/main tests/identity_contract listing the receiver's contract directory on lys main, Waffles' review of this brief before it is dispatched (DIRECTORY-001 boundary: no row brief is dispatched until Waffles has reviewed it)
+> **Blocked by:** The fork-owned brief for row 03's Rauthy changes, which does not yet exist: a brief in the ablative-io/rauthy fork's own repository (vendor/rauthy, branch ablative; maintenance owner Chippy, Waffles reviewing, docs/design/identity/RAUTHY-BASELINE.md:39) carrying the fork files R1 names. This brief is not executable until that brief exists and has landed on a gated fork commit, Waffles' review of this brief before it is dispatched (DIRECTORY-001 boundary: no row brief is dispatched until Waffles has reviewed it)
 > **Design anchor:**
 > - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
 > **Checklist:**
@@ -974,17 +989,14 @@ Carry IDENTITY-001 revision 5 row 03 (docs/design/identity/briefs/IDENTITY-001.j
 
 THE SYSTEM SHALL move the vendor/rauthy submodule pin to a commit on the fork's ablative branch that carries the linking change and has passed the fork-owned brief's gate (ADR-009); the pin never names an ungated or cherry-picked commit.
 
-The linking change, owned by the fork-owned brief and named here only (owner: the ablative-io/rauthy fork, its maintenance owner as recorded in docs/design/identity/RAUTHY-BASELINE.md:39; paths relative to the fork's root, from revision 5's wall, docs/design/identity/briefs/IDENTITY-001.json:216-238): src/api/src/auth_providers.rs, src/api_types/src/auth_providers.rs, src/api_types/src/users.rs, src/data/src/entity/auth_providers.rs, src/data/src/entity/users.rs, src/data/src/entity/mod.rs, src/data/src/entity/identity_links.rs, src/data/src/entity/identity_link_audit.rs, src/data/src/migration/inserts.rs, src/service/src/oidc/auth_providers/login_finish.rs, src/service/src/oidc/auth_providers/login_start.rs, frontend/src/api/types/auth_provider.ts, frontend/src/api/types/user.ts, frontend/src/lib/account/AccMain.svelte, frontend/src/lib/account/AccOther.svelte, frontend/src/lib/account/AccLinkedProviders.svelte, frontend/src/lib/admin/users/UserInfo.svelte, frontend/src/routes/providers/callback/+page.svelte, migrations/hiqlite/32_identity_links.sql, migrations/postgres/V27__identity_links.sql, and the ID001_LINK_* tests in a compiled member crate of the fork's workspace under src/, at the path the fork's card chooses, which the fork gate's cargo test runs (this replaces revision 5's tests/identity_links/, which the fork's virtual workspace, members src/*, never compiles). Its work, from revision 5 (docs/design/identity/briefs/IDENTITY-001.json:246-249): replace the single provider pair with a link relation unique on provider and subject, migrating existing links transactionally without changing Rauthy user IDs, with row 01's exact migration filenames confirmed before code starts; require an authenticated person, fresh reauthentication and a single-use target-bound linking intent, bind state, nonce, provider and callback, and reject identity collision instead of merging by matching email; update every reader row 01 found, including administrative deletion, export and import; list links, and unlink only after confirming the identity keeps a usable authentication or recovery method, preserving upstream account security controls; commit link or unlink and its audit provenance atomically through the minimal durable link-audit design selected in row 01, and label the audit complete only on an acknowledged Lys receipt from the DIRECTORY-003 receiver, so a duplicate delivery never creates another identity event.
-
-WHEN no commit on the ablative branch of ablative-io/rauthy has passed the fork's own chain, THE SYSTEM SHALL NOT start R1 and SHALL NOT move the pin; R1 SHALL NOT name a commit whose ID001_LINK_* tests sit outside a crate the fork gate compiles.
+The linking change, owned by the fork-owned brief and named here only (owner: the ablative-io/rauthy fork, maintained by Chippy with Waffles reviewing; paths relative to the fork's root, from revision 5's wall, docs/design/identity/briefs/IDENTITY-001.json:216-238): src/api/src/auth_providers.rs, src/api_types/src/auth_providers.rs, src/api_types/src/users.rs, src/data/src/entity/auth_providers.rs, src/data/src/entity/users.rs, src/data/src/entity/mod.rs, src/data/src/entity/identity_links.rs, src/data/src/entity/identity_link_audit.rs, src/data/src/migration/inserts.rs, src/service/src/oidc/auth_providers/login_finish.rs, src/service/src/oidc/auth_providers/login_start.rs, frontend/src/api/types/auth_provider.ts, frontend/src/api/types/user.ts, frontend/src/lib/account/AccMain.svelte, frontend/src/lib/account/AccOther.svelte, frontend/src/lib/account/AccLinkedProviders.svelte, frontend/src/lib/admin/users/UserInfo.svelte, frontend/src/routes/providers/callback/+page.svelte, migrations/hiqlite/32_identity_links.sql, migrations/postgres/V27__identity_links.sql, tests/identity_links/. Its work, from revision 5 (docs/design/identity/briefs/IDENTITY-001.json:246-249): replace the single provider pair with a link relation unique on provider and subject, migrating existing links transactionally without changing Rauthy user IDs, with row 01's exact migration filenames confirmed before code starts; require an authenticated person, fresh reauthentication and a single-use target-bound linking intent, bind state, nonce, provider and callback, and reject identity collision instead of merging by matching email; update every reader row 01 found, including administrative deletion, export and import; list links, and unlink only after confirming the identity keeps a usable authentication or recovery method, preserving upstream account security controls; commit link or unlink and its audit provenance atomically through the minimal durable link-audit design selected in row 01, and label the audit complete only on an acknowledged Lys receipt from the DIRECTORY-003 receiver, so a duplicate delivery never creates another identity event.
 
 **Acceptance:**
 - ID001_LINK_PAIR: Google then GitHub, and GitHub then Google, resolve to one unchanged user subject; sign out and back in through either provider and reopen storage.
 - ID001_LINK_REFUSAL: same email with different subject, already-owned provider identity, replayed/cross-account intent, CSRF/nonce mismatch and final-login unlink are refused with no unintended link.
 - ID001_LINK_MIGRATION: both supported storage migrations preserve IDs and links, restart safely after interruption and refuse incompatible schema versions by name.
 - ID001_LINK_AUDIT: crash after database commit but before audit acknowledgement retains the outbox; delivery/retry yields one logical signed event. Audit outage is visible, never a false completed receipt.
-- Precondition, before R1 starts: git ls-remote https://github.com/ablative-io/rauthy refs/heads/ablative prints a commit id other than dd61ac3c84d6b238108dc8438b53043b5177a662, and the fork gate's recorded result for that exact commit id reads passed.
-- vendor/rauthy names that gated commit on the ablative branch; at it, rg -n 'ID001_LINK_PAIR|ID001_LINK_REFUSAL|ID001_LINK_MIGRATION|ID001_LINK_AUDIT' vendor/rauthy finds each of the four identifiers in a test, and the fork gate's cargo test log for that commit names each ID001_LINK_* test with a passed result; an identifier found by rg with no passed result in the log fails this line.
+- vendor/rauthy names a commit on the ablative branch whose fork gate passed, and the four identifiers above are each found in that commit's tests under vendor/rauthy/tests/identity_links/.
 
 **Files:**
 - modify: vendor/rauthy
@@ -997,12 +1009,10 @@ WHEN no commit on the ablative branch of ablative-io/rauthy has passed the fork'
 
 ### R2: Write the provider-link contract and the links report
 
-THE SYSTEM SHALL write docs/design/identity/PROVIDER-LINK-CONTRACT.md, the fork-side record of the typed link-audit contract that the DIRECTORY-003 receiver authors in lys with its fixtures (stable source operation IDs, pending and acknowledged states, what an issuer observes as against what a person claims): it names the lys contract by path and by the lys commit it was read at, and states the wire shape the fork sends in those terms. It SHALL also write docs/design/identity/reports/IDENTITY-001-links.md, the report of the row: the fork commit the pin moves to, its gate result, the counted legs of each ID001_LINK_* case and the development install's release-and-advisory check (CN10). Both keep the file names revision 5 gives this row (docs/design/identity/briefs/IDENTITY-001.json:241-242).
-
-WHEN DIRECTORY-003 has not landed, THE SYSTEM SHALL NOT start R2. R2 SHALL NOT author any field, state or fixture the receiver does not already hold, and a difference between the record and the receiver's contract SHALL be reported as a finding against the fork and SHALL NOT change the receiver.
+THE SYSTEM SHALL write docs/design/identity/PROVIDER-LINK-CONTRACT.md, the typed contract between the fork's link audit and the DIRECTORY-003 receiver (stable source operation IDs, pending and acknowledged states, what an issuer observes as against what a person claims), and docs/design/identity/reports/IDENTITY-001-links.md, the report of the row: the fork commit the pin moves to, its gate result, the counted legs of each ID001_LINK_* case and the development install's release-and-advisory check (CN10). Both keep the file names revision 5 gives this row (docs/design/identity/briefs/IDENTITY-001.json:241-242).
 
 **Acceptance:**
-- docs/design/identity/PROVIDER-LINK-CONTRACT.md names the lys contract path and the lys commit it was read at, names every field the receiver reads and the states a link audit passes through, and the DIRECTORY-003 receiver's fixtures at that commit match it.
+- docs/design/identity/PROVIDER-LINK-CONTRACT.md names every field the receiver reads and the states a link audit passes through, and the DIRECTORY-003 receiver's fixtures match it.
 - docs/design/identity/reports/IDENTITY-001-links.md names the pinned fork commit, its gate result and the count of exercised legs per identifier, and records the release-and-advisory check of the install.
 
 **Files:**
@@ -1025,13 +1035,12 @@ WHEN DIRECTORY-003 has not landed, THE SYSTEM SHALL NOT start R2. R2 SHALL NOT a
 - No row is dispatched until Waffles has reviewed it.
 - No fork file is edited by this brief: the fork's changes land through the fork-owned brief and its gate, and reach this repository only as a pin.
 - No cherry-pick and no nightly base: rows 02 to 05 run on v0.36.2 (CN10).
-- Revision under CN9: revision 5's wall entry tests/identity_links/ is replaced by the ID001_LINK_* tests in a compiled member crate under src/ of the fork's workspace, at the path the fork's card chooses, and the verification becomes the rg search together with the fork gate's cargo test log. Approved by the identity line's lead in the answer to survey question survey-question-7c352c54a390.
 
 ## Verification
 
 - From the repository root: cargo fmt --check; cargo clippy --all-targets --all-features -- -D warnings; cargo clippy --all-targets -- -D warnings; cargo test --workspace --all-features; cargo doc --no-deps --all-features; cargo doc --no-deps, all clean (CLAUDE.md, gates before any commit).
 - From the repository root: python3 scripts/design/validate.py docs/design/directory and python3 scripts/design/check-coverage.py docs/design/directory exit 0.
-- From the repository root, with submodules checked out: rg -n 'ID001_LINK_PAIR|ID001_LINK_REFUSAL|ID001_LINK_MIGRATION|ID001_LINK_AUDIT' vendor/rauthy finds each identifier in a test, and the fork gate's cargo test log for the pinned commit names each ID001_LINK_* test with its result; a test found but never run fails the check.
+- From the repository root, with submodules checked out: rg -n 'ID001_LINK_PAIR|ID001_LINK_REFUSAL|ID001_LINK_MIGRATION|ID001_LINK_AUDIT' vendor/rauthy/tests/identity_links finds each identifier in a test.
 - ID001_LINK_LIVE, after the row lands (CN5, CN6): a person installs the exact gated fork and shows Tom two linked providers resolving to one person in Rauthy's own account page, signing in through both, then posts a separate install and showing receipt to Tom with the Melbourne pass time, fork ref, artifact hash and observed result. A venue test or screenshot alone does not replace the live demonstration, and DIRECTORY-005 stays blocked until the receipt is recorded.
 
 
@@ -1558,4 +1567,177 @@ THE SYSTEM SHALL append one sentence to the intention of docs/design/directory/d
 - From the repository root, on the build branch: git diff --no-ext-diff --name-only <base>..HEAD prints exactly four paths, docs/design/directory/DESIGN.md, docs/design/directory/briefs/DIRECTORY-005.json, docs/design/directory/briefs/DIRECTORY-005.md and docs/design/directory/design.json, where <base> is the commit the build started from; git diff --no-ext-diff --name-only <base>..HEAD -- . ':!docs/design/directory' prints nothing.
 - From the repository root: python3 scripts/design/validate.py docs/design/directory and python3 scripts/design/check-coverage.py docs/design/directory exit 0; the coverage report may list C1, C3, C6 and S2 as claimed by DIRECTORY-001 and DIRECTORY-008, a warning whose split this brief's task notes, and lists no failure.
 - From the repository root: python3 scripts/design/render-cluster.py docs/design/directory run a second time changes no file (git status --porcelain docs/design/directory prints nothing after it).
+
+
+---
+type: brief
+id: DIRECTORY-019
+cluster: directory
+title: Make CONFORMANCE rows 3.1 and 3.2 true on the lifecycle record: every agent answers to a person, an agent whose person is retired is flagged on read as needing a new person, and the four states are authority only
+---
+
+# DIRECTORY-019: Make CONFORMANCE rows 3.1 and 3.2 true on the lifecycle record: every agent answers to a person, an agent whose person is retired is flagged on read as needing a new person, and the four states are authority only
+
+> **Cluster:** directory
+> **Depends on:** DIRECTORY-003, DIRECTORY-009
+> **Blocked by:** The lifecycle-hand brief DIRECTORY-009 (roadmap row RM-017, branch brief/directory/lifecycle-hand) signed off and landed on main with ADR-027 and ADR-028, because this brief reads that brief's lifecycle record, its fold (its R3, crates/lys-identity/src/lifecycle/fold.rs and state.rs), its cause rule (its R2, crates/lys-identity/src/lifecycle/causes.rs), its typed read (its R6, crates/lys-identity-server/src/lifecycle_read.rs) and its contract (its R1, docs/design/identity/LIFECYCLE-CONTRACT.md), and keeps no copy of any of them. Check: git ls-tree -r --name-only origin/main crates/lys-identity/src/lifecycle crates/lys-identity-server/src/lifecycle_read.rs docs/design/identity/LIFECYCLE-CONTRACT.md prints fold.rs, state.rs, causes.rs, error.rs, mod.rs, lifecycle_read.rs and LIFECYCLE-CONTRACT.md. Until then no row starts, R1 included, because R1 adds to that contract., The lead's sign-off of this brief before any row is dispatched (DIRECTORY-001 boundary), which is also the manifest review CN9 asks for of the four files this brief adds under crates/lys-identity/ and crates/lys-identity-server/ and of the added lines it names in the lifecycle-hand brief's files. Check: python3 scripts/design/validate.py docs/design/directory and python3 scripts/design/check-coverage.py docs/design/directory both exit 0, and the card that carries this brief records the sign-off before card_build_v3 runs.
+> **Design anchor:**
+> - ADR-003 — Everything is pegged to a human authority — A person signs in first; an agent is provisioned under that person with its own identity; the person's permissions are the ceiling and the agent holds an explicit subset; every grant says who may exercise it and who may pass it on; withdrawing the authority stops every grant derived from it. The exact delegation schema is not settled by this decision.
+> - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
+> - ADR-007 — The product starts an agent by giving its start command, never by running it — The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.
+> - ADR-011 — An identity is registered, active, suspended or retired — An identity is in one of four states: registered (exists in the directory, no grants, no credential handle, may not act), active (may act within its grants), suspended (kept whole, grants kept but not effective) and retired (permanent, history kept, never reactivated; a new identity is made instead). Register, activate, suspend, reinstate and retire are the only transitions, each one signed audit record naming the authenticated actor and their provenance, the identity, from, to, when and reason. Having a grant or a credential is a fact beside the state, not a state. A person is registered by first sign-in; an agent is registered by a signed-in person, who carries it as its responsible person for life and may cause every transition of their own agents. Source: docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:71-95.
+> - ADR-056 — Needs a new person is a view worked out on read from an agent's registration and its person's retire record, never stored or appended — An agent's needs-a-new-person flag is worked out each time its lifecycle record is read, from the responsible person its registration names and that person's retire record: it is true when that person's folded state is retired and false otherwise, a suspended person included. Nothing is appended to any agent's history, no transition is made on the agent, the agent keeps its own state, and no responsible person changes. The flag records a fact, that the agent's person is retired; clearing it needs the reassignment card, which is the one that revises ADR-011's responsible person for life. Rejected: a signed flag record appended on each agent when its person is retired; moving the agent to another state with its person.
+> **Checklist:**
+> - C123 — docs/design/identity/LIFECYCLE-CONTRACT.md maps CONFORMANCE rows 3.1 and 3.2 to named tests and states the needs-a-new-person rule, that ADR-011 is not revised, and that the state is authority only.
+> - C124 — Registering an agent whose register request names no responsible person is refused lifecycle_agent_without_person and appends nothing.
+> - C125 — An agent's lifecycle read carries needs_a_new_person, worked out on read, true on every one of a person's agents once that person is retired and false while the person is suspended, with no record appended and each agent's state unchanged.
+> - C126 — A walk of all 20 origin-by-target changes of state admits exactly the 6 in the table and refuses the other 14 by name with nothing appended.
+> - C127 — A change of state starts and stops no process, and no key of the typed lifecycle read says anything about running.
+> **Stories:**
+> - S52 (Operator, Installs and runs the standalone identity product) — As an operator, I want every agent whose person is retired to show that it needs a new person, so that no agent is left answering to a retired person without anyone seeing it.
+> - S53 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want an identity's state to move only along the lifecycle table and to say nothing about running, so that a state is read as authority and never mistaken for whether a process is alive.
+
+## Purpose
+
+CONFORMANCE section 3 (docs/design/identity/CONFORMANCE.md:36-37) holds two lifecycle rows no brief on main makes true. Row 3.1: every agent answers to a person, and an agent whose person is retired is flagged as needing a new one. Row 3.2: the identity states are registered, active, suspended and retired, and the state is authority only and says nothing about running. This brief makes both rows true on the lifecycle record the lifecycle-hand brief DIRECTORY-009 (RM-017) defines, reading its fold and its typed read and keeping no copy of either: an agent recorded with no person is refused by name; an agent's read carries a needs-a-new-person flag worked out each time it is read from its registration and its person's retire record (ADR-056); every change of state is walked, the six in the table admitted and the fourteen others refused by name; and a test shows a change of state starts and stops no process and that the read says nothing about running (ADR-007, ADR-004). Each row maps to at least one acceptance line that tests it on the lifecycle record: row 3.1 to R2 and R3, row 3.2 to R4 and R5.
+
+## Task
+
+Five rows, in order: R1 the conformance section of the lifecycle contract (1 hour), R2 the named refusal of an agent recorded with no person (2 hours), R3 the needs-a-new-person flag worked out on read (3 hours), R4 the walk of every change of state (2 hours), R5 the authority-only test (2 hours): 10 focused implementer hours. R1 is documents only; R2 to R5 stand on files the lifecycle-hand brief DIRECTORY-009 (RM-017) creates, and every such file is touched only by the added lines a row names (CN9).
+
+The lead's answers are written in as settled. (1) The flag stands, and ADR-011's responsible person for life stays in force: this brief does not revise ADR-011 or DIRECTORY-003 R1. The flag records a fact: the agent's person is retired. Clearing it needs the reassignment card, which is the one that revises that rule. (2) The flag is computed on read, from the agent's registration and its person's retire record, with nothing appended to the agent: each agent's history stays as it is, and the lifecycle-hand brief's rule that retiring someone has no automatic effect on other identities except the grant check holds (ADR-056). (3) The agent's own state is unchanged: it stays in whatever state it was, for example active, and its derived grants refuse at the check, as the lifecycle-states statement's rule that retiring the human makes every derived grant refuse at the next check already says; retiring the person moves no other identity, and this brief neither asserts nor duplicates that grant rule (DIRECTORY-006 R4). (4) Shows is met by the flag in the lifecycle read and in the lifecycle-hand brief's typed read (its R6); the screen that shows it on the people list and the agent file belongs to a later card. (5) Only an agent whose person is retired is flagged. What a suspension stops stays open, so a suspended person's agents are not flagged.
+
+Split notes. DIRECTORY-003 R5 already refuses four named out-of-table transitions; R4's walk is its superset over all twenty origin-by-target pairs and adds no second table check: every refusal it counts is the one DIRECTORY-003 R5's commit path gives, or the lifecycle-hand brief's lifecycle_unknown_identity. DIRECTORY-003 R1 refuses a registration with no signed-in caller at the server; R2's refusal is of the record, an agent registration naming no responsible person whoever the caller is, and the two stay separate names.
+
+Out: giving an agent a new person (its own card); the screen that shows the flag on the people list and the agent file (a later card); CONFORMANCE row 3.4.
+
+## Requirements
+
+### R1: Add the conformance section to the lifecycle contract: rows 3.1 and 3.2 mapped to their tests, the needs-a-new-person rule, and the state as authority only
+
+Documents only. The contract is created by DIRECTORY-009 R1, on which this brief depends. THE SYSTEM SHALL add to docs/design/identity/LIFECYCLE-CONTRACT.md, after its existing sections, one section headed 'Conformance rows 3.1 and 3.2' holding, in this order: (1) a table with one row per conformance row, beginning '| 3.1 |' and '| 3.2 |', each naming the test files and test functions of this brief that test it on the lifecycle record: 3.1 to crates/lys-identity/tests/lifecycle_no_person.rs and crates/lys-identity/tests/lifecycle_needs_new_person.rs, 3.2 to crates/lys-identity/tests/lifecycle_walk.rs and crates/lys-identity-server/tests/lifecycle_authority.rs; (2) the needs-a-new-person rule: an agent's needs_a_new_person flag is worked out on read from the agent's registration and its responsible person's retire record, and never appended; it is true on every one of that person's agents when the person is retired and false otherwise, a suspended person included, because what a suspension stops stays open; the flag is not a state and not a transition, the agent keeps its own state, its derived grants refuse at the check, and no responsible person changes; (3) the statement that the flag records a fact, the agent's person is retired, that this contract does not revise ADR-011's responsible person for life or DIRECTORY-003 R1, and that clearing the flag needs the reassignment card, which is the one that revises that rule; (4) the sentence 'the state is authority only: it starts and stops no process and says nothing about whether an identity is running'. The section SHALL NOT change any existing line of the contract, SHALL NOT edit the lifecycle-states statement or CONFORMANCE.md, and SHALL NOT add a state or a transition. Estimate: 1 hour.
+
+**Acceptance:**
+- grep -c '^| 3.1 |\|^| 3.2 |' docs/design/identity/LIFECYCLE-CONTRACT.md prints 2.
+- Each of grep -c 'needs_a_new_person', grep -c 'worked out on read', grep -c 'a suspended person included', grep -c 'clearing the flag needs the reassignment card' and grep -c 'the state is authority only' over docs/design/identity/LIFECYCLE-CONTRACT.md prints at least 1.
+- git diff --numstat on the R1 commit for docs/design/identity/LIFECYCLE-CONTRACT.md prints a second number of 0, and git diff --stat on the R1 commit for docs/design/identity/CONFORMANCE.md and the lifecycle-states statement under docs/design/identity/ prints nothing.
+- sh scripts/design/gate.sh exits 0 on the R1 commit.
+
+**Files:**
+- modify: docs/design/identity/LIFECYCLE-CONTRACT.md
+
+**Checklist:**
+- C123 — docs/design/identity/LIFECYCLE-CONTRACT.md maps CONFORMANCE rows 3.1 and 3.2 to named tests and states the needs-a-new-person rule, that ADR-011 is not revised, and that the state is authority only.
+
+**Stories:**
+- S52 (Operator, Installs and runs the standalone identity product) — As an operator, I want every agent whose person is retired to show that it needs a new person, so that no agent is left answering to a retired person without anyone seeing it.
+- S53 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want an identity's state to move only along the lifecycle table and to say nothing about running, so that a state is read as authority and never mistaken for whether a process is alive.
+
+### R2: Refuse by name an agent recorded with no responsible person, and append nothing
+
+IF a register transition for an agent names no responsible person, THEN THE SYSTEM SHALL refuse it lifecycle_agent_without_person, whose message names the agent and says that every agent is registered under a responsible person, and SHALL append nothing. The check lives in crates/lys-identity/src/lifecycle/responsible.rs, the refusal name in crates/lys-identity/src/lifecycle/error.rs beside the lifecycle-hand brief's names, and it is called by one added line in crates/lys-identity/src/lifecycle/causes.rs on the register path, before the append. THE SYSTEM SHALL NOT fill an absent responsible person from the caller, the administrator or any other source, SHALL NOT apply the check to the registration of a person, and SHALL NOT change DIRECTORY-003 R1's refusal of a registration with no signed-in caller, which stays a separate refusal at the server. The four modified files are created by DIRECTORY-009 R2, on which this brief depends. No wall clock; every time value the test needs is injected through crates/lys-identity/tests/lifecycle_support/mod.rs. Estimate: 2 hours.
+
+**Acceptance:**
+- cf3_r2_ac1: the attested administrator registers an agent whose register request names no responsible person: 1 refusal named lifecycle_agent_without_person, its message containing 'responsible person', and the log's leaf count unchanged; the same request naming a registered test person P as responsible person is admitted, the leaf count rises by exactly 1, and the agent's registration record names P; the test asserts 1 refusal and 1 admission; cargo test -p lys-identity --test lifecycle_no_person cf3_r2_ac1 prints 'test result: ok. 1 passed; 0 failed'.
+- cf3_r2_ac2: the attested administrator registers a person with no responsible person named: admitted, the leaf count rises by exactly 1, and no refusal named lifecycle_agent_without_person is returned; cargo test -p lys-identity --test lifecycle_no_person cf3_r2_ac2 prints 'test result: ok. 1 passed; 0 failed'.
+- rg -c 'responsible::' crates/lys-identity/src/lifecycle/causes.rs prints 1, and git diff --numstat on the row's commits for crates/lys-identity/src/lifecycle/causes.rs prints a second number of 0.
+- rg -c 'fn cf3_r2_ac(1|2)' crates/lys-identity/tests/lifecycle_no_person.rs prints 2, and on the row's first commit cargo test -p lys-identity --test lifecycle_no_person fails to compile.
+
+**Files:**
+- create: crates/lys-identity/src/lifecycle/responsible.rs
+- create: crates/lys-identity/tests/lifecycle_no_person.rs
+- modify: crates/lys-identity/src/lifecycle/mod.rs
+- modify: crates/lys-identity/src/lifecycle/error.rs
+- modify: crates/lys-identity/src/lifecycle/causes.rs
+- modify: crates/lys-identity/tests/lifecycle_support/mod.rs
+
+**Checklist:**
+- C124 — Registering an agent whose register request names no responsible person is refused lifecycle_agent_without_person and appends nothing.
+
+**Stories:**
+- S52 (Operator, Installs and runs the standalone identity product) — As an operator, I want every agent whose person is retired to show that it needs a new person, so that no agent is left answering to a retired person without anyone seeing it.
+
+### R3: Work out each agent's needs-a-new-person flag on read from its registration and its person's retire record, and move nothing
+
+WHEN an agent's lifecycle record is read, THE SYSTEM SHALL work out its needs_a_new_person flag from the responsible person its registration record names and that person's folded state (the lifecycle-hand brief's fold, in which only the person's retire record makes it retired): true when that person is retired, whatever the agent's own state, and false when that person is registered, active or suspended. The derivation is one function in crates/lys-identity/src/lifecycle/responsible.rs over the lifecycle-hand brief's fold, and the typed read in crates/lys-identity-server/src/lifecycle_read.rs gains one field, needs_a_new_person, filled from that function by added lines and serialised as a JSON boolean. THE SYSTEM SHALL NOT append any record to work out or show the flag, SHALL NOT make a transition on the agent, SHALL NOT change the agent's state, SHALL NOT change the agent's responsible person, SHALL NOT store the flag, SHALL NOT make the flag a state, SHALL NOT flag an agent whose person is suspended, and SHALL NOT read DIRECTORY-006's grant decision to work it out. crates/lys-identity-server/src/lifecycle_read.rs is created by DIRECTORY-009 R6, on which this brief depends. No second store or projection of lifecycle state is added. Estimate: 3 hours.
+
+**Acceptance:**
+- cf3_r3_ac1 (row 3.1): person P, active, with agents A1 active, A2 suspended and A3 retired, and person Q, active, with agent B1 active; the attested administrator retires P; the reads answer A1 needs_a_new_person true with state active, A2 true with state suspended, A3 true with state retired, and B1 false with state active; the test asserts a flagged count of 3, equal to the count of P's agents, a flagged count of 0 among Q's agents, each agent's state equal to its state before the retire, each agent's history length equal to its length before the retire, and a log leaf count exactly 1 higher (the retire of P); cargo test -p lys-identity --test lifecycle_needs_new_person cf3_r3_ac1 prints 'test result: ok. 1 passed; 0 failed'.
+- cf3_r3_ac2: person R, active, with agents C1 active and C2 registered: before any change both read needs_a_new_person false; the administrator suspends R and both read false with their states unchanged; the administrator reinstates R and both read false; the administrator retires R and both read true; the test asserts flagged counts 0, 0, 0 and 2 in that order, and each agent's history length unchanged across all three transitions of R; cargo test -p lys-identity --test lifecycle_needs_new_person cf3_r3_ac2 prints 'test result: ok. 1 passed; 0 failed'.
+- cf3_r3_ac3: the test records the log's leaf count, the count of files under the log directory and the SHA-256 of each file, then reads every agent of cf3_r3_ac1 again, and asserts that the leaf count, the file count and each file's SHA-256 equal those recorded before the read; cargo test -p lys-identity --test lifecycle_needs_new_person cf3_r3_ac3 prints 'test result: ok. 1 passed; 0 failed'.
+- rg -n '\.append\(|fn set_state|grants::' crates/lys-identity/src/lifecycle/responsible.rs prints nothing; rg -c 'needs_a_new_person' crates/lys-identity-server/src/lifecycle_read.rs prints at least 1; git diff --numstat on the row's commits for crates/lys-identity-server/src/lifecycle_read.rs prints a second number of 0.
+- rg -c 'fn cf3_r3_ac(1|2|3)' crates/lys-identity/tests/lifecycle_needs_new_person.rs prints 3, and on the row's first commit cargo test -p lys-identity --test lifecycle_needs_new_person fails to compile.
+
+**Files:**
+- create: crates/lys-identity/tests/lifecycle_needs_new_person.rs
+- modify: crates/lys-identity/src/lifecycle/responsible.rs
+- modify: crates/lys-identity-server/src/lifecycle_read.rs
+- modify: crates/lys-identity/tests/lifecycle_support/mod.rs
+
+**Checklist:**
+- C125 — An agent's lifecycle read carries needs_a_new_person, worked out on read, true on every one of a person's agents once that person is retired and false while the person is suspended, with no record appended and each agent's state unchanged.
+
+**Stories:**
+- S52 (Operator, Installs and runs the standalone identity product) — As an operator, I want every agent whose person is retired to show that it needs a new person, so that no agent is left answering to a retired person without anyone seeing it.
+
+### R4: Walk every change of state on the lifecycle record: admit the six in the table and refuse the fourteen others by name
+
+THE SYSTEM SHALL admit, through the lifecycle-hand brief's transition path over DIRECTORY-003 R5's commit path, exactly the six changes of state in the table: none to registered (register), registered to active (activate), active to suspended (suspend), suspended to active (reinstate), active to retired (retire) and suspended to retired (retire). IF any other change of an origin in none, registered, active, suspended and retired to a target in registered, active, suspended and retired is requested, THEN THE SYSTEM SHALL refuse it by name and append nothing: lifecycle_unknown_identity when the origin is none, and DIRECTORY-003 R5's out-of-table refusal otherwise. This row adds no table check, no refusal name and no source file: the walk is a test, crates/lys-identity/tests/lifecycle_walk.rs, that requests each of the twenty origin-by-target pairs once, self-changes included, as the attested administrator so no refusal is by actor, each pair through the operation the table records for its target (register for registered, activate for active except reinstate from suspended, suspend for suspended, retire for retired). THE SYSTEM SHALL NOT admit a retired identity to any other state, and SHALL NOT add a fifth state. Estimate: 2 hours.
+
+**Acceptance:**
+- cf3_r4_ac1 (row 3.2): setup, before the walk and outside it, registers and transitions the identities that give each origin state (a fresh id for none, and one identity each brought to registered, active, suspended and retired for every pair from that origin); the walk then requests the 20 pairs, and the test samples the log's leaf count immediately before each of the 20 requests and immediately after it; the test asserts exactly 20 requests, 6 admissions (the six pairs of the table, each folding to its target) and 14 refusals, a leaf count difference of exactly +1 across each of the 6 admissions and exactly 0 across each of the 14 refusals, and a sum of the 20 differences equal to 6; cargo test -p lys-identity --test lifecycle_walk cf3_r4_ac1 prints 'test result: ok. 1 passed; 0 failed'.
+- cf3_r4_ac2: of the 14 refusals, the 3 whose origin is none are named lifecycle_unknown_identity; each of the other 11 carries a non-empty refusal name that is neither lifecycle_actor_not_permitted nor lifecycle_unknown_identity, and a message containing both its origin state's name and its target state's name; the test asserts the counts 3 and 11; cargo test -p lys-identity --test lifecycle_walk cf3_r4_ac2 prints 'test result: ok. 1 passed; 0 failed'.
+- cf3_r4_ac3: the listing of every value of the lifecycle-hand brief's state type has length 4 and names registered, active, suspended and retired; cargo test -p lys-identity --test lifecycle_walk cf3_r4_ac3 prints 'test result: ok. 1 passed; 0 failed'.
+- rg -c 'fn cf3_r4_ac(1|2|3)' crates/lys-identity/tests/lifecycle_walk.rs prints 3, and the row's commits change no file under crates/lys-identity/src: git diff --stat on them for crates/lys-identity/src prints nothing.
+
+**Files:**
+- create: crates/lys-identity/tests/lifecycle_walk.rs
+
+**Checklist:**
+- C126 — A walk of all 20 origin-by-target changes of state admits exactly the 6 in the table and refuses the other 14 by name with nothing appended.
+
+**Stories:**
+- S53 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want an identity's state to move only along the lifecycle table and to say nothing about running, so that a state is read as authority and never mistaken for whether a process is alive.
+
+### R5: Show that a change of state starts and stops no process, and that the lifecycle read says nothing about running
+
+WHEN an agent's state changes, THE SYSTEM SHALL record the transition and do nothing else: THE SYSTEM SHALL NOT start, stop, signal or ask any engine to start or stop a process, and the lifecycle code SHALL NOT reference a process API. THE SYSTEM SHALL keep the typed lifecycle read free of any field about running: no key of the read, at any depth, names running, an execution, a process, a pid, liveness or a heartbeat. The test counts the child processes of the test process around each transition, and lives in crates/lys-identity-server/tests/lifecycle_authority.rs; it carries a positive control proving its key matcher fires, so the absence it asserts cannot pass vacuously. This row changes no source file. Estimate: 2 hours.
+
+**Acceptance:**
+- cf3_r5_ac1 (row 3.2): the attested administrator registers, activates, suspends, reinstates and retires one agent, and after each of the 5 transitions the typed read of the agent is serialised to JSON; the key matcher, the case-insensitive pattern run|exec|process|pid|alive|heartbeat applied to every key at every depth, finds 0 matches in each of the 5 reads, and the same matcher applied to the fixture object {"running": true, "pid": 1} finds 2; the test asserts 5 reads, 0 matches and the control's 2; cargo test -p lys-identity-server --test lifecycle_authority cf3_r5_ac1 prints 'test result: ok. 1 passed; 0 failed'.
+- cf3_r5_ac2: the same serialised read carries the key needs_a_new_person at its top level after each of the 5 transitions; cargo test -p lys-identity-server --test lifecycle_authority cf3_r5_ac2 prints 'test result: ok. 1 passed; 0 failed'.
+- cf3_r5_ac3 (row 3.2): the attested administrator registers, activates, suspends, reinstates and retires one agent, and the test records the count of child processes of the test process immediately before and immediately after each of the 5 transitions; the test asserts 5 comparisons with 0 differences, each after-count equal to its before-count; cargo test -p lys-identity-server --test lifecycle_authority cf3_r5_ac3 prints 'test result: ok. 1 passed; 0 failed'.
+- rg -n 'std::process|Command::new|tokio::process|process::exit|libc::kill|nix::sys::signal' crates/lys-identity/src/lifecycle crates/lys-identity-server/src/lifecycle_read.rs prints nothing, and the same pattern's positive control, printf 'Command::new\n' | rg -c 'std::process|Command::new|tokio::process|process::exit|libc::kill|nix::sys::signal', prints 1.
+- rg -c 'fn cf3_r5_ac(1|2|3)' crates/lys-identity-server/tests/lifecycle_authority.rs prints 3, and the row's commits change no file under crates/lys-identity/src and no file under crates/lys-identity-server/src: git diff --stat on them for those two directories prints nothing.
+
+**Files:**
+- create: crates/lys-identity-server/tests/lifecycle_authority.rs
+
+**Checklist:**
+- C127 — A change of state starts and stops no process, and no key of the typed lifecycle read says anything about running.
+
+**Stories:**
+- S53 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want an identity's state to move only along the lifecycle table and to say nothing about running, so that a state is read as authority and never mistaken for whether a process is alive.
+
+## Boundaries
+
+- No way to give an agent a new person, and no change to any agent's responsible person: that is its own card, the one that revises ADR-011's responsible person for life and clears the flag. This brief revises neither ADR-011 nor DIRECTORY-003 R1.
+- No copy of the lifecycle-hand brief's lifecycle record: no second store, projection or fold of lifecycle state. Its files are touched only by the added lines a row names: one line in crates/lys-identity/src/lifecycle/causes.rs (R2), added lines in crates/lys-identity/src/lifecycle/error.rs and mod.rs (R2), crates/lys-identity/tests/lifecycle_support/mod.rs (R2, R3), crates/lys-identity-server/src/lifecycle_read.rs (R3) and one added section of docs/design/identity/LIFECYCLE-CONTRACT.md (R1). A row that needs any other file stops and names it (CN9).
+- No fifth state; the needs-a-new-person flag and provisioned are never states; no transition is added and none is caused by the flag, and retiring a person moves no other identity. Nothing is appended except the transitions a test drives through DIRECTORY-003 R5's commit path.
+- No flag for an agent whose person is suspended: what a suspension stops stays open.
+- No screen: showing the flag on the people list and the agent file is a later card; this brief shows it in the lifecycle read and the typed read.
+- No start, stop or execution control in the identity product, and no call to any engine (ADR-007, ADR-004).
+- DIRECTORY-006 R4's grant rule is neither asserted nor duplicated: the flag reads the person's folded state, never a grant decision.
+- The IDENTITY-001 files, docs/design/identity/LIFECYCLE-STATES-2026-09-22.md, docs/design/identity/CONFORMANCE.md and lys-core's shipped formats are unchanged.
+- No audit record is deleted, hidden or rewritten; the checklist and story ledgers are append-only.
+- No wall clock in new code, no person's name or date in code, no credential, token or key value anywhere, test identities only.
+
+## Verification
+
+- From the repository root: sh scripts/design/gate.sh exits 0, and python3 scripts/design/validate.py docs/design/decisions.json and python3 scripts/design/validate.py docs/design/roadmap.json each exit 0.
+- From the repository root, after each code row: cargo fmt --all; cargo clippy --all-targets --all-features -- -D warnings; cargo clippy --all-targets -- -D warnings; cargo test --workspace --all-features; cargo doc --no-deps --all-features; cargo doc --no-deps, all clean, with git status showing no change from cargo fmt (heavy runs at the gate venue, CN8).
+- From the repository root: rg -c 'fn cf3_r2_ac(1|2)' crates/lys-identity/tests/lifecycle_no_person.rs prints 2; rg -c 'fn cf3_r3_ac(1|2|3)' crates/lys-identity/tests/lifecycle_needs_new_person.rs prints 3; rg -c 'fn cf3_r4_ac(1|2|3)' crates/lys-identity/tests/lifecycle_walk.rs prints 3; rg -c 'fn cf3_r5_ac(1|2|3)' crates/lys-identity-server/tests/lifecycle_authority.rs prints 3.
+- grep -c '^| 3.1 |\|^| 3.2 |' docs/design/identity/LIFECYCLE-CONTRACT.md prints 2, and every test function that section names exists in the file it names.
+- The row diffs touch no path under vendor/rauthy, docs/design/identity/briefs, docs/design/identity/CONFORMANCE.md or the lifecycle-states statement, and of the lifecycle-hand brief's source files only added lines: git diff --numstat <base> HEAD -- crates/lys-identity/src/lifecycle/causes.rs crates/lys-identity-server/src/lifecycle_read.rs prints lines whose second number is 0.
+- rg -n 'SystemTime::now|Utc::now|Local::now|Instant::now' crates/lys-identity/src/lifecycle/responsible.rs prints nothing.
 

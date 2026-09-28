@@ -48,12 +48,10 @@
 - [ ] **C29** — The You and delegation screens show real server authority, separate service accounts from sign-in identities, and preserve personal versus administrator visibility.
 - [ ] **C30** — The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success.
 
-## Certificate revocation folded from the log
+## Lifecycle conformance rows 3.1 and 3.2 (DIRECTORY-019)
 
-- [ ] **C65** — docs/design/identity/CERTIFICATE-REVOCATION.md states the certificate-log leaves, the one-claim certificate as the revocable unit, the issuing-authority signer, permanence, revocation_before_issuance, the fold, N and the tolerance, history, the no-log forms and the refusal table.
-- [ ] **C66** — The issuance leaf, the revocation leaf and the attestation entry encode and decode under lys-identity/certificate-log/v1, and a revocation verifies only under the issuing authority's key for the log's origin.
-- [ ] **C67** — The live set is folded from the certificate log with its folded size; revocations not signed by the issuing authority, revocations of a certificate with no earlier issuance and reinstatements are refused by name at their index, and a leaf the fold cannot read blocks every permit.
-- [ ] **C68** — A revocation is one leaf appended at the log's extent through lys-log-store, and the LeafStore trait gains no delete, rewrite, truncate, fork or merge.
-- [ ] **C69** — Revocation-aware verification takes N and a tolerance with no default, carries the folded size in every answer, and refuses a revoked certificate naming its revocation leaf.
-- [ ] **C70** — A revoked certificate's inclusion and consistency proofs and issuance record still verify, an attestation by its key verifies only when its own entry precedes the revocation leaf, and an attestation by a certificate not revoked needs no entry.
-- [ ] **C71** — lys ca verify keeps its meaning and its help says verification without a log does not check revocation, with lys-core unchanged.
+- [ ] **C123** — docs/design/identity/LIFECYCLE-CONTRACT.md maps CONFORMANCE rows 3.1 and 3.2 to named tests and states the needs-a-new-person rule, that ADR-011 is not revised, and that the state is authority only.
+- [ ] **C124** — Registering an agent whose register request names no responsible person is refused lifecycle_agent_without_person and appends nothing.
+- [ ] **C125** — An agent's lifecycle read carries needs_a_new_person, worked out on read, true on every one of a person's agents once that person is retired and false while the person is suspended, with no record appended and each agent's state unchanged.
+- [ ] **C126** — A walk of all 20 origin-by-target changes of state admits exactly the 6 in the table and refuses the other 14 by name with nothing appended.
+- [ ] **C127** — A change of state starts and stops no process, and no key of the typed lifecycle read says anything about running.
