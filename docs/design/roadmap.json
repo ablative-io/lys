@@ -889,6 +889,32 @@
         "RM-005"
       ],
       "notes": "Ids are the next after main's highest and every open brief branch's as fetched at this writing (RM-017, ADR-028, C70, S31): RM-018, ADR-029, ADR-030, C71 to C81, S32 to S34, CN11. The brief id HOME-008 is the one this run was given; the open branch brief/home/5898fcb0 also holds a HOME-008 (the rendered-uuid rule), so one of the two is renumbered when the second lands. The card lead has answered the author's questions on a boundary with no preserved list, a boundary with no summary, the listing's exit status and how a compaction that keeps nothing is written (firstKeptEntryId the empty string, lys.loss first_kept null), and HOME-008 carries them; the lys lead has answered that the boundary record's uuid comes from render-uuid/v2 alongside v1, and HOME-008 R6 carries it. The checklist row C82 is the next after C81. The survey's unit Measure and, if needed, change the Claude Code render of a compaction to the compact_boundary pair on 2.1.283 is delivered by HOME-008 R6 and R7, on the card lead's answer that the render writes that pair. Further units, not written: Write docs/design/home/LOSS-ACCOUNT.md covering both the render's loss account and lys.loss; Account for compactions in homes imported before this card; Stage 4b: translation as a derived record with its own loss entry."
+    },
+    {
+      "id": "RM-026",
+      "title": "Judge certificate admission at an instant its caller names, and take the sleep out of its expiry test",
+      "status": "idea",
+      "kind": "fix",
+      "summary": "RecognisedCertificate gains admit_at, judging a submission at an instant its caller names on lys-core's existing verify_certificate_chain_at; admit keeps its signature and calls it with the present, so a live request is judged as before. an_expired_certificate_is_refused stops sleeping 2.1 seconds and asserts admitted inside the one-second window and NotAdmitted two seconds past issuance at explicit instants, so the suite no longer pays a wait on every run or depends on a host's load. lys-core is not changed.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-27T10:36:00+10:00",
+        "quote": "The test an_expired_certificate_is_refused in crates/lys-anchor/src/admission/certificate_tests.rs issues a certificate valid for one second and then sleeps 2.1 seconds so that the admission policy sees it expired. That wait is a clock. Under load the sleep proves nothing about the code, on a loaded host it is the kind of wait that makes a suite slow, and the suite pays it on every run. Tom's word of 27 September 2026, relayed by Waffles in the pipeline channel: tests must not take this long and things must not fail under load; a test that waits on the clock is a defect in the code, not a flake. The crate lys-core already carries verify_certificate_chain_at, which takes the instant to judge against, and its API is frozen at 0.2.0 and is not changed here.\n\nThe rule to meet: an admission policy judges at an instant its caller names. RecognisedCertificate gains admit_at, taking the statement, the asserted credential and the instant, built on verify_certificate_chain_at; admit keeps its signature and calls admit_at with the present, so nothing that admits a live request changes. The test issues the same one-second certificate and calls admit_at twice with no sleep: at an instant inside the validity window it asserts admitted, and at an instant two seconds past issuance it asserts NotAdmitted. The positive control stays, the refusal is still the only check that tells a chain verification that consults the window from one that does not, and the test runs in milliseconds.\n\nAcceptance: the sleep is gone and both assertions stand on explicit instants; a grep for thread::sleep and tokio::time::sleep across crates/lys-anchor prints nothing; every other admission test is unchanged and green; no timeout is raised and no test is split; the change is one commit on the card branch. Keep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh). The cluster is lys-anchor, new under docs/design, holding only this card's documents; the brief id is the first for that cluster's prefix, and the roadmap row and any decision take the next free id after main's highest and every open brief/* and draft/* branch's, checked with git ls-remote immediately before writing. Not in scope: how notAfter is truncated at issuance, lys-core's public API, or any other test in the workspace. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie on 27 September 2026 on lys main 7b53625.",
+        "context": "The card filed on the lys board against main 7b53625, relaying the rule given in the pipeline channel that a test waiting on the clock is a defect in the code. Its survey asked the lys lead two questions, answered in round 1: the method documents are added beside the eight pre-method documents already in docs/design/lys-anchor, which stay unrenamed and unchanged; and admit_at takes the statement, the SubmitterContext and the instant, exactly what admit takes plus the instant."
+      },
+      "links": {
+        "cluster": "lys-anchor",
+        "decisions": [
+          "ADR-004",
+          "ADR-040"
+        ],
+        "briefs": [
+          "LYSANCHOR-001"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Further units, not written: Remove the 20 ms sleeps from lys-home's templates and blocks record tests. Ids: RM-026 and ADR-040 are the next free after main's highest (RM-016, ADR-018 at 7b53625) and every open brief/* and draft/* branch's (RM-025, ADR-039), checked with git ls-remote over origin's 69 main, brief/* and draft/* refs immediately before writing; no ref held a LYSANCHOR brief. The render writes DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSANCHOR-001.md, none of which a pre-method document holds, so nothing is renamed."
     }
   ]
 }

@@ -894,6 +894,25 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-040",
+      "title": "An admission policy judges at an instant its caller names; the live path names the present",
+      "status": "decided",
+      "scope": "lys-anchor",
+      "date": "2026-09-27",
+      "decided_by": "The card's words and the lys lead's answer on admit_at's parameters; recorded with LYSANCHOR-001",
+      "context": "RecognisedCertificate could judge a certificate only at the present, because its admit called lys-core's verify_certificate_chain, which reads the clock itself. Its expiry test therefore slept 2.1 seconds, a wait the suite paid on every run and one whose outcome depends on a host's load. lys-core already exports verify_certificate_chain_at, frozen at 0.2.0, which takes the instant to judge against.",
+      "decision": "RecognisedCertificate gains an inherent admit_at taking the submission, the SubmitterContext and the instant, built on verify_certificate_chain_at; AdmissionPolicy::admit keeps its signature and calls admit_at with the present, so a live request is judged exactly as before, and tests state the instants they judge at. Rejected: keeping the sleep; raising a timeout or splitting the test; injecting a clock into the policy instead of passing an instant; changing the AdmissionPolicy trait; and an admit_at taking only the asserted credential bytes, which would have to collapse the context's provenance before the call and could not represent the unidentified or transport-authenticated arms.",
+      "quote": "The rule to meet: an admission policy judges at an instant its caller names.",
+      "consequences": [
+        "The AdmissionPolicy trait, NotAdmitted and anchor/append.rs are unchanged; DP9 and DP23 in docs/design/lys-anchor/DECISIONS.md stand.",
+        "A test of the certificate gate's validity window states its instants and never sleeps.",
+        "lys-anchor depends on chrono through the workspace's existing entry.",
+        "verify_certificate_chain_at is used as lys-core 0.2.0 publishes it; lys-core is not changed."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

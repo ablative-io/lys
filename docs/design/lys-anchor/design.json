@@ -1,0 +1,311 @@
+{
+  "cluster": "lys-anchor",
+  "title": "lys-anchor: admission judged at an instant its caller names",
+  "intention": "The anchor's certificate gate is judged at an instant its caller names. A live request is still judged at the present, exactly as it is today, while a test states the instants it judges at instead of waiting for the clock to reach them, so the expiry refusal is proved in milliseconds and cannot fail because a host is loaded.\n\nThe gate keeps every property it has: the same one-value refusal, the same two questions put to lys-core, provenance arriving attached, and a positive control beside the refusal so that the refusal is still the check that tells a chain verification that consults the validity window from one that does not.",
+  "problem": "an_expired_certificate_is_refused in crates/lys-anchor/src/admission/certificate_tests.rs issues a certificate valid for one second, asserts it admitted, then sleeps 2100 milliseconds before asserting it refused. It is the only sleep in crates/lys-anchor. The suite pays the wait on every run, and on a loaded host a wait on the clock is what makes a suite slow and its outcome depend on scheduling rather than on the code. The test has to wait because RecognisedCertificate can only judge at the present: its AdmissionPolicy::admit calls lys-core's verify_certificate_chain, which reads the clock itself, although lys-core already exports verify_certificate_chain_at, which takes the instant to judge against.",
+  "solution": "RecognisedCertificate gains a public, documented inherent method, admit_at, that takes what admit takes, the submission and the SubmitterContext, plus the instant to judge at, as a chrono UTC date-time, the type verify_certificate_chain_at takes. Its body is the body admit has today with verify_certificate_chain replaced by verify_certificate_chain_at at that instant: the three context arms matched with no wildcard (Unidentified refused, the asserted bytes and the transport-authenticated peer's certificate each read as the credential), the chain verified first, and the optional subject allow-list read only after the chain verifies. Every refusal is the same fieldless NotAdmitted. AdmissionPolicy::admit keeps its signature and calls admit_at with the present, so anchor/append.rs, the only non-test caller of admit, and every live request are unchanged. The AdmissionPolicy trait does not change (DP23, policy.rs), and admit_at is inherent to RecognisedCertificate rather than a trait method (ADR-040). lys-anchor gains chrono through the workspace's existing entry (ADR-004: nothing outside the workspace is added).\n\nThe words say admit_at takes the asserted credential; the lead ruled that this is read as the SubmitterContext that carries it, so the Unidentified, asserted and authenticated arms are kept and nothing collapses provenance before the call, as policy.rs's contract says.\n\nThe expiry test issues the same one-second certificate from the same authority and takes its issuance instant from the certificate itself, as its expires_at less the one-second lifetime: lys-core truncates both validity bounds to whole seconds, so that instant is exactly the certificate's notBefore and the window runs one second from it, bounds inclusive. It asserts admitted at half a second past issuance, strictly inside the window, and NotAdmitted at two seconds past issuance, strictly after it. Neither instant is read from the clock, so the outcome does not depend on how long issuance took. The module docs of certificate.rs and certificate_tests.rs are rewritten where they say the certificate is judged right now or that a case waits for expiry.\n\nThis cluster's documents sit beside the eight documents docs/design/lys-anchor already held, which are its pre-method record and are read, not changed (CN6): BUILD-PLAN.md, DECISIONS.md, DELEGATION-V1.md, HANDOFF-2026-08-08.md, KEY-HISTORY-FOLD-QUESTIONS.md, STRAWMAN-SESSION.md, STRAWMAN.md and WIRE-DRAFTS.md. DECISIONS.md is cited by path from elsewhere in the tree, which is why none is renamed. The method's render writes DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSANCHOR-001.md, and none of the eight holds any of those names.",
+  "principles": [
+    {
+      "id": "P1",
+      "text": "An admission policy judges at an instant its caller names; the live path names the present."
+    },
+    {
+      "id": "P2",
+      "text": "A test states the instants it judges at and never waits on the clock."
+    },
+    {
+      "id": "P3",
+      "text": "Provenance arrives attached: admit_at takes the SubmitterContext admit takes, and nothing collapses its arms before the call."
+    },
+    {
+      "id": "P4",
+      "text": "The positive control stands beside the refusal, and the refusal remains the only check that tells a chain verification that consults the validity window from one that does not."
+    }
+  ],
+  "decisions": [
+    "ADR-004",
+    "ADR-040"
+  ],
+  "goals": [
+    "an_expired_certificate_is_refused contains no sleep and asserts Ok(()) from admit_at at issuance plus 500 milliseconds and Err(NotAdmitted) at issuance plus 2 seconds.",
+    "grep -rnE 'thread::sleep|tokio::time::sleep' crates/lys-anchor prints nothing.",
+    "The 18 other admission tests (9 in certificate_tests.rs, 4 in context_tests.rs, 5 in trivial_tests.rs) are byte-unchanged and pass.",
+    "crates/lys-core, crates/lys-anchor/src/admission/policy.rs, crates/lys-anchor/src/admission/context.rs and crates/lys-anchor/src/anchor/append.rs are byte-unchanged.",
+    "Every leg of the gate passes, and the code change is one commit on the card branch."
+  ],
+  "non_goals": [
+    {
+      "text": "How notAfter is truncated at issuance.",
+      "reason": "Out of scope by the words; the test reads the truncated bound, it does not change it."
+    },
+    {
+      "text": "Any change to lys-core, its public API included.",
+      "reason": "Out of scope by the words; verify_certificate_chain_at is frozen at 0.2.0 and used as published."
+    },
+    {
+      "text": "The 20 ms sleeps in crates/lys-home/src/record/templates_tests.rs and blocks_tests.rs.",
+      "reason": "The words put every other test in the workspace out of scope; they are a further unit on the roadmap row."
+    },
+    {
+      "text": "A clock injected into the policy in place of an instant.",
+      "reason": "The words ask for an instant the caller names."
+    },
+    {
+      "text": "A change to the AdmissionPolicy trait.",
+      "reason": "admit keeps its signature (DP23 keeps the trait as the policy boundary); admit_at is inherent to RecognisedCertificate."
+    },
+    {
+      "text": "Raising a timeout or splitting a test.",
+      "reason": "Excluded by the words."
+    },
+    {
+      "text": "Renaming, moving or rewriting the eight pre-method documents in docs/design/lys-anchor.",
+      "reason": "The lead ruled they stay where they are, unchanged; the render writes no name any of them holds."
+    }
+  ],
+  "structure": [
+    {
+      "path": "crates/lys-anchor/Cargo.toml",
+      "note": "lys-anchor's manifest; gains chrono from the workspace in [dependencies] (LYSANCHOR-001 R1)",
+      "brief": ""
+    },
+    {
+      "path": "Cargo.lock",
+      "note": "the workspace lockfile; lys-anchor's dependency list gains chrono (LYSANCHOR-001 R1)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-anchor/src/admission/certificate.rs",
+      "note": "RecognisedCertificate; gains admit_at, admit calls it with the present, docs name the instant (LYSANCHOR-001 R2)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-anchor/src/admission/certificate_tests.rs",
+      "note": "RecognisedCertificate's tests; an_expired_certificate_is_refused judges at two named instants with no sleep, module doc rewritten (LYSANCHOR-001 R3)",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/lys-anchor/design.json",
+      "note": "this design",
+      "brief": "LYSANCHOR-001"
+    },
+    {
+      "path": "docs/design/lys-anchor/DESIGN.md",
+      "note": "rendered design",
+      "brief": "LYSANCHOR-001"
+    },
+    {
+      "path": "docs/design/lys-anchor/checklist.json",
+      "note": "the checklist",
+      "brief": "LYSANCHOR-001"
+    },
+    {
+      "path": "docs/design/lys-anchor/CHECKLIST.md",
+      "note": "rendered checklist",
+      "brief": "LYSANCHOR-001"
+    },
+    {
+      "path": "docs/design/lys-anchor/stories.json",
+      "note": "the user stories",
+      "brief": "LYSANCHOR-001"
+    },
+    {
+      "path": "docs/design/lys-anchor/USER-STORIES.md",
+      "note": "rendered stories",
+      "brief": "LYSANCHOR-001"
+    },
+    {
+      "path": "docs/design/lys-anchor/briefs/LYSANCHOR-001.json",
+      "note": "the brief",
+      "brief": "LYSANCHOR-001"
+    },
+    {
+      "path": "docs/design/lys-anchor/briefs/LYSANCHOR-001.md",
+      "note": "the rendered brief",
+      "brief": "LYSANCHOR-001"
+    }
+  ],
+  "inventory": [
+    {
+      "path": "crates/lys-anchor/src/admission/certificate.rs",
+      "note": "239 lines. RecognisedCertificate { issuer_public_key, subject_keys }, constructors issued_by and issued_by_to, no Default (a compile_fail doctest checks it). Its AdmissionPolicy::admit matches Unidentified (refused), AssertedBySubmitter and AuthenticatedByTransport with no wildcard, calls verify_certificate_chain(credential, &issuer) at the present, then reads the subject key only if an allow-list is set. Module doc question 1 says 'inside its validity window right now'; issued_by and admit docs say 'currently'."
+    },
+    {
+      "path": "crates/lys-anchor/src/admission/certificate_tests.rs",
+      "note": "387 lines, 10 tests. an_expired_certificate_is_refused (lines 182-208) issues from seed b\"lys-anchor-admission-ca-seed-05!\" with a one-second TTL, asserts admit Ok(()), sleeps 2100 ms (line 202, the only sleep in crates/lys-anchor), asserts Err(NotAdmitted). The module doc bullet 'The passage of time' (lines 16-19) says one case waits for a certificate to expire."
+    },
+    {
+      "path": "crates/lys-anchor/src/admission/policy.rs",
+      "note": "The AdmissionPolicy trait: admit(&self, &Submission, &SubmitterContext) -> Result<(), NotAdmitted>; the context arrives with its provenance attached; NotAdmitted is fieldless. Unchanged."
+    },
+    {
+      "path": "crates/lys-anchor/src/admission/context.rs",
+      "note": "SubmitterContext: Unidentified, AssertedBySubmitter(&[u8]), AuthenticatedByTransport(AuthenticatedPeer). Unchanged."
+    },
+    {
+      "path": "crates/lys-anchor/src/admission/context_tests.rs",
+      "note": "4 tests. Unchanged."
+    },
+    {
+      "path": "crates/lys-anchor/src/admission/trivial_tests.rs",
+      "note": "5 tests. Unchanged."
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/append.rs",
+      "note": "Line 107 is the only non-test caller of admit in lys-anchor and lys-anchor-cli. Unchanged."
+    },
+    {
+      "path": "crates/lys-anchor/Cargo.toml",
+      "note": "publish = false; [dependencies] lys-core, lys-log-store, thiserror from the workspace; no chrono."
+    },
+    {
+      "path": "Cargo.toml",
+      "note": "The workspace; chrono 0.4 with serde is a workspace dependency (line 32). Unchanged."
+    },
+    {
+      "path": "crates/lys-core/src/ca/authority.rs",
+      "note": "verify_certificate_chain (line 312) wraps verify_certificate_chain_at (line 358) with Utc::now(); the window check is inclusive at both bounds. Issuance truncates notBefore and notAfter to whole seconds. Frozen at 0.2.0; unchanged."
+    },
+    {
+      "path": "crates/lys-core/src/ca/certificate.rs",
+      "note": "IssuedCertificate exposes expires_at (whole seconds, equal to notAfter) and no issuance instant. Unchanged."
+    },
+    {
+      "path": "docs/design/lys-anchor/BUILD-PLAN.md",
+      "note": "Pre-method record read by this cluster, unrenamed and unchanged: the anchor's build plan, written before the method."
+    },
+    {
+      "path": "docs/design/lys-anchor/DECISIONS.md",
+      "note": "Pre-method record read by this cluster, unrenamed and unchanged: the DP decision ledger: DP9 (the write path is certificate-gated, never on a request's signature) at line 179 and DP23 (admission is a policy object and no default ships) at line 359; DP26 is cited by path from the revocation brief."
+    },
+    {
+      "path": "docs/design/lys-anchor/DELEGATION-V1.md",
+      "note": "Pre-method record read by this cluster, unrenamed and unchanged: the lys/delegation/v1 draft."
+    },
+    {
+      "path": "docs/design/lys-anchor/HANDOFF-2026-08-08.md",
+      "note": "Pre-method record read by this cluster, unrenamed and unchanged: the anchor's handoff record."
+    },
+    {
+      "path": "docs/design/lys-anchor/KEY-HISTORY-FOLD-QUESTIONS.md",
+      "note": "Pre-method record read by this cluster, unrenamed and unchanged: the open questions on the key-history fold."
+    },
+    {
+      "path": "docs/design/lys-anchor/STRAWMAN-SESSION.md",
+      "note": "Pre-method record read by this cluster, unrenamed and unchanged: the strawman session record."
+    },
+    {
+      "path": "docs/design/lys-anchor/STRAWMAN.md",
+      "note": "Pre-method record read by this cluster, unrenamed and unchanged: the anchor strawman."
+    },
+    {
+      "path": "docs/design/lys-anchor/WIRE-DRAFTS.md",
+      "note": "Pre-method record read by this cluster, unrenamed and unchanged: the anchor's wire-format drafts."
+    }
+  ],
+  "constraints": [
+    {
+      "id": "CN1",
+      "text": "crates/lys-core is byte-unchanged, its public API included."
+    },
+    {
+      "id": "CN2",
+      "text": "The AdmissionPolicy trait is unchanged; no Default and no defaulting constructor is added to any policy (DP23); NotAdmitted stays fieldless and every refusal is that one value."
+    },
+    {
+      "id": "CN3",
+      "text": "crates/lys-anchor/src/anchor/append.rs is unchanged and admit keeps its signature, so a live request is judged at the present."
+    },
+    {
+      "id": "CN4",
+      "text": "No test other than an_expired_certificate_is_refused changes anywhere in the workspace; no timeout is raised; no test is split."
+    },
+    {
+      "id": "CN5",
+      "text": "No file over 500 lines of code; no unwrap, expect, panic, todo, unimplemented or unreachable in library code; every public item documented; no #[allow], #[ignore], _-prefixed unused binding added, or #[cfg(any())]."
+    },
+    {
+      "id": "CN6",
+      "text": "The eight pre-method documents in docs/design/lys-anchor are not renamed, moved or changed."
+    },
+    {
+      "id": "CN7",
+      "text": "The code change is one commit on the card branch."
+    },
+    {
+      "id": "CN8",
+      "text": "Every path in this cluster's documents is relative to the repository root."
+    }
+  ],
+  "gate": [
+    {
+      "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
+      "legs": [
+        {
+          "name": "fmt",
+          "command": "cargo fmt --all",
+          "requires": [
+            "tool:cargo",
+            "tool:rustfmt"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy-all-features",
+          "command": "cargo clippy --all-targets --all-features -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy",
+          "command": "cargo clippy --all-targets -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "tests",
+          "command": "cargo test --workspace --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc-all-features",
+          "command": "cargo doc --no-deps --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc",
+          "command": "cargo doc --no-deps",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
+          "requires": [
+            "tool:sh",
+            "tool:python3"
+          ],
+          "cadence": "round"
+        }
+      ]
+    }
+  ]
+}
