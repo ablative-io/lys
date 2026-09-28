@@ -1,9 +1,17 @@
-//! The authenticated link-audit receiver endpoint over lys-identity's core (R4).
+//! The authenticated link-audit receiver endpoint over lys-identity's core (R4),
+//! and the source's question of which person holds a login.
+//!
+//! The person a login belongs to is read from the directory's bindings by the
+//! login's exact issuer and subject. It is never inferred from an email
+//! address, and an issuer's own user id is never taken to be a person id. Only
+//! the configured link-audit source may ask, and a login no person holds is
+//! refused as `LoginUnbound`.
 
 use std::str::FromStr;
 use std::sync::Arc;
 
 use axum::extract::State;
+use axum::extract::rejection::JsonRejection;
 use axum::http::HeaderMap;
 use axum::routing::post;
 use axum::{Json, Router};
@@ -15,9 +23,42 @@ use crate::error::ServerError;
 use crate::routes::{AppState, receipt_json, signed_in, with_directory};
 use crate::session::now;
 
-/// The link-audit route.
+/// The link-audit routes.
 pub fn routes() -> Router<Arc<AppState>> {
-    Router::new().route("/link-audit", post(deliver))
+    Router::new()
+        .route("/link-audit", post(deliver))
+        .route("/link-audit/person", post(holder))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Asked {
+    issuer: String,
+    subject: String,
+}
+
+async fn holder(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    body: Result<Json<Asked>, JsonRejection>,
+) -> Result<Json<Value>, ServerError> {
+    let source = signed_in(&state, &headers)?;
+    state.admission.link_audit_source(&source)?;
+    let Json(asked) = body.map_err(|refused| ServerError::RequestMalformed {
+        reason: refused.body_text(),
+    })?;
+    let login = LoginBinding::new(&asked.issuer, &asked.subject).map_err(|refused| {
+        ServerError::RequestMalformed {
+            reason: refused.to_string(),
+        }
+    })?;
+    with_directory(&state, |directory| {
+        let person = directory
+            .projection()?
+            .person_for(&login)
+            .ok_or(ServerError::LoginUnbound)?;
+        Ok(Json(json!({ "person": person.to_string() })))
+    })
 }
 
 #[derive(Deserialize)]

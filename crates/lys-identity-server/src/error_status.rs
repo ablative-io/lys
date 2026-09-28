@@ -86,6 +86,7 @@ impl ServerError {
             | Self::SessionUnknown
             | Self::RequestUnknown
             | Self::MachineUnknown
+            | Self::LoginUnbound
             | Self::LaunchRecordMissing
             | Self::ProfileVersionUnknown { .. }
             | Self::RuntimeSessionUnknown
