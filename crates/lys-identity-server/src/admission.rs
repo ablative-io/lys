@@ -5,8 +5,14 @@
 //! Admission compares the login the service authenticated, issuer and subject
 //! exactly, with the configured one. An email is never compared, and a first
 //! visit admits nobody and registers nobody.
+//!
+//! The link-audit source may also be an agent whose signed request the
+//! service verified. The agent is admitted when the person responsible for it
+//! holds the configured link-audit source login, read from the directory's
+//! bindings, and the request is then recorded under that person's login.
 
-use lys_identity::{Actor, LoginBinding};
+use lys_identity::projection::{Projection, Record};
+use lys_identity::{Actor, AgentId, IdentityId, LoginBinding};
 
 use crate::error::ServerError;
 
@@ -52,6 +58,29 @@ impl Admission {
         } else {
             Err(ServerError::NotAdmitted {
                 reason: "only the configured link-audit source may deliver observations",
+            })
+        }
+    }
+
+    /// Admit `agent`, whose signed request the service verified, as the
+    /// link-audit source, answering the login of the person responsible for
+    /// it that the request is recorded under, or refuse by name.
+    pub fn link_audit_agent(
+        &self,
+        directory: &Projection,
+        agent: AgentId,
+    ) -> Result<&LoginBinding, ServerError> {
+        let responsible = directory
+            .record(IdentityId::Agent(agent))
+            .and_then(Record::responsible)
+            .ok_or(ServerError::NotAdmitted {
+                reason: "the signing agent has no responsible person, so nobody answers for its link-audit requests (act: sign the request as an agent registered under the person who holds the configured link-audit source login)",
+            })?;
+        if directory.person_for(&self.link_audit_source) == Some(responsible) {
+            Ok(&self.link_audit_source)
+        } else {
+            Err(ServerError::NotAdmitted {
+                reason: "the signing agent's responsible person does not hold the configured link-audit source login (act: bind that login to the person responsible for the agent)",
             })
         }
     }

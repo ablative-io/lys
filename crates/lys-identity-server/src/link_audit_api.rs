@@ -6,19 +6,44 @@
 //! address, and an issuer's own user id is never taken to be a person id. Only
 //! the configured link-audit source may ask, and a login no person holds is
 //! refused as `LoginUnbound`.
+//!
+//! The source is admitted to both routes in one of two ways. A session whose
+//! login is the configured link-audit source login is admitted, and the actor
+//! recorded is that login by the method OIDC. A request carrying the
+//! `lys-agent-signature` header is admitted when the signature stands, as
+//! `agent_signature` checks it over the method `POST`, the route's path and
+//! the exact bytes of the body, and the person responsible for the signing
+//! agent holds the configured link-audit source login. The actor recorded is
+//! then that person, named by that login, by the method agent signature, and
+//! the event keeps the agent's id. No token of any other kind is taken.
+//!
+//! A request carrying both a session cookie and the signature header is
+//! judged by the signature alone: the session neither admits it nor names
+//! its actor.
+//!
+//! The path an agent signs is the path this router serves the route at,
+//! `/link-audit` or `/link-audit/person`, as it is for every signed agent
+//! request: where the service mounts its routes under a prefix, the prefix is
+//! not part of what is signed.
+//!
+//! The caller is admitted before the body is read, and the body is read from
+//! the bytes that were signed. A body that is not JSON, or not the members
+//! the route asks for and no others, is refused `RequestMalformed`.
 
 use std::str::FromStr;
 use std::sync::Arc;
 
+use axum::body::Bytes;
 use axum::extract::State;
-use axum::extract::rejection::JsonRejection;
-use axum::http::HeaderMap;
+use axum::http::{HeaderMap, Uri, header};
 use axum::routing::post;
 use axum::{Json, Router};
-use lys_identity::{LinkChange, LinkObservation, LoginBinding, PersonId};
+use lys_identity::{Actor, LinkChange, LinkObservation, LoginBinding, PersonId, Provenance};
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 
+use crate::agent_signature::signed_agent;
 use crate::error::ServerError;
 use crate::routes::{AppState, receipt_json, signed_in, with_directory};
 use crate::session::now;
@@ -28,6 +53,64 @@ pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/link-audit", post(deliver))
         .route("/link-audit/person", post(holder))
+}
+
+fn malformed(reason: impl Into<String>) -> ServerError {
+    ServerError::RequestMalformed {
+        reason: reason.into(),
+    }
+}
+
+/// The actor a POST of `body` to `path` is admitted as: the person
+/// responsible for the agent that signed it, or else the signed-in source.
+fn admitted(
+    state: &AppState,
+    headers: &HeaderMap,
+    path: &str,
+    body: &[u8],
+) -> Result<Actor, ServerError> {
+    let signed = with_directory(state, |directory| {
+        let directory = directory.projection()?;
+        let Some(agent) = signed_agent(state, directory, headers, ("POST", path, body))? else {
+            return Ok(None);
+        };
+        let login = state.admission.link_audit_agent(directory, agent)?;
+        Ok(Some(Actor::new(
+            login.clone(),
+            Provenance::by_agent(agent, now()),
+        )))
+    })?;
+    if let Some(actor) = signed {
+        return Ok(actor);
+    }
+    let source = signed_in(state, headers)?;
+    state.admission.link_audit_source(&source)?;
+    Ok(source)
+}
+
+/// Whether the request says its body is JSON.
+fn says_json(headers: &HeaderMap) -> bool {
+    headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.split(';').next())
+        .map(|kind| kind.trim().to_ascii_lowercase())
+        .is_some_and(|kind| {
+            kind == "application/json"
+                || (kind.starts_with("application/") && kind.ends_with("+json"))
+        })
+}
+
+/// The members `body` carries, which must be the ones `T` names and no others.
+fn read<T: DeserializeOwned>(headers: &HeaderMap, body: &[u8]) -> Result<T, ServerError> {
+    if !says_json(headers) {
+        return Err(malformed(
+            "the request does not say its body is JSON (act: send it with `Content-Type: application/json`)",
+        ));
+    }
+    let Json(members) =
+        Json::<T>::from_bytes(body).map_err(|refused| malformed(refused.body_text()))?;
+    Ok(members)
 }
 
 #[derive(Deserialize)]
@@ -40,18 +123,13 @@ struct Asked {
 async fn holder(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    body: Result<Json<Asked>, JsonRejection>,
+    uri: Uri,
+    bytes: Bytes,
 ) -> Result<Json<Value>, ServerError> {
-    let source = signed_in(&state, &headers)?;
-    state.admission.link_audit_source(&source)?;
-    let Json(asked) = body.map_err(|refused| ServerError::RequestMalformed {
-        reason: refused.body_text(),
-    })?;
-    let login = LoginBinding::new(&asked.issuer, &asked.subject).map_err(|refused| {
-        ServerError::RequestMalformed {
-            reason: refused.to_string(),
-        }
-    })?;
+    admitted(&state, &headers, uri.path(), &bytes)?;
+    let asked: Asked = read(&headers, &bytes)?;
+    let login = LoginBinding::new(&asked.issuer, &asked.subject)
+        .map_err(|refused| malformed(refused.to_string()))?;
     with_directory(&state, |directory| {
         let person = directory
             .projection()?
@@ -76,17 +154,16 @@ struct Delivery {
 async fn deliver(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    Json(body): Json<Delivery>,
+    uri: Uri,
+    bytes: Bytes,
 ) -> Result<Json<Value>, ServerError> {
-    let source = signed_in(&state, &headers)?;
-    state.admission.link_audit_source(&source)?;
+    let source = admitted(&state, &headers, uri.path(), &bytes)?;
+    let body: Delivery = read(&headers, &bytes)?;
     let change = match body.change.as_str() {
         "linked" => LinkChange::Linked,
         "unlinked" => LinkChange::Unlinked,
         other => {
-            return Err(ServerError::RequestMalformed {
-                reason: format!("{other} is not linked or unlinked"),
-            });
+            return Err(malformed(format!("{other} is not linked or unlinked")));
         }
     };
     let person = PersonId::from_str(&body.person)?;

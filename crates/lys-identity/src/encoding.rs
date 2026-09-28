@@ -146,6 +146,26 @@ fn change(out: &mut Vec<u8>, value: &Change) {
     }
 }
 
+/// The actor's map: keys 1 to 4, and the agent's id under key 5 when an agent
+/// signed the request. An OIDC actor is written as it always was.
+fn actor(out: &mut Vec<u8>, value: &Actor) {
+    let provenance = value.provenance();
+    let agent = provenance.agent();
+    map(out, if agent.is_some() { 5 } else { 4 });
+    uint(out, 1);
+    text(out, value.binding().issuer());
+    uint(out, 2);
+    text(out, value.binding().subject());
+    uint(out, 3);
+    uint(out, wire::method(provenance.method()));
+    uint(out, 4);
+    uint(out, provenance.authenticated_at());
+    if let Some(agent) = agent {
+        uint(out, 5);
+        bytes(out, agent.as_bytes());
+    }
+}
+
 /// The canonical body bytes of `event`: the COSE payload, and what the payload commitment is taken over.
 pub fn encode_body(event: &IdentityEvent) -> Vec<u8> {
     let mut out = Vec::new();
@@ -155,16 +175,7 @@ pub fn encode_body(event: &IdentityEvent) -> Vec<u8> {
     uint(&mut out, 2);
     bytes(&mut out, event.operation().as_bytes());
     uint(&mut out, 3);
-    let actor = event.actor();
-    map(&mut out, 4);
-    uint(&mut out, 1);
-    text(&mut out, actor.binding().issuer());
-    uint(&mut out, 2);
-    text(&mut out, actor.binding().subject());
-    uint(&mut out, 3);
-    uint(&mut out, wire::method(actor.provenance().method()));
-    uint(&mut out, 4);
-    uint(&mut out, actor.provenance().authenticated_at());
+    actor(&mut out, event.actor());
     uint(&mut out, 4);
     map(&mut out, 2);
     uint(&mut out, 1);
@@ -326,6 +337,32 @@ fn decode_change(kind: u64, value: Value) -> Result<Change, IdentityError> {
     }
 }
 
+/// The actor an actor's map names: keys 1 to 4, and the agent's id under key
+/// 5 when, and only when, the method is an agent's signature.
+fn decode_actor(value: Value) -> Result<Actor, IdentityError> {
+    const SHAPE: &str = "an actor is a map of keys 1 to 4, or 1 to 5 when it names an agent";
+    let named = matches!(&value, Value::Map(pairs) if pairs.len() == 5);
+    let ([issuer, subject, method, authenticated_at], agent) = if named {
+        let [issuer, subject, method, authenticated_at, agent] = fields::<5>(value, SHAPE)?;
+        let agent = AgentId::from_bytes(as_id(agent, "a signing agent's id is 16 bytes")?);
+        ([issuer, subject, method, authenticated_at], Some(agent))
+    } else {
+        (fields::<4>(value, SHAPE)?, None)
+    };
+    let code = as_uint(&method, "an authentication method is a code")?;
+    let method = wire::method_from(code, agent).map_err(malformed)?;
+    Ok(Actor::new(
+        LoginBinding::new(
+            &as_text(issuer, "an actor's issuer is text")?,
+            &as_text(subject, "an actor's subject is text")?,
+        )?,
+        Provenance::new(
+            method,
+            as_uint(&authenticated_at, "an authentication time is seconds")?,
+        ),
+    ))
+}
+
 /// The event an event body's bytes name, refused unless the bytes are its canonical encoding.
 pub fn decode_body(body: &[u8]) -> Result<IdentityEvent, IdentityError> {
     const SHAPE: &str = "the body is a map of keys 1 to 7";
@@ -339,20 +376,7 @@ pub fn decode_body(body: &[u8]) -> Result<IdentityEvent, IdentityError> {
         }
     }
     let [_, operation, actor, identity, recorded_at, kind, change] = fields::<7>(value, SHAPE)?;
-    let [issuer, subject, method, authenticated_at] =
-        fields::<4>(actor, "an actor is a map of keys 1 to 4")?;
-    let method = wire::method_from(as_uint(&method, "an authentication method is a code")?)
-        .ok_or_else(|| malformed("an authentication method code is 1"))?;
-    let actor = Actor::new(
-        LoginBinding::new(
-            &as_text(issuer, "an actor's issuer is text")?,
-            &as_text(subject, "an actor's subject is text")?,
-        )?,
-        Provenance::new(
-            method,
-            as_uint(&authenticated_at, "an authentication time is seconds")?,
-        ),
-    );
+    let actor = decode_actor(actor)?;
     let [identity_kind, identity_id] =
         fields::<2>(identity, "an identity is a map of keys 1 and 2")?;
     let identity_id = as_id(identity_id, "an identity id is 16 bytes")?;
