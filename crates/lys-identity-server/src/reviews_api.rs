@@ -262,10 +262,10 @@ async fn keep(
     Path(grant): Path<String>,
     body: Result<Json<KeepBody>, JsonRejection>,
 ) -> Result<Json<Kept>, ServerError> {
+    let actor = signed_in(&state, &headers)?;
     let Json(body) = body.map_err(|refused| ServerError::RequestMalformed {
         reason: refused.body_text(),
     })?;
-    let actor = signed_in(&state, &headers)?;
     let grant = grant_id(&grant)?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
     let note = note(&body.note)?;

@@ -133,6 +133,7 @@ async fn stop(
     Path(id): Path<String>,
     body: Result<Json<StopBody>, JsonRejection>,
 ) -> Result<Json<StopView>, ServerError> {
+    let actor = signed_in(&state, &headers)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?;
     let reason = body.reason.trim().to_owned();
@@ -144,7 +145,6 @@ async fn stop(
             "reason is longer than {REASON_MAX} characters"
         )));
     }
-    let actor = signed_in(&state, &headers)?;
     let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
     let administrator = state.admission.administrator(&actor).is_ok();
     let (by, lifecycle) = with_directory(&state, |directory| {

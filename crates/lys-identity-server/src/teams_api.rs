@@ -231,8 +231,8 @@ async fn create(
     headers: HeaderMap,
     body: Result<Json<CreateBody>, JsonRejection>,
 ) -> Result<Json<TeamChanged>, ServerError> {
-    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let actor = signed_in(&state, &headers)?;
+    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let id = OperationId::from_str(&body.operation)?.to_string();
     let name = words("name", &body.name, NAME_MAX)?;
     if name.is_empty() {
@@ -329,8 +329,8 @@ async fn add(
     Path(id): Path<String>,
     body: Result<Json<MemberBody>, JsonRejection>,
 ) -> Result<Json<TeamChanged>, ServerError> {
-    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let actor = signed_in(&state, &headers)?;
+    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let id = team_id(&id)?;
     let member = body.member.trim().to_owned();
     change(&state, &actor, &id, |team, by| {
@@ -345,8 +345,8 @@ async fn remove(
     Path((id, member)): Path<(String, String)>,
     body: Result<Json<RetireBody>, JsonRejection>,
 ) -> Result<Json<TeamChanged>, ServerError> {
-    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let actor = signed_in(&state, &headers)?;
+    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let id = team_id(&id)?;
     change(&state, &actor, &id, |team, by| {
         changed(&body.operation, team, member, by).map(Line::Removed)
@@ -360,8 +360,8 @@ async fn retire(
     Path(id): Path<String>,
     body: Result<Json<RetireBody>, JsonRejection>,
 ) -> Result<Json<TeamChanged>, ServerError> {
-    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let actor = signed_in(&state, &headers)?;
+    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let id = team_id(&id)?;
     change(&state, &actor, &id, |team, by| {
         changed(&body.operation, team, String::new(), by).map(Line::Retired)
