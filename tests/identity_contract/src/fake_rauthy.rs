@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::post;
 use axum::{Json, Router};
 use serde_json::{Value, json};
 
@@ -53,7 +53,8 @@ impl FakeRauthy {
         });
         let router = Router::new()
             .route("/auth/v1/providers/lookup", post(lookup))
-            .route("/auth/v1/providers", get(list).post(create))
+            .route("/auth/v1/providers", post(list))
+            .route("/auth/v1/providers/create", post(create))
             .route("/auth/v1/providers/{id}", axum::routing::put(replace))
             .with_state(Arc::clone(&inner));
         tokio::spawn(async move { axum::serve(listener, router).await });
