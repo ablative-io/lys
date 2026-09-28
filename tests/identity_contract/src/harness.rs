@@ -418,4 +418,24 @@ impl Service {
             .body(body);
         answer(request.send().await?).await
     }
+
+    /// POST the JSON `body` bytes to `path` carrying every header of
+    /// `headers`, so a request may carry a signature over those exact bytes
+    /// and a session cookie at once.
+    pub async fn post_carrying(
+        &self,
+        path: &str,
+        headers: &[(&str, &str)],
+        body: Vec<u8>,
+    ) -> Result<Answer, Box<dyn Error>> {
+        let mut request = self
+            .client
+            .post(format!("{}{path}", self.base))
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(body);
+        for (name, value) in headers {
+            request = request.header(*name, *value);
+        }
+        answer(request.send().await?).await
+    }
 }
