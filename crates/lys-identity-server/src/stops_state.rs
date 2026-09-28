@@ -1,10 +1,11 @@
 //! What the emergency stops' log folds to, and how that fold is sealed in
 //! the log's signed snapshot so a start reads only the leaves after it.
 //!
-//! A stop is kept whole, with everything it did, once every part of it is
-//! done. It is named by the operation id it was sent under, so the same stop
-//! sent again answers exactly what was kept, and the same operation in
-//! other words is refused.
+//! A stop is kept twice: as asked, before its first part, binding its words
+//! to its operation id; and whole, with everything it did, once every part
+//! is done. So the same stop sent again answers exactly what was kept, and
+//! the same operation in other words is refused, even for a stop cut off
+//! between its parts.
 
 use serde::{Deserialize, Serialize};
 
@@ -36,6 +37,13 @@ pub struct Stop {
     pub credentials_ended: Option<Vec<String>>,
     /// The broker's refusal, by name, when the handles were not ended.
     pub credentials_refused: Option<String>,
+    /// Whether every part is done; false while the stop is only asked.
+    #[serde(default = "done")]
+    pub done: bool,
+}
+
+fn done() -> bool {
+    true
 }
 
 impl Stop {
@@ -70,16 +78,28 @@ impl Held {
         self.stops.iter().find(|stop| stop.operation == operation)
     }
 
+    /// Every stop kept on `agent`, in the order kept.
+    pub fn of_agent<'a>(&'a self, agent: &'a str) -> impl Iterator<Item = &'a Stop> + 'a {
+        self.stops.iter().filter(move |stop| stop.agent == agent)
+    }
+
     /// Fold one stop. A second stop under an operation already kept is
     /// refused, since every kept stop was checked against what came before.
     pub fn hold(&mut self, stop: Stop) -> Result<(), String> {
-        if self.operation(&stop.operation).is_some() {
-            return Err(format!(
-                "operation `{}` already names a stop",
-                stop.operation
-            ));
+        let held = self
+            .stops
+            .iter_mut()
+            .find(|held| held.operation == stop.operation);
+        match held {
+            None => self.stops.push(stop),
+            Some(asked) if !asked.done && stop.done && asked.same_words(&stop) => *asked = stop,
+            Some(_) => {
+                return Err(format!(
+                    "operation `{}` already names a stop",
+                    stop.operation
+                ));
+            }
         }
-        self.stops.push(stop);
         Ok(())
     }
 

@@ -9,7 +9,10 @@
 //! operation id it answers exactly what was kept and does nothing twice;
 //! the same operation in other words is refused `StopReused`. Each part is
 //! kept once by its own record too, so a stop cut off before it was kept
-//! does nothing twice when it is sent again.
+//! does nothing twice when it is sent again; and since the suspension is
+//! the first part and the directory keeps it under the stop's operation, a
+//! stop cut off after it and sent again in other words is refused by that
+//! record.
 //!
 //! The broker is asked after the suspension, the certificates and the
 //! sessions are recorded, so a broker that cannot be reached leaves those
@@ -22,9 +25,9 @@ use axum::body::Bytes;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, Method};
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
-use lys_identity::{AgentId, IdentityId, LifecycleState, OperationId, Transition};
+use lys_identity::{AgentId, IdentityError, IdentityId, LifecycleState, OperationId, Transition};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -96,7 +99,58 @@ impl From<Stop> for StopView {
 
 /// The stop route.
 pub fn routes() -> Router<Arc<AppState>> {
-    Router::new().route("/agents/{id}/stop", post(stop))
+    Router::new()
+        .route("/agents/{id}/stop", post(stop))
+        .route("/agents/{id}/stops", get(stops))
+}
+
+/// The answer of `GET /agents/{id}/stops`.
+#[derive(Debug, Clone, Serialize)]
+pub struct StopsView {
+    /// Every stop kept on the agent, in the order kept.
+    pub stops: Vec<StopView>,
+}
+
+/// Admit the caller to `agent`: the person responsible for it or the
+/// administrator; anyone else is refused `AgentNotVisible`, as is an id
+/// the directory does not hold.
+fn admitted(
+    state: &AppState,
+    actor: &lys_identity::Actor,
+    id: &str,
+) -> Result<(AgentId, String, LifecycleState), ServerError> {
+    let agent = AgentId::from_str(id).map_err(|_unread| ServerError::AgentNotVisible)?;
+    let administrator = state.admission.administrator(actor).is_ok();
+    with_directory(state, |directory| {
+        let projection = directory.projection()?;
+        let person = own_person(projection, actor)?;
+        let record = projection
+            .record(IdentityId::Agent(agent))
+            .ok_or(ServerError::AgentNotVisible)?;
+        if !administrator && record.responsible() != Some(person) {
+            return Err(ServerError::AgentNotVisible);
+        }
+        Ok((agent, person.to_string(), record.state()))
+    })
+}
+
+async fn stops(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<StopsView>, ServerError> {
+    let actor = signed_in(&state, &headers)?;
+    let (agent, _by, _lifecycle) = admitted(&state, &actor, &id)?;
+    with_stops(&state, |store| {
+        Ok(StopsView {
+            stops: store
+                .of_agent(&agent.to_string())
+                .into_iter()
+                .map(StopView::from)
+                .collect(),
+        })
+    })
+    .map(Json)
 }
 
 fn malformed(reason: impl Into<String>) -> ServerError {
@@ -145,19 +199,7 @@ async fn stop(
             "reason is longer than {REASON_MAX} characters"
         )));
     }
-    let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
-    let administrator = state.admission.administrator(&actor).is_ok();
-    let (by, lifecycle) = with_directory(&state, |directory| {
-        let projection = directory.projection()?;
-        let person = own_person(projection, &actor)?;
-        let record = projection
-            .record(IdentityId::Agent(agent))
-            .ok_or(ServerError::AgentNotVisible)?;
-        if !administrator && record.responsible() != Some(person) {
-            return Err(ServerError::AgentNotVisible);
-        }
-        Ok((person.to_string(), record.state()))
-    })?;
+    let (agent, by, lifecycle) = admitted(&state, &actor, &id)?;
     let asked = Stop {
         operation: operation.to_string(),
         agent: agent.to_string(),
@@ -168,36 +210,38 @@ async fn stop(
         sessions_asked: Vec::new(),
         credentials_ended: None,
         credentials_refused: None,
+        done: false,
     };
-    let kept = with_stops(&state, |store| {
-        Ok(store.recorded(&asked.operation).cloned())
+    if let Some(kept) = with_stops(&state, |store| store.ask(asked.clone()))? {
+        return Ok(Json(kept.into()));
+    }
+    let suspended = with_directory(&state, |directory| {
+        Ok(directory.transition(
+            actor.clone(),
+            operation,
+            IdentityId::Agent(agent),
+            Transition::Suspend,
+            &reason,
+            now(),
+        ))
     })?;
-    if let Some(kept) = kept {
-        if !kept.same_words(&asked) {
+    match (suspended, lifecycle) {
+        // Suspended now, or before by this same stop and answered again; or
+        // suspended by another act, and the stop still withdraws, asks and ends.
+        (Ok(_), _) | (Err(IdentityError::TransitionRefused { .. }), LifecycleState::Suspended) => {}
+        // This operation already suspended the agent in other words: a stop cut
+        // off before it was kept, sent again changed.
+        (Err(IdentityError::OperationReused { .. }), _) => {
             return Err(ServerError::StopReused {
                 operation: asked.operation,
             });
         }
-        return Ok(Json(kept.into()));
-    }
-    match lifecycle {
-        LifecycleState::Active => with_directory(&state, |directory| {
-            directory.transition(
-                actor.clone(),
-                operation,
-                IdentityId::Agent(agent),
-                Transition::Suspend,
-                &reason,
-                now(),
-            )?;
-            Ok(())
-        })?,
-        LifecycleState::Suspended => {}
-        other => {
+        (Err(IdentityError::TransitionRefused { .. }), other) => {
             return Err(ServerError::AgentNotActive {
                 state: other.to_string(),
             });
         }
+        (Err(other), _) => return Err(other.into()),
     }
     let agent = agent.to_string();
     let certificates_withdrawn = withdraw_certificates(&state, &agent, &by, &reason)?;

@@ -192,9 +192,35 @@ impl<S: LeafStore> StopStore<S> {
         self.held.operation(operation)
     }
 
-    /// Keep `stop`, once every part of it is done. Sent again in the same
-    /// words it is kept once and answers what was kept; the same operation
-    /// in other words is refused.
+    /// Every stop kept on `agent`, in the order kept.
+    pub fn of_agent(&self, agent: &str) -> Vec<Stop> {
+        self.held.of_agent(agent).cloned().collect()
+    }
+
+    /// Keep `stop` as asked, before its first part. Answers the stop as kept
+    /// when the same words were already done; nothing when they are asked
+    /// and not yet done, or newly asked; the same operation in other words
+    /// is refused.
+    pub fn ask(&mut self, stop: Stop) -> Result<Option<Stop>, ServerError> {
+        self.settle()?;
+        if let Some(kept) = self.held.operation(&stop.operation) {
+            if !kept.same_words(&stop) {
+                return Err(ServerError::StopReused {
+                    operation: stop.operation,
+                });
+            }
+            return Ok(kept.done.then(|| kept.clone()));
+        }
+        self.append(Stop {
+            done: false,
+            ..stop
+        })?;
+        Ok(None)
+    }
+
+    /// Keep `stop` whole, once every part of it is done. Sent again in the
+    /// same words it is kept once and answers what was kept; the same
+    /// operation in other words is refused.
     pub fn keep(&mut self, stop: Stop) -> Result<Stop, ServerError> {
         self.settle()?;
         if let Some(kept) = self.held.operation(&stop.operation) {
@@ -203,8 +229,11 @@ impl<S: LeafStore> StopStore<S> {
                     operation: stop.operation,
                 });
             }
-            return Ok(kept.clone());
+            if kept.done {
+                return Ok(kept.clone());
+            }
         }
+        let stop = Stop { done: true, ..stop };
         self.append(stop.clone())?;
         Ok(stop)
     }
