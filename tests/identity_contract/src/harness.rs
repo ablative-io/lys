@@ -430,13 +430,13 @@ impl Service {
         Ok(())
     }
 
-    /// Begin a sign-in and let the issuer answer it as `login`, answering the
-    /// service path the issuer sends the browser back to.
+    /// Begin a sign-in through a sign-in provider and let it answer as
+    /// `login`, answering the service path the browser is sent back to.
     pub async fn issuer_answer(&self, login: Login) -> Result<String, Box<dyn Error>> {
         self.issuer.sign_in_as(login);
         let to_issuer = self
             .client
-            .get(format!("{}/login", self.base))
+            .get(format!("{}/sign-in/providers/harness", self.base))
             .send()
             .await?;
         let authorize = location(&to_issuer)?;
