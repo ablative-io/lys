@@ -113,7 +113,6 @@ function Row({ x, roles, reach, i, cursor, open }: { x: Entry; roles: RolesLoad;
       className={i === cursor ? 'cursor' : ''}
       data-href={'#/file/' + x.id}
       data-pick={i}
-      onClick={open}
       onMouseOver={() => i !== cursor && shell.setCursor(i)}
       onFocus={() => i !== cursor && shell.setCursor(i)}
       {...keyable(open)}
