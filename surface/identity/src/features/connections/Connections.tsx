@@ -31,6 +31,7 @@ export function Connections() {
       </section>)}</div>
       {data.connections.length === 0 ? <p>The service returned no configured integrations.</p> : null}
       <p className="note">This view shows installation settings. It does not yet list products using Lys or external accounts available to agents.</p>
+      <a className="btn" href="#/service-accounts">Manage service accounts</a>{' '}
       <a className="btn" href="#/me">Your sign-in accounts</a>
     </>} />
   </div>;

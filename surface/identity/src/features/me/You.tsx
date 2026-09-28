@@ -114,7 +114,7 @@ function Page({ data, reload }: { data: YouData; reload: () => void }) {
             </div>
           </div>
           <div className="card" id="service-accounts">
-            <h2>Your service-account records</h2>
+            <h2>Your service-account records</h2><a className="btn" href="#/service-accounts">Manage service accounts</a>
             <div className="note" style={{ margin: '2px 0 6px' }}>These records name accounts. Permission to use or lend their credentials is checked separately.</div>
             {me.service_accounts.length ? (
               me.service_accounts.map((s) => (
