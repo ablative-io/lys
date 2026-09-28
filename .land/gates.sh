@@ -40,5 +40,6 @@ leg cargo test --workspace --all-features --no-fail-fast
 leg cargo doc --no-deps --all-features
 leg cargo doc --no-deps
 leg ast-grep scan --config sgconfig.yml
+leg sh scripts/file-length.sh
 leg identity_leg
 exit "$status"
