@@ -3336,6 +3336,11 @@
       "path": "crates/lys/src/identity/upgrade/back.rs",
       "note": "`lys identity upgrade --back`: the exchange of bin/, configuration, compose and surface with the kept build, atomic where both folders exist, undoing its own finished renames on failure, and finishing an interrupted exchange from the intent record.",
       "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys-secrets/src/audit/codec.rs",
+      "note": "The broker's audit log codec: its kinds are one list the decoder matches, entered in the workspace kinds registry so go-back can compare kind sets.",
+      "brief": "DIRECTORY-053"
     }
   ],
   "inventory": [
