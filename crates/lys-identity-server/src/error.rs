@@ -120,6 +120,11 @@ pub enum ServerError {
         /// What failed.
         reason: String,
     },
+    /// No person in the directory holds the login that was asked about.
+    #[error(
+        "LoginUnbound: no person in the directory holds that login (act: bind the login to its person in the directory, then ask again)"
+    )]
+    LoginUnbound,
     /// No machine is kept by that id.
     #[error("MachineUnknown: no machine is kept by that id")]
     MachineUnknown,
