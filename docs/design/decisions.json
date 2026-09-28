@@ -1678,18 +1678,20 @@
     },
     {
       "id": "ADR-118",
-      "title": "Lys tracks every agent session's tokens, context, time, budgets and goals; Argus's job moves into Lys, in Rust",
+      "title": "Lys owns running and monitoring its agents and enforcing values; Argus reads data for analytics",
       "status": "decided",
       "scope": "project",
       "date": "2026-09-28",
       "decided_by": "Tom, 28 September 2026 19:50 to 19:51 Melbourne, on Dot; recorded by Waffles with DIRECTORY-051",
-      "context": "Argus, a separate service, watches agent sessions: context use and budgets, compaction requests, goal reminders and scheduled messages, reaching sessions through herdr. Tom: it keeps crashing and cannot track budgets, token usage, time and goals through Lys. Lys already keeps each session's home and transcript (lys-home) and, with DIRECTORY-050, runs the session.",
-      "decision": "Lys measures each session it runs from the harness's own transcript: tokens in and out per turn, context in use against the model's window, time running, and the account each turn was paid from. A budget is set on an agent, a team or a person, for context, tokens and time, and Lys acts when one is reached: compacts at a context threshold, stops at a hard token or time cap, or tells the responsible person. Goals are records on an agent with a deadline and reminders Lys delivers into the session through its runner. Everything is under grants, on screens, in the API and in receipts; nothing depends on Argus.",
+      "context": "Argus, a separate service, watches agent sessions: context use and budgets, compaction requests, goal reminders and scheduled messages, reaching sessions through herdr. Tom: it keeps crashing and cannot track budgets, token usage, time and goals through Lys. Lys already keeps each session's home and transcript (lys-home) and, with DIRECTORY-050, runs the session. Amended by the later clarification relayed by Waffles from Tom on Dot, 29 September 2026 06:59 to 07:00; the earlier quotation below is retained as history, not the current service boundary. Tom reversed the inbound-feed proposal at 07:02 on Dot, relayed in full by Waffles at 07:03. This final clarification governs: Lys installs the hooks/status line and reads the stream itself. The 06:59 to 07:00 intermediate proposal remains history only. At 07:04 Tom further described Argus as an extension consuming Lys streams and reading permitted Lys variables, otherwise doing its own work.",
+      "decision": "Lys owns everything about running and monitoring an agent it starts: installing its hooks/status line, reading its session stream and recording tokens, context and time. Lys holds budgets, goals, expectations and deliverables and enforces them through its runner with notices, compaction requests or stops as the value says. The context-watch notices previously driven by Argus become Lys-driven acts. Lys exposes the resulting data for Argus, which keeps analytics and visualisation; Lys does not depend on it. Lys screens are plain controls/state plus the authoritative refused-acts list on each agent page. Context compaction, goals and reminders are Lys-owned background acts. Argus may read explicitly permitted Lys variables alongside its data stream; no secret or arbitrary environment export follows from this.",
       "quote": "Argus is not going to be able to do what we need, to be able to track budgets and token usage, time, goals and everything like that through Lys. We're going to completely rewrite that, in Rust.",
       "consequences": [
-        "Argus is retired once Lys does what it does for our sessions; nothing in Lys calls it.",
-        "A budget is only called a hard cap where Lys can stop the session that breaches it.",
-        "Usage is measured from the transcript Lys keeps, never from a session's own claim."
+        "No upstream Argus feed dependency or card remains; Lys owns collection and enforcement.",
+        "Hook/status-line installation and incremental stream tracking must be proved on a real scratch session, without global-config writes or telemetry network waits on the turn path.",
+        "Argus analytics readers cannot block Lys collection, turns or enforcement.",
+        "A hard cap is called enforced only with adequate measurement coverage and actual runner enforcement evidence.",
+        "The original quotation and the 06:59 to 07:00 intermediate reversal are retained as history; the 07:02 clarification governs."
       ],
       "supersedes": [],
       "superseded_by": ""

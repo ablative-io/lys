@@ -638,7 +638,6 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/usage_api.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
 | `crates/lys-identity-server/src/usage_state.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
 | `crates/lys-identity-server/src/usage_store.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
-| `crates/lys-home/src/harness/claude_code/usage.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
 | `crates/lys-identity-server/tests/usage.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
 | `crates/lys-identity-server/src/budgets_api.rs` | DIRECTORY-051 R2: Budgets on agents, teams and people | DIRECTORY-051 |
 | `crates/lys-identity-server/src/budgets_state.rs` | DIRECTORY-051 R2: Budgets on agents, teams and people | DIRECTORY-051 |
@@ -941,6 +940,38 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-home/src/lib.rs` | DIRECTORY-052 R3: lys-home's library exposes the fewshot writer | DIRECTORY-052 |
 | `crates/lys-home/src/cli.rs` | DIRECTORY-052 R3: the fewshot command calls the library writer | DIRECTORY-052 |
 | `crates/lys-identity-server/src/grants_connector.rs` | Application-connector holder conversion and authorization helpers, keeping grants.rs within ADR-111. | DIRECTORY-048 |
+| `crates/lys-identity-server/src/provisioning_api.rs` | R1: Authenticated parsed tracking from Argus, durably resumed by cursor | DIRECTORY-051 |
+| `crates/lys-identity-server/src/budgets_store.rs` | R2: Budgets on agents, teams and people | DIRECTORY-051 |
+| `crates/lys-runner/src/operations.rs` | R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-runner/tests/operations.rs` | R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-runner/src/state.rs` | R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-identity-server/src/runner_acts.rs` | R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-identity-server/src/goals_store.rs` | R4: Goals, expectations and deliverables, with deadlines and reminders | DIRECTORY-051 |
+| `surface/identity/tests/usage.test.tsx` | R5: Plain budget and goal controls | DIRECTORY-051 |
+| `surface/identity/src/shell/Shell.tsx` | R5: Plain budget and goal controls | DIRECTORY-051 |
+| `crates/lys-identity-server/src/refusals_api.rs` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-identity-server/src/refusals_store.rs` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-identity-server/tests/refusals.rs` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-runner/src/refusals.rs` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-runner/tests/refusals.rs` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `surface/identity/src/features/file/AgentRefusals.tsx` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `surface/identity/tests/agent-refusals.test.tsx` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `surface/identity/src/features/file/tabs.ts` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-runner/src/tracking.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-runner/src/tracking_store.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-runner/tests/tracking.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/tracking.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/tracking_tests.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-identity-server/src/tracking_export.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-runner/src/session/lifecycle.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/mod.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/mod.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/launch.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/launch_env.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/codex/mod.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `surface/identity/tests/acceptance/refusals.spec.ts` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `surface/identity/vite.config.ts` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-identity-server/src/grants_refusals.rs` | R6: refusal capture without growing grants.rs | DIRECTORY-051 |
 
 ## Inventory
 

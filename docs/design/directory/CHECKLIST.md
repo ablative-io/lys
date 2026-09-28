@@ -316,11 +316,12 @@
 
 ## Lys tracks tokens, context, time, budgets and goals (DIRECTORY-051)
 
-- [ ] **C381** — Each session's tokens per turn, context in use against its window, time running and paying account are measured from its transcript (DIRECTORY-051 R1).
+- [ ] **C381** — Lys installs its own session hooks/status line and incrementally follows the runner-local stream; usage is durable, authenticated and exported for optional Argus analytics (DIRECTORY-051 R1).
 - [ ] **C382** — Budgets for context, tokens and time are set on an agent, a team or a person, and inherited downward (DIRECTORY-051 R2).
 - [ ] **C383** — A reached budget compacts, stops or tells, as the budget says, once, with a receipt (DIRECTORY-051 R3).
 - [ ] **C384** — Goals on an agent carry a deadline and reminders delivered into its session (DIRECTORY-051 R4).
-- [ ] **C385** — A Usage screen shows every agent's usage against its budgets, and goals with their state (DIRECTORY-051 R5).
+- [ ] **C385** — Plain controls set and read budgets and goals and show reached or uncertain state; analytics stays in Argus (DIRECTORY-051 R5).
+- [ ] **C421** — Each agent page lists authoritative runner/sandbox and grant-check refusals, newest first, with attempted act, reason and the real granting authority where one exists (DIRECTORY-051 R6).
 
 ## Provision a working team in one act (DIRECTORY-052)
 

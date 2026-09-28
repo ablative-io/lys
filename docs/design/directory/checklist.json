@@ -1246,7 +1246,7 @@
       "items": [
         {
           "id": "C381",
-          "text": "Each session's tokens per turn, context in use against its window, time running and paying account are measured from its transcript (DIRECTORY-051 R1).",
+          "text": "Lys installs its own session hooks/status line and incrementally follows the runner-local stream; usage is durable, authenticated and exported for optional Argus analytics (DIRECTORY-051 R1).",
           "done": false
         },
         {
@@ -1266,7 +1266,12 @@
         },
         {
           "id": "C385",
-          "text": "A Usage screen shows every agent's usage against its budgets, and goals with their state (DIRECTORY-051 R5).",
+          "text": "Plain controls set and read budgets and goals and show reached or uncertain state; analytics stays in Argus (DIRECTORY-051 R5).",
+          "done": false
+        },
+        {
+          "id": "C421",
+          "text": "Each agent page lists authoritative runner/sandbox and grant-check refusals, newest first, with attempted act, reason and the real granting authority where one exists (DIRECTORY-051 R6).",
           "done": false
         }
       ]

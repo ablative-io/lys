@@ -2,73 +2,109 @@
 type: brief
 id: DIRECTORY-051
 cluster: directory
-title: Lys tracks every agent session's tokens, context and time, and holds its budgets, goals, expectations and deliverables; Argus's job moves into Lys
+title: Lys runs and monitors its agents, enforces budgets and goals, and shows authoritative refused acts
 ---
 
-# DIRECTORY-051: Lys tracks every agent session's tokens, context and time, and holds its budgets, goals, expectations and deliverables; Argus's job moves into Lys
+# DIRECTORY-051: Lys runs and monitors its agents, enforces budgets and goals, and shows authoritative refused acts
 
 > **Cluster:** directory
 > **Depends on:** DIRECTORY-050
 > **Design anchor:**
-> - ADR-118 — Lys tracks every agent session's tokens, context, time, budgets and goals; Argus's job moves into Lys, in Rust — Lys measures each session it runs from the harness's own transcript: tokens in and out per turn, context in use against the model's window, time running, and the account each turn was paid from. A budget is set on an agent, a team or a person, for context, tokens and time, and Lys acts when one is reached: compacts at a context threshold, stops at a hard token or time cap, or tells the responsible person. Goals are records on an agent with a deadline and reminders Lys delivers into the session through its runner. Everything is under grants, on screens, in the API and in receipts; nothing depends on Argus.
+> - ADR-118 — Lys owns running and monitoring its agents and enforcing values; Argus reads data for analytics — Lys owns everything about running and monitoring an agent it starts: installing its hooks/status line, reading its session stream and recording tokens, context and time. Lys holds budgets, goals, expectations and deliverables and enforces them through its runner with notices, compaction requests or stops as the value says. The context-watch notices previously driven by Argus become Lys-driven acts. Lys exposes the resulting data for Argus, which keeps analytics and visualisation; Lys does not depend on it. Lys screens are plain controls/state plus the authoritative refused-acts list on each agent page. Context compaction, goals and reminders are Lys-owned background acts. Argus may read explicitly permitted Lys variables alongside its data stream; no secret or arbitrary environment export follows from this.
 > **Checklist:**
-> - C381 — Each session's tokens per turn, context in use against its window, time running and paying account are measured from its transcript (DIRECTORY-051 R1).
+> - C381 — Lys installs its own session hooks/status line and incrementally follows the runner-local stream; usage is durable, authenticated and exported for optional Argus analytics (DIRECTORY-051 R1).
 > - C382 — Budgets for context, tokens and time are set on an agent, a team or a person, and inherited downward (DIRECTORY-051 R2).
 > - C383 — A reached budget compacts, stops or tells, as the budget says, once, with a receipt (DIRECTORY-051 R3).
 > - C384 — Goals on an agent carry a deadline and reminders delivered into its session (DIRECTORY-051 R4).
-> - C385 — A Usage screen shows every agent's usage against its budgets, and goals with their state (DIRECTORY-051 R5).
+> - C385 — Plain controls set and read budgets and goals and show reached or uncertain state; analytics stays in Argus (DIRECTORY-051 R5).
+> - C421 — Each agent page lists authoritative runner/sandbox and grant-check refusals, newest first, with attempted act, reason and the real granting authority where one exists (DIRECTORY-051 R6).
 > **Stories:**
 > - S156 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want each agent held to a budget for context, tokens and time, compacted or stopped when it reaches it, so that no agent burns what I cannot afford.
 > - S157 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to give an agent goals with deadlines and have it reminded, so that work is paced and I can see where each goal stands.
 
 ## Purpose
 
-Tom, 28 September 2026 19:50 to 19:51, on Dot: 'Argus is not going to be able to do what we need, to be able to track budgets and token usage, time, goals and everything like that through Lys. We're going to completely rewrite that, in Rust.' Argus keeps crashing, and the budgets and goals our agents run under must live with their identity, grants and sessions, in Lys. Tom, 19:51: 'Not the day-to-day operational tasks. That will still go into Cambium. But I want to start setting budgets and goals and expectations and deliverables that need to be done, and I think the only way to do that is through Lys.' Amended 28 September 2026 20:45 by Waffles after Archie's review of the brief against the tree.
+Tom, 28 September 2026 19:50 to 19:51, on Dot: 'Argus is not going to be able to do what we need, to be able to track budgets and token usage, time, goals and everything like that through Lys. We're going to completely rewrite that, in Rust.' Argus keeps crashing, and the budgets and goals our agents run under must live with their identity, grants and sessions, in Lys. Tom, 19:51: 'Not the day-to-day operational tasks. That will still go into Cambium. But I want to start setting budgets and goals and expectations and deliverables that need to be done, and I think the only way to do that is through Lys.' Amended 28 September 2026 20:45 by Waffles after Archie's review of the brief against the tree. Clarification relayed by Waffles from Tom on Dot, 29 September 2026 06:59 to 07:00: Argus remains the real-time observability/control, parsed-stream analytics and visualisation service. Lys consumes tracking behind the scenes and sets and enforces budgets, goals, expectations and deliverables. Its screen is plain controls, not an analytics dashboard. The 06:55 request for an authoritative refused-acts list on each agent's page stands. These later directions replace transcript parsing inside Lys and the earlier page-performance proposal. Final clarification, Tom on Dot at 07:02 as relayed by Waffles: Lys owns running and monitoring its agents, installs their hooks/status line and reads their streams itself. Lys enforces held values and drives context notices, compaction and stops. Lys can export the resulting data to Argus, which keeps analytics and visualisation. This replaces the 06:59 to 07:00 inbound-Argus-feed proposal; no Argus dependency or upstream feed card remains.
 
 ## Task
 
-Measure each running session's usage from its transcript; let budgets be set on agents, teams and people and act when reached; give agents goals with deadlines and reminders delivered through the runner; show it all on a Usage screen and in the API.
+When Lys starts an agent, install the harness hooks/status line, follow the runner-local session stream incrementally and record measured usage. Hold and enforce budgets, goals, expectations and deliverables through the runner; show plain values and their state, plus authoritative refused acts on each agent page. Expose figures for Argus analytics without relying on Argus to run or monitor a session. Base implementation on complete, green DIRECTORY-050; 051 has not previously been built. Archie independently signs this brief before dispatch. All six requirements need real acceptance evidence before the card is complete.
 
 ## Requirements
 
-### R1: Usage measured from the transcript, per turn
+### R1: Lys-owned hooks, status line and incremental session-stream tracking
 
-Behavioural. For each session the runner holds, Lys follows the harness transcript the home keeps (lys-home) as it grows and records per turn: input, output and cache tokens, context in use against the model's window from the model's own figure, the turn's instant, and the account it was paid from. Following is driven by the file's change notification, never a poll. A transcript line it cannot read is recorded as unread with its offset and reason, never skipped silently. GET /agents/{id}/usage and GET /runtime/sessions/{id}/usage answer totals and per-turn rows, paged. The transcript lives on the machine the session runs on, so the follower runs in the runner (DIRECTORY-050) and sends the server usage rows of figures only (turn, tokens in and out, cache, context used, instants), never transcript text. The context window comes from the agent's profile, declared, with no default; a profile without one is refused window_undeclared. The account comes from the runner's rotation record. The card creates rules/ast-grep/no-poll.yml (a loop around a sleep, or an interval timer, outside tests) and lists it, and it is seen red on a poll written to prove it before it is removed.
+Behavioural. When starting a session, Lys installs its own supported harness hooks and status-line collector in the isolated provisioned home, and starts a stream follower on the runner machine. It does not rewrite a person's global harness configuration or depend on Argus. Use actual supported Claude Code and Codex integration points verified from the installed harness contract; inventory each supported signal before implementation. A harness lacking a requested required signal is refused by name, not given a fabricated hook. The hooks/status line are bounded local collection and enforcement adapters; no synchronous network call to Argus or the Lys server lies on the turn path. Analytics, durable aggregation and UI reads run off the session path. An explicit enforcement block is distinguished from incidental telemetry delay. Preserve pre-existing permitted session hooks/settings when installing the Lys-owned entries, never duplicate the entries on restart. Each collector is bound to a runner-generated session capability kept with restrictive local permissions, and the local IPC authenticates its session; a body naming another session cannot change attribution. Deliver figure records to the server through the existing signed runner protocol extended with a versioned tracking read/follow act and opaque durable cursor. Do not treat a fresh connection challenge as a durable event identity. A record names version, source runner/session, generation, source offset or stable event id, turn id, observed instant, kind and measured figures. Count each completed turn once across hook/status-line/stream overlap, using declared source precedence and stable identities, not summing overlapping snapshots. Measure input, output, cache tokens, context in use, running time and paying account; unavailable figures remain null with a named reason. Context window is explicitly declared and validated in the profile, and that profile version is retained; missing window refuses window_undeclared. Account attribution follows the runner's rotation evidence at the turn instant. Follow stream changes by filesystem notifications; persist generation/offset and incomplete-line boundary. Never reread an entire file after restart, poll it on a timer or silently skip an unreadable line; truncation, rotation or lost source coverage is named and reconciled. Persist received rows and their consumed cursor atomically with replay deduplication. Expose authorised paged GET /agents/{id}/usage and GET /runtime/sessions/{id}/usage plus a new authenticated GET /tracking/events cursor-follow route for Argus to read figures. This outbound read uses Lys service-account grants with an explicit tracking_read action in the configured grant model, preserving the data-driven model semantics; unauthenticated or ungranted reads refuse. Export version, stable event identity, source generation/cursor, agent/session binding, instant and figures only, never transcript text or credentials. Replay-to-live handover loses no event; an expired cursor gives a named gap rather than silently restarting. A slow or disconnected Argus reader cannot block collection, an agent turn or enforcement. Named stale/incomplete tracking stays visible; missing measurements cannot prove a hard cap was respected. rules/ast-grep/no-poll.yml must reject a deliberately inserted proof poll, then pass the final tree. The 07:04 clarification permits Argus to read Lys variables as well as its stream. Export only explicitly granted tracking/budget/goal values, with the same holder visibility checks as the control API; never expose arbitrary process environment or secret values.
 
 **Acceptance:**
-- A recorded Claude Code transcript fixture yields the exact per-turn tokens and context figures, checked against hand-counted values.
-- An unreadable line is listed with its offset and reason.
-- rules/ast-grep/no-poll.yml exists, fires on a proof poll, and passes on the card's tree.
-- No usage row holds transcript text.
+- Start a supported scratch harness through Lys: the installed hooks and status-line entries are present exactly once in its isolated home and the global user configuration is unchanged.
+- Claude Code and Codex fixtures exercise their actual supported signals; each completed turn yields the exact independently counted token/context/time figures without double-counting overlapping hook, status-line and stream reports.
+- Restart with a partial final line, repeated delivery and a saved offset: complete turns appear once and no earlier stream bytes are reread; instrument the file reads to prove it.
+- Rotate or truncate the stream and introduce an unreadable line: source generation, offset and reason remain visible and no missing data is replaced with zero.
+- A collector with the wrong local session capability cannot submit a record; a signed runner record for a different bound session is refused.
+- Missing/invalid profile windows are refused; the valid declared window and version are used exactly.
+- Account rotation retains the paying account for each measured turn; missing or ambiguous evidence remains named unknown.
+- Disconnect the server/Argus reader while a local session turn and explicit enforcement check execute: neither waits for a network telemetry roundtrip, and bounded local collection pressure is surfaced as incomplete coverage rather than a silent drop.
+- An authenticated Argus reader with tracking_read resumes the outbound cursor across replay/live handover without loss; a wrong or ungranted identity is refused.
+- No stored figure, export, log or receipt contains transcript text or the local collector credential.
+- The no-poll rule fails on the deliberate proof poll and passes on the final card tree.
+- Argus reads explicitly granted budget/goal variables through the authorised API; an unrelated holder and a secret/environment value remain unavailable.
 
 **Files:**
+- create: crates/lys-runner/src/tracking.rs
+- create: crates/lys-runner/src/tracking_store.rs
+- create: crates/lys-runner/tests/tracking.rs
+- create: crates/lys-home/src/harness/tracking.rs
+- create: crates/lys-home/src/harness/tracking_tests.rs
 - create: crates/lys-identity-server/src/usage_api.rs
 - create: crates/lys-identity-server/src/usage_state.rs
 - create: crates/lys-identity-server/src/usage_store.rs
-- create: crates/lys-home/src/harness/claude_code/usage.rs
+- create: crates/lys-identity-server/src/tracking_export.rs
 - create: crates/lys-identity-server/tests/usage.rs
 - create: rules/ast-grep/no-poll.yml
+- modify: crates/lys-runner/src/lib.rs
+- modify: crates/lys-runner/src/protocol.rs
+- modify: crates/lys-runner/src/session.rs
+- modify: crates/lys-runner/src/state.rs
+- modify: crates/lys-runner/src/socket.rs
+- modify: crates/lys-runner/src/session/lifecycle.rs
+- modify: crates/lys-runner/Cargo.toml
+- modify: crates/lys-home/src/harness/mod.rs
+- modify: crates/lys-home/src/harness/claude_code/mod.rs
+- modify: crates/lys-home/src/harness/claude_code/launch.rs
+- modify: crates/lys-home/src/harness/claude_code/launch_env.rs
+- modify: crates/lys-home/src/harness/codex/mod.rs
+- modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-identity-server/src/main.rs
+- modify: crates/lys-identity-server/src/config.rs
 - modify: crates/lys-identity-server/src/routes.rs
+- modify: crates/lys-identity-server/src/provisioning_api.rs
+- modify: crates/lys-identity-server/src/runner_api.rs
+- modify: crates/lys-identity/src/provisioning.rs
+- modify: crates/lys-identity-server/Cargo.toml
 
 **Checklist:**
-- C381 — Each session's tokens per turn, context in use against its window, time running and paying account are measured from its transcript (DIRECTORY-051 R1).
+- C381 — Lys installs its own session hooks/status line and incrementally follows the runner-local stream; usage is durable, authenticated and exported for optional Argus analytics (DIRECTORY-051 R1).
 
 **Stories:**
 - S156 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want each agent held to a budget for context, tokens and time, compacted or stopped when it reaches it, so that no agent burns what I cannot afford.
 
 ### R2: Budgets on agents, teams and people
 
-Behavioural. A budget names its holder (agent, team or person), its measure (context percent, tokens per period, running time per period), its limit, and its act (compact, stop or tell), set by the responsible person or an administrator. A narrower holder's budget applies before a wider one's; the tightest reached budget acts. Budgets are log events with versions, readable and changeable through the API. A budget's period names its time zone explicitly; there is no machine default, and a period without a zone is refused zone_missing.
+Behavioural. A budget names its holder (agent, team or person), its measure (context percent, tokens per period, running time per period), its limit, and its act (compact, stop or tell), set by the responsible person or an administrator. A narrower holder's budget applies before a wider one's; the tightest reached budget acts. Budgets are log events with versions, readable and changeable through the API. A budget's period names its time zone explicitly; there is no machine default, and a period without a zone is refused zone_missing. Holder visibility and authority are checked on reads as well as changes. Aggregate only the members/period the budget names; replaying a usage row adds no spend. Explicit zone and period boundaries, and changes of budget version, are recorded so a restart does not invent a new crossing.
 
 **Acceptance:**
 - A team budget applies to every agent in the team unless an agent's own is tighter.
 - A person without authority over the agent is refused not_permitted when setting its budget.
+- Boundary and restart fixtures show the same per-holder totals and period under an explicit zone, without double-counting a replayed usage row or disclosing another person's budget.
 
 **Files:**
 - create: crates/lys-identity-server/src/budgets_api.rs
 - create: crates/lys-identity-server/src/budgets_state.rs
 - create: crates/lys-identity-server/tests/budgets.rs
+- create: crates/lys-identity-server/src/budgets_store.rs
 - modify: crates/lys-identity-server/src/routes.rs
+- modify: crates/lys-identity-server/src/lib.rs
 
 **Checklist:**
 - C382 — Budgets for context, tokens and time are set on an agent, a team or a person, and inherited downward (DIRECTORY-051 R2).
@@ -78,17 +114,28 @@ Behavioural. A budget names its holder (agent, team or person), its measure (con
 
 ### R3: A reached budget acts once
 
-Behavioural. When a measured figure reaches a budget, Lys does the budget's act once per crossing: compact sends the harness's compaction command through the runner at the next turn boundary; stop ends the session through the runner and reports it confirmed; tell delivers a notice to the responsible person. Each act leaves a receipt naming the budget, the figure and the instant. A compaction that does not bring context under the limit is reported, not retried in a loop. A notice ('tell') is a record shown on the Usage screen and read through the API; Lys sends nothing outward.
+Behavioural. When a measured figure reaches a budget, Lys does the budget's act once per crossing: compact sends the harness's compaction command through the runner at the next turn boundary; stop ends the session through the runner and reports it confirmed; tell delivers a notice to the responsible person. Each act leaves a receipt naming the budget, the figure and the instant. A compaction that does not bring context under the limit is reported, not retried in a loop. A notice ('tell') is a record shown on the Usage screen and read through the API; Lys sends nothing outward. Persist each crossing's stable operation identity and requested act before delivery. Reconcile the same operation against the runner's receipt after a crash or an uncertain reply; never issue a replacement act merely because the answer was lost. A stop is shown confirmed only on actual runner process-exit evidence. Unknown delivery remains visible as unconfirmed until reconciled, rather than being presented as success. A fresh connection challenge is not an idempotency key for an act. Extend the runner with stable operation identities and durable outcome readback shared by compaction and reminder input. If a crash leaves terminal input delivery unknowable, retain uncertain state and do not type again; do not promise exactly-once external input from a durable log alone. Lys, not Argus, drives the context-watch notices and threshold acts. The held value selects notice, compaction request or stop. A required block is actually applied at the runner boundary and recorded; merely displaying a reached threshold is not enforcement. A context notice to the session uses the same durable operation protocol as reminder input, separate from the tell notice shown to the responsible person.
 
 **Acceptance:**
 - Crossing a context budget sends one compaction at the next turn boundary.
 - Crossing a hard token cap stops the session and it shows confirmed.
 - Each act appears once in receipts.
+- Fault injection before send and after runner acceptance but before receipt persistence yields one act under the same operation identity; a lost reply remains unconfirmed and cannot cause a second compaction or stop.
+- Cross a held context value and observe the configured Lys-driven notice in the live session under one operation identity.
+- A stopped/blocked session cannot continue the next forbidden act; test the enforcement result rather than only the displayed threshold.
 
 **Files:**
 - create: crates/lys-identity-server/src/budgets_act.rs
+- create: crates/lys-runner/src/operations.rs
+- create: crates/lys-runner/tests/operations.rs
 - modify: crates/lys-identity-server/src/runner_api.rs
 - modify: crates/lys-identity-server/src/receipts_api.rs
+- modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-runner/src/protocol.rs
+- modify: crates/lys-runner/src/session.rs
+- modify: crates/lys-runner/src/state.rs
+- modify: crates/lys-identity-server/src/runner_acts.rs
+- modify: crates/lys-runner/src/lib.rs
 
 **Checklist:**
 - C383 — A reached budget compacts, stops or tells, as the budget says, once, with a receipt (DIRECTORY-051 R3).
@@ -98,7 +145,7 @@ Behavioural. When a measured figure reaches a budget, Lys does the budget's act 
 
 ### R4: Goals, expectations and deliverables, with deadlines and reminders
 
-Behavioural. A goal on an agent or a team is one of three kinds: a goal (an outcome), an expectation (a standard its work is held to) or a deliverable (a named thing handed over, with the evidence that proves it: a landed commit, a document, a passing check). Each has words, a deadline, a state (open, met, missed, dropped) and reminders (before the deadline, at intervals, or on events such as a compaction). Lys delivers each reminder into the agent's live session through the runner, with the goal's words and time left, and records the delivery or its refusal. Reminders are timers held in the log so a restart keeps them; none is lost or fired twice. Day-to-day operational tasks stay in the product that runs them; Lys holds only these three kinds. Only the item's responsible person, or the holder of a relation the plan names for it, may mark a goal, expectation or deliverable met; the agent it judges may never mark its own, refused not_your_judgement. Lys calls no app, so evidence is recorded as a claim by the person who marks it, in those words, naming them. A reminder that fell due while the server was down fires once at start, recorded as late with both the due and the fired instant.
+Behavioural. A goal on an agent or a team is one of three kinds: a goal (an outcome), an expectation (a standard its work is held to) or a deliverable (a named thing handed over, with the evidence that proves it: a landed commit, a document, a passing check). Each has words, a deadline, a state (open, met, missed, dropped) and reminders (before the deadline, at intervals, or on events such as a compaction). Lys delivers each reminder into the agent's live session through the runner, with the goal's words and time left, and records the delivery or its refusal. Reminders are timers held in the log so a restart keeps them; none is lost or fired twice. Day-to-day operational tasks stay in the product that runs them; Lys holds only these three kinds. Only the item's responsible person, or the holder of a relation the plan names for it, may mark a goal, expectation or deliverable met; the agent it judges may never mark its own, refused not_your_judgement. Lys calls no app, so evidence is recorded as a claim by the person who marks it, in those words, naming them. A reminder that fell due while the server was down fires once at start, recorded as late with both the due and the fired instant. Reminder delivery uses the same durable operation/receipt reconciliation rule as R3. Restart recovery distinguishes pending, accepted, confirmed and uncertain delivery; a crash after typing but before recording the receipt must not type a second reminder. Goal reads and changes preserve holder visibility and the named judgement authority. R3 owns the shared runner operation/receipt seam; no second reminder delivery mechanism is added.
 
 **Acceptance:**
 - A reminder due at a set instant is typed into the session at that instant, once.
@@ -107,12 +154,15 @@ Behavioural. A goal on an agent or a team is one of three kinds: a goal (an outc
 - A deliverable is marked met only with its evidence named; without it the mark is refused evidence_missing.
 - The judged agent marking its own deliverable met is refused not_your_judgement.
 - A reminder due during a stop fires once at start, recorded late with both instants.
+- A crash after the runner accepted a reminder but before its receipt was stored reconciles that same reminder without a second typed message; an uncertain answer is never labelled delivered.
 
 **Files:**
 - create: crates/lys-identity-server/src/goals_api.rs
 - create: crates/lys-identity-server/src/goals_state.rs
 - create: crates/lys-identity-server/tests/goals.rs
+- create: crates/lys-identity-server/src/goals_store.rs
 - modify: crates/lys-identity-server/src/routes.rs
+- modify: crates/lys-identity-server/src/lib.rs
 
 **Checklist:**
 - C384 — Goals on an agent carry a deadline and reminders delivered into its session (DIRECTORY-051 R4).
@@ -120,35 +170,88 @@ Behavioural. A goal on an agent or a team is one of three kinds: a goal (an outc
 **Stories:**
 - S157 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to give an agent goals with deadlines and have it reminded, so that work is paced and I can see where each goal stands.
 
-### R5: Usage screen
+### R5: Plain budget and goal controls
 
-Behavioural. A Usage screen (surface/identity/src/features/usage) shows each agent's context, tokens and time against its budgets as bars from the design tokens, per-turn detail on opening one, and its goals with deadlines and state; budgets and goals are set there with styled controls, never default ones.
+Behavioural. A small Usage screen under the actual routes and navigation shows authorised current budgets, goals, expectations and deliverables, with their values, deadline and held/reached/open/met/missed/dropped state. Styled forms set permitted values and show named refusals and pending/unconfirmed acts. Tracking freshness or missing coverage is visible in plain words. This is not a dashboard: graphs, per-turn visual analytics and observability remain in Argus; do not add them here. The API may retain paged figures for authorised reads. No page-load bound is invented in this brief.
 
 **Acceptance:**
-- The screen lists every agent the caller may see with its figures and budgets.
-- Setting a budget and a goal from the screen takes effect.
-- Surface tests cover the list, the detail and the forms.
+- An authorised person reads and changes a budget through the actual navigable screen, and the server records that change.
+- An authorised person sets a goal with a deadline and deliverable evidence through the screen, and reads the persisted values after reload.
+- A reached budget and an uncertain act are shown in plain words without claiming confirmation.
+- An unrelated caller cannot read or change another holder's values.
+- The screen shows a named stale/incomplete tracking state when runner tracking is unavailable.
+- Surface tests cover the real route, forms, state and refusal rendering; no analytics dashboard is introduced.
 
 **Files:**
 - create: surface/identity/src/features/usage/Usage.tsx
 - create: surface/identity/src/features/usage/usage.css
+- create: surface/identity/tests/usage.test.tsx
+- modify: surface/identity/src/routes.tsx
+- modify: surface/identity/src/shell/Shell.tsx
+- modify: surface/identity/src/api.ts
+- modify: crates/lys-identity-server/src/surface.rs
 
 **Checklist:**
-- C385 — A Usage screen shows every agent's usage against its budgets, and goals with their state (DIRECTORY-051 R5).
+- C385 — Plain controls set and read budgets and goals and show reached or uncertain state; analytics stays in Argus (DIRECTORY-051 R5).
 
 **Stories:**
 - S156 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want each agent held to a budget for context, tokens and time, compacted or stopped when it reaches it, so that no agent burns what I cannot afford.
 - S157 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to give an agent goals with deadlines and have it reminded, so that work is paced and I can see where each goal stands.
 
+### R6: Every refused act is visible on the agent page, from authoritative records
+
+Behavioural. Each agent page contains a live plain list, newest first, of refused acts recorded by the runner's enforcement/sandbox boundary and the grant check. Each record states what was attempted (tool, file, host or permission), the refusing source and named rule/check, the permission that would allow it where one exists, and who actually has authority to grant it. Resolve authority through the grant owner; never invent a grantor or imply a hard sandbox rule can be overridden by a grant. When no granting path exists, say so in plain words. Preserve source event identity, agent/session binding and instant; replay does not duplicate a row. Feed the list from authenticated authoritative refusal records, never an agent's narrative or an interpretation of its terminal prose. Add durable refusal records and cursor-based change delivery under GET /agents/{id}/refusals and GET /agents/{id}/refusals/events, both new routes, with visibility checked on initial reads and subsequent events. The runner must expose actual enforcement refusals by source record; a missing source is explicit incomplete coverage, never an empty success. The server's grant-check refusal path records the refusal without changing grant decisions or recording a successful exercise; failures to record are visible and never turn denial into permission. Show safe resource descriptions only within the caller's visibility and never log secrets/command credential values. This card records/displays existing enforcement; it must not add an allow path or weaken sandbox policy. Reconnect resumes the applied cursor; no polling or full-history refresh on every update. grants.rs is already at its code-line ceiling; this change adds no code line to it. Put the refusal capture/helper in grants_refusals.rs and move the minimum existing call-site code as needed without changing grant decisions. Run scripts/file-length.sh at the final head; no line-count bypass is allowed.
+
+**Acceptance:**
+- Drive a real denied grant check from an agent and open its page in the acceptance browser: the resulting source record appears with attempted permission, refusing check, legitimate grantor and newest-first ordering.
+- Drive a real sandbox-denied tool/file or host access in the scratch runner and see the authoritative enforcement refusal on that same page; a hand-written fake record or agent statement is not sufficient evidence.
+- A non-grantable sandbox refusal explicitly says no grant can permit it; it does not offer an invented permission or grantor.
+- Resume after browser/server restart and repeated source delivery: the same refusal appears once with its original identity and instant.
+- An unauthorised viewer receives a named refusal and sees no protected resource detail, including on an already-open event stream after visibility is withdrawn.
+- Disconnect a refusal source: the screen shows incomplete coverage, not a falsely empty all-clear list.
+- An agent statement claiming an act was denied creates no authoritative refusal entry.
+
+**Files:**
+- create: crates/lys-identity-server/src/refusals_api.rs
+- create: crates/lys-identity-server/src/refusals_store.rs
+- create: crates/lys-identity-server/tests/refusals.rs
+- create: crates/lys-runner/src/refusals.rs
+- create: crates/lys-runner/tests/refusals.rs
+- create: surface/identity/src/features/file/AgentRefusals.tsx
+- create: surface/identity/tests/agent-refusals.test.tsx
+- create: surface/identity/tests/acceptance/refusals.spec.ts
+- create: crates/lys-identity-server/src/grants_refusals.rs
+- modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-identity-server/src/routes.rs
+- modify: crates/lys-identity-server/src/grants.rs
+- modify: crates/lys-identity-server/src/runner_api.rs
+- modify: crates/lys-runner/src/lib.rs
+- modify: crates/lys-runner/src/protocol.rs
+- modify: crates/lys-runner/src/session.rs
+- modify: crates/lys-runner/src/state.rs
+- modify: surface/identity/src/features/file/IdentityFile.tsx
+- modify: surface/identity/src/api.ts
+- modify: surface/identity/src/features/file/sections.tsx
+- modify: surface/identity/src/features/file/tabs.ts
+- modify: surface/identity/vite.config.ts
+
+**Checklist:**
+- C421 — Each agent page lists authoritative runner/sandbox and grant-check refusals, newest first, with attempted act, reason and the real granting authority where one exists (DIRECTORY-051 R6).
+
+**Stories:**
+- S156 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want each agent held to a budget for context, tokens and time, compacted or stopped when it reaches it, so that no agent burns what I cannot afford.
+
 ## Boundaries
 
-- SHALL NOT call Argus or read its store; nothing in Lys depends on it.
-- SHALL NOT measure usage from a session's own claim; only the transcript.
-- SHALL NOT poll: following, reminders and budget checks run on change notifications and timers held in the log.
-- SHALL NOT add a timeout, deadline on a request, #[allow], #[ignore] or any bypass.
-- SHALL NOT add a silent fallback: every failure is a named refusal.
+- SHALL NOT depend on Argus for collection, session running or enforcement; Argus is an optional reader of exported analytics figures.
+- SHALL NOT measure usage or refusals from the agent's own claims.
+- SHALL NOT add synchronous analytics/network telemetry work to a session turn; bounded local enforcement hooks are required and distinguished from analytics.
+- SHALL NOT poll or reread whole transcripts: following uses source change notifications and durable generation/offset; reminders use timers held in the log.
+- SHALL NOT add a request timeout, #[allow], #[ignore] or any bypass.
+- SHALL NOT add silent fallbacks, anonymous telemetry access, or a permission bypass for a sandbox refusal.
 
 ## Verification
 
-- The full Lys gate, ast-grep scan and the surface checks exit 0 at the card's head, measured by the card round.
-- On a scratch install: run a session from a recorded transcript, see its usage, cross a context budget and see one compaction, get one goal reminder.
+- The full Lys chain (Jev, fmt, Clippy pedantic, tests, ast-grep and gate) and surface acceptance exit 0 at the final card head, on Dean's laptop.
+- On a scratch install run an agent with Lys-installed hooks/status line and stream tracking, show a held value causing a real notice/compaction/stop, one goal reminder and a real denied act visible on the agent page. Argus may read the exported figures for analytics; stopping that reader must not stop Lys enforcement. No terminal-only demonstration or installed-production claim.
+- scripts/file-length.sh exits 0 on the final tree; grants.rs gains no code line and new helpers stay within the gate.

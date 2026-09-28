@@ -2724,11 +2724,6 @@
       "brief": "DIRECTORY-051"
     },
     {
-      "path": "crates/lys-home/src/harness/claude_code/usage.rs",
-      "note": "DIRECTORY-051 R1: Usage measured from the transcript, per turn",
-      "brief": "DIRECTORY-051"
-    },
-    {
       "path": "crates/lys-identity-server/tests/usage.rs",
       "note": "DIRECTORY-051 R1: Usage measured from the transcript, per turn",
       "brief": "DIRECTORY-051"
@@ -4237,6 +4232,166 @@
       "path": "crates/lys-identity-server/src/grants_connector.rs",
       "note": "Application-connector holder conversion and authorization helpers, keeping grants.rs within ADR-111.",
       "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-identity-server/src/provisioning_api.rs",
+      "note": "R1: Authenticated parsed tracking from Argus, durably resumed by cursor",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/budgets_store.rs",
+      "note": "R2: Budgets on agents, teams and people",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/src/operations.rs",
+      "note": "R3: A reached budget acts once",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/tests/operations.rs",
+      "note": "R3: A reached budget acts once",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/src/state.rs",
+      "note": "R3: A reached budget acts once",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/runner_acts.rs",
+      "note": "R3: A reached budget acts once",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/goals_store.rs",
+      "note": "R4: Goals, expectations and deliverables, with deadlines and reminders",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/tests/usage.test.tsx",
+      "note": "R5: Plain budget and goal controls",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/src/shell/Shell.tsx",
+      "note": "R5: Plain budget and goal controls",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/refusals_api.rs",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/refusals_store.rs",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/refusals.rs",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/src/refusals.rs",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/tests/refusals.rs",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/src/features/file/AgentRefusals.tsx",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/tests/agent-refusals.test.tsx",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/src/features/file/tabs.ts",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/src/tracking.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/src/tracking_store.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/tests/tracking.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/tracking.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/tracking_tests.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/tracking_export.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/src/session/lifecycle.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/mod.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/mod.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/launch.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/launch_env.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/mod.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/tests/acceptance/refusals.spec.ts",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/vite.config.ts",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grants_refusals.rs",
+      "note": "R6: refusal capture without growing grants.rs",
+      "brief": "DIRECTORY-051"
     }
   ],
   "inventory": [
