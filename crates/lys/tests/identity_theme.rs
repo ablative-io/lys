@@ -134,7 +134,7 @@ fn declared() -> TestResult<Value> {
 
 fn check_exports(deployment: &Deployment, mapping: &Value) -> TestResult<Vec<(String, Value)>> {
     let mut exports = Vec::new();
-    for (role, client_id) in [("platform", "lys-platform"), ("cambium", "cambium")] {
+    for (role, client_id) in [("platform", "lys-platform"), ("app", "app")] {
         let theme = rauthy_json(deployment, "POST", &format!("/auth/v1/theme/{client_id}"))?;
         let dark = &theme["dark"];
         for field in ["text", "bg", "bg_high", "accent"] {
@@ -186,17 +186,17 @@ fn contrast_and_id001_theme_persist_after_restart() -> TestResult {
             .contains("purple")
     );
     assert_eq!(
-        mapping["clients"]["cambium"]["dark"]["accent"]["hex"],
+        mapping["clients"]["app"]["dark"]["accent"]["hex"],
         "#5E8C6A"
     );
     assert_eq!(
         mapping["clients"]["platform"]["dark"]["accent"]["hex"],
         "#D4975A"
     );
-    for role in ["platform", "cambium"] {
+    for role in ["platform", "app"] {
         assert_ne!(
             mapping["clients"][role]["dark"]["accent"]["hex"], "#6B96D1",
-            "Aion blue"
+            "the console blue"
         );
     }
     let deployment = Deployment::new("theme", |text| text)?;

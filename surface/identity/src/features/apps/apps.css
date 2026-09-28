@@ -1,0 +1,20 @@
+/* The Apps screen, from the design tokens only: no control keeps a default style. */
+.apps .app-card h3 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; }
+.apps .app-id { color: var(--text-muted); }
+.apps .app-state { font-size: 11px; padding: 1px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-default); color: var(--text-secondary); background: var(--surface-default); }
+.apps .app-state.app-pending { color: var(--warn); border-color: var(--warn-glow); background: var(--warn-glow); }
+.apps .app-state.app-approved { color: var(--ok); border-color: var(--ok-glow); background: var(--ok-glow); }
+.apps .app-state.app-retired, .apps .app-state.app-declined { color: var(--text-muted); }
+.apps .app-list { margin: 4px 0 10px; padding-left: 18px; color: var(--text-secondary); }
+.apps .app-list li + li { margin-top: 2px; }
+.apps .app-actions { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin-top: 10px; }
+.apps .app-actions .field { margin-top: 0; min-width: 260px; }
+.apps .app-waiting { display: block; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--warn-glow); border-radius: var(--radius-md); background: var(--surface-default); }
+.apps .app-waiting .btn { margin-right: 8px; }
+.apps .app-secret { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--accent-deep); border-radius: var(--radius-md); background: var(--accent-wash); color: var(--text-primary); }
+.apps .app-secret dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 8px 0 0; }
+.apps .app-secret dt { color: var(--text-secondary); }
+.apps .app-secret dd { margin: 0; overflow-wrap: anywhere; user-select: all; }
+.apps .app-refused { color: var(--danger); }
+.apps input, .apps textarea, .apps select { background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 6px 10px; font: inherit; }
+.apps input:focus-visible, .apps textarea:focus-visible, .apps select:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }

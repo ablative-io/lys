@@ -934,6 +934,8 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/tests/version.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
 | `docs/design/directory/reports/DIRECTORY-054-fresh-account.md` | R6: Prepare the fresh-account proof and its evidence record | DIRECTORY-054 |
 | `docs/design/directory/reports/DIRECTORY-054-open-items.md` | R6: Prepare the fresh-account proof and its evidence record | DIRECTORY-054 |
+| `crates/lys/src/cli/mcp.rs` | DIRECTORY-049 R7: 'lys mcp', the stdio face agents reach the MCP server by, signing with their own key | DIRECTORY-049 |
+| `crates/lys/tests/mcp_stdio.rs` | DIRECTORY-049 R7: 'lys mcp' over stdio, each call signed with the agent's own key | DIRECTORY-049 |
 
 ## Inventory
 

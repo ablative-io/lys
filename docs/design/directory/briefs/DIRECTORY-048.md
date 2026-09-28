@@ -64,6 +64,43 @@ Behavioural. Add apps as log events and a projection (apps_api.rs, apps_state.rs
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
 - S152 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Unchanged from round 2. An app is a log record, pending until approved. Approval records the client and its secret's SHA-256, shows the secret once and writes it to no log. A pending app's kinds are refused app_not_approved and a retired app's app_retired, and its grants stay readable. sign_in_client is the provider's client lookup, and it refuses a pending, declined or retired app by name.
+- Deviation: Blocked on DIRECTORY-047 R3. Lys's OpenID provider (crates/lys-identity-server/src/provider.rs) is not in this tree. It exists, uncommitted, in the DIRECTORY-047b card clone; its client lookup, ProductClient {secret_sha256, redirect_uris}, is the seam sign_in_client fills. So approval cannot enable a client at the provider, and no person can sign in through an app's client. Once 047 R3 lands, the wiring is: the provider's client() calls sign_in_client, and tests/apps.rs:84 signs in through the client instead of GET /apps/me. The registrar credential stands in for 'a service account holding register_app'. In this tree, grants are held only by people and agents, and a service account is a store record with a string id, so it cannot hold a register_app grant. That needs the brief owner's decision. The files outside R1's file list (apps_binding.rs, apps_views.rs, apps_error.rs) need the brief revision CN9 asks for.
+- Files changed:
+  - created: `crates/lys-identity-server/src/apps_api.rs` — The app routes: register, list, read one, the app's own record (/apps/me), approve, decline, retire and registrars. Approval records the client, shows its secret once and never logs it.
+  - modified: `crates/lys-identity-server/src/apps_binding.rs` — sign_in_client, the lookup the provider will make of an app's client.
+  - created: `crates/lys-identity-server/src/apps_binding_tests.rs` — Unit tests of sign_in_client: pending, approved, wrong secret, unlisted address, retired.
+  - created: `crates/lys-identity-server/tests/apps.rs` — The R1 API tests.
+  - created: `surface/identity/src/features/apps/Apps.tsx` — The Apps screen.
+- Checklist delivery:
+  - [ ] C361 — An app is registered through the API with its id, name, sign-in client and permission schema, and has no effect until an administrator approves it on a Lys screen (DIRECTORY-048 R1). — Registration and approval are done. Enabling the client at the provider, and signing in through it, wait on DIRECTORY-047 R3.
+- Story delivery:
+  - [x] S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys. — An app registers itself and its schema through POST /apps.
+  - [x] S152 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen. — The Apps screen shows the whole registration before Approve or Decline.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] A pending app's client cannot complete a sign-in and checks on its kinds answer app_not_approved. — The check half passes: crates/lys-identity-server/tests/apps.rs:42 a_pending_app_has_no_client_and_its_kinds_answer_app_not_approved asserts 403 app_not_approved at :64. The sign-in half is missing: crates/lys-identity-server/src/provider.rs does not exist, and grep shows sign_in_client (src/apps_binding.rs:251) has no caller outside apps_binding_tests.rs, so no sign-in through an app's client is exercised.
+  - [ ] Approval on the screen enables the client and the schema; a sign-in and a check then pass. — tests/apps.rs:84 approves and then checks. The 'sign-in' there is GET /apps/me with the app's bearer, not a sign-in through a provider client, because the provider is not in the tree.
+  - [x] A second registration of the same id is refused app_exists. — tests/apps.rs:149 a_second_registration_of_an_id_and_of_lys_are_refused_app_exists; passed locally (apps: 13 passed).
+  - [x] A retired app's checks answer app_retired and its grants remain readable. — tests/apps.rs:185 a_retired_apps_checks_answer_app_retired_and_its_grants_stay_readable; passed.
+  - [x] An id with a hyphen, a dot or under three characters is refused app_id_invalid. — tests/apps.rs:168 ids_with_a_hyphen_a_dot_or_under_three_characters_are_refused_app_id_invalid; crates/lys-identity/src/grants/schema_tests.rs:163; passed.
+  - [ ] Registering creates nothing at the provider; approving creates the client and shows its secret once to the approver; no log line holds it. — The secret is shown once and no log holds it (tests/apps.rs:96-129, held_anywhere scans the service dir). But approval only records the client and its SHA-256 in Lys's own log; nothing is created at a provider, because none exists in this tree.
+- Stories verified: S152
+- Issues:
+  - Land or rebase onto DIRECTORY-047 R3's provider (crates/lys-identity-server/src/provider.rs), then wire the provider's client() lookup to apps_binding::sign_in_client so that approval enables the client at the provider.
+  - Change tests/apps.rs:84 to complete a real sign-in through the approved app's client, and add a test showing a pending app's client cannot complete a sign-in.
+  - Get the brief owner's ruling on the registrar credential standing in for 'a service account holding register_app', since service accounts in this tree cannot hold grants.
+  - Get the brief revision CN9 requires for apps_binding.rs, apps_views.rs and apps_error.rs, which are outside R1's file list, before the row closes.
+  - C361 is not delivered: the client is not enabled at a provider, and there is no sign-in through it.
+
 ### R2: An app's schema: its own kinds, actions, relations and parents, checked on entry
 
 Behavioural. A schema is JSON: kinds, each with actions, relations (each carrying a set of the kind's actions) and optional parents (a relation on a parent kind flows to the child, as a workspace's member reaches its channels). Every kind is written '{app}.{kind}'; a kind outside the app's prefix, an action not declared on its kind, a relation carrying an unknown action, a parent cycle or a parent in another app is refused schema_invalid naming the JSON pointer of the fault. Grant creation, delegation and every check refuse kind_not_registered for a kind no approved app declares, and not_your_app when a caller acting for one app names another's kind. The schema is translated to the permission store's definitions under the app's prefix only; no write touches another prefix. The app 'lys' is the one exception to the app.kind form: Lys's own kinds keep their present names, and every other app's kinds carry its prefix. A service account is bound to an app by an app binding record (service account id, app id, bound by, when), written on approval of the registration that names it and read by not_your_app.
@@ -90,6 +127,34 @@ Behavioural. A schema is JSON: kinds, each with actions, relations (each carryin
 **Stories:**
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
 
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Unchanged from round 2. A schema is parsed and checked when it arrives, and each fault is refused by name.
+- Deviation: Unchanged from round 2: files beyond the listed set (admission.rs, cannot_give.rs, schema_diff.rs, spicedb_apps.rs) were needed.
+- Files changed:
+  - created: `crates/lys-identity/src/grants/schema.rs` — The app schema and its checks.
+- Checklist delivery:
+  - [x] C362 — An app's schema declares kinds under its own prefix, their actions, relations carrying actions and parent kinds; an invalid schema is refused naming the line of the fault (DIRECTORY-048 R2).
+  - [x] C363 — An app cannot define, change or grant on another app's kinds; the refusal names the owning prefix (DIRECTORY-048 R2).
+- Story delivery:
+  - [x] S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
+
+**Review (recorded):**
+
+- Alignment: aligned
+- Acceptance verdicts:
+  - [x] Each fault above is refused with its pointer, with one test per fault. — crates/lys-identity/src/grants/schema_tests.rs:53-154, one test per fault (prefix, unprefixed kind, foreign action, unknown action, cycle, self-parent, foreign parent, undeclared parent, engine name rule, relation named as an action, unknown member); tests/apps.rs:436 covers pointers over HTTP.
+  - [x] A grant naming an unregistered kind is refused kind_not_registered. — tests/apps.rs:268 a_kind_no_approved_app_declares_is_refused_kind_not_registered; passed.
+  - [x] An app's service account naming another app's kind is refused not_your_app. — tests/apps.rs:294 an_apps_credential_naming_another_apps_kind_is_refused_not_your_app; passed.
+  - [x] A parent relation grants the child: a workspace member may read a channel in it. — tests/apps.rs:338 a_workspace_member_may_read_a_channel_placed_in_it_and_no_more; schema_tests.rs:193.
+- Checklist verified: C362, C363
+- Stories verified: S151
+- Issues:
+  - The files beyond R2's list (admission.rs, cannot_give.rs, schema_diff.rs, spicedb_apps.rs) are recorded as a deviation; the reviewer approving the brief revision should confirm them under CN9.
+
 ### R3: Schema changes are versioned, dry-run first, and never strand a grant
 
 Behavioural. PUT /apps/{app}/schema carries the version it replaces and is refused schema_version_moved when that is not current. POST /apps/{app}/schema/check answers what the change would do without writing: kinds, relations and actions added and removed, and the standing grants each removal would strand. A change that removes a kind or relation with standing grants, or an action a standing grant carries, is refused schema_change_strands_grants naming each relation and its count; it is applied only after those grants are revoked through the ordinary revoke route. A change made by a service account waits for administrator approval on the Apps screen, as registration does. Every version stays readable at GET /apps/{app}/schema?version=N. The apps store is born with its checkpoint beside its log, so a start reads the checkpoint and the tail only, never the whole history.
@@ -111,6 +176,31 @@ Behavioural. PUT /apps/{app}/schema carries the version it replaces and is refus
 **Stories:**
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
 
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Unchanged from round 2. Schema versions are kept, a change has a dry run first, and a change that would strand a grant is refused.
+- Deviation: (none)
+- Files changed:
+  - modified: `crates/lys-identity-server/tests/apps_schema.rs` — The bench scenario moved into tests/shared/bench.rs, so the live SpiceDB test runs the same body.
+- Checklist delivery:
+  - [x] C364 — A schema change that would strand standing grants is refused naming the relation and the count; a dry run answers the same without writing (DIRECTORY-048 R3).
+- Story delivery:
+  - [x] S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
+
+**Review (recorded):**
+
+- Alignment: aligned
+- Acceptance verdicts:
+  - [x] A stale version is refused schema_version_moved. — tests/apps_schema.rs:38 a_change_naming_a_stale_version_is_refused_schema_version_moved; passed (8 passed).
+  - [x] The check route and the refused write name the same relations and counts. — tests/apps_schema.rs:51 a_stranding_change_is_named_alike_by_its_dry_run_and_its_write_and_taken_after_revoking.
+  - [x] After revoking the stranded grants the same change applies and the version moves by one. — Same test, tests/apps_schema.rs:51, second half.
+  - [x] Version N stays readable after N+1. — tests/apps_schema.rs:51 reads the earlier version after the change applies; passed.
+- Checklist verified: C364
+- Stories verified: S151
+
 ### R4: Lys's own model is the schema of the app 'lys'
 
 Behavioural. At start, when no 'lys' app exists in the log, the model in grant_model_file is recorded once as the schema of the app 'lys', approved, at the model's version; afterwards the log is the only source and the file is not read again. Lys's own kinds keep their present names, recorded as the 'lys' prefix's kinds, so every existing grant and check answers the same. The 'lys' app cannot be retired and its schema changes only by an administrator. This is the exception R2 names for the app 'lys'.
@@ -130,6 +220,30 @@ Behavioural. At start, when no 'lys' app exists in the log, the model in grant_m
 
 **Stories:**
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
+
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Unchanged from round 2.
+- Deviation: The service starts in service_saying in routes.rs, so start.rs is unchanged.
+- Files changed:
+  - modified: `crates/lys-identity-server/src/grants.rs` — Lys's own model is the schema of the app lys.
+- Checklist delivery:
+  - [x] C365 — Lys's own model is the schema of the app 'lys'; existing grants and checks answer the same after the move (DIRECTORY-048 R4).
+- Story delivery:
+  - [x] S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
+
+**Review (recorded):**
+
+- Alignment: aligned
+- Acceptance verdicts:
+  - [x] Every existing grant and check test passes unchanged after the move. — The workflow's tests leg (cargo test --workspace --all-features --no-fail-fast) exited 0. The grants.rs/grant_explanations.rs changes in the diff only tighten the asserts to name the refusal.
+  - [x] A second start with a changed model file changes nothing and says so by name in the start log. — tests/apps_schema.rs:269 a_second_start_with_a_changed_model_file_changes_nothing_and_says_so_by_name; config.rs apps_dir/grant_model docs.
+  - [x] Retiring 'lys' is refused app_is_lys. — tests/apps_schema.rs:204 lys_is_an_app_whose_schema_is_the_model_and_changes_only_by_the_administrator; passed.
+- Checklist verified: C365
+- Stories verified: S151
 
 ### R5: Apps check many permissions at once and list what a subject may act on
 
@@ -151,6 +265,31 @@ Behavioural. POST /grants/check/batch takes up to 500 checks (subject, kind, id,
 
 **Stories:**
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
+
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Unchanged from round 2.
+- Deviation: (none)
+- Files changed:
+  - modified: `crates/lys-identity-server/src/grants_batch.rs` — The batch and which routes.
+- Checklist delivery:
+  - [x] C366 — Apps check many permissions in one call and list the resources a subject may act on (DIRECTORY-048 R5).
+- Story delivery:
+  - [x] S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
+
+**Review (recorded):**
+
+- Alignment: aligned
+- Acceptance verdicts:
+  - [x] A batch of mixed allowed and refused checks answers each in order at one named revision. — tests/grants_batch.rs:15; passed (6 passed).
+  - [x] 501 checks are refused batch_too_large. — tests/grants_batch.rs:68; BATCH_MAX=500 at src/grants_batch.rs:37 is the brief's own bound.
+  - [x] which lists exactly the ids the batch would allow, across pages. — tests/grants_batch.rs:100 which_lists_exactly_the_ids_the_batch_allows_across_pages.
+  - [x] A check with at_least of a just-made grant sees it. — tests/grants_batch.rs:190 a_check_naming_the_revision_of_a_just_made_grant_sees_it.
+- Checklist verified: C366
+- Stories verified: S151
 
 ### R6: One OpenAPI document, generated, describes every route
 
@@ -175,6 +314,51 @@ Behavioural. GET /openapi.json answers an OpenAPI 3.1 document generated from th
 
 **Stories:**
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
+
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: The document is generated from the request, answer and refusal types. Every route names its types except 21 whose answer is open (the secrets broker's forwarded answers, redirects, the configuration dump, the start owners' own JSON, /openapi.json) and 11 that take no typed body; both lists are exact and tested. Refusals are held complete from both sides: tests/openapi.rs fails on a listed refusal no test produces, and the harness fails any test that meets a refusal its route does not list. 123 missing pairs were found and listed. lys-identity-server and identity-contract then passed 271 tests with 0 failed.
+- Deviation: The refusal lists are checked against what the tests produce; they are not generated from the error types. /grants/who cannot answer NotHeld: it lists holders and never calls decide. Drift injections showed each list check failing only the test built for it.
+- Files changed:
+  - created: `crates/lys-identity-server/src/openapi_types.rs` — The request and answer schema of every table route, from its ToSchema types. The module doc lists each route left untyped, with its reason.
+  - created: `crates/lys-identity-server/src/directory_views.rs` — Typed answers replacing hand-built json! for receipts, registrations, identities, sign-in, link audit and the service key; the same JSON on the wire.
+  - modified: `crates/lys-identity-server/src/routes.rs` — The directory routes answer typed structs.
+  - modified: `crates/lys-identity-server/src/connections_api.rs` — Typed ConnectionsView.
+  - modified: `crates/lys-identity-server/src/setup.rs` — Typed answer.
+  - modified: `crates/lys-identity-server/src/link_audit_api.rs` — Typed answers.
+  - modified: `crates/lys-identity-server/src/receipts_api.rs` — Typed answers.
+  - modified: `crates/lys-openapi/src/lib.rs` — Route.refusals is a Vec. Registering two different types under one schema name is now a named fault rather than a silent overwrite; the nine such collisions in the crate were renamed.
+  - modified: `crates/lys-identity-server/src/openapi.rs` — Each table route gets its types from openapi_types; its refusals are its sets joined, without repeats.
+  - created: `crates/lys-identity-server/src/openapi_refusals.rs` — The refusal sets.
+  - modified: `crates/lys-identity-server/src/openapi_table.rs` — One line per route through a macro_rules! table, each with every refusal the suite produces on it.
+  - modified: `crates/lys-identity-server/src/openapi_typed.rs` — The app routes list the refusals they answer beyond their sets.
+  - created: `tests/identity_contract/src/refusals.rs` — Harness middleware: an answer carrying a refusal its route's document entry does not list becomes 500 RefusalUndocumented, naming the route and the refusal.
+  - modified: `tests/identity_contract/src/harness.rs` — Serves the service behind that middleware.
+  - modified: `crates/lys-identity-server/tests/openapi.rs` — every_route_names_the_types_it_takes_and_answers, with exact lists of the untyped routes; a listed route that is in fact typed fails the test.
+  - modified: `crates/lys-identity-server/tests/grants.rs` — Asserts Revoked by name.
+  - modified: `crates/lys-identity-server/tests/grant_explanations.rs` — Asserts GrantUnknown and GrantIdMalformed by name.
+  - modified: `crates/lys-identity-server/tests/network.rs` — Asserts IdentifierMalformed by name.
+  - modified: `crates/lys-identity-server/tests/requests.rs` — Asserts SourceUnknown by name.
+  - modified: `crates/lys-identity-server/src/*_api.rs, *_views.rs, *_state.rs` — utoipa::ToSchema derived on each body and answer type a table route reaches.
+- Checklist delivery:
+  - [x] C367 — One OpenAPI document, generated from the routes and types, describes every route; a route without an entry fails the build (DIRECTORY-048 R6). — One generated document, typed from the routes' types, with refusal lists enforced by tests.
+- Story delivery:
+  - [x] S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys. — The API is published at /openapi.json.
+
+**Review (recorded):**
+
+- Alignment: aligned
+- Acceptance verdicts:
+  - [x] The document validates as OpenAPI 3.1. — tests/openapi.rs:102 the_document_reads_as_openapi_3_1: lys_openapi::validate (crates/lys-openapi/src/lib.rs:284) deserializes into utoipa::openapi::OpenApi, resolves every $ref and checks operation ids, and a planted broken ref yields exactly one fault. Passed (13 passed).
+  - [x] Adding a route without a description fails the test naming the route. — tests/openapi.rs:155 a_route_added_without_an_entry_fails_naming_the_route asserts the exact names [get /planted/{id}, post /planted/{id}]; :132 checks both directions.
+  - [x] Every refusal in the document has a test that produces it. — tests/openapi.rs:236 every_refusal_the_document_names_is_produced_by_a_test; tests/identity_contract/src/refusals.rs turns an unlisted refusal into 500 RefusalUndocumented, and the workspace tests leg exited 0.
+- Checklist verified: C367
+- Stories verified: S151
+- Issues:
+  - The 3.1 validity check is utoipa's model plus a local ref walker, not the published OpenAPI 3.1 JSON Schema; that is independence of parser, not of specification. It is recorded, not failing.
 
 ### R7: Lys depends on no app
 
@@ -202,6 +386,34 @@ Structural. Lys depends on no app. It holds no app's name, kind, schema or code;
 **Stories:**
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
 
+#### R7 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Lys holds no app's name, kind or schema, and calls no app. Measured here this round: fmt --check clean; clippy with all features clean for lys-openapi, lys-identity-server and identity-contract; their tests pass (271 passed, 0 failed); doc builds in both shapes; ast-grep scan exits 0; file-length finds 0 files over across 576.
+- Deviation: The design leg failed in round 2 because the workflow writes the dev report into briefs/DIRECTORY-048.json after the answer, and the design leg runs before the docs tree's render leg. The committed .md is therefore stale when the design leg checks it. The workflow has to render before the design leg, or the round has to re-render. The full workspace gate and the lys identity_* leg run on Dean's laptop and need remeasuring by the card round.
+- Files changed:
+  - created: `rules/ast-grep/no-app-names.yml` — Enforces no product names in code, configuration or screens.
+- Checklist delivery:
+  - [x] C368 — Lys holds no app's name or schema in code or configuration and makes no call to any app (DIRECTORY-048 R7).
+- Story delivery:
+  - [x] S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
+
+**Review (recorded):**
+
+- Alignment: aligned
+- Acceptance verdicts:
+  - [x] ast-grep scan exits 0 on the tree and fails on a planted product name. — ast-grep scan --config sgconfig.yml exit 0 locally; ast-grep test: no-app-names-rust PASS, 2 passed 0 failed (rules/ast-grep-tests/).
+  - [x] The full gate passes with no app registered. — The workflow measured fmt, both clippy shapes, tests, both doc shapes, ast-grep, file-length and surface at exit 0. Design failed only on the stale DIRECTORY-048.md; after my re-render, sh scripts/design/gate.sh exits 0 locally.
+  - [x] A test registers two apps with the same kind name under their own prefixes and checks each separately. — tests/apps.rs:410 two_apps_with_the_same_kind_name_are_checked_each_under_its_own_prefix; passed.
+- Checklist verified: C368
+- Stories verified: S151
+- Issues:
+  - The design leg failed at the round's head because DIRECTORY-048.md was stale against DIRECTORY-048.json.
+- Fixes:
+  - Re-rendered docs/design/directory with scripts/design/render-cluster.py; sh scripts/design/gate.sh now exits 0.
+
 ### R8: Build an app's permission template on a Lys screen
 
 Behavioural. Building the template is the requirement; a description of it is not. The Apps screen gains a builder in which a person makes an app's whole permission schema without writing any schema language: add kinds under the app's prefix; give each kind its actions; make relations and tick which actions each carries; set a kind's parents by choosing them; start from a template (owner/editor/viewer on one kind; workspace with members over child kinds; team-scoped resources) and change it. The kinds are drawn as a tree with their relations, editable in place. A test bench beside it lets the person place example people and agents on example resources and ask 'may X do Y to Z', answered by the real permission check against the draft, with the path that allowed or refused it. Saving runs the dry run of R3, lists what would be added and removed and any grants a change would strand, and cannot save a change that strands grants. It saves through the same routes as an upload, so a schema built here and one uploaded through the API are the same record, each editable by the other. Controls are styled from the design tokens, never default ones. The draft being built is held in the builder's own session store, separate from the permission store; the bench's check runs against a scratch copy of the draft loaded into a throwaway namespace of the permission service, so no standing check can see a draft, and the namespace is removed when the bench closes.
@@ -225,6 +437,40 @@ Behavioural. Building the template is the requirement; a description of it is no
 **Stories:**
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
 - S152 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen.
+
+#### R8 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: When SpiceDB is configured, the bench now goes through the same engine the real check uses, in a throwaway scope removed on answering. Verified against a local SpiceDB 1.56.2: the live test passes, the bench test made 12 schema writes and 33 relationship deletes, and nothing is left behind.
+- Deviation: (none)
+- Files changed:
+  - created: `crates/lys-identity-server/src/spicedb_scope.rs` — A scratch scope of SpiceDB, a child module of spicedb: every definition and caveat named under lys/b{hex}/. The one engine call applies the scope. The service's engine never sees scratch names and keeps them when it writes its schema. Also remove_scratch and clear_scratch.
+  - created: `crates/lys-identity-server/src/spicedb_scope_tests.rs` — Unit tests: name length, block parsing, each side's view, each side's write keeping the other's names, and a scoped request.
+  - modified: `crates/lys-identity-server/src/spicedb.rs` — A scope field and open_scratch.
+  - modified: `crates/lys-identity-server/src/apps_bench_scratch.rs` — With SpiceDB configured, the scratch grants run on a scratch scope, examples are placed in the engine, and the scope is removed before the answer.
+  - modified: `crates/lys-identity-server/src/apps_bench.rs` — Under SpiceDB, a question is asked while holding the grants' lock, and scopes an earlier question left are cleared first.
+  - modified: `crates/lys-identity-server/tests/identity_spicedb.rs` — Live test: the bench scenario on SpiceDB. A planted leftover scope is removed, and no scratch name remains afterwards.
+  - created: `crates/lys-identity-server/tests/shared/bench.rs` — The shared bench scenario.
+- Checklist delivery:
+  - [x] C386 — A person builds an app's whole permission template on the Apps screen from templates, tests it on example people and resources against the real check, and saves it; built and uploaded schemas are the same record (DIRECTORY-048 R8).
+- Story delivery:
+  - [x] S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
+  - [x] S152 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen.
+
+**Review (recorded):**
+
+- Alignment: aligned
+- Acceptance verdicts:
+  - [x] A person builds a two-kind schema with a parent from a template on the screen, with no schema text typed, and saving it yields the same record as uploading the same schema through the API. — surface/identity/tests/schema-builder.test.tsx:75; the surface leg (npm install-ci-test) exited 0.
+  - [x] An uploaded schema opens in the builder and edits there. — surface/identity/tests/schema-builder.test.tsx:93.
+  - [x] The test bench answers 'may X do Y to Z' against the draft with the path, matching the real check after saving. — tests/apps_schema.rs:384 the_bench_answers_the_draft_as_the_real_check_answers_it_once_saved (local engine); tests/identity_spicedb.rs:271 the_bench_asks_a_scratch_scope_of_the_engine_and_leaves_none_behind (SpiceDB); schema-builder.test.tsx:110.
+  - [x] A change that would strand grants shows the stranded count before saving and cannot be saved. — surface/identity/tests/schema-builder.test.tsx:144 shows the stranded count of a change and cannot save it.
+- Checklist verified: C386
+- Stories verified: S151, S152
+- Issues:
+  - apps_bench.rs:258 holds the std grants Mutex across blocking SpiceDB HTTP calls in an async handler, so a bench question stalls grant writes for its duration. This is by design (the scope shares the engine schema) and is recorded rather than failing.
 
 ## Boundaries
 

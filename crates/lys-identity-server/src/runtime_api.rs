@@ -44,7 +44,8 @@ use crate::session::now;
 const WORDS_MAX: usize = 500;
 
 /// A confirmed stop.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(as = RuntimeStopView)]
 pub struct StopView {
     /// When the stop was reported, in seconds since the Unix epoch.
     pub at: u64,
@@ -53,7 +54,8 @@ pub struct StopView {
 }
 
 /// One session as the runtimes have reported it.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(as = RuntimeSessionView)]
 pub struct SessionView {
     /// The session.
     pub session: String,
@@ -84,16 +86,17 @@ pub struct SessionView {
 }
 
 /// Sessions, in the order first reported.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(as = RuntimeSessionsView)]
 pub struct SessionsView {
     /// The sessions.
     pub sessions: Vec<SessionView>,
 }
 
 /// A report as a runtime sends it.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct ReportBody {
+pub(crate) struct ReportBody {
     operation: String,
     state: Reported,
     machine: String,

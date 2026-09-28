@@ -34,7 +34,7 @@ struct Homes {
 }
 
 /// One memory, without its words.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct MemoryLine {
     /// The lantern's entry id.
     pub id: String,
@@ -53,7 +53,7 @@ pub struct MemoryLine {
 }
 
 /// A session that could not be read.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct SkippedLine {
     /// The session.
     pub session: String,
@@ -62,7 +62,7 @@ pub struct SkippedLine {
 }
 
 /// The context given last, by its sizes.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct GivenView {
     /// The session the entry stands in.
     pub session: String,
@@ -81,7 +81,7 @@ pub struct GivenView {
 }
 
 /// Who the memory of this agent is shown to.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct VisibleTo {
     /// The agent itself.
     pub agent: String,
@@ -92,7 +92,7 @@ pub struct VisibleTo {
 }
 
 /// The answer of the memory route.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct MemoryView {
     /// The agent.
     pub agent: String,

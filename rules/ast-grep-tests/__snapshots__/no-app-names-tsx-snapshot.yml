@@ -1,0 +1,14 @@
+id: no-app-names-tsx
+snapshots:
+  const link = <a href="/meridian">open</a>;:
+    labels:
+    - source: /meridian
+      style: primary
+      start: 22
+      end: 31
+  export const title = 'Haematite apps';:
+    labels:
+    - source: Haematite apps
+      style: primary
+      start: 22
+      end: 36

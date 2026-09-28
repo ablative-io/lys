@@ -186,7 +186,16 @@ impl Config {
         .map_err(|error| invalid(format!("link_audit_source: {error}")))
     }
 
-    /// The permission model, read from its file and checked.
+    /// The directory the apps are kept in: `apps`, beside the grant log.
+    /// The apps log is always kept, since it holds Lys's own model as the
+    /// schema of the app `lys`.
+    pub fn apps_dir(&self) -> PathBuf {
+        self.grant_log_dir.with_file_name("apps")
+    }
+
+    /// The permission model, read from its file and checked. It is read only
+    /// when the apps log does not yet hold the app `lys`, to record it there
+    /// once; afterwards the log is the only source and the file is not read.
     pub fn grant_model(&self) -> Result<Model, ServerError> {
         let path = &self.grant_model_file;
         let text = std::fs::read_to_string(path)

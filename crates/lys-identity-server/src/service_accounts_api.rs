@@ -36,9 +36,10 @@ const NAME_MAX: usize = 100;
 const DESCRIPTION_MAX: usize = 500;
 
 /// A service account as its creator sends it.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct CreateBody {
+#[schema(as = ServiceAccountCreateBody)]
+pub(crate) struct CreateBody {
     operation: String,
     name: String,
     #[serde(default)]
@@ -48,9 +49,10 @@ struct CreateBody {
 }
 
 /// A retirement as it is sent.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct RetireBody {
+#[schema(as = ServiceAccountRetireBody)]
+pub(crate) struct RetireBody {
     operation: String,
 }
 

@@ -60,7 +60,11 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
 
 impl IntoResponse for ServerError {
     fn into_response(self) -> Response {
-        let body = serde_json::json!({ "refusal": self.name(), "reason": self.to_string() });
+        let body = serde_json::json!({
+            "refusal": self.name(),
+            "reason": self.to_string(),
+            "fields": self.fields(),
+        });
         (self.status(), Json(body)).into_response()
     }
 }
@@ -70,6 +74,15 @@ impl ServerError {
     pub fn name(&self) -> String {
         let text = self.to_string();
         text.split(':').next().unwrap_or_default().to_owned()
+    }
+
+    /// The fields at fault, as JSON pointers into the request body; none
+    /// when the refusal is not about a field.
+    pub fn fields(&self) -> Vec<crate::apps_error::Field> {
+        match self {
+            Self::App(error) => error.fields(),
+            _ => Vec::new(),
+        }
     }
 
     pub(crate) fn status(&self) -> StatusCode {
@@ -149,6 +162,7 @@ impl ServerError {
             Self::SecretsRefused { status, .. } => *status,
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),
+            Self::App(error) => error.status(),
         }
     }
 }

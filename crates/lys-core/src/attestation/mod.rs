@@ -112,8 +112,8 @@
 //! | **Permitted, never provided** | That the signer is anyone in particular. **Attribution is entirely the caller's**, and no argument to these functions can express it. |
 //!
 //! This was not written from the API but measured against a real integrator, by
-//! someone who could read a repository this crate cannot see. `manifold-node`
-//! consumes this module and closes the gap **by construction** rather than by
+//! someone who could read a repository this crate cannot see. One integrator's
+//! node consumes this module and closes the gap **by construction** rather than by
 //! discipline: at its single production verification site it looks up a registry
 //! pin keyed on the claimed sender, passes it in, and resolves to one of three
 //! verdicts — pin matches, pin differs (*forged*), or **no pin at all, which
@@ -127,7 +127,7 @@
 //! exactly why the table above exists rather than a sentence saying callers
 //! ought to be careful.
 //!
-//! *(Finding and framing: Waffles the Terrible, on the manifold seat, 2026-08-08.
+//! *(Finding and framing: Waffles the Terrible, on that integrator's seat, 2026-08-08.
 //! This crate's own review had bounded the gap as "mitigated in the callers I
 //! found" — a search of this repository only, which could establish that the
 //! hole existed but never that any consumer had closed it.)*

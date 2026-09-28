@@ -116,14 +116,17 @@ pub enum CredentialSource {
     Provided,
 }
 
-/// The `[clients]` table: exactly the platform and Cambium clients.
+/// The `[clients]` table: exactly the platform's client and one app's client.
+/// Every further app registers itself through the directory's Apps API; the
+/// install names no product.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Clients {
     /// The platform's own confidential client, themed identity orange.
     pub platform: Client,
-    /// Cambium's client, themed Cambium green.
-    pub cambium: Client,
+    /// The one app client installed beside the platform's, themed with the
+    /// app accent the theme mapping declares.
+    pub app: Client,
 }
 
 /// One managed OIDC client.
@@ -193,7 +196,7 @@ impl DeploymentConfig {
     pub fn managed_clients(&self) -> [(ClientRole, &Client); 2] {
         [
             (ClientRole::Platform, &self.clients.platform),
-            (ClientRole::Cambium, &self.clients.cambium),
+            (ClientRole::App, &self.clients.app),
         ]
     }
 
@@ -256,12 +259,12 @@ impl DeploymentConfig {
         }
         validate_admin_url(&self.issuer.admin_url)?;
         self.validate_database()?;
-        let [(_, platform), (_, cambium)] = self.managed_clients();
-        if platform.id == cambium.id {
+        let [(_, platform), (_, app)] = self.managed_clients();
+        if platform.id == app.id {
             return Err(refuse(
                 ErrorKind::ClientInvalid,
                 "clients",
-                "the platform and Cambium clients need distinct ids",
+                "the platform and app clients need distinct ids",
             ));
         }
         for (role, client) in self.managed_clients() {
@@ -379,8 +382,9 @@ impl DeploymentConfig {
 pub enum ClientRole {
     /// The platform's own client.
     Platform,
-    /// Cambium's client.
-    Cambium,
+    /// The one installed app's client. Every further app registers itself
+    /// through the directory's Apps API.
+    App,
 }
 
 impl ClientRole {
@@ -388,7 +392,7 @@ impl ClientRole {
     pub fn key(self) -> &'static str {
         match self {
             Self::Platform => "platform",
-            Self::Cambium => "cambium",
+            Self::App => "app",
         }
     }
 }

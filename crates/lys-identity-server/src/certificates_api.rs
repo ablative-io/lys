@@ -25,7 +25,7 @@ use crate::error::ServerError;
 use crate::routes::{AppState, hex};
 
 /// What verifies a certificate's entry offline.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct EntryView {
     /// The index of the leaf the issuance was entered as.
     pub leaf: u64,
@@ -40,13 +40,14 @@ pub struct EntryView {
 }
 
 /// One certificate as it stands.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct CertificateView {
     /// Its serial.
     pub serial: String,
     /// The person it was issued for.
     pub person: String,
     /// What held when it was issued.
+    #[schema(value_type = Object)]
     pub claims: Value,
     /// The certificate, DER, standard base64.
     pub der: String,
@@ -59,7 +60,7 @@ pub struct CertificateView {
 }
 
 /// The answer of the certificate route.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct CertificatesView {
     /// The agent.
     pub agent: String,

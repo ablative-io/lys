@@ -226,7 +226,12 @@ async fn serve(
     ),
     Box<dyn Error>,
 > {
-    let app = service(config).await?;
+    let documented = crate::refusals::listed();
+    let app = service(config)
+        .await?
+        .layer(axum::middleware::from_fn(move |request, next| {
+            crate::refusals::listed_only(Arc::clone(&documented), request, next)
+        }));
     let server = tokio::spawn(async move { axum::serve(listener, app).await });
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())

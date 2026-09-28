@@ -59,15 +59,15 @@ pub fn routes() -> Router<Arc<AppState>> {
 }
 
 /// A decision to keep a grant, as the reviewer sends it.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct KeepBody {
+pub(crate) struct KeepBody {
     operation: String,
     note: String,
 }
 
 /// The latest decision to keep a grant.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct KeptView {
     /// The person who kept it.
     pub by: String,
@@ -88,7 +88,7 @@ impl From<&Kept> for KeptView {
 }
 
 /// One grant an agent holds, with the agent and the person who reviews it.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct DueView {
     /// The grant, as `GET /grants/{id}` answers it.
     pub grant: GrantView,
@@ -101,7 +101,7 @@ pub struct DueView {
 }
 
 /// An agent whose person is not active, so no one answers for it.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct UnansweredView {
     /// The agent.
     pub agent: AgentSummary,
@@ -110,7 +110,7 @@ pub struct UnansweredView {
 }
 
 /// The answer of `GET /reviews`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ReviewView {
     /// `personal` for the signed-in person's own agents, `directory` for the root authority's view of every agent.
     pub scope: String,

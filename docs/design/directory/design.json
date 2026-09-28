@@ -4206,6 +4206,16 @@
       "path": "docs/design/directory/reports/DIRECTORY-054-open-items.md",
       "note": "R6: Prepare the fresh-account proof and its evidence record",
       "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/cli/mcp.rs",
+      "note": "DIRECTORY-049 R7: 'lys mcp', the stdio face agents reach the MCP server by, signing with their own key",
+      "brief": "DIRECTORY-049"
+    },
+    {
+      "path": "crates/lys/tests/mcp_stdio.rs",
+      "note": "DIRECTORY-049 R7: 'lys mcp' over stdio, each call signed with the agent's own key",
+      "brief": "DIRECTORY-049"
     }
   ],
   "inventory": [

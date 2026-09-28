@@ -50,7 +50,7 @@ use crate::runtime_state::{Report, Reported};
 use crate::session::now;
 
 /// The answer of the start-command route.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct StartCommandView {
     /// The agent.
     pub agent: String,
@@ -78,9 +78,10 @@ pub struct StartCommandView {
     pub executed: bool,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct Launch {
+#[schema(as = LaunchBody)]
+pub(crate) struct Launch {
     machine: String,
     operation: String,
 }

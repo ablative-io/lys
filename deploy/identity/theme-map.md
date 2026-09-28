@@ -11,7 +11,8 @@ validates it, and `lys identity configure` applies it.
 - File: `docs/design-system-v2/palette/estate-colour-tokens.json`
 - Commit: `385916eb437cae62c4269e6db1db2e542af5749e` (385916e, the commit that added the
   identity entry). The file is read, never changed.
-- The tokens' purple status entry (`open_items.aion_status_special`) is not copied.
+- The tokens' purple status entry (the console's special status colour under
+  `open_items`) is not copied.
 
 ## Mapped fields (dark mode)
 
@@ -22,7 +23,7 @@ A Rauthy field takes an estate token only where the estate names the same role.
 | `text` | `foundation.text` | `#E8EAEC` | 210 10 92 | both |
 | `bg` | `foundation.ink` | `#0C0E10` | 210 14 5 | both |
 | `bg_high` | `foundation.raised` | `#1E2226` | 210 12 13 | both |
-| `accent` | `products.cambium.accent` (Cambium green) | `#5E8C6A` | 136 20 46 | cambium |
+| `accent` | `products.app.accent` (the installed app's green) | `#5E8C6A` | 136 20 46 | app |
 | `accent` | `products.identity.accent` (identity orange) | `#D4975A` | 30 59 59 | platform |
 
 `text` is not mapped to `foundation.muted`: that would set the body of every page in
@@ -66,7 +67,7 @@ WCAG 2.1 AA, relative-luminance formula, six pairs per client, gap fields at
 Rauthy's default, CSS variable forms resolved in the dark mode and alpha composited
 over ink:
 
-| Pair | Tier | Cambium | Platform |
+| Pair | Tier | App | Platform |
 |---|---|---|---|
 | text over bg (ink) | 4.5 | 16.25 | 16.25 |
 | text over bg_high (raised) | 4.5 | 13.48 | 13.48 |

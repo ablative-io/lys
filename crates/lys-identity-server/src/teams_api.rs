@@ -42,7 +42,7 @@ const NAME_MAX: usize = 100;
 const DESCRIPTION_MAX: usize = 500;
 
 /// A team as the routes answer it.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct TeamView {
     /// The team, named by the operation id it was created with.
     pub id: String,
@@ -65,7 +65,8 @@ pub struct TeamView {
 }
 
 /// The line an operation was first kept as.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(as = TeamRecorded)]
 pub struct Recorded {
     /// The operation id the act was sent under.
     pub operation: String,
@@ -80,7 +81,7 @@ pub struct Recorded {
 }
 
 /// The answer of every act on a team.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct TeamChanged {
     /// The team as it stands now.
     #[serde(flatten)]
@@ -90,31 +91,34 @@ pub struct TeamChanged {
 }
 
 /// The answer of `GET /teams`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct TeamsView {
     /// Every team, in the order created.
     pub teams: Vec<TeamView>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct CreateBody {
+#[schema(as = TeamCreateBody)]
+pub(crate) struct CreateBody {
     operation: String,
     name: String,
     #[serde(default)]
     description: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct MemberBody {
+#[schema(as = TeamMemberBody)]
+pub(crate) struct MemberBody {
     operation: String,
     member: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct RetireBody {
+#[schema(as = TeamRetireBody)]
+pub(crate) struct RetireBody {
     operation: String,
 }
 

@@ -7,10 +7,34 @@ use axum::http::HeaderMap;
 use axum::routing::get;
 use axum::{Json, Router};
 use openidconnect::reqwest::Url;
-use serde_json::{Value, json};
+use serde::Serialize;
 
 use crate::error::ServerError;
 use crate::routes::{AppState, signed_in};
+
+/// One integration this installation is configured with.
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct ConnectionView {
+    /// Its id, which a screen codes against.
+    pub id: &'static str,
+    /// Its name, in words.
+    pub name: &'static str,
+    /// What it is for, in words.
+    pub purpose: &'static str,
+    /// Whether it is configured, and how.
+    pub state: &'static str,
+    /// The origin it is reached at, never a credential, path or query.
+    pub endpoint: Option<String>,
+}
+
+/// The answer of `GET /connections`.
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct ConnectionsView {
+    /// Every integration, in the order shown.
+    pub connections: Vec<ConnectionView>,
+    /// Whether the service reached any of them to say so: never.
+    pub health_checked: bool,
+}
 
 /// Read the installation's integrations. This is not an upstream or client registry.
 pub fn routes() -> Router<Arc<AppState>> {
@@ -33,7 +57,7 @@ pub(crate) fn origin(value: &str, name: &str) -> Result<String, ServerError> {
 async fn connections(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<ConnectionsView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
     let issuer = origin(state.oidc.issuer(), "sign-in provider")?;
@@ -54,14 +78,40 @@ async fn connections(
         .as_ref()
         .map(|broker| origin(broker.endpoint(), "secrets broker"))
         .transpose()?;
-    Ok(Json(json!({
-        "connections": [
-            {"id": "sign_in", "name": "Sign-in provider", "purpose": "Authenticates people signing in to Lys.", "state": "configured", "endpoint": issuer},
-            {"id": "permissions", "name": "Permission engine", "purpose": "Checks the access represented by Lys grants.", "state": if projection.is_some() { "configured" } else { "local" }, "endpoint": projection},
-            {"id": "secrets", "name": "Secrets broker", "purpose": "Provides secret access on behalf of the signed-in person.", "state": if broker.is_some() { "configured" } else { "unconfigured" }, "endpoint": broker}
+    Ok(Json(ConnectionsView {
+        connections: vec![
+            ConnectionView {
+                id: "sign_in",
+                name: "Sign-in provider",
+                purpose: "Authenticates people signing in to Lys.",
+                state: "configured",
+                endpoint: Some(issuer),
+            },
+            ConnectionView {
+                id: "permissions",
+                name: "Permission engine",
+                purpose: "Checks the access represented by Lys grants.",
+                state: if projection.is_some() {
+                    "configured"
+                } else {
+                    "local"
+                },
+                endpoint: projection,
+            },
+            ConnectionView {
+                id: "secrets",
+                name: "Secrets broker",
+                purpose: "Provides secret access on behalf of the signed-in person.",
+                state: if broker.is_some() {
+                    "configured"
+                } else {
+                    "unconfigured"
+                },
+                endpoint: broker,
+            },
         ],
-        "health_checked": false
-    })))
+        health_checked: false,
+    }))
 }
 
 #[cfg(test)]

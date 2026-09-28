@@ -1,5 +1,5 @@
-//! `lys identity configure`: reconcile exactly the platform and Cambium
-//! clients and their themes in Rauthy, idempotently.
+//! `lys identity configure`: reconcile exactly the platform's client and the
+//! one installed app's client and their themes in Rauthy, idempotently.
 //!
 //! Every change has a stable operation identifier derived from what it
 //! makes true, so a second run over an unchanged configuration reports the
@@ -281,7 +281,7 @@ pub fn run(config_path: &Path, json: bool) -> IdentityResult<()> {
     private_files::write(&state_dir.join(OPERATIONS_FILE), &encoded)?;
     let managed = [
         config.clients.platform.id.as_str(),
-        config.clients.cambium.id.as_str(),
+        config.clients.app.id.as_str(),
         "rauthy",
     ];
     let mut emitter = Emitter::new(json);

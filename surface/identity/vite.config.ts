@@ -13,5 +13,15 @@ export default defineConfig({
   preview: { proxy },
   // `tests/**/*.spec.ts` is the acceptance shape: the same jsdom runner, kept
   // under its own name so an acceptance is not mistaken for a unit test.
-  test: { environment: 'jsdom', include: ['tests/**/*.test.tsx', 'tests/acceptance/grants.spec.ts'], setupFiles: ['tests/setup.ts'] },
+  // No time limits (CLAUDE.md): vitest's default per-test and per-hook clocks
+  // of five and ten seconds are switched off, so a test under a loaded machine
+  // is judged by what it asserts, never by how long it took. A test that
+  // hangs is found by its signal, never by a clock.
+  test: {
+    environment: 'jsdom',
+    include: ['tests/**/*.test.tsx', 'tests/acceptance/grants.spec.ts'],
+    setupFiles: ['tests/setup.ts'],
+    testTimeout: 0,
+    hookTimeout: 0,
+  },
 });

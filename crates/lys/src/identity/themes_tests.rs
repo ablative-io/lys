@@ -30,10 +30,7 @@ fn the_declared_mapping_is_valid() -> Result<(), Box<dyn Error>> {
         mapping.source.commit,
         "385916eb437cae62c4269e6db1db2e542af5749e"
     );
-    assert_eq!(
-        mapping.client(ClientRole::Cambium)?.dark.accent.hex,
-        "#5E8C6A"
-    );
+    assert_eq!(mapping.client(ClientRole::App)?.dark.accent.hex, "#5E8C6A");
     assert_eq!(
         mapping.client(ClientRole::Platform)?.dark.accent.hex,
         "#D4975A"
@@ -89,7 +86,7 @@ fn twelve_pairs_meet_their_tier_with_gap_fields_at_rauthys_defaults() -> Result<
 {
     let mapping = ThemeMapping::declared()?;
     let mut measured = 0;
-    for role in [ClientRole::Platform, ClientRole::Cambium] {
+    for role in [ClientRole::Platform, ClientRole::App] {
         let themed = mapping.apply(role, &default_theme(role.key()));
         for pair in contrast_pairs(&themed.dark)? {
             assert!(
@@ -109,8 +106,8 @@ fn twelve_pairs_meet_their_tier_with_gap_fields_at_rauthys_defaults() -> Result<
 #[test]
 fn applying_the_mapping_sets_four_dark_fields_and_nothing_else() -> Result<(), Box<dyn Error>> {
     let mapping = ThemeMapping::declared()?;
-    let current = default_theme("cambium");
-    let themed = mapping.apply(ClientRole::Cambium, &current);
+    let current = default_theme("app");
+    let themed = mapping.apply(ClientRole::App, &current);
     assert_eq!(themed.light, current.light);
     assert_eq!(themed.border_radius, current.border_radius);
     let (dark, default) = (&themed.dark, &current.dark);
@@ -136,8 +133,8 @@ fn refused(text: &str) -> bool {
 #[test]
 fn a_gap_field_cannot_be_named_in_the_mapping() {
     let text = DECLARED.replacen(
-        "\"accent\": { \"token\": \"products.cambium.accent\"",
-        "\"error\": { \"token\": \"foundation.text\", \"hex\": \"#E8EAEC\", \"hsl\": [210, 10, 92] },\n        \"accent\": { \"token\": \"products.cambium.accent\"",
+        "\"accent\": { \"token\": \"products.app.accent\"",
+        "\"error\": { \"token\": \"foundation.text\", \"hex\": \"#E8EAEC\", \"hsl\": [210, 10, 92] },\n        \"accent\": { \"token\": \"products.app.accent\"",
         1,
     );
     assert_ne!(text, DECLARED);
@@ -156,7 +153,7 @@ fn text_mapped_to_muted_is_refused() {
 }
 
 #[test]
-fn aion_blue_or_purple_accents_are_refused() {
+fn console_blue_or_purple_accents_are_refused() {
     let blue = DECLARED.replace(
         "\"hex\": \"#5E8C6A\", \"hsl\": [136, 20, 46]",
         "\"hex\": \"#6B96D1\", \"hsl\": [215, 53, 62]",

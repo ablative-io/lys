@@ -15,6 +15,7 @@ ciborium.workspace = true
 lys-core.workspace = true
 lys-log-store.workspace = true
 rand.workspace = true
+serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
