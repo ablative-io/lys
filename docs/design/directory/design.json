@@ -61,7 +61,9 @@
     "ADR-056",
     "ADR-001",
     "ADR-019",
-    "ADR-078"
+    "ADR-078",
+    "ADR-093",
+    "ADR-094"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -75,7 +77,8 @@
     "CONFORMANCE rows 3.1 and 3.2 are true on the lifecycle record, each tested by at least one acceptance line of DIRECTORY-019, reading the lifecycle-hand brief DIRECTORY-009's record and keeping no copy of it.",
     "DIRECTORY-009 states and tests conformance row 1.2: linking a provider account linked to a person to an agent, and delegating a sign-in identity, are each refused by name and write nothing; one counted test over the store finds no agent record carrying a sign-in identity; the broker's refusal is recorded as a finding against SECRETS-002, on which row 1.2's full pass waits.",
     "Every decision still open for Tom is recorded as open and decided nowhere in this cluster. Decided under ADR-078: the grant representation was ruled by the owning lead, Archie, with Apollo as second reader, on Waffles' ruling of 12:13 on Tom's word of 12:12 that technical formats are the owning lead's with a second reader.",
-    "Every grant and permission check the standalone identity server makes is answered by SpiceDB behind DIRECTORY-006's permission decision, the administrator's admission being the one named exception, a call after a committed revoke is never admitted, and the screen answers why an identity can and why it cannot do a thing from the server's answer (DIRECTORY-025, ADR-078)."
+    "Every grant and permission check the standalone identity server makes is answered by SpiceDB behind DIRECTORY-006's permission decision, the administrator's admission being the one named exception, a call after a committed revoke is never admitted, and the screen answers why an identity can and why it cannot do a thing from the server's answer (DIRECTORY-025, ADR-078).",
+    "Road step 2's certificate half (defined in docs/design/identity/STATEMENT-2026-09-22.md, The road; brought into this cluster by ADR-093): an enduring agent's certificate states what it was granted at issuance in a typed, versioned claim, lys/agent-capability/v1, a new format under its own proposed OID 1.3.6.1.4.1.66364.2.1 alongside the unchanged shipped .1 extension transport, and a named verifier, verify_agent_capability, checks the chain against a set of trusted issuer keys, reads the claim and refuses what it does not cover (DIRECTORY-031)."
   ],
   "non_goals": [
     {
@@ -193,6 +196,10 @@
     {
       "text": "Road step 2 onward: capability certificates, arbitrary grants and their enforcement, session launch and stop, credential handles, memory, context assembly, lanterns and anchoring in production",
       "reason": "Revision 5 keeps them out of step 1 (docs/design/identity/briefs/IDENTITY-001.json:29-30); ADR-007 (the start command) and ADR-008 (the certificate on an agent's file) govern what the step-1 screens do not present as working. Permission enforcement through SpiceDB on the standalone identity server is not covered by this non-goal; ADR-078 and CN11 carve it out."
+    },
+    {
+      "text": "Road step 2 onward, except its certificate half, the typed capability claim and its verifier, which ADR-093 makes a goal: arbitrary grants and their enforcement, session launch and stop, credential handles, memory, context assembly, lanterns and anchoring in production",
+      "reason": "Revision 5 keeps them out of step 1 (docs/design/identity/briefs/IDENTITY-001.json:29-30); ADR-007 (the start command) and ADR-008 (the certificate on an agent's file) govern what the step-1 screens do not present as working. Step 2 is defined in docs/design/identity/STATEMENT-2026-09-22.md (The road); only its certificate half left this non-goal, under ADR-093."
     }
   ],
   "structure": [
@@ -1295,6 +1302,151 @@
       "path": "surface/identity/tests/acceptance/permission_why.spec.ts",
       "note": "the why view against the standalone server",
       "brief": "DIRECTORY-025"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-031.json",
+      "note": "the typed capability claim in an agent's certificate and its verifier: road step 2's certificate half",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-031.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "docs/design/identity/CAPABILITY-CLAIM.md",
+      "note": "the design round's proposal for lys/agent-capability/v1 under the proposed OID 1.3.6.1.4.1.66364.2.1: transport, assertion, encoding, issuer key identifier, scope, verifier check, rendering consumer, revocation, issuer and anchor, status",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "docs/design/identity/CAPABILITY-CLAIM-REVIEW.md",
+      "note": "the adversarial review of the capability-claim draft, by a party other than its author, before the owning lead's ratification with a second reader",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "docs/design/WIRE-FORMATS.md",
+      "note": "the wire-format register; gains one line pointing at the capability-claim proposal and its PROPOSED decision-log row, which reads RATIFIED once the ratification is recorded on the card (R3), and both of its ratification sentences name the owning lead with a second reader; D1 to D6 and every other existing line unchanged",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "docs/PEN-REGISTRATION.md",
+      "note": "the sub-arc register under 1.3.6.1.4.1.66364; its .2 row keeps .2 a family arc for agent-certificate extensions, names .2.1 for the typed capability claim lys/agent-capability/v1 and keeps the rest of its stated purpose; its status cell stays Reserved until the ratification is recorded and then reads In use (.2.1) (R3); the .1 and .3+ rows unchanged",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity/Cargo.toml",
+      "note": "the directory crate's manifest; gains the capability claim's encoding dependency from the workspace lockfile",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity/src/capability/mod.rs",
+      "note": "declarations and re-exports only",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity/src/capability/claim.rs",
+      "note": "the typed lys/agent-capability/v1 claim: holder id and every grant held at issuance, each with its grant id and its window as it stood then",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity/src/capability/encoding.rs",
+      "note": "canonical encode and strict decode of the claim: claim_malformed, claim_version_unknown",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity/src/capability/error.rs",
+      "note": "named capability errors, never key or seed bytes",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity/src/capability/verify.rs",
+      "note": "verify_agent_capability: the signing key from the trusted set first, then the Authority Key Identifier, the claim, holder, listed grant and the certificate's own window, each refusal named",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity/src/capability/issue.rs",
+      "note": "the directory's issuance of an enduring agent's one certificate carrying one claim and the Authority Key Identifier of its issuer key, appended to the certificate log as the revocation card's issuance leaf, refusing an agent that holds a current certificate, recorded as one directory event naming the certificate it follows",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity/tests/capability_encoding.rs",
+      "note": "the pinned vector and the counted decode refusals",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity/tests/capability_verify.rs",
+      "note": "the verifier's acceptance, counted refusal legs and drift injections",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity/tests/capability_issue.rs",
+      "note": "issuance, reissue after expiry and its counted refusals",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity/src/agent_key.rs",
+      "note": "an agent's one enrolled Ed25519 public key, keyed by its directory id beside the agent record, enrolled once by the operator",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity/tests/agent_key.rs",
+      "note": "enrolment and its counted refusals",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity-server/src/lib.rs",
+      "note": "the directory service's crate root; declares the issuer key, key enrolment, key replacement and issuance route modules",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity-server/src/issuer_key.rs",
+      "note": "custody of the directory's issuer key: restricted private file, Zeroizing seed, redacted Debug",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/issuer_key.rs",
+      "note": "issuer key loading, counted refusals and redaction",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity-server/src/agent_key_route.rs",
+      "note": "the operator's enrol route POST /identity/agents/{agent_id}/key and its named refusals",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/agent_key_route.rs",
+      "note": "the enrol route's acceptance and counted refusals",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity-server/src/certificate_route.rs",
+      "note": "the directory's issuance route POST /identity/agents/{agent_id}/certificate: the operator's call with the agent's certificate-signing request, its named refusals",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/certificate_route.rs",
+      "note": "the issuance route's acceptance and counted refusals",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity/src/agent_key_replacement.rs",
+      "note": "the audited replacement of an agent's enrolled key, one event naming the old and new key, never an overwrite",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity/tests/agent_key_replacement.rs",
+      "note": "replacement, reissue under the new key and the counted refusals",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity-server/src/agent_key_replacement_route.rs",
+      "note": "the operator's replacement route POST /identity/agents/{agent_id}/key/replacement and its named refusals",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/agent_key_replacement_route.rs",
+      "note": "the replacement route's acceptance and counted refusals",
+      "brief": "DIRECTORY-031"
     }
   ],
   "inventory": [
@@ -1373,12 +1525,20 @@
     {
       "path": "docs/design/secrets/briefs/SECRETS-002.json",
       "note": "the broker brief: R4 keeps a sign-in identity and an OAuth service-access grant as distinct records, R5 puts the seat's login token into its environment at spawn; DIRECTORY-009 records a finding against it and changes nothing in it"
+    },
+    {
+      "path": "crates/lys-core/src/ca/extensions.rs",
+      "note": "the shipped extension transport: LYS_OID_ARC, encode_extension and decode_extension carry opaque bytes; DIRECTORY-031 uses it unchanged; read, never changed"
+    },
+    {
+      "path": "crates/lys-core/src/ca/authority.rs",
+      "note": "issue_certificate_for_request and verify_certificate_chain_at, which DIRECTORY-031 issues and verifies through; read, never changed"
     }
   ],
   "constraints": [
     {
       "id": "CN1",
-      "text": "Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed. Ruling (DIRECTORY-025): CN1 bounds DIRECTORY-001's documents-only work; each later brief of the cluster states its own file walls."
+      "text": "Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed. Ruling (ADR-093): CN1 binds DIRECTORY-001's documents-only work."
     },
     {
       "id": "CN2",
@@ -1418,7 +1578,7 @@
     },
     {
       "id": "CN11",
-      "text": "Step 1 is directory records, sign-in and the minimum signed identity audit. SpiceDB is installed and checked in row 02 and enforces nothing in step 1; live capability policy and its enforcement are step 2's, and running SpiceDB is not permission enforcement (docs/design/identity/briefs/IDENTITY-001.json:29-30). Ruling (ADR-078): permission enforcement through SpiceDB on the standalone identity server is a goal of this cluster, carried by DIRECTORY-025; DIRECTORY-002 R4 and the rest of step 2 are unchanged."
+      "text": "Step 1 is directory records, sign-in and the minimum signed identity audit. SpiceDB is installed and checked in row 02 and enforces nothing in step 1; live capability policy and its enforcement are step 2's, and running SpiceDB is not permission enforcement (docs/design/identity/briefs/IDENTITY-001.json:29-30). Ruling (ADR-093): the certificate half of step 2, the typed capability claim and its verifier, is a goal of this cluster, carried by DIRECTORY-031; the rest of step 2 stays out."
     },
     {
       "id": "CN12",

@@ -1100,6 +1100,42 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-093",
+      "title": "The directory cluster carries the certificate half of road step 2",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for the identity line, ruling on the capability-claim card; recorded with DIRECTORY-031",
+      "context": "The capability-claim card asks for a brief in the directory cluster as road step 2, but the directory design's non-goal 'Road step 2 onward' puts capability certificates out of scope, CN11 gives live capability policy to step 2, and the design defines no road steps; step 2 is defined in docs/design/identity/STATEMENT-2026-09-22.md (The road, line 143). CN1 ('Documents only') is also contradicted by the code paths DIRECTORY-002 to DIRECTORY-006 already name.",
+      "decision": "Amend narrowly, as on the SpiceDB brief (QZD2uagw): the certificate half of step 2, the typed capability claim and its verifier, leaves the 'Road step 2 onward' non-goal and becomes a goal of this cluster, and CN11 gains one appended ruling line saying the same; everything else in the non-goal stays out. CN1 gains one appended ruling line saying it binds DIRECTORY-001's documents-only work, and its own words are not changed. Rejected: leaving the brief under the unamended non-goal, which would make the cluster's design deny the work its own brief carries; widening the amendment to the rest of step 2 (SpiceDB, the per-call door check, per-execution credentials); and rewording CN1 or CN11 themselves.",
+      "quote": "The non-goal 'Road step 2 onward' is amended narrowly, as on the SpiceDB brief (QZD2uagw). The certificate half of step 2, the typed capability claim and its verifier, leaves that non-goal and becomes a goal, and CN11 gets the same by one appended ruling line. Everything else in the non-goal stays. The amendment is recorded as this brief's own decision at the next free ADR id, citing STATEMENT-2026-09-22.md for where step 2 is defined.",
+      "consequences": [
+        "docs/design/directory/design.json gains a goal for the certificate half of step 2, the 'Road step 2 onward' non-goal no longer lists it, and CN11 and CN1 each end with one ruling line citing this decision.",
+        "The rest of step 2 (SpiceDB as a service, the door asking it on every call, per-execution credentials, presenting the certificate at spawn) stays a non-goal of this cluster and belongs to its own cards.",
+        "A brief that lands after DIRECTORY-031 and needs the CN1 ruling cites it rather than writing a second line."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-094",
+      "title": "An agent certificate's validity window comes from the directory's configuration: 30 days by default, 90 days at most",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for the identity line, ruling on the capability-claim card; recorded with DIRECTORY-031",
+      "context": "DIRECTORY-031 issues an enduring agent a certificate whose notBefore and notAfter govern its life; its typed claim carries no validity window of its own, and its verifier refuses the certificate past its notAfter through lys-core's certificate-expired check. The draft let the operator set the lifetime on every issuance call, with no default and no upper bound, so one typo could issue a certificate that outlives the grants it lists and the person's role behind it; revocation (the DP26 fold) is not built yet, so expiry is the only thing that bounds a certificate today.",
+      "decision": "The directory's configuration holds a default validity window and a maximum, shipped as 30 days (2592000 seconds) and 90 days (7776000 seconds). An issuance call with no window takes the default; the operator may ask for a shorter window, never a longer one, and a request above the maximum is refused by name, lifetime_above_maximum, naming the maximum. The certificate records the window it was given as its own notBefore and notAfter. A verifier takes a set of trusted issuer keys, never exactly one, and the certificate names the issuer key that signed it in X.509's Authority Key Identifier by its issuer-key fingerprint, the first 20 bytes of the SHA-256 of that key's SubjectPublicKeyInfo (RFC 7093 method 1, matching the SubjectKeyIdentifier of lys-core's issuer certificate), so a later rotation of the issuer key needs no change of format. Rejected: an operator-supplied lifetime with no default and no bound, which lets a typo outlive a withdrawn grant; a window fixed in code with no configuration; and a verifier bound to exactly one issuer key, which would make every rotation a format change.",
+      "quote": "A value the directory's configuration states. The configuration holds a default validity window and a maximum, with 30 days and 90 days as the shipped values. The operator may ask for a shorter window on an issuance call, and never a longer one. A request above the maximum is refused by name, naming the maximum, and a request with no window takes the default. The certificate records the window it was given.",
+      "consequences": [
+        "DIRECTORY-031 R6 reads the default and the maximum from the directory service's configuration and refuses a longer window with lifetime_above_maximum; its acceptance covers a default issuance, a shorter request and a longer request refused by name.",
+        "A short window bounds how long a certificate outlives a withdrawn grant until the DP26 fold of the revocation card is built, and the maximum keeps an operator's typo from issuing a certificate that outlives its person's role.",
+        "verify_agent_capability takes a set of trusted issuer keys and compares the certificate's Authority Key Identifier with the signing key's fingerprint, so the issuer key rotation card changes configuration, not the format of lys/agent-capability/v1."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

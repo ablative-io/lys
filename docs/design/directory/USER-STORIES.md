@@ -8,8 +8,6 @@
 
 **S5.** As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email.
 
-**S77.** As the responsible person, I want an agent whose permission I withdraw in the middle of a task to be refused on its next call, so that the withdrawal takes effect at once and not when the task ends.
-
 ## Reviewer — Reviews a brief before any of its rows is dispatched
 
 **S2.** As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria.
@@ -20,11 +18,13 @@
 
 **S6.** As the operator, I want the directory's screens to show every refusal, pending audit and outage as it is, so that I never act on a completed state that did not happen.
 
-**S79.** As the operator, I want a permission check the permission projection has not yet caught up with to be refused by name, naming the grant, while unrelated checks keep being answered, so that a lagging projection never admits a call and never stops unrelated work.
-
 ## Verifier — Checks a recorded identity change without the operator's cooperation
 
 **S7.** As a verifier, I want to check a recorded identity change against a checkpoint and key with standard tooling, so that the directory's history does not rest on the operator's word.
+
+**S113.** As a verifier, I want to read from an agent's certificate what it was granted at issuance and have a holder, a grant or an instant outside that refused, so that a signed claim is never taken as checked when nothing checked it.
+
+**S114.** As a stranger verifying lys artifacts, I want the capability claim format specified, attacked and ratified before anything is signed under it, with every shipped format left byte-identical, so that no historical verification breaks.
 
 ## Grant holder and reviewer — Exercises or delegates current authority and verifies its exact origin
 
@@ -38,4 +38,4 @@
 
 **S12.** As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
 
-**S78.** As a grant holder or reviewer looking at an identity, I want the screen to answer why it can or cannot do a thing, with the path to a responsible person or the named reason, so that I can trust or correct its access from the server's own decision.
+**S115.** As a responsible person, I want my agent issued one certificate listing the grants it holds and naming its holder, against a key enrolled for it, so that it carries proof of those grants from its first spawn and a lost key or an expired certificate can be replaced.
