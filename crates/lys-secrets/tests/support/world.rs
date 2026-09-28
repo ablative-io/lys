@@ -1,11 +1,11 @@
 //! The broker every refusal test starts from: a fresh store and log under a
-//! temporary directory, a clock fixed at `NOW_MS`, and the in-process grants
-//! the test names. Nothing here signs; a holder and its key live in
-//! `signer.rs`.
+//! temporary directory, a clock fixed at `NOW_MS` or one the test moves by
+//! hand, and the in-process grants the test names. Nothing here signs; a
+//! holder and its key live in `signer.rs`.
 
 use std::path::PathBuf;
 
-use lys_secrets::{Broker, BrokerPaths, LocalGrants, SecretRelation, SecretsError};
+use lys_secrets::{Broker, BrokerPaths, Clock, LocalGrants, SecretRelation, SecretsError};
 use tempfile::TempDir;
 
 pub type Failure = Box<dyn std::error::Error>;
@@ -33,7 +33,9 @@ impl World {
         self.root.path().join("keys")
     }
 
-    fn paths(&self) -> BrokerPaths {
+    /// Where this world's broker keeps its store, its log and its keys, for
+    /// a broker opened again over them.
+    pub fn paths(&self) -> BrokerPaths {
         let keys = self.keys();
         BrokerPaths {
             store_dir: self.root.path().join("store"),
@@ -47,7 +49,17 @@ impl World {
     /// A new broker over this world's store and log, at `NOW_MS`, asking
     /// `grants` for permission.
     pub fn broker(&self, grants: LocalGrants) -> Result<Broker<LocalGrants>, SecretsError> {
-        Broker::create(&self.paths(), grants, Box::new(|| NOW_MS))
+        self.broker_on(grants, Box::new(|| NOW_MS))
+    }
+
+    /// A new broker over this world's store and log on `clock`, which the
+    /// test moves by hand and never waits on, asking `grants`.
+    pub fn broker_on(
+        &self,
+        grants: LocalGrants,
+        clock: Clock,
+    ) -> Result<Broker<LocalGrants>, SecretsError> {
+        Broker::create(&self.paths(), grants, clock)
     }
 }
 

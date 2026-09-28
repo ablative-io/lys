@@ -1,7 +1,8 @@
 //! The secrets broker's command line: make a broker, seal a credential from
 //! standard input, grant and revoke its use, issue and drop handles, sign a
 //! presentation as an agent, page through the audit log from its tail, audit
-//! every line of it, and serve the proxy.
+//! every line of it, seal a signing key the broker signs with and never
+//! gives out, and serve the proxy.
 
 #![warn(clippy::await_holding_lock)]
 
@@ -17,6 +18,7 @@ mod redact_tests;
 mod serve;
 #[cfg(test)]
 mod serve_tests;
+mod signature_route;
 mod spice;
 mod view;
 #[cfg(test)]
@@ -30,7 +32,8 @@ use clap::Parser;
 use lys_core::Ed25519Identity;
 use lys_secrets::{
     Broker, EntryClass, HandleId, Holder, Presentation, Recipients, RecordedLine, Relation, Scope,
-    Secret, SecretsError, UpstreamRevocation, new_operation_id, request_digest, to_hex,
+    Secret, SecretsError, SigningPurpose, UpstreamRevocation, new_operation_id, request_digest,
+    to_hex,
 };
 
 use args::{Page, RecordClass};
@@ -50,6 +53,19 @@ fn read_credential() -> Result<Secret, SecretsError> {
         value.pop();
     }
     Ok(Secret::new(value))
+}
+
+/// A signing key's seed, read from standard input as raw bytes and never
+/// trimmed: every byte of a seed is the seed's.
+fn read_seed() -> Result<Secret, SecretsError> {
+    let mut seed = Vec::with_capacity(64);
+    std::io::stdin()
+        .read_to_end(&mut seed)
+        .map_err(|source| SecretsError::Io {
+            context: "reading the signing key's seed from standard input".to_owned(),
+            source,
+        })?;
+    Ok(Secret::new(seed))
 }
 
 fn open(at: &Where) -> Result<Broker<Grants>, SecretsError> {
@@ -429,6 +445,21 @@ fn run(command: Command) -> Result<(), SecretsError> {
             };
             open(&at)?.seal_record(&name, class, &owner, &value)?;
             println!("sealed {name} ({} bytes, not shown)", value.len());
+        }
+        Command::SealSigningKey {
+            at,
+            name,
+            owner,
+            purpose,
+        } => {
+            let purpose = SigningPurpose::parse(&purpose)?;
+            let seed = read_seed()?;
+            let public_key = open(&at)?.seal_signing_key(&name, &owner, purpose, &seed)?;
+            println!(
+                "sealed signing key {name} for {} with public key {} (seed not shown)",
+                purpose.label(),
+                to_hex(&public_key)
+            );
         }
         Command::ReadRecord {
             at,

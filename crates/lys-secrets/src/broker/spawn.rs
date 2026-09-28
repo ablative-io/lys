@@ -19,8 +19,9 @@ impl<P: PermissionCheck> Broker<P> {
     ///
     /// # Errors
     ///
-    /// `PermissionDenied`, `SecretUnknown`, `AccountsRested`, the
-    /// store's opening refusals, and the audit log's.
+    /// `PermissionDenied`, `not_a_value_secret` for a signing key, which
+    /// hands no login out, `SecretUnknown`, `AccountsRested`, the store's
+    /// opening refusals, and the audit log's.
     pub fn spawn_login(
         &mut self,
         seat: &str,
@@ -39,6 +40,7 @@ impl<P: PermissionCheck> Broker<P> {
                 secret: secret.to_owned(),
                 reason,
             })
+            .and_then(|()| self.gives_value(secret, secret))
             .and_then(|()| self.store.take_turn(secret))
             .and_then(|(entry, account)| {
                 self.store

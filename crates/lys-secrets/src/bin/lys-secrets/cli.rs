@@ -260,6 +260,21 @@ pub enum Command {
         #[arg(long, value_enum)]
         class: RecordClass,
     },
+    /// Seal a signing key: its 32-byte Ed25519 seed, read as raw bytes from
+    /// standard input, and the one purpose it signs for. Prints its public
+    /// key; the seed is never printed and never leaves the broker, which
+    /// signs with it at `POST /_lys/signature`.
+    SealSigningKey {
+        #[command(flatten)]
+        at: Where,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        owner: String,
+        /// The one purpose it signs for: `agent_request`.
+        #[arg(long)]
+        purpose: String,
+    },
     /// Read a memory record as an identity holding the read relation, and
     /// write it to standard output; `--from` and `--len` read a piece.
     ReadRecord {

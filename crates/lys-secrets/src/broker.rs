@@ -49,6 +49,8 @@ pub use revocation::{RevocationState, UpstreamRevocation};
 mod rotation;
 mod scope;
 pub use scope::{Discovery, ListScope, SecretSettings};
+mod signing;
+pub use signing::{AgentRequest, Signable, Signed, Signing, SigningPurpose};
 mod spawn;
 mod using;
 
@@ -323,7 +325,12 @@ impl<P: PermissionCheck> Broker<P> {
                     record: secret.to_owned(),
                 });
             }
-            Some(EntryClass::Credential | EntryClass::Key | EntryClass::OAuth) => {}
+            Some(
+                EntryClass::Credential
+                | EntryClass::Key
+                | EntryClass::OAuth
+                | EntryClass::SigningKey,
+            ) => {}
         }
         let now = (self.clock)();
         if not_after_ms <= now || max_uses == 0 {

@@ -21,6 +21,10 @@ use super::Broker;
 use super::checked::Checked;
 use super::owner::{Admission, Call, OwnerChanged, SCOPE};
 
+/// How a use line names a secret's first account, which is sealed as the
+/// secret itself.
+const PRIMARY_USE: &str = "@primary";
+
 /// A secret's owner settings as they stand.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SecretSettings {
@@ -197,8 +201,15 @@ impl<P: PermissionCheck> Broker<P> {
 
     /// Whether `identity` may discover `secret`: inside its scope, and its
     /// owner or granted it. An account sealed under a secret is granted as
-    /// that secret is.
+    /// that secret is, and a secret's first account, which a use line names
+    /// `<secret>@primary` and which is sealed as the secret itself, is the
+    /// secret.
     pub fn discovers(&self, identity: &str, secret: &str) -> bool {
+        let sealed = |name: &str| self.store.entry(name).is_some();
+        let secret = match secret.strip_suffix(PRIMARY_USE) {
+            Some(named) if !sealed(secret) && sealed(named) => named,
+            _ => secret,
+        };
         let granted_as = self.store.account_parent(secret).unwrap_or(secret);
         let granted = self
             .store

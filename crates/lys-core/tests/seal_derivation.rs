@@ -80,8 +80,8 @@ const RECIPIENT_SEED: &[u8; 32] = b"lys-seal-derivation-test-seed-01";
 
 /// Builds the deterministic recipient identity from [`RECIPIENT_SEED`].
 ///
-/// The seed is written to a temp file because `Ed25519Identity::from_seed` is
-/// private — `load` is the public route to a known key, and is the same route
+/// The seed is written to a temp file and read back through `load`, the route
+/// a file-held key takes, which is the same route
 /// `signed_note_crosscheck.rs` uses for its golden identity. The `TempDir` is
 /// returned so it outlives the identity's construction.
 fn recipient_identity() -> (tempfile::TempDir, Ed25519Identity) {

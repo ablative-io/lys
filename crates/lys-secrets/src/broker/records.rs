@@ -1,7 +1,9 @@
 //! Sealed records: memory and keys kept encrypted in the store. A memory
 //! record is read by name, in the smallest piece asked for, when the asking
 //! identity holds the `read` relation on it; a key is used through the
-//! proxy and never read. Every read and every refusal is one audit line.
+//! proxy and never read, and a signing key, which gives no value out, is
+//! refused `not_a_value_secret`. Every read and every refusal is one audit
+//! line.
 
 use std::ops::Range;
 
@@ -46,8 +48,9 @@ impl<P: PermissionCheck> Broker<P> {
     ///
     /// # Errors
     ///
-    /// `NotFound`, `NoRelation`, `RelationRemoved`, `KeyNotReadable`, the
-    /// store's opening refusals, and the audit log's.
+    /// `NotFound`, `NoRelation`, `RelationRemoved`, `not_a_value_secret`
+    /// for a signing key, `KeyNotReadable`, the store's opening refusals,
+    /// and the audit log's.
     pub fn read_record(
         &mut self,
         identity: &str,
@@ -111,6 +114,7 @@ impl<P: PermissionCheck> Broker<P> {
                 }
             });
         }
+        self.gives_value(name, name)?;
         if class != EntryClass::Memory {
             return Err(SecretsError::KeyNotReadable {
                 record: name.to_owned(),

@@ -12,7 +12,7 @@ use axum::Json;
 use axum::extract::{Query, Request, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use lys_secrets::Broker;
+use lys_secrets::{Broker, SigningPurpose};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -90,6 +90,8 @@ pub async fn secrets(State(shared): State<Arc<Shared>>, request: Request) -> Res
                     "scope": scope,
                     "upstream": route.map(|route| route.upstream.clone()),
                     "header": route.map(|route| route.header.clone()),
+                    "purpose": entry.purpose.map(SigningPurpose::label),
+                    "public_key": entry.public_key,
                 })
             })
             .collect();

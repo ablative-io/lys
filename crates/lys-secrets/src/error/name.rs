@@ -55,6 +55,7 @@ impl SecretsError {
             Self::OAuth(refusal) => refusal.name(),
             Self::Service(refusal) => refusal.name(),
             Self::OwnerChange(refusal) => refusal.name(),
+            Self::Signing(refusal) => refusal.name(),
             Self::MemoryNotUsable { .. } => "MemoryNotUsable",
             Self::ReservationMissing { .. } => "ReservationMissing",
             Self::StoreLocked { .. } => "StoreLocked",

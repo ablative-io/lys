@@ -7,7 +7,7 @@
 //! grant upstream; the log says whether the provider confirmed it.
 
 use crate::audit::AuditKind;
-use crate::error::{OAuthRefusal, SecretsError};
+use crate::error::{OAuthRefusal, SecretsError, SigningRefusal};
 use crate::handle::HandleId;
 use crate::oauth::OAuthGrant;
 use crate::permission::PermissionCheck;
@@ -20,8 +20,14 @@ impl Ticket {
     ///
     /// # Errors
     ///
+    /// `not_a_value_secret` when the ticket opened a signing key, and
     /// `Encoding` when the sealed grant does not read.
     pub fn oauth(&self) -> Result<Option<OAuthGrant>, SecretsError> {
+        if self.class == EntryClass::SigningKey {
+            return Err(SecretsError::from(SigningRefusal::NotAValueSecret {
+                secret: self.secret.clone(),
+            }));
+        }
         if self.class != EntryClass::OAuth {
             return Ok(None);
         }
@@ -136,13 +142,15 @@ impl<P: PermissionCheck> Broker<P> {
     ///
     /// # Errors
     ///
-    /// `HandleUnknown`, and the store's refusals.
+    /// `HandleUnknown`, `not_a_value_secret` for a handle on a signing key,
+    /// and the store's refusals.
     pub fn oauth_grant_of(&self, id: &HandleId) -> Result<Option<OAuthGrant>, SecretsError> {
         let record = self
             .handles
             .get(id.as_str())
             .ok_or(SecretsError::HandleUnknown)?;
         let (entry, _account) = self.store.current_entry(&record.secret)?;
+        self.gives_value(&entry, &record.secret)?;
         if self.store.entry(&entry).map(|view| view.class) != Some(EntryClass::OAuth) {
             return Ok(None);
         }

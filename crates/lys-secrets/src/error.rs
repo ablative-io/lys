@@ -12,6 +12,7 @@ mod oauth;
 mod owner;
 mod revocation;
 mod service;
+mod signing;
 
 pub use accounts::AccountsRefusal;
 pub use bounds::BoundsRefusal;
@@ -21,6 +22,7 @@ pub use oauth::OAuthRefusal;
 pub use owner::OwnerChangeRefusal;
 pub use revocation::RevocationRefusal;
 pub use service::ServiceRefusal;
+pub use signing::SigningRefusal;
 
 /// A named refusal or failure of the secrets broker.
 #[derive(Debug, thiserror::Error)]
@@ -391,6 +393,9 @@ pub enum SecretsError {
     /// An owner change refused for its operation id.
     #[error(transparent)]
     OwnerChange(#[from] OwnerChangeRefusal),
+    /// A signing key refused: not sealed, or not used as asked.
+    #[error(transparent)]
+    Signing(#[from] SigningRefusal),
     /// A scope written as none of the three kinds.
     #[error(
         "InvalidScope: {text:?} is not a scope (act: name it as personal:<person>, team:<name> or organisation:<name>)"

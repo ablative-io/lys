@@ -5,6 +5,12 @@
 //! reservation. A call admitted and never settled when the broker stops is
 //! settled at start as `outcome_unknown`, at its full reservation, and is
 //! never forwarded again.
+//!
+//! A use is admitted for a value, which the ticket carries to a forward,
+//! or for a signature the broker makes itself (see `signing`). Both pass
+//! the one admission and write the same use lines; a signing key is
+//! refused `not_a_value_secret` for a value before its use is admitted, so
+//! no ticket carrying its seed is ever handed out.
 
 use crate::audit::AuditKind;
 use crate::encoding::hex;
@@ -70,6 +76,15 @@ pub enum Settled {
     Failed(u64),
 }
 
+/// What a use is admitted for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum UseFor {
+    /// A value handed to a forward: every use but a signature.
+    Value,
+    /// A signature the broker makes with a signing key it holds.
+    Signature,
+}
+
 /// What admission answers.
 #[derive(Debug)]
 pub enum Admitted {
@@ -121,7 +136,7 @@ impl<P: PermissionCheck> Broker<P> {
         presentation: &Presentation,
         reserve: u64,
     ) -> Result<Admitted, UseError> {
-        self.admit_use_as(token, presentation, reserve, (None, None))
+        self.admit_use_as(token, presentation, reserve, (None, None), UseFor::Value)
     }
 
     /// Admits one call of `token` presented for the secret `asked`, as
@@ -139,7 +154,13 @@ impl<P: PermissionCheck> Broker<P> {
         asked: &str,
         reserve: u64,
     ) -> Result<Admitted, UseError> {
-        self.admit_use_as(token, presentation, reserve, (Some(asked), None))
+        self.admit_use_as(
+            token,
+            presentation,
+            reserve,
+            (Some(asked), None),
+            UseFor::Value,
+        )
     }
 
     /// Admits one call of `token` as [`Broker::admit_use`] does, taking the
@@ -156,7 +177,13 @@ impl<P: PermissionCheck> Broker<P> {
         reserve: u64,
         checked: &Checked,
     ) -> Result<Admitted, UseError> {
-        self.admit_use_as(token, presentation, reserve, (None, Some(checked)))
+        self.admit_use_as(
+            token,
+            presentation,
+            reserve,
+            (None, Some(checked)),
+            UseFor::Value,
+        )
     }
 
     /// Admits one call of `token` presented for the secret `asked`, as
@@ -174,15 +201,24 @@ impl<P: PermissionCheck> Broker<P> {
         reserve: u64,
         checked: &Checked,
     ) -> Result<Admitted, UseError> {
-        self.admit_use_as(token, presentation, reserve, (Some(asked), Some(checked)))
+        self.admit_use_as(
+            token,
+            presentation,
+            reserve,
+            (Some(asked), Some(checked)),
+            UseFor::Value,
+        )
     }
 
-    fn admit_use_as(
+    /// Admits one use of `token` for `used_for`: the one admission every
+    /// use, a signature included, passes.
+    pub(super) fn admit_use_as(
         &mut self,
         token: &HandleToken,
         presentation: &Presentation,
         reserve: u64,
         (asked, checked): (Option<&str>, Option<&Checked>),
+        used_for: UseFor,
     ) -> Result<Admitted, UseError> {
         let operation = hex(&presentation.operation_id);
         let mark = self.request_mark(&presentation.request)?;
@@ -220,7 +256,7 @@ impl<P: PermissionCheck> Broker<P> {
                 reserved,
             } => (id, identity, secret, uses_left, used, reserved),
         };
-        let (entry, account) = match self.store.current_entry(&secret) {
+        let (entry, account) = match self.current_for(&secret, used_for) {
             Ok(current) => current,
             Err(refusal) => {
                 let subject = (
@@ -282,6 +318,20 @@ impl<P: PermissionCheck> Broker<P> {
             uses_left,
             credential,
         }))
+    }
+
+    /// The entry a use of `secret` for `used_for` opens, and its account. A
+    /// signing key is refused `not_a_value_secret` for a value.
+    fn current_for(
+        &self,
+        secret: &str,
+        used_for: UseFor,
+    ) -> Result<(String, String), SecretsError> {
+        let (entry, account) = self.store.current_entry(secret)?;
+        if used_for == UseFor::Value {
+            self.gives_value(&entry, secret)?;
+        }
+        Ok((entry, account))
     }
 
     /// Settles an admitted call: records its outcome and what it spent, and

@@ -3,6 +3,8 @@
 //! the one header its route names, and the request goes to the one upstream
 //! the secret is bound to. The credential never reaches the holder: every
 //! occurrence of it in the upstream's answer is replaced before it returns.
+//! A signing key carries no value: the proxy refuses it `not_a_value_secret`
+//! at admission, and the broker signs with it only at `POST /_lys/signature`.
 //!
 //! No async worker waits on the broker. Its work, which takes its lock and
 //! writes its audit log, runs on the blocking pool ([`on_broker`]). The
@@ -86,6 +88,10 @@ pub fn serve(mut broker: Broker<Grants>, layout: Layout, listen: &str) -> Result
             .route("/_lys/grants", axum::routing::get(crate::view::grants))
             .route("/_lys/handles", axum::routing::get(crate::view::handles))
             .route("/_lys/next-account", axum::routing::post(next_account))
+            .route(
+                "/_lys/signature",
+                axum::routing::post(crate::signature_route::signature),
+            )
             .route("/_lys/scope", axum::routing::post(crate::manage::scope))
             .route(
                 "/_lys/recipients",

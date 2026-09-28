@@ -15,8 +15,9 @@ use std::path::{Path, PathBuf};
 use lys_core::seal::{SealedEnvelope, open, seal};
 use serde::{Deserialize, Serialize};
 
+use crate::broker::SigningPurpose;
 use crate::encoding::{Canonical, Reader, hex, random_bytes};
-use crate::error::SecretsError;
+use crate::error::{SecretsError, SigningRefusal};
 use crate::fsutil::{io, write_atomic};
 use crate::keys::StoreKey;
 use crate::secret::Secret;
@@ -45,6 +46,10 @@ pub enum EntryClass {
     Credential,
     /// A key, used only through the proxy and never read.
     Key,
+    /// An Ed25519 signing key, sealed with the one purpose it signs for. It
+    /// has no value-bearing use: the broker signs with it and never gives
+    /// its seed out.
+    SigningKey,
     /// A memory, read by those it is shared with.
     Memory,
     /// An OAuth service grant, used only through the proxy, which refreshes
@@ -58,6 +63,7 @@ impl EntryClass {
         match self {
             Self::Credential => "credential",
             Self::Key => "key",
+            Self::SigningKey => "signing_key",
             Self::Memory => "memory",
             Self::OAuth => "oauth",
         }
@@ -77,6 +83,12 @@ pub struct EntryView {
     pub owner: String,
     /// The latest sequence written for it.
     pub sequence: u64,
+    /// The one purpose a signing key signs for; none for any other class.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub purpose: Option<SigningPurpose>,
+    /// A signing key's Ed25519 public key in hex; none for any other class.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub public_key: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -204,18 +216,50 @@ impl SecretStore {
         self.index.entries.get(name)
     }
 
-    /// Seals `value` as a new entry named `name`, owned by `owner`.
+    /// Seals `value` as a new entry named `name`, owned by `owner`. A
+    /// signing key is sealed only with its purpose, by
+    /// [`crate::Broker::seal_signing_key`].
     ///
     /// # Errors
     ///
-    /// `InvalidName`, `SecretExists`, `Random`, `Trust` when sealing fails,
-    /// and `Io`.
+    /// `InvalidName`, `SecretExists`, `signing_key_invalid` for the class
+    /// of a signing key, `Random`, `Trust` when sealing fails, and `Io`.
     pub fn add(
         &mut self,
         key: &StoreKey,
         name: &str,
         class: EntryClass,
         owner: &str,
+        value: &Secret,
+    ) -> Result<EntryView, SecretsError> {
+        if class == EntryClass::SigningKey {
+            return Err(SecretsError::from(SigningRefusal::KeyInvalid {
+                secret: name.to_owned(),
+                reason: "is sealed only with its purpose, by seal-signing-key".to_owned(),
+            }));
+        }
+        self.add_as(key, (name, class, owner), None, value)
+    }
+
+    /// Seals `value`, the encoding of a signing key's purpose and seed, as
+    /// the signing key `name`, owned by `owner`, signing for `purpose` with
+    /// the public key `public_key` in hex.
+    pub(crate) fn add_signing_key(
+        &mut self,
+        key: &StoreKey,
+        (name, owner): (&str, &str),
+        (purpose, public_key): (SigningPurpose, String),
+        value: &Secret,
+    ) -> Result<EntryView, SecretsError> {
+        let named = (name, EntryClass::SigningKey, owner);
+        self.add_as(key, named, Some((purpose, public_key)), value)
+    }
+
+    fn add_as(
+        &mut self,
+        key: &StoreKey,
+        (name, class, owner): (&str, EntryClass, &str),
+        signs: Option<(SigningPurpose, String)>,
         value: &Secret,
     ) -> Result<EntryView, SecretsError> {
         check_name("secret name", name)?;
@@ -225,12 +269,15 @@ impl SecretStore {
                 name: name.to_owned(),
             });
         }
+        let (purpose, public_key) = signs.unzip();
         let view = EntryView {
             id: hex(&random_bytes::<16>()?),
             name: name.to_owned(),
             class,
             owner: owner.to_owned(),
             sequence: 1,
+            purpose,
+            public_key,
         };
         self.write_entry(key, &view, value)?;
         self.index.entries.insert(name.to_owned(), view.clone());

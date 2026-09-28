@@ -19,6 +19,7 @@ use std::sync::PoisonError;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::http::HeaderMap;
+use lys_core::agent_request;
 use lys_core::attestation::verify_attestation_bytes_by_signer;
 use lys_core::ca::certificate_subject_public_key;
 use lys_identity::projection::Projection;
@@ -30,9 +31,6 @@ use crate::routes::AppState;
 
 /// The header an agent's signed request carries.
 pub const HEADER: &str = "lys-agent-signature";
-
-/// The domain every agent request signature is made under.
-const DOMAIN: &str = "lys-identity/agent-request/v1";
 
 /// How far a signing time may stand from this service's clock.
 const WINDOW_MS: u64 = 60_000;
@@ -47,10 +45,12 @@ fn refused(reason: &'static str) -> ServerError {
     ServerError::AgentSignatureRefused { reason }
 }
 
-/// The bytes an agent signs for a request.
+/// The bytes an agent signs for a request: the one payload
+/// [`lys_core::agent_request::payload`] builds, over the SHA-256 digest of
+/// `body`, so this verifier and every signer build the same bytes.
 pub fn payload(method: &str, path: &str, body: &[u8], signed_at_ms: u64, nonce: &str) -> Vec<u8> {
     let digest = hex(&Sha256::digest(body));
-    format!("{DOMAIN}\n{method}\n{path}\n{digest}\n{signed_at_ms}\n{nonce}").into_bytes()
+    agent_request::payload(method, path, &digest, signed_at_ms, nonce)
 }
 
 /// The agent a signed request is from; none when it carries no signature.

@@ -280,12 +280,14 @@ impl Ed25519Identity {
     /// guaranteed to be overwritten when it goes out of scope; only the
     /// [`SigningKey`]'s own internal copy survives.
     ///
-    /// Private to the crate; tests in the same module use it to build
-    /// deterministic identities. Not part of the public API, so no
-    /// constructor accepting private key material is exposed to consumers.
+    /// This one constructor taking private key material is exposed, for a
+    /// holder that keeps the seed sealed, as the secrets broker does: it
+    /// opens a signing key's sealed seed inside itself, signs there, and
+    /// never gives the seed out. ADR-124 lifts the rule that no constructor
+    /// accepting private key material is exposed for this constructor only.
     ///
     /// [`SigningKey`]: ed25519_dalek::SigningKey
-    fn from_seed(seed: &Zeroizing<[u8; 32]>) -> Self {
+    pub fn from_seed(seed: &Zeroizing<[u8; 32]>) -> Self {
         let signing_key = ed25519_dalek::SigningKey::from_bytes(seed);
         let verifying_key = signing_key.verifying_key();
         Self {

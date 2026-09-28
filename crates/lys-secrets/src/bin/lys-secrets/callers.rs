@@ -7,7 +7,9 @@ use std::sync::{Arc, PoisonError};
 
 use axum::http::StatusCode;
 use axum::http::request::Parts;
-use lys_secrets::{Asker, AskerKind, OnBehalf, Recipients, SecretsError, request_digest};
+use lys_secrets::{
+    Asker, AskerKind, OnBehalf, Recipients, SecretsError, SigningRefusal, request_digest,
+};
 use serde_json::Value;
 
 use crate::files::now_ms;
@@ -50,7 +52,10 @@ pub fn refused(error: &SecretsError) -> (StatusCode, String) {
         | SecretsError::OwnerChange(_)
         | SecretsError::PresentationUnsigned { .. }
         | SecretsError::PresentationInvalid { .. }
-        | SecretsError::OperationIdTooShort { .. } => StatusCode::BAD_REQUEST,
+        | SecretsError::OperationIdTooShort { .. }
+        | SecretsError::Signing(
+            SigningRefusal::KeyInvalid { .. } | SigningRefusal::PurposeUnknown { .. },
+        ) => StatusCode::BAD_REQUEST,
         SecretsError::Lending(_)
         | SecretsError::Lease(_)
         | SecretsError::OAuth(_)
@@ -66,7 +71,10 @@ pub fn refused(error: &SecretsError) -> (StatusCode, String) {
         | SecretsError::PresentationStale { .. }
         | SecretsError::OperationIdReused { .. }
         | SecretsError::LeaseExhausted { .. }
-        | SecretsError::LeaseWindowClosed { .. } => StatusCode::FORBIDDEN,
+        | SecretsError::LeaseWindowClosed { .. }
+        | SecretsError::Signing(
+            SigningRefusal::PurposeMismatch { .. } | SigningRefusal::NotAValueSecret { .. },
+        ) => StatusCode::FORBIDDEN,
         _ => StatusCode::INTERNAL_SERVER_ERROR,
     };
     (status, format!("{}: {error}\n", error.name()))

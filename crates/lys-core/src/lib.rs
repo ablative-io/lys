@@ -29,6 +29,7 @@
 // by the workspace-level `deny`, which no test overrides.
 #![cfg_attr(not(test), forbid(unsafe_code))]
 
+pub mod agent_request;
 pub mod attestation;
 #[cfg(feature = "unstable-anchor")]
 pub mod bundle;
