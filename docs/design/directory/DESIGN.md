@@ -784,6 +784,11 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `surface/identity/src/features/apps/ConnectRequest.tsx` | An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code | DIRECTORY-059 |
 | `crates/lys-identity-server/src/session.rs` | Signing out of Lys signs the person out at the issuer, and the issuer tells every registered app | DIRECTORY-059 |
 | `surface/identity/src/features/sessions/Sessions.tsx` | Signing out of Lys signs the person out at the issuer, and the issuer tells every registered app | DIRECTORY-059 |
+| `crates/lys-identity/src/log.rs` | The receipts route answers a signed checkpoint | DIRECTORY-058 |
+| `crates/lys-identity/src/error.rs` | One function verifies a receipt against a pinned key | DIRECTORY-058 |
+| `crates/lys-identity/src/receipt.rs` | One function verifies a receipt against a pinned key | DIRECTORY-058 |
+| `crates/lys-core/src/checkpoint/note.rs` | One function verifies a receipt against a pinned key | DIRECTORY-058 |
+| `crates/lys-core/src/checkpoint/note_tests.rs` | One function verifies a receipt against a pinned key | DIRECTORY-058 |
 
 ## Inventory
 
