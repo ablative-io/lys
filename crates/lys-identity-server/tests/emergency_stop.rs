@@ -299,6 +299,8 @@ async fn a_stop_cut_off_after_its_suspension_binds_its_words_and_is_readable() -
     assert_eq!(kept["stops"].as_array().map(Vec::len), Some(1), "{kept}");
     assert_eq!(kept["stops"][0]["operation"], operation);
     assert_eq!(kept["stops"][0]["reason"], "leaked its key");
+    assert_eq!(kept["stops"][0]["state"], "suspended");
+    assert_eq!(kept["stops"][0]["done"], true);
 
     let answer = table
         .service

@@ -128,7 +128,9 @@ impl ServerError {
             | Self::GrantNotDue { .. }
             | Self::ReviewReused { .. } => StatusCode::CONFLICT,
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
-            Self::SignInFailed { .. } | Self::SecretsUnavailable { .. } => StatusCode::BAD_GATEWAY,
+            Self::SignInFailed { .. }
+            | Self::SecretsUnavailable { .. }
+            | Self::SignInProvidersRefused { .. } => StatusCode::BAD_GATEWAY,
             Self::ConfigInvalid { .. }
             | Self::DirectoryUnavailable { .. }
             | Self::RequestsUnavailable { .. }
@@ -141,6 +143,7 @@ impl ServerError {
             | Self::ServiceAccountsUnavailable { .. }
             | Self::TeamsUnavailable { .. }
             | Self::StopsUnavailable { .. }
+            | Self::SignInProvidersUnavailable { .. }
             | Self::ReviewsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
             Self::Identity(error) => identity_status(error),

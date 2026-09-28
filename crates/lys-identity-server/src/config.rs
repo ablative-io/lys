@@ -116,6 +116,11 @@ pub struct Config {
     /// not exist. Without it keeping a grant answers `ReviewsUnavailable`.
     #[serde(default)]
     pub reviews_dir: Option<PathBuf>,
+    /// The issuer's administration API the sign-in providers are set
+    /// through. Without it the sign-in provider routes answer
+    /// `SignInProvidersUnavailable`.
+    #[serde(default)]
+    pub sign_in_providers: Option<crate::sign_in_providers::SignInProvidersSettings>,
 }
 
 /// The permission model as its file writes it: a version, and each relation
