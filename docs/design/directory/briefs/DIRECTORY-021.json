@@ -79,7 +79,78 @@
       ],
       "stories": [
         "S75"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-identity/src/roles/mod.rs",
+            "change": "created",
+            "note": "Module docs, the pub mod list and the pub use list. Nothing else."
+          },
+          {
+            "path": "crates/lys-identity/src/roles/types.rs",
+            "change": "created",
+            "note": "RoleId and HoldingId. The closed sets MovePolicy, Capacity and Timing, each written and read by name and refused by name when unknown. Template, a grant with no holder, no source and no end of its own. Version, Role (a committed version is kept apart from current and never changes) and Holding, with its check() and lapsed()."
+          },
+          {
+            "path": "crates/lys-identity/src/roles/events.rs",
+            "change": "created",
+            "note": "RoleChange with the seven kinds, RoleEvent (a person actor plus a capacity), the canonical body encoding, and sign_role_event and verify_role_event in the identity-event COSE_Sign1 shape under the content type application/vnd.lys.role-event.v1+cbor."
+          },
+          {
+            "path": "crates/lys-identity/src/roles/codec.rs",
+            "change": "created",
+            "note": "Canonical encoding and strict reading of templates, holding records and event bodies. Refusals by name: template_has_holder, template_has_source, template_has_end, missing_policy, unknown_policy, unknown_capacity. Anything that is not the canonical encoding is refused."
+          },
+          {
+            "path": "crates/lys-identity/src/roles/error.rs",
+            "change": "created",
+            "note": "RoleError, each variant naming its rule, and TemplateReason with the four reasons of conformance row 2.4."
+          },
+          {
+            "path": "crates/lys-identity/src/roles/holders.rs",
+            "change": "created",
+            "note": "RoleBook, the fold of role events. It refuses version_gap, version_immutable, project_mismatch and grants that do not match the templates, and changes nothing on a refusal. Also the R5 query."
+          },
+          {
+            "path": "crates/lys-identity/src/roles/test_support.rs",
+            "change": "created",
+            "note": "RoleWorld, the brief's fixtures (D1, H1, O1, O2, X1, A1 to A4, B1, P1, builder, T0 and E) on temporary logs. Built only under the crate's existing test-support feature, like grants::test_support."
+          },
+          {
+            "path": "crates/lys-identity/src/lib.rs",
+            "change": "modified",
+            "note": "Declares pub mod roles."
+          },
+          {
+            "path": "docs/design/identity/IDENTITY-EVENTS.md",
+            "change": "modified",
+            "note": "New section 'Role events, drafted for this envelope's review'. It gives the body, the seven kinds, the template and holding maps and the named refusals, marked drafted and not reviewed, with nothing durably signed until review."
+          },
+          {
+            "path": "crates/lys-identity/tests/roles_records.rs",
+            "change": "created",
+            "note": "Tests ROLE_RECORDS, ROLE_RECORDS_VALUES, ROLE_RECORDS_EVENTS and ROLE_RECORDS_TEMPLATE."
+          }
+        ],
+        "how": "ROLE_RECORDS: met. tests/roles_records.rs:48 verifies and re-decodes every committed event and replays them into a fresh RoleBook, whose builder, at versions 1 and 2, equals the live book's. Version 3 on a book whose last version is 1 is refused VersionGap{last:1, version:3}. A version-1 event with new templates is refused VersionImmutable. Three outcomes are counted. The rules are in holders.rs step() (line 188).\nROLE_RECORDS_VALUES: met. tests/roles_records.rs:138 gives four refusals: MissingPolicy (holding map with key 8 removed), UnknownPolicy \"renewal_or_manual\", ProjectMismatch (a holding in P2 checked against builder in P1), and UnknownCapacity \"owner_label\" in a real holding-granted body. The count is asserted at 4. The readers are codec.rs read_holding (line 315) and read_body.\nROLE_RECORDS_EVENTS: met. tests/roles_records.rs:211: H1, once given the owner relation, commits one event of each kind (granted, moved, renewed, policy changed, title changed, default changed, version made). The test verifies them all with the service key and counts 7 events with actor H1, whose kinds are exactly 1 to 7.\nROLE_RECORDS_TEMPLATE: met. tests/roles_records.rs:280: read-P1 round-trips with relation reader, project p1, actions [read], use_only, no end and responsible H1. A key 3 inserted gives TemplateHasHolder and a key 9 gives TemplateHasSource. Three outcomes are counted. The reader is codec.rs read_template (line 246).\nThe spec's 'SHALL NOT durably sign before the review accepts' is kept: Roles (holding.rs) holds its events in memory only, and IDENTITY-EVENTS.md marks the kinds as drafted. A committed version cannot be changed: Role exposes no mutator for past versions, and the book refuses one.",
+        "deviation": "1. Content type: the seven kinds use the identity-event COSE_Sign1 envelope shape (alg, kid, Signature1) but their own content type, application/vnd.lys.role-event.v1+cbor. Their body carries the actor as a person identity plus a capacity, instead of kinds 8 to 14 inside lys/identity-event/v1 whose key 3 is a login binding. Sharing the identity-event content type with a different body would invite cross-protocol confusion. The grants did the same for the same reason. The choice is written in IDENTITY-EVENTS.md for the review to accept or overturn.\n2. Two files outside the manifest: roles/codec.rs (events.rs would pass 500 lines of code otherwise) and roles/test_support.rs (one fixture shared by eight test roots without dead-code warnings, gated like grants::test_support).\n3. Templates may not carry an end of their own (template_has_end). This follows from 'a holding's end date is the one written on each grant it carries'.",
+        "checklist": [
+          {
+            "id": "C169",
+            "done": true,
+            "note": "Typed records, seven signed kinds each naming actor and capacity, committed versions immutable (book refuses version_immutable)."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S75",
+            "satisfied": true,
+            "note": "Every role act is one verifiable signed event carrying actor and capacity. ROLE_RECORDS_EVENTS reads all seven back."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -108,7 +179,52 @@
         "C170",
         "C171"
       ],
-      "stories": []
+      "stories": [],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-identity/src/roles/check.rs",
+            "change": "created",
+            "note": "The one seam: the Check enum, Facts, Asked, the RoleCheck trait (capacity, owners), admit() (not_permitted when the seam answers neither), responsible_for() from the registration record, and RecordCheck, the only implementation. RecordCheck reads the owner relation from grants::permission relationships, rooted in the person and unexpired by confirm(). This is the only roles file that names grants::permission."
+          },
+          {
+            "path": "crates/lys-identity/src/roles/ownership.rs",
+            "change": "created",
+            "note": "give_owner: admitted only when the giver is the configured administrator (the grants' root authority) or the seam answers project_owner. An agent holder is refused not_permitted. The grant is committed through Grants::commit_owner."
+          },
+          {
+            "path": "crates/lys-identity/src/grants/types.rs",
+            "change": "modified",
+            "note": "Adds OWNER_RELATION \"owner\", OWNER_ACTION \"own\", PROJECT_KIND, Relation::owner(), Grants::root_authority(), and the pub(crate) Grants::commit_owner. commit_owner commits one signed root grant of the owner relation (holder and responsible both the recipient, use-only, no end, issuer the giver) through the grants' own settle and commit path."
+          },
+          {
+            "path": "docs/design/identity/GRANT-CONTRACT.md",
+            "change": "modified",
+            "note": "New section 'The project owner relation': the relation, its root-grant shape, who may give it, never to an agent, and how a holder is read from the relationships."
+          },
+          {
+            "path": "crates/lys-identity/tests/roles_check.rs",
+            "change": "created",
+            "note": "Tests ROLE_OWNER_GIVE, ROLE_OWNER_NOT_LABEL, ROLE_CHECK_SEAM and ROLE_CHECK_UNAVAILABLE."
+          }
+        ],
+        "how": "ROLE_OWNER_GIVE: met. tests/roles_check.rs:23 first asserts D1 holds no grant on P1. D1 gives O1: one grant event with caller D1, holder O1, responsible O1, relation owner, use_only. O1 gives O2: admitted. X1 gives X1: NotPermitted{GiveOwner}. D1 gives A1: NotPermitted. Four cases counted; the grant revision rises by 2. The rule is in ownership.rs:41.\nROLE_OWNER_NOT_LABEL: met. tests/roles_check.rs:78: X1's display name is 'Owner of P1' and X1 holds only a use-only read grant. The seam answers None for X1, ProjectOwner for O1, ResponsiblePerson for H1 on A1's holding, and None for H1 on the role. The seam is check.rs:210.\nROLE_CHECK_SEAM: met. tests/roles_check.rs:108 reads every file under src/roles and finds 'grants::permission' only in src/roles/check.rs. A file-count guard fails the test if no files are read.\nROLE_CHECK_UNAVAILABLE: met. tests/roles_check.rs:128 takes the FailingRelationships engine down. O1's move of A1 is refused CheckUnavailable{check: Move}, and the role event count and A1's version are unchanged.\nThe SpiceDB leg of the seam is conditional on spicedb/check.rs being on main. It is not, so RecordCheck is the one implementation. The RoleCheck trait is the swap point, and no other roles file decides a permission.",
+        "deviation": "The administrator the owner-relation give admits is the grants' root authority (Grants::root_authority()), which is how the identity server opens its grants. There is no separate DIRECTORY-003 R3 hook in the library. I put commit_owner in grants/types.rs because that is the only grants file inside this brief's wall, and Grants::commit is visible only within grants.",
+        "checklist": [
+          {
+            "id": "C170",
+            "done": true,
+            "note": "Owner is an explicit relation. It is given only by the administrator or an existing owner, never inferred from a name or label (ROLE_OWNER_GIVE, ROLE_OWNER_NOT_LABEL). The SpiceDB projection half sits in R10, which is blocked."
+          },
+          {
+            "id": "C171",
+            "done": true,
+            "note": "One seam in roles/check.rs, and no request type carries a capacity. The server half (no actor or capacity taken from a request body) is R10's, which is blocked."
+          }
+        ],
+        "stories": []
+      }
     },
     {
       "id": "R3",
@@ -138,7 +254,43 @@
       ],
       "stories": [
         "S98"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-identity/src/roles/holding.rs",
+            "change": "created",
+            "note": "Holds the Roles store (signed events plus the book, commit and fresh). Acting (grants, directory, seam, clock) with admit and is_administrator. plan_copies judges every template's delegation against a grant the actor holds before any grant is made, and gives row 2.4 reasons. commit_copies, judge_withdrawals and withdraw go through DIRECTORY-006. Assign."
+          },
+          {
+            "path": "crates/lys-identity/tests/roles_assign.rs",
+            "change": "created",
+            "note": "Tests ROLE_ASSIGN, ROLE_ASSIGN_OWNER, ROLE_ASSIGN_OTHER_RESPONSIBLE, ROLE_ASSIGN_REFUSED, ROLE_ASSIGN_POLICY and ROLE_ASSIGN_END."
+          }
+        ],
+        "how": "ROLE_ASSIGN: met. tests/roles_assign.rs:49: A1 on version 1 with exactly the grants read and test, and one holding-granted event with actor H1, capacity ResponsiblePerson, version 1.\nROLE_ASSIGN_OWNER: met. Line 63: O1 assigns A2, recorded as ProjectOwner, with the two grants.\nROLE_ASSIGN_OTHER_RESPONSIBLE: met. Line 76: every grant of B1's holding names responsible O2, never H1. The seam answers O2 ResponsiblePerson and H1 None. After version 2, H1's move of B1 is refused NotPermitted{Move}, and 0 moved events are added.\nROLE_ASSIGN_REFUSED: met. Line 102: X1 and D1 are refused NotPermitted. With H1's tester made use-only, H1's assign is refused TemplatesRefused naming only tester with reason UseOnly. Holdings, grant revision and role events are each unchanged by 0.\nROLE_ASSIGN_POLICY: met. Line 154: with the default move_at_next_renewal, A1 with end date E gets move_at_next_renewal and A2 with no end date gets deliberate_only.\nROLE_ASSIGN_END: met. Line 170: both grants end at E.\nThe grants are copies made at grant time: holding.rs:329 assign copies the templates into DelegateRequests, and no link to the role is kept.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C172",
+            "done": true,
+            "note": "Holding names its role and version. Its grants are copied at grant time from that version's templates, each admitted by judge_delegation for the assigning actor, with the agent's registered responsible person."
+          },
+          {
+            "id": "C179",
+            "done": true,
+            "note": "The end date is written on each grant at assign (ROLE_ASSIGN_END) and is the same after an edit (ROLE_EDIT_END) and a move (ROLE_MOVE_END)."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S98",
+            "satisfied": true,
+            "note": "An owner assigns (ROLE_ASSIGN_OWNER), makes and edits roles (R4), and no existing holder changes."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -168,7 +320,48 @@
       "stories": [
         "S71",
         "S98"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-identity/src/roles/edit.rs",
+            "change": "created",
+            "note": "make_role (version 1, default move_at_next_renewal), edit_templates (the next version, no holding touched) and change_title (no version), each admitted only as project_owner. Each template's actions must be the ones the model resolves its relation to."
+          },
+          {
+            "path": "crates/lys-identity/tests/roles_edit.rs",
+            "change": "created",
+            "note": "Tests ROLE_EDIT, ROLE_EDIT_TITLE, ROLE_EDIT_REFUSED, ROLE_EDIT_NEW_DEFAULT and ROLE_EDIT_END."
+          }
+        ],
+        "how": "ROLE_EDIT: met. tests/roles_edit.rs:42: O1's edit makes version 2. A1 and A2 stay on version 1, and the encode_grant bytes of every one of their grants are identical before and after.\nROLE_EDIT_TITLE: met. Line 59: one title-changed event, Builder to Code builder, actor O1, capacity ProjectOwner. The last version is still 1.\nROLE_EDIT_REFUSED: met. Line 83: H1 and D1 are refused NotPermitted{EditTemplates}. The last version is 1 and 0 events are added.\nROLE_EDIT_NEW_DEFAULT: met. Line 103: reviewer is on version 1 in P1 with default move_at_next_renewal.\nROLE_EDIT_END: met. Line 117: after the edit, A1's holding and both its grants end at E.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C173",
+            "done": true,
+            "note": "A template edit makes the next version and moves nobody. A title edit is recorded and makes no version. A new role's default is move_at_next_renewal."
+          },
+          {
+            "id": "C179",
+            "done": true,
+            "note": "ROLE_EDIT_END."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S71",
+            "satisfied": true,
+            "note": "A role edit leaves the agent on its version with byte-identical grants."
+          },
+          {
+            "id": "S98",
+            "satisfied": true,
+            "note": "make_role, edit_templates and change_title are admitted for owners, and no holder changes."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -191,7 +384,32 @@
       "checklist": [
         "C174"
       ],
-      "stories": []
+      "stories": [],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-identity/src/roles/holders.rs",
+            "change": "created",
+            "note": "Roles::holders(role, at) answers from the holding records, grouped by every version from first to current, with the current one marked and lapsed holdings left out. No member list is kept on a role."
+          },
+          {
+            "path": "crates/lys-identity/tests/roles_holders.rs",
+            "change": "created",
+            "note": "Tests ROLE_HOLDERS and ROLE_HOLDERS_QUERY."
+          }
+        ],
+        "how": "ROLE_HOLDERS: met. tests/roles_holders.rs:34: the answer is [(1, [A1], not current), (2, [A2], current)], and A3, whose end date is before the controlled clock's now, is absent.\nROLE_HOLDERS_QUERY: met. Line 59: exactly one role event is committed between the two answers (asserted), and the second answer lists A4 alongside A1.\nThe query is holders.rs:405.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C174",
+            "done": true,
+            "note": "Answered as a query over holding records."
+          }
+        ],
+        "stories": []
+      }
     },
     {
       "id": "R6",
@@ -220,7 +438,48 @@
       "stories": [
         "S72",
         "S75"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-identity/src/roles/move_holder.rs",
+            "change": "created",
+            "note": "preview (the added and removed templates as GrantViews in the six grant fields, window ending at the holding's end date, the holder's responsible person; commits nothing). confirm_move: not_newer, admission, the timing default next_start, a stale preview refused, all adds and withdrawals judged before any is made, then one holding-moved event. Timing now is refused now_not_operator for anyone but the administrator, and now_unavailable for the administrator because the session stop is not built."
+          },
+          {
+            "path": "crates/lys-identity/tests/roles_move.rs",
+            "change": "created",
+            "note": "Tests ROLE_MOVE_PREVIEW, ROLE_MOVE_RECORD, ROLE_MOVE_CAPACITY and ROLE_MOVE_END."
+          }
+        ],
+        "how": "ROLE_MOVE_PREVIEW: met. tests/roles_move.rs:49: exactly one added (pusher, project p1, [push], use_only, window ending E, responsible H1) and exactly one removed (tester, same fields). Role events and grant revision are unchanged.\nROLE_MOVE_RECORD: met. Line 68: one moved event with actor H1, ResponsiblePerson, from 1 to 2, timing NextStart, added [push], removed [test]. A1 is on version 2.\nROLE_MOVE_CAPACITY: met. Line 96: O1's move of A2 is committed as ProjectOwner. X1 is refused NotPermitted. D1 is refused NotPermitted until given the owner relation, then committed as ProjectOwner. Moved events added: 2.\nROLE_MOVE_END: met. Line 132: after the move, the holding and both grants end at E.",
+        "deviation": "1. In ROLE_MOVE_CAPACITY, D1 is also issued a pusher root grant, with pass-on to agents, before its move. R6 makes the added grants 'through DIRECTORY-006 R2's admission', and that admission needs a grant held by the mover to copy push-P1 from. The brief's fixture gives D1 no grant on P1, so without this D1's move would be refused above_held.\n2. The move withdraws removed grants through DIRECTORY-006's revocation admission (issuer, ancestor holder or root authority), judged before anything is committed. An owner therefore cannot move a holding whose grants the responsible person issued, and vice versa. This is a real limit of 'withdraw through DIRECTORY-006', flagged for the reviewer. The test pairs each move with a mover who stands above the holding's grants.",
+        "checklist": [
+          {
+            "id": "C175",
+            "done": true,
+            "note": "The preview comes first, the confirm is admitted only for the responsible person or an owner, and the result is one signed record with actor, capacity and timing."
+          },
+          {
+            "id": "C179",
+            "done": true,
+            "note": "ROLE_MOVE_END."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S72",
+            "satisfied": true,
+            "note": "The mover sees what is added and removed and chooses the timing. Next start is the default; now is refused, see R7."
+          },
+          {
+            "id": "S75",
+            "satisfied": true,
+            "note": "The moved event names actor, capacity, versions, timing and grants."
+          }
+        ]
+      }
     },
     {
       "id": "R7",
@@ -248,7 +507,27 @@
       ],
       "stories": [
         "S72"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked: the artifacts named in blocked_by are absent on main. After git fetch origin main at 3f48732, git cat-file -e origin/main:crates/lys-identity/src/session/start.rs fails (no next-start leg possible) and git cat-file -e origin/main:crates/lys-identity/src/session/end.rs fails (no now leg possible). The brief says each leg dispatches only when its artifact exists on main. roles/timing.rs and tests/roles_move_timing.rs are not created. None of ROLE_MOVE_NEXT_START, ROLE_MOVE_NOW, ROLE_MOVE_NOW_UNCONFIRMED, ROLE_MOVE_NOW_ALREADY_ENDED or ROLE_MOVE_NOW_REFUSED is met. The draft-branch reading commands were not run because the main-branch block already stops R7. What exists in R6 is only the safe refusal: move_holder.rs:151 refuses timing now as now_not_operator for anyone but the configured administrator, and as now_unavailable for the administrator, committing nothing.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C176",
+            "done": false,
+            "note": "Blocked on session/start.rs and session/end.rs being absent from main."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S72",
+            "satisfied": false,
+            "note": "The timing half ('choose when it takes effect') is blocked. Only next_start is taken, and it is recorded without session effect."
+          }
+        ]
+      }
     },
     {
       "id": "R8",
@@ -279,7 +558,48 @@
       "stories": [
         "S74",
         "S75"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-identity/src/roles/renewal.rs",
+            "change": "created",
+            "note": "renew. Anyone but the responsible person or an owner is refused ROLE_RENEW_REFUSED, no end date is refused no_end_date, and after the end date is refused holding_lapsed; exactly at the end date is admitted. It lands on the current version under move_at_next_renewal and the held one under deliberate_only. New grants go through admission with the new end date, the replaced grants are withdrawn, and one holding-renewed event is committed. Nothing else renews."
+          },
+          {
+            "path": "crates/lys-identity/tests/roles_renewal.rs",
+            "change": "created",
+            "note": "Tests ROLE_RENEW, ROLE_RENEW_NONE, ROLE_RENEW_AT_END, ROLE_RENEW_OWNER, ROLE_RENEW_DELIBERATE and ROLE_RENEW_REFUSED."
+          }
+        ],
+        "how": "ROLE_RENEW: met. tests/roles_renewal.rs:86: version 2 made at T0 + 1 day. A1 is on version 1 at E - 2h. H1 renews at E - 1h: one renewed event with H1, ResponsiblePerson, A1's holding, version 2, E + 30 days. The grants are read and push, each ending at E + 30 days.\nROLE_RENEW_NONE: met. Line 105: at E - 1s the holding is on version 1 and unlapsed. At E + 1s it is lapsed and DIRECTORY-006's effective() answers Expired{ended_at: E} for every grant. It is still on version 1, with 0 moved and 0 renewed events.\nROLE_RENEW_AT_END: met. Line 128: at exactly E the renewal is admitted, on version 2, grants read and push ending at E + 30 days.\nROLE_RENEW_OWNER: met. Line 139: O1's renewal is recorded with actor O1, ProjectOwner, version 2, E + 30 days.\nROLE_RENEW_DELIBERATE: met. Line 151: under deliberate_only the renewed event names version 1, with grants read and test ending at E + 30 days.\nROLE_RENEW_REFUSED: met. Line 171: X1 is refused RenewRefused, H1 at E + 1 is refused HoldingLapsed{ended_at: E}, H1 on A2 is refused NoEndDate, and 0 events are added.",
+        "deviation": "In ROLE_RENEW_OWNER, A1 is assigned by O1, not H1. The renewal withdraws the replaced grants through DIRECTORY-006's revocation admission, and O1 stands in no lineage of grants H1 issued, so an owner cannot renew a holding the responsible person assigned. This is the same limit as in R6, flagged for the reviewer.",
+        "checklist": [
+          {
+            "id": "C177",
+            "done": true,
+            "note": "A new grant with a new end date, by the responsible person or an owner, at the version the policy names. It is recorded, and an unrenewed holding lapses unmoved."
+          },
+          {
+            "id": "C179",
+            "done": true,
+            "note": "The end date stays on the grants, and only a renewal changes it."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S74",
+            "satisfied": true,
+            "note": "The renewal is a recorded act. Nothing renews quietly, and lapsing is shown by ROLE_RENEW_NONE."
+          },
+          {
+            "id": "S75",
+            "satisfied": true,
+            "note": "The renewed event names actor, capacity, holding, version and end date."
+          }
+        ]
+      }
     },
     {
       "id": "R9",
@@ -310,7 +630,48 @@
         "S73",
         "S75",
         "S98"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-identity/src/roles/policy.rs",
+            "change": "created",
+            "note": "holding_policy and role_policies, giving the move date, the words NEXT_RENEWAL_WORDS or DELIBERATE_WORDS, who can stop the move (the responsible person, then the owners from the seam) and differs_from_default only for holdings with an end date. change_policy (refuses move_at_next_renewal on a holding with no end date as no_end_date) and change_default (applies only to later holdings)."
+          },
+          {
+            "path": "crates/lys-identity/tests/roles_policy.rs",
+            "change": "created",
+            "note": "Tests ROLE_POLICY_SHOWN, ROLE_POLICY_CHANGE, ROLE_POLICY_CHANGE_OWNER, ROLE_POLICY_NO_END, ROLE_DEFAULT and ROLE_DEFAULT_NO_END."
+          }
+        ],
+        "how": "ROLE_POLICY_SHOWN: met. tests/roles_policy.rs:64: A1 moves at E with 'Its next renewal moves it to the current version', and who can stop it is [H1, O1]. A2 is deliberate_only with 'Moves only by a deliberate act' and no move date.\nROLE_POLICY_CHANGE: met. Line 82: one policy-changed event with H1, ResponsiblePerson, A1's holding, move_at_next_renewal to deliberate_only. A2's policy, A1's version, A1's end date and A1's grant bytes are unchanged.\nROLE_POLICY_CHANGE_OWNER: met. Line 122: O1 is recorded as ProjectOwner. X1 is refused NotPermitted{ChangePolicy} and 0 events are added.\nROLE_POLICY_NO_END: met. Line 140: NoEndDate, 0 events.\nROLE_DEFAULT: met. Line 152: one default-changed event by O1. A1 keeps move_at_next_renewal and is marked differing. A4, assigned afterwards with end date E, gets deliberate_only.\nROLE_DEFAULT_NO_END: met. Line 182: A1, changed to deliberate_only, is marked. A2 is not marked and shows only 'Moves only by a deliberate act', with no date and no stoppers.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C178",
+            "done": true,
+            "note": "The policy, its words, the date and who can stop are all shown. Policy and default change only by recorded acts that move nobody."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S73",
+            "satisfied": true,
+            "note": "The move date and the stoppers are shown, and one holding's policy can be changed."
+          },
+          {
+            "id": "S75",
+            "satisfied": true,
+            "note": "The policy and default events name actor and capacity."
+          },
+          {
+            "id": "S98",
+            "satisfied": true,
+            "note": "An owner changes the default without changing any holder."
+          }
+        ]
+      }
     },
     {
       "id": "R10",
@@ -339,7 +700,26 @@
         "C170",
         "C171"
       ],
-      "stories": []
+      "stories": [],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked: ROLE_OWNER_PROJECTION and ROLE_ROUTES_SPICEDB need crates/lys-identity/src/grants/relationships.rs, crates/lys-identity-server/src/spicedb/schema.zed and crates/lys-identity-server/src/spicedb/check.rs on main. git cat-file -e origin/main at 3f48732 fails for all three, so two of the four acceptance rows cannot be met. There is also a file collision: crates/lys-identity-server/tests/roles.rs already exists (401 lines, the administrator-only role routes of an earlier brief, with roles_api.rs, roles_store.rs and roles_records.rs beside it). R10's 'file create' of tests/roles.rs, and a new src/roles.rs next to that surface, need a reconciled manifest under CN9 before the routes are built. No server file is changed. The library seam (RoleCheck in roles/check.rs) is ready for the server to supply an evaluator-backed implementation when check.rs lands.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C170",
+            "done": false,
+            "note": "The library half is done in R2. The SpiceDB schema and projection half is blocked on schema.zed and relationships.rs."
+          },
+          {
+            "id": "C171",
+            "done": false,
+            "note": "The library seam is done in R2. The server routes and the evaluator swap are blocked (check.rs absent, tests/roles.rs collision)."
+          }
+        ],
+        "stories": []
+      }
     },
     {
       "id": "R11",
@@ -376,7 +756,32 @@
       "stories": [
         "S72",
         "S73"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked: surface/identity/src/routes.tsx and surface/identity/src/generated/index.ts exist, but the screen renders only the server's answers, and R10's routes do not exist (see R10). ROLE_SCREEN_MOVE_NOW also needs R7's move-now answer with session outcomes, which is blocked on session/end.rs. None of the six ROLE_SCREEN rows can be met against a real server answer. No surface file is changed.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C180",
+            "done": false,
+            "note": "Blocked on R10's routes and R7's move-now answer."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S72",
+            "satisfied": false,
+            "note": "The screen half is blocked."
+          },
+          {
+            "id": "S73",
+            "satisfied": false,
+            "note": "The screen half is blocked."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [

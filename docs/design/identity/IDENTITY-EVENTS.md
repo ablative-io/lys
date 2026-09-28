@@ -54,6 +54,44 @@ Lifecycle states are `1` registered, `2` active, `3` suspended, `4` retired. Tra
 
 A link-audit event records the issuer's observation as the receiver accepted it, under the source's own operation id. It is an observation, kept apart from any claim a person made. Its fields follow R4 as written. Row 01's typed link-audit contract must equal this payload: a wire format is kept for ever, so the contract follows the wire and never the other way round.
 
+## Role events, drafted for this envelope's review
+
+DIRECTORY-021 R1 adds seven role event kinds, one for each role act: every act on a role, a version or a holding is one signed directory event naming the authenticated actor and the capacity it acted in (P4, P7). The code that writes them is crates/lys-identity/src/roles: events.rs holds the typed event and its signed message, codec.rs the canonical encoding and its strict reading.
+
+**Status: drafted, not reviewed.** These kinds are put to the same joint review this envelope passed, and no role event is durably signed before that review accepts them: until it does, the role events are held in memory only, and nothing is appended to a log. Kinds 1 to 7 of the identity event and their signature-covered bytes are unchanged, and no lys-core format changes.
+
+A role event is a `COSE_Sign1` message in this envelope's shape, the protected header naming its own content type, `application/vnd.lys.role-event.v1+cbor`, so a role event is never read as an identity or grant event nor either of them as a role event. The signature is the directory service's, as for an identity event.
+
+The body is a canonical CBOR map:
+
+| Key | Field | Value |
+| --- | --- | --- |
+| 1 | version | `1` |
+| 2 | operation | the caller's operation id, 16 bytes |
+| 3 | actor | identity map: `1` kind (`1` person), `2` id (16 bytes); only a person acts on a role |
+| 4 | capacity | text: `responsible_person` or `project_owner` |
+| 5 | recorded-at | seconds since the Unix epoch, by the service's clock |
+| 6 | change kind | a code from the table below |
+| 7 | change | the change's map, below |
+
+| Kind | Change | Its map |
+| --- | --- | --- |
+| 1 | role version made | `1` role id (16 bytes), `2` project (`1` kind, `2` id), `3` version number, `4` grant templates (array); for version 1 only, `5` title (text) and `6` default move policy |
+| 2 | role title changed | `1` role id, `2` title before, `3` title after |
+| 3 | role default policy changed | `1` role id, `2` policy before, `3` policy after |
+| 4 | holding granted | the holding record |
+| 5 | holding moved | `1` holding id, `2` from version, `3` to version, `4` timing (`next_start` or `now`), `5` grant ids added, `6` grant ids removed |
+| 6 | holding renewed | `1` holding id, `2` version it lands on, `3` new end date, `4` grant ids made, `5` grant ids replaced |
+| 7 | holding policy changed | `1` holding id, `2` policy before, `3` policy after |
+
+A move policy is the text `move_at_next_renewal` or `deliberate_only`. Every closed value is written as its name, and a name outside its set is refused by name: `unknown_capacity`, `unknown_policy`, `unknown_timing`. No value has a default, and a missing key is refused.
+
+A grant template is a map of exactly the grant keys of docs/design/identity/GRANT-CONTRACT.md it carries: `4` responsible, `5` resource, `6` relation, `7` actions, `8` pass-on and `10` window, whose `2` ends-at is null. It is a grant with no holder and no source: a template carrying key `3` is refused `template_has_holder`, one carrying key `9` `template_has_source`, and a window with an end of its own `template_has_end`. Its responsible value is replaced, on every copy, by the holder's own responsible person.
+
+A holding record is a map of `1` holding id (16 bytes), `2` holder agent id (16 bytes), `3` role id, `4` version held, `5` project, `6` the grant ids it carries (one for each template of its version, in order), `7` end date or null, and `8` move policy. A record with no key `8` is refused `missing_policy`. A holding sits in its role's project or is refused `project_mismatch`, and a move at the next renewal needs an end date.
+
+A version skipping a number is refused `version_gap`, and one naming a committed version `version_immutable`: a committed version never changes.
+
 ## Strict reading
 
 A message is refused unless it decodes to exactly this shape, the event it names passes the same checks as an event being written, and re-encoding that event gives back the very bytes that were read. So each event has one byte string. A padded, reordered or long-form message never verifies. A message over 65536 bytes is refused before it is parsed. A message naming a key other than the service key it is checked against is refused as a signer mismatch. A bad signature is refused with no further detail.

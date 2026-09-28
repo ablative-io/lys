@@ -9,14 +9,36 @@
 //! Exercising and passing on are separate members. Pass-on is an affirmative
 //! member of every grant: [`PassOn::UseOnly`] is written out, never implied by
 //! a missing field, and nothing in this module turns absence into permission.
+//!
+//! The model's project definition carries the relation [`OWNER_RELATION`]:
+//! an owner of a project is a person holding a root grant of that relation
+//! on the project, rooted in that person, and never a name, a label or a
+//! rank. It carries the one action [`OWNER_ACTION`] and is use-only, so
+//! holding it passes nothing else on. Its admission is not a delegation's:
+//! [`crate::roles::ownership`] admits it, and [`Grants::root_authority`] is
+//! the configured administrator who may give it without holding it.
 
 use std::collections::BTreeSet;
 use std::fmt;
 use std::str::FromStr;
 
+use lys_log_store::LeafStore;
+
+use super::authority::{Grants, Recorded};
 use super::error::GrantError;
+use super::events::{GrantChange, GrantEvent};
+use super::permission::RelationshipStore;
 use crate::id::{ID_LEN, IdentityId, PersonId, from_hex, random_bytes, to_hex};
 use crate::operation::OperationId;
+
+/// The relation on a project that makes its holder an owner of the project.
+pub const OWNER_RELATION: &str = "owner";
+
+/// The one action the owner relation carries in the model.
+pub const OWNER_ACTION: &str = "own";
+
+/// The resource kind of a project.
+pub const PROJECT_KIND: &str = "project";
 
 /// The longest action, relation, resource kind or resource id, in bytes.
 pub const TOKEN_MAX_BYTES: usize = 128;
@@ -112,6 +134,11 @@ impl Relation {
     /// The relation's name.
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// The project relation [`OWNER_RELATION`].
+    pub fn owner() -> Self {
+        Self(OWNER_RELATION.to_owned())
     }
 }
 
@@ -391,5 +418,52 @@ impl Grant {
     /// When it may be exercised.
     pub fn window(&self) -> Window {
         self.parts.window
+    }
+}
+
+impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
+    /// The root authority these grants were opened with: the directory's
+    /// configured administrator.
+    pub fn root_authority(&self) -> PersonId {
+        self.root_authority
+    }
+
+    /// Commit, as one signed grant event, `giver`'s grant of the owner
+    /// relation on `project` to the person `holder`: a root grant rooted in
+    /// `holder`, who is its holder and its responsible person, use-only, with
+    /// the actions the model resolves [`OWNER_RELATION`] to and no end of its
+    /// own. Whether `giver` may give it is judged before this is called, by
+    /// [`crate::roles::ownership`] alone.
+    pub(crate) fn commit_owner(
+        &mut self,
+        operation: OperationId,
+        giver: IdentityId,
+        holder: PersonId,
+        project: &Resource,
+        at: u64,
+    ) -> Result<Recorded, GrantError> {
+        self.settle_for_change()?;
+        let relation = Relation::owner();
+        let actions = self.model.actions(&relation)?.clone();
+        let grant = Grant::new(GrantParts {
+            id: GrantId::generate()?,
+            issuer: giver,
+            holder: IdentityId::Person(holder),
+            responsible: holder,
+            resource: project.clone(),
+            relation,
+            actions,
+            pass_on: PassOn::UseOnly,
+            source: Source::Root,
+            window: Window::new(at, None)?,
+            model_version: self.model.version(),
+            operation,
+        })?;
+        self.commit(GrantEvent::new(
+            operation,
+            giver,
+            at,
+            GrantChange::Issue(Box::new(grant)),
+        )?)
     }
 }
