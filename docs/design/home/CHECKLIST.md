@@ -31,8 +31,28 @@
 
 - [ ] **C13** — At compaction or retirement the outgoing session's letter to its successor, with its real thinking, becomes the successor's first entry as lys.inherited; it is never authored and replays only to the same provider, api and model; seeded against plain is measured on a card.
 
+## The launch template
+
+- [ ] **C14** — A Claude Code launch template schema in docs/design/home names its five slots (transcript, mcp, env, secrets, instructions), and a template with a slot outside them is refused by that slot's name with nothing written.
+- [ ] **C15** — The home keeps each template it renders as an object under templates/ named by its SHA-256, written once and never rewritten.
+- [ ] **C16** — lys-home render-launch writes the rendered JSONL, its loss account, an MCP configuration file, an environment file and an appended-instructions file into one directory, and a second render of the same template and session writes files with identical SHA-256.
+- [ ] **C17** — The launch line in render-launch's report resumes the rendered file by path with --fork-session and the template's flags, and the tool never runs it.
+- [ ] **C18** — A use-only secret is written as its handle and never its value, and a template marking a secret readable is refused naming secret_reader_unbuilt and SECRETS-002.
+- [ ] **C19** — Every render appends one lys.harness_event of kind template_render beside the context path, naming the template hash, the session head hash and a manifest block of the written paths, and the head does not move.
+- [ ] **C20** — PROOF-LAUNCH.md records the launch measured on the installed Claude Code version: template hash, written paths and hashes, launch line, the rendered file unchanged, where the continuation landed; never transcript content.
+
 ## The context record
 
-- [ ] **C14** — Every launch-template render appends one lys.given custom entry after the render event, listing the instruction documents Claude Code will load for the session's working directory and the files the render wrote, in the order measured on the named Claude Code version, each by kind, path, byte length and SHA-256, with the harness name and version, the kinds resolved, the kinds it leaves unlisted, and the environment variable names the template set; never a document's content and never a variable's value.
-- [ ] **C15** — lys-home lists a session's given records with their documents, and checks a listed document against a file on disk by hash, answering matches or differs and never printing either file.
-- [ ] **C16** — The Claude Code version on this Mac, the instruction load order and project slug rule measured from its own behaviour, and one real session render, are written in PROOF-GIVEN.md as paths, counts and hashes only.
+- [ ] **C21** — Every launch-template render appends one lys.given custom entry after the render event, listing the instruction documents Claude Code will load for the session's working directory and the files the render wrote, in the order measured on the named Claude Code version, each by kind, path, byte length and SHA-256, with the harness name and version, the kinds resolved, the kinds it leaves unlisted, and the environment variable names the template set; never a document's content and never a variable's value.
+- [ ] **C22** — lys-home lists a session's given records with their documents, and checks a listed document against a file on disk by hash, answering matches or differs and never printing either file.
+- [ ] **C23** — The Claude Code version on this Mac, the instruction load order and project slug rule measured from its own behaviour, and one real session render, are written in PROOF-GIVEN.md as paths, counts and hashes only.
+
+## The first translation
+
+- [ ] **C24** — lys-home render-codex takes a home, a session, a target directory that is a Codex sessions root, and a Codex version; renders only for the measured Codex 0.156.0 and refuses any other version naming the version asked for and the one measured; walks the context path the Claude Code render walks; and writes one rollout under that root's dated directories in the shape Codex 0.156.0 writes for its own threads, measured from files that version wrote, with nothing written when it refuses.
+- [ ] **C25** — Every text part, tool call and tool result on the context path is carried whole as Codex's own message, function_call and function_call_output items, paired by call id, never clipped or noted; readable thinking is carried as text; an image part whose source is base64 is carried as Codex's input_image item, and any other image source is named lost, never fetched; opaque thinking is dropped and named by hash; a compaction becomes Codex's own compaction item where 0.156.0 writes one with readable text, measured, and otherwise a user message that says it is a compaction summary.
+- [ ] **C26** — The rendered thread announces itself in band as a translated context with the source session id and the source head hash.
+- [ ] **C27** — A JSON loss account beside the rollout lists, by entry id and the importer's block hash, what was kept, what changed shape (before and after kinds, and how), and what was lost and why: sidechains, harness events, lys entries, and any part kind Codex has no item for.
+- [ ] **C28** — The report is JSON with the rollout and account paths, entry and block counts and the loss counts, never content; an existing path is refused by name with nothing written; each translation is recorded on the session as a codex_translation side leaf naming both files by path and SHA-256 and the Codex version; the Claude Code render of the same session is unchanged, checked by hash.
+- [ ] **C29** — A fixture session imported from a fixture Claude Code file renders to a rollout whose items match a fixture rollout recorded from Codex 0.156.0, apart from ids and timestamps, over the item kinds the render can produce, with the kinds Codex writes that no source record stands behind named and counted; a tool result longer than Codex's importer clips is carried whole.
+- [ ] **C30** — PROOF-TRANSLATE.md records Codex 0.156.0 resuming the rendered rollout in an isolated Codex home and answering from its content, in hashes, counts and paths only.
