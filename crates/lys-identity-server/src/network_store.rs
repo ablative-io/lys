@@ -74,11 +74,15 @@ fn unavailable(what: impl std::fmt::Display) -> ServerError {
 }
 
 fn read(path: &Path) -> Result<Kept, ServerError> {
-    if !path.exists() {
-        return Ok(Kept::default());
-    }
-    let bytes = fs::read(path)
-        .map_err(|error| unavailable(format!("reading {}: {error}", path.display())))?;
+    let bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(Kept::default());
+        }
+        Err(error) => {
+            return Err(unavailable(format!("reading {}: {error}", path.display())));
+        }
+    };
     serde_json::from_slice(&bytes)
         .map_err(|error| unavailable(format!("{} does not read: {error}", path.display())))
 }
@@ -89,7 +93,11 @@ fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     file.write_all(bytes)?;
     file.sync_all()?;
     drop(file);
-    fs::rename(&beside, path)
+    fs::rename(&beside, path)?;
+    match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => fs::File::open(parent)?.sync_all(),
+        _ => Ok(()),
+    }
 }
 
 impl NetworkStore {
