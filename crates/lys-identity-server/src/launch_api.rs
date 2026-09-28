@@ -10,8 +10,9 @@
 //! A start is admitted once, under the caller's operation id, and kept in
 //! the runtime reports' log as the session's `starting` report before the
 //! command is answered; the session is that operation id. The same request
-//! sent again answers the same session and keeps nothing more, and the same
-//! operation id with other words is refused.
+//! sent again answers the start exactly as it was first answered, kept whole
+//! in that report, whatever has changed since; the same operation id naming
+//! any other report is refused. Only an active agent is started.
 //!
 //! The administrator and the person responsible for the agent are given
 //! the command. Each refusal is by name: an agent the directory does not
@@ -28,6 +29,7 @@ use axum::extract::{Path, State};
 use axum::http::{HeaderMap, Method};
 use axum::routing::post;
 use axum::{Json, Router};
+use lys_identity::LifecycleState;
 use lys_identity::{AgentId, IdentityId, OperationId};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -38,6 +40,7 @@ use crate::launch_template::{HandleName, Start, handle_variable, render};
 use crate::network_api::with_network;
 use crate::network_store::{Machine, NetworkStore};
 use crate::provisioning_api::with_provisioning;
+use crate::provisioning_store::Version;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::runtime_api::with_runtime;
 use crate::runtime_state::{Report, Reported};
@@ -155,7 +158,7 @@ async fn start_command(
     headers: HeaderMap,
     Path(id): Path<String>,
     body: Result<Json<Launch>, JsonRejection>,
-) -> Result<Json<StartCommandView>, ServerError> {
+) -> Result<Json<Value>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
     let Json(Launch { machine, operation }) =
@@ -164,7 +167,7 @@ async fn start_command(
         })?;
     let session = OperationId::from_str(&operation)?.to_string();
     let agent = agent.to_string();
-    let (version, runtime, admitted_by) = with_directory(&state, |directory| {
+    let admission = with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let admitted_by = caller(&state, &headers, directory)?.to_string();
         let parsed = AgentId::from_str(&agent)?;
@@ -180,6 +183,14 @@ async fn start_command(
                 reason: "only the administrator or the person responsible for the agent is given its start command",
             });
         }
+        if let Some(kept) = admitted(&state, &session, &agent)? {
+            return Ok(Admission::Kept(kept));
+        }
+        if record.state() != LifecycleState::Active {
+            return Err(ServerError::AgentNotActive {
+                state: record.state().to_string(),
+            });
+        }
         let version = with_provisioning(&state, |store| {
             store
                 .profile(&agent)
@@ -193,8 +204,12 @@ async fn start_command(
                 .clone()
                 .ok_or(ServerError::MachineWithoutRuntime)
         })?;
-        Ok((version, runtime, admitted_by))
+        Ok(Admission::New(Box::new(version), runtime, admitted_by))
     })?;
+    let (version, runtime, admitted_by) = match admission {
+        Admission::Kept(kept) => return Ok(Json(kept)),
+        Admission::New(version, runtime, admitted_by) => (version, runtime, admitted_by),
+    };
     let handles = handles(&state, &headers, &agent).await?;
     let rendered = render(
         &Start {
@@ -206,7 +221,24 @@ async fn start_command(
         },
         &handles,
     )?;
-    with_runtime(&state, |store| {
+    let view = serde_json::to_value(StartCommandView {
+        agent: agent.clone(),
+        machine: machine.clone(),
+        runtime,
+        session: session.clone(),
+        provisioning_version: version.number,
+        harness: lys_home::harness::claude_code::HARNESS,
+        handles,
+        template: rendered.template,
+        template_sha256: rendered.template_sha256.clone(),
+        command: rendered.command,
+        left_out: rendered.left_out,
+        executed: false,
+    })
+    .map_err(|error| ServerError::LaunchUnrenderable {
+        reason: error.to_string(),
+    })?;
+    let kept = with_runtime(&state, |store| {
         store.report(Report {
             operation: session.clone(),
             session: session.clone(),
@@ -217,20 +249,36 @@ async fn start_command(
             confirmation: String::new(),
             reported_by: admitted_by,
             at: now(),
+            launch: Some(view),
         })
     })?;
-    Ok(Json(StartCommandView {
-        agent,
-        machine,
-        runtime,
-        session,
-        provisioning_version: version.number,
-        harness: lys_home::harness::claude_code::HARNESS,
-        handles,
-        template: rendered.template,
-        template_sha256: rendered.template_sha256,
-        command: rendered.command,
-        left_out: rendered.left_out,
-        executed: false,
-    }))
+    kept.first()
+        .and_then(|first| first.launch.clone())
+        .map(Json)
+        .ok_or(ServerError::RuntimeReportReused { operation: session })
+}
+
+/// A start already admitted, or what a new one is rendered from.
+enum Admission {
+    Kept(Value),
+    New(Box<Version>, String, String),
+}
+
+/// The start kept under `session` for `agent`, answered exactly as it was
+/// first; none when nothing is kept under it, and refused when the id names
+/// any other report.
+fn admitted(state: &AppState, session: &str, agent: &str) -> Result<Option<Value>, ServerError> {
+    with_runtime(state, |store| {
+        let Some(tracked) = store.session(session) else {
+            return Ok(None);
+        };
+        tracked
+            .first()
+            .filter(|first| first.operation == session && tracked.agent.as_deref() == Some(agent))
+            .and_then(|first| first.launch.clone())
+            .map(Some)
+            .ok_or_else(|| ServerError::RuntimeReportReused {
+                operation: session.to_owned(),
+            })
+    })
 }

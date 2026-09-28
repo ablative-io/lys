@@ -99,6 +99,11 @@ pub struct Config {
     /// not exist. Without it the runtime routes answer `RuntimeUnavailable`.
     #[serde(default)]
     pub runtime_dir: Option<PathBuf>,
+    /// The directory the service accounts are kept in, created when it does
+    /// not exist. Without it the service account routes answer
+    /// `ServiceAccountsUnavailable` and `GET /me` lists none.
+    #[serde(default)]
+    pub service_accounts_dir: Option<PathBuf>,
 }
 
 /// The permission model as its file writes it: a version, and each relation
