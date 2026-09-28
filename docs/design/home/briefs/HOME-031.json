@@ -78,7 +78,27 @@
       ],
       "stories": [
         "S24"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. None of the acceptance rows is met, because nothing was written. The brief's first blocker needs DIRECTORY-003 R2 landed 'with the home-entry, home-entry-copy and home checkpoint payloads reviewed with its envelope before any durable byte is signed'. The envelope has landed: crates/lys-identity/src/lib.rs and docs/design/identity/IDENTITY-EVENTS.md are both in the tree. But IDENTITY-EVENTS.md (76 lines) holds no home payload and no review of one; `grep -n home` finds nothing. The envelope as landed is a service-signed `lys/identity-event/v1` COSE_Sign1 with a closed `Change` enum (crates/lys-identity/src/signer.rs:1-14, crates/lys-identity/src/event.rs:117 onward). R1 instead wants the leaf's COSE bytes made by `lys_core::attestation::sign_attestation` under an agent key. That is a second signing shape inside 'the same envelope', and the envelope's owner has to settle it, not this card. The second blocker, lys-log-store 0.3.0, is also unmet: the workspace Cargo.toml:17 still says 0.2.0. The task says to 'Build after both blockers land', so the Cargo.toml, Cargo.lock, leaf.rs, home_payloads.rs and lib.rs changes were not made.",
+        "deviation": "Not built, because both blocker checks in the brief fail on this tree. The brief itself says to build only after they land.",
+        "checklist": [
+          {
+            "id": "C45",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S24",
+            "satisfied": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -107,7 +127,27 @@
       ],
       "stories": [
         "S24"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. R2 says to sign 'with the Ed25519 key the identity crate (DIRECTORY-003 R2) holds for that agent identity', and the identity crate holds no such key. Its only Ed25519Identity uses are the directory service's own key: `sign_event(event, service_key)` at signer.rs:98 and `load_service_key` at signer.rs:210. The rest of the crate (directory.rs, log.rs, restart.rs, grants/*) uses that same service key. It has no per-agent key store and no lookup. The identity server only resolves an agent's certified public keys (crates/lys-identity-server/src/agent_signature.rs:115 `certified_keys`), and lys-secrets holds only the broker's store and audit keys (crates/lys-secrets/src/keys.rs:1-3). The boundary forbids 'no generated or stand-in key' and R2 forbids 'make, generate or store a key of its own'. Any implementation now would have to invent exactly that. The log side is also blocked: F-BV2vqP (lys-log-store 0.3.0, Log not holding every leaf) has not landed. lys-log-store's Log still keeps `leaves: Vec<Vec<u8>>` (crates/lys-log-store/src/log.rs:59-65), and the version is 0.2.0.",
+        "deviation": "Not built. There is no identity-crate agent key to sign with, and lys-log-store 0.3.0 has not landed.",
+        "checklist": [
+          {
+            "id": "C46",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S24",
+            "satisfied": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -140,7 +180,32 @@
       ],
       "stories": [
         "S25"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked by R2. log-enable must check that 'the identity crate holds a key for the agent named by --agent' and sign the checkpoint with it, and the identity crate has no such holding. It also depends on the R1 checkpoint payload, which has not been reviewed.",
+        "deviation": "Not built: it depends on R1 and R2, which are blocked.",
+        "checklist": [
+          {
+            "id": "C48",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          },
+          {
+            "id": "C54",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S25",
+            "satisfied": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -175,7 +240,37 @@
       ],
       "stories": [
         "S24"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked by R1 to R3. The hook into Session::append_entry, append_beside, append_under and append_copied has nothing to append to until the entry log and a signing key exist. Adding it without them would put an unsigned or stand-in-signed leaf on disk, which the boundaries forbid.",
+        "deviation": "Not built: it depends on R1 to R3, which are blocked.",
+        "checklist": [
+          {
+            "id": "C46",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          },
+          {
+            "id": "C54",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          },
+          {
+            "id": "C57",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S24",
+            "satisfied": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -199,7 +294,27 @@
       ],
       "stories": [
         "S27"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. The refusal is defined by whether 'the identity crate holds no key for the agent log/agent names', and the identity crate has no API that holds agent keys (see R2).",
+        "deviation": "Not built: it depends on the missing identity-crate agent key holding.",
+        "checklist": [
+          {
+            "id": "C55",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S27",
+            "satisfied": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -229,7 +344,27 @@
       ],
       "stories": [
         "S27"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked by R2 and R4. The pending marker records a leaf append that failed, and there is no leaf append yet.",
+        "deviation": "Not built: it depends on R2 and R4, which are blocked.",
+        "checklist": [
+          {
+            "id": "C49",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S27",
+            "satisfied": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R7",
@@ -252,7 +387,27 @@
       ],
       "stories": [
         "S24"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked by R2 and R4. Reconciling on re-ingest needs the entry log's leaf lookup and its append.",
+        "deviation": "Not built: it depends on R2 and R4, which are blocked.",
+        "checklist": [
+          {
+            "id": "C50",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S24",
+            "satisfied": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R8",
@@ -286,7 +441,27 @@
       ],
       "stories": [
         "S28"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. lys-home open must refuse unless the identity crate holds the agent's key (R5) and must append a signed lys.open leaf (R4). Neither is possible without the blocked R2.",
+        "deviation": "Not built: it depends on R2, R4 and R5, which are blocked.",
+        "checklist": [
+          {
+            "id": "C56",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S28",
+            "satisfied": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R9",
@@ -321,7 +496,27 @@
       ],
       "stories": [
         "S26"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked by R1 to R4: verify checks leaves that nothing can yet write. One thing to fix in the re-brief: crates/lys-home/src/record/verify.rs and verify_tests.rs already exist. They hold the strict home verification of HOME-004 and HOME-019 (ship and fetch reasons index_missing and the rest). The brief lists them as 'file create', but design.json assigns that same path to HOME-004, HOME-008 and HOME-019. The session-against-log verify therefore has to go beside the existing code in that file, not replace it.",
+        "deviation": "Not built: it depends on R1 to R4. Also noted: verify.rs is listed as 'file create' but already exists.",
+        "checklist": [
+          {
+            "id": "C51",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S26",
+            "satisfied": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R10",
@@ -345,7 +540,27 @@
       ],
       "stories": [
         "S26"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked by R9: the verify subcommand wraps it.",
+        "deviation": "Not built: it depends on R9, which is blocked.",
+        "checklist": [
+          {
+            "id": "C51",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S26",
+            "satisfied": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R11",
@@ -383,7 +598,62 @@
         "S24",
         "S25",
         "S26"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. The end-to-end test needs 'agent-fixture' to have its key held by the identity crate, and no such holding exists. The prelog fixture could be written, but it has to come from lys-home at the base commit on the lys main the blockers land on, which is not this tree.",
+        "deviation": "Not built: it depends on R2 to R10 and on the blockers landing.",
+        "checklist": [
+          {
+            "id": "C46",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          },
+          {
+            "id": "C47",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          },
+          {
+            "id": "C48",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          },
+          {
+            "id": "C50",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          },
+          {
+            "id": "C51",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          },
+          {
+            "id": "C54",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S24",
+            "satisfied": false,
+            "note": "Not built: the brief is blocked."
+          },
+          {
+            "id": "S25",
+            "satisfied": false,
+            "note": "Not built: the brief is blocked."
+          },
+          {
+            "id": "S26",
+            "satisfied": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R12",
@@ -408,7 +678,32 @@
       ],
       "stories": [
         "S24"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. The adversarial review is to be 'held jointly with the review of the envelope DIRECTORY-003 R2 lands', and no such joint review has been held. Whether the home payloads are signed by the service-key envelope (signer.rs) or by an agent key through lys-core attestation v2 is still open (see R1), and a review record written before that is settled would review a format nobody has decided. Updating RECORD.md to say entries are signed would be false while nothing signs them.",
+        "deviation": "Not built: the joint review with the envelope has not been held, and RECORD.md cannot truthfully say entries are signed.",
+        "checklist": [
+          {
+            "id": "C52",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          },
+          {
+            "id": "C53",
+            "done": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S24",
+            "satisfied": false,
+            "note": "Not built: the brief is blocked."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
