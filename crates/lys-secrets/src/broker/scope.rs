@@ -8,9 +8,18 @@ use crate::audit::AuditKind;
 use crate::error::{LendingRefusal, SecretsError};
 use crate::handle::{HandleToken, Presentation};
 use crate::permission::PermissionCheck;
-use crate::store::{EntryView, Scope};
+use crate::store::{EntryView, Recipients, Scope};
 
 use super::Broker;
+
+/// A secret's owner settings as they stand.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SecretSettings {
+    /// The scope its owner set; none bounds no one.
+    pub scope: Option<Scope>,
+    /// Who it may be handed to.
+    pub recipients: Recipients,
+}
 
 impl<P: PermissionCheck> Broker<P> {
     /// Whether `identity` stands inside the scope of `secret`: its owner;
@@ -102,6 +111,21 @@ impl<P: PermissionCheck> Broker<P> {
             .ok_or_else(|| SecretsError::SecretUnknown {
                 name: secret.to_owned(),
             })
+    }
+
+    /// The owner settings of `secret` as they stand, to an identity that may
+    /// discover it: the scope, when one is set, and who it may be handed to.
+    ///
+    /// # Errors
+    ///
+    /// `SecretUnknown` when no such secret is sealed or `identity` may not
+    /// discover it; the two are not told apart.
+    pub fn settings(&self, identity: &str, secret: &str) -> Result<SecretSettings, SecretsError> {
+        self.metadata(identity, secret)?;
+        Ok(SecretSettings {
+            scope: self.store.scope(secret),
+            recipients: self.store.recipients(secret),
+        })
     }
 
     /// Sets the scope of `secret`, as its owner.

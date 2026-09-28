@@ -35,6 +35,7 @@ mod revocation;
 pub use revocation::{RevocationState, UpstreamRevocation};
 mod rotation;
 mod scope;
+pub use scope::SecretSettings;
 mod spawn;
 mod using;
 
