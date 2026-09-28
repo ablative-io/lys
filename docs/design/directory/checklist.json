@@ -1271,7 +1271,7 @@
         },
         {
           "id": "C421",
-          "text": "Each agent page lists authoritative runner/sandbox and grant-check refusals, newest first, with attempted act, reason and the real granting authority where one exists (DIRECTORY-051 R6).",
+          "text": "Lys creates an editable tool-boundary policy and records runner/grant denials on the agent page; Codex pre-tool coverage is explicitly unavailable (DIRECTORY-051 R6).",
           "done": false
         }
       ]

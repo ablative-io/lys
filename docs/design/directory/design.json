@@ -3443,8 +3443,8 @@
     },
     {
       "path": "crates/lys-runner/src/peer.rs",
-      "note": "the runner's session holder key",
-      "brief": "DIRECTORY-060"
+      "note": "R6: socket peer credentials, ancestry and leader start identity; DIRECTORY-060 reuses this proof",
+      "brief": "DIRECTORY-051"
     },
     {
       "path": "crates/lys-runner/tests/present.rs",
@@ -4550,6 +4550,121 @@
       "path": "docs/design/directory/PROOF-CONTAINMENT.md",
       "note": "A person watches real native denials and an allowed control; DIRECTORY-062 R6.",
       "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/settings.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/settings_tests.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/config.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/config_tests.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys/src/commands/runner_hook.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys/src/commands/runner_statusline.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys/src/commands/runner_notify.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_write.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/template.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/provisioning_store.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/src/judge.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/src/refusal_log.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/tests/judge.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys/src/commands/runner_judge.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/agent_policy_api.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/agent_policy_store.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/agent_policy.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/src/features/file/AgentPolicy.tsx",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/tests/agent-policy.test.tsx",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/tests/judge_peer.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/runner_sessions.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grant_sight.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
     }
   ],
   "inventory": [

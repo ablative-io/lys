@@ -321,7 +321,7 @@
 - [ ] **C383** — A reached budget compacts, stops or tells, as the budget says, once, with a receipt (DIRECTORY-051 R3).
 - [ ] **C384** — Goals on an agent carry a deadline and reminders delivered into its session (DIRECTORY-051 R4).
 - [ ] **C385** — Plain controls set and read budgets and goals and show reached or uncertain state; analytics stays in Argus (DIRECTORY-051 R5).
-- [ ] **C421** — Each agent page lists authoritative runner/sandbox and grant-check refusals, newest first, with attempted act, reason and the real granting authority where one exists (DIRECTORY-051 R6).
+- [ ] **C421** — Lys creates an editable tool-boundary policy and records runner/grant denials on the agent page; Codex pre-tool coverage is explicitly unavailable (DIRECTORY-051 R6).
 
 ## Provision a working team in one act (DIRECTORY-052)
 

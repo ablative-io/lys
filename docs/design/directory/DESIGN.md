@@ -784,7 +784,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/src/session_key.rs` | the runner's session holder key | DIRECTORY-060 |
 | `crates/lys-runner/tests/session_key.rs` | the runner's session holder key | DIRECTORY-060 |
 | `crates/lys-core/src/keys/identity.rs` | the runner's session holder key | DIRECTORY-060 |
-| `crates/lys-runner/src/peer.rs` | the runner's session holder key | DIRECTORY-060 |
+| `crates/lys-runner/src/peer.rs` | R6: socket peer credentials, ancestry and leader start identity; DIRECTORY-060 reuses this proof | DIRECTORY-051 |
 | `crates/lys-runner/tests/present.rs` | the runner's session holder key | DIRECTORY-060 |
 | `crates/lys-runner/src/present_client.rs` | the runner's session holder key | DIRECTORY-060 |
 | `docs/design/directory/briefs/DIRECTORY-060.json` | the runner's session holder key brief | DIRECTORY-060 |
@@ -1006,6 +1006,29 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/tests/containment_probe.rs` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
 | `surface/identity/tests/acceptance/containment.spec.ts` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
 | `docs/design/directory/PROOF-CONTAINMENT.md` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
+| `crates/lys-home/src/harness/claude_code/settings.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/settings_tests.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/codex/config.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/codex/config_tests.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys/src/commands/runner_hook.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys/src/commands/runner_statusline.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys/src/commands/runner_notify.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/render.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/render_write.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/template.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-identity-server/src/provisioning_store.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-runner/src/judge.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-runner/src/refusal_log.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-runner/tests/judge.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys/src/commands/runner_judge.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-identity-server/src/agent_policy_api.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-identity-server/src/agent_policy_store.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-identity-server/tests/agent_policy.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `surface/identity/src/features/file/AgentPolicy.tsx` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `surface/identity/tests/agent-policy.test.tsx` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-runner/tests/judge_peer.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-identity-server/src/runner_sessions.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-identity-server/src/grant_sight.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
 
 ## Inventory
 
