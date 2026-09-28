@@ -940,6 +940,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-home/tests/fewshot_write.rs` | DIRECTORY-052 R3: fewshot turns written through lys-home's public library function | DIRECTORY-052 |
 | `crates/lys-home/src/lib.rs` | DIRECTORY-052 R3: lys-home's library exposes the fewshot writer | DIRECTORY-052 |
 | `crates/lys-home/src/cli.rs` | DIRECTORY-052 R3: the fewshot command calls the library writer | DIRECTORY-052 |
+| `crates/lys-identity-server/src/grants_connector.rs` | Application-connector holder conversion and authorization helpers, keeping grants.rs within ADR-111. | DIRECTORY-048 |
 
 ## Inventory
 

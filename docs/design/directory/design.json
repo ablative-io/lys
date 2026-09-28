@@ -4232,6 +4232,11 @@
       "path": "crates/lys-home/src/cli.rs",
       "note": "DIRECTORY-052 R3: the fewshot command calls the library writer",
       "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grants_connector.rs",
+      "note": "Application-connector holder conversion and authorization helpers, keeping grants.rs within ADR-111.",
+      "brief": "DIRECTORY-048"
     }
   ],
   "inventory": [
